@@ -28,8 +28,7 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
         std::string name;                       // Name of the test.
         std::vector<MockSample> samples;        // Input samples to trim.
         std::optional<const RegionInt> region;  // Region from which the samples were generated.
-        bool expect_throw = false;
-        std::vector<TrimInfo> expected;  // Expected results.
+        std::vector<TrimInfo> expected;         // Expected results.
     };
 
     // clang-format off
@@ -38,7 +37,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
             "Empty input == empty output",
             {},             // samples
             std::nullopt,   // region
-            false,          // expect_throw
             {},             // expected
         },
         TestCase{
@@ -51,13 +49,12 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             RegionInt{0, 0, 10},   // region
-            false,              // expect_throw
             {   // Expected results.
                 TrimInfo{0, 10, false},
             },
         },
         TestCase{
-            "Medaka test. Three samples, overlapping. Should trim.",
+            "Medaka test. Three samples, overlapping. Should trim. Trim position is in the middle of the overlap.",
             {   // Input samples.
                 MockSample{
                     0,                                  // seq_id
@@ -76,7 +73,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             std::nullopt,   // region
-            false,          // expect_throw
             {   // Expected results.
                 TrimInfo{0, 9, false},
                 TrimInfo{1, 6, false},
@@ -98,14 +94,13 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             std::nullopt,   // region
-            false,          // expect_throw
             {   // Expected results.
                 TrimInfo{0, 11, false},
                 TrimInfo{0, 4, false},
             },
         },
         TestCase{
-            "Medaka test. Input samples are out of order and overlapping. Should throw.",
+            "Medaka test. Input samples are out of order and overlapping. The first valid sample will be kept and the rest filtered out.",
             {   // Input samples.
                 MockSample{
                     0,              // seq_id
@@ -124,12 +119,14 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             std::nullopt,   // region
-            true,           // expect_throw
             {   // Expected results.
+                TrimInfo{0, 4, false},
+                TrimInfo{0, -1, false},
+                TrimInfo{0, -1, false},
             },
         },
         TestCase{
-            "Input samples are out of order but NOT overlapping. Should throw because only forward oriented relationship is allowed.",
+            "Input samples are out of order but NOT overlapping. The first valid sample will be kept and the rest filtered out.",
             {   // Input samples.
                 MockSample{
                     0,              // seq_id
@@ -143,12 +140,13 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             std::nullopt,   // region
-            true,           // expect_throw
             {   // Expected results.
+                TrimInfo{0, 4, false},
+                TrimInfo{0, -1, false},
             },
         },
         TestCase{
-            "Three samples on different reference. No trimming should be applied.",
+            "Three samples on different references. No trimming should be applied.",
             {   // Input samples.
                 MockSample{
                     0,                                  // seq_id
@@ -167,7 +165,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             std::nullopt,   // region
-            false,          // expect_throw
             {   // Expected results.
                 TrimInfo{0, 11, false},
                 TrimInfo{0, 8, false},
@@ -209,7 +206,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             std::nullopt,   // region
-            false,          // expect_throw
             {   // Expected results.
                 TrimInfo{0, 9, false},
                 TrimInfo{1, 6, false},
@@ -239,7 +235,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             RegionInt{0, 0, 1000},   // region
-            false,          // expect_throw
             {   // Expected results.
                 TrimInfo{0, 9, false},
                 TrimInfo{1, 6, false},
@@ -271,7 +266,6 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             RegionInt{0, 1, 5},   // region
-            false,          // expect_throw
             {   // Expected results.
                 TrimInfo{2, 9, false},
                 TrimInfo{1, 4, false},
@@ -280,7 +274,7 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
             },
         },
         TestCase{
-            "Use a region, but the start coordinate is not valid. Should throw.",
+            "Use a region, but the start coordinate is not valid. Should throw. This will emit a warning and not trim to region.",
             {   // Input samples.
                 MockSample{
                     0,                                  // seq_id
@@ -289,12 +283,12 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             RegionInt{0, -1, 1000},   // region
-            true,          // expect_throw
             {   // Expected results.
+                TrimInfo{0, 11, false},
             },
         },
         TestCase{
-            "Use a region, but the end coordinate is not valid. Should throw.",
+            "Use a region, but the end coordinate is not valid. This will emit a warning and not trim to region.",
             {   // Input samples.
                 MockSample{
                     0,                                  // seq_id
@@ -303,12 +297,12 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             RegionInt{0, 1000, -1},   // region
-            true,          // expect_throw
             {   // Expected results.
+                TrimInfo{0, 11, false},
             },
         },
         TestCase{
-            "Use a region, but the seq_id is not valid. Should throw.",
+            "Use a region, but the seq_id is not valid. This will emit a warning and not trim to region.",
             {   // Input samples.
                 MockSample{
                     0,                                  // seq_id
@@ -317,8 +311,206 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 },
             },
             RegionInt{-1, 1000, 2000},   // region
-            true,          // expect_throw
             {   // Expected results.
+                TrimInfo{0, 11, false},
+            },
+        },
+
+        /////////////////////////////////////////////////////////
+        // These are all possible relationships, tested below: //
+        //     DIFFERENT_REF_NAME,
+        //     FORWARD_OVERLAP,
+        //     REVERSE_OVERLAP,
+        //     FORWARD_ABUTTED,
+        //     REVERSE_ABUTTED,
+        //     FORWARD_GAPPED,
+        //     REVERSE_GAPPED,
+        //     S2_WITHIN_S1,
+        //     S1_WITHIN_S2,
+        TestCase{
+            "Relative orientation tests. DIFFERENT_REF_NAME. Keep both, untrimmed.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    1,                                                      // seq_id
+                    {305, 306, 307, 308, 309, 310, 311, 312, 313, 314},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},
+                TrimInfo{0, 10, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. FORWARD_OVERLAP. Trim both. Trim position is at the middle of the overlap.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {305, 306, 307, 308, 309, 310, 311, 312, 313, 314},     // positions_major
+                    {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 7, false},
+                TrimInfo{2, 10, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. REVERSE_OVERLAP. Overlaps are out of order. Keep the first one which is valid.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {305, 306, 307, 308, 309, 310, 311, 312, 313, 314},     // positions_major
+                    {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},
+                TrimInfo{0, -1, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. FORWARD_ABUTTED. No trimming, use full samples.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {310, 311, 312, 313, 314, 315, 316, 317, 318, 319},     // positions_major
+                    {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},
+                TrimInfo{0, 10, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. REVERSE_ABUTTED. Overlaps are out of order. Keep the first one which is valid.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {310, 311, 312, 313, 314, 315, 316, 317, 318, 319},     // positions_major
+                    {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},
+                TrimInfo{0, -1, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. FORWARD_GAPPED. No trimming, use full samples.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {311, 312, 313, 314, 315, 316, 317, 318, 319, 320},     // positions_major
+                    {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},
+                TrimInfo{0, 10, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. REVERSE_GAPPED. Overlaps are out of order. Keep the first one which is valid.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {311, 312, 313, 314, 315, 316, 317, 318, 319, 320},     // positions_major
+                    {  0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},
+                TrimInfo{0, -1, false},
+            },
+        },
+        TestCase{
+            "Relative orientation tests. S2_WITHIN_S1. Filter the one which is contained.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {303, 304, 305, 306, 307},                              // positions_major
+                    {0,     0,   0,   0,   0},                              // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 10, false},     // Fully used.
+                TrimInfo{0, -1, false},     // Removed.
+            },
+        },
+        TestCase{
+            "Relative orientation tests. S1_WITHIN_S2. Filter the one which is contained.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                      // seq_id
+                    {295, 296, 297, 298, 299, 300, 301, 302, 303, 304, 305},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {303, 304, 305, 306, 307},                              // positions_major
+                    {0,     0,   0,   0,   0},                              // positions_minor
+                },
+                MockSample{
+                    0,                                                      // seq_id
+                    {300, 301, 302, 303, 304, 305, 306, 307, 308, 309},     // positions_major
+                    {0,     0,   0,   0,   0,   0,   0,   0,   0,   0},     // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 8, false},      // Trim the first one with the third one.
+                TrimInfo{0, -1, false},     // Filter because it's fully contained in the third one.
+                TrimInfo{3, 10, false},     // Trim with the first one, because the previous one was skipped.
             },
         },
     }));
@@ -334,12 +526,8 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
         samples.emplace_back(std::move(new_sample));
     }
 
-    if (test_case.expect_throw) {
-        CATCH_CHECK_THROWS(trim_samples(samples, test_case.region));
-    } else {
-        const std::vector<TrimInfo> result = trim_samples(samples, test_case.region);
-        CATCH_CHECK(test_case.expected == result);
-    }
+    const std::vector<TrimInfo> result = trim_samples(samples, test_case.region);
+    CATCH_CHECK(test_case.expected == result);
 }
 
 /**
@@ -388,7 +576,6 @@ CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
     struct TestCase {
         std::string name;                       // Name of the test.
         std::vector<int32_t> sample_ids;        // IDs of samples to create a permutation, -1 means nullptr.
-        bool expect_throw = false;
         std::vector<TrimInfo> expected;         // Expected results.
     };
     // clang-format on
@@ -398,13 +585,11 @@ CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
         TestCase{
             "Empty input == empty output",
             {},             // sample_ids
-            false,          // expect_throw
             {},             // expected
         },
         TestCase{
             "Three samples, overlapping. Should trim.",
             {1, 2, 0},      // sample_ids
-            false,          // expect_throw
             {               // expected
                 TrimInfo{0, 9, false},
                 TrimInfo{1, 6, false},
@@ -412,9 +597,8 @@ CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
             },
         },
         TestCase{
-            "One of the samples is a nullptr, this should throw.",
+            "One of the samples is a nullptr, this should return empty and emit a warning.",
             {1, -1, 0},     // sample_ids
-            true,           // expect_throw
             {               // expected
             },
         },
@@ -444,12 +628,8 @@ CATCH_TEST_CASE("trim_samples via pointers", TEST_GROUP) {
         }
     }
 
-    if (test_case.expect_throw) {
-        CATCH_CHECK_THROWS(trim_samples(input, std::nullopt));
-    } else {
-        const std::vector<TrimInfo> result = trim_samples(input, std::nullopt);
-        CATCH_CHECK(test_case.expected == result);
-    }
+    const std::vector<TrimInfo> result = trim_samples(input, std::nullopt);
+    CATCH_CHECK(test_case.expected == result);
 }
 
 }  // namespace dorado::secondary::tests

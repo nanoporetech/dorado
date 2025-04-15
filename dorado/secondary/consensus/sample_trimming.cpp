@@ -63,6 +63,15 @@ std::ostream& operator<<(std::ostream& os, const TrimInfo& rhs) {
     return os;
 }
 
+bool is_trim_info_valid(const TrimInfo& t) {
+    return !((t.start < 0) || (t.end <= 0) || (t.start >= t.end));
+}
+
+bool is_trim_info_valid(const TrimInfo& t, const int64_t len) {
+    return !((t.start < 0) || (t.end <= 0) || (t.start >= t.end) || (t.start >= len) ||
+             (t.end > len));
+}
+
 namespace {
 
 Relationship relative_position(const secondary::Sample& s1, const secondary::Sample& s2) {
@@ -142,10 +151,9 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
         return {dorado::ssize(s1.positions_major), 0, false};
     }
 
+    // If the relationship is not supported, mark the second sample as filtered (negative value).
     if (rel != Relationship::FORWARD_OVERLAP) {
-        throw std::runtime_error(
-                "Cannot overlap samples! Relationship is not FORWARD_OVERLAP. rel = " +
-                relationship_to_string(rel));
+        return {dorado::ssize(s1.positions_major), -1, false};
     }
 
     // Linear search over the pairs.
@@ -178,9 +186,15 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
     const int64_t ovl_start_ind1 = find_left(s1, s2.get_position(0));
     const int64_t ovl_end_ind2 = find_right(s2, s1.get_last_position());
 
+    // Sanity check. Filter out the second sample if anything is wrong.
     if ((ovl_start_ind1 < 0) || (ovl_end_ind2 < 0)) {
-        throw std::runtime_error(
-                "Samples should be overlapping, but cannot find adequate cooordinate positions!");
+        std::ostringstream oss;
+        oss << "Samples should be overlapping, but cannot find adequate cooordinate positions! "
+               "ovl_start_ind1 = "
+            << ovl_start_ind1 << ", ovl_end_ind2 = " << ovl_end_ind2 << ", s1 = {" << s1
+            << "}, s2 = {" << s2 << "}. Marking the second sample as filtered.";
+        spdlog::warn(oss.str());
+        return {dorado::ssize(s1.positions_major), -1, false};
     }
 
     int64_t end_1_ind = dorado::ssize(s1.positions_major);
@@ -334,67 +348,127 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
         return result;
     }
 
+    // Sanity check the input pointers.
     for (size_t i = 0; i < std::size(samples); ++i) {
         if (!samples[i]) {
-            throw std::runtime_error{"Nullptr sample provided to trim_samples. Returning empty."};
+            spdlog::warn("Nullptr sample provided to trim_samples. Returning empty.");
+            return {};
         }
     }
 
-    size_t idx_s1 = 0;
+    int64_t idx_s1 = 0;
     int64_t num_heuristic = 0;
 
     result[0].start = 0;
     result[0].end = dorado::ssize(samples.front()->positions_major);
 
-    for (size_t i = 1; i < std::size(samples); ++i) {
+    int64_t max_filtered_idx = -1;
+
+    for (int64_t idx_s2 = 1; idx_s2 < dorado::ssize(samples); ++idx_s2) {
         const secondary::Sample& s1 = *samples[idx_s1];
-        const secondary::Sample& s2 = *samples[i];
+        const secondary::Sample& s2 = *samples[idx_s2];
         bool heuristic = false;
 
         const Relationship rel = relative_position(s1, s2);
 
         TrimInfo& trim1 = result[idx_s1];
-        TrimInfo& trim2 = result[i];
+        TrimInfo& trim2 = result[idx_s2];
 
+        // Initialize with no trimming (full sample is used).
         trim2.start = 0;
         trim2.end = dorado::ssize(s2.positions_major);
 
-        if (rel == Relationship::S2_WITHIN_S1) {
+        const auto print_unhandled_warning = [&]() {
+            std::ostringstream oss;
+            oss << "Sample 1 (index = " << idx_s1 << "): " << s1 << ", sample 2 (index = " << idx_s2
+                << "): " << s2 << ", trim 1 = " << trim1 << ", trim 2 = " << trim2;
+            spdlog::warn(
+                    "Cannot trim samples with relationship: {}. Marking the second "
+                    "sample as filtered. {}",
+                    relationship_to_string(rel), oss.str());
+        };
+
+        switch (rel) {
+        // Contained, mark as filtered.
+        case Relationship::S2_WITHIN_S1: {
+            trim2 = {};
+            max_filtered_idx = std::max(max_filtered_idx, idx_s2);
             continue;
-
-        } else if (rel == Relationship::FORWARD_GAPPED) {
-            // Deprecated: trim2.is_last_in_contig = true;
-
-        } else if (rel == Relationship::DIFFERENT_REF_NAME) {
-            // Pass. No trimming should be applied.
-
-        } else {
-            try {
-                std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
-            } catch (const std::runtime_error& e) {
-                throw std::runtime_error(
-                        "Unhandled overlap type whilst stitching chunks. Message: " +
-                        std::string(e.what()));
+        }
+        case Relationship::S1_WITHIN_S2: {
+            // The new sample completely overlaps the previous one.
+            // Mark the previous one as filtered and find the predecessor.
+            trim1 = {};
+            max_filtered_idx = std::max(max_filtered_idx, idx_s1);
+            const int64_t prev_idx = idx_s1;
+            while ((idx_s1 > 0) && !is_trim_info_valid(result[idx_s1])) {
+                --idx_s1;
             }
+            // Reset the end coordinate of the predecessor.
+            result[idx_s1].end = dorado::ssize(samples[idx_s1]->positions_major);
+            // Avoid infinite loops.
+            if (idx_s1 == prev_idx) {
+                trim2 = {};
+                max_filtered_idx = std::max(max_filtered_idx, idx_s2);
+                continue;
+            }
+            // Reprocess the current sample with a new predecessor.
+            --idx_s2;
+            continue;
         }
 
-        idx_s1 = i;
+        // Nothing to do.
+        case Relationship::FORWARD_GAPPED:
+        case Relationship::DIFFERENT_REF_NAME: {
+            break;
+        }
+
+        // Bad cases.
+        case Relationship::REVERSE_OVERLAP:
+        case Relationship::REVERSE_ABUTTED:
+        case Relationship::REVERSE_GAPPED:
+        case Relationship::UNKNOWN: {
+            trim2 = {};
+            max_filtered_idx = std::max(max_filtered_idx, idx_s2);
+            print_unhandled_warning();
+            break;
+        }
+
+        // Trim the samples. Needs to be handled after all other cases.
+        case Relationship::FORWARD_ABUTTED:
+        case Relationship::FORWARD_OVERLAP: {
+            std::tie(trim1.end, trim2.start, heuristic) = overlap_indices(s1, s2);
+            break;
+        }
+
+        // Catch all, though all current cases are handled above.
+        default: {
+            trim2 = {};
+            max_filtered_idx = std::max(max_filtered_idx, idx_s2);
+            print_unhandled_warning();
+            break;
+        }
+        }
+
+        idx_s1 = idx_s2;
 
         num_heuristic += heuristic;
     }
 
-    {
+    if (!std::empty(samples) && (max_filtered_idx != (dorado::ssize(samples) - 1))) {
         result.back().end = dorado::ssize(samples.back()->positions_major);
-        // Deprecated: result.back().is_last_in_contig = true;
     }
+
+    assert(std::size(result) == std::size(samples));
 
     // Trim each sample to the region.
     if (region) {
         if ((region->seq_id < 0) || (region->start < 0) || (region->end <= 0)) {
-            throw std::runtime_error{"Region trimming coordinates are not valid. seq_id = " +
-                                     std::to_string(region->seq_id) +
-                                     ", start = " + std::to_string(region->start) +
-                                     ", end = " + std::to_string(region->end)};
+            spdlog::warn(
+                    "Region trimming coordinates are not valid. Region: seq_id = {}, start = {} , "
+                    "end = {}. Skipping trimming to region in trim_samples.",
+                    region->seq_id, region->start, region->end);
+            return result;
         }
 
         spdlog::trace("[trim_samples] Trimming to region.");
