@@ -342,6 +342,11 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
                                     (prop->major == 8 && prop->minor == 7);    // Orin
     float memory_limit_fraction =
             params.memory_limit_fraction * (is_unified_memory_device ? 0.5f : 1.f);
+    if (is_unified_memory_device && prop->major == 8 && available > (32 * GB)) {
+        // restrict Orin further as there's no benefit to the largest batch sizes
+        // and definite down sides to using all the memory
+        memory_limit_fraction *= 0.5f;
+    }
 
     // Apply limit fraction, and allow 1GB for model weights, etc.
     int64_t gpu_mem_limit = int64_t(available * memory_limit_fraction - GB);
