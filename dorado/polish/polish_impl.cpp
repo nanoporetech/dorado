@@ -3,6 +3,7 @@
 #include "hts_io/FastxRandomReader.h"
 #include "secondary/architectures/model_factory.h"
 #include "secondary/batching.h"
+#include "secondary/consensus/consensus_utils.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
@@ -28,6 +29,8 @@
 #endif
 
 // #define DEBUG_POLISH_SAMPLE_CONSTRUCTION
+// #define DEBUG_INFERENCE_DATA
+// #define DEBUG_VC_DATA
 
 namespace dorado::polisher {
 
@@ -916,12 +919,31 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             }
 #endif
 
+#ifdef DEBUG_INFERENCE_DATA
+            {
+                std::cout << "[infer] input: batch_features_tensor.shape = "
+                          << utils::tensor_shape_as_string(batch_features_tensor) << "\n";
+                std::cout << "[infer] input: batch_features_tensor =\n"
+                          << batch_features_tensor << "\n";
+                utils::save_tensor(batch_features_tensor, "debug.tensor.in.pt");
+            }
+#endif
+
             try {
                 output = model.predict_on_batch(std::move(batch_features_tensor));
             } catch (std::exception& e) {
                 spdlog::error("ERROR! Exception caught: {}", e.what());
                 throw;
             }
+
+#ifdef DEBUG_INFERENCE_DATA
+            {
+                std::cout << "[infer] output: output.shape = "
+                          << utils::tensor_shape_as_string(output) << "\n";
+                std::cout << "[infer] output: output =\n" << output << "\n";
+                utils::save_tensor(output, "debug.tensor.out.pt");
+            }
+#endif
         }
 
         // Debug output.
@@ -1456,6 +1478,50 @@ std::vector<secondary::Variant> call_variants(
 
     // Reserve the space for results for each individual group.
     std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
+
+#ifdef DEBUG_VC_DATA
+    {
+        for (int64_t ii = 0; ii < dorado::ssize(vc_input_data); ++ii) {
+            const secondary::VariantCallingSample& vc_sample = vc_input_data[ii];
+            const std::string& header = draft_lens[vc_sample.seq_id].first;
+            const std::string draft = draft_readers[0]->fetch_seq(header);
+
+            // Get raw probability data.
+            const size_t batch_size = 1;
+            const size_t seq_len = std::size(vc_sample.positions_major);
+            const size_t num_haplotypes = 2;  // static_cast<size_t>(probs_3D.size(1));
+            const size_t num_classes = std::size(decoder.get_label_scheme_symbols());
+            const dorado::Span<const float> raw_probs_data(
+                    vc_sample.logits.data_ptr<float>(),
+                    batch_size * seq_len * num_haplotypes * num_classes);
+
+            // Consensus sequences.
+            const std::vector<std::vector<secondary::ConsensusResult>> cons_seqs_with_gaps_all =
+                    dorado::secondary::decode_batch_bases_impl(decoder.get_label_scheme_symbols(),
+                                                               raw_probs_data, batch_size, seq_len,
+                                                               num_haplotypes, num_classes);
+
+            std::cout << "Debugging data before merging. vc_sample.logits.shape = ["
+                      << utils::tensor_shape_as_string(vc_sample.logits) << "]\n";
+            std::cout << "batch_size = " << batch_size << "\n";
+            std::cout << "seq_len = " << seq_len << "\n";
+            std::cout << "num_haplotypes = " << num_haplotypes << "\n";
+            std::cout << "num_classes = " << num_classes << "\n";
+            std::vector<std::string_view> cons_view;
+            for (const secondary::ConsensusResult& val : cons_seqs_with_gaps_all.front()) {
+                cons_view.emplace_back(val.seq);
+            }
+            std::cout << "vc_sample.seq_id = " << vc_sample.seq_id << '\n';
+            const std::string ref_seq_with_gaps = dorado::secondary::extract_draft_with_gaps(
+                    draft, vc_sample.positions_major, vc_sample.positions_minor);
+            dorado::secondary::print_slice(
+                    std::cout, ref_seq_with_gaps, cons_view, vc_sample.positions_major,
+                    vc_sample.positions_minor,
+                    std::vector<bool>(std::size(vc_sample.positions_major), false), 0, -1, 0, -1);
+            std::cout << "vc_sample.logits tensor =\n" << vc_sample.logits << "\n";
+        }
+    }
+#endif
 
     // Add worker tasks.
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
