@@ -352,15 +352,17 @@ secondary::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_fi
                                                       const int64_t ref_start,
                                                       const int64_t ref_end,
                                                       const int32_t seq_id) const {
-    (void)m_phasing_bin;
-
     // Compute the counts and data.
     ReadAlignmentTensors tensors;
     try {
+        const std::string phasing_bin_fn_str =
+                (m_phasing_bin) ? m_phasing_bin->string() : std::string();
+
         ReadAlignmentData counts = calculate_read_alignment(
                 bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name,
                 m_tag_value, m_tag_keep_missing, m_read_group, m_min_mapq, m_row_per_read,
-                m_include_dwells, m_include_haplotype, m_max_reads, m_right_align_insertions);
+                m_include_dwells, m_include_haplotype, phasing_bin_fn_str, m_max_reads,
+                m_right_align_insertions);
 
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);

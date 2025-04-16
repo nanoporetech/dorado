@@ -82,6 +82,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype,
+                                           const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,
                                            const bool right_align_insertions);
 
