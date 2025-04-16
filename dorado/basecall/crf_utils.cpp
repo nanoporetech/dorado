@@ -23,43 +23,63 @@ namespace {
 using namespace torch::nn;
 using namespace config;
 
-std::vector<at::Tensor> load_lstm_model_weights(const std::filesystem::path &dir,
-                                                bool decomposition,
-                                                bool linear_layer_bias) {
-    auto tensors = std::vector<std::string>{
+std::vector<torch::Tensor> load_lstm_model_weights(const BasecallModelConfig &cfg) {
+    if (!cfg.is_lstm_model()) {
+        throw std::runtime_error("load_lstm_model_weights expected a lstm model config from: '" +
+                                 cfg.model_path.string() + "'");
+    }
+    const bool decomposition = cfg.out_features.has_value();
+    const bool linear_layer_bias = cfg.bias;
 
-            "0.conv.weight.tensor",      "0.conv.bias.tensor",
+    const std::vector<std::string> conv_names{".conv.weight.tensor", ".conv.bias.tensor"};
+    const std::vector<std::string> lstm_names{
+            ".rnn.weight_ih_l0.tensor",
+            ".rnn.weight_hh_l0.tensor",
+            ".rnn.bias_ih_l0.tensor",
+            ".rnn.bias_hh_l0.tensor",
+    };
 
-            "1.conv.weight.tensor",      "1.conv.bias.tensor",
+    const size_t num_conv_weights = cfg.convs.size() * conv_names.size();
+    const size_t num_rnn_weights = cfg.lstm_layers * lstm_names.size();
+    const size_t num_tensors = num_conv_weights + num_rnn_weights + 1 + size_t(linear_layer_bias) +
+                               size_t(decomposition);
 
-            "2.conv.weight.tensor",      "2.conv.bias.tensor",
+    std::vector<std::string> tensors{num_tensors};
 
-            "4.rnn.weight_ih_l0.tensor", "4.rnn.weight_hh_l0.tensor",
-            "4.rnn.bias_ih_l0.tensor",   "4.rnn.bias_hh_l0.tensor",
+    // Add convolutions
+    for (size_t cv = 0; cv < cfg.convs.size(); ++cv) {
+        for (size_t n = 0; n < conv_names.size(); ++n) {
+            const size_t idx = cv * conv_names.size() + n;
+            const std::string name = std::to_string(cv) + conv_names.at(n);
+            tensors.at(idx) = name;
+        }
+    }
 
-            "5.rnn.weight_ih_l0.tensor", "5.rnn.weight_hh_l0.tensor",
-            "5.rnn.bias_ih_l0.tensor",   "5.rnn.bias_hh_l0.tensor",
+    // Add lstms
+    size_t offset = num_conv_weights;
+    for (int l = 0; l < cfg.lstm_layers; ++l) {
+        for (size_t n = 0; n < lstm_names.size(); ++n) {
+            const size_t idx = offset + l * lstm_names.size() + n;
+            const size_t layer = cfg.convs.size() + l + 1;  // skip fused layer
+            const std::string name = std::to_string(layer) + lstm_names.at(n);
+            tensors.at(idx) = name;
+        }
+    }
 
-            "6.rnn.weight_ih_l0.tensor", "6.rnn.weight_hh_l0.tensor",
-            "6.rnn.bias_ih_l0.tensor",   "6.rnn.bias_hh_l0.tensor",
-
-            "7.rnn.weight_ih_l0.tensor", "7.rnn.weight_hh_l0.tensor",
-            "7.rnn.bias_ih_l0.tensor",   "7.rnn.bias_hh_l0.tensor",
-
-            "8.rnn.weight_ih_l0.tensor", "8.rnn.weight_hh_l0.tensor",
-            "8.rnn.bias_ih_l0.tensor",   "8.rnn.bias_hh_l0.tensor",
-
-            "9.linear.weight.tensor"};
-
+    const size_t layer = cfg.convs.size() + cfg.lstm_layers + 1;
+    // Add upsample and linear
+    offset += num_rnn_weights;
+    tensors.at(offset) = std::to_string(layer) + ".linear.weight.tensor";
     if (linear_layer_bias) {
-        tensors.push_back("9.linear.bias.tensor");
+        offset++;
+        tensors.at(offset) = std::to_string(layer) + ".linear.bias.tensor";
     }
-
     if (decomposition) {
-        tensors.push_back("10.linear.weight.tensor");
+        offset++;
+        tensors.at(offset) = std::to_string(layer + 1) + ".linear.weight.tensor";
     }
 
-    return utils::load_tensors(dir, tensors);
+    return utils::load_tensors(cfg.model_path, tensors);
 }
 
 std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg) {
@@ -92,8 +112,8 @@ std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg)
     auto tensors = std::vector<std::string>{num_tensors};
 
     // Add convolutions
-    for (size_t cv = 0; cv < cfg.convs.size(); cv++) {
-        for (size_t n = 0; n < conv_names.size(); n++) {
+    for (size_t cv = 0; cv < cfg.convs.size(); ++cv) {
+        for (size_t n = 0; n < conv_names.size(); ++n) {
             const size_t idx = cv * conv_names.size() + n;
             const std::string name = conv_prefix + std::to_string(cv) + conv_names.at(n);
             tensors.at(idx) = name;
@@ -102,8 +122,8 @@ std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg)
 
     // Add encoders
     size_t offset = num_conv_weights;
-    for (int enc = 0; enc < cfg.tx->tx.depth; enc++) {
-        for (size_t n = 0; n < enc_names.size(); n++) {
+    for (int enc = 0; enc < cfg.tx->tx.depth; ++enc) {
+        for (size_t n = 0; n < enc_names.size(); ++n) {
             const size_t idx = offset + enc * enc_names.size() + n;
             const std::string name = enc_prefix + std::to_string(enc) + enc_names.at(n);
             tensors.at(idx) = name;
@@ -112,7 +132,7 @@ std::vector<torch::Tensor> load_tx_model_weights(const BasecallModelConfig &cfg)
 
     // Add upsample and linear
     offset += num_tx_weights;
-    for (size_t i = 0; i < remaining_names.size(); i++) {
+    for (size_t i = 0; i < remaining_names.size(); ++i) {
         const size_t idx = offset + i;
         const std::string &name = remaining_names.at(i);
         tensors.at(idx) = name;
@@ -127,8 +147,7 @@ std::vector<at::Tensor> load_crf_model_weights(const BasecallModelConfig &model_
     if (model_config.is_tx_model()) {
         return load_tx_model_weights(model_config);
     }
-    return load_lstm_model_weights(model_config.model_path, model_config.out_features.has_value(),
-                                   model_config.bias);
+    return load_lstm_model_weights(model_config);
 }
 
 namespace {
