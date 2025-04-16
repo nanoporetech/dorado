@@ -2,6 +2,8 @@
 
 #include "utils/math_utils.h"
 
+#include <stdexcept>
+
 #if DORADO_CUDA_BUILD
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -23,9 +25,8 @@ std::string to_string(const TensorLayout &layout) {
         return std::string("CUTLASS_TNC_I8");
     case TensorLayout::CUBLAS_TN2C:
         return std::string("CUBLAS_TN2C");
-    default:
-        return std::string("TensorLayout::UNKNOWN");
     }
+    throw std::logic_error("TensorLayout unknown");
 }
 
 int64_t WorkingMemory::tensor_bytes(torch::IntArrayRef sizes, torch::Dtype dtype) {

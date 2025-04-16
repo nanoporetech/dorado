@@ -2,6 +2,7 @@
 
 #include "config/common.h"
 #include "utils/bam_utils.h"
+#include "utils/dev_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -397,8 +398,9 @@ ContextParams parse_context_params(const toml::value& config_toml) {
 
     constexpr int MAX_CHUNK_SIZE = 102400;
     const int min_chunk_size = context_before + context_after;
-    const int chunk_size =
-            get_int_in_range(params, "chunk_size", min_chunk_size, MAX_CHUNK_SIZE, min_chunk_size);
+    const int chunk_size = utils::get_dev_opt(
+            "modbase_chunksize",
+            get_int_in_range(params, "chunk_size", min_chunk_size, MAX_CHUNK_SIZE, min_chunk_size));
 
     const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
     const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);

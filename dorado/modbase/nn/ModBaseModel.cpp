@@ -317,32 +317,39 @@ struct ModBaseConvLSTMModelImpl : Module {
 struct ModBaseConvLSTMV3ModelImpl : Module {
     ModBaseConvLSTMV3ModelImpl(const config::ModBaseModelConfig& config) : m_config(config) {
         const auto& sig_cvs = m_config.general.modules->signal_convs;
+        const auto& seq_cvs = m_config.general.modules->sequence_convs;
+        const auto& merge_cv = m_config.general.modules->merge_conv;
+        const auto& lstms = m_config.general.modules->lstms;
+        const auto& ll = m_config.general.modules->linear;
+        const auto& lu = m_config.general.modules->upsample;
+
         if (sig_cvs.size() != 3) {
             throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
         }
+        if (seq_cvs.size() != 2) {
+            throw std::runtime_error("ModBaseConvLSTMV3Model expected 2 sequence convolutions");
+        }
+        if (lstms.size() != 2) {
+            throw std::runtime_error("ModBaseConvLSTMV3Model expected 2 lstms");
+        }
+
         sig_conv1 = register_module("sig_conv1", ModsConv(sig_cvs.at(0)));
         sig_conv2 = register_module("sig_conv2", ModsConv(sig_cvs.at(1)));
         sig_conv3 = register_module("sig_conv3", ModsConv(sig_cvs.at(2)));
 
-        const auto& seq_cvs = m_config.general.modules->sequence_convs;
-        if (seq_cvs.size() != 2) {
-            throw std::runtime_error("ModBaseConvLSTMV3Model expected 2 sequence convolutions");
-        }
         seq_conv1 = register_module("seq_conv1", ModsConv(seq_cvs.at(0)));
         seq_conv2 = register_module("seq_conv2", ModsConv(seq_cvs.at(1)));
 
-        merge_conv1 =
-                register_module("merge_conv1", ModsConv(m_config.general.modules->merge_conv));
+        merge_conv1 = register_module("merge_conv1", ModsConv(merge_cv));
 
-        const auto& lstms = m_config.general.modules->lstms;
-        if (lstms.size() != 2) {
-            throw std::runtime_error("ModBaseConvLSTMV3Model expected 2 lstms");
-        }
         lstm1 = register_module("lstm1", LSTM(LSTMOptions(lstms.at(0).size, lstms.at(0).size)));
         lstm2 = register_module("lstm2", LSTM(LSTMOptions(lstms.at(1).size, lstms.at(1).size)));
 
-        const auto& ll = m_config.general.modules->linear;
         linear = register_module("linear", Linear(ll.in_size, ll.out_size));
+
+        if (lu.has_value()) {
+            upsample = register_module("upsample", nn::LinearUpsample(lu.value()));
+        }
     }
 
     at::Tensor forward(at::Tensor sigs, at::Tensor seqs) {
@@ -389,6 +396,7 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
             utils::ScopedProfileRange spr2("upsample", 2);
             z = upsample->forward(z);  // NTC -> N(sf*T)C
         }
+        utils::ScopedProfileRange spr2("softmax", 2);
         // NTC -> N(TC)
         return z.softmax(2).flatten(1);
     }
@@ -426,9 +434,7 @@ TORCH_MODULE(ModBaseConvLSTMV3Model);
 #if DORADO_CUDA_BUILD
 
 struct ModBaseConvLSTMV3CUDAModelImpl : Module {
-    ModBaseConvLSTMV3CUDAModelImpl(const config::ModBaseModelConfig& config,
-                                   const at::TensorOptions& options,
-                                   const int batch_size_)
+    ModBaseConvLSTMV3CUDAModelImpl(const config::ModBaseModelConfig& config, const int batch_size_)
             : m_config(config), batch_size(batch_size_) {
         const auto& sig_cvs = m_config.general.modules->signal_convs;
         const auto& seq_cvs = m_config.general.modules->sequence_convs;
@@ -460,7 +466,6 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
             auto [T, C] = config.chunked_sequence_input_TC();
             wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
             seq_convs->reserve_working_memory(wm_seq, nn::TensorLayout::NTC);
-            wm_seq.allocate_backing_tensor(options.device());
         }
         {
             // Reserve and allocate working memory for everything else
@@ -485,7 +490,6 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
 
             merge_conv->reserve_working_memory(wm, force_dtype);
             lstm->reserve_working_memory(wm);
-            wm.allocate_backing_tensor(options.device());
         }
     }
 
@@ -497,12 +501,14 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         {
             utils::ScopedProfileRange spr2("seq_copy", 2);
             const auto [Tin_seq, Cin_seq] = m_config.chunked_sequence_input_TC();
+            wm_seq.allocate_backing_tensor(seqs_NTC.device());
             auto wm_seq_in = wm_seq.next_TC(Tin_seq, Cin_seq, nn::TensorLayout::NTC);
             wm_seq_in.index({Slice()}) = seqs_NTC;
         }
         {
             utils::ScopedProfileRange spr2("sig_copy", 2);
             const auto [Tin_sig, Cin_sig] = m_config.chunked_signal_input_TC();
+            wm.allocate_backing_tensor(sigs_N1T.device());
             auto wm_in = wm.next_TC(Tin_sig, Cin_sig, nn::TensorLayout::NTC);
             // This transpose is free because C is 1
             wm_in.index({Slice()}) = sigs_N1T.transpose(1, 2);
@@ -563,7 +569,6 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
                                           ? wm.get_current_NTC_view().to(torch::kF16) / 127.0f
                                           : wm.get_current_NTC_view());
         }
-
         if (m_config.general.modules->upsample.has_value()) {
             utils::ScopedProfileRange spr2("upsample", 2);
             out = upsample->forward(out);  // NTC -> N(sf*T)C
@@ -627,12 +632,11 @@ dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig
 #if DORADO_CUDA_BUILD
         static bool use_torch = utils::get_dev_opt("modbase_torch", false);
         if (!use_torch) {
-            spdlog::info("Loading ModBaseConvLSTMV3CUDAModel - CUDA");
-            auto model = model::ModBaseConvLSTMV3CUDAModel(config, options, batchsize);
+            auto model = model::ModBaseConvLSTMV3CUDAModel(config, batchsize);
             return populate_model(std::move(model), config.model_path, options);
         }
 #endif
-        spdlog::info("Loading ModBaseConvLSTMV3Model - Torch only");
+        spdlog::debug("Loading ModBaseConvLSTMV3Model - Torch only");
         auto model = model::ModBaseConvLSTMV3Model(config);
         return populate_model(std::move(model), config.model_path, options);
     }

@@ -3,8 +3,6 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #include <string>
 
 #if DORADO_CUDA_BUILD
@@ -28,10 +26,12 @@ LSTMStackImpl::LSTMStackImpl(int num_layers, int size, bool reverse_first_)
 };
 
 at::Tensor LSTMStackImpl::forward(at::Tensor x) {
-    // FIXME: Test on HAC models that the reverse_first logic hasn't broken anything
     // Input is [N, T, C], contiguity optional
     for (size_t i = 0; i < rnns.size(); ++i) {
-        x = std::get<0>(rnns[i]((i == 0 && !reverse_first) ? x : x.flip(1)));
+        if (i != 0 && reverse_first) {
+            x = x.flip(1);
+        }
+        x = std::get<0>(rnns[i](x));
     }
     // Output is [N, T, C], contiguous
     return ((rnns.size() & 1) != reverse_first) ? x.flip(1) : x;

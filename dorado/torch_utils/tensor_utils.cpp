@@ -105,7 +105,7 @@ std::vector<at::Tensor> load_tensors(const std::filesystem::path& dir,
 void dump_tensor([[maybe_unused]] const at::Tensor& t,
                  [[maybe_unused]] const std::string& name,
                  [[maybe_unused]] const int layer_no) {
-    // #ifndef NDEBUG
+#ifndef NDEBUG
     static const bool is_active = utils::get_dev_opt<bool>("dump_tensors", false);
     if (!is_active) {
         return;
@@ -130,7 +130,7 @@ void dump_tensor([[maybe_unused]] const at::Tensor& t,
 
     utils::serialise_tensor(t, path);
     spdlog::warn("Writing {} to: {}", utils::print_size(t, name), path);
-    // #endif
+#endif
 }
 
 at::Tensor quantile(const at::Tensor& t, const at::Tensor& q) {

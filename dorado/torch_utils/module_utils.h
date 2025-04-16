@@ -14,7 +14,13 @@
 namespace dorado::utils {
 
 inline void load_state_dict(torch::nn::Module& module, const std::vector<at::Tensor>& weights) {
-    assert(weights.size() == module.parameters().size());
+    if (weights.size() != module.parameters().size()) {
+        spdlog::error(
+                "Failed to load state dict - number of weights ({}) and model parameters ({}) are "
+                "inconsistent.",
+                weights.size(), module.parameters().size());
+        throw std::runtime_error("Failed to load model state dict");
+    }
     for (size_t idx = 0; idx < weights.size(); idx++) {
         try {
             module.parameters()[idx].data() = weights[idx].data();

@@ -4,8 +4,6 @@
 #include "nn/KoiUtils.h"
 #include "torch_utils/gpu_profiling.h"
 
-#include <spdlog/spdlog.h>
-
 #if DORADO_CUDA_BUILD
 extern "C" {
 #include "koi.h"
