@@ -45,6 +45,7 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
     new_kit.double_ends = false;
     new_kit.ends_different = false;
     new_kit.rear_only_barcodes = false;
+    new_kit.rna_barcodes = false;
 
     const auto& config = toml::find(config_toml, ARRANGEMENT_TOML_KEY);
     std::string kit_name = toml::find<std::string>(config, "name");
@@ -115,6 +116,10 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
 
     if (config.contains("rear_only_barcodes")) {
         new_kit.rear_only_barcodes = toml::find<bool>(config, "rear_only_barcodes");
+    }
+
+    if (config.contains("rna_barcodes")) {
+        new_kit.rna_barcodes = toml::find<bool>(config, "rna_barcodes");
     }
 
     return std::make_pair(kit_name, new_kit);
