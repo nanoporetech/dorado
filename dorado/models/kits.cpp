@@ -136,6 +136,7 @@ const std::unordered_map<KitCode, KitInfo> codes_map = {
         {KC::SQK_16S114_24, {"SQK-16S114-24", 400, not_rapid}},
         {KC::SQK_16S114_24_260, {"SQK-16S114-24-260", 260, not_rapid}},
         {KC::SQK_MAB114_24, {"SQK-MAB114-24", 400, not_rapid}},
+        {KC::SQK_DRB004_24, {"SQK-DRB004-24", 130, not_rapid}},
         {KC::SQK_LWB001, {"SQK-LWB001", 400, not_rapid}},
         {KC::SQK_MLK111_96_XL, {"SQK-MLK111-96-XL", 400, not_rapid}},
         {KC::SQK_MLK114_96_XL, {"SQK-MLK114-96-XL", 400, not_rapid}},
