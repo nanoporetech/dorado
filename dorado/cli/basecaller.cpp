@@ -9,6 +9,7 @@
 #include "config/ModBaseBatchParams.h"
 #include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
+#include "demux/KitInfoProvider.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
@@ -827,6 +828,11 @@ int basecaller(int argc, char* argv[]) {
     adapter_info->trim_primers = trim_primers;
     adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
+    if (barcoding_info && !barcoding_info->kit_name.empty()) {
+        demux::KitInfoProvider provider(barcoding_info->kit_name);
+        const barcode_kits::KitInfo& kit_info = provider.get_kit_info(barcoding_info->kit_name);
+        adapter_info->rna_adapters = kit_info.rna_barcodes;
+    }
 
     fs::path model_path;
     std::vector<fs::path> mods_model_paths;
