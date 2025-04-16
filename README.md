@@ -24,10 +24,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.9.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-linux-x64.tar.gz)
- - [dorado-0.9.1-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-linux-arm64.tar.gz)
- - [dorado-0.9.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-osx-arm64.zip)
- - [dorado-0.9.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.1-win64.zip)
+ - [dorado-0.9.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.2-linux-x64.tar.gz)
+ - [dorado-0.9.2-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.2-linux-arm64.tar.gz)
+ - [dorado-0.9.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.2-osx-arm64.zip)
+ - [dorado-0.9.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.2-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
@@ -56,7 +56,7 @@ Dorado has been tested extensively and supported on the following systems:
 | Linux arm64 | Jetson Orin | Linux for Tegra ≥34.1.1 |
 | Windows x86_64 | (G)V100, A100 | CUDA Driver ≥452.39 |
 | | H100 | CUDA Driver ≥520 |
-| Apple | Apple Silicon (M1/M2) | |
+| Apple | Apple Silicon (M series) | |
 
 Linux x64 or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 

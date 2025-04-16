@@ -2,6 +2,15 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [0.9.2] (16 Apr 2025)
+
+This release of Dorado matches the version included in MinKNOW 25.03 and Dorado Basecall Server 7.8.3. This release is only recommended to users who require matching performance to MinKNOW 25.03. For all other users, we recommend the latest version of Dorado (≥0.9.5) to benefit from all available improvements. Changes from 0.9.1 in this release include:
+
+* 48b513daa867b2b727b753c0d57f57629766a700 - Fix crashes when running Dorado basecaller on systems with heterogeneous GPUs
+* 8a67020cc6c66d250137aa0e94e3e10e89eafd6e - Improve speed of VCF output in Dorado `polish`
+* c7de7e485d0f488bbd2374e64c7f964a6ed06016 - Bump third party library versions
+
+
 # [0.9.1] (21 Jan 2025)
 
 This release of Dorado brings significant basecalling speed improvements for Nvidia GPUs with compute capabilities 8.6 (Ampere – e.g., RTX A6000), 8.7 (Ampere – e.g., Orin family), and 8.9 (Ada Lovelace). Additionally, `dorado polish` receives major enhancements, including the introduction of the `--bacteria` flag, which optimizes basecalling for native bacterial and methylated DNA. The updated `dorado polish` is now compatible with data basecalled using v4.3 and v4.2 models and serves as a beta-stage replacement for Medaka.
