@@ -194,6 +194,7 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
 
     // Get rid of any spurious unmapped records.
     size_t non_sup_count = 0;  // Counts non-supplementary records, for mapq score recalculation.
+    size_t num_blocks_mapped = 0;  // Counts blocks with mappings, for mapq score recalculation.
     if (alignment_found) {
         bool first_block = true;
         for (auto& records : block_records) {
@@ -208,17 +209,22 @@ std::vector<BamPtr> Minimap2Aligner::align(bam1_t* irecord, mm_tbuf_t* buf) {
             }
             records.swap(filtered_records);
             first_block = false;
+            if (!records.empty()) {
+                num_blocks_mapped++;
+            }
         }
     } else {
         // Just keep the first block, which will only have one record.
         block_records.resize(1);
     }
 
+    // Only recompute the mapq score if more than 1 block produced an alignment.
+    const int new_mapq = (num_blocks_mapped > 1) ? compute_mapq(non_sup_count) : -1;
+
     // We can only have one primary alignment. Make all other primary alignments, and all supplementary
     // alignments that aren't in the first block, secondary.
     std::vector<BamPtr> final_records;
     const auto softclipping_on = (m_minimap_index->mapping_options().flag & MM_F_SOFTCLIP);
-    const int new_mapq = compute_mapq(non_sup_count);
     bool first_block = true;
     for (auto& records : block_records) {
         for (auto& record : records) {
@@ -475,6 +481,7 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
 
     // We need to remove any spurious unmapped results.
     size_t non_sup_count = 0;  // Counts non-supplementary records, for mapq score recalculation.
+    size_t num_blocks_mapped = 0;  // Counts blocks with mappings, for mapq score recalculation.
     if (alignment_found) {
         bool first_block = true;
         for (auto& results : block_results) {
@@ -490,15 +497,20 @@ void Minimap2Aligner::align(dorado::ReadCommon& read_common,
             }
             results.swap(filtered_results);
             first_block = false;
+            if (!results.empty()) {
+                num_blocks_mapped++;
+            }
         }
     } else {
         // We can just include the first block of results, which will only have 1 result.
         block_results.resize(1);
     }
 
+    // Only recompute the mapq score if more than 1 block produced an alignment.
+    const int new_mapq = (num_blocks_mapped > 1) ? compute_mapq(non_sup_count) : -1;
+
     // Mark all alignments that aren't from the first block as secondary.
     bool first_block = true;
-    const int new_mapq = compute_mapq(non_sup_count);
     for (auto& results : block_results) {
         for (auto& result : results) {
             update_read_record(result, new_mapq, first_block);
