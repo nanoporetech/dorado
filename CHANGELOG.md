@@ -10,6 +10,7 @@ This release of Dorado introduces fixes and improvements following the Dorado 0.
 * 5a28b1eb040b6abfb3ebe199eea6ee2f3927e817 - Modest speed improvement of Transformer based SUP basecalling models on Volta GPUs
 * d58ce4cd6c71e7cacb8cd6041264304d6d7c7896 - Improve handling of exceptions in Dorado polish
 * 86f4f02a4a01b1d47616d25230e1f11fb7de4673 - Add Cuda 12.8 Rocky Linux 8 builds
+* 20b7409bdcbccd8e1638f52b7514f968dd8717c6 - Fix mapQ values reported by Dorado `aligner`
 
 
 # [0.9.5] (31 March 2025)
