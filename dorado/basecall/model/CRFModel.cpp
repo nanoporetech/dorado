@@ -28,7 +28,7 @@ CRFModelImpl::CRFModelImpl(const BasecallModelConfig &config) {
     const auto cv = config.convs;
     const auto lstm_size = config.lstm_size;
     convs = register_module("convs", ConvStack(cv));
-    rnns = register_module("rnns", LSTMStack(config.lstm_layers, lstm_size));
+    rnns = register_module("rnns", LSTMStack(config.lstm_layers, lstm_size, true));
 
     if (config.out_features.has_value()) {
         // The linear layer is decomposed into 2 matmuls.
