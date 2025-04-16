@@ -3,6 +3,7 @@
 #include "modbase/ModBaseContext.h"
 #include "stereo_features.h"
 #include "utils/bam_utils.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -298,8 +299,9 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
 float ReadCommon::calculate_mean_qscore() const {
     if (is_rna_model) {
         const size_t polya_start = utils::find_rna_polya(seq);
-        spdlog::trace("calculate_mean_qscore rna - len:{} polya_start_idx: {}, polya_trim_len:{}",
-                      seq.size(), polya_start, seq.size() - polya_start);
+        utils::trace_log(
+                "calculate_mean_qscore rna - len:{} polya_start_idx: {}, polya_trim_len:{}",
+                seq.size(), polya_start, seq.size() - polya_start);
         if (polya_start == 0) {
             return utils::mean_qscore_from_qstring(qstring);
         }

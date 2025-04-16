@@ -3,6 +3,7 @@
 #include "read_pipeline/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/bam_utils.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -100,14 +101,14 @@ std::pair<int, int> Trimmer::determine_trim_interval(AdapterScoreResult& res, in
         res.front.name = UNCLASSIFIED;
     } else {
         trim_interval.first = res.front.position.second + 1;
-        spdlog::trace("Detected front interval adapter/primer - {}", res.front.name);
+        utils::trace_log("Detected front interval adapter/primer - {}", res.front.name);
     }
     if (res.rear.name == UNCLASSIFIED || res.rear.score < score_thres) {
         trim_interval.second = seqlen;
         res.rear.name = UNCLASSIFIED;
     } else {
         trim_interval.second = res.rear.position.first;
-        spdlog::trace("Detected rear interval adapter/primer - {}", res.rear.name);
+        utils::trace_log("Detected rear interval adapter/primer - {}", res.rear.name);
     }
 
     if (trim_interval.second <= trim_interval.first) {

@@ -9,6 +9,7 @@
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 
@@ -110,7 +111,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            spdlog::trace(
+            utils::trace_log(
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     qname);
@@ -163,7 +164,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            spdlog::trace(
+            utils::trace_log(
                     "Adapter and/or primer detected for read {}, but could not be "
                     "trimmed due to short length.",
                     read.read_common.read_id);

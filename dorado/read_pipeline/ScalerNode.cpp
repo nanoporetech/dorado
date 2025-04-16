@@ -5,6 +5,7 @@
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"
 #include "torch_utils/trim.h"
+#include "utils/log_utils.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
@@ -24,10 +25,6 @@
 static constexpr float EPS = 1e-9f;
 
 using Slice = at::indexing::Slice;
-
-// Set this to 1 if you want the per-read spdlog::trace calls.
-// Note that under high read-throughput this could cause slowdowns.
-#define PER_READ_LOGGING 0
 
 namespace {
 
@@ -110,10 +107,8 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
         auto min_pos = std::distance(medians.begin(), minmax.first);
         auto max_pos = std::distance(medians.begin(), minmax.second);
 
-#if PER_READ_LOGGING
-        spdlog::trace("window {}-{} min {} max {} diff {}", i, i + kWindowSize, min_median,
-                      max_median, (max_median - min_median));
-#endif
+        dorado::utils::trace_log("window {}-{} min {} max {} diff {}", i, i + kWindowSize,
+                                 min_median, max_median, (max_median - min_median));
 
         if ((median_pos >= static_cast<int>(medians.size()) &&
              window_pos[max_pos] > window_pos[min_pos]) &&
@@ -242,10 +237,8 @@ void ScalerNode::input_thread_fn() {
 
         read->read_common.num_trimmed_samples = trim_start;
 
-#if PER_READ_LOGGING
-        spdlog::trace("ScalerNode: {} shift: {} scale: {} trim: {}", read->read_common.read_id,
-                      shift, scale, trim_start);
-#endif
+        dorado::utils::trace_log("ScalerNode: {} shift: {} scale: {} trim: {}",
+                                 read->read_common.read_id, shift, scale, trim_start);
 
         // Pass the read to the next node
         send_message_to_sink(std::move(read));

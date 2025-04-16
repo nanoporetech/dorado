@@ -2,6 +2,7 @@
 
 #include "parse_custom_kit.h"
 #include "parse_custom_sequences.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -199,7 +200,7 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
         const auto& name = queries[i].name;
         std::string_view query_seq_front = queries[i].front_sequence;
         std::string_view query_seq_rear = queries[i].rear_sequence;
-        spdlog::trace("Checking adapter/primer {}", name);
+        utils::trace_log("Checking adapter/primer {}", name);
 
         if (!query_seq_front.empty()) {
             auto result = align(query_seq_front, read_front, IS_FRONT, placement_config);

@@ -1,5 +1,6 @@
 #include "sam_utils.h"
 
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -117,7 +118,7 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
         // Read the genome sequence lengths from the header
         sam_content_stream >> sq >> reference >> length_field;
         if (sq == "@SQ") {
-            spdlog::trace(__func__ + std::string{"length_field: {}"}, length_field);
+            utils::trace_log(__func__ + std::string{"length_field: {}"}, length_field);
             int ref_length = std::stoi(length_field.substr(3, length_field.size()));
             reference_length[reference.substr(3, reference.size())] = ref_length;
         }
@@ -226,8 +227,8 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
                     throw std::runtime_error("Input SAM line for read ID " + seq_name +
                                              " does not contain required 'NM' tag");
                 }
-                spdlog::trace(__func__ + std::string{"opt_values.at(\"NM\").Value: {}"},
-                              opt_values.at("NM").Value);
+                utils::trace_log(__func__ + std::string{"opt_values.at(\"NM\").Value: {}"},
+                                 opt_values.at("NM").Value);
                 int edit_distance = std::stoi(opt_values.at("NM").Value);
                 int num_mismatches = edit_distance - res.num_insertions - res.num_deletions;
                 res.num_correct = res.num_aligned - num_mismatches;
@@ -235,8 +236,8 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
                 res.accuracy = float(res.num_correct) /
                                float(res.num_aligned + res.num_insertions + res.num_deletions);
                 if (opt_values.find("AS") != opt_values.end()) {
-                    spdlog::trace(__func__ + std::string{"opt_values.at(\"AS\").Value: {}"},
-                                  opt_values.at("AS").Value);
+                    utils::trace_log(__func__ + std::string{"opt_values.at(\"AS\").Value: {}"},
+                                     opt_values.at("AS").Value);
                     res.strand_score = std::stoi(opt_values.at("AS").Value);
                 } else {
                     res.strand_score = 0;

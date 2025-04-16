@@ -5,6 +5,7 @@
 #include "poly_tail_config.h"
 #include "read_pipeline/messages.h"
 #include "rna_poly_tail_calculator.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -114,7 +115,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     const float kMinAvgVal = min_avg_val();
 
     auto [left_end, right_end] = signal_range(signal_anchor, signal_len, num_samples_per_base, fwd);
-    spdlog::trace("Bounds left {}, right {}", left_end, right_end);
+    utils::trace_log("Bounds left {}, right {}", left_end, right_end);
 
     std::vector<Interval> intervals;
     const int kStride = 3;
@@ -124,7 +125,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
         auto [avg, stdev] = calc_stats(s, e);
         if (avg > kMinAvgVal && stdev < kVar) {
             if (intervals.empty()) {
-                spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
+                utils::trace_log("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                 intervals.push_back({s, e, avg});
             } else {
                 // If new interval overlaps with the previous interval and
@@ -134,12 +135,12 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                     std::abs(avg - last_interval.avg) < kMeanValueProximity) {
                     // recalc stats for new interval
                     std::tie(avg, stdev) = calc_stats(last_interval.start, e);
-                    spdlog::trace("extend interval {}-{} to {}-{} avg {} stdev {}",
-                                  last_interval.start, last_interval.end, last_interval.start, e,
-                                  avg, stdev);
+                    utils::trace_log("extend interval {}-{} to {}-{} avg {} stdev {}",
+                                     last_interval.start, last_interval.end, last_interval.start, e,
+                                     avg, stdev);
                     last_interval = Interval{last_interval.start, e, avg};
                 } else {
-                    spdlog::trace("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
+                    utils::trace_log("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                     intervals.push_back({s, e, avg});
                 }
             }
@@ -150,7 +151,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     for (const auto& in : intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
-    spdlog::trace("found intervals {}", int_str);
+    utils::trace_log("found intervals {}", int_str);
 
     // Cluster intervals if there are interrupted poly tails that should
     // be combined. Interruption length is specified through a config file.
@@ -180,8 +181,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
             if (mean_proximity_ok && (skip_glitch || allow_linker)) {
                 // retain avg value from the best section to prevent drift for future merges
                 auto& best = (i.length() < last.length()) ? last : i;
-                spdlog::trace("extend interval {}-{} to {}-{}", last.start, last.end, last.start,
-                              i.end);
+                utils::trace_log("extend interval {}-{} to {}-{}", last.start, last.end, last.start,
+                                 i.end);
                 last = Interval{last.start, i.end, best.avg};
                 longest_interval = std::max(longest_interval, last.length());
                 merge_intervals = true;
@@ -202,7 +203,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     for (const auto& in : intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
-    spdlog::trace("clustered intervals {}", int_str);
+    utils::trace_log("clustered intervals {}", int_str);
 
     // Once the clustered intervals are available, filter them by how
     // close they are to the anchor.
@@ -228,10 +229,10 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     for (const auto& in : filtered_intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
-    spdlog::trace("filtered intervals {}", int_str);
+    utils::trace_log("filtered intervals {}", int_str);
 
     if (filtered_intervals.empty()) {
-        spdlog::trace("Anchor {} No range within anchor proximity found", signal_anchor);
+        utils::trace_log("Anchor {} No range within anchor proximity found", signal_anchor);
         return {0, 0};
     }
 
@@ -254,15 +255,16 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                                               }
                                           });
 
-    spdlog::trace("Anchor {} Range {} {}", signal_anchor, best_interval->start, best_interval->end);
+    utils::trace_log("Anchor {} Range {} {}", signal_anchor, best_interval->start,
+                     best_interval->end);
 
     return std::make_pair(best_interval->start, best_interval->end);
 }
 
 int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
                                             const SignalAnchorInfo& signal_info) const {
-    spdlog::trace("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
-                  signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
+    utils::trace_log("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
+                     signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
 
     auto [num_samples_per_base, stddev] = estimate_samples_per_base(read);
     if (num_samples_per_base == 0) {
@@ -282,7 +284,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
             static_cast<int>(std::round(static_cast<float>(signal_len) / num_samples_per_base -
                                         signal_info.trailing_adapter_bases - m_offset_calibration));
 
-    spdlog::trace(
+    utils::trace_log(
             "{} PolyA bases {}, signal anchor {} Signal range is {} {} Signal length "
             "{}, samples/base {} trim {} read len {}",
             read.read_common.read_id, num_bases, signal_info.signal_anchor, signal_start,

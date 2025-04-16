@@ -1,6 +1,7 @@
 #include "read_utils.h"
 
 #include "torch_utils/trim.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -122,15 +123,15 @@ void mux_change_trim_read(ReadCommon& read_common) {
 
     // Excessive trimming - do nothing
     if (trim_seq_idx < std::floor(sequence_size * 0.3f)) {
-        spdlog::trace("mux_change_trimming {} - size: {} trim: {} excessive trimming",
-                      read_common.read_id, sequence_size, trim_seq_idx);
+        trace_log("mux_change_trimming {} - size: {} trim: {} excessive trimming",
+                  read_common.read_id, sequence_size, trim_seq_idx);
         return;
     }
 
     const int kMinMuxChangeTrim = 5;
     // Nothing to do
     if (trim_seq_idx >= sequence_size - kMinMuxChangeTrim) {
-        spdlog::trace("mux_change_trimming {} - no trim", read_common.read_id, trim_seq_idx);
+        trace_log("mux_change_trimming {} - no trim", read_common.read_id, trim_seq_idx);
         return;
     }
 
@@ -139,7 +140,7 @@ void mux_change_trim_read(ReadCommon& read_common) {
             utils::sequence_to_move_table_index(read_common.moves, trim_seq_idx, sequence_size);
 
     if (trim_moves_idx < 0) {
-        spdlog::trace("mux_change_trimming {} - move table index failed", read_common.read_id);
+        trace_log("mux_change_trimming {} - move table index failed", read_common.read_id);
         return;
     }
     read_common.moves.resize(trim_moves_idx);
@@ -154,8 +155,8 @@ void mux_change_trim_read(ReadCommon& read_common) {
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
     read_common.attributes.num_samples = read_common.get_raw_data_samples();
 
-    spdlog::trace("mux_change_trimming {} - seq(before:{} after:{} net:-{})", read_common.read_id,
-                  sequence_size, trim_seq_idx + 1, sequence_size - trim_seq_idx - 1);
+    trace_log("mux_change_trimming {} - seq(before:{} after:{} net:-{})", read_common.read_id,
+              sequence_size, trim_seq_idx + 1, sequence_size - trim_seq_idx - 1);
 }
 
 }  // namespace dorado::utils

@@ -2,6 +2,7 @@
 
 #include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <edlib.h>
@@ -47,15 +48,15 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     float rev_front_score = 1.f - rev_front.editDistance / float(rear_flank_rc.length());
     float rev_rear_score = 1.f - rev_rear.editDistance / float(front_flank_rc.length());
 
-    spdlog::trace("Flank scores: fwd_front {} fwd_rear {}, rev_front {}, rev_rear {}",
-                  fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score);
+    utils::trace_log("Flank scores: fwd_front {} fwd_rear {}, rev_front {}, rev_rear {}",
+                     fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score);
 
     auto scores = {fwd_front_score, fwd_rear_score, rev_front_score, rev_rear_score};
 
     if (std::all_of(std::begin(scores), std::end(scores),
                     [threshold](auto val) { return val < threshold; })) {
-        spdlog::trace("{} flank scores too low - best score {}", read.read_common.read_id,
-                      *std::max_element(std::begin(scores), std::end(scores)));
+        utils::trace_log("{} flank scores too low - best score {}", read.read_common.read_id,
+                         *std::max_element(std::begin(scores), std::end(scores)));
         return {false, -1, 0, false};
     }
 
@@ -73,7 +74,7 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
                       rear_result.endLocations[0] < front_result.startLocations[0];
 
     if (split_tail) {
-        spdlog::trace("{} split tail found - not supported yet", read.read_common.read_id);
+        utils::trace_log("{} split tail found - not supported yet", read.read_common.read_id);
         return {false, -1, 0, false};
     }
 
@@ -82,10 +83,10 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     if (fwd) {
         if (fwd_front_score < fwd_rear_score) {
             base_anchor = front_result.endLocations[0];
-            spdlog::trace("Using fwd front flank as anchor");
+            utils::trace_log("Using fwd front flank as anchor");
         } else {
             base_anchor = rear_result.startLocations[0];
-            spdlog::trace("Using fwd rear flank as anchor");
+            utils::trace_log("Using fwd rear flank as anchor");
         }
 
         if (fwd_front_score >= threshold) {
@@ -97,10 +98,10 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     } else {
         if (rev_front_score < rev_rear_score) {
             base_anchor = front_result.endLocations[0];
-            spdlog::trace("Using rev front flank as anchor");
+            utils::trace_log("Using rev front flank as anchor");
         } else {
             base_anchor = rear_result.startLocations[0];
-            spdlog::trace("Using rev rear flank as anchor");
+            utils::trace_log("Using rev rear flank as anchor");
         }
 
         if (rev_front_score >= threshold) {

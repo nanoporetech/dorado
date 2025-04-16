@@ -9,6 +9,7 @@
 #include "torch_utils/trim.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -32,7 +33,7 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     } else {
         bc = UNCLASSIFIED_BARCODE;
     }
-    spdlog::trace("BC: {}", bc);
+    dorado::utils::trace_log("BC: {}", bc);
     return bc;
 }
 
@@ -92,7 +93,7 @@ void BarcodeClassifierNode::barcode(BamMessage& read, const demux::BarcodingInfo
                                     barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
-    spdlog::trace("Barcode for {} is {}", bam_get_qname(irecord), bc);
+    utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
     bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
     m_num_records++;
     {
@@ -118,7 +119,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
-    spdlog::trace("Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);
+    utils::trace_log("Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);
     read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     int seqlen = int(read.read_common.seq.length());
     if (barcoding_info->trim) {

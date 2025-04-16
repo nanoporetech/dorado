@@ -6,6 +6,7 @@
 #include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
+#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <cstdint>
