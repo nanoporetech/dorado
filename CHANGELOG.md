@@ -4,7 +4,7 @@ All notable changes to Dorado will be documented in this file.
 
 # [0.9.6] (16 Apr 2025)
 
-This release of Dorado introduces fixes and improvements following the Dorado 0.9.5 release, including a fix to support v5 SUP basecalling models on Turing (Compute Capability 7.5) GPUs.
+This release of Dorado introduces fixes and improvements following the Dorado 0.9.5 release, including a fix to support v5 SUP basecalling models on Turing (Compute Capability 7.5) GPUs and a fix to correct mapQ values reported by Dorado aligner.
 
 * 7070bd7cbded7bc2b0725ad8c4e3846edebc3e38 - Update to torch 2.6.0.2 for CUDA Linux x64 and Windows to add support for Turing GPUs
 * 5a28b1eb040b6abfb3ebe199eea6ee2f3927e817 - Modest speed improvement of Transformer based SUP basecalling models on Volta GPUs
