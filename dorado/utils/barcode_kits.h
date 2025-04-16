@@ -25,6 +25,7 @@ struct KitInfo {
     bool double_ends;
     bool ends_different;
     bool rear_only_barcodes;
+    bool rna_barcodes;
     std::string top_front_flank;
     std::string top_rear_flank;
     std::string bottom_front_flank;

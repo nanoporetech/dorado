@@ -79,10 +79,10 @@ CATCH_TEST_CASE("BamUtilsTest: Add read group headers scenarios", TEST_GROUP) {
         const std::string CUSTOM_BARCODE_NAME{"CUSTOM-BC01"};
         const std::string CUSTOM_BARCODE_SEQUENCE{"AAA"};
         const std::string KIT_NAME{"CUSTOM-SQK-RAB204"};
-        auto kit_info = barcode_kits::KitInfo{KIT_NAME, false,  false,
-                                              false,    "ACGT", "ACGT",
-                                              "ACGT",   "ACGT", {CUSTOM_BARCODE_NAME},
-                                              {},       {}};
+        auto kit_info =
+                barcode_kits::KitInfo{KIT_NAME, false,  false,  false,  false,
+                                      "ACGT",   "ACGT", "ACGT", "ACGT", {CUSTOM_BARCODE_NAME},
+                                      {},       {}};
         dorado::SamHdrPtr sam_header(sam_hdr_init());
 
         std::unordered_map<std::string, std::string> custom_barcodes{
