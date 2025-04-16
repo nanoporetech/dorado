@@ -24,10 +24,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.9.5-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-x64.tar.gz)
- - [dorado-0.9.5-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-linux-arm64.tar.gz)
- - [dorado-0.9.5-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-osx-arm64.zip)
- - [dorado-0.9.5-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.5-win64.zip)
+ - [dorado-0.9.6-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-linux-x64.tar.gz)
+ - [dorado-0.9.6-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-linux-arm64.tar.gz)
+ - [dorado-0.9.6-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-osx-arm64.zip)
+ - [dorado-0.9.6-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
