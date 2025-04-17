@@ -21,7 +21,7 @@
     - ctest --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
 build:linux:x86:focal:ont_core:
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_PRESET: "linux-x64-conan_gcc9-dorado-release"
   extends:

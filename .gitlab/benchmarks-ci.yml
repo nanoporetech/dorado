@@ -51,7 +51,7 @@ regression_test:linux:x86:focal:v100:
         - dna_kit14_400bps_5khz_simplex_sup_cudaall_nomods_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cuda0_5mCG-5hmCG_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cudaall_5mCG-5hmCG_noaln_nobarcode
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
     GPU_TYPE: "v100"
     PLATFORM: "linux"
@@ -74,7 +74,7 @@ regression_test:linux:x86:focal:a100:
         - dna_kit14_400bps_5khz_simplex_sup_cudaall_nomods_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cuda0_5mCG-5hmCG_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cudaall_5mCG-5hmCG_noaln_nobarcode
-  image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   variables:
     GPU_TYPE: "a100"
     PLATFORM: "linux"
