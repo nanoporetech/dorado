@@ -1,11 +1,11 @@
 #include "sequence_utils.h"
 
+#include "log_utils.h"
 #include "simd.h"
 
 #include <edlib.h>
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
@@ -202,7 +202,7 @@ int64_t sequence_to_move_table_index(const std::vector<uint8_t>& move_vals,
     const bool size_invalid = sequence_size > moves_sz;
 
     if (move_vals.empty() || oob_moves || oob_seq || size_invalid) {
-        spdlog::trace(
+        trace_log(
                 "sequence_to_move_table_index - bad input "
                 "seq_index:{} seq_size:{} move.size:{} - reason empty_moves: {} "
                 "oob_moves: {} oob_seq {} size_invalid: {}",

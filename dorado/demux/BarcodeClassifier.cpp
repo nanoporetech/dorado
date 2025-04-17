@@ -3,6 +3,7 @@
 #include "barcoding_info.h"
 #include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -71,7 +72,7 @@ int extract_mask_location(EdlibAlignResult aln, std::string_view query) {
             query_cursor++;
         }
     }
-    spdlog::trace("query cursor {} target cursor {}", query_cursor, target_cursor);
+    utils::trace_log("query cursor {} target cursor {}", query_cursor, target_cursor);
     return aln.startLocations[0] + target_cursor;
 }
 
@@ -87,9 +88,9 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view stra
                                          int(read.length()), placement_config);
     float score = 1.f - static_cast<float>(result.editDistance) / (strand.length() - barcode_len);
     int bc_loc = extract_mask_location(result, strand);
-    spdlog::trace("{} dist {} position {} bc_loc {} score {}", debug_prefix, result.editDistance,
-                  result.startLocations[0], bc_loc, score);
-    spdlog::trace("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
+    utils::trace_log("{} dist {} position {} bc_loc {} score {}", debug_prefix, result.editDistance,
+                     result.startLocations[0], bc_loc, score);
+    utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
     return {result, score, bc_loc};
 }
 
@@ -102,8 +103,8 @@ int extract_barcode_penalty(std::string_view barcode,
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto penalty = result.editDistance;
-    spdlog::trace("{} {}", debug_prefix, penalty);
-    spdlog::trace("\n{}", utils::alignment_to_str(barcode.data(), read.data(), result));
+    utils::trace_log("{} {}\n{}", debug_prefix, penalty,
+                     utils::alignment_to_str(barcode.data(), read.data(), result));
     edlibFreeAlignResult(result);
     return penalty;
 }
@@ -404,8 +405,8 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
     // Find the best variant of the two.
     int total_v1_penalty = top_result_v1.editDistance + bottom_result_v1.editDistance;
     int total_v2_penalty = top_result_v2.editDistance + bottom_result_v2.editDistance;
-    spdlog::trace("total v1 edit dist {}, total v2 edit dis {}", total_v1_penalty,
-                  total_v2_penalty);
+    utils::trace_log("total v1 edit dist {}, total v2 edit dis {}", total_v1_penalty,
+                     total_v2_penalty);
 
     std::vector<BarcodeScoreResult> results;
     for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
@@ -427,7 +428,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
             continue;
         }
 
-        spdlog::trace("Checking barcode {}", barcode_name);
+        utils::trace_log("Checking barcode {}", barcode_name);
 
         // Calculate barcode penalties for v1.
         auto top_mask_result_penalty_v1 =
@@ -622,7 +623,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
             continue;
         }
-        spdlog::trace("Checking barcode {}", barcode_name);
+        utils::trace_log("Checking barcode {}", barcode_name);
 
         auto top_mask_penalty =
                 extract_barcode_penalty(barcode, top_mask, mask_config, "top window");
@@ -732,7 +733,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
     auto end_idx = top_bc_loc + static_cast<int>(top_right_buffer.length());
     std::string_view top_mask = read_top.substr(start_idx, end_idx - start_idx);
 
-    spdlog::trace("BC location {}", top_bc_loc);
+    utils::trace_log("BC location {}", top_bc_loc);
 
     std::vector<BarcodeScoreResult> results;
     for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
@@ -743,7 +744,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
             continue;
         }
-        spdlog::trace("Checking barcode {}", barcode_name);
+        utils::trace_log("Checking barcode {}", barcode_name);
 
         auto top_mask_penalty =
                 extract_barcode_penalty(barcode, top_mask, mask_config, "top window");
@@ -854,8 +855,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
     const auto midstrand_thres = m_scoring_params.midstrand_flank_score;
     if (midstrand_score >= midstrand_thres) {
-        spdlog::trace("Found midstrand barcode flanks with score {}, threshold {}", midstrand_score,
-                      midstrand_thres);
+        utils::trace_log("Found midstrand barcode flanks with score {}, threshold {}",
+                         midstrand_score, midstrand_thres);
         auto midstrand_res = UNCLASSIFIED;
         midstrand_res.found_midstrand = true;
         return midstrand_res;
@@ -891,7 +892,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     for (auto& s : results) {
         d << s.barcode_name << " " << s.penalty << ", ";
     }
-    spdlog::trace("Scores: {}", d.str());
+    utils::trace_log("Scores: {}", d.str());
     auto best_result = results.begin();
     auto are_penalties_acceptable = [this](const auto& proposal) {
         // If barcode penalty is 0, it's a perfect match. Consider it a pass.
@@ -930,9 +931,9 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         // have a high score for the same barcode. If not then consider it
         // unclassified.
         if (std::max(out.top_penalty, out.bottom_penalty) > m_scoring_params.max_barcode_penalty) {
-            spdlog::trace("Max of top {} and bottom penalties {} > max barcode penalty {}",
-                          out.top_penalty, out.bottom_penalty,
-                          m_scoring_params.max_barcode_penalty);
+            utils::trace_log("Max of top {} and bottom penalties {} > max barcode penalty {}",
+                             out.top_penalty, out.bottom_penalty,
+                             m_scoring_params.max_barcode_penalty);
             return UNCLASSIFIED;
         }
     }
@@ -952,7 +953,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
               (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
              ((out.barcode_name != best_bottom_result->barcode_name) &&
               (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty)))) {
-            spdlog::trace(
+            utils::trace_log(
                     "Superior barcode found for arrangement {} : top best bc {}, bottom best bc {}",
                     out.barcode_name, best_top_result->barcode_name,
                     best_bottom_result->barcode_name);

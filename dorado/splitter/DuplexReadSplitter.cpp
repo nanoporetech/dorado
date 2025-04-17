@@ -5,6 +5,7 @@
 #include "splitter_utils.h"
 #include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/uuid_utils.h"
 
@@ -21,10 +22,6 @@
 #include <string>
 #include <string_view>
 #include <utility>
-
-// Set this to 1 if you want the per-read spdlog::trace calls.
-// Note that under high read-throughput this could cause slowdowns.
-#define PER_READ_LOGGING 0
 
 namespace dorado::splitter {
 
@@ -142,9 +139,7 @@ DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r
 }
 
 PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::ExtRead& read) const {
-#if PER_READ_LOGGING
-    spdlog::trace("Analyzing signal in read {}", read.read->read_common.read_id);
-#endif
+    utils::trace_log("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
             detect_pore_signal<float>(read.data_as_float32, m_settings.pore_thr,
@@ -198,18 +193,14 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
     //sorting by first coordinate again
     std::sort(pore_regions.begin(), pore_regions.end());
 
-#if PER_READ_LOGGING
-    spdlog::trace("Detected {} potential pore regions in read {}", pore_regions.size(),
-                  read.read->read_common.read_id);
-#endif
+    utils::trace_log("Detected {} potential pore regions in read {}", pore_regions.size(),
+                     read.read->read_common.read_id);
 
     return pore_regions;
 }
 
 PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const {
-#if PER_READ_LOGGING
-    spdlog::trace("Finding muA regions for read {}", read.read->read_common.read_id);
-#endif
+    utils::trace_log("Finding muA regions for read {}", read.read->read_common.read_id);
 
     constexpr std::string_view muA_seq = "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA";
     constexpr std::int64_t max_muA_edist = 11;
@@ -225,10 +216,8 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
     // Skip if the read is too small.
     const auto& read_seq = read.read->read_common.seq;
     if (read_seq.size() < min_read_len) {
-#if PER_READ_LOGGING
-        spdlog::trace("Read too small: id={} size={}", read.read->read_common.read_id,
-                      read_seq.size());
-#endif
+        utils::trace_log("Read too small: id={} size={}", read.read->read_common.read_id,
+                         read_seq.size());
         return {};
     }
 
@@ -290,9 +279,7 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
     const auto muA_ranges =
             match_start_range(muA_seq, ignore_start, read_seq.size(), max_muA_edist, false);
     if (muA_ranges.empty()) {
-#if PER_READ_LOGGING
-        spdlog::trace("No muA found in read: id={}", read.read->read_common.read_id);
-#endif
+        utils::trace_log("No muA found in read: id={}", read.read->read_common.read_id);
         return {};
     }
 
@@ -353,10 +340,8 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
     auto end_it = std::unique(spike_ranges.begin(), spike_ranges.end());
     spike_ranges.erase(end_it, spike_ranges.end());
 
-#if PER_READ_LOGGING
-    spdlog::trace("Detected {} muA+adapter spike region(s) in read {}", spike_ranges.size(),
-                  read.read->read_common.read_id);
-#endif
+    utils::trace_log("Detected {} muA+adapter spike region(s) in read {}", spike_ranges.size(),
+                     read.read->read_common.read_id);
 
     return spike_ranges;
 }
@@ -420,10 +405,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_middle_adapter_split(
     if (r_l < search_span) {
         return std::nullopt;
     }
-
-#if PER_READ_LOGGING
-    spdlog::trace("Searching for adapter match");
-#endif
+    utils::trace_log("Searching for adapter match");
 
     if (auto adapter_match = find_best_adapter_match(
                 m_settings.adapter, read.read_common.seq, m_settings.relaxed_adapter_edist,
@@ -431,9 +413,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_middle_adapter_split(
         const uint64_t adapter_start = adapter_match->first;
         const uint64_t adapter_end = adapter_match->second;
 
-#if PER_READ_LOGGING
-        spdlog::trace("Checking middle match & start/end match");
-#endif
+        utils::trace_log("Checking middle match & start/end match");
 
         //Checking match around adapter
         if (check_flank_match(read, {adapter_start, adapter_start}, m_settings.flank_err)) {
@@ -476,9 +456,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
     int flank_edist = int(std::round(m_settings.flank_err *
                                      (m_settings.strand_end_flank - m_settings.strand_end_trim)));
 
-#if PER_READ_LOGGING
-    spdlog::trace("Checking start/end match");
-#endif
+    utils::trace_log("Checking start/end match");
 
     if (auto templ_start_match = check_rc_match(
                 read.read_common.seq,
@@ -490,18 +468,14 @@ std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
         }
         uint64_t est_middle = (templ_start_match->second + (r_l - m_settings.strand_end_flank)) / 2;
 
-#if PER_READ_LOGGING
-        spdlog::trace("Middle estimate {}", est_middle);
-#endif
+        utils::trace_log("Middle estimate {}", est_middle);
 
         //TODO parameterize
         const int min_split_margin = 100;
         const float split_margin_frac = 0.05f;
         const auto split_margin = std::max(min_split_margin, int(split_margin_frac * r_l));
 
-#if PER_READ_LOGGING
-        spdlog::trace("Checking approx middle match");
-#endif
+        utils::trace_log("Checking approx middle match");
 
         if (auto middle_match_ranges =
                     check_flank_match(read, {est_middle - split_margin, est_middle + split_margin},
@@ -509,9 +483,7 @@ std::optional<PosRange> DuplexReadSplitter::identify_extra_middle_split(
             est_middle =
                     (middle_match_ranges->first.second + middle_match_ranges->second.first) / 2;
 
-#if PER_READ_LOGGING
-            spdlog::trace("Middle re-estimate {}", est_middle);
-#endif
+            utils::trace_log("Middle re-estimate {}", est_middle);
 
             return PosRange{est_middle - 1, est_middle};
         }
@@ -628,20 +600,15 @@ template <typename SplitFinder>
 void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
                                             [[maybe_unused]] const char* description,
                                             const SplitFinder& split_finder) const {
-#if PER_READ_LOGGING
-    spdlog::trace("Running {}", description);
-#endif
+    utils::trace_log("Running {}", description);
 
     std::vector<ExtRead> split_round_result;
     split_round_result.reserve(to_split.size());
     for (auto& read : to_split) {
         auto spacers = split_finder(read);
 
-#if PER_READ_LOGGING
-        spdlog::trace("DSN: {} strategy {} splits in read {}", description, spacers.size(),
-                      read.read->read_common.read_id);
-#endif
-
+        utils::trace_log("DSN: {} strategy {} splits in read {}", description, spacers.size(),
+                         read.read->read_common.read_id);
         if (spacers.empty()) {
             split_round_result.push_back(std::move(read));
         } else {
@@ -655,19 +622,14 @@ void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
 }
 
 std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) const {
-#if PER_READ_LOGGING
     using namespace std::chrono;
     auto start_ts = high_resolution_clock::now();
     auto read_id = init_read->read_common.read_id;
-    spdlog::trace("Processing read {}; length {}", read_id, init_read->read_common.seq.size());
-#endif
+    utils::trace_log("Processing read {}; length {}", read_id, init_read->read_common.seq.size());
 
-    //assert(!init_read->seq.empty() && !init_read->moves.empty());
     if (init_read->read_common.seq.empty() || init_read->read_common.moves.empty()) {
-#if PER_READ_LOGGING
-        spdlog::trace("Empty read {}; length {}; moves {}", read_id,
-                      init_read->read_common.seq.size(), init_read->read_common.moves.size());
-#endif
+        utils::trace_log("Empty read {}; length {}; moves {}", read_id,
+                         init_read->read_common.seq.size(), init_read->read_common.moves.size());
 
         std::vector<SimplexReadPtr> split_result;
         split_result.push_back(std::move(init_read));
@@ -708,12 +670,10 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::split(SimplexReadPtr init_read) 
         }
     }
 
-#if PER_READ_LOGGING
-    spdlog::trace("Read {} split into {} subreads", read_id, split_result.size());
+    utils::trace_log("Read {} split into {} subreads", read_id, split_result.size());
     auto stop_ts = high_resolution_clock::now();
-    spdlog::trace("READ duration: {} microseconds (ID: {})",
-                  duration_cast<microseconds>(stop_ts - start_ts).count(), read_id);
-#endif
+    utils::trace_log("READ duration: {} microseconds (ID: {})",
+                     duration_cast<microseconds>(stop_ts - start_ts).count(), read_id);
 
     return split_result;
 }

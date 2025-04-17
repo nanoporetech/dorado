@@ -1,6 +1,7 @@
 #include "rna_poly_tail_calculator.h"
 
 #include "read_pipeline/messages.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -68,7 +69,7 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
             edlibAlign(rna_adapter.data(), int(rna_adapter.length()), read_bottom.data(),
                        int(read_bottom.length()), align_config);
 
-    spdlog::trace("polytail barcode mask edit dist {}", align_result.editDistance);
+    utils::trace_log("polytail barcode mask edit dist {}", align_result.editDistance);
 
     const float adapter_score =
             1.f - static_cast<float>(align_result.editDistance) / rna_adapter.length();
@@ -87,7 +88,7 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
                 int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
         result = {false, signal_anchor, trailing_Ts, false};
     } else {
-        spdlog::trace("{} adapter score too low {}", read.read_common.read_id, adapter_score);
+        utils::trace_log("{} adapter score too low {}", read.read_common.read_id, adapter_score);
     }
 
     edlibFreeAlignResult(align_result);

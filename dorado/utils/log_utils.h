@@ -1,4 +1,5 @@
 #pragma once
+#include <spdlog/spdlog.h>
 
 namespace dorado::utils {
 
@@ -23,5 +24,16 @@ void SetVerboseLogging(VerboseLogLevel level);
 /// stdout to a file
 /// </remarks>
 void EnsureInfoLoggingEnabled(VerboseLogLevel level);
+
+/// Note that enabling this can impact short-read and adaptive-sampling performance.
+#if ENABLE_PER_READ_TRACE
+template <typename... Args>
+void trace_log(Args &&...args) {
+    spdlog::trace(std::forward<Args>(args)...);
+}
+#else  // Per-read trace logging is disabled.
+template <typename... Args>
+void trace_log(Args &&...) {}
+#endif
 
 }  // namespace dorado::utils

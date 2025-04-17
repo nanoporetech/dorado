@@ -1,6 +1,7 @@
 #include "dna_poly_tail_calculator.h"
 
 #include "read_pipeline/messages.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -54,7 +55,7 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
                        int(read_bottom.length()), align_config);
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
-    spdlog::trace("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
+    utils::trace_log("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     const bool fwd = dist_v1 < dist_v2;
     const float flank_score = 1.f - static_cast<float>(std::min(dist_v1, dist_v2)) /
@@ -79,8 +80,8 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
 
         result = {fwd, signal_anchor, trailing_Ts, false};
     } else {
-        spdlog::trace("{} primer edit distance too high {}", read.read_common.read_id,
-                      std::min(dist_v1, dist_v2));
+        utils::trace_log("{} primer edit distance too high {}", read.read_common.read_id,
+                         std::min(dist_v1, dist_v2));
     }
 
     edlibFreeAlignResult(top_v1);
