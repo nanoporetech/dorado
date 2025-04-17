@@ -41,7 +41,7 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
                       KC::SQK_NBD114_96_260, KC::SQK_PCB114_24,     KC::SQK_PCB114_24_260,
                       KC::SQK_RBK114_24,     KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
                       KC::SQK_RBK114_96_260, KC::SQK_RPB114_24,     KC::SQK_RPB114_24_260}},
-        {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL}}};
+        {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL, KC::SQK_DRB004_24}}};
 
 // Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
 // will actually be found near the beginning of a forward read, and vice-versa for reverse
@@ -85,9 +85,13 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
                 PC::PCS110,
                 {KC::SQK_PCS114, KC::SQK_PCS114_260, KC::SQK_PCB114_24, KC::SQK_PCB114_24_260},
         },
-        {PC::RAD,
-         {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260, KC::SQK_RBK114_24,
-          KC::SQK_RBK114_24_260, KC::SQK_RBK114_96, KC::SQK_RBK114_96_260}}};
+        {
+                PC::RAD,
+                {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260,
+                 KC::SQK_RBK114_24, KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
+                 KC::SQK_RBK114_96_260},
+        },
+};
 
 // The PCS114 and PCB114_24 kits can include UMI tag sequences.
 // When present, the tag will either immediately follow the PCS110 SSP sequence near the beginning

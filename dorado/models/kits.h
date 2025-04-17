@@ -101,6 +101,7 @@ enum class KitCode {
     SQK_16S114_24,
     SQK_16S114_24_260,
     SQK_MAB114_24,
+    SQK_DRB004_24,
     SQK_LWB001,
     SQK_MLK111_96_XL,
     SQK_MLK114_96_XL,
