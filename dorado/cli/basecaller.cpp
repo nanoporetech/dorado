@@ -106,12 +106,6 @@ void set_basecaller_params(const argparse::ArgumentParser& arg,
         // TODO: This is tuned for LSTM models - investigate Tx
         model_config.basecaller.set_batch_size(128);
     }
-#if DORADO_METAL_BUILD
-    else if (device == "metal" && model_config.is_tx_model() &&
-             model_config.basecaller.batch_size() == 0) {
-        model_config.basecaller.set_batch_size(32);
-    }
-#endif
 
     model_config.normalise_basecaller_params();
 }

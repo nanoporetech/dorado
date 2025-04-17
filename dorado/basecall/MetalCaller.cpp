@@ -515,6 +515,10 @@ MetalTxCaller::MetalTxCaller(const BasecallModelConfig &model_config) : MetalCal
     // Chunk size after decimation via convolution stride.
     m_out_chunk_size = m_in_chunk_size / model_config.stride;
     m_batch_size = model_config.basecaller.batch_size();
+    if (m_batch_size == 0) {
+        // TODO: replace with implementation of autobatch size calculation
+        m_batch_size = 32;
+    }
 
     assert(m_out_chunk_size > 0);
     assert(m_batch_size > 0);
