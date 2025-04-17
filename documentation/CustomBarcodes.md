@@ -76,6 +76,7 @@ The table below describes the arrangement options in more detail.
 | first_index | (Required) Start index for range of barcode sequences to use in the arrangement. Used in combination with the `last_index`. |
 | last_index | (Required) End index for range of barcode sequences to use in the arrangement. Used in combination with the `first_index`. |
 | rear_only_barcodes | (Optional) For single ended barcodes, the barcode is at the rear of the read rather than the front (e.g for an RNA kit). |
+| rna_barcodes | (Optional) Indicates barcodes are for an RNA kit. This skips signal-space adapter trimming. |
 
 The pre-built barcode sequence in Dorado can be found in this [file](../dorado/utils/barcode_kits.cpp) under the `barcodes` map.
 
