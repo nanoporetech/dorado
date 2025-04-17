@@ -44,7 +44,7 @@ torch::Tensor ModelTorchScript::forward(torch::Tensor x) {
             return {};
         }
 
-        return tuple->elements()[0].toTensor();
+        return tuple->elements()[0].toTensor().clone();
     }
 
     spdlog::warn("Model returned an unsupported output type.");
