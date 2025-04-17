@@ -434,6 +434,11 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch) const {
                                  torch::indexing::Slice(0, depths[i]), torch::indexing::Slice()},
                                 batch[i]);
         }
+    } else {
+        spdlog::warn(
+                "Unsupported feature shape when collating samples. Shape: [{}], expected 3 "
+                "dimensions. Returning an uninitialized features tensor.",
+                utils::tensor_shape_as_string(batch.front()));
     }
 
     return features;
