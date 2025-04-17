@@ -2,6 +2,7 @@
 
 #include "utils/container_utils.h"
 
+#include <algorithm>
 #include <ostream>
 #include <string_view>
 #include <tuple>
@@ -37,6 +38,17 @@ bool operator==(const Variant& lhs, const Variant& rhs) {
                     lhs.genotype, lhs.rstart,
                     lhs.rend) == std::tie(rhs.seq_id, rhs.pos, rhs.ref, rhs.alts, rhs.filter,
                                           rhs.info, rhs.qual, rhs.genotype, rhs.rstart, rhs.rend);
+}
+
+bool is_valid(const Variant& var) {
+    if (std::empty(var.alts)) {
+        return false;
+    }
+    if (std::all_of(std::cbegin(var.alts), std::cend(var.alts),
+                    [&var](const std::string& val) { return val == var.ref; })) {
+        return false;
+    }
+    return true;
 }
 
 }  // namespace dorado::secondary
