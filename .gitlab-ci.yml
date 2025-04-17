@@ -592,15 +592,6 @@ test_archive:linux:x86:focal:cuda12:
     - build_archive:linux:x86:focal:cuda12
 
 # Test that you can run dorado in a clean l4t environment
-test_archive:linux:arm64:18.04:
-  image: nvcr.io/nvidia/l4t-base:r32.4.3
-  extends:
-    - .linux_tegra_runner
-    - .test_archive
-  needs:
-    - build_archive:linux:arm64:bionic
-
-# Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:22.04:
   image: nvcr.io/nvidia/l4t-cuda:12.6.11-runtime
   extends:
@@ -650,7 +641,6 @@ deploy:all:
   needs:
     - build_archive:linux:x86:centos7
     - build_archive:linux:x86:focal:cuda12
-    - build_archive:linux:arm64:bionic
     - build_archive:linux:arm64:jammy
     - build_archive:macos:arm
     - build_archive:windows
