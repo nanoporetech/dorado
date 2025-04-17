@@ -259,14 +259,14 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     return std::make_pair(best_interval->start, best_interval->end);
 }
 
-int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
+PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
                                             const SignalAnchorInfo& signal_info) const {
     spdlog::trace("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
                   signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
 
     auto [num_samples_per_base, stddev] = estimate_samples_per_base(read);
     if (num_samples_per_base == 0) {
-        return 0;
+        return {0, 0, 0};
     }
 
     // Walk through signal. Require a minimum of length 10 poly-A since below that
@@ -289,7 +289,7 @@ int PolyTailCalculator::calculate_num_bases(const SimplexRead& read,
             signal_end, signal_len, num_samples_per_base, read.read_common.num_trimmed_samples,
             read.read_common.seq.length());
 
-    return num_bases;
+    return {num_bases,signal_start,signal_end};
 }
 
 std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(

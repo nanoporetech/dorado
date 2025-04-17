@@ -76,6 +76,11 @@ const std::array s_alignment_fields = {
         "alignment_bed_hits"sv,
 };
 
+const std::array s_polya_fields = {
+    "polya_length"sv,               "polya_signal_start"sv,
+    "polya_signal_end"sv           
+};
+
 }  // namespace
 
 SummaryData::SummaryData() = default;
@@ -85,7 +90,7 @@ SummaryData::SummaryData(FieldFlags flags) { set_fields(flags); }
 void SummaryData::set_separator(char s) { m_separator = s; }
 
 void SummaryData::set_fields(FieldFlags flags) {
-    if (flags == 0 || flags > (GENERAL_FIELDS | BARCODING_FIELDS | ALIGNMENT_FIELDS)) {
+    if (flags == 0 || flags > (GENERAL_FIELDS | BARCODING_FIELDS | ALIGNMENT_FIELDS | POLYA_FIELDS)) {
         throw std::runtime_error(
                 "Invalid value of flags option in SummaryData::set_fields method.");
     }
@@ -100,6 +105,12 @@ void SummaryData::process_file(const std::string& filename, std::ostream& writer
         m_field_flags |= ALIGNMENT_FIELDS;
     }
     auto read_group_exp_start_time = utils::get_read_group_info(reader.header(), "DT");
+    auto command_line_cl = utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
+    
+    // If dorado run with --estimate-poly-a option, output polyA related fields in the summary
+    if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
+        m_field_flags |= POLYA_FIELDS;
+    }
     write_header(writer);
     write_rows_from_reader(reader, writer, read_group_exp_start_time);
 }
@@ -146,6 +157,11 @@ void SummaryData::write_header(std::ostream& writer) {
     if (m_field_flags & ALIGNMENT_FIELDS) {
         for (size_t i = 0; i < s_alignment_fields.size(); ++i) {
             writer << m_separator << s_alignment_fields[i];
+        }
+    }
+    if (m_field_flags & POLYA_FIELDS) {
+        for (size_t i = 0; i < s_polya_fields.size(); ++i) {
+            writer << m_separator << s_polya_fields[i];
         }
     }
     writer << '\n';
@@ -278,6 +294,29 @@ void SummaryData::write_rows_from_reader(
                    << m_separator << alignment_accurary << m_separator << alignment_bed_hits;
             ;
         }
+
+        if (m_field_flags & POLYA_FIELDS) {
+
+            // if there is no data on polya signal boundaries, set start end end to -1
+            int polya_signal_start = -1;
+            int polya_signal_end = -1;
+
+            // get polyA from pt:i tag
+            auto polya_length = reader.get_tag<int>("pt");
+            // get signal boundaries from ps:Z tag
+            auto polya_signal_boundaries = reader.get_tag<std::string>("ps");
+           
+            // split the value in ps:Z tag into start and end positions
+            size_t commaPos = polya_signal_boundaries.find(',');
+            if (commaPos != std::string::npos) {
+                polya_signal_start = std::stoi(polya_signal_boundaries.substr(0, commaPos));
+                polya_signal_end = std::stoi(polya_signal_boundaries.substr(commaPos + 1));
+            }
+            
+            writer << m_separator << polya_length << m_separator << polya_signal_start
+                   << m_separator << polya_signal_end;
+        }
+
         writer << '\n';
     }
 }

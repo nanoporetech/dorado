@@ -122,6 +122,11 @@ public:
     // where the adapter ends.
     int rna_adapter_end_signal_pos{0};
 
+    // Track the position of the polyA tail in signal space. This is used to
+    // determine the position of the polyA tail in the read.
+    // and can be used for debugging the polyA estimations
+    std::pair<int, int> polya_signal_boundaries{};
+
     // subread_id is used to track 2 types of offsprings of a read
     // (1) read splits
     // (2) duplex pairs which share this read as the template read
