@@ -6,7 +6,6 @@
 #include <edlib.h>
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>

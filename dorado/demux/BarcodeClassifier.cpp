@@ -103,8 +103,8 @@ int extract_barcode_penalty(std::string_view barcode,
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto penalty = result.editDistance;
-    utils::trace_log("{} {}", debug_prefix, penalty);
-    utils::trace_log("\n{}", utils::alignment_to_str(barcode.data(), read.data(), result));
+    utils::trace_log("{} {}\n{}", debug_prefix, penalty,
+                     utils::alignment_to_str(barcode.data(), read.data(), result));
     edlibFreeAlignResult(result);
     return penalty;
 }
