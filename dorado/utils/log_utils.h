@@ -26,7 +26,7 @@ void SetVerboseLogging(VerboseLogLevel level);
 void EnsureInfoLoggingEnabled(VerboseLogLevel level);
 
 /// Note that enabling this can impact short-read and adaptive-sampling performance.
-#ifdef ENABLE_PER_READ_TRACE
+#if ENABLE_PER_READ_TRACE
 template <typename... Args>
 void trace_log(Args &&...args) {
     spdlog::trace(std::forward<Args>(args)...);

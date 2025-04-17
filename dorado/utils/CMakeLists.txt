@@ -86,6 +86,7 @@ add_library(dorado_utils
 
 target_compile_definitions(dorado_utils
     PUBLIC
+        ENABLE_PER_READ_TRACE=$<BOOL:${DORADO_PER_READ_TRACE}>
         DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
         DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
         DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>
