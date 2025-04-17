@@ -23,7 +23,7 @@
 build:linux:x86:focal:ont_core:
   image: ${DORADO_DOCKER_ROOT}/dorado-deps-20.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_PRESET: "linux-x64-gpu-conan_gcc9-dorado-release"
+    BUILD_PRESET: "linux-x64-conan_gcc9-dorado-release"
   extends:
     - .linux_runner
     - .test_ont_core_compatibility
@@ -31,7 +31,7 @@ build:linux:x86:focal:ont_core:
 
 build:macos:arm:ont_core:
   variables:
-    BUILD_PRESET: "macos-aarch64-cpu-conan-dorado-release"
+    BUILD_PRESET: "macos-aarch64-conan-dorado-release"
   extends:
     - .macos_arm_runner
     - .test_ont_core_compatibility
