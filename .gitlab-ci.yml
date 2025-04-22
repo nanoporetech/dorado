@@ -31,7 +31,7 @@ variables:
   BUILD_TARGET: install
   BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
-  CUDA: "11.8"
+  CUDA: "12.8"
   WIN_CUDA: "12.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${WIN_CUDA}"
   MTL_DEBUG_LAYER: 1
@@ -218,7 +218,7 @@ pre-commit:
 # Build stages
 
 build:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -227,7 +227,7 @@ build:linux:x86:focal:
     - .build_and_test_dorado
 
 build:linux:x86:focal_koi_from_source:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
@@ -238,7 +238,7 @@ build:linux:x86:focal_koi_from_source:
   artifacts: null
 
 build:linux:x86:noble:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-24.04.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -265,7 +265,7 @@ build:linux:x86:focal:debug:
 
 build:linux:x86:focal_coverage:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
@@ -282,7 +282,7 @@ build:linux:x86:focal_coverage:
 
 build:linux:x86:focal:clang_tidy:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -295,7 +295,7 @@ build:linux:x86:focal:clang_tidy:
 
 .build:linux:x86:focal:valgrind:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
     # valgrind can't cope with huge executables, so we have to go dynamic.
     BUILD_OPTIONS: "-D TRY_USING_STATIC_TORCH_LIB=NO"
@@ -391,10 +391,8 @@ build:macos:arm:no_ccache:
     - .on_nightly_or_manual
   artifacts: null
 
-build_archive:linux:x86:focal:cuda12:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-12.8.0:1.0
-  variables:
-    CUDA: "12.8"
+build_archive:linux:x86:focal:
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -409,20 +407,20 @@ build_archive:linux:arm64:jammy:
     - .build_dorado_archive
     - .on_nightly_or_manual    
 
-build_archive:linux:x86:centos7:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-centos7-cuda-${CUDA}.0:1.0
+build_archive:linux:x86:centos7:cuda11:
+  image: ${DORADO_DOCKER_ROOT}/dorado-centos7-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
+    CUDA: "11.8"
   extends:
     - .linux_build_dependencies
     - .linux_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
 
-build_archive:linux:x86:rocky8:cuda12:
-  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:0
+build_archive:linux:x86:rocky8:
+  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.0
   variables:
-    CUDA: "12.8"
     BUILD_OPTIONS: "-DDYNAMIC_HDF=ON"
   script:
     - source /opt/rh/gcc-toolset-11/enable
@@ -518,7 +516,7 @@ test:windows:
     - build:windows
 
 test:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_test_dependencies
     - .linux_runner
@@ -562,7 +560,7 @@ test:macos:arm:
         IMAGE:
         - "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
         - "nvidia/cuda:${CUDA}.0-devel-ubuntu22.04"
-        #- "nvidia/cuda:${CUDA}.0-devel-ubuntu24.04" doesn't exist
+        - "nvidia/cuda:${CUDA}.0-devel-ubuntu24.04"
       # CPU environment
       - RUNNER_TAG: "docker-as"
         IMAGE:
@@ -574,13 +572,13 @@ test_archive:linux:x86:cuda11:
   extends:
     - .test_archive:linux:x86
   needs:
-    - build_archive:linux:x86:centos7
+    - build_archive:linux:x86:centos7:cuda11
 # CUDA 12 build
 test_archive:linux:x86:focal:cuda12:
   extends:
     - .test_archive:linux:x86
   needs:
-    - build_archive:linux:x86:focal:cuda12
+    - build_archive:linux:x86:focal
 
 # Test that you can run dorado in a clean l4t environment
 test_archive:linux:arm64:22.04:
@@ -593,7 +591,7 @@ test_archive:linux:arm64:22.04:
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_test_dependencies
     - .linux_runner
@@ -630,8 +628,8 @@ deploy:all:
       - archive
     expire_in: 1 day
   needs:
-    - build_archive:linux:x86:centos7
-    - build_archive:linux:x86:focal:cuda12
+    - build_archive:linux:x86:centos7:cuda11
+    - build_archive:linux:x86:focal
     - build_archive:linux:arm64:jammy
     - build_archive:macos:arm
     - build_archive:windows
