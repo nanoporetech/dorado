@@ -263,7 +263,7 @@ build:linux:x86:focal:debug:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
   artifacts: null
 
-build:linux:x86:focal_coverage:
+build:linux:x86:coverage:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
@@ -280,7 +280,7 @@ build:linux:x86:focal_coverage:
     paths:
       - build/dorado_test_coverage/*
 
-build:linux:x86:focal:clang_tidy:
+build:linux:x86:clang_tidy:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   extends:
@@ -293,7 +293,7 @@ build:linux:x86:focal:clang_tidy:
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
   artifacts: null
 
-.build:linux:x86:focal:valgrind:
+.build:linux:x86:valgrind:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
