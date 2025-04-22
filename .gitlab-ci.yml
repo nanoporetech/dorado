@@ -248,7 +248,7 @@ build:linux:x86:jammy:
   artifacts: null
 
 build:linux:x86:noble:
-  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-24.04.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -294,6 +294,7 @@ build:linux:x86:focal:clang_tidy:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-no-deps-20.04-cuda-${CUDA}.0:1.0
   extends:
+    - .linux_build_dependencies
     - .linux_runner
   script:
     - apt update
