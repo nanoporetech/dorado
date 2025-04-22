@@ -331,6 +331,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype,
+                                           const bool clip_to_zero,
                                            const bool right_align_insertions,
                                            const std::optional<std::filesystem::path>& phasing_bin)
         : m_dtypes{dtypes},
@@ -344,6 +345,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
           m_include_haplotype{include_haplotype},
+          m_clip_to_zero{clip_to_zero},
           m_right_align_insertions{right_align_insertions},
           m_phasing_bin{phasing_bin} {}
 
@@ -391,6 +393,10 @@ secondary::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_fi
                              std::move(depth),
                              std::move(tensors.read_ids_left),
                              std::move(tensors.read_ids_right)};
+
+    if (m_clip_to_zero) {
+        sample.features = torch::clamp_min(sample.features, 0);
+    }
 
     return sample;
 }

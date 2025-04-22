@@ -30,7 +30,8 @@ public:
                   const bool tag_keep_missing,
                   const std::string& read_group,
                   const int32_t min_mapq,
-                  const bool symmetric_indels);
+                  const bool symmetric_indels,
+                  const bool clip_to_zero);
 
     ~EncoderCounts() = default;
 
@@ -55,6 +56,7 @@ private:
     std::string m_read_group;
     int32_t m_min_mapq = 1;
     bool m_symmetric_indels = false;
+    bool m_clip_to_zero = false;
     FeatureIndicesType m_feature_indices;
 };
 

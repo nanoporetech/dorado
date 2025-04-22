@@ -23,6 +23,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::string& read_group,
         const std::string& tag_name,
         const int32_t tag_value,
+        const bool clip_to_zero,
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
         const std::optional<std::filesystem::path>& phasing_bin_fn) {
@@ -73,7 +74,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
 
         std::unique_ptr<EncoderCounts> ret = std::make_unique<EncoderCounts>(
                 normalise_type, config.feature_encoder_dtypes, tag_name, tag_value,
-                tag_keep_missing, read_group, min_mapq, sym_indels);
+                tag_keep_missing, read_group, min_mapq, sym_indels, clip_to_zero);
 
         return ret;
 
@@ -94,7 +95,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
 
         std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
                 config.feature_encoder_dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, row_per_read, include_dwells, include_haplotype,
+                min_mapq, max_reads, row_per_read, include_dwells, include_haplotype, clip_to_zero,
                 right_align_insertions, phasing_bin_fn);
 
         return ret;

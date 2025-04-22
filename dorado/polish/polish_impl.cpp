@@ -146,7 +146,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
 
     spdlog::info("Creating the encoder.");
     resources.encoder =
-            encoder_factory(model_config, read_group, tag_name, tag_value,
+            encoder_factory(model_config, read_group, tag_name, tag_value, true,
                             tag_keep_missing_override, min_mapq_override, phasing_bin_fn);
 
     spdlog::info("Creating the decoder.");
