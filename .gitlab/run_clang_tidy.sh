@@ -44,11 +44,11 @@ cmake \
   -B ${build_dir} \
   -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
-# Build dorado_utils so that its dependencies (htslib, etc...) get installed, otherwise
-# clang-tidy can't find their headers.
+# Build dependencies so that their headers get installed, otherwise
+# clang-tidy can't find them.
 cmake \
   --build ${build_dir} \
-  --target dorado_utils \
+  --target htslib_project \
   --target vbz_hdf_plugin \
   -j ${num_jobs}
 
