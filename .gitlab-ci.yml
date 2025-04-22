@@ -413,7 +413,6 @@ build_archive:linux:x86:centos7:cuda11:
     BUILD_OPTIONS: "-DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
     CUDA: "11.8"
   extends:
-    - .linux_build_dependencies
     - .linux_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
