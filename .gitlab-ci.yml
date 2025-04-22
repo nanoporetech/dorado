@@ -282,7 +282,7 @@ build:linux:x86:focal_coverage:
 
 build:linux:x86:focal:clang_tidy:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_build_dependencies
     - .linux_runner
