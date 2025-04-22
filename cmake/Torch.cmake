@@ -205,6 +205,22 @@ if(WIN32 AND DEFINED MKL_ROOT)
     link_directories(${MKL_ROOT}/lib/intel64)
 endif()
 
+# Add missing frameworks
+if (APPLE)
+    find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
+    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+    find_library(METAL_FRAMEWORK Metal REQUIRED)
+    find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
+    find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
+    list(APPEND TORCH_LIBRARIES
+        ${ACCELERATE_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+        ${METAL_FRAMEWORK}
+        ${MPS_FRAMEWORK}
+        ${MPSG_FRAMEWORK}
+    )
+endif()
+
 # Static builds require a few libs to be added
 if (USING_STATIC_TORCH_LIB)
     if(WIN32)
@@ -216,23 +232,7 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cusparse
         )
 
-    elseif(APPLE)
-        find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
-        find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
-        list(APPEND TORCH_LIBRARIES
-            ${ACCELERATE_FRAMEWORK}
-            ${FOUNDATION_FRAMEWORK}
-        )
-        find_library(METAL_FRAMEWORK Metal REQUIRED)
-        find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
-        find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
-        list(APPEND TORCH_LIBRARIES
-            ${METAL_FRAMEWORK}
-            ${MPS_FRAMEWORK}
-            ${MPSG_FRAMEWORK}
-        )
-
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ${CUDAToolkit_VERSION} VERSION_LESS 11.0)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUDAToolkit_VERSION VERSION_LESS 11.0)
         list(APPEND TORCH_LIBRARIES
             # Missing libs that Torch forgets to link to
             ${TORCH_LIB}/lib/libbreakpad.a
