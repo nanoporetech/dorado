@@ -181,7 +181,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
                                const std::vector<c10::optional<c10::Stream>>& streams,
-                               const secondary::EncoderBase& encoder);
+                               const secondary::EncoderBase& encoder,
+                               const std::vector<std::pair<std::string, int64_t>>& draft_lens);
 
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,

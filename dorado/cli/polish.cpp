@@ -865,7 +865,8 @@ void run_polishing(const Options& opt,
                         opt.run_variant_calling);
 
                 polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                                    resources.streams, *resources.encoder);
+                                                    resources.streams, *resources.encoder,
+                                                    draft_lens);
 
                 if (thread_sample_producer.joinable()) {
                     thread_sample_producer.join();

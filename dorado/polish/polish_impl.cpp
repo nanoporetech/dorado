@@ -31,6 +31,7 @@
 // #define DEBUG_POLISH_SAMPLE_CONSTRUCTION
 // #define DEBUG_INFERENCE_DATA
 // #define DEBUG_VC_DATA
+// #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
 
 namespace dorado::polisher {
 
@@ -862,21 +863,40 @@ void sample_producer(PolisherResources& resources,
     infer_data.terminate();
 }
 
-void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
-                               utils::AsyncQueue<DecodeData>& decode_queue,
-                               std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
-                               const std::vector<c10::optional<c10::Stream>>& streams,
-                               const secondary::EncoderBase& encoder) {
+void infer_samples_in_parallel(
+        utils::AsyncQueue<InferenceData>& batch_queue,
+        utils::AsyncQueue<DecodeData>& decode_queue,
+        std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
+        const std::vector<c10::optional<c10::Stream>>& streams,
+        const secondary::EncoderBase& encoder,
+        [[maybe_unused]] const std::vector<std::pair<std::string, int64_t>>& draft_lens) {
     utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
 
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    auto batch_infer = [&encoder](secondary::ModelTorchBase& model, const InferenceData& batch,
-                                  const int32_t tid) {
+    auto batch_infer = [&encoder, &draft_lens](secondary::ModelTorchBase& model,
+                                               const InferenceData& batch, const int32_t tid) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
+
+        (void)draft_lens;
+
+#ifdef DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
+        // Debug write tensors for each sample, individually.
+        {
+            for (int64_t ii = 0; ii < dorado::ssize(batch.samples); ++ii) {
+                const int64_t seq_id = batch.samples[ii].seq_id;
+                const std::string& seq_name = draft_lens[seq_id].first;
+                const int64_t s = batch.samples[ii].start();
+                const int64_t e = batch.samples[ii].end();
+                utils::save_tensor(batch.samples[ii].features,
+                                   "debug.tensor_in.seq_" + seq_name + "." + std::to_string(s) +
+                                           "_" + std::to_string(e) + ".pt");
+            }
+        }
+#endif
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         timer::TimerHighRes timer_collate;
@@ -945,6 +965,21 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             }
 #endif
         }
+
+#ifdef DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
+        // Debug write output tensors for each sample, individually.
+        {
+            for (int64_t ii = 0; ii < output.size(0); ++ii) {
+                const int64_t seq_id = batch.samples[ii].seq_id;
+                const std::string& seq_name = draft_lens[seq_id].first;
+                const int64_t s = batch.samples[ii].start();
+                const int64_t e = batch.samples[ii].end();
+                utils::save_tensor(output[ii], "debug.tensor_out.seq_" + seq_name + "." +
+                                                       std::to_string(s) + "_" + std::to_string(e) +
+                                                       ".pt");
+            }
+        }
+#endif
 
         // Debug output.
         {
