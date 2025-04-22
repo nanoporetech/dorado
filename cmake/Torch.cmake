@@ -53,6 +53,11 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 11.8)
       list(APPEND CMAKE_CUDA_ARCHITECTURES 90)
     endif()
+
+    # Versions of nvcc before CUDA 12.x don't support CUDA C++20 as a standard.
+    if (CUDAToolkit_VERSION VERSION_LESS 12.0)
+        set(CMAKE_CUDA_STANDARD 17)
+    endif()
 endif()
 
 if(DEFINED DORADO_LIBTORCH_DIR)
