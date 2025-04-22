@@ -288,7 +288,7 @@ build:linux:x86:clang_tidy:
     - .linux_runner
   script:
     - apt update
-    - apt install -y clang clang-tidy
+    - apt install -y automake clang clang-tidy
     - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
   artifacts: null
