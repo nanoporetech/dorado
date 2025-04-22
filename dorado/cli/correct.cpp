@@ -454,7 +454,7 @@ int correct(int argc, char* argv[]) {
             const int64_t num_blocks =
                     node.get_current_index_block_id() + ((node.get_index_seqs() > 0) ? 1 : 0);
 
-            std::cout << num_blocks << std::endl;
+            std::cout << num_blocks << '\n';
 
             return EXIT_SUCCESS;
         }
