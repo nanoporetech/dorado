@@ -369,7 +369,6 @@ target_include_directories(dorado_lib
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
-        ${DORADO_3RD_PARTY_SOURCE}/intervaltree
 )
 
 enable_testing()
