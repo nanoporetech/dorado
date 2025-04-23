@@ -408,6 +408,9 @@ int correct(int argc, char* argv[]) {
 
     // Check if input options are good.
     validate_options(opt);
+#if DORADO_CUDA_BUILD
+    cli::log_requested_cuda_devices(opt.device);
+#endif
 
     // Set the number of threads so that libtorch doesn't cause a thread bomb.
     utils::initialise_torch();

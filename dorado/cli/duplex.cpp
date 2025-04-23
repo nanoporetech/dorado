@@ -625,6 +625,7 @@ int duplex(int argc, char* argv[]) {
 
 #if DORADO_CUDA_BUILD
             auto initial_device_info = utils::get_cuda_device_info(device, false);
+            cli::log_requested_cuda_devices(initial_device_info);
 #endif
 
             const auto modbase_params = validate_modbase_params(models.mods_model_paths, parser);
