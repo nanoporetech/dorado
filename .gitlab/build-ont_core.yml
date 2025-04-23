@@ -31,7 +31,7 @@ build:linux:x86:focal:ont_core:
 
 build:macos:arm:ont_core:
   variables:
-    BUILD_PRESET: "macos-aarch64-conan-dorado-release"
+    BUILD_PRESET: "macos-aarch64-conan_appleclang15-dorado-release"
   extends:
     - .macos_arm_runner
     - .test_ont_core_compatibility
