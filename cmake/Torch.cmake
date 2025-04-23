@@ -437,7 +437,7 @@ if (USING_STATIC_TORCH_LIB)
     endif()
 elseif (TORCH_VERSION VERSION_EQUAL 2.6 AND LINUX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
     # For some reason cublas is missing in non-static Linux builds (ie sanitized), so do that here.
-    list(APPEND TORCH_LIBRARIES ${TORCH_LIB}/lib/libcublas-3b81d170.so.11)
+    list(APPEND TORCH_LIBRARIES ${TORCH_LIB}/lib/libcublas-d9343511.so.12)
 endif()
 
 # Create the target which other libraries can link to
