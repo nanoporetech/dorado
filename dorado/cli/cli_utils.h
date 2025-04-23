@@ -147,6 +147,22 @@ inline bool validate_device_string(const std::string& device) {
     return false;
 }
 
+#if DORADO_CUDA_BUILD
+inline void log_requested_cuda_devices(const std::vector<utils::CUDADeviceInfo>& cuda_device_info) {
+    if (!cuda_device_info.empty()) {
+        spdlog::info("Using CUDA devices:");
+        for (const auto& device_info : cuda_device_info) {
+            spdlog::info("cuda:{} - {}", device_info.device_id, device_info.device_properties.name);
+        }
+    }
+}
+
+inline void log_requested_cuda_devices(const std::string& device_string) {
+    auto cuda_device_info = utils::get_cuda_device_info(device_string, false);
+    log_requested_cuda_devices(cuda_device_info);
+}
+
+#endif
 }  // namespace cli
 
 }  // namespace dorado

@@ -379,6 +379,7 @@ void setup(const std::vector<std::string>& args,
 
 #if DORADO_CUDA_BUILD
     auto initial_device_info = utils::get_cuda_device_info(device, false);
+    cli::log_requested_cuda_devices(initial_device_info);
 #endif
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
