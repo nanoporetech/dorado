@@ -63,6 +63,9 @@ if(NOT TARGET htslib) # lazy include guard
             PROPERTIES 
                 "IMPORTED_LOCATION" ${htslib_PREFIX}/lib/libhts.a
                 "INTERFACE_INCLUDE_DIRECTORIES" ${htslib_PREFIX}/include)
-        message(STATUS "Done Building htslib")
+        message(STATUS "Done configuring htslib")
+
+        # Make sure that the project is built before any targets try to use it.
+        add_dependencies(htslib htslib_project)
     endif()
 endif()

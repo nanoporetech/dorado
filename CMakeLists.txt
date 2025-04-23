@@ -398,10 +398,6 @@ target_link_libraries(dorado_lib
         cxxpool
 )
 
-if(NOT WIN32)
-    add_dependencies(dorado_lib htslib_project)
-endif()
-
 if(NOT DORADO_DISABLE_DORADO)
     add_executable(dorado
         dorado/main.cpp

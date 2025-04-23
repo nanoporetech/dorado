@@ -105,8 +105,4 @@ if (NOT APPLE)
     target_link_libraries(dorado_secondary PRIVATE OpenSSL::SSL)
 endif()
 
-if(NOT WIN32)
-    add_dependencies(dorado_secondary htslib_project)
-endif()
-
 enable_warnings_as_errors(dorado_secondary)
