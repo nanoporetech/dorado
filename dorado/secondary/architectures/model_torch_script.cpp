@@ -11,7 +11,7 @@ ModelTorchScript::ModelTorchScript(const std::filesystem::path& model_path) {
     try {
         spdlog::debug("Loading model from file: {}", model_path.string());
         m_module = torch::jit::load(model_path.string());
-        m_module.get_method("set_normalise")({false});
+        m_module.get_method("set_normalise")({true});
     } catch (const c10::Error& e) {
         throw std::runtime_error("Error loading model from " + model_path.string() +
                                  " with error: " + e.what());

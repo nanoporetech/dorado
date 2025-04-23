@@ -165,6 +165,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         // Load a TorchScript model. Parameters are not important here.
         spdlog::debug("Loading a TorchScript model.");
         model = std::make_unique<ModelTorchScript>(config.model_dir / config.model_file);
+        model->set_normalise(false);
 
     } else if (model_type == ModelType::GRU) {
         spdlog::debug("Constructing a GRU model.");
