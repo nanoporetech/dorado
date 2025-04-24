@@ -1,8 +1,10 @@
 #pragma once
 
-#include "config/common.h"
-
 #include <torch/nn.h>
+
+namespace dorado::config {
+struct LinearUpsampleParams;
+}
 
 namespace dorado::nn {
 

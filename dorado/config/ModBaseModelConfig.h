@@ -47,6 +47,7 @@ struct ModelGeneralParams {
     const int kmer_len;
     const int num_out;
     const int stride;
+    const int sequence_stride;
 
     // For conv_lstm_v3 models only
     const std::optional<ModulesParams> modules;
@@ -56,6 +57,7 @@ struct ModelGeneralParams {
                        int kmer_len_,
                        int num_out_,
                        int stride_,
+                       int sequence_stride_,
                        std::optional<ModulesParams> modules_);
 
     int stride_ratio() const { return modules.has_value() ? modules->stride_ratio() : 1; }

@@ -208,12 +208,14 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
                                        int kmer_len_,
                                        int num_out_,
                                        int stride_,
+                                       int sequence_stride_,
                                        std::optional<ModulesParams> modules_)
         : model_type(model_type_),
           size(size_),
           kmer_len(kmer_len_),
           num_out(num_out_),
           stride(stride_),
+          sequence_stride(sequence_stride_),
           modules(std::move(modules_)) {
     if (model_type == ModelType::UNKNOWN) {
         throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
@@ -230,12 +232,11 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
             (modules->lstms.front().size != modules->lstms.back().size)) {
             throw std::runtime_error("Modbase model config lstm size mismatch");
         }
-        int signal_stride = 1;
-        for (const auto& conv : modules->signal_convs) {
-            signal_stride *= conv.stride;
-        }
-        if (stride != signal_stride) {
+        if (stride != stride_product(modules->signal_convs)) {
             throw std::runtime_error("Modbase model config signal convolution stride mismatch");
+        }
+        if (sequence_stride != stride_product(modules->sequence_convs)) {
+            throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
         }
         if (num_out != modules->linear.out_size) {
             throw std::runtime_error("Modbase model config linear and num_out mismatch");
@@ -263,8 +264,11 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     const auto kmer_len = get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED);
     const auto num_out = get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED);
     const auto stride = get_int_in_range(segment, "stride", 1, MAX_STRIDE, 3);
+    const auto sequence_stride =
+            get_int_in_range(segment, "sequence_stride", 1, MAX_STRIDE, stride);
 
-    ModelGeneralParams params{model_type, size, kmer_len, num_out, stride, modules};
+    ModelGeneralParams params{model_type,      size,   kmer_len, num_out, stride,
+                              sequence_stride, modules};
     return params;
 }
 

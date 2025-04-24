@@ -1,5 +1,7 @@
 #include "LinearUpsample.h"
 
+#include "config/common.h"
+
 namespace dorado::nn {
 
 LinearUpsampleImpl::LinearUpsampleImpl(const int size, const int scale_factor_)

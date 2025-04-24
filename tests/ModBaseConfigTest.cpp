@@ -64,49 +64,49 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
             GENERATE_COPY(table<fs::path, Gen, Mod, Ctx, Rmt>({
             std::make_tuple(
                 _5mCG, 
-                Gen{ModelType::CONV_V1, 64, 9, 2, 3, std::nullopt}, 
+                Gen{ModelType::CONV_V1, 64, 9, 2, 3, 3, std::nullopt}, 
                 Mod{{"m"}, {"5mC"}, "CG", 0},
                 Ctx{50, 50, 100, 4, 4, false, false}, 
                 Rmt{}
             ),
             std::make_tuple(
                 _5mCG_5hmCG, 
-                Gen{ModelType::CONV_LSTM_V1, 256, 9, 3, 3, std::nullopt},
+                Gen{ModelType::CONV_LSTM_V1, 256, 9, 3, 3, 3, std::nullopt},
                 Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0,},                
                 Ctx{50, 50, 100, 4, 4, false, false}, 
                 Rmt{6}
             ),
             std::make_tuple(
                 _pseU,
-                Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, 3, std::nullopt},
+                Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, 3, 3, std::nullopt},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
                 Ctx{150, 150, 300, 4, 4, true, false},
                 Rmt{3}
             ),
             std::make_tuple(
                 _pseU_j,
-                Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, 3, std::nullopt},
+                Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, 3, 3, std::nullopt},
                 Mod{{"17802"}, {"pseU"}, "T", 0},            
                 Ctx{150, 150, 300, 4, 4, true, true},
                 Rmt{3}
             ),
             std::make_tuple(
                 _5mCG_5hmCG_v3,
-                Gen{ModelType::CONV_LSTM_V2, 256, 9, 3, 6, std::nullopt},
+                Gen{ModelType::CONV_LSTM_V2, 256, 9, 3, 6, 6, std::nullopt},
                 Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0},            
                 Ctx{96, 96, 192, 4, 4, false, true},
                 Rmt{6}
             ),
             std::make_tuple(
                 _6mA_v3,
-                Gen{ModelType::CONV_LSTM_V2, 256, 9, 2, 3, std::nullopt},
+                Gen{ModelType::CONV_LSTM_V2, 256, 9, 2, 3, 3, std::nullopt},
                 Mod{{"a"}, {"6mA"}, "A", 0},            
                 Ctx{150, 150, 600, 4, 4, false, true},
                 Rmt{6}
             ),
             std::make_tuple(
                 _6mA_v4,
-                Gen{ModelType::CONV_LSTM_V3, 384, 9, 2, 6, modules_6mA_v4},
+                Gen{ModelType::CONV_LSTM_V3, 384, 9, 2, 6, 1, modules_6mA_v4},
                 Mod{{"a"}, {"6mA"}, "A", 0},            
                 Ctx{150, 150, 600, 4, 4, false, true},
                 Rmt{6}
