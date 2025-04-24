@@ -1,0 +1,19 @@
+commit 4d8526e93771c4728cbdcd238369e434bad58d32
+Author: Christian Blume <chr.blume@gmail.com>
+Date:   Sun Mar 20 20:37:09 2022 +1300
+
+    use declval in place of result_of
+
+diff --git a/src/cxxpool.h b/src/cxxpool.h
+index fe200fb..fd69975 100644
+--- a/src/cxxpool.h
++++ b/src/cxxpool.h
+@@ -22,7 +22,7 @@ namespace detail {
+ template<typename Iterator>
+ struct future_info {
+     typedef typename std::iterator_traits<Iterator>::value_type future_type;
+-    typedef typename std::result_of<decltype(&future_type::get)(future_type)>::type value_type;
++    typedef decltype(std::declval<future_type>().get()) value_type;
+     static constexpr bool is_void = std::is_void<value_type>::value;
+ };
+ 

@@ -30,13 +30,6 @@ if (DORADO_GPU_BUILD)
     endif()
 endif()
 
-target_compile_definitions(dorado_torch_utils
-    PUBLIC
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-        DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
-        DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>
-)
-
 target_include_directories(dorado_torch_utils
     INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -94,7 +87,5 @@ endif()
 if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
     set_source_files_properties(duplex_utils.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
-
-add_dependencies(dorado_torch_utils dorado_utils)
 
 enable_warnings_as_errors(dorado_torch_utils)

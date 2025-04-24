@@ -54,7 +54,7 @@ if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
     list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif()
 
-set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set warnings and RPATH before we create any targets.
@@ -367,10 +367,8 @@ target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
         ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
-        ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
-        ${DORADO_3RD_PARTY_SOURCE}/intervaltree
 )
 
 enable_testing()
@@ -396,11 +394,8 @@ target_link_libraries(dorado_lib
     PRIVATE
         minimap2
         toml11::toml11
+        cxxpool
 )
-
-if(NOT WIN32)
-    add_dependencies(dorado_lib htslib_project)
-endif()
 
 if(NOT DORADO_DISABLE_DORADO)
     add_executable(dorado
@@ -445,6 +440,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado_model_downloader_lib
         dorado_compat
         minimap2
+        cxxpool
     )
 
     install(TARGETS dorado RUNTIME)

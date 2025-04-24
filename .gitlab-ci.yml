@@ -263,7 +263,7 @@ build:linux:x86:focal:debug:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
   artifacts: null
 
-build:linux:x86:focal_coverage:
+build:linux:x86:coverage:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
@@ -280,20 +280,20 @@ build:linux:x86:focal_coverage:
     paths:
       - build/dorado_test_coverage/*
 
-build:linux:x86:focal:clang_tidy:
+build:linux:x86:clang_tidy:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_build_dependencies
     - .linux_runner
   script:
     - apt update
-    - apt install -y clang clang-tidy
+    - apt install -y automake clang clang-tidy
     - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
   artifacts: null
 
-.build:linux:x86:focal:valgrind:
+.build:linux:x86:valgrind:
   stage: build
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
@@ -434,7 +434,7 @@ build_archive:linux:x86:rocky8:
 build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
   extends:
     - .windows_runner
     - .build_dorado_archive

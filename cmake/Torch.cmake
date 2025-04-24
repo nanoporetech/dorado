@@ -44,14 +44,19 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
     set(CUDNN_INCLUDE_PATH ${DORADO_3RD_PARTY_SOURCE}/fake_cudnn)
 
     set(CMAKE_CUDA_ARCHITECTURES 62 70 72 75)
-    if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 11.3)
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 11.3)
         list(APPEND CMAKE_CUDA_ARCHITECTURES 80 86)
     endif()
-    if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 11.4)
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 11.4)
       list(APPEND CMAKE_CUDA_ARCHITECTURES 87)
     endif()
-    if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 11.8)
+    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 11.8)
       list(APPEND CMAKE_CUDA_ARCHITECTURES 90)
+    endif()
+
+    # Versions of nvcc before CUDA 12.x don't support CUDA C++20 as a standard.
+    if (CUDAToolkit_VERSION VERSION_LESS 12.0)
+        set(CMAKE_CUDA_STANDARD 17)
     endif()
 endif()
 
@@ -63,7 +68,7 @@ else()
     # Otherwise download a new one
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
-            if(${CUDAToolkit_VERSION} VERSION_LESS 11.0)
+            if(CUDAToolkit_VERSION VERSION_LESS 11.0)
                 set(TORCH_VERSION 1.10.2)
                 if (TRY_USING_STATIC_TORCH_LIB)
                     set(TORCH_URL ${DORADO_CDN_URL}/torch-1.10.2.1-linux-aarch64-ont-static.zip)
@@ -77,7 +82,7 @@ else()
                     set(TORCH_HASH "9b5b111986dd54b7d25f9f9382e56b06423bb18ae3e2c0a19de6d74949d9c06a")
                     set(TORCH_LIB_SUFFIX "/torch")
                 endif()
-            elseif(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 12.0)
+            elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.0)
                 if (TRY_USING_STATIC_TORCH_LIB)
                     set(TORCH_URL ${DORADO_CDN_URL}/torch-2.6.0-linux-aarch64-ont.zip)
                     set(TORCH_PATCH_SUFFIX -ont)
@@ -105,7 +110,7 @@ else()
         else()
             if (TRY_USING_STATIC_TORCH_LIB)
                 if(DORADO_USING_OLD_CPP_ABI)
-                    if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 12.8)
+                    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8)
                         set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.2-ont-CUDA-12.8-linux-x64-pre-cxx11.zip)
                         set(TORCH_HASH "ce1b9fc2f829b5bf4e4761d69f2cdf58fc64c5df604cd80311e68e3e9cef7df6")
                     else()
@@ -114,7 +119,7 @@ else()
                     endif()
                     set(TORCH_PATCH_SUFFIX -ont-pre-cxx11)
                 else()
-                    if(${CUDAToolkit_VERSION} VERSION_GREATER_EQUAL 12.8)
+                    if(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8)
                         set(TORCH_URL ${DORADO_CDN_URL}/torch-${TORCH_VERSION}.2-ont-CUDA-12.8-linux-x64-cxx11-abi.zip)
                         set(TORCH_HASH "75bb7dd8c6e9d96261338b53ead12aa492d8d43f9abb724bd484a1150956db9f")
                     else()
@@ -205,6 +210,22 @@ if(WIN32 AND DEFINED MKL_ROOT)
     link_directories(${MKL_ROOT}/lib/intel64)
 endif()
 
+# Add missing frameworks
+if (APPLE)
+    find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
+    find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
+    find_library(METAL_FRAMEWORK Metal REQUIRED)
+    find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
+    find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
+    list(APPEND TORCH_LIBRARIES
+        ${ACCELERATE_FRAMEWORK}
+        ${FOUNDATION_FRAMEWORK}
+        ${METAL_FRAMEWORK}
+        ${MPS_FRAMEWORK}
+        ${MPSG_FRAMEWORK}
+    )
+endif()
+
 # Static builds require a few libs to be added
 if (USING_STATIC_TORCH_LIB)
     if(WIN32)
@@ -216,23 +237,7 @@ if (USING_STATIC_TORCH_LIB)
             CUDA::cusparse
         )
 
-    elseif(APPLE)
-        find_library(ACCELERATE_FRAMEWORK Accelerate REQUIRED)
-        find_library(FOUNDATION_FRAMEWORK Foundation REQUIRED)
-        list(APPEND TORCH_LIBRARIES
-            ${ACCELERATE_FRAMEWORK}
-            ${FOUNDATION_FRAMEWORK}
-        )
-        find_library(METAL_FRAMEWORK Metal REQUIRED)
-        find_library(MPS_FRAMEWORK MetalPerformanceShaders REQUIRED)
-        find_library(MPSG_FRAMEWORK MetalPerformanceShadersGraph REQUIRED)
-        list(APPEND TORCH_LIBRARIES
-            ${METAL_FRAMEWORK}
-            ${MPS_FRAMEWORK}
-            ${MPSG_FRAMEWORK}
-        )
-
-    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND ${CUDAToolkit_VERSION} VERSION_LESS 11.0)
+    elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CUDAToolkit_VERSION VERSION_LESS 11.0)
         list(APPEND TORCH_LIBRARIES
             # Missing libs that Torch forgets to link to
             ${TORCH_LIB}/lib/libbreakpad.a
@@ -428,7 +433,7 @@ if (USING_STATIC_TORCH_LIB)
             ${ont_torch_extra_platform_libs}
         )
 
-        if (${CMAKE_VERSION} VERSION_LESS 3.23.4 AND EXISTS ${CUDAToolkit_TARGET_DIR}/lib64/libcusolver_lapack_static.a)
+        if (CMAKE_VERSION VERSION_LESS 3.23.4 AND EXISTS ${CUDAToolkit_TARGET_DIR}/lib64/libcusolver_lapack_static.a)
             # CUDA::cusolver_static is missing the cusolver_lapack_static target+dependency in older versions of cmake
             list(APPEND TORCH_LIBRARIES
                 ${CUDAToolkit_TARGET_DIR}/lib64/libcusolver_lapack_static.a

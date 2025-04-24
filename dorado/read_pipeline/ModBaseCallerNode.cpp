@@ -77,7 +77,9 @@ void ModBaseCallerNode::start_threads() {
 
     for (size_t worker_id = 0; worker_id < m_runners.size(); ++worker_id) {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_models(); ++model_id) {
-            m_runner_workers.emplace_back([=] { modbasecall_worker_thread(worker_id, model_id); });
+            m_runner_workers.emplace_back([this, worker_id, model_id] {
+                modbasecall_worker_thread(worker_id, model_id);
+            });
             ++m_num_active_runner_workers;
         }
     }

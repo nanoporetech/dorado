@@ -34,8 +34,6 @@ const std::string VALID_SEPARATOR{"+"};
 const std::string VALID_SEPARATOR_LINE{VALID_SEPARATOR + "\n"};
 const std::string VALID_QUAL{"!$#(%(()N~"};
 const std::string VALID_QUAL_LINE{VALID_QUAL + "\n"};
-const std::string VALID_LINE_WRAPPED_QUAL{"!$#(\n%(()N~"};
-const std::string VALID_LINE_WRAPPED_QUAL_LINE{VALID_LINE_WRAPPED_QUAL + "\n"};
 const std::string VALID_QUAL_2{"$(#%(()N~!"};
 const std::string VALID_QUAL_LINE_2{VALID_QUAL_2 + "\n"};
 const std::string VALID_FASTQ_RECORD{VALID_ID_LINE + VALID_SEQ_LINE + VALID_SEPARATOR_LINE +

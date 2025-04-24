@@ -57,6 +57,7 @@ at::Tensor make_polyploid_probs(const std::string_view symbols,
 
     // Fill the probabilities for the input sequences.
     std::vector<at::Tensor> all_probs;
+    all_probs.reserve(cons_seqs.size());
     for (size_t i = 0; i < std::size(cons_seqs); ++i) {
         all_probs.emplace_back(make_haploid_probs(symbols, cons_seqs[i], true_pos_probs[i]));
     }

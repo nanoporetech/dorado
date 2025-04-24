@@ -87,7 +87,7 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
     }
 
     if (!data.empty()) {
-        const auto folder_entries = utils::fetch_directory_entries(data.u8string(), recursive);
+        const auto folder_entries = utils::fetch_directory_entries(data.string(), recursive);
         const auto chemisty = file_info::get_unique_sequencing_chemistry(folder_entries);
         auto model_search = models::ModelComplexSearch(model_complex, chemisty, true);
 
@@ -208,17 +208,17 @@ int download(int argc, char* argv[]) {
         if (fs::exists(new_model_path)) {
             if (!overwrite) {
                 spdlog::info(" - found existing model: '{}'", info.name);
-                spdlog::debug(" - model found at: '{}'", fs::canonical(new_model_path).u8string());
+                spdlog::debug(" - model found at: '{}'", fs::canonical(new_model_path).string());
                 continue;
             }
             spdlog::debug(" - deleting existing model: {} at: '{}'", info.name,
-                          fs::canonical(new_model_path).u8string());
+                          fs::canonical(new_model_path).string());
             fs::remove_all(new_model_path);
         }
         try {
             const auto actual_path = downloader.get(info, "your");
             spdlog::debug(" - downloaded model: '{}' into '{}'", info.name,
-                          fs::canonical((actual_path)).u8string());
+                          fs::canonical((actual_path)).string());
         } catch (const std::exception& e) {
             spdlog::debug("downloader exception: {}", e.what());
             spdlog::error("Failed to download model: {}", info.name);

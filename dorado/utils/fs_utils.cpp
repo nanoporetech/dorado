@@ -32,7 +32,7 @@ bool has_write_permission(const fs::path& directory) {
     tmp.close();
 
     if (!tmp) {
-        spdlog::error("Insufficient permissions or drive is full: {}", directory.u8string());
+        spdlog::error("Insufficient permissions or drive is full: {}", directory.string());
         return false;
     }
 
@@ -78,7 +78,7 @@ fs::path get_downloads_path(const std::optional<fs::path>& override) {
 
 void clean_temporary_models(const std::set<std::filesystem::path>& paths) {
     for (const auto& path : paths) {
-        spdlog::trace("Deleting temporary model path: {}", path.u8string());
+        spdlog::trace("Deleting temporary model path: {}", path.string());
         try {
             fs::remove_all(path);
         } catch (const fs::filesystem_error& e) {

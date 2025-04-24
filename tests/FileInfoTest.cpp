@@ -110,14 +110,14 @@ CATCH_TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemistry", TEST_GROUP) {
         CATCH_CAPTURE(condition);
         auto data = fs::path(get_data_dir("pod5")) / condition;
         CATCH_CHECK(fs::exists(data));
-        auto result = get_unique_sequencing_chemistry(dir_entries(data.u8string(), false));
+        auto result = get_unique_sequencing_chemistry(dir_entries(data.string(), false));
         CATCH_CHECK(result == expected);
     }
 
     CATCH_SECTION("get_chemistry throws with inhomogeneous") {
         auto data = fs::path(get_data_dir("pod5")) / "mixed";
         utils::SuppressStdout suppress_error_message{};
-        CATCH_CHECK_THROWS(get_unique_sequencing_chemistry(dir_entries(data.u8string(), true)),
+        CATCH_CHECK_THROWS(get_unique_sequencing_chemistry(dir_entries(data.string(), true)),
                            Catch::Matchers::Contains(
                                    "Could not uniquely resolve chemistry from inhomogeneous data"));
     }

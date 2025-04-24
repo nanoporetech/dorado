@@ -2,6 +2,7 @@
 Checks: '-*,
 fuchsia-default-arguments-declarations,
 performance-*,
+-performance-enum-size,
 '
 WarningsAsErrors: '*'
 

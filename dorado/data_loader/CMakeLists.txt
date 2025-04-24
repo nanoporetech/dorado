@@ -13,6 +13,7 @@ PRIVATE
     vbz_hdf_plugin
     ${ZLIB_LIBRARIES}
     HighFive::Include
+    cxxpool
 )
 
 enable_warnings_as_errors(dorado_io_lib)

@@ -190,7 +190,8 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                 // Trim right.
                 if (all_same) {
                     for (auto& seq : seqs) {
-                        seq.resize(dorado::ssize(seq) - 1);
+                        assert(!seq.empty());
+                        seq.pop_back();
                     }
                     changed = true;
                     var.ref = seqs[0];

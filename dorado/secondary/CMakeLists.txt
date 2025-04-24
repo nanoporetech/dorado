@@ -56,26 +56,6 @@ add_library(dorado_secondary
     features/medaka_read_matrix.h
  )
 
-target_compile_definitions(dorado_secondary
-    PUBLIC
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-        DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
-        DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>
-)
-if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
-    target_compile_definitions(dorado_secondary
-        PUBLIC
-            DORADO_TX2=$<VERSION_LESS:${CUDAToolkit_VERSION},11.0>
-            DORADO_ORIN=$<VERSION_GREATER_EQUAL:${CUDAToolkit_VERSION},11.0>
-    )
-else()
-    target_compile_definitions(dorado_secondary
-        PUBLIC
-            DORADO_TX2=0
-            DORADO_ORIN=0
-    )
-endif()
-
 target_include_directories(dorado_secondary
     INTERFACE
     ${CMAKE_CURRENT_SOURCE_DIR}/..
@@ -100,13 +80,5 @@ target_link_libraries(dorado_secondary
         spdlog::spdlog
         toml11::toml11
 )
-
-if (NOT APPLE)
-    target_link_libraries(dorado_secondary PRIVATE OpenSSL::SSL)
-endif()
-
-if(NOT WIN32)
-    add_dependencies(dorado_secondary htslib_project)
-endif()
 
 enable_warnings_as_errors(dorado_secondary)
