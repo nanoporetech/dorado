@@ -516,8 +516,14 @@ MetalTxCaller::MetalTxCaller(const BasecallModelConfig &model_config) : MetalCal
     m_out_chunk_size = m_in_chunk_size / model_config.stride;
     m_batch_size = model_config.basecaller.batch_size();
     if (m_batch_size == 0) {
+        // Testing shows that a batch size of 16 is optimal in most cases, except
+        // on low memory machines where 16 can perform a lot worse than 8.
         // TODO: replace with implementation of autobatch size calculation
-        m_batch_size = 32;
+        if (utils::total_host_memory_GB() < 16) {
+            m_batch_size = 8;
+        } else {
+            m_batch_size = 16;
+        }
     }
 
     assert(m_out_chunk_size > 0);
