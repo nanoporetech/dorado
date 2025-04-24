@@ -499,7 +499,7 @@ build_archive:macos:arm:
     - mkdir test_archive
     - cd test_archive
     - mv ../archive .
-    - tar -xzf archive/dorado-*.gz
+    - tar -xzf archive/dorado-*.gz || unzip archive/dorado-*.zip
     - ldd ./dorado-*/bin/dorado
     - if [ -e ./dorado-*/lib/libdorado_torch_lib.so ]; then ldd ./dorado-*/lib/libdorado_torch_lib.so; fi
     # We just want to check that dorado will run here, so simply display the verbose version info
@@ -587,6 +587,16 @@ test_archive:linux:arm64:22.04:
     - .test_archive
   needs:
     - build_archive:linux:arm64:jammy
+
+# Test that you can run dorado on a CUDA-less windows machine
+test_archive:windows:cpu:
+  extends:
+    - .test_archive
+  tags:
+    - windows-11
+    - no-gpu
+  needs:
+    - build_archive:windows
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
