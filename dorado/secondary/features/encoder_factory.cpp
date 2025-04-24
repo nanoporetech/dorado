@@ -26,6 +26,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const bool clip_to_zero,
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
+        const std::optional<HaplotagSource>& hap_source,
         const std::optional<std::filesystem::path>& phasing_bin_fn) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key, const bool throw_on_fail) -> std::string {
@@ -88,15 +89,23 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const int32_t max_reads = std::stoi(get_value(kwargs, "max_reads", true));
         const bool row_per_read = get_bool_value(kwargs, "row_per_read", true);
         const bool include_dwells = get_bool_value(kwargs, "include_dwells", true);
-        const bool include_haplotype = get_bool_value(kwargs, "include_haplotype", true);
+        const bool include_haplotype_column = get_bool_value(kwargs, "include_haplotype", true);
+        HaplotagSource hap_source_final = hap_source ? *hap_source : HaplotagSource::UNPHASED;
 
         // Optional. Config version >= 3 feature.
         const bool right_align_insertions = get_bool_value(kwargs, "right_align_insertions", false);
 
+        if ((hap_source_final == HaplotagSource::BIN_FILE) && !phasing_bin_fn) {
+            spdlog::warn(
+                    "Haplotag source is the input bin file, but no input bin file is provided! "
+                    "Continuing without phasing.");
+            hap_source_final = HaplotagSource::UNPHASED;
+        }
+
         std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
                 config.feature_encoder_dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, row_per_read, include_dwells, include_haplotype, clip_to_zero,
-                right_align_insertions, phasing_bin_fn);
+                min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                right_align_insertions, include_haplotype_column, hap_source_final, phasing_bin_fn);
 
         return ret;
     }

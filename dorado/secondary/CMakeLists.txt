@@ -51,6 +51,7 @@ add_library(dorado_secondary
     features/encoder_factory.h
     features/encoder_read_alignment.cpp
     features/encoder_read_alignment.h
+    features/haplotag_source.h
     features/kadayashi_utils.cpp
     features/kadayashi_utils.h
     features/medaka_bamiter.cpp

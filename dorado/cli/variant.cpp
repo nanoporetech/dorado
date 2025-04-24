@@ -9,6 +9,7 @@
 #include "secondary/bam_info.h"
 #include "secondary/batching.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/features/haplotag_source.h"
 #include "secondary/stats.h"
 #include "secondary/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
@@ -96,7 +97,11 @@ struct Options {
     bool any_model = false;
     bool ambig_ref = false;
     float pass_min_qual = 3.0f;
+
+    secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
     std::optional<std::filesystem::path> phasing_bin_path;
+    bool hp_tag_from_bam = false;
+    bool unphased = false;
 };
 
 /// \brief Define the CLI options.
@@ -213,6 +218,20 @@ ParserPtr create_cli(int& verbosity) {
                 .default_value(3.0f)
                 .scan<'g', float>();
     }
+    {
+        parser->visible.add_group("Phasing options");
+        parser->visible.add_argument("--hp-tag")
+                .help("Use the HP tag from the input BAM file to load phasing information, instead "
+                      "of computing it.")
+                .flag()
+                .default_value(false);
+        parser->visible.add_argument("--phasing-bin")
+                .help("The .bin file containing phasing information for reads in the given BAM.");
+        parser->visible.add_argument("--unphased")
+                .help("Deactivate phasing.")
+                .flag()
+                .default_value(false);
+    }
 
     // Hidden advanced arguments.
     {
@@ -232,8 +251,6 @@ ParserPtr create_cli(int& verbosity) {
         parser->hidden.add_argument("--skip-model-compatibility-check")
                 .help("Allow any model to be applied on the data.")
                 .flag();
-        parser->hidden.add_argument("--phasing-bin")
-                .help("The .bin file containing phasing information for reads in the given BAM.");
     }
 
     return parser;
@@ -318,7 +335,14 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     }
 
     opt.pass_min_qual = parser.visible.get<float>("pass-qual-filter");
-    opt.phasing_bin_path = parser.hidden.present<std::string>("phasing-bin");
+
+    opt.phasing_bin_path = parser.visible.present<std::string>("phasing-bin");
+    opt.hp_tag_from_bam = parser.visible.get<bool>("hp-tag");
+    opt.unphased = parser.visible.get<bool>("unphased");
+    opt.haplotag_source = (opt.phasing_bin_path)  ? secondary::HaplotagSource::BIN_FILE
+                          : (opt.hp_tag_from_bam) ? secondary::HaplotagSource::BAM_HAP_TAG
+                          : (opt.unphased)        ? secondary::HaplotagSource::UNPHASED
+                                                  : secondary::HaplotagSource::COMPUTE;
 
     return opt;
 }
@@ -386,6 +410,14 @@ void validate_options(const Options& opt) {
 
     if (opt.phasing_bin_path && !std::filesystem::exists(*opt.phasing_bin_path)) {
         spdlog::error("Phasing bin path file {} does not exist.", opt.phasing_bin_path->string());
+        std::exit(EXIT_FAILURE);
+    }
+
+    // If multiple opposing haplotagging options are selected, report an error.
+    if (((opt.phasing_bin_path != std::nullopt) + opt.hp_tag_from_bam + opt.unphased) > 1) {
+        spdlog::error(
+                "Selected multiple haplotagging options (phasing-bin, hp-tag or unphased). Only "
+                "one is allowed.");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -884,7 +916,7 @@ int variant_caller(int argc, char* argv[]) {
         polisher::PolisherResources resources = polisher::create_resources(
                 model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads, opt.infer_threads,
                 /*full_precision=*/true, opt.read_group, opt.tag_name, opt.tag_value,
-                opt.tag_keep_missing, opt.min_mapq, opt.phasing_bin_path);
+                opt.tag_keep_missing, opt.min_mapq, opt.haplotag_source, opt.phasing_bin_path);
 
         // Progress bar.
         secondary::Stats stats;

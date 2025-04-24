@@ -330,9 +330,10 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
                                            const int32_t max_reads,
                                            const bool row_per_read,
                                            const bool include_dwells,
-                                           const bool include_haplotype,
                                            const bool clip_to_zero,
                                            const bool right_align_insertions,
+                                           const bool include_haplotype_column,
+                                           const HaplotagSource hap_source,
                                            const std::optional<std::filesystem::path>& phasing_bin)
         : m_dtypes{dtypes},
           m_num_dtypes{static_cast<int32_t>(std::size(dtypes)) + 1},
@@ -344,7 +345,8 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_max_reads{max_reads},
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
-          m_include_haplotype{include_haplotype},
+          m_include_haplotype_column{include_haplotype_column},
+          m_hap_source{hap_source},
           m_clip_to_zero{clip_to_zero},
           m_right_align_insertions{right_align_insertions},
           m_phasing_bin{phasing_bin} {}
@@ -361,10 +363,10 @@ secondary::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_fi
                 (m_phasing_bin) ? m_phasing_bin->string() : std::string();
 
         ReadAlignmentData counts = calculate_read_alignment(
-                bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name,
+                bam_file, nullptr, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name,
                 m_tag_value, m_tag_keep_missing, m_read_group, m_min_mapq, m_row_per_read,
-                m_include_dwells, m_include_haplotype, phasing_bin_fn_str, m_max_reads,
-                m_right_align_insertions);
+                m_include_dwells, m_include_haplotype_column, m_hap_source, phasing_bin_fn_str,
+                m_max_reads, m_right_align_insertions);
 
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);

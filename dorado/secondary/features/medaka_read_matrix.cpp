@@ -1,10 +1,15 @@
 #include "medaka_read_matrix.h"
 
 #include "kadayashi_utils.h"
+#include "local_haplotagging.h"
 #include "medaka_bamiter.h"
 #include "secondary/bam_file.h"
 #include "utils/ssize.h"
 
+#include <htslib/faidx.h>
+#include <htslib/khash.h>
+#include <htslib/khash_str2int.h>
+#include <htslib/kstring.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
@@ -231,6 +236,7 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
 }
 
 ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
+                                           faidx_t *fai_ptr,  // Can be nullptr.
                                            const std::string &chr_name,
                                            const int64_t start,  // Zero-based.
                                            const int64_t end,    // Non-inclusive.
@@ -243,7 +249,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const int32_t min_mapq,
                                            const bool row_per_read,
                                            const bool include_dwells,
-                                           const bool include_haplotype,
+                                           const bool include_haplotype_column,
+                                           const secondary::HaplotagSource hap_source,
                                            const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,
                                            const bool right_align_insertions) {
@@ -256,17 +263,11 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
         throw std::runtime_error("The num_dtypes needs to be > 0.");
     }
 
-    // Optionally get the haplotag lookup if available.
-    const bool has_haplotag_bin = (!std::empty(in_haplotag_bin_fn));
-    const std::unordered_map<std::string, int32_t> kadayashi_qn2tag = [&in_haplotag_bin_fn,
-                                                                       &chr_name, start, end]() {
-        if (!std::empty(in_haplotag_bin_fn)) {
-            return query_bin_file_get_qname2tag(in_haplotag_bin_fn, chr_name, start, end);
-        }
-        return std::unordered_map<std::string, int32_t>();
-    }();
-
-    const bool use_hap_feature = include_haplotype || has_haplotag_bin;
+    if ((hap_source == secondary::HaplotagSource::BIN_FILE) && std::empty(in_haplotag_bin_fn)) {
+        throw std::runtime_error{
+                "Cannot load haplotags from the input bin file, because input bin file path is "
+                "empty!"};
+    }
 
     // Open bam etc. This is all now deferred to the caller
     htsFile *fp = bam_file.fp();
@@ -276,6 +277,69 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     if (!fp || !idx || !hdr) {
         throw std::runtime_error{"[calculate_read_alignment] BamFile not opened properly!"};
     }
+
+    spdlog::debug("Haplotag source: {}", secondary::haplotag_source_to_string(hap_source));
+
+    // Load haplotags, either from file or compute in place.
+    const std::unordered_map<std::string, int32_t> kadayashi_qn2tag =
+            [&hap_source, &in_haplotag_bin_fn, &fp, &idx, &hdr, &fai_ptr, &chr_name, start, end]() {
+                if (hap_source == secondary::HaplotagSource::BIN_FILE) {
+                    return query_bin_file_get_qname2tag(in_haplotag_bin_fn, chr_name, start, end);
+
+                } else if (hap_source == secondary::HaplotagSource::COMPUTE) {
+                    spdlog::trace("Running Kadayashi on region: {}:{}-{}", chr_name, (start + 1),
+                                  end);
+
+                    std::unordered_map<std::string, int32_t> ret =
+                            kadayashi::kadayashi_dvr_single_region_wrapper(
+                                    fp, idx, hdr, fai_ptr, chr_name.c_str(), start, end,
+                                    !KDYS_DISABLE_REGION_EXPANSION, 5, 5, 0.2f, 10, 200,
+                                    KDYS_DISABLE_MAX_READ_CAP);
+                    spdlog::trace("Kadayashi done on region: {}:{}-{}", chr_name, (start + 1), end);
+
+                    return ret;
+                }
+
+                return std::unordered_map<std::string, int32_t>();
+            }();
+
+    const auto get_haplotag = [&](const bam1_t *alignment, const std::string &qname) {
+        constexpr int8_t DEFAULT_HAPLOTYPE = 0;
+
+        if (!include_haplotype_column) {
+            return DEFAULT_HAPLOTYPE;
+
+        } else if (hap_source == secondary::HaplotagSource::UNPHASED) {
+            return DEFAULT_HAPLOTYPE;
+
+        } else if (hap_source == secondary::HaplotagSource::BAM_HAP_TAG) {
+            if (alignment == nullptr) {
+                return DEFAULT_HAPLOTYPE;
+            }
+
+            const uint8_t *const tag = bam_aux_get(alignment, "HP");
+
+            if (tag == nullptr) {
+                // Tag isn't preset.
+                return DEFAULT_HAPLOTYPE;
+            }
+
+            const int8_t haplotype = static_cast<int8_t>(bam_aux2i(tag));
+
+            return haplotype;
+
+        } else if ((hap_source == secondary::HaplotagSource::BIN_FILE) ||
+                   (hap_source == secondary::HaplotagSource::COMPUTE)) {
+            const auto it_hap = kadayashi_qn2tag.find(qname);
+            const int8_t haplotype = (it_hap == std::cend(kadayashi_qn2tag))
+                                             ? DEFAULT_HAPLOTYPE
+                                             : static_cast<int8_t>(it_hap->second);
+
+            return haplotype;
+        }
+
+        return DEFAULT_HAPLOTYPE;
+    };
 
     const std::string region =
             chr_name + ':' + std::to_string(start + 1) + '-' + std::to_string(end);
@@ -303,8 +367,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     int32_t max_n_reads = 0;
     const int32_t buffer_pos = static_cast<int32_t>(2 * (end - start));
     const int32_t buffer_reads = std::min(max_reads, 100);
-    const int32_t extra_featlen =
-            (include_dwells ? 1 : 0) + (use_hap_feature ? 1 : 0) + (num_dtypes > 1 ? 1 : 0);
+    const int32_t extra_featlen = include_dwells + include_haplotype_column + (num_dtypes > 1);
     ReadAlignmentData pileup(n_pos, max_n_reads, buffer_pos, buffer_reads, extra_featlen, 0);
 
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
@@ -420,19 +483,9 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                         throw std::runtime_error{"Datatype not found for qname: '" + qname + "'."};
                     }
                 }
+
                 // get haplotype tag
-                int8_t haplotype = 0;
-                if (!has_haplotag_bin) {
-                    const uint8_t *tag = bam_aux_get(alignment, "HP");
-                    if (tag) {
-                        haplotype = static_cast<int8_t>(bam_aux2i(tag));
-                    }
-                } else {
-                    const auto it_hap = kadayashi_qn2tag.find(qname);
-                    haplotype = (it_hap == std::cend(kadayashi_qn2tag))
-                                        ? 0
-                                        : static_cast<int8_t>(it_hap->second);
-                }
+                const int8_t haplotype = get_haplotag(alignment, qname);
 
                 std::vector<int8_t> dwells;
                 if (include_dwells) {
@@ -504,13 +557,13 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 if (include_dwells) {
                     pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN] = -1;  //dwell
                 }
-                if (use_hap_feature) {
+                if (include_haplotype_column) {
                     pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN +
                                   (include_dwells ? 1 : 0)] = read.haplotype;  //haplotag
                 }
                 if (num_dtypes > 1) {
                     pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN +
-                                  (include_dwells ? 1 : 0) + (use_hap_feature ? 1 : 0)] =
+                                  (include_dwells ? 1 : 0) + (include_haplotype_column ? 1 : 0)] =
                             read.dtype;  //dtype
                 }
                 min_minor = 1;  // in case there is also an indel, skip the major position
@@ -539,13 +592,13 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                     pileup.matrix[partial_index + BASE_FEATLEN] =
                             read.dwells[p->qpos + query_pos_offset];  //dwell
                 }
-                if (use_hap_feature) {
+                if (include_haplotype_column) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0)] =
                             read.haplotype;  //haplotag
                 }
                 if (num_dtypes > 1) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0) +
-                                  (use_hap_feature ? 1 : 0)] = read.dtype;  //dtype
+                                  (include_haplotype_column ? 1 : 0)] = read.dtype;  //dtype
                 }
             }
 
@@ -566,13 +619,13 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 if (include_dwells) {
                     pileup.matrix[partial_index + BASE_FEATLEN] = -1;  //dwell
                 }
-                if (use_hap_feature) {
+                if (include_haplotype_column) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0)] =
                             read.haplotype;  //haplotag
                 }
                 if (num_dtypes > 1) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0) +
-                                  (use_hap_feature ? 1 : 0)] = read.dtype;  //dtype
+                                  (include_haplotype_column ? 1 : 0)] = read.dtype;  //dtype
                 }
             }
         }

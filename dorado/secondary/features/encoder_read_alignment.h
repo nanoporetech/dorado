@@ -1,6 +1,7 @@
 #pragma once
 
 #include "encoder_base.h"
+#include "haplotag_source.h"
 #include "secondary/bam_file.h"
 #include "secondary/consensus/sample.h"
 
@@ -36,9 +37,10 @@ public:
                          const int32_t max_reads,
                          const bool row_per_read,
                          const bool include_dwells,
-                         const bool include_haplotype,
                          const bool clip_to_zero,
                          const bool right_align_insertions,
+                         const bool include_haplotype_column,  // Add a column to the tensor.
+                         const HaplotagSource hap_source,      // Where the column value comes from.
                          const std::optional<std::filesystem::path>& phasing_bin);
 
     ~EncoderReadAlignment() = default;
@@ -65,7 +67,8 @@ private:
     int32_t m_max_reads = 100;
     bool m_row_per_read = false;
     bool m_include_dwells = true;
-    bool m_include_haplotype = false;
+    bool m_include_haplotype_column = false;
+    HaplotagSource m_hap_source;
     bool m_clip_to_zero = false;
     bool m_right_align_insertions = false;
     std::optional<std::filesystem::path> m_phasing_bin;

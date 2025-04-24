@@ -82,6 +82,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
+                                   const std::optional<secondary::HaplotagSource>& haptag_source,
                                    const std::optional<std::filesystem::path>& phasing_bin_fn);
 
 /**

@@ -2,6 +2,7 @@
 
 #include "encoder_counts.h"
 #include "encoder_read_alignment.h"
+#include "haplotag_source.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -28,6 +29,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const bool clip_to_zero,
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
+        const std::optional<HaplotagSource>& hap_source,
         const std::optional<std::filesystem::path>& phasing_bin_fn);
 
 }  // namespace dorado::secondary
