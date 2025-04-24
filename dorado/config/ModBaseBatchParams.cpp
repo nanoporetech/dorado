@@ -19,7 +19,7 @@ namespace {
 namespace DefaultModBaseParameters {
 constexpr std::size_t batchsize{1024};
 
-#if DORADO_TX2
+#if DORADO_TX2 || DORADO_METAL_BUILD
 constexpr std::size_t batchsize_conv_lstm_v2{128};
 #else
 constexpr std::size_t batchsize_conv_lstm_v2{2048};
