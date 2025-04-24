@@ -27,7 +27,7 @@
              \"models\": ${MODELS},
              \"duplex_models\": ${DUPLEX_MODELS},
              \"sre_output\": \"${SRE_OUTPUT_ROOT}/${CI_COMMIT_SHA}/\",
-             \"sre_config\": \"${projectDir}/configs/${SRE_CONFIG}\",
+             \"sre_config\": \"\${projectDir}/configs/${SRE_CONFIG}\",
              \"basecaller_mode\": \"dorado_artifact\",
              \"basecaller\": \"${CI_COMMIT_SHA}\"
          }
