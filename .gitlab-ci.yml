@@ -434,7 +434,7 @@ build_archive:linux:x86:rocky8:
 build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT}"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
   extends:
     - .windows_runner
     - .build_dorado_archive
