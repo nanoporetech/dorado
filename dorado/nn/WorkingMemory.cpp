@@ -2,6 +2,8 @@
 
 #include "utils/math_utils.h"
 
+#include <stdexcept>
+
 #if DORADO_CUDA_BUILD
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
@@ -10,6 +12,22 @@
 namespace dorado::nn {
 
 #if DORADO_CUDA_BUILD
+
+std::string to_string(const TensorLayout &layout) {
+    switch (layout) {
+    case TensorLayout::NTC:
+        return std::string("NTC");
+    case TensorLayout::TNC:
+        return std::string("TNC");
+    case TensorLayout::CUTLASS_TNC_F16:
+        return std::string("CUTLASS_TNC_F16");
+    case TensorLayout::CUTLASS_TNC_I8:
+        return std::string("CUTLASS_TNC_I8");
+    case TensorLayout::CUBLAS_TN2C:
+        return std::string("CUBLAS_TN2C");
+    }
+    throw std::logic_error("TensorLayout unknown");
+}
 
 int64_t WorkingMemory::tensor_bytes(torch::IntArrayRef sizes, torch::Dtype dtype) {
     auto elems = c10::multiply_integers(sizes);

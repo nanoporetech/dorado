@@ -104,13 +104,18 @@ ConvStackImpl::ConvStackImpl(const std::vector<config::ConvParams> &layer_params
 }
 
 #if DORADO_CUDA_BUILD
-void ConvStackImpl::reserve_working_memory(WorkingMemory &wm) {
+void ConvStackImpl::reserve_working_memory(WorkingMemory &wm,
+                                           std::optional<TensorLayout> output_layout) {
     auto &last = layers.back();
-    last.output_layout = get_koi_lstm_input_layout(last.params.size, last.params.activation);
+    last.output_layout =
+            output_layout.has_value()
+                    ? output_layout.value()
+                    : get_koi_lstm_input_layout(last.params.size, last.params.activation);
+
     last.cutlass_conv = utils::get_dev_opt<bool>("cutlass_conv", true) &&
                         (last.output_layout == TensorLayout::CUTLASS_TNC_I8 ||
                          last.output_layout == TensorLayout::CUTLASS_TNC_F16);
-    if (last.cutlass_conv) {
+    if (last.cutlass_conv && layers.size() >= 2) {
         layers[layers.size() - 2].output_T_padding = last.params.winlen / 2;
     }
     for (auto &layer : layers) {
@@ -195,8 +200,9 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                                  params.winlen / 2, int(out.stride(0)), in.data_ptr(),
                                  out.data_ptr(), w_device.data_ptr(), b_device.data_ptr(),
                                  get_koi_activation(params.activation))) {
-            throw std::runtime_error(std::string("Koi convolution failed with in size ") +
-                                     std::to_string(params.insize));
+            throw std::runtime_error(
+                    std::string("Koi convolution (host_convolution_f16) failed with in size ") +
+                    std::to_string(params.insize));
         }
     } else if (cutlass_conv) {
 #if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
@@ -214,8 +220,9 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                                in.data_ptr(), w_device.data_ptr(), out_ntc.data_ptr(), nullptr,
                                b_device.data_ptr());
         if (res != KOI_SUCCESS) {
-            throw std::runtime_error(std::string("Koi convolution failed with in size ") +
-                                     std::to_string(params.insize));
+            throw std::runtime_error(
+                    std::string("Koi convolution (host_linear) failed with in size ") +
+                    std::to_string(params.insize));
         }
 #endif  // DORADO_TX2
     } else {
@@ -225,9 +232,14 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
         bool is_NT = (output_layout == TensorLayout::NTC);
         wm.next_TC(T_out, params.winlen * C_in, is_NT ? TensorLayout::NTC : TensorLayout::TNC);
         auto window_mat = wm.get_current_NTC_view();
-        host_window_ntwc_f16(stream, wm.N, T_in, C_in, params.winlen, params.stride,
-                             int(window_mat.stride(0)), int(window_mat.stride(1)), in.data_ptr(),
-                             window_mat.data_ptr());
+        auto res = host_window_ntwc_f16(stream, wm.N, T_in, C_in, params.winlen, params.stride,
+                                        int(window_mat.stride(0)), int(window_mat.stride(1)),
+                                        in.data_ptr(), window_mat.data_ptr());
+        if (res != KOI_SUCCESS) {
+            throw std::runtime_error(
+                    std::string("Koi convolution (host_window_ntwc_f16) failed with in size ") +
+                    std::to_string(params.insize));
+        }
 
         auto mm_in = wm.current.flatten(0, 1);
         at::Tensor mm_out;
@@ -242,9 +254,16 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
 
         mm_out = mm_out.view({-1, C_out});
         dorado::utils::matmul_f16(mm_in, w_device, mm_out);
-        host_bias_activation_f16_inplace(
+        res = host_bias_activation_f16_inplace(
                 stream, int(mm_out.size(0)), int(mm_out.size(1)), int(mm_out.stride(0)),
                 mm_out.data_ptr(), b_device.data_ptr(), get_koi_activation(params.activation));
+
+        if (res != KOI_SUCCESS) {
+            throw std::runtime_error(
+                    std::string("Koi convolution (host_bias_activation_f16_inplace) failed with in "
+                                "size ") +
+                    std::to_string(params.insize));
+        }
 
         if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
             wm.next_TC(T_out, C_out, output_layout);

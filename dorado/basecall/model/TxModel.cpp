@@ -1,6 +1,7 @@
 #include "TxModel.h"
 
 #include "config/BasecallModelConfig.h"
+#include "nn/LinearUpsample.h"
 #include "nn/TxModules.h"
 #include "torch_utils/gpu_profiling.h"
 

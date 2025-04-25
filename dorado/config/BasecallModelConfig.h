@@ -63,15 +63,6 @@ struct TxEncoderParams {
     std::string to_string() const;
 };
 
-struct EncoderUpsampleParams {
-    // The number of expected features in the encoder/decoder inputs
-    int d_model;
-    // Linear upsample scale factor
-    int scale_factor;
-
-    std::string to_string() const;
-};
-
 struct CRFEncoderParams {
     int insize;
     int n_base;
@@ -97,7 +88,7 @@ struct CRFEncoderParams {
 
 struct TxStack {
     TxEncoderParams tx;
-    EncoderUpsampleParams upsample;
+    LinearUpsampleParams upsample;
     CRFEncoderParams crf;
 
     // Self consistency check

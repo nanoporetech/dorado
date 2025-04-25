@@ -363,10 +363,10 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     return params;
 }
 
-EncoderUpsampleParams parse_encoder_upsample_params(const toml::value &cfg) {
+LinearUpsampleParams parse_encoder_upsample_params(const toml::value &cfg) {
     const auto &ups = toml::find(cfg, "model", "encoder", "upsample");
-    EncoderUpsampleParams params;
-    params.d_model = toml::find<int>(ups, "d_model");
+    LinearUpsampleParams params;
+    params.size = toml::find<int>(ups, "d_model");
     params.scale_factor = toml::find<int>(ups, "scale_factor");
     return params;
 }
@@ -397,7 +397,7 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     parse_qscore_params(config, config_toml);
 
     const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
-    const EncoderUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
+    const LinearUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
     const CRFEncoderParams crf_encoder = parse_crf_encoder_params(config_toml);
 
     config.tx = TxStack{tx_encoder, upsample, crf_encoder};
@@ -444,7 +444,7 @@ void TxStack::check() const {
         }
     };
     eq(crf.insize, tx.d_model, "linearcrfencoder.insize == transformer_encoder.layer.d_model");
-    eq(upsample.d_model, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
+    eq(upsample.size, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
 }
 
 bool BasecallModelConfig::has_normalised_basecaller_params() const {
@@ -562,13 +562,6 @@ std::string TxEncoderParams::to_string() const {
         << " deepnorm_alpha:"   << deepnorm_alpha    << " }";
     return oss.str();
     // clang-format on
-}
-
-std::string EncoderUpsampleParams::to_string() const {
-    std::ostringstream oss;
-    oss << "EncoderUpsampleParams {"
-        << " d_model:" << d_model << " scale_factor:" << scale_factor << " }";
-    return oss.str();
 }
 
 std::string CRFEncoderParams::to_string() const {

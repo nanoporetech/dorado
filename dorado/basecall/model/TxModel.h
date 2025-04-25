@@ -1,7 +1,7 @@
 #pragma once
 
-#include "nn/CRFModules.h"
 #include "nn/ConvStack.h"
+#include "nn/LinearUpsample.h"
 #include "nn/TxModules.h"
 #include "torch_utils/module_utils.h"
 

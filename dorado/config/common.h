@@ -27,6 +27,7 @@ enum class SublayerType {
     LINEAR_CRF_ENCODER,
     LSTM,
     PERMUTE,
+    UPSAMPLE,
     UNRECOGNISED
 };
 
@@ -46,5 +47,11 @@ struct ConvParams {
 
 ConvParams parse_conv_params(const toml::value& segment, bool has_clamp_next);
 std::vector<ConvParams> parse_convs(const std::vector<toml::value>& sublayers);
+
+struct LinearUpsampleParams {
+    int size;             // Number of input features
+    int scale_factor{1};  // Linear upsample scale factor
+    std::string to_string() const;
+};
 
 }  // namespace dorado::config

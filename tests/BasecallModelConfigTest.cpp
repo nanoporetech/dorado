@@ -139,7 +139,7 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
     CATCH_CHECK(config.tx->crf.scale == 5.0);
 
     CATCH_CHECK(config.tx->upsample.scale_factor == 2);
-    CATCH_CHECK(config.tx->upsample.d_model == 512);
+    CATCH_CHECK(config.tx->upsample.size == 512);
 
     CATCH_CHECK(config.basecaller.chunk_size() == 12288);
     CATCH_CHECK(config.basecaller.overlap() == 600);

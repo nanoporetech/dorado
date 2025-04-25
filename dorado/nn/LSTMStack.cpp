@@ -3,6 +3,8 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 
+#include <string>
+
 #if DORADO_CUDA_BUILD
 extern "C" {
 #include "koi.h"
@@ -13,7 +15,8 @@ extern "C" {
 
 namespace dorado::nn {
 
-LSTMStackImpl::LSTMStackImpl(int num_layers, int size) : layer_size(size) {
+LSTMStackImpl::LSTMStackImpl(int num_layers, int size, bool reverse_first_)
+        : layer_size(size), reverse_first(reverse_first_) {
     // torch::nn::LSTM expects/produces [N, T, C] with batch_first == true
     const auto lstm_opts = torch::nn::LSTMOptions(size, size).batch_first(true);
     for (int i = 0; i < num_layers; ++i) {
@@ -24,12 +27,14 @@ LSTMStackImpl::LSTMStackImpl(int num_layers, int size) : layer_size(size) {
 
 at::Tensor LSTMStackImpl::forward(at::Tensor x) {
     // Input is [N, T, C], contiguity optional
-    for (auto &rnn : rnns) {
-        x = std::get<0>(rnn(x.flip(1)));
+    for (size_t i = 0; i < rnns.size(); ++i) {
+        if (i != 0 && reverse_first) {
+            x = x.flip(1);
+        }
+        x = std::get<0>(rnns[i](x));
     }
-
     // Output is [N, T, C], contiguous
-    return (rnns.size() & 1) ? x.flip(1) : x;
+    return ((rnns.size() & 1) != reverse_first) ? x.flip(1) : x;
 }
 
 #if DORADO_CUDA_BUILD
@@ -80,7 +85,7 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
     auto gate_buf = wm.temp({wm.N, layer_size * 4}, torch::kF16);
 
     for (size_t layer_idx = 0; layer_idx < rnns.size(); ++layer_idx) {
-        bool reverse = !(layer_idx & 1);
+        bool reverse = reverse_first ? !(layer_idx & 1) : (layer_idx & 1);
         utils::ScopedProfileRange spr_lstm("lstm_layer", 3);
         auto state_buf = torch::zeros({wm.N, layer_size}, in.options());
         {
@@ -127,7 +132,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
 
     for (size_t layer_idx = 0; layer_idx < rnns.size(); ++layer_idx) {
         utils::ScopedProfileRange spr_lstm("lstm_layer", 3);
-        bool reverse = !(layer_idx & 1);
+        bool reverse = reverse_first ? !(layer_idx & 1) : (layer_idx & 1);
         auto in = wm.current;
         auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_F16) ? KOI_F16 : KOI_I8;
         auto state_buf = torch::zeros({wm.N, layer_size}, opts_f16);

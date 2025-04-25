@@ -34,6 +34,7 @@ struct ModulesParams {
     ConvParams merge_conv;
     std::vector<LSTMParams> lstms;  //< LSTM sizes per layer
     LinearParams linear;
+    std::optional<LinearUpsampleParams> upsample;
 
     int stride_ratio() const;
     int sequence_stride() const;
@@ -46,6 +47,7 @@ struct ModelGeneralParams {
     const int kmer_len;
     const int num_out;
     const int stride;
+    const int sequence_stride;
 
     // For conv_lstm_v3 models only
     const std::optional<ModulesParams> modules;
@@ -55,6 +57,7 @@ struct ModelGeneralParams {
                        int kmer_len_,
                        int num_out_,
                        int stride_,
+                       int sequence_stride_,
                        std::optional<ModulesParams> modules_);
 
     int stride_ratio() const { return modules.has_value() ? modules->stride_ratio() : 1; }
@@ -133,6 +136,13 @@ struct ModBaseModelConfig {
                        ModificationParams mods_,
                        ContextParams context_,
                        RefinementParams refine_);
+
+    // Sequence input tensor dimensions for chunked models
+    std::tuple<int64_t, int64_t> chunked_sequence_input_TC() const;
+    // Signal input tensor dimensions for chunked models
+    std::tuple<int64_t, int64_t> chunked_signal_input_TC() const;
+    // Output tensor dimensions for chunked models
+    std::tuple<int64_t, int64_t> chunked_output_TC() const;
 };
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);

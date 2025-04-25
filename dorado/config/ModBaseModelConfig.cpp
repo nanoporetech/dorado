@@ -2,6 +2,7 @@
 
 #include "config/common.h"
 #include "utils/bam_utils.h"
+#include "utils/dev_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -104,6 +105,13 @@ LinearParams parse_linear(const toml::value& segment) {
     return p;
 }
 
+LinearUpsampleParams parse_linear_upsample(const toml::value& segment) {
+    LinearUpsampleParams p;
+    p.size = toml::find<int>(segment, "size");
+    p.scale_factor = toml::find<int>(segment, "scale_factor");
+    return p;
+}
+
 LSTMParams parse_lstm(const toml::value& segment) {
     LSTMParams p;
     p.size = toml::find<int>(segment, "size");
@@ -155,7 +163,15 @@ ModulesParams parse_modules_params(const toml::value& config) {
     const auto& layers = toml::find(config, "encoder", "sublayers").as_array();
     m.merge_conv = parse_merge_conv(layers);
     m.lstms = parse_lstms(layers);
-    m.linear = parse_linear(layers.back());
+
+    for (const auto& layer : layers) {
+        if (sublayer_type(layer) == SublayerType::LINEAR) {
+            m.linear = parse_linear(layer);
+        }
+        if (sublayer_type(layer) == SublayerType::UPSAMPLE) {
+            m.upsample = parse_linear_upsample(layer);
+        }
+    }
 
     if (m.lstms.back().size != m.linear.in_size) {
         throw std::runtime_error("Modbase model config lstm and linear size mismatch");
@@ -192,12 +208,14 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
                                        int kmer_len_,
                                        int num_out_,
                                        int stride_,
+                                       int sequence_stride_,
                                        std::optional<ModulesParams> modules_)
         : model_type(model_type_),
           size(size_),
           kmer_len(kmer_len_),
           num_out(num_out_),
           stride(stride_),
+          sequence_stride(sequence_stride_),
           modules(std::move(modules_)) {
     if (model_type == ModelType::UNKNOWN) {
         throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
@@ -214,12 +232,11 @@ ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
             (modules->lstms.front().size != modules->lstms.back().size)) {
             throw std::runtime_error("Modbase model config lstm size mismatch");
         }
-        int signal_stride = 1;
-        for (const auto& conv : modules->signal_convs) {
-            signal_stride *= conv.stride;
-        }
-        if (stride != signal_stride) {
+        if (stride != stride_product(modules->signal_convs)) {
             throw std::runtime_error("Modbase model config signal convolution stride mismatch");
+        }
+        if (sequence_stride != stride_product(modules->sequence_convs)) {
+            throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
         }
         if (num_out != modules->linear.out_size) {
             throw std::runtime_error("Modbase model config linear and num_out mismatch");
@@ -247,8 +264,11 @@ ModelGeneralParams parse_general_params(const toml::value& config_toml) {
     const auto kmer_len = get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED);
     const auto num_out = get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED);
     const auto stride = get_int_in_range(segment, "stride", 1, MAX_STRIDE, 3);
+    const auto sequence_stride =
+            get_int_in_range(segment, "sequence_stride", 1, MAX_STRIDE, stride);
 
-    ModelGeneralParams params{model_type, size, kmer_len, num_out, stride, modules};
+    ModelGeneralParams params{model_type,      size,   kmer_len, num_out, stride,
+                              sequence_stride, modules};
     return params;
 }
 
@@ -382,8 +402,9 @@ ContextParams parse_context_params(const toml::value& config_toml) {
 
     constexpr int MAX_CHUNK_SIZE = 102400;
     const int min_chunk_size = context_before + context_after;
-    const int chunk_size =
-            get_int_in_range(params, "chunk_size", min_chunk_size, MAX_CHUNK_SIZE, min_chunk_size);
+    const int chunk_size = utils::get_dev_opt(
+            "modbase_chunksize",
+            get_int_in_range(params, "chunk_size", min_chunk_size, MAX_CHUNK_SIZE, min_chunk_size));
 
     const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
     const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
@@ -456,6 +477,25 @@ ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
                                  " != " + kl_b + "'.");
     }
 }
+
+std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_sequence_input_TC() const {
+    assert(is_chunked_input_model());
+    const int64_t T = context.chunk_size / general.stride_ratio();
+    const int64_t C = context.kmer_len * 4;
+    return {T, C};
+};
+
+std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_signal_input_TC() const {
+    assert(is_chunked_input_model());
+    return {context.chunk_size, 1};
+};
+
+std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_output_TC() const {
+    assert(is_chunked_input_model());
+    const int64_t T = context.chunk_size / general.stride;
+    const int64_t C = general.num_out;
+    return {T, C};
+};
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     const auto config_toml = toml::parse(model_path / "config.toml");

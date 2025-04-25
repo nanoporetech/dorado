@@ -9,7 +9,7 @@
 namespace dorado::nn {
 
 struct LSTMStackImpl : torch::nn::Module {
-    LSTMStackImpl(int num_layers, int size);
+    LSTMStackImpl(int num_layers, int size, bool reverse_first);
     at::Tensor forward(at::Tensor x);
 #if DORADO_CUDA_BUILD
     void reserve_working_memory(WorkingMemory &wm);
@@ -29,6 +29,7 @@ private:
 
     int layer_size;
     std::vector<torch::nn::LSTM> rnns;
+    const bool reverse_first;
 };
 
 TORCH_MODULE(LSTMStack);
