@@ -24,14 +24,14 @@ public:
                       const int32_t out_dim,                     // 128
                       const std::vector<int32_t>& kernel_sizes,  // [1, 17]
                       const std::vector<int32_t>& channel_dims,
-                      bool use_batch_norm  // True
-    );
+                      bool use_batch_norm,  // True
+                      bool add_expansion_layer);
 
     at::Tensor forward(at::Tensor x);
 
 private:
-    torch::nn::Sequential m_convs;
-    torch::nn::Linear m_expansion_layer;
+    torch::nn::Sequential m_convs{nullptr};
+    torch::nn::Linear m_expansion_layer{nullptr};
 };
 TORCH_MODULE(ReadLevelConv);
 

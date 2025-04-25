@@ -3,6 +3,7 @@
 #include "model_config.h"
 #include "model_gru.h"
 #include "model_latent_space_lstm.h"
+#include "model_slot_attention_consensus.h"
 #include "model_torch_base.h"
 #include "model_torch_script.h"
 
