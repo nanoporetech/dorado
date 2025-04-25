@@ -3,6 +3,7 @@
 .idea/
 .vs
 .vscode
+.devcontainer
 *.qdrep
 dist
 build
