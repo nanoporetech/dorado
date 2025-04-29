@@ -159,20 +159,9 @@ TempDir download_model(const std::string& model) {
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     using SampleType = dorado::models::SampleType;
     auto pipeline_restart = GENERATE(false, true);
-    auto model_type = GENERATE(SampleType::DNA, SampleType::RNA002, SampleType::RNA004);
+    auto model_type = GENERATE(SampleType::DNA, SampleType::RNA004);
     CATCH_CAPTURE(pipeline_restart);
     CATCH_CAPTURE(model_type);
-
-    if (model_type == SampleType::RNA002) {
-        auto trim_adapter = GENERATE(true, false);
-        auto rna_adapter = GENERATE(true, false);
-        CATCH_CAPTURE(trim_adapter);
-        CATCH_CAPTURE(rna_adapter);
-        auto adapter_info = std::make_shared<dorado::demux::AdapterInfo>();
-        adapter_info->trim_adapters = trim_adapter;
-        adapter_info->trim_adapters = rna_adapter;
-        client_info->contexts().register_context<const dorado::demux::AdapterInfo>(adapter_info);
-    }
 
     set_pipeline_restart(pipeline_restart);
 

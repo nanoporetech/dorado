@@ -56,25 +56,15 @@ using SampleType = dorado::models::SampleType;
 // This function returns the approximate position where the DNA adapter
 // in a dRNA read ends. The adapter location is determined by looking
 // at the median signal value over a sliding window on the raw signal.
-// RNA002 and RNA004 have different offsets and thresholds for the
-// sliding window heuristic.
-int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_type) {
+int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     assert(read.read_common.raw_data.dtype() == at::kShort);
-    static const std::unordered_map<SampleType, int> kOffsetMap = {
-            {SampleType::RNA002, 3500},
-            {SampleType::RNA004, 1000},
-    };
-    static const std::unordered_map<SampleType, int16_t> kAdapterCutoff = {
-            {SampleType::RNA002, static_cast<int16_t>(550)},
-            {SampleType::RNA004, static_cast<int16_t>(700)},
-    };
 
     const int kWindowSize = 250;
     const int kStride = 50;
     const int16_t kMedianDiff = 125;
     const int16_t kMedianDiffForDiffOnlyCheck = 150;
 
-    const int16_t kMinMedianForRNASignal = kAdapterCutoff.at(model_type);
+    const int16_t kMinMedianForRNASignal = 700;
 
     int signal_len = static_cast<int>(read.read_common.get_raw_data_samples());
     const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
@@ -84,7 +74,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read, SampleType model_
     std::array<int32_t, 5> window_pos = {0, 0, 0, 0, 0};
     int median_pos = 0;
     int break_point = 0;
-    const int signal_start = kOffsetMap.at(model_type);
+    const int signal_start = 1000;
     const int signal_end = 3 * signal_len / 4;
     for (int i = signal_start; i < signal_end; i += kStride) {
         auto slice = at::from_blob(const_cast<int16_t*>(&signal[i]),
@@ -140,8 +130,7 @@ void ScalerNode::input_thread_fn() {
 
         auto read = std::get<SimplexReadPtr>(std::move(message));
 
-        bool is_rna_model =
-                (m_model_type == SampleType::RNA002 || m_model_type == SampleType::RNA004);
+        bool is_rna_model = m_model_type == SampleType::RNA004;
 
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
@@ -153,7 +142,7 @@ void ScalerNode::input_thread_fn() {
 
             const bool has_rna_based_adapters = adapter_info && adapter_info->rna_adapters;
             if (!has_rna_based_adapters) {
-                trim_start = determine_rna_adapter_pos(*read, m_model_type);
+                trim_start = determine_rna_adapter_pos(*read);
                 if (size_t(trim_start) < read->read_common.get_raw_data_samples()) {
                     read->read_common.raw_data = read->read_common.raw_data.index(
                             {Slice(trim_start, at::indexing::None)});

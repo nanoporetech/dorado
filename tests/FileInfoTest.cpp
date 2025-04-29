@@ -7,6 +7,8 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 
+#include <stdexcept>
+
 #define TEST_GROUP "[dorado::file_info]"
 
 namespace dorado::file_info::test {
@@ -102,8 +104,6 @@ CATCH_TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemistry", TEST_GROUP) {
                 std::make_tuple("dna_r10.4.1_e8.2_260bps", CC::DNA_R10_4_1_E8_2_260BPS),
                 std::make_tuple("dna_r10.4.1_e8.2_400bps_4khz", CC::DNA_R10_4_1_E8_2_400BPS_4KHZ),
                 std::make_tuple("dna_r10.4.1_e8.2_400bps_5khz", CC::DNA_R10_4_1_E8_2_400BPS_5KHZ),
-                std::make_tuple("dna_r9.4.1_e8", CC::DNA_R9_4_1_E8),
-                std::make_tuple("rna002_70bps", CC::RNA002_70BPS),
                 std::make_tuple("rna004_130bps", CC::RNA004_130BPS),
         }));
 

@@ -1,6 +1,7 @@
 #include "config/BasecallModelConfig.h"
 
 #include "models/kits.h"
+#include "models/models.h"
 
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
@@ -68,7 +69,7 @@ void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_
             config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
         } else {
             // If information is not present in the config, find start position by model name.
-            std::string model_name = config.model_path.filename().string();
+            const std::string model_name = config.model_path.filename().string();
             config.mean_qscore_start_pos = get_mean_qscore_start_pos_by_model_name(model_name);
         }
         if (config.mean_qscore_start_pos < 0) {
@@ -132,14 +133,8 @@ bool has_clamp(const std::vector<toml::value> &sublayers) {
 }
 
 // Parse a the config.toml to resolve the scaling parameters.
-SignalNormalisationParams parse_signal_normalisation_params(const toml::value &config_toml,
-                                                            const std::string &model_name) {
+SignalNormalisationParams parse_signal_normalisation_params(const toml::value &config_toml) {
     SignalNormalisationParams params;
-
-    // med_mad scaling set based on filename for r9.4.1 models (~v3)
-    if (model_name.rfind("dna_r9.4.1", 0) == 0) {
-        params.strategy = ScalingStrategy::MED_MAD;
-    }
 
     // scaling.strategy introduced with v4.3 models
     if (config_toml.contains(keys::SCALING)) {
@@ -205,6 +200,10 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     config.model_path = path;
     config.basecaller.update(path);
 
+    const std::string model_name =
+            std::filesystem::canonical(config.model_path).filename().string();
+    models::throw_on_deprecated_model(model_name);
+
     parse_qscore_params(config, config_toml);
     parse_polya_coefficients(config, config_toml);
 
@@ -268,9 +267,7 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     // so we have 4^bases * 4 transitions.
     const auto PowerOf4 = [](int x) { return 1 << (x << 1); };
     config.outsize = PowerOf4(config.state_len + 1);
-
-    std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
-    config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
+    config.signal_norm_params = parse_signal_normalisation_params(config_toml);
 
     if (config.convs.size() != 3) {
         throw std::runtime_error("Expected 3 convolution layers but found: " +
@@ -317,7 +314,9 @@ bool is_rna_model(const BasecallModelConfig &model_config) {
     case models::SampleType::DNA:
         return false;
     case models::SampleType::RNA002:
-        [[fallthrough]];
+        models::throw_on_deprecated_model(model_config.model_path.filename().string());
+        // In case the model name is not recognised.
+        throw std::logic_error("RNA002 is deprecated");
     case models::SampleType::RNA004:
         return true;
     case models::SampleType::UNKNOWN:
@@ -394,6 +393,10 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.model_path = path;
     config.basecaller.update(path);
 
+    const std::string model_name =
+            std::filesystem::canonical(config.model_path).filename().string();
+    models::throw_on_deprecated_model(model_name);
+
     parse_qscore_params(config, config_toml);
 
     const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
@@ -423,8 +426,7 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.state_len = config.tx->crf.state_len;
     config.num_features = config.convs.front().insize;
 
-    std::string model_name = std::filesystem::canonical(config.model_path).filename().string();
-    config.signal_norm_params = parse_signal_normalisation_params(config_toml, model_name);
+    config.signal_norm_params = parse_signal_normalisation_params(config_toml);
 
     parse_run_info(config, model_name, config_toml);
 

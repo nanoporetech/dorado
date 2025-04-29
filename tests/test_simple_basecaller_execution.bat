@@ -1,14 +1,16 @@
 set dorado_bin=%1
-set model=dna_r9.4.1_e8_hac@v3.3
+set model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0
+set modbase=5mCG_5hmCG
+set test_data=tests/data/pod5/dna_r10.4.1_e8.2_400bps_5khz
 set model_speed=hac
 set batch=384
 
 echo dorado basecaller test stage
 %dorado_bin% download --model %model%
 if %errorlevel% neq 0 exit /b %errorlevel%
-%dorado_bin% basecaller %model% tests/data/pod5 -b %batch% --emit-fastq > ref.fq
+%dorado_bin% basecaller %model% %test_data% -b %batch% --emit-fastq > ref.fq
 if %errorlevel% neq 0 exit /b %errorlevel%
-%dorado_bin% basecaller %model% tests/data/pod5 -b %batch% --modified-bases 5mCG --emit-moves --reference ref.fq --emit-sam > calls.sam
+%dorado_bin% basecaller %model% %test_data% -b %batch% --modified-bases %modbase% --emit-moves --reference ref.fq --emit-sam > calls.sam
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo dorado summary test stage
@@ -28,7 +30,7 @@ echo dorado duplex hac complex
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo dorado duplex hac complex with mods
-%dorado_bin% duplex hac,5mCG_5hmCG tests/data/duplex/pod5 --threads 1 > $output_dir/duplex_calls_mods.bam
+%dorado_bin% duplex %model_speed%,%modbase% tests/data/duplex/pod5 --threads 1 > $output_dir/duplex_calls_mods.bam
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo dorado demux test stage
@@ -36,9 +38,9 @@ echo dorado demux test stage
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo dorado auto model basecaller test stage
-%dorado_bin% basecaller %model_speed% tests/data/pod5/dna_r9.4.1_e8/ -b %batch% --emit-fastq > ref.fq
+%dorado_bin% basecaller %model_speed% %test_data% -b %batch% --emit-fastq > ref.fq
 if %errorlevel% neq 0 exit /b %errorlevel%
-%dorado_bin% basecaller %model_speed%,5mCG tests/data/pod5/dna_r9.4.1_e8/ -b %batch% --emit-moves --reference ref.fq --emit-sam > calls.sam
+%dorado_bin% basecaller %model_speed%,%modbase% %test_data% -b %batch% --emit-moves --reference ref.fq --emit-sam > calls.sam
 if %errorlevel% neq 0 exit /b %errorlevel%
 
 echo dorado auto summary test stage

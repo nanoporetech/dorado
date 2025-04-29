@@ -148,7 +148,7 @@ The software automatically searches for primer sequences used in Oxford Nanopore
 
 ### RNA adapter trimming
 
-Adapters for RNA002 and RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
+Adapters for RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
 
 ### Modified basecalling
 
@@ -593,7 +593,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
 
-- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna002` or `rna004`, depending on the kit.
+- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna004`.
 
 - **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106D/FLO-FLG001 is signified by `r9.4.1`.
 
@@ -641,10 +641,6 @@ The versioning of modification models is bound to the basecalling model. This me
 | dna_r10.4.1_e8.2_400bps_fast@v3.5.2 | 5mCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v3.5.2 | 5mCG | v2 | 4 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r9.4.1_e8_sup@v3.6 |  |  | 4 kHz |
-| dna_r9.4.1_e8_fast@v3.4 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 | 4 kHz |
-| dna_r9.4.1_e8_hac@v3.3 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 |4 kHz |
-| dna_r9.4.1_e8_sup@v3.3 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 |4 kHz |
 
 ### **RNA models:**
 
@@ -661,9 +657,6 @@ The versioning of modification models is bound to the basecalling model. This me
 | rna004_130bps_fast@v3.0.1 | | | 4 kHz |
 | rna004_130bps_hac@v3.0.1 | | | 4 kHz |
 | rna004_130bps_sup@v3.0.1 | m6A_DRACH | v1 | 4 kHz |
-| rna002_70bps_fast@v3 | | | 3 kHz |
-| rna002_70bps_hac@v3 | | | 3 kHz |
-
 
 ## Automatic model selection complex
 

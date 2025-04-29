@@ -155,20 +155,12 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
     const auto& vers = version_map();
 
     CATCH_SECTION("ModelVersion to_string") {
-        CATCH_CHECK(to_string(ModelVersion::v0_0_0) == "v0.0.0");
-        CATCH_CHECK(to_string(ModelVersion::v0_1_0) == "v0.1.0");
         CATCH_CHECK(to_string(ModelVersion::v1_0_0) == "v1.0.0");
-        CATCH_CHECK(to_string(ModelVersion::v1_1_0) == "v1.1.0");
-        CATCH_CHECK(to_string(ModelVersion::v1_2_0) == "v1.2.0");
         CATCH_CHECK(to_string(ModelVersion::v2_0_0) == "v2.0.0");
         CATCH_CHECK(to_string(ModelVersion::v3_0_0) == "v3.0.0");
         CATCH_CHECK(to_string(ModelVersion::v3_0_1) == "v3.0.1");
         CATCH_CHECK(to_string(ModelVersion::v3_1_0) == "v3.1.0");
-        CATCH_CHECK(to_string(ModelVersion::v3_3_0) == "v3.3.0");
-        CATCH_CHECK(to_string(ModelVersion::v3_4_0) == "v3.4.0");
-        CATCH_CHECK(to_string(ModelVersion::v3_5_0) == "v3.5.0");
         CATCH_CHECK(to_string(ModelVersion::v3_5_2) == "v3.5.2");
-        CATCH_CHECK(to_string(ModelVersion::v3_6_0) == "v3.6.0");
         CATCH_CHECK(to_string(ModelVersion::v4_0_0) == "v4.0.0");
         CATCH_CHECK(to_string(ModelVersion::v4_1_0) == "v4.1.0");
         CATCH_CHECK(to_string(ModelVersion::v4_2_0) == "v4.2.0");
@@ -214,9 +206,9 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVariantPair / ModsVariantPair", TEST_TAG) {
     CATCH_CHECK(mods_cp.ver == ModelVersion::NONE);
     CATCH_CHECK_FALSE(mods_cp.has_ver());
 
-    mods_cp = ModsVariantPair{ModsVariant::M_5mCG_5hmCG, ModelVersion::v1_1_0};
+    mods_cp = ModsVariantPair{ModsVariant::M_5mCG_5hmCG, ModelVersion::v5_1_0};
     CATCH_CHECK(mods_cp.variant == ModsVariant::M_5mCG_5hmCG);
     CATCH_CHECK(mods_cp.has_variant());
-    CATCH_CHECK(mods_cp.ver == ModelVersion::v1_1_0);
+    CATCH_CHECK(mods_cp.ver == ModelVersion::v5_1_0);
     CATCH_CHECK(mods_cp.has_ver());
 }

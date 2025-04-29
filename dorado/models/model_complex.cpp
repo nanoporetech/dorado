@@ -55,7 +55,7 @@ ModelComplex ModelComplexParser::parse(const std::string& arg) {
         }
 
         if (!std::filesystem::exists(std::filesystem::path(selection.raw))) {
-            spdlog::warn(
+            spdlog::debug(
                     "Model argument '{}' did not satisfy the model complex syntax and is assumed "
                     "to be "
                     "a path.",

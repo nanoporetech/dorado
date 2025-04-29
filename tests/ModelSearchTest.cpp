@@ -38,10 +38,6 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG
     CATCH_SECTION("get_simplex_model_name simplex spot checks") {
         // Check given the model definitions the same model can be found
         auto [chemistry, mvp, expected] = GENERATE(table<CC, MVP, std::string>({
-                std::make_tuple(CC::DNA_R9_4_1_E8, MVP{MV::FAST, VV::v3_4_0},
-                                "dna_r9.4.1_e8_fast@v3.4"),
-                std::make_tuple(CC::DNA_R9_4_1_E8, MVP{MV::SUP, VV::v3_6_0},
-                                "dna_r9.4.1_e8_sup@v3.6"),
                 std::make_tuple(CC::DNA_R10_4_1_E8_2_260BPS, MVP{MV::HAC, VV::v3_5_2},
                                 "dna_r10.4.1_e8.2_260bps_hac@v3.5.2"),
                 std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v3_5_2},
@@ -58,7 +54,6 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG
                                 "dna_r10.4.1_e8.2_400bps_sup@v4.2.0"),
                 std::make_tuple(CC::DNA_R10_4_1_E8_2_APK_5KHZ, MVP{MV::SUP, VV::v5_0_0},
                                 "dna_r10.4.1_e8.2_apk_sup@v5.0.0"),
-                std::make_tuple(CC::RNA002_70BPS, MVP{MV::HAC, VV::v3_0_0}, "rna002_70bps_hac@v3"),
                 std::make_tuple(CC::RNA004_130BPS, MVP{MV::HAC, VV::v3_0_1},
                                 "rna004_130bps_hac@v3.0.1"),
         }));
@@ -220,7 +215,6 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ModelComplexParser ", TEST_TAG) {
                 std::make_tuple("rna004_130bps_sup@v3.0.1_m6A_DRACH@v1"),
                 std::make_tuple("hac/dna_r10.4.1_e8.2_400bps_5khz@4.2.0"),
                 std::make_tuple("../auto/fast/dna_r9.4.1_e8@3.5.0"),
-                std::make_tuple("~/sup/rna002_70bps@4.1.0"),
                 std::make_tuple("rna004_130bps@4.2.0"),
                 std::make_tuple("foo"),
                 std::make_tuple("sup/foo/"),

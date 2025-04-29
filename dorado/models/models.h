@@ -4,6 +4,7 @@
 #include "metadata.h"
 
 #include <filesystem>
+#include <optional>
 
 namespace dorado::models {
 
@@ -35,8 +36,10 @@ std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
 
 using ModelList = std::vector<ModelInfo>;
 const ModelList& simplex_models();
+const ModelList& simplex_deprecated_models();
 const ModelList& stereo_models();
 const ModelList& modified_models();
+const ModelList& modified_deprecated_models();
 const ModelList& correction_models();
 const ModelList& polish_models();
 
@@ -46,6 +49,12 @@ std::vector<std::string> modified_model_names();
 std::vector<std::string> modified_model_variants();
 
 bool is_valid_model(const std::string& selected_model);
+
+// Get ModelInfo if this name matches is a known deprecated model
+std::optional<ModelInfo> get_deprecated_model(const std::string& model_name);
+
+// Throws std::runtime_error with deprecation message containing the model name.
+void throw_on_deprecated_model(const std::string& model_name);
 
 // Search for a model by name and return the ModelInfo - searches all simplex, mods and stereo models
 ModelInfo get_model_info(const std::string& model_name);

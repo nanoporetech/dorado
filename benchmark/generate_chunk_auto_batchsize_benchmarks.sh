@@ -18,9 +18,6 @@ rm chunk_benchmarks* || true
 
 echo Running benchmarks for models of interest
 for model_name in \
-                  dna_r9.4.1_e8_fast@v3.4 \
-                  dna_r9.4.1_e8_hac@v3.3 \
-                  dna_r9.4.1_e8_sup@v3.3 \
                   dna_r10.4.1_e8.2_260bps_fast@v4.1.0 \
                   dna_r10.4.1_e8.2_260bps_hac@v4.1.0 \
                   dna_r10.4.1_e8.2_260bps_sup@v4.1.0 \

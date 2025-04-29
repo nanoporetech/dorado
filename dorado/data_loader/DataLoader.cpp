@@ -192,6 +192,8 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.rapid_chemistry = condition_info.rapid_chemistry();
     new_read->read_common.chemistry = condition_info.chemistry();
 
+    throw_on_deprecated_chemistry(new_read->read_common.chemistry);
+
     pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
     char end_reason_string_value[200];
     size_t end_reason_string_value_size = sizeof(end_reason_string_value);
