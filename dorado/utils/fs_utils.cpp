@@ -3,6 +3,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <optional>
@@ -78,11 +79,13 @@ fs::path get_downloads_path(const std::optional<fs::path>& override) {
 
 void clean_temporary_models(const std::set<std::filesystem::path>& paths) {
     for (const auto& path : paths) {
-        spdlog::trace("Deleting temporary model path: {}", path.string());
         try {
+            spdlog::debug("Deleting temporary model path: {}", path.string());
             fs::remove_all(path);
         } catch (const fs::filesystem_error& e) {
-            spdlog::trace("Failed to clean temporary model path - {}", e.what());
+            spdlog::warn("Failed to clean temporary model: {} - {}", path.string(), e.what());
+        } catch (const std::exception& e) {
+            spdlog::warn("Error while cleaning temporary model: {}: - {}", path.string(), e.what());
         }
     }
 }
