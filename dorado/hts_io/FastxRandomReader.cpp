@@ -8,14 +8,28 @@
 #include <algorithm>
 #include <memory>
 
-struct CharDestructor {
-    void operator()(char* ptr) { hts_free(ptr); };
-};
-using CharPtr = std::unique_ptr<char, CharDestructor>;
-
 namespace dorado::hts_io {
 
 void FaidxDestructor::operator()(faidx_t* faidx) { fai_destroy(faidx); }
+
+namespace {
+struct CharDestructor {
+    void operator()(char* ptr) { hts_free(ptr); };
+};
+
+using CharPtr = std::unique_ptr<char, CharDestructor>;
+
+FaidxPtr open_fai(const std::filesystem::path& fastx_path, const fai_format_options fmt) {
+    FaidxPtr faidx_ptr(fai_load_format(fastx_path.string().c_str(), fmt));
+
+    if (!faidx_ptr) {
+        throw std::runtime_error{"Could not open .fai index file from path: '" +
+                                 fastx_path.string() + "'."};
+    }
+
+    return faidx_ptr;
+}
+}  // namespace
 
 FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
     // Convert the string to lowercase.
@@ -23,23 +37,24 @@ FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
     std::transform(std::begin(path_str), std::end(path_str), std::begin(path_str),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-    faidx_t* faidx_ptr = nullptr;
+    fai_format_options fmt = FAI_NONE;
 
     if (utils::ends_with(path_str, ".fasta") || utils::ends_with(path_str, ".fa") ||
         utils::ends_with(path_str, ".fasta.gz") || utils::ends_with(path_str, ".fa.gz")) {
-        faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTA);
+        fmt = FAI_FASTA;
+
     } else if (utils::ends_with(path_str, ".fastq") || utils::ends_with(path_str, ".fq") ||
                utils::ends_with(path_str, ".fastq.gz") || utils::ends_with(path_str, ".fq.gz")) {
-        faidx_ptr = fai_load_format(fastx_path.string().c_str(), FAI_FASTQ);
+        fmt = FAI_FASTQ;
     }
 
+    m_faidx = open_fai(fastx_path, fmt);
+
     // Both attempts failed.
-    if (!faidx_ptr) {
+    if (!m_faidx) {
         spdlog::error("Could not create/load index for FASTx file {}", fastx_path.string());
         throw std::runtime_error("");
     }
-
-    m_faidx.reset(faidx_ptr);
 }
 
 std::string FastxRandomReader::fetch_seq(const std::string& read_id) const {
@@ -73,6 +88,8 @@ std::vector<uint8_t> FastxRandomReader::fetch_qual(const std::string& read_id) c
         return qscores;
     }
 }
+
+faidx_t* FastxRandomReader::get_raw_faidx_ptr() { return m_faidx.get(); }
 
 int FastxRandomReader::num_entries() const { return faidx_nseq(m_faidx.get()); }
 
