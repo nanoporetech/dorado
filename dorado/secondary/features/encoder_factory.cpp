@@ -20,6 +20,8 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
 
 std::unique_ptr<EncoderBase> encoder_factory(
         const ModelConfig& config,
+        const std::filesystem::path& in_ref_fn,
+        const std::filesystem::path& in_bam_aln_fn,
         const std::string& read_group,
         const std::string& tag_name,
         const int32_t tag_value,
@@ -74,7 +76,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         }
 
         std::unique_ptr<EncoderCounts> ret = std::make_unique<EncoderCounts>(
-                normalise_type, config.feature_encoder_dtypes, tag_name, tag_value,
+                in_bam_aln_fn, normalise_type, config.feature_encoder_dtypes, tag_name, tag_value,
                 tag_keep_missing, read_group, min_mapq, sym_indels, clip_to_zero);
 
         return ret;
@@ -103,9 +105,10 @@ std::unique_ptr<EncoderBase> encoder_factory(
         }
 
         std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
-                config.feature_encoder_dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source_final, phasing_bin_fn);
+                in_ref_fn, in_bam_aln_fn, config.feature_encoder_dtypes, tag_name, tag_value,
+                tag_keep_missing, read_group, min_mapq, max_reads, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source_final,
+                phasing_bin_fn);
 
         return ret;
     }

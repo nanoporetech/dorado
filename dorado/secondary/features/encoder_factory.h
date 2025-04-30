@@ -23,6 +23,8 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type);
 
 std::unique_ptr<EncoderBase> encoder_factory(
         const ModelConfig& config,
+        const std::filesystem::path& in_ref_fn,
+        const std::filesystem::path& in_bam_aln_fn,
         const std::string& read_group,
         const std::string& tag_name,
         const int32_t tag_value,

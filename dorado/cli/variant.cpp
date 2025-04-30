@@ -786,7 +786,7 @@ void run_variant_calling(const Options& opt,
                         /*collect_vc_data=*/true);
 
                 polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                                    resources.streams, *resources.encoder,
+                                                    resources.streams, resources.encoders,
                                                     draft_lens);
 
                 if (thread_sample_producer.joinable()) {
@@ -914,7 +914,8 @@ int variant_caller(int argc, char* argv[]) {
         // Create the models, encoders and BAM handles. Do not cast to half precision because autocast
         // will be used below.
         polisher::PolisherResources resources = polisher::create_resources(
-                model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads, opt.infer_threads,
+                model_config, opt.in_ref_fastx_fn, opt.in_aln_bam_fn, opt.device_str, opt.threads,
+                opt.infer_threads,
                 /*full_precision=*/true, opt.read_group, opt.tag_name, opt.tag_value,
                 opt.tag_keep_missing, opt.min_mapq, opt.haplotag_source, opt.phasing_bin_path);
 

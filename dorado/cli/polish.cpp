@@ -880,7 +880,7 @@ void run_polishing(const Options& opt,
                         opt.run_variant_calling);
 
                 polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                                    resources.streams, *resources.encoder,
+                                                    resources.streams, resources.encoders,
                                                     draft_lens);
 
                 if (thread_sample_producer.joinable()) {
@@ -1051,8 +1051,8 @@ int polish(int argc, char* argv[]) {
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(
-                model_config, opt.in_aln_bam_fn, opt.device_str, opt.threads, opt.infer_threads,
-                opt.full_precision, opt.read_group, opt.tag_name, opt.tag_value,
+                model_config, opt.in_draft_fastx_fn, opt.in_aln_bam_fn, opt.device_str, opt.threads,
+                opt.infer_threads, opt.full_precision, opt.read_group, opt.tag_name, opt.tag_value,
                 opt.tag_keep_missing, opt.min_mapq, std::nullopt, std::nullopt);
 
         // Progress bar.

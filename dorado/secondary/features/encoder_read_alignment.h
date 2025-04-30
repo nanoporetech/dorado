@@ -2,6 +2,7 @@
 
 #include "encoder_base.h"
 #include "haplotag_source.h"
+#include "hts_io/FastxRandomReader.h"
 #include "secondary/bam_file.h"
 #include "secondary/consensus/sample.h"
 
@@ -10,6 +11,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <vector>
@@ -26,9 +28,9 @@ struct ReadAlignmentTensors {
 
 class EncoderReadAlignment : public EncoderBase {
 public:
-    EncoderReadAlignment() = default;
-
-    EncoderReadAlignment(const std::vector<std::string>& dtypes,
+    EncoderReadAlignment(const std::filesystem::path& in_ref_fn,
+                         const std::filesystem::path& in_bam_aln_fn,
+                         const std::vector<std::string>& dtypes,
                          const std::string& tag_name,
                          const int32_t tag_value,
                          const bool tag_keep_missing,
@@ -45,11 +47,10 @@ public:
 
     ~EncoderReadAlignment() = default;
 
-    secondary::Sample encode_region(secondary::BamFile& bam_file,
-                                    const std::string& ref_name,
+    secondary::Sample encode_region(const std::string& ref_name,
                                     const int64_t ref_start,
                                     const int64_t ref_end,
-                                    const int32_t seq_id) const override;
+                                    const int32_t seq_id) override;
 
     at::Tensor collate(std::vector<at::Tensor> batch) const override;
 
@@ -57,6 +58,8 @@ public:
             std::vector<secondary::Sample> samples) const override;
 
 private:
+    hts_io::FastxRandomReader m_fastx_reader;
+    secondary::BamFile m_bam_file;
     std::vector<std::string> m_dtypes;
     int32_t m_num_dtypes = 1;
     std::string m_tag_name;
@@ -72,6 +75,7 @@ private:
     bool m_clip_to_zero = false;
     bool m_right_align_insertions = false;
     std::optional<std::filesystem::path> m_phasing_bin;
+    std::mutex m_mtx;
 };
 
 }  // namespace dorado::secondary

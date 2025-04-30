@@ -321,7 +321,9 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
 
 }  // namespace
 
-EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtypes,
+EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_fn,
+                                           const std::filesystem::path& in_bam_aln_fn,
+                                           const std::vector<std::string>& dtypes,
                                            const std::string& tag_name,
                                            const int32_t tag_value,
                                            const bool tag_keep_missing,
@@ -335,7 +337,9 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
                                            const bool include_haplotype_column,
                                            const HaplotagSource hap_source,
                                            const std::optional<std::filesystem::path>& phasing_bin)
-        : m_dtypes{dtypes},
+        : m_fastx_reader{in_ref_fn},
+          m_bam_file{secondary::BamFile(in_bam_aln_fn)},
+          m_dtypes{dtypes},
           m_num_dtypes{static_cast<int32_t>(std::size(dtypes)) + 1},
           m_tag_name{tag_name},
           m_tag_value{tag_value},
@@ -351,22 +355,23 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_right_align_insertions{right_align_insertions},
           m_phasing_bin{phasing_bin} {}
 
-secondary::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
-                                                      const std::string& ref_name,
+secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_name,
                                                       const int64_t ref_start,
                                                       const int64_t ref_end,
-                                                      const int32_t seq_id) const {
+                                                      const int32_t seq_id) {
     // Compute the counts and data.
     ReadAlignmentTensors tensors;
     try {
+        std::unique_lock<std::mutex> lock(m_mtx);
+
         const std::string phasing_bin_fn_str =
                 (m_phasing_bin) ? m_phasing_bin->string() : std::string();
 
         ReadAlignmentData counts = calculate_read_alignment(
-                bam_file, nullptr, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes, m_tag_name,
-                m_tag_value, m_tag_keep_missing, m_read_group, m_min_mapq, m_row_per_read,
-                m_include_dwells, m_include_haplotype_column, m_hap_source, phasing_bin_fn_str,
-                m_max_reads, m_right_align_insertions);
+                m_bam_file, m_fastx_reader.get_raw_faidx_ptr(), ref_name, ref_start, ref_end,
+                m_num_dtypes, m_dtypes, m_tag_name, m_tag_value, m_tag_keep_missing, m_read_group,
+                m_min_mapq, m_row_per_read, m_include_dwells, m_include_haplotype_column,
+                m_hap_source, phasing_bin_fn_str, m_max_reads, m_right_align_insertions);
 
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);
