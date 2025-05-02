@@ -1,11 +1,12 @@
 #include "MetalModules.h"
 
-#include "torch_utils/module_utils.h"
 #include "utils/math_utils.h"
 
 #include <spdlog/spdlog.h>
 
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 // Splitting up command buffers can be useful since it allows Xcode to make GPU captures.
 #define USE_SPLIT_LSTM_COMMAND_BUFFERS 0
@@ -324,11 +325,13 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     if (cv3.size != config.lstm_size) {
         throw std::runtime_error("MetalCRFModel invalid config - conv_3.size != config.lstm_size");
     }
-    rnn1 = register_module("rnn_1", MetalLSTM(config.lstm_size, true));
-    rnn2 = register_module("rnn_2", MetalLSTM(config.lstm_size, false));
-    rnn3 = register_module("rnn_3", MetalLSTM(config.lstm_size, true));
-    rnn4 = register_module("rnn_4", MetalLSTM(config.lstm_size, false));
-    rnn5 = register_module("rnn_5", MetalLSTM(config.lstm_size, true));
+
+    rnns.reserve(config.lstm_layers);
+    for (int i = 0; i < config.lstm_layers; ++i) {
+        bool is_forward = !(i % 2);
+        rnns.push_back(register_module("rnn_" + std::to_string(i),
+                                       MetalLSTM(config.lstm_size, is_forward)));
+    }
 
     const int linear_threads = kernel_simd_groups * kSIMDGroupWidth;
     // If the intermediate feature size between conv1 and conv2 is 16, then this is a v4
@@ -404,7 +407,7 @@ void MetalBlockImpl::load_weights() {
     conv2->load_weights();
     conv3->load_weights();
 
-    for (auto &&rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+    for (auto &&rnn : rnns) {
         auto params = rnn->named_parameters();
 
         auto t_w = *params.find("weight_ih");
@@ -478,7 +481,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     }
 
     std::string lstm_label = "lstm_rnn0";
-    for (auto &rnn : {rnn1, rnn2, rnn3, rnn4, rnn5}) {
+    for (auto &rnn : rnns) {
         lstm_label.back()++;
         POINT_OF_INTEREST_SCOPE(MetalCRFModule, lstm_layer, "id=%s, try_count=%i",
                                 lstm_label.c_str(), try_count);
