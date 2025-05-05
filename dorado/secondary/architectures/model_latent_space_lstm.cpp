@@ -101,14 +101,13 @@ ReversibleLSTM::ReversibleLSTM(const int32_t input_size,
     register_module("lstm", m_lstm);
 }
 
-torch::Tensor ReversibleLSTM::forward(torch::Tensor x) {
+torch::Tensor ReversibleLSTM::forward(const torch::Tensor& x) {
     const int32_t flip_dim = m_batch_first ? 1 : 0;
+    torch::Tensor output;
     if (m_reverse) {
-        x = x.flip(flip_dim);
-    }
-    auto output = std::get<0>(m_lstm->forward(x));
-    if (m_reverse) {
-        output = output.flip(flip_dim);
+        output = std::get<0>(m_lstm->forward(x.flip(flip_dim))).flip(flip_dim);
+    } else {
+        output = std::get<0>(m_lstm->forward(x));
     }
     return output;
 }
