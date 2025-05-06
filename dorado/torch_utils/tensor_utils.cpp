@@ -233,7 +233,7 @@ ScaledTensor quantize_tensor(const at::Tensor& t, int dim) {
 }
 
 std::string print_size(const at::Tensor& t, const std::string& name) {
-    std::string size = "";
+    std::string size;
     std::stringstream ss;
     ss << name << " tensor size: [";
     for (int i = 0; i < t.dim(); i++) {
@@ -247,6 +247,10 @@ std::string print_size(const at::Tensor& t, const std::string& name) {
 }
 
 void print_tensor_shape(std::ostream& os, const at::Tensor& tensor, const std::string& delimiter) {
+    if (!tensor.defined()) {
+        os << "undefined";
+        return;
+    }
     for (size_t i = 0; i < std::size(tensor.sizes()); ++i) {
         if (i > 0) {
             os << delimiter;

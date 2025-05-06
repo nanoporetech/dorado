@@ -970,15 +970,14 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
 void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results_cons,
                                 std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
-                                PolishStats& polish_stats,
+                                secondary::Stats& stats,
                                 const secondary::DecoderBase& decoder,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data) {
     utils::ScopedProfileRange spr1("decode_samples_in_parallel", 2);
 
-    auto batch_decode = [&decoder, &polish_stats, min_depth](const DecodeData& item,
-                                                             const int32_t tid) {
+    auto batch_decode = [&decoder, &stats, min_depth](const DecodeData& item, const int32_t tid) {
         utils::ScopedProfileRange spr2("decode_samples_in_parallel-batch_decode", 3);
 
         timer::TimerHighRes timer_total;
@@ -1073,8 +1072,7 @@ void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results
                 }
             }
 
-            polish_stats.add("processed",
-                             static_cast<double>(result.draft_end - result.draft_start));
+            stats.add("processed", static_cast<double>(result.draft_end - result.draft_start));
         }
         const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
 
@@ -1270,7 +1268,7 @@ std::vector<secondary::Variant> call_variants(
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
-        polisher::PolishStats& polish_stats) {
+        secondary::Stats& stats) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -1297,7 +1295,7 @@ std::vector<secondary::Variant> call_variants(
     // Worker for parallel processing.
     const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
                             std::vector<std::vector<secondary::Variant>>& results,
-                            polisher::PolishStats& ps) {
+                            secondary::Stats& ps) {
         if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
             throw std::runtime_error("Worker group_id is out of bounds! start = " +
                                      std::to_string(start) + ", end = " + std::to_string(end) +
@@ -1368,7 +1366,7 @@ std::vector<secondary::Variant> call_variants(
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
         futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
-                                       std::ref(thread_results), std::ref(polish_stats)));
+                                       std::ref(thread_results), std::ref(stats)));
     }
 
     // Join and catch exceptions.

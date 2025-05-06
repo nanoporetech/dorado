@@ -10,6 +10,7 @@
 #include "secondary/bam_info.h"
 #include "secondary/batching.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/stats.h"
 #include "secondary/vcf_writer.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
@@ -675,7 +676,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
 void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
-                   polisher::PolishStats& polish_stats) {
+                   secondary::Stats& stats) {
     spdlog::info("Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
                  opt.infer_threads, std::size(resources.devices));
 
@@ -773,8 +774,8 @@ void run_polishing(const Options& opt,
             total_input_bases *= 2;
         }
 
-        polish_stats.set("total", static_cast<double>(total_input_bases));
-        polish_stats.set("processed", 0.0);
+        stats.set("total", static_cast<double>(total_input_bases));
+        stats.set("processed", 0.0);
     }
 
     int64_t total_batch_bases = 0;
@@ -844,7 +845,7 @@ void run_polishing(const Options& opt,
 
                 std::thread thread_sample_decoder = std::thread(
                         &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                        std::ref(vc_input_data), std::ref(decode_queue), std::ref(polish_stats),
+                        std::ref(vc_input_data), std::ref(decode_queue), std::ref(stats),
                         std::cref(*resources.decoder), opt.threads, opt.min_depth,
                         opt.run_variant_calling);
 
@@ -876,7 +877,7 @@ void run_polishing(const Options& opt,
 
             // Round the counter, in case some samples were dropped.
             total_batch_bases += batch_bases;
-            polish_stats.set("processed", static_cast<double>(total_batch_bases));
+            stats.set("processed", static_cast<double>(total_batch_bases));
 
             spdlog::debug(
                     "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
@@ -911,10 +912,10 @@ void run_polishing(const Options& opt,
 
             // Run variant calling, optionally.
             if (opt.run_variant_calling) {
-                std::vector<secondary::Variant> variants = call_variants(
+                std::vector<secondary::Variant> variants = polisher::call_variants(
                         batch_interval, vc_input_data, draft_readers, draft_lens,
                         *resources.decoder, opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF,
-                        opt.threads, polish_stats);
+                        opt.threads, stats);
 
                 std::sort(std::begin(variants), std::end(variants),
                           [](const auto& a, const auto& b) {
@@ -929,7 +930,7 @@ void run_polishing(const Options& opt,
                 // We approximate the progress by expecting 2x bases to be processed
                 // when doing variant calling.
                 total_batch_bases += batch_bases;
-                polish_stats.set("processed", static_cast<double>(total_batch_bases));
+                stats.set("processed", static_cast<double>(total_batch_bases));
             }
         } catch (const std::exception& e) {
             spdlog::warn(
@@ -1023,18 +1024,18 @@ int polish(int argc, char* argv[]) {
                 opt.tag_keep_missing, opt.min_mapq);
 
         // Progress bar.
-        polisher::PolishStats polish_stats;
+        secondary::Stats stats;
         std::vector<dorado::stats::StatsReporter> stats_reporters;
         polisher::PolishProgressTracker tracker;
         std::vector<dorado::stats::StatsCallable> stats_callables;
-        stats_callables.push_back([&tracker, &polish_stats](const stats::NamedStats& /*stats*/) {
-            tracker.update_progress_bar(polish_stats.get_stats());
+        stats_callables.push_back([&tracker, &stats](const stats::NamedStats& /*stats*/) {
+            tracker.update_progress_bar(stats.get_stats());
         });
         constexpr auto kStatsPeriod = std::chrono::milliseconds(1000);
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
-        run_polishing(opt, resources, tracker, polish_stats);
+        run_polishing(opt, resources, tracker, stats);
 
         tracker.finalize();
         stats_sampler->terminate();

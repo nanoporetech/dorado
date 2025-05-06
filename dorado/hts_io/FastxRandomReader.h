@@ -5,9 +5,6 @@
 #include <string>
 #include <vector>
 
-// Class to wrap reading randomly from a FASTx
-// file using an index via the htslib APIs.
-
 struct faidx_t;
 
 namespace dorado::hts_io {
@@ -16,8 +13,12 @@ struct FaidxDestructor {
     void operator()(faidx_t*);
 };
 
+using FaidxPtr = std::unique_ptr<faidx_t, FaidxDestructor>;
+
+// Class to wrap reading randomly from a FASTx
+// file using an index via the htslib APIs.
 class FastxRandomReader {
-    std::unique_ptr<faidx_t, FaidxDestructor> m_faidx;
+    FaidxPtr m_faidx{nullptr};
 
 public:
     FastxRandomReader(const std::filesystem::path& fastx_path);
@@ -25,6 +26,8 @@ public:
 
     std::string fetch_seq(const std::string& read_id) const;
     std::vector<uint8_t> fetch_qual(const std::string& read_id) const;
+
+    faidx_t* get_raw_faidx_ptr();
 
     int num_entries() const;
 };
