@@ -48,7 +48,13 @@ void set_torch_allocator_max_split_size() {
     // Do not re-use smaller chunks of large buffers
     // This prevents small allocations from reusing large sections of cached allocated memory
     // which can lead to OoM errors when the original large allocation is needed again
+#if DORADO_ORIN
+    // Transformer models fail to reuse the buffers correctly on Orin with the smaller value
+    // so increase it to a value that works (see INSTX-9750).
+    auto max_split_size_mb = 250;
+#else
     auto max_split_size_mb = 25;
+#endif
     std::string settings = "max_split_size_mb:" + std::to_string(max_split_size_mb);
 
     const char* pytorch_cuda_alloc_conf = std::getenv("PYTORCH_CUDA_ALLOC_CONF");
