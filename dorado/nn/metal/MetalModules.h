@@ -76,7 +76,7 @@ struct MetalBlockImpl : torch::nn::Module {
     std::vector<NS::SharedPtr<MTL::Buffer>> args_linear;
     int in_chunk_size, lstm_chunk_size, batch_size, kernel_thread_groups, kernel_simd_groups;
     config::BasecallModelConfig config;
-    MetalLSTM rnn1{nullptr}, rnn2{nullptr}, rnn3{nullptr}, rnn4{nullptr}, rnn5{nullptr};
+    std::vector<MetalLSTM> rnns;
     MetalConv1d conv1{nullptr}, conv2{nullptr}, conv3{nullptr};
     MetalLinear linear1{nullptr}, linear2{nullptr};
 };
