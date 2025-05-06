@@ -1,6 +1,5 @@
 #pragma once
 
-#include "polish_stats.h"
 #include "secondary/architectures/model_config.h"
 #include "secondary/architectures/model_torch_base.h"
 #include "secondary/bam_file.h"
@@ -12,6 +11,7 @@
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
 #include "secondary/interval.h"
+#include "secondary/stats.h"
 #include "secondary/variant.h"
 #include "utils/AsyncQueue.h"
 #include "utils/span.h"
@@ -166,7 +166,7 @@ std::vector<secondary::Window> create_windows_from_regions(
 void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results_cons,
                                 std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
-                                PolishStats& polish_stats,
+                                secondary::Stats& polish_stats,
                                 const secondary::DecoderBase& decoder,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
@@ -206,6 +206,6 @@ std::vector<secondary::Variant> call_variants(
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
-        PolishStats& polish_stats);
+        secondary::Stats& polish_stats);
 
 }  // namespace dorado::polisher

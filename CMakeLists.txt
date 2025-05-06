@@ -347,7 +347,6 @@ add_library(dorado_lib
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp
     dorado/polish/polish_progress_tracker.h
-    dorado/polish/polish_stats.h
 )
 
 enable_warnings_as_errors(dorado_lib)

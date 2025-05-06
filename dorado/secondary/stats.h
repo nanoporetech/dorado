@@ -6,11 +6,11 @@
 #include <mutex>
 #include <string>
 
-namespace dorado::polisher {
+namespace dorado::secondary {
 
-class PolishStats {
+class Stats {
 public:
-    PolishStats() = default;
+    Stats() = default;
 
     void increment(const std::string& name) {
         std::unique_lock<std::mutex> lock(m_mtx);
@@ -34,4 +34,4 @@ private:
     std::mutex m_mtx;
 };
 
-}  // namespace dorado::polisher
+}  // namespace dorado::secondary
