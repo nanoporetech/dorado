@@ -330,7 +330,9 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
                                            const int32_t max_reads,
                                            const bool row_per_read,
                                            const bool include_dwells,
-                                           const bool include_haplotype)
+                                           const bool include_haplotype,
+                                           const bool right_align_insertions,
+                                           const std::optional<std::filesystem::path>& phasing_bin)
         : m_dtypes{dtypes},
           m_num_dtypes{static_cast<int32_t>(std::size(dtypes)) + 1},
           m_tag_name{tag_name},
@@ -341,13 +343,18 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_max_reads{max_reads},
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
-          m_include_haplotype{include_haplotype} {}
+          m_include_haplotype{include_haplotype},
+          m_right_align_insertions{right_align_insertions},
+          m_phasing_bin{phasing_bin} {}
 
 secondary::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_file,
                                                       const std::string& ref_name,
                                                       const int64_t ref_start,
                                                       const int64_t ref_end,
                                                       const int32_t seq_id) const {
+    (void)m_right_align_insertions;
+    (void)m_phasing_bin;
+
     // Compute the counts and data.
     ReadAlignmentTensors tensors;
     try {

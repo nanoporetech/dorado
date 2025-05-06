@@ -73,7 +73,8 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::string& tag_name,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
-                                   const std::optional<int32_t>& min_mapq_override) {
+                                   const std::optional<int32_t>& min_mapq_override,
+                                   const std::optional<std::filesystem::path>& phasing_bin_fn) {
     PolisherResources resources;
 
     spdlog::info("Initializing the devices.");
@@ -144,8 +145,9 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
     std::tie(resources.models, resources.streams) = create_models();
 
     spdlog::info("Creating the encoder.");
-    resources.encoder = encoder_factory(model_config, read_group, tag_name, tag_value,
-                                        tag_keep_missing_override, min_mapq_override);
+    resources.encoder =
+            encoder_factory(model_config, read_group, tag_name, tag_value,
+                            tag_keep_missing_override, min_mapq_override, phasing_bin_fn);
 
     spdlog::info("Creating the decoder.");
     resources.decoder = decoder_factory(model_config);
