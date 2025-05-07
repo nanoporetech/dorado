@@ -8,12 +8,9 @@
 #include "utils/thread_naming.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
-#include "vbz_plugin_user_utils.h"
 
 #include <ATen/Functions.h>
 #include <cxxpool.h>
-#include <highfive/H5Easy.hpp>
-#include <highfive/H5File.hpp>
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
@@ -21,7 +18,6 @@
 #include <cctype>
 #include <ctime>
 #include <filesystem>
-#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -558,8 +554,6 @@ DataLoader::DataLoader(Pipeline& pipeline,
           m_ignored_read_ids(std::move(read_ignore_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
-    static std::once_flag vbz_init_flag;
-    std::call_once(vbz_init_flag, vbz_register);
 }
 
 DataLoader::InputFiles DataLoader::InputFiles::search_pod5s(const std::filesystem::path& path,

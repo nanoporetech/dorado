@@ -21,7 +21,6 @@ $ apt-get update && apt-get install -y --no-install-recommends \
         git \
         ca-certificates \
         build-essential \
-        libhdf5-dev \
         libssl-dev \
         autoconf \
         automake

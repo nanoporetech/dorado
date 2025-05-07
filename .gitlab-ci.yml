@@ -85,7 +85,7 @@ variables:
   before_script:
     - echo Dorado dependency stage
     - apt-get update
-    - apt-get install -y --no-install-recommends samtools curl libhdf5-dev libssl-dev libsz2 ccache automake
+    - apt-get install -y --no-install-recommends samtools curl libssl-dev libsz2 ccache automake
 
 .linux_test_dependencies:
   before_script:
@@ -406,7 +406,7 @@ build_archive:linux:arm64:jammy:
 build_archive:linux:x86:centos7:cuda11:
   image: ${DORADO_DOCKER_ROOT}/dorado-centos7-cuda-${CUDA}.0:1.0
   variables:
-    BUILD_OPTIONS: "-DDORADO_USING_OLD_CPP_ABI=ON -DDYNAMIC_HDF=ON"
+    BUILD_OPTIONS: "-DDORADO_USING_OLD_CPP_ABI=ON"
     CUDA: "11.8"
   extends:
     - .linux_runner
@@ -416,7 +416,7 @@ build_archive:linux:x86:centos7:cuda11:
 build_archive:linux:x86:rocky8:
   image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.0
   variables:
-    BUILD_OPTIONS: "-DDYNAMIC_HDF=ON"
+    BUILD_OPTIONS: ""
   script:
     - source /opt/rh/gcc-toolset-11/enable
     - which gcc

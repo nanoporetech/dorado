@@ -72,14 +72,6 @@ gsl-lite:
     license: PATH_NOT_AVAILABLE
     files:
         - hdf_plugins/third_party/gsl
-HighFive:
-    description: >
-        Header-only C++11 friendly interface for libhdf5.
-    version: "v2.10.1"
-    url: https://github.com/BlueBrain/HighFive
-    license: HighFive/LICENSE
-    files:
-        - HighFive
 htslib:
     description: >
         C library for accessing common file formats, such as SAM, CRAM and VCF

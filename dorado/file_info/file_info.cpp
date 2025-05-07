@@ -4,7 +4,6 @@
 #include "utils/fs_utils.h"
 #include "utils/time_utils.h"
 
-#include <highfive/H5Easy.hpp>
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
