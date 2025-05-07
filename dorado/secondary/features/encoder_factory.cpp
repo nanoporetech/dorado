@@ -2,6 +2,8 @@
 
 #include "secondary/architectures/model_config.h"
 
+#include <spdlog/spdlog.h>
+
 #include <stdexcept>
 #include <unordered_map>
 
@@ -16,16 +18,21 @@ FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
     throw std::runtime_error{"Unknown feature encoder type: '" + type + "'!"};
 }
 
-std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
-                                             const std::string& read_group,
-                                             const std::string& tag_name,
-                                             const int32_t tag_value,
-                                             const std::optional<bool>& tag_keep_missing_override,
-                                             const std::optional<int32_t>& min_mapq_override) {
+std::unique_ptr<EncoderBase> encoder_factory(
+        const ModelConfig& config,
+        const std::string& read_group,
+        const std::string& tag_name,
+        const int32_t tag_value,
+        const std::optional<bool>& tag_keep_missing_override,
+        const std::optional<int32_t>& min_mapq_override,
+        const std::optional<std::filesystem::path>& phasing_bin_fn) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
-                              const std::string& key) -> std::string {
+                              const std::string& key, const bool throw_on_fail) -> std::string {
         const auto it = dict.find(key);
         if (it == std::cend(dict)) {
+            if (!throw_on_fail) {
+                return {};
+            }
             throw std::runtime_error{"Cannot find key '" + key + "' in kwargs!"};
         }
         if ((std::size(it->second) >= 2) && (it->second.front() == '"') &&
@@ -37,8 +44,8 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
 
     const auto get_bool_value = [&get_value](
                                         const std::unordered_map<std::string, std::string>& dict,
-                                        const std::string& key) -> bool {
-        return (get_value(dict, key) == "true") ? true : false;
+                                        const std::string& key, const bool throw_on_fail) -> bool {
+        return (get_value(dict, key, throw_on_fail) == "true") ? true : false;
     };
 
     const FeatureEncoderType feature_encoder_type =
@@ -47,15 +54,22 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
     const auto& kwargs = config.feature_encoder_kwargs;
 
     if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
-        const std::string normalise = get_value(kwargs, "normalise");
+        const std::string normalise = get_value(kwargs, "normalise", true);
         const bool tag_keep_missing = (tag_keep_missing_override)
                                               ? *tag_keep_missing_override
-                                              : get_bool_value(kwargs, "tag_keep_missing");
-        const int32_t min_mapq =
-                (min_mapq_override) ? *min_mapq_override : std::stoi(get_value(kwargs, "min_mapq"));
-        const bool sym_indels = get_bool_value(kwargs, "sym_indels");
+                                              : get_bool_value(kwargs, "tag_keep_missing", true);
+        const int32_t min_mapq = (min_mapq_override)
+                                         ? *min_mapq_override
+                                         : std::stoi(get_value(kwargs, "min_mapq", true));
+        const bool sym_indels = get_bool_value(kwargs, "sym_indels", true);
 
         NormaliseType normalise_type = parse_normalise_type(normalise);
+
+        if (phasing_bin_fn) {
+            spdlog::warn(
+                    "Phasing bin path is provided, but this feature is not supported with the "
+                    "counts feature encoder.");
+        }
 
         std::unique_ptr<EncoderCounts> ret = std::make_unique<EncoderCounts>(
                 normalise_type, config.feature_encoder_dtypes, tag_name, tag_value,
@@ -66,17 +80,22 @@ std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
     } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
         const bool tag_keep_missing = (tag_keep_missing_override)
                                               ? *tag_keep_missing_override
-                                              : get_bool_value(kwargs, "tag_keep_missing");
-        const int32_t min_mapq =
-                (min_mapq_override) ? *min_mapq_override : std::stoi(get_value(kwargs, "min_mapq"));
-        const int32_t max_reads = std::stoi(get_value(kwargs, "max_reads"));
-        const bool row_per_read = get_bool_value(kwargs, "row_per_read");
-        const bool include_dwells = get_bool_value(kwargs, "include_dwells");
-        const bool include_haplotype = get_bool_value(kwargs, "include_haplotype");
+                                              : get_bool_value(kwargs, "tag_keep_missing", true);
+        const int32_t min_mapq = (min_mapq_override)
+                                         ? *min_mapq_override
+                                         : std::stoi(get_value(kwargs, "min_mapq", true));
+        const int32_t max_reads = std::stoi(get_value(kwargs, "max_reads", true));
+        const bool row_per_read = get_bool_value(kwargs, "row_per_read", true);
+        const bool include_dwells = get_bool_value(kwargs, "include_dwells", true);
+        const bool include_haplotype = get_bool_value(kwargs, "include_haplotype", true);
+
+        // Optional. Config version >= 3 feature.
+        const bool right_align_insertions = get_bool_value(kwargs, "right_align_insertions", false);
 
         std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
                 config.feature_encoder_dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, row_per_read, include_dwells, include_haplotype);
+                min_mapq, max_reads, row_per_read, include_dwells, include_haplotype,
+                right_align_insertions, phasing_bin_fn);
 
         return ret;
     }

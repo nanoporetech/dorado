@@ -4,6 +4,7 @@
 #include "encoder_read_alignment.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <memory>
 #include <optional>
 #include <string>
@@ -19,11 +20,13 @@ enum class FeatureEncoderType {
 
 FeatureEncoderType parse_feature_encoder_type(const std::string& type);
 
-std::unique_ptr<EncoderBase> encoder_factory(const ModelConfig& config,
-                                             const std::string& read_group,
-                                             const std::string& tag_name,
-                                             const int32_t tag_value,
-                                             const std::optional<bool>& tag_keep_missing_override,
-                                             const std::optional<int32_t>& min_mapq_override);
+std::unique_ptr<EncoderBase> encoder_factory(
+        const ModelConfig& config,
+        const std::string& read_group,
+        const std::string& tag_name,
+        const int32_t tag_value,
+        const std::optional<bool>& tag_keep_missing_override,
+        const std::optional<int32_t>& min_mapq_override,
+        const std::optional<std::filesystem::path>& phasing_bin_fn);
 
 }  // namespace dorado::secondary

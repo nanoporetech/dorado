@@ -76,6 +76,7 @@ add_executable(dorado_tests
     TrimTest.cpp
     PafUtilsTest.cpp
     SecondaryDecodeVariantsTest.cpp
+    SecondaryKadayashiUtils.cpp
     SecondaryNormalizeVariantsTest.cpp
     SecondaryMergeVCSamplesTest.cpp
     SecondarySampleTest.cpp

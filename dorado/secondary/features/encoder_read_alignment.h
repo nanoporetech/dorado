@@ -8,6 +8,8 @@
 #include <torch/types.h>
 
 #include <cstdint>
+#include <filesystem>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -34,7 +36,9 @@ public:
                          const int32_t max_reads,
                          const bool row_per_read,
                          const bool include_dwells,
-                         const bool include_haplotype);
+                         const bool include_haplotype,
+                         const bool right_align_insertions,
+                         const std::optional<std::filesystem::path>& phasing_bin);
 
     ~EncoderReadAlignment() = default;
 
@@ -61,6 +65,8 @@ private:
     bool m_row_per_read = false;
     bool m_include_dwells = true;
     bool m_include_haplotype = false;
+    bool m_right_align_insertions = false;
+    std::optional<std::filesystem::path> m_phasing_bin;
 };
 
 }  // namespace dorado::secondary

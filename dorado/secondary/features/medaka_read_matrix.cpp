@@ -1,5 +1,6 @@
 #include "medaka_read_matrix.h"
 
+#include "kadayashi_utils.h"
 #include "medaka_bamiter.h"
 #include "secondary/bam_file.h"
 #include "utils/ssize.h"
@@ -231,8 +232,8 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
 
 ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const std::string &chr_name,
-                                           const int64_t start,
-                                           const int64_t end,  // Non-inclusive.
+                                           const int64_t start,  // Zero-based.
+                                           const int64_t end,    // Non-inclusive.
                                            const int64_t num_dtypes,
                                            const std::vector<std::string> &dtypes,
                                            const std::string &tag_name,
@@ -243,7 +244,9 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype,
-                                           const int32_t max_reads) {
+                                           const std::string &in_haplotag_bin_fn,
+                                           const int32_t max_reads,
+                                           const bool right_align_insertions) {
     if ((num_dtypes == 1) && !std::empty(dtypes)) {
         throw std::runtime_error(
                 "Received invalid num_dtypes and dtypes args. num_dtypes == 1 but size(dtypes) = " +
@@ -252,6 +255,18 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     if (num_dtypes == 0) {
         throw std::runtime_error("The num_dtypes needs to be > 0.");
     }
+
+    // Optionally get the haplotag lookup if available.
+    const bool has_haplotag_bin = (!std::empty(in_haplotag_bin_fn));
+    const std::unordered_map<std::string, int32_t> kadayashi_qn2tag = [&in_haplotag_bin_fn,
+                                                                       &chr_name, start, end]() {
+        if (!std::empty(in_haplotag_bin_fn)) {
+            return query_bin_file_get_qname2tag(in_haplotag_bin_fn, chr_name, start, end);
+        }
+        return std::unordered_map<std::string, int32_t>();
+    }();
+
+    const bool use_hap_feature = include_haplotype || has_haplotag_bin;
 
     // Open bam etc. This is all now deferred to the caller
     htsFile *fp = bam_file.fp();
@@ -289,7 +304,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     const int32_t buffer_pos = static_cast<int32_t>(2 * (end - start));
     const int32_t buffer_reads = std::min(max_reads, 100);
     const int32_t extra_featlen =
-            (include_dwells ? 1 : 0) + (include_haplotype ? 1 : 0) + (num_dtypes > 1 ? 1 : 0);
+            (include_dwells ? 1 : 0) + (use_hap_feature ? 1 : 0) + (num_dtypes > 1 ? 1 : 0);
     ReadAlignmentData pileup(n_pos, max_n_reads, buffer_pos, buffer_reads, extra_featlen, 0);
 
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
@@ -407,13 +422,16 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 }
                 // get haplotype tag
                 int8_t haplotype = 0;
-                failed = false;
-                const uint8_t *tag = bam_aux_get(alignment, "HP");
-                if (tag == NULL) {  // tag isn't present
-                    failed = true;
+                if (!has_haplotag_bin) {
+                    const uint8_t *tag = bam_aux_get(alignment, "HP");
+                    if (tag) {
+                        haplotype = static_cast<int8_t>(bam_aux2i(tag));
+                    }
                 } else {
-                    haplotype = static_cast<int8_t>(bam_aux2i(tag));
-                    failed = errno == EINVAL;
+                    const auto it_hap = kadayashi_qn2tag.find(qname);
+                    haplotype = (it_hap == std::cend(kadayashi_qn2tag))
+                                        ? 0
+                                        : static_cast<int8_t>(it_hap->second);
                 }
 
                 std::vector<int8_t> dwells;
@@ -486,13 +504,13 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 if (include_dwells) {
                     pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN] = -1;  //dwell
                 }
-                if (include_haplotype) {
+                if (use_hap_feature) {
                     pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN +
                                   (include_dwells ? 1 : 0)] = read.haplotype;  //haplotag
                 }
                 if (num_dtypes > 1) {
                     pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN +
-                                  (include_dwells ? 1 : 0) + (include_haplotype ? 1 : 0)] =
+                                  (include_dwells ? 1 : 0) + (use_hap_feature ? 1 : 0)] =
                             read.dtype;  //dtype
                 }
                 min_minor = 1;  // in case there is also an indel, skip the major position
@@ -501,11 +519,17 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
             int32_t query_pos_offset = 0;
             int32_t minor = min_minor;
             for (; minor <= max_minor; ++minor, ++query_pos_offset) {
+                // Major position is kept left aligned, while insertions are now pushed to the right.
+                const int32_t left_offset = (!right_align_insertions || (minor == 0))
+                                                    ? minor
+                                                    : (max_ins - max_minor + minor);
+
                 const int32_t base_j = bam1_seqi(read.seqi, p->qpos + query_pos_offset);
                 const int8_t base_i = NUM_TO_COUNT_BASE_SYMM[base_j];
                 const size_t partial_index =
-                        major_col + pileup.featlen * pileup.buffer_reads * minor  // skip to column
-                        + pileup.featlen * read_i;  // skip to read row
+                        major_col +
+                        pileup.featlen * pileup.buffer_reads * left_offset  // skip to column
+                        + pileup.featlen * read_i;                          // skip to read row
 
                 pileup.matrix[partial_index + 0] = base_i;                                 //base
                 pileup.matrix[partial_index + 1] = read.qual[p->qpos + query_pos_offset];  //qual
@@ -515,16 +539,22 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                     pileup.matrix[partial_index + BASE_FEATLEN] =
                             read.dwells[p->qpos + query_pos_offset];  //dwell
                 }
-                if (include_haplotype) {
+                if (use_hap_feature) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0)] =
                             read.haplotype;  //haplotag
                 }
                 if (num_dtypes > 1) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0) +
-                                  (include_haplotype ? 1 : 0)] = read.dtype;  //dtype
+                                  (use_hap_feature ? 1 : 0)] = read.dtype;  //dtype
                 }
             }
-            for (; minor <= max_ins; ++minor) {
+
+            // The minor == 0 position represents a major base so minor_start is 1 for right alignment.
+            const int32_t minor_start = right_align_insertions ? 1 : minor;
+            const int32_t minor_end = right_align_insertions ? (max_ins - max_minor) : max_ins;
+
+            // Fill the deletion columns (minor columns where a read does not have an insertion).
+            for (minor = minor_start; minor <= minor_end; ++minor) {
                 const size_t partial_index =
                         major_col + pileup.featlen * pileup.buffer_reads * minor  // skip to column
                         + pileup.featlen * read_i;  // skip to read row
@@ -536,13 +566,13 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 if (include_dwells) {
                     pileup.matrix[partial_index + BASE_FEATLEN] = -1;  //dwell
                 }
-                if (include_haplotype) {
+                if (use_hap_feature) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0)] =
                             read.haplotype;  //haplotag
                 }
                 if (num_dtypes > 1) {
                     pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0) +
-                                  (include_haplotype ? 1 : 0)] = read.dtype;  //dtype
+                                  (use_hap_feature ? 1 : 0)] = read.dtype;  //dtype
                 }
             }
         }
