@@ -333,7 +333,7 @@ int duplex(int argc, char* argv[]) {
     {
         parser.visible.add_group("Input data arguments");
         parser.visible.add_argument("-r", "--recursive")
-                .help("Recursively scan through directories to load FAST5 and POD5 files.")
+                .help("Recursively scan through directories to load POD5 files.")
                 .default_value(false)
                 .implicit_value(true);
         parser.visible.add_argument("-l", "--read-ids")
@@ -479,9 +479,12 @@ int duplex(int argc, char* argv[]) {
         const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
 
         const bool recursive_file_loading = parser.visible.get<bool>("--recursive");
-        auto input_files = DataLoader::InputFiles::search(reads, recursive_file_loading);
-        if (!input_files.has_value()) {
-            // search() will have logged an error message for us.
+
+        DataLoader::InputFiles input_pod5_files;
+        try {
+            input_pod5_files = DataLoader::InputFiles::search_pod5s(reads, recursive_file_loading);
+        } catch (const std::exception& e) {
+            spdlog::error("Failed to load pod5 data: '{}'", e.what());
             return EXIT_FAILURE;
         }
 
@@ -489,9 +492,9 @@ int duplex(int argc, char* argv[]) {
         if (basespace_duplex) {
             num_reads = read_list_from_pairs.size();
         } else {
-            num_reads = file_info::get_num_reads(input_files->get(), read_list, {});
+            num_reads = file_info::get_num_reads(input_pod5_files.get(), read_list, {});
             if (num_reads == 0) {
-                spdlog::error("No POD5 or FAST5 reads found in path: " + reads);
+                spdlog::error("No reads found in path: " + reads);
                 return EXIT_FAILURE;
             }
         }
@@ -606,11 +609,6 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-            if (!file_info::is_read_data_present(input_files->get())) {
-                std::string err = "No POD5 or FAST5 data found in path: " + reads;
-                throw std::runtime_error(err);
-            }
-
             const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
             const auto batch_params = get_batch_params(parser.visible);
             const bool skip_model_compatibility_check =
@@ -619,7 +617,7 @@ int duplex(int argc, char* argv[]) {
             const auto models_directory = model_resolution::get_models_directory(parser.visible);
             const DuplexModels models = load_models(
                     model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
-                    input_files->get(), batch_params, skip_model_compatibility_check, device);
+                    input_pod5_files.get(), batch_params, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
 
@@ -643,8 +641,9 @@ int duplex(int argc, char* argv[]) {
             auto duplex_rg_name = std::string(models.model_name + "_" + models.stereo_model_name);
             // TODO: supply modbase model names once duplex modbase is complete
             auto read_groups =
-                    file_info::load_read_groups(input_files->get(), models.model_name, "");
-            read_groups.merge(file_info::load_read_groups(input_files->get(), duplex_rg_name, ""));
+                    file_info::load_read_groups(input_pod5_files.get(), models.model_name, "");
+            read_groups.merge(
+                    file_info::load_read_groups(input_pod5_files.get(), duplex_rg_name, ""));
             utils::add_rg_headers(hdr.get(), read_groups);
 
             const size_t num_runners = default_parameters.num_runners;
@@ -778,7 +777,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
             // Run pipeline.
-            loader.load_reads(*input_files, ReadOrder::BY_CHANNEL);
+            loader.load_reads(input_pod5_files, ReadOrder::BY_CHANNEL);
 
             utils::clean_temporary_models(temp_model_paths);
         }

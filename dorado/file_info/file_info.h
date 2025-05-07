@@ -17,11 +17,11 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
         const std::string& model_name,
         const std::string& modbase_model_names);
 
-int get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_files,
-                  std::optional<std::unordered_set<std::string>> read_list,
-                  const std::unordered_set<std::string>& ignore_read_list);
+size_t get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_files,
+                     std::optional<std::unordered_set<std::string>> read_list,
+                     const std::unordered_set<std::string>& ignore_read_list);
 
-bool is_read_data_present(const std::vector<std::filesystem::directory_entry>& dir_files);
+bool is_pod5_data_present(const std::vector<std::filesystem::directory_entry>& dir_files);
 
 uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& dir_files);
 
