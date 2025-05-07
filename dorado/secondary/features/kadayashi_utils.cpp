@@ -4,14 +4,54 @@
 
 #include <cassert>
 #include <cstdio>
+#include <fstream>
 #include <memory>
 #include <stdexcept>
+#include <string_view>
 
 namespace dorado::secondary {
 
+namespace {
+
+template <typename T>
+void read_checked(std::ifstream& ifs,
+                  T* buffer,
+                  const size_t num_elements,
+                  const std::string_view context) {
+    const int64_t num_bytes = static_cast<int64_t>(sizeof(T) * num_elements);
+    ifs.read(reinterpret_cast<char*>(buffer), num_bytes);
+    if (ifs.gcount() != num_bytes) {
+        const std::string context_suffix =
+                (context.empty() ? "" : " (" + std::string(context) + ")");
+        throw std::runtime_error("Failed to read " + std::to_string(num_bytes) +
+                                 " bytes from file." + context_suffix);
+    }
+}
+
+template <typename T>
+T read_checked_pod(std::ifstream& ifs, const std::string_view context) {
+    T ret{};
+    read_checked(ifs, &ret, 1, context);
+    return ret;
+}
+
+void seek_checked(std::ifstream& ifs,
+                  const std::streamoff offset,
+                  const std::ios::seekdir dir,
+                  const std::string_view context) {
+    ifs.seekg(offset, dir);
+    if (!ifs) {
+        const std::string context_suffix =
+                (context.empty() ? "" : " (" + std::string(context) + ")");
+        throw std::runtime_error("Seek failed." + context_suffix);
+    }
+}
+
+}  // namespace
+
 std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
-        const std::filesystem::path &in_haplotag_bin_fn,
-        const std::string &chrom,
+        const std::filesystem::path& in_haplotag_bin_fn,
+        const std::string& chrom,
         const int64_t chrom_start,
         const int64_t chrom_end) {
     constexpr bool DEBUG_PRINT = false;
@@ -22,10 +62,9 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
         throw std::runtime_error{"Empty input path provided to query_bin_file_get_qname2tag."};
     }
 
-    std::unique_ptr<FILE, int (*)(FILE *)> fp(fopen(in_haplotag_bin_fn.string().c_str(), "rb"),
-                                              &fclose);
+    std::ifstream ifs(in_haplotag_bin_fn, std::ios::binary);
 
-    if (!fp.get()) {
+    if (!ifs) {
         throw std::runtime_error{"Could not open file: " + in_haplotag_bin_fn.string() +
                                  " for reading!"};
     }
@@ -35,27 +74,26 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
                 "Input to query_bin_file_get_qname2tag is not valid. chrom_start = {}, chrom_end = "
                 "{}. Returning an empty haplotag lookup.",
                 chrom_start, chrom_end);
+        return {};
     }
 
     const uint64_t chrom_start_uint = static_cast<uint64_t>(chrom_start);
     const uint64_t chrom_end_uint = static_cast<uint64_t>(chrom_end);
 
     // Load the number of reference sequences.
-    uint32_t n_ref = 0;
-    std::ignore = fread(&n_ref, sizeof(uint32_t), 1, fp.get());
+    const uint32_t n_ref = read_checked_pod<uint32_t>(ifs, "n_ref");
 
     // Find the ID of chrom.
     std::string ref_name;
     int32_t ref_i = -1;
     for (uint32_t i = 0; i < n_ref; ++i) {
         // Header length.
-        uint8_t tn_l = 0;
-        std::ignore = fread(&tn_l, 1, 1, fp.get());
+        const uint8_t tn_l = read_checked_pod<uint8_t>(ifs, "tn_l");
 
         if (ref_i < 0) {  // haven't found the chrom yet
             // Load the ref name.
             ref_name.resize(tn_l);
-            std::ignore = fread(ref_name.data(), 1, tn_l, fp.get());
+            read_checked(ifs, ref_name.data(), tn_l, "ref_name");
 
             // Found the ref.
             if (ref_name == chrom) {
@@ -66,7 +104,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
             }
         } else {
             // Skip other ref names after we found chrom.
-            std::ignore = fseek(fp.get(), tn_l, SEEK_CUR);
+            seek_checked(ifs, tn_l, std::ios::cur, "tn_l");
         }
     }
 
@@ -80,25 +118,14 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     }
 
     // Find info for this reference.
-    {
-        const int32_t rv = fseek(fp.get(), ref_i * (sizeof(uint64_t) + sizeof(uint32_t)), SEEK_CUR);
-        if (rv) {
-            spdlog::warn(
-                    "Could not fseek to the data for chrom: '{}'. Returning an empty haplotag "
-                    "lookup.",
-                    chrom);
-            return {};
-        }
-    }
+    seek_checked(ifs, ref_i * (sizeof(uint64_t) + sizeof(uint32_t)), std::ios::cur, "reference");
 
     // Load the position of the intervals and the number of intervals.
-    uint64_t pos_intervals_start = 0;
-    uint32_t n_intervals = 0;
-    std::ignore = fread(&pos_intervals_start, sizeof(uint64_t), 1, fp.get());
-    std::ignore = fread(&n_intervals, sizeof(uint32_t), 1, fp.get());
+    const uint64_t pos_intervals_start = read_checked_pod<uint64_t>(ifs, "pos_intervals_start");
+    const uint32_t n_intervals = read_checked_pod<uint32_t>(ifs, "n_intervals");
 
     // Move to the part of the file with the intervals.
-    fseek(fp.get(), pos_intervals_start, SEEK_SET);
+    seek_checked(ifs, pos_intervals_start, std::ios::beg, "pos_intervals_start");
 
     // Search to find the ID of a fulfilling chunk.
     uint64_t best_ovlp_len = 0;  // will check all overlapping intervals and take
@@ -110,14 +137,10 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     uint32_t best_ovlp_end = 0;
 
     for (uint32_t i = 0; i < n_intervals; ++i) {
-        uint32_t start = 0;
-        uint32_t end = 0;
-        uint64_t pos_chunk_start = 0;
-        uint32_t n_reads = 0;
-        std::ignore = fread(&start, sizeof(uint32_t), 1, fp.get());
-        std::ignore = fread(&end, sizeof(uint32_t), 1, fp.get());
-        std::ignore = fread(&pos_chunk_start, sizeof(uint64_t), 1, fp.get());
-        std::ignore = fread(&n_reads, sizeof(uint32_t), 1, fp.get());
+        const uint32_t start = read_checked_pod<uint32_t>(ifs, "start");
+        const uint32_t end = read_checked_pod<uint32_t>(ifs, "end");
+        const uint64_t pos_chunk_start = read_checked_pod<uint64_t>(ifs, "pos_chunk_start");
+        const uint32_t n_reads = read_checked_pod<uint32_t>(ifs, "n_reads");
 
         if ((chrom_end_uint > start) && (chrom_start_uint < end)) {
             if (DEBUG_PRINT) {
@@ -157,7 +180,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     }
 
     // Move to the found chunk.
-    fseek(fp.get(), best_ovlp_chunk_start, SEEK_SET);
+    seek_checked(ifs, best_ovlp_chunk_start, std::ios::beg, "best_ovlp_chunk_start");
 
     if (DEBUG_PRINT) {
         spdlog::debug("[M::{}] use interval {}-{}\n", std::string(__func__), best_ovlp_start,
@@ -165,18 +188,16 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     }
 
     // Read the chunk.
-    uint8_t qn_l = 0;
-    uint8_t haptag = 0;
     std::string buffer(256, '\0');
     bool found = false;
     for (uint32_t j = 0; j < best_ovlp_nreads; ++j) {
         // Read the query name.
-        std::ignore = fread(&qn_l, 1, 1, fp.get());
-        std::ignore = fread(buffer.data(), qn_l, 1, fp.get());
+        const uint8_t qn_l = read_checked_pod<uint8_t>(ifs, "qn_l");
+        read_checked(ifs, buffer.data(), qn_l, "buffer");
         const std::string qn = buffer.substr(0, qn_l);
 
         // Read the haplotag.
-        std::ignore = fread(&haptag, 1, 1, fp.get());
+        const uint8_t haptag = read_checked_pod<uint8_t>(ifs, "haptag");
 
         if (qname2tag.count(qn) != 0) {
             spdlog::warn("Query name '{}' already seen in the haplotag file. Skipping.", qn);
