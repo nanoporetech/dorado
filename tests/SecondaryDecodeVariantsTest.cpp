@@ -55,6 +55,15 @@ at::Tensor make_polyploid_probs(const std::string_view symbols,
 
     assert(std::size(cons_seqs) == std::size(true_pos_probs));
 
+    const size_t len = std::size(cons_seqs[0]);
+    for (const std::string_view seq : cons_seqs) {
+        if (std::size(seq) != len) {
+            throw std::runtime_error("All input sequences need to be of the same length! len: " +
+                                     std::to_string(len) +
+                                     ", found: " + std::to_string(std::size(seq)));
+        }
+    }
+
     // Fill the probabilities for the input sequences.
     std::vector<at::Tensor> all_probs;
     all_probs.reserve(cons_seqs.size());
@@ -62,7 +71,7 @@ at::Tensor make_polyploid_probs(const std::string_view symbols,
         all_probs.emplace_back(make_haploid_probs(symbols, cons_seqs[i], true_pos_probs[i]));
     }
 
-    return at::stack(all_probs);
+    return at::stack(all_probs, /*dim=*/1);
 }
 }  // namespace
 
@@ -74,9 +83,11 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         std::vector<std::string_view> consensus_seqs;
         std::vector<int64_t> pos_major;
         std::vector<int64_t> pos_minor;
-        bool normalize = false;
         bool ambig_ref = false;
         bool return_all = false;
+        bool normalize = false;
+        bool merge_overlapping = false;
+        bool merge_adjacent = false;
         std::vector<Variant> expected;
         bool expect_throw = false;
     };
@@ -85,17 +96,22 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
     auto [test_case] = GENERATE_REF(table<TestCase>({
         TestCase{
             "Empty test",
-            "", {}, {}, {}, false, false, false, {}, false,
+            "", {}, {}, {}, false, false, false, false, false, {}, false,
         },
 
         TestCase{
             "No variants, one haplotype.",
-            "ACTG", {"ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, {}, false,
+            "ACTG", {"ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false, {}, false,
+        },
+
+        TestCase{
+            "No variants, three haplotype.",
+            "ACTG", {"ACTG", "ACTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false, {}, false,
         },
 
         TestCase{
             "One variant, one haplotype. No normalization.",
-            "ACTG", {"AGTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false,
+            "ACTG", {"AGTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
             {
                 Variant{0, 1, "C", {"G"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 1, 2},
             },
@@ -103,8 +119,37 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
+            "One variant, two haplotype. No normalization. The genotype information and the alleles are always normalized so they are valid, however.",
+            "ACTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
+            {
+                Variant{0, 1, "C", {"G"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 1, 2},
+            },
+            false,
+        },
+
+        TestCase{
+            "Two variants, two haplotypes. No normalization.",
+            "ACATG", {"AGATG", "ACAAG"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, false, false, false, false, false,
+            {
+                Variant{0, 1, "C", {"G"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 1, 2},
+                Variant{0, 3, "T", {"A"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 3, 4},
+            },
+            false,
+        },
+
+        TestCase{
+            "Multi-base SNP variant, two haplotypes. No normalization.",
+            "ACTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
+            {
+                Variant{0, 1, "CT", {"CA", "GT"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 1, 3},
+            },
+            false,
+        },
+
+
+        TestCase{
             "Normalization. One SNP variant, one haplotype. No effect, SNPs cannot be normalized.",
-            "AAAA", {"ACAA"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false,
+            "AAAA", {"ACAA"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, true, false, false,
             {
                 Variant{0, 1, "A", {"C"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 1, 2},
             },
@@ -113,26 +158,25 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Normalization. One deletion variant, one haplotype.",
-            "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false,
+            "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, true, false, false,
             {
                 Variant{0, 0, "CA", {"C"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 3},
             },
             false,
         },
 
-        // Enable this test when normalization can be turned off in decode_variants.
-        // TestCase{
-        //     "No normalization. One deletion variant, one haplotype.",
-        //     "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false,
-        //     {
-        //         Variant{0, 2, "A", {""}, "PASS", {}, 70.0f, {{"GT", 1}, {"GQ", 70}}, 2, 3},
-        //     },
-        //     false,
-        // },
+        TestCase{
+            "No normalization. One deletion variant, one haplotype.",
+            "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
+            {
+                Variant{0, 2, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 2, 3},
+            },
+            false,
+        },
 
         TestCase{
             "Normalization. One deletion variant at position 0, one haplotype. Deletion is the first event, cannot left-extend. Extend to the right with one reference base instead.",
-            "ATAC", {"*TAC"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false,
+            "ATAC", {"*TAC"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, true, false, false,
             {
                 Variant{0, 0, "AT", {"T"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 2},
             },
@@ -141,7 +185,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Normalization. Single reference base which is deleted in the alt.",
-            "A", {"*"}, {0}, {0}, true, false, false,
+            "A", {"*"}, {0}, {0}, false, false, true, false, false,
             {
                 Variant{0, 0, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 1},
             },
@@ -150,7 +194,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Return all reference positions (gVCF). This includes reference positions on variant sites as well.",
-            "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, true, false, true,
+            "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, false, true, true, false, false,
             {
                 Variant{0, 0, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 0, 1},
                 Variant{0, 1, "C", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 1, 2},
@@ -164,9 +208,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Prepending with a reference base because the entire variant is in an insertion.",
-            "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, true, false, false,
+            "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, false, false, true, false, false,
             {
-                Variant{0, 2, "T", {"TAAA"}, "PASS", {}, 210.0f, {{"GT", "1"}, {"GQ", "210"}}, 2, 6},
+                Variant{0, 2, "T", {"TAAA"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 2, 6},
             },
             false,
         },
@@ -178,9 +222,312 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 7, 8, 9, 10, 11},
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0},
-            true, false, false,
+            false, false, true, false, false,
             {
-                Variant{0, 6, "A", {"TC"}, "PASS", {}, 280.0f, {{"GT", "1"}, {"GQ", "280"}}, 4, 18},
+                Variant{0, 6, "A", {"TC"}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 4, 18},
+            },
+            false,
+        },
+
+        TestCase{
+            "Edge case, diploid. Normalize, merge overlapping and merge adjacent. SNPs follow a long stretch of minor positions, making a large variant region. The rstart moved left 1bp because a base was prepended.",
+             "CCTAG************TTATTATT",
+            {"CCTAG*********TT**T*TTATT",
+             "CCTAG*********T*AT*ATTATT",
+            },
+            {0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 7, 8, 9, 10, 11, 12},
+            {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, true, true, true,
+            {
+                Variant{0, 6, "TA", {"ATA", "TT"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 4, 20},
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference not allowed. Single base SNP, not reported because the reference has an N base.",
+            "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
+            {
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference IS allowed. Single base SNP is reported even though the reference has an N base.",
+            "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false, false, false,
+            {
+                Variant{0, 1, "N", {"C", "G"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 1, 2},
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference - variants not allowed. 2-base SNP extends into an N reference region. Only one base should be reported.",
+            "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
+            {
+                Variant{0, 2, "T", {"A"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 2, 3},
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference IS allowed. 2-base SNP extends into an N reference region.",
+            "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, true, false, false, false, false,
+            {
+                Variant{0, 1, "NT", {"CA", "GT"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 1, 3},
+            },
+            false,
+        },
+
+        ///// Diploid test 1. /////
+        // Diploid case with minor reference positions.
+        //           <same>
+        //             012 3456789 Indices
+        //             012 3455678 Major positions
+        //             000 0001000 Minor positions
+        //     REF:    ACC|AAA*AAA
+        //     HAP1:   ACC|*A***AA
+        //     HAP1:   ACC|*ACC*A*
+        //                 ^ ^^^ ^
+        //                 V1 V2 V3
+        //     Three variants in this region:
+        //         - V1: 'A'  -> ('', ''), pos = 3 - 4
+        //         - V2: 'AA' -> ('', 'CC'), pos = 5 - 7, but it spans 3 columns because of
+        //                                                 a minor position.
+        //         - V3: 'A'  -> ('A', ''), pos = 8 - 9
+        //
+        // Explanation for test 3 (merge_overlapping and merge_adjacent test):
+        //   1. Normalized individual variants are located in positions (check the previous test case: Diploid 1, test 2):
+        //       V1: rstart = 2, rend = 4
+        //       V2: rstart = 4, rend = 8
+        //       V3: rstart = 8, rend = 10
+        //    2. These variants are neighboring, and the total region is: rstart = 2, rend = 10.
+        //    3. The slice of the pileup for this region is:
+        //       - IDX  : 23456789
+        //       - MAJOR: 23455678
+        //       - MINOR: 00001000
+        //       - REF  : CAAA*AAA
+        //       - HAP 0: C*A***AA
+        //       - HAP 1: C*ACC*A*
+        //       - VAR  : 01011101
+        //    4. Sequences without deletions:
+        //           R : CAAAAAA
+        //           H1: CAAA
+        //           H2: CACCA
+        //    5. Normalization steps:
+        //               Input           Right trim      Left trim
+        //       rstart: 2               2               3           4
+        //           R : CAAAAAA         CAAAAA          AAAAA       AAAA
+        //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop.
+        //           H2: CACCA           CACC            ACC         CC
+        TestCase{
+            "Diploid 1, test 1. No normalization and no filtering of overlapping variants. Report all variants as they are.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*ACC*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, false, false, false,
+            {
+                Variant{0, 3, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 3, 4},           // V1
+                Variant{0, 5, "AA", {"", "CC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 5, 8},    // V2
+                Variant{0, 8, "A", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 9, 10},          // V3
+            },
+            false,
+        },
+        TestCase{
+            "Diploid 1, test 2. Using normalization but no filtering of overlapping variants.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*ACC*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, false, false,
+            {
+                Variant{0, 2, "CA", {"C"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 2, 4},             // V1
+                Variant{0, 4, "AAA", {"A", "ACC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 4, 8},     // V2
+                Variant{0, 7, "AA", {"A"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 8, 10},            // V3
+            },
+            false,
+        },
+        TestCase{
+            "Diploid 1, test 3. Filter overlapping variants.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*ACC*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, true, true,
+            {
+                Variant{0, 4, "AAAA", {"A", "CC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 2, 10},
+            },
+            false,
+        },
+
+        ///// Diploid test 2. /////
+        // Explanation for test 3 (merge_overlapping and merge_adjacent test):
+        //   1. Normalized individual variants are located in positions (check the previous test case: Diploid 1, test 2):
+        //       V1: rstart = 2, rend = 4
+        //       V2: rstart = 4, rend = 8
+        //       V3: rstart = 8, rend = 10
+        //    2. These variants are neighboring, and the total region is: rstart = 2, rend = 10.
+        //    3. The slice of the pileup for this region is:
+        //       - IDX  : 23456789
+        //       - MAJOR: 23455678
+        //       - MINOR: 00001000
+        //       - REF  : CAAA*AAA
+        //       - HAP 0: C*A***AA
+        //       - HAP 1: C*AAC*A*
+        //       - VAR  : 01011101
+        //    4. Sequences without deletions:
+        //           R : CAAAAAA
+        //           H1: CAAA
+        //           H2: CAACA
+        //    5. Normalization steps:
+        //               Input           Right trim      Left trim
+        //       rstart: 2               2               3           4
+        //           R : CAAAAAA         CAAAAA          AAAAA       AAAA
+        //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop. No left trim because H1 would be empty.
+        //           H2: CAACA           CAAC            AAC         AC
+        TestCase{
+            "Diploid 2, test 1. No normalization and no filtering of overlapping variants. Report all variants as they are.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAC*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, false, false, false,
+            {
+                Variant{0, 3, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 3, 4},           // V1
+                Variant{0, 5, "AA", {"", "AC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 5, 8},    // V2
+                Variant{0, 8, "A", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 9, 10},          // V3
+            },
+            false,
+        },
+        TestCase{
+            "Diploid 2, test 2. Using normalization but no filtering of overlapping variants. Similar to Diploid 1 tests, "
+            "but position 5 does not have a SNP. That means that there could be more trimming at the front of the variant "
+            "during normalization, but normalization stops because it hits the previous variant.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAC*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, false, false,
+            {
+                Variant{0, 2, "CA", {"C"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 2, 4},             // V1
+                Variant{0, 4, "AAA", {"A", "AAC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 4, 8},     // V2
+                Variant{0, 7, "AA", {"A"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 8, 10},            // V3
+            },
+            false,
+        },
+        TestCase{
+            "Diploid 2, test 3. Merge adjacent variants.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAC*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, true, true,
+            {
+                Variant{0, 4, "AAAA", {"A", "AC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 2, 10},
+            },
+            false,
+        },
+
+        ///// Diploid test 3. /////
+        // Explanation for test 2 (normalization):
+        // Here is an interesting case for V2:
+        // The slice of the pileup for this region is:
+        //       - IDX  : 23456789
+        //       - MAJOR: 23455678
+        //       - MINOR: 00001000
+        //       - REF  : CAAA*AAA
+        //       - HAP 0: C*A***AA
+        //       - HAP 1: C*AAA*A*
+        //       - VAR  : 01011101
+        //                 V1 V2 V3
+        // Normalization steps for V2:
+        //               Input               Left extend     Right trim
+        //       rstart: 5           5       4               4
+        //           R : A*A         AA      AAA             AA              Stop. H1 is empty but cannot left-extend because idx=3 is a variant!
+        //           H1: ***     =>       => A           =>                  This should fall back to the last step before the "Right trim".
+        //           H2: AA*         AA      AAA             AA              This test case triggers the new heuristic in normalization.
+        //
+        // Explanation for test 3 (merge_overlapping and merge_adjacent test):
+        //   1. Normalized individual variants are located in positions (check the previous test case: Diploid 1, test 2):
+        //       V1: rstart = 2, rend = 4
+        //       V2: rstart = 4, rend = 8
+        //       V3: rstart = 8, rend = 10
+        //    2. These variants are neighboring, and the total region is: rstart = 2, rend = 10.
+        //    3. The slice of the pileup for this region is:
+        //       - IDX  : 23456789
+        //       - MAJOR: 23455678
+        //       - MINOR: 00001000
+        //       - REF  : CAAA*AAA
+        //       - HAP 0: C*A***AA
+        //       - HAP 1: C*AAA*A*
+        //       - VAR  : 01011101
+        //    4. Sequences without deletions:
+        //           R : CAAAAAA
+        //           H1: CAAA
+        //           H2: CAAAA
+        //    5. Normalization steps:
+        //               Input           Right trim      Right trim      Right trim      Right trim
+        //       rstart: 2               2               2               2               2
+        //           R : CAAAAAA         CAAAAA          CAAAA           CAAAA           CAAA
+        //           H1: CAAA        =>  CAA         =>  CA          =>  CA          =>  C           Stop. No left trim because H1 would be empty.
+        //           H2: CAAAA           CAAA            CAA             CAA             CAA
+        TestCase{
+            "Diploid 3, test 1. No normalization and no filtering of overlapping variants. Report all variants as they are.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAA*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, false, false, false,
+            {
+                Variant{0, 3, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 3, 4},       // V1
+                Variant{0, 5, "AA", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 5, 8},      // V2
+                Variant{0, 8, "A", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 9, 10},      // V3
+            },
+            false,
+        },
+        TestCase{
+            "Diploid 3, test 2. Using normalization but no filtering of overlapping variants. "
+            "Triggers the case where left-extend would step into a previous variant.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAA*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, false, false,
+            {
+                Variant{0, 2, "CA", {"C"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 2, 4},     // V1
+                Variant{0, 4, "AAA", {"A"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 4, 8},    // V2
+                Variant{0, 7, "AA", {"A"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 8, 10},    // V3
+            },
+            false,
+        },
+        TestCase{
+            "Diploid 3, test 3. Merge adjacent variants.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAA*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, false, true,
+            {
+                Variant{0, 2, "CAAA", {"C", "CA"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 2, 10},
             },
             false,
         },
@@ -213,22 +560,21 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
                                  std::vector<float>(std::size(test_case.consensus_seqs), 1.0f)),
     };
 
-    // Workaround - for now, decode_variants is for haploid inputs only. Take probs only for the first haplotype.
-    if (!std::empty(test_case.consensus_seqs)) {
-        vc_sample.logits = vc_sample.logits.index({0});
-    }
-
     // Create the ungapped draft sequence.
     std::string draft = test_case.ref_seq_with_gaps;
     draft.erase(std::remove(std::begin(draft), std::end(draft), '*'), std::end(draft));
 
     if (test_case.expect_throw) {
-        CATCH_CHECK_THROWS(decode_variants(decoder, vc_sample, draft, test_case.ambig_ref,
-                                           test_case.return_all));
+        CATCH_CHECK_THROWS(general_decode_variants(
+                decoder, vc_sample.seq_id, vc_sample.positions_major, vc_sample.positions_minor,
+                vc_sample.logits, draft, test_case.ambig_ref, test_case.return_all,
+                test_case.normalize, test_case.merge_overlapping, test_case.merge_adjacent));
 
     } else {
-        const std::vector<Variant> result = decode_variants(
-                decoder, vc_sample, draft, test_case.ambig_ref, test_case.return_all);
+        const std::vector<Variant> result = general_decode_variants(
+                decoder, vc_sample.seq_id, vc_sample.positions_major, vc_sample.positions_minor,
+                vc_sample.logits, draft, test_case.ambig_ref, test_case.return_all,
+                test_case.normalize, test_case.merge_overlapping, test_case.merge_adjacent);
 
         CATCH_CHECK(test_case.expected == result);
     }
