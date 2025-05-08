@@ -4,29 +4,43 @@ about: Standard template for reporting dorado issues
 title: ''
 labels: ''
 assignees: ''
-
 ---
 
-# Issue Report
+<!-- 
+Before posting an issue please take a look at the Dorado Documentation at:
+https://dorado-docs.readthedocs.io/en/latest/
 
-## Please describe the issue:
+Please include as much detailed information in your issue description as possible. 
 
-*Please provide a clear and concise description of the issue you are seeing and the result you expect.*
+Issues with missing template information may be closed.
+-->
 
-## Steps to reproduce the issue:
+## Issue Report
 
-*Please list any steps to reproduce the issue.*
+<!--
+Please provide a clear description of the issue you are seeing and the result you expect.
 
-## Run environment:
-- Dorado version:
-- Dorado command:
-- Operating system:
-- Hardware (CPUs, Memory, GPUs):
-- Source data type (e.g., pod5 or fast5 - please note we always recommend converting to pod5 for optimal basecalling performance):
-- Source data location (on device or networked drive - NFS, etc.): 
-- Details about data (flow cell, kit, read lengths, number of reads, total dataset size in MB/GB/TB): 
-- Dataset to reproduce, if applicable (small subset of data to share as a pod5 to reproduce the issue):
+List any steps to reproduce the issue here and describe what you've tried to resolve the issue
+
+If this issue relates to performance, please be specific about what your expectations are
+and / or what the observed change has been. 
+-->
 
 ## Logs
+<!-- 
+Please include debug output from dorado (run dorado with `-v`, or `-vv` on a small dataset) 
 
-* Please provide output trace of dorado (run dorado with -v, or -vv on a small subset)
+If the logs are large you can attach them as a text file to the github issue.
+-->
+
+## Run environment
+<!--
+Please be as specific as possible here especially if your issue relates to performance.
+-->
+- Dorado version: <!-- run dorado --version -->
+- Dorado command: <!-- e.g dorado basecaller hac reads/ > calls.bam -->
+- Operating system: <!-- Please be specific -->
+- Hardware specs: <!-- CPUs, Memory, GPUs -->
+- Source data type: <!-- pod5 / fast5 -->
+- Source data location: <!-- e.g. Local SSD or Network Drive -->
+- Details about data: <!-- Flow cell, kit, read lengths, number of reads, dataset size -->
