@@ -143,6 +143,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
     if (Chemistry::UNKNOWN == chemistry) {
         throw std::runtime_error("Cannot get model without chemistry");
     }
+    throw_on_deprecated_chemistry(chemistry);
     const std::vector<ModelInfo> matches = find_models(models, chemistry, model, mods);
 
     if (matches.empty()) {
@@ -169,8 +170,6 @@ std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
     if (Chemistry::UNKNOWN == chemistry) {
         throw std::logic_error("Cannot get models without chemistry");
     }
-
-    throw_on_deprecated_chemistry(chemistry);
 
     spdlog::trace("Searching for: {}", format_msg(chemistry, model, mods));
 

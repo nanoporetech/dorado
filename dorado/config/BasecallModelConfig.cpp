@@ -314,9 +314,7 @@ bool is_rna_model(const BasecallModelConfig &model_config) {
     case models::SampleType::DNA:
         return false;
     case models::SampleType::RNA002:
-        models::throw_on_deprecated_model(model_config.model_path.filename().string());
-        // In case the model name is not recognised.
-        throw std::logic_error("RNA002 is deprecated");
+        return true;
     case models::SampleType::RNA004:
         return true;
     case models::SampleType::UNKNOWN:

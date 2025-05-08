@@ -90,8 +90,8 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
 
     if (!data.empty()) {
         const auto folder_entries = utils::fetch_directory_entries(data.string(), recursive);
-        const auto chemisty = file_info::get_unique_sequencing_chemistry(folder_entries);
-        auto model_search = models::ModelComplexSearch(model_complex, chemisty, true);
+        const auto chemistry = file_info::get_unique_sequencing_chemistry(folder_entries);
+        auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
 
         try {
             if (model_complex.has_model_variant()) {
