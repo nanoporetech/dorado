@@ -35,12 +35,6 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<int64_t>& positions_minor,
                           const Variant& variant);
 
-std::vector<Variant> decode_variants(const DecoderBase& decoder,
-                                     const VariantCallingSample& vc_sample,
-                                     const std::string& draft,
-                                     const bool ambig_ref,
-                                     const bool gvcf);
-
 /**
  * \brief Decodes polyploid variants from a given tensor of probabilities for a single inference sample (not a batch).
  * \param decoder The decoder which contains the label scheme.
