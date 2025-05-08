@@ -337,7 +337,7 @@ private:
     interval_vector intervals;
     std::unique_ptr<IntervalTree> left;
     std::unique_ptr<IntervalTree> right;
-    Scalar center;
+    Scalar center{};
 };
 #ifdef USE_INTERVAL_TREE_NAMESPACE
 }
