@@ -95,11 +95,15 @@ void remove_deletions(secondary::ConsensusResult& cons);
  * \brief Takes consensus results for all samples and stitches them into full sequences.
  *          If fill_gaps is true, missing pieces will be filled with either the draft sequence
  *          or with an optional fill_char character.
+ * \param sample_results is a 2D vector of: [window x haplotype]. For haploid sequences, inner
+ *                          vector should be of size 1.
+ * \returns a 2D vector of dimensions: [part x haplotype], where parts are gap-separated portions
+ *          of the consensus.
  */
-std::vector<secondary::ConsensusResult> stitch_sequence(
+std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
         const hts_io::FastxRandomReader& fastx_reader,
         const std::string& header,
-        const std::vector<secondary::ConsensusResult>& sample_results,
+        const std::vector<std::vector<secondary::ConsensusResult>>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
         const bool fill_gaps,
         const std::optional<char>& fill_char);
@@ -164,7 +168,7 @@ std::vector<secondary::Window> create_windows_from_regions(
  * \param num_threads Number of threads for processing.
  * \param min_depth Consensus sequences will be split in regions of insufficient depth.
  */
-void decode_samples_in_parallel(std::vector<secondary::ConsensusResult>& results_cons,
+void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResult>>& results_cons,
                                 std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 secondary::Stats& polish_stats,
@@ -189,9 +193,10 @@ void sample_producer(PolisherResources& resources,
                      const int32_t bam_subchunk_len,
                      utils::AsyncQueue<InferenceData>& infer_data);
 
-std::vector<std::vector<secondary::ConsensusResult>> construct_consensus_seqs(
+/// \brief Dimensions: [draft_id x part_id x haplotype_id]
+std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_consensus_seqs(
         const secondary::Interval& region_batch,
-        const std::vector<secondary::ConsensusResult>& all_results_cons,
+        const std::vector<std::vector<secondary::ConsensusResult>>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const bool fill_gaps,
         const std::optional<char>& fill_char,

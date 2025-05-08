@@ -442,8 +442,12 @@ void validate_options(const Options& opt) {
     }
 }
 
+/**
+ * \brief Writes the consensus sequence from the given results. The dimensions of the `results` vector
+ *          are: [part_id x haplotype_id].
+ */
 void write_consensus_results(std::ostream& os,
-                             const std::vector<secondary::ConsensusResult>& results,
+                             const std::vector<std::vector<secondary::ConsensusResult>>& results,
                              const bool fill_gaps,
                              const bool write_quals) {
     if (std::empty(results)) {
@@ -451,19 +455,29 @@ void write_consensus_results(std::ostream& os,
     }
 
     for (size_t i = 0; i < std::size(results); ++i) {
-        secondary::ConsensusResult out = results[i];
-        polisher::remove_deletions(out);
-
-        std::string header = results[i].name;
-        if (!fill_gaps) {
-            header += "_" + std::to_string(i) + " " + std::to_string(out.draft_start) + "-" +
-                      std::to_string(out.draft_end);
+        if (std::empty(results[i])) {
+            continue;
         }
 
-        if (write_quals) {
-            os << '@' << header << '\n' << out.seq << "\n+\n" << out.quals << '\n';
-        } else {
-            os << '>' << header << '\n' << out.seq << '\n';
+        for (size_t hap_id = 0; hap_id < std::size(results[i]); ++hap_id) {
+            const std::string hap_label =
+                    (std::size(results[i]) > 1) ? ("_hap_" + std::to_string(hap_id)) : "";
+
+            secondary::ConsensusResult out = results[i][hap_id];
+            polisher::remove_deletions(out);
+
+            std::string header = out.name + hap_label;
+
+            if (!fill_gaps) {
+                header += "_" + std::to_string(i) + " " + std::to_string(out.draft_start) + "-" +
+                          std::to_string(out.draft_end);
+            }
+
+            if (write_quals) {
+                os << '@' << header << '\n' << out.seq << "\n+\n" << out.quals << '\n';
+            } else {
+                os << '>' << header << '\n' << out.seq << '\n';
+            }
         }
     }
 }
@@ -803,7 +817,7 @@ void run_polishing(const Options& opt,
                           secondary::region_to_string(region_batch[i]));
         }
 
-        std::vector<secondary::ConsensusResult> all_results_cons;
+        std::vector<std::vector<secondary::ConsensusResult>> all_results_cons;
         std::vector<secondary::VariantCallingSample> vc_input_data;
 
         // Inference and consensus.
@@ -893,10 +907,11 @@ void run_polishing(const Options& opt,
             if (opt.write_consensus) {
                 utils::ScopedProfileRange spr2("run-construct_seqs_and_write", 2);
 
-                const std::vector<std::vector<secondary::ConsensusResult>> consensus_seqs =
-                        polisher::construct_consensus_seqs(batch_interval, all_results_cons,
-                                                           draft_lens, opt.fill_gaps, opt.fill_char,
-                                                           *draft_readers.front());
+                // Dimensions: [draft_id x part_id x haplotype_id].
+                const std::vector<std::vector<std::vector<secondary::ConsensusResult>>>
+                        consensus_seqs = polisher::construct_consensus_seqs(
+                                batch_interval, all_results_cons, draft_lens, opt.fill_gaps,
+                                opt.fill_char, *draft_readers.front());
 
                 // Write the consensus file.
                 for (const auto& consensus : consensus_seqs) {

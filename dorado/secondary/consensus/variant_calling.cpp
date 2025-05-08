@@ -404,8 +404,18 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
 
     // Predicted sequence with gaps.
     const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-    const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
-    const std::string& cons_seq_with_gaps = c.front().seq;
+    const std::vector<std::vector<ConsensusResult>> c = decoder.decode_bases(logits);
+
+    // This shouldn't be possible.
+    if ((std::size(c) != 1) || (std::size(c.front()) != 1)) {
+        spdlog::warn(
+                "Unexpected number of consensus sequences generated from a single sample: "
+                "c.size = {}. Skipping consensus of this sample.",
+                std::size(c));
+        return {};
+    }
+
+    const std::string& cons_seq_with_gaps = c.front().front().seq;
 
     // Draft sequence with gaps.
     const std::string ref_seq_with_gaps =

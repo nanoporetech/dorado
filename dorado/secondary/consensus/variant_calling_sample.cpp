@@ -193,10 +193,10 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
         // In this case, the "batch size" is 1.
         const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-        const std::vector<ConsensusResult> c = decoder.decode_bases(logits);
+        const std::vector<std::vector<ConsensusResult>> c = decoder.decode_bases(logits);
 
         // This shouldn't be possible.
-        if (std::size(c) != 1) {
+        if ((std::size(c) != 1) || (std::size(c.front()) != 1)) {
             spdlog::warn(
                     "Unexpected number of consensus sequences generated from a single sample: "
                     "c.size = {}. Skipping consensus of this sample.",
@@ -205,7 +205,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         }
 
         // Sequences for comparison.
-        const std::string& call_with_gaps = c.front().seq;
+        const std::string& call_with_gaps = c.front().front().seq;
         const std::string draft_with_gaps = extract_draft_with_gaps(
                 draft, vc_sample.positions_major, vc_sample.positions_minor);
         assert(std::size(call_with_gaps) == std::size(draft_with_gaps));
