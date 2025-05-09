@@ -97,9 +97,7 @@ void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &co
     }
 }
 
-void parse_run_info(BasecallModelConfig &config,
-                    const std::string &model_name,
-                    const toml::value &config_toml) {
+void parse_run_info(BasecallModelConfig &config, const toml::value &config_toml) {
     // Fetch run_info parameters.
     // Do nothing if run_info is not available in config file.
     if (config_toml.contains(keys::RUN_INFO)) {
@@ -114,6 +112,8 @@ void parse_run_info(BasecallModelConfig &config,
 
     using namespace dorado::models;
     if (config.sample_type == SampleType::UNKNOWN) {
+        const std::string model_name =
+                std::filesystem::canonical(config.model_path).filename().string();
         config.sample_type = get_sample_type_from_model_name(model_name);
         if (config.sample_type == SampleType::UNKNOWN) {
             throw std::runtime_error(
@@ -200,10 +200,6 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     config.model_path = path;
     config.basecaller.update(path);
 
-    const std::string model_name =
-            std::filesystem::canonical(config.model_path).filename().string();
-    models::throw_on_deprecated_model(model_name);
-
     parse_qscore_params(config, config_toml);
     parse_polya_coefficients(config, config_toml);
 
@@ -280,7 +276,7 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
                 std::to_string(config.convs[0].size));
     }
 
-    parse_run_info(config, model_name, config_toml);
+    parse_run_info(config, config_toml);
 
     return config;
 }
@@ -391,10 +387,6 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.model_path = path;
     config.basecaller.update(path);
 
-    const std::string model_name =
-            std::filesystem::canonical(config.model_path).filename().string();
-    models::throw_on_deprecated_model(model_name);
-
     parse_qscore_params(config, config_toml);
 
     const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
@@ -426,7 +418,7 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
 
     config.signal_norm_params = parse_signal_normalisation_params(config_toml);
 
-    parse_run_info(config, model_name, config_toml);
+    parse_run_info(config, config_toml);
 
     // Force downstream issue (negative lstm size) if a tx model config is incorrectly
     // used to define an LSTM model. Incorrect use should be guarded against by using is_tx_model()
@@ -471,6 +463,8 @@ bool BasecallModelConfig::has_normalised_basecaller_params() const {
 }
 
 BasecallModelConfig load_model_config(const std::filesystem::path &path) {
+    const std::string model_name = std::filesystem::canonical(path).filename().string();
+    models::throw_on_deprecated_model(model_name);
     return is_tx_model_config(path) ? load_tx_model_config(path) : load_lstm_model_config(path);
 }
 
