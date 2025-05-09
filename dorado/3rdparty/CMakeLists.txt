@@ -75,3 +75,7 @@ add_subdirectory(date EXCLUDE_FROM_ALL)
 # toml11
 set(TOML11_PRECOMPILE ON)
 add_subdirectory(toml11 EXCLUDE_FROM_ALL)
+
+# kadayashi
+set(BUILD_KADAYASHI_EXE OFF)
+add_subdirectory(kadayashi EXCLUDE_FROM_ALL)

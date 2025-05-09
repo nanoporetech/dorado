@@ -84,6 +84,7 @@ add_executable(dorado_tests
     SecondaryWindowTest.cpp
     RleTest.cpp
     CorrectionWindowTest.cpp
+    KadayashiTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
@@ -113,6 +114,7 @@ target_link_libraries(dorado_tests_common
         dorado_utils
         dorado_compat
         dorado_secondary
+        kadayashi::haplotag_lib
         Catch2::Catch2
 )
 target_compile_definitions(dorado_tests_common

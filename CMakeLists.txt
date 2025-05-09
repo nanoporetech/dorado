@@ -387,6 +387,7 @@ target_link_libraries(dorado_lib
         minimap2
         toml11::toml11
         cxxpool
+        kadayashi::haplotag_lib
 )
 
 if(NOT DORADO_DISABLE_DORADO)
