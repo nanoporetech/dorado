@@ -1,6 +1,8 @@
 #include "kits.h"
 
 #include <algorithm>
+#include <array>
+#include <cstdlib>
 #include <stdexcept>
 #include <string>
 
@@ -254,7 +256,7 @@ const KitSets sets_apk = {{kit14::flowcells, {KC::SQK_APK114}}};
 }  // namespace kit14
 
 namespace kit10 {
-// Kit10 ~ R9.4.1 e8
+// Deprecated Kit10 ~ R9.4.1 e8
 
 const std::vector<FC> flowcells = {
         FC::FLO_FLG001, FC::FLO_MIN106,     FC::FLO_MINSP6,  FC::FLO_PRO001,
@@ -317,7 +319,7 @@ const KitSets sets = {{kit10::flowcells, kit10::kits}};
 }  // namespace kit10
 
 namespace rna002 {
-// RNA002 Flowcells and Kits
+// Deprecated RNA002 Flowcells and Kits
 const std::vector<FC> flowcells = {
         FC::FLO_FLG001, FC::FLO_MIN106, FC::FLO_MINSP6,     FC::FLO_MIN107,
         FC::FLO_PRO001, FC::FLO_PRO002, FC::FLO_PRO002_ECO, FC::FLO_PRO002M,
@@ -344,25 +346,35 @@ const std::unordered_map<SampleType, SampleTypeInfo> sample_type_map = {
 };
 
 /*
+Mapping of deprecated chemistries to a tuple of {name, version dropped, last version}
+*/
+const std::unordered_map<Chemistry, std::array<std::string, 3>> deprecated = {
+        {Chemistry::RNA002_70BPS, {"RNA002", "v1.0.0", "v0.9.6"}},
+        {Chemistry::DNA_R9_4_1_E8, {"DNA r9.4.1 e8", "v1.0.0", "v0.9.6"}},
+};
+
+/*
 Mapping of Chemistry to the complete set of sequencing kits associated with that chemistry.
 The cross product of a chemistry's set of flowcells and kits is generated at runtime
 */
 const std::unordered_map<Chemistry, ChemistryKits> kit_map = {
-        {Chemistry::UNKNOWN, {"__UNKNOWN_CHEMISTRY__", 1, SampleType::DNA, {}}},
-        {Chemistry::DNA_R9_4_1_E8, {"dna_r9.4.1_e8", 4000, SampleType::DNA, kit_sets::kit10::sets}},
+        {Chemistry::UNKNOWN, {"__UNKNOWN_CHEMISTRY__", 1, SampleType::DNA, {}, false}},
+        {Chemistry::DNA_R9_4_1_E8,
+         {"dna_r9.4.1_e8", 4000, SampleType::DNA, kit_sets::kit10::sets, true}},
         {Chemistry::DNA_R10_4_1_E8_2_260BPS,
-         {"dna_r10.4.1_e8.2_260bps", 4000, SampleType::DNA, kit_sets::kit14::sets_260bps}},
+         {"dna_r10.4.1_e8.2_260bps", 4000, SampleType::DNA, kit_sets::kit14::sets_260bps, false}},
         {Chemistry::DNA_R10_4_1_E8_2_APK_5KHZ,
-         {"dna_r10.4.1_e8.2_apk_5khz", 5000, SampleType::DNA, kit_sets::kit14::sets_apk}},
+         {"dna_r10.4.1_e8.2_apk_5khz", 5000, SampleType::DNA, kit_sets::kit14::sets_apk, false}},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ,
-         {"dna_r10.4.1_e8.2_400bps_4khz", 4000, SampleType::DNA, kit_sets::kit14::sets_400bps}},
+         {"dna_r10.4.1_e8.2_400bps_4khz", 4000, SampleType::DNA, kit_sets::kit14::sets_400bps,
+          false}},
         {Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-         {"dna_r10.4.1_e8.2_400bps_5khz", 5000, SampleType::DNA,
-          kit_sets::kit14::sets_400bps_5khz}},
+         {"dna_r10.4.1_e8.2_400bps_5khz", 5000, SampleType::DNA, kit_sets::kit14::sets_400bps_5khz,
+          false}},
         {Chemistry::RNA002_70BPS,
-         {"rna002_70bps", 3000, SampleType::RNA002, kit_sets::rna002::sets}},
+         {"rna002_70bps", 3000, SampleType::RNA002, kit_sets::rna002::sets, true}},
         {Chemistry::RNA004_130BPS,
-         {"rna004_130bps", 4000, SampleType::RNA004, kit_sets::rna004::sets}},
+         {"rna004_130bps", 4000, SampleType::RNA004, kit_sets::rna004::sets, false}},
 };
 
 // Crate a map of flowcell and sequencing kit pairs to categorical chemistry
@@ -399,11 +411,13 @@ const ChemistryMap& chemistry_map() { return chemistry::chemistry_map; }
 Chemistry get_chemistry(const ChemistryKey& key) {
     const auto& map = chemistry_map();
     auto it = map.find(key);
-    return it == map.end() ? Chemistry::UNKNOWN : it->second;
+    const auto chem = it == map.cend() ? Chemistry::UNKNOWN : it->second;
+    return chem;
 }
 
 Chemistry get_chemistry(const std::string& chemistry) {
-    return get_code(chemistry, Chemistry::UNKNOWN, chemistry_kits());
+    const auto chem = get_code(chemistry, Chemistry::UNKNOWN, chemistry_kits());
+    return chem;
 }
 
 ChemistryKey get_chemistry_key(const std::string& flow_cell_product_code,
@@ -443,6 +457,18 @@ SampleTypeInfo get_sample_type_info(const SampleType& sample_type) {
 
 std::string to_string(const SampleType& sample_type) {
     return get_sample_type_info(sample_type).name;
+}
+
+void throw_on_deprecated_chemistry(const Chemistry chemistry) {
+    if (!chemistry::deprecated.contains(chemistry)) {
+        return;
+    }
+    const auto [name, dropped, last] = chemistry::deprecated.at(chemistry);
+    throw std::runtime_error("The '" + name + "' chemistry has been deprecated since Dorado " +
+                             dropped +
+                             ". Please use a previous version which can be found at "
+                             "https://github.com/nanoporetech/dorado/releases/tag/" +
+                             last + ".");
 }
 
 }  // namespace dorado::models

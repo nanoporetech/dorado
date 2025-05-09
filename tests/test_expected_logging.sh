@@ -7,7 +7,7 @@ set -o pipefail
 
 test_dir=$(dirname $0)
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
-model=${2:-dna_r9.4.1_e8_hac@v3.3}
+model=${2:-dna_r10.4.1_e8.2_400bps_hac@v5.0.0}
 batch=${3:-384}
 data_dir=$test_dir/data
 output_dir_name=$(echo $RANDOM | head -c 10)

@@ -1,6 +1,7 @@
 #include "models/model_complex.h"
 
 #include "models.h"
+#include "models/kits.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -55,7 +56,7 @@ ModelComplex ModelComplexParser::parse(const std::string& arg) {
         }
 
         if (!std::filesystem::exists(std::filesystem::path(selection.raw))) {
-            spdlog::warn(
+            spdlog::debug(
                     "Model argument '{}' did not satisfy the model complex syntax and is assumed "
                     "to be "
                     "a path.",
@@ -154,7 +155,9 @@ ModelComplexSearch::ModelComplexSearch(const ModelComplex& complex,
         : m_complex(complex),
           m_chemistry(chemistry),
           m_suggestions(suggestions),
-          m_simplex_model_info(resolve_simplex()) {}
+          m_simplex_model_info(resolve_simplex()) {
+    throw_on_deprecated_chemistry(chemistry);
+}
 
 ModelInfo ModelComplexSearch::resolve_simplex() const {
     if (m_complex.is_path()) {

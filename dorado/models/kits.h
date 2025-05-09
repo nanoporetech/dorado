@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <map>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <vector>
 
@@ -198,6 +199,7 @@ struct ChemistryKits {
     const SamplingRate sampling_rate;
     const SampleType sample_type;
     const KitSets kit_sets;
+    const bool is_deprecated{false};
 };
 
 // Enumeration of chemistries
@@ -211,6 +213,8 @@ enum class Chemistry {
     RNA004_130BPS,
     UNKNOWN,
 };
+
+void throw_on_deprecated_chemistry(const Chemistry chemistry);
 
 const std::unordered_map<Chemistry, ChemistryKits>& chemistry_kits();
 using ChemistryKey = std::tuple<Flowcell, KitCode, SamplingRate>;

@@ -8,7 +8,10 @@
 
 #include <algorithm>
 #include <filesystem>
+#include <optional>
 #include <stdexcept>
+#include <string>
+#include <vector>
 
 namespace fs = std::filesystem;
 
@@ -140,6 +143,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
     if (Chemistry::UNKNOWN == chemistry) {
         throw std::runtime_error("Cannot get model without chemistry");
     }
+    throw_on_deprecated_chemistry(chemistry);
     const std::vector<ModelInfo> matches = find_models(models, chemistry, model, mods);
 
     if (matches.empty()) {
@@ -191,32 +195,6 @@ using VV = ModelVersion;
 namespace simplex {
 
 const std::vector<ModelInfo> models = {
-        // v3.{3,4,6}
-        ModelInfo{
-                "dna_r9.4.1_e8_fast@v3.4",
-                "879cbe2149d5eea524e8902a2d00b39c9b999b66ef40938f0cc37e7e0dc88aed",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::FAST, VV::v3_4_0},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_hac@v3.3",
-                "6f74b6a90c70cdf984fed73798f5e5a8c17c9af3735ef49e83763143c8c67066",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::HAC, VV::v3_3_0, true},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_sup@v3.3",
-                "5fc46541ad4d82b37778e87e65ef0a36b578b1d5b0c55832d80b056bee8703a4",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::SUP, VV::v3_3_0},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_sup@v3.6",
-                "1db1377b516c158b5d2c39533ac62e8e334e70fcb71c0a4d29e7b3e13632aa73",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::SUP, VV::v3_6_0},
-        },
-
         // v3.5.2 260bps
         ModelInfo{
                 "dna_r10.4.1_e8.2_260bps_fast@v3.5.2",
@@ -403,20 +381,6 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
         },
 
-        // RNA002
-        ModelInfo{
-                "rna002_70bps_fast@v3",
-                "f8f533797e9bf8bbb03085568dc0b77c11932958aa2333902cf2752034707ee6",
-                CC::RNA002_70BPS,
-                ModelVariantPair{ModelVariant::FAST, VV::v3_0_0},
-        },
-        ModelInfo{
-                "rna002_70bps_hac@v3",
-                "342b637efdf1a106107a1f2323613f3e4793b5003513b0ed85f6c76574800b52",
-                CC::RNA002_70BPS,
-                ModelVariantPair{ModelVariant::HAC, VV::v3_0_0, true},
-        },
-
         // RNA004 v3.0.1
         ModelInfo{
                 "rna004_130bps_fast@v3.0.1",
@@ -476,6 +440,47 @@ const std::vector<ModelInfo> models = {
         },
 };
 
+const std::vector<ModelInfo> deprecated = {
+        // v3.{3,4,6}
+        ModelInfo{
+                "dna_r9.4.1_e8_fast@v3.4",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::FAST, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_hac@v3.3",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::HAC, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_sup@v3.3",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::SUP, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_sup@v3.6",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::SUP, VV::NONE},
+        },
+        // RNA002
+        ModelInfo{
+                "rna002_70bps_fast@v3",
+                "f8f533797e9bf8bbb03085568dc0b77c11932958aa2333902cf2752034707ee6",
+                CC::RNA002_70BPS,
+                ModelVariantPair{ModelVariant::FAST, VV::v3_0_0},
+        },
+        ModelInfo{
+                "rna002_70bps_hac@v3",
+                "342b637efdf1a106107a1f2323613f3e4793b5003513b0ed85f6c76574800b52",
+                CC::RNA002_70BPS,
+                ModelVariantPair{ModelVariant::HAC, VV::v3_0_0, true},
+        },
+};
+
 }  // namespace simplex
 
 namespace stereo {
@@ -519,51 +524,6 @@ const std::vector<ModelInfo> models = {
 namespace modified {
 
 const std::vector<ModelInfo> models = {
-        // v3.{3,4}
-        ModelInfo{
-                "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
-                "dab18ae409c754ed164c0214b51d61a3b5126f3e5d043cee60da733db3e78b13",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::FAST, VV::v3_4_0},
-                ModsVariantPair{ModsVariant::M_5mCG, VV::v0_1_0},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1",
-                "349f6623dd43ac8a8ffe9b8e1a02dfae215ea0c1daf32120612dbaabb4f3f16d",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::HAC, VV::v3_3_0},
-                ModsVariantPair{ModsVariant::M_5mCG, VV::v0_1_0},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1",
-                "7ee1893b2de195d387184757504aa5afd76d3feda1078dbc4098efe53acb348a",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::SUP, VV::v3_3_0},
-                ModsVariantPair{ModsVariant::M_5mCG, VV::v0_1_0},
-        },
-
-        ModelInfo{
-                "dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0",
-                "d45f514c82f25e063ae9e9642d62cec24969b64e1b7b9dffb851b09be6e8f01b",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::FAST, VV::v3_4_0},
-                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v0_0_0},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0",
-                "4877da66a0ff6935033557a49f6dbc4676e9d7dba767927fec24b2deae3b681f",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::HAC, VV::v3_3_0},
-                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v0_0_0},
-        },
-        ModelInfo{
-                "dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0",
-                "7ef57e63f0977977033e3e7c090afca237e26fe3c94b950678346a1982f6116a",
-                CC::DNA_R9_4_1_E8,
-                ModelVariantPair{ModelVariant::SUP, VV::v3_3_0},
-                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v0_0_0},
-        },
-
         // v3.5.2
         ModelInfo{
                 "dna_r10.4.1_e8.2_260bps_fast@v3.5.2_5mCG@v2",
@@ -1105,6 +1065,52 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{ModsVariant::M_pseU, VV::v1_0_0},
         }};
 
+std::vector<ModelInfo> deprecated = {
+        // Deprecated R9.4.1 modbase models - v3.{3,4}
+        ModelInfo{
+                "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::FAST, VV::NONE},
+                ModsVariantPair{ModsVariant::M_5mCG, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::HAC, VV::NONE},
+                ModsVariantPair{ModsVariant::M_5mCG, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::SUP, VV::NONE},
+                ModsVariantPair{ModsVariant::M_5mCG, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_fast@v3.4_5mCG_5hmCG@v0",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::FAST, VV::NONE},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::HAC, VV::NONE},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::NONE},
+        },
+        ModelInfo{
+                "dna_r9.4.1_e8_sup@v3.3_5mCG_5hmCG@v0",
+                "",
+                CC::DNA_R9_4_1_E8,
+                ModelVariantPair{ModelVariant::SUP, VV::NONE},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::NONE},
+        },
+};
+
 }  // namespace modified
 
 namespace correction {
@@ -1197,8 +1203,10 @@ const std::vector<ModelInfo> models = {
 }  // namespace polisher
 
 const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
+const std::vector<ModelInfo>& simplex_deprecated_models() { return simplex::deprecated; }
 const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
 const std::vector<ModelInfo>& modified_models() { return modified::models; }
+const std::vector<ModelInfo>& modified_deprecated_models() { return modified::deprecated; }
 const std::vector<ModelInfo>& correction_models() { return correction::models; }
 const std::vector<ModelInfo>& polish_models() { return polisher::models; }
 
@@ -1238,6 +1246,30 @@ bool is_valid_model(const std::string& model_name) {
     return false;
 }
 
+std::optional<ModelInfo> get_deprecated_model(const std::string& model_name) {
+    for (const auto& collection : {simplex::deprecated, modified::deprecated}) {
+        for (const ModelInfo& model_info : collection) {
+            if (model_info.name == model_name) {
+                return model_info;
+            }
+        }
+    }
+    return std::nullopt;
+}
+
+void throw_on_deprecated_model(const std::string& model_name) {
+    const std::optional<ModelInfo> deprecated_model = get_deprecated_model(model_name);
+    if (!deprecated_model.has_value()) {
+        return;
+    }
+
+    const std::string chemistry = to_string(deprecated_model->chemistry);
+    throw std::runtime_error("Deprecated model: '" + model_name + "'. The " + chemistry +
+                             " chemistry has been deprecated since Dorado version 1.0.0. "
+                             "Please use a previous version which can be found at "
+                             "https://github.com/nanoporetech/dorado/releases/tag/v0.9.6");
+}
+
 ModelInfo get_modification_model(const std::filesystem::path& simplex_model_path,
                                  const std::string& modification) {
     if (!fs::exists(simplex_model_path)) {
@@ -1249,6 +1281,8 @@ ModelInfo get_modification_model(const std::filesystem::path& simplex_model_path
     ModelInfo modification_model;
     bool model_found = false;
     auto simplex_name = simplex_model_path.filename().string();
+
+    throw_on_deprecated_model(simplex_name);
 
     if (is_valid_model(simplex_name)) {
         std::string mods_prefix = simplex_name + "_" + modification + "@v";
@@ -1284,6 +1318,7 @@ ModelInfo get_simplex_model_info(const std::string& model_name) {
                  std::back_inserter(matches), is_name_match);
 
     if (matches.empty()) {
+        throw_on_deprecated_model(model_name);
         throw std::runtime_error("Could not find simplex model information from: " + model_name);
     } else if (matches.size() > 1) {
         throw std::logic_error("Found multiple simplex models with name: " + model_name);
@@ -1312,6 +1347,7 @@ ModelInfo get_model_info(const std::string& model_name) {
                  is_name_match);
 
     if (matches.empty()) {
+        throw_on_deprecated_model(model_name);
         throw std::runtime_error("Could not find information on model: " + model_name);
     } else if (matches.size() > 1) {
         throw std::logic_error("Found multiple models with name: " + model_name);
@@ -1368,7 +1404,7 @@ std::string get_supported_model_info(const std::filesystem::path& model_download
         const auto& chemistry = variant.first;
         const auto& chemistry_kit_info = variant.second;
 
-        if (chemistry == Chemistry::UNKNOWN) {
+        if (chemistry == Chemistry::UNKNOWN || chemistry_kit_info.is_deprecated) {
             continue;
         }
 

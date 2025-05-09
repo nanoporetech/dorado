@@ -856,10 +856,10 @@ int basecaller(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
     } else {
-        const auto chemistry =
-                file_info::get_unique_sequencing_chemistry(input_folder_info.files().get());
-        const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
+            const auto chemistry =
+                    file_info::get_unique_sequencing_chemistry(input_folder_info.files().get());
+            const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
             model_path = downloader.get(model_search.simplex(), "simplex");
             if (!check_model_path(model_path)) {
                 throw std::runtime_error("Downloaded simplex model is invalid.");
@@ -884,8 +884,14 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    auto model_config = load_model_config(model_path);
-    set_basecaller_params(parser.visible, model_config, device);
+    BasecallModelConfig model_config;
+    try {
+        model_config = load_model_config(model_path);
+        set_basecaller_params(parser.visible, model_config, device);
+    } catch (const std::exception& e) {
+        spdlog::error(e.what());
+        return EXIT_FAILURE;
+    }
 
     spdlog::info("> Creating basecall pipeline");
 
