@@ -3,6 +3,7 @@
 #include "utils/ssize.h"
 
 #include <cassert>
+#include <cstddef>
 #include <ostream>
 #include <sstream>
 #include <stdexcept>
@@ -12,7 +13,7 @@ namespace dorado::secondary {
 /**
  * \brief Copy the draft sequence for a given sample, and expand it with '*' in places of gaps.
  */
-std::string extract_draft_with_gaps(const std::string& draft,
+std::string extract_draft_with_gaps(const std::string_view draft,
                                     const std::vector<int64_t>& positions_major,
                                     const std::vector<int64_t>& positions_minor) {
     if (std::size(positions_major) != std::size(positions_minor)) {

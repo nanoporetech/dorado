@@ -17,6 +17,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
@@ -33,8 +34,8 @@ namespace {
 std::string remove_gaps(const std::string_view seq) {
     std::string ret;
     ret.reserve(std::size(seq));
-    std::copy_if(std::begin(seq), std::end(seq), std::back_inserter(ret),
-                 [](char c) { return c != '*'; });
+    std::copy_if(std::cbegin(seq), std::cend(seq), std::back_inserter(ret),
+                 [](const char c) { return c != '*'; });
     return ret;
 }
 
@@ -44,7 +45,8 @@ float round_float(float val, const int32_t decimal_places) {
     return val;
 }
 
-bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map, const std::string& query) {
+bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map,
+                          const std::string_view query) {
     for (const char c : query) {
         if (symbol_map.count(c) == 0) {
             return false;
@@ -65,10 +67,10 @@ float phred(float err, const float cap) {
 /**
  * \brief Create a lookup table of valid symbols.
  */
-std::array<int32_t, 256> create_symbol_lookup(const std::string& symbols) {
+std::array<int32_t, 256> create_symbol_lookup(const std::string_view symbols) {
     std::array<int32_t, 256> ret;
     std::fill(std::begin(ret), std::end(ret), -1);
-    for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
+    for (int32_t i = 0; i < dorado::ssize(symbols); ++i) {
         ret[static_cast<int32_t>(symbols[i])] = i;
     }
     return ret;
@@ -96,7 +98,7 @@ float compute_subseq_log_prob(
         const int64_t rend,
         const int64_t hap_id,
         const bool substitute_n) {
-    if (probs_3D.sizes().size() != 3) {
+    if (std::size(probs_3D.sizes()) != 3) {
         throw std::runtime_error(
                 "Tensor of probabilities given to compute_subseq_quality is of wrong shape. Input "
                 "shape: " +
@@ -111,7 +113,7 @@ float compute_subseq_log_prob(
             probs_3D.data_ptr<float>(),
             static_cast<size_t>(num_pos * num_haplotypes * num_classes));
 
-    if (data.size() == 0) {
+    if (std::empty(data)) {
         return 0.0f;
     }
 
@@ -250,12 +252,12 @@ Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float
 
     // Create unique and sorted alts for the return variant.
     std::unordered_set<std::string> unique_alts;
-    for (const auto& alt : var.alts) {
+    for (const std::string_view alt : var.alts) {
         if (alt != var.ref) {
             unique_alts.emplace(alt);
         }
     }
-    ret.alts = std::vector<std::string>(std::begin(unique_alts), std::end(unique_alts));
+    ret.alts = std::vector<std::string>(std::cbegin(unique_alts), std::cend(unique_alts));
     std::stable_sort(std::begin(ret.alts), std::end(ret.alts));
 
     // Look-up table: alt -> numeric ID. +1 is because ref is the zeroth allele.
@@ -266,7 +268,7 @@ Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float
     alt_dict[var.ref] = 0;
 
     std::vector<int32_t> alleles(std::size(var.alts));
-    for (size_t i = 0; i < std::size(var.alts); ++i) {
+    for (int64_t i = 0; i < dorado::ssize(var.alts); ++i) {
         const auto it = alt_dict.find(var.alts[i]);
         if (it == std::cend(alt_dict)) {
             continue;
@@ -276,7 +278,7 @@ Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float
     std::sort(std::begin(alleles), std::end(alleles));
 
     std::ostringstream oss_gt;
-    for (size_t i = 0; i < std::size(alleles); ++i) {
+    for (int64_t i = 0; i < dorado::ssize(alleles); ++i) {
         if (i > 0) {
             oss_gt << '/';
         }
@@ -323,7 +325,7 @@ Variant construct_variant(const std::string_view draft,
     std::string var_ref = remove_gaps(var_ref_with_gaps);
 
     std::vector<std::string> var_preds;
-    for (size_t hap_id = 0; hap_id < std::size(cons_seqs_with_gaps); ++hap_id) {
+    for (int64_t hap_id = 0; hap_id < dorado::ssize(cons_seqs_with_gaps); ++hap_id) {
         const std::string_view var_pred_with_gaps(
                 std::data(cons_seqs_with_gaps[hap_id].seq) + rstart,
                 static_cast<size_t>(rend - rstart));
@@ -331,7 +333,7 @@ Variant construct_variant(const std::string_view draft,
     }
 
     if (is_var && std::all_of(std::cbegin(var_preds), std::cend(var_preds),
-                              [&var_ref](const std::string& val) { return val == var_ref; })) {
+                              [&var_ref](const std::string_view val) { return val == var_ref; })) {
         return {};
     } else if (!ambig_ref && !is_subset_of_symbols(symbol_set, var_ref)) {
         return {};
@@ -351,7 +353,7 @@ Variant construct_variant(const std::string_view draft,
         // Create a vector of views for normalize_variant.
         std::vector<std::string_view> cons_view;
         cons_view.reserve(std::size(cons_seqs_with_gaps));
-        for (const auto& val : cons_seqs_with_gaps) {
+        for (const ConsensusResult& val : cons_seqs_with_gaps) {
             cons_view.emplace_back(val.seq);
         }
         var = normalize_variant(ref_seq_with_gaps, cons_view, positions_major, positions_minor,
@@ -412,7 +414,7 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             std::vector<interval_tree::Interval<int64_t, int64_t>> hits =
                     tree.findOverlapping(var.rstart, var.rend - 1);
             // Expand the set of variants to merge.
-            for (const auto& ival : hits) {
+            for (const interval_tree::Interval<int64_t, int64_t>& ival : hits) {
                 variants_to_merge.emplace(ival.value);
             }
         }
@@ -465,7 +467,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const Variant& variant) {
     const bool all_same_as_ref =
             std::all_of(std::cbegin(variant.alts), std::cend(variant.alts),
-                        [&variant](const std::string& s) { return s == variant.ref; });
+                        [&variant](const std::string_view s) { return s == variant.ref; });
 
     if (all_same_as_ref) {
         return variant;
@@ -496,7 +498,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         int64_t start_pos = 0;
         for (int64_t i = 0; i < (min_len - 1); ++i) {
             bool bases_same = true;
-            for (size_t j = 1; j < std::size(seqs); ++j) {
+            for (int64_t j = 1; j < dorado::ssize(seqs); ++j) {
                 if (seqs[j][i] != seqs[0][i]) {
                     bases_same = false;
                     break;
@@ -522,7 +524,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         }
         // Assign.
         var.ref = seqs[0];
-        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
         var.pos += start_pos;
     };
 
@@ -563,7 +565,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             if (all_non_empty) {
                 // Check if the last base is identical in all seqs.
                 bool all_same = true;
-                for (size_t i = 1; i < std::size(seqs); ++i) {
+                for (int64_t i = 1; i < dorado::ssize(seqs); ++i) {
                     if (seqs[i].back() != seqs[0].back()) {
                         all_same = false;
                         break;
@@ -578,7 +580,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     }
                     changed = true;
                     var.ref = seqs[0];
-                    var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                    var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                 }
             }
 
@@ -608,7 +610,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                         }
                         var.rend = found_idx + 1;
                         var.ref = seqs[0];
-                        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                         changed = true;
                     } else {
                         // Revert any trimming and stop if a base wasn't found.
@@ -631,13 +633,13 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     // Collect all prefixes for all consensus sequences and the ref.
                     std::vector<std::string> prefixes;
                     prefixes.emplace_back(ref_with_gaps.substr(new_rstart, span));
-                    for (const auto& seq : cons_seqs_with_gaps) {
+                    for (const std::string_view seq : cons_seqs_with_gaps) {
                         prefixes.emplace_back(seq.substr(new_rstart, span));
                     }
 
                     // Create a set to count unique prefixes.
-                    const std::unordered_set<std::string> prefix_set(std::begin(prefixes),
-                                                                     std::end(prefixes));
+                    const std::unordered_set<std::string> prefix_set(std::cbegin(prefixes),
+                                                                     std::cend(prefixes));
 
                     // Check if there is more than 1 unique prefix - this is a variant then, stop extension.
                     // Revert trimming if it was applied.
@@ -648,7 +650,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     }
 
                     // Remove the deletions and prepend the prefix sequence.
-                    for (size_t i = 0; i < std::size(seqs); ++i) {
+                    for (int64_t i = 0; i < dorado::ssize(seqs); ++i) {
                         std::string& p = prefixes[i];
                         p.erase(std::remove(std::begin(p), std::end(p), '*'), std::end(p));
                         seqs[i] = p + seqs[i];
@@ -658,13 +660,13 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     var.pos = positions_major[new_rstart];
                     var.rstart = new_rstart;
                     var.ref = seqs[0];
-                    var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                    var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                     changed = true;
                 }
             }
         }
         var.ref = seqs[0];
-        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
     };
 
     Variant ret = variant;
@@ -707,7 +709,7 @@ std::vector<Variant> general_decode_variants(
         const std::vector<int64_t>& positions_major,
         const std::vector<int64_t>& positions_minor,
         const at::Tensor& probs,  // Probabilities for a single sample (not batch).
-        const std::string& draft,
+        const std::string_view draft,
         const bool ambig_ref,
         const bool return_all,
         const bool normalize,
@@ -739,7 +741,7 @@ std::vector<Variant> general_decode_variants(
             << ", num_columns = " << num_columns;
         throw std::runtime_error(oss.str());
     }
-    if ((probs.sizes().size() < 2) || (probs.sizes().size() > 3)) {
+    if ((std::size(probs.sizes()) < 2) || (std::size(probs.sizes()) > 3)) {
         throw std::runtime_error("Input probs tensor is of unexpected size. Tensor dimensions: " +
                                  std::to_string(probs.sizes().size()) + ", expected 2 or 3.");
     }
@@ -759,11 +761,11 @@ std::vector<Variant> general_decode_variants(
 
     // Systematize the input probabilities to support the legacy case (shape [num_pos x num_classes])
     // and the new case (shape [num_pos x num_haps x num_classes]).
-    const at::Tensor probs_3D = (probs.sizes().size() == 2) ? probs.unsqueeze(1) : probs;
+    const at::Tensor probs_3D = (std::size(probs.sizes()) == 2) ? probs.unsqueeze(1) : probs;
 
     // Symbols and lookup.
     const std::string symbols = decoder.get_label_scheme_symbols();
-    const std::unordered_set<char> symbol_set(std::begin(symbols), std::end(symbols));
+    const std::unordered_set<char> symbol_set(std::cbegin(symbols), std::cend(symbols));
     const std::array<int32_t, 256> symbol_lookup = create_symbol_lookup(symbols);
 
     // Get raw probability data.
@@ -804,7 +806,7 @@ std::vector<Variant> general_decode_variants(
 #ifdef DEBUG_VARIANT_REGIONS
     std::vector<std::string_view> cons_view;
     cons_view.reserve(std::size(cons_seqs_with_gaps));
-    for (const auto& val : cons_seqs_with_gaps) {
+    for (const ConsensusResult val : cons_seqs_with_gaps) {
         cons_view.emplace_back(val.seq);
     }
 #endif
@@ -813,7 +815,7 @@ std::vector<Variant> general_decode_variants(
     {
         std::vector<std::string_view> cons_view2;
         cons_view2.reserve(std::size(cons_seqs_with_gaps));
-        for (const auto& val : cons_seqs_with_gaps) {
+        for (const ConsensusResult val : cons_seqs_with_gaps) {
             cons_view2.emplace_back(val.seq);
         }
         std::cerr << "seq_id = " << seq_id << '\n';
@@ -853,7 +855,7 @@ std::vector<Variant> general_decode_variants(
     }
 
     if (merge_overlapping || merge_adjacent) {
-        std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+        std::sort(std::begin(variants), std::end(variants), [](const Variant& a, const Variant& b) {
             return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
         });
 
@@ -885,11 +887,11 @@ std::vector<Variant> general_decode_variants(
         }
     }
 
-    std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+    std::sort(std::begin(variants), std::end(variants), [](const Variant& a, const Variant& b) {
         return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
     });
 
-    for (auto& var : variants) {
+    for (Variant& var : variants) {
         var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
     }
 

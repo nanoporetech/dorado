@@ -55,15 +55,15 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
  */
 std::vector<Variant> general_decode_variants(
         const DecoderBase& decoder,
-        const int32_t seq_id,
+        int32_t seq_id,
         const std::vector<int64_t>& positions_major,
         const std::vector<int64_t>& positions_minor,
         const at::Tensor& probs,  // Probabilities for a single sample (not batch).
-        const std::string& draft,
-        const bool ambig_ref,
-        const bool return_all,
-        const bool normalize,
-        const bool merge_overlapping,
-        const bool merge_adjacent);
+        const std::string_view draft,
+        bool ambig_ref,
+        bool return_all,
+        bool normalize,
+        bool merge_overlapping,
+        bool merge_adjacent);
 
 }  // namespace dorado::secondary

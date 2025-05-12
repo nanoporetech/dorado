@@ -12,7 +12,7 @@
 
 namespace dorado::secondary {
 
-std::string extract_draft_with_gaps(const std::string& draft,
+std::string extract_draft_with_gaps(const std::string_view draft,
                                     const std::vector<int64_t>& positions_major,
                                     const std::vector<int64_t>& positions_minor);
 
