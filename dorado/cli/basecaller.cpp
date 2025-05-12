@@ -271,9 +271,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                           utils::arg_parse::ArgParser& parser) {
+                                           utils::arg_parse::ArgParser& parser,
+                                           size_t device_count) {
     // Convert path to params.
-    auto params = get_modbase_params(paths);
+    auto params = get_modbase_params(paths, device_count);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -908,7 +909,12 @@ int basecaller(int argc, char* argv[]) {
     const bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
                                           parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
-    const auto modbase_params = validate_modbase_params(mods_model_paths, parser);
+    size_t device_count = 1;
+#if DORADO_CUDA_BUILD
+    auto initial_device_info = utils::get_cuda_device_info(device, false);
+    device_count = initial_device_info.size();
+#endif
+    const auto modbase_params = validate_modbase_params(mods_model_paths, parser, device_count);
 
     try {
         setup(args, model_config, pod5_folder_info, mods_model_paths, device,

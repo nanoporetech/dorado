@@ -250,9 +250,10 @@ DuplexModels load_models(const std::string& model_arg,
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                           utils::arg_parse::ArgParser& parser) {
+                                           utils::arg_parse::ArgParser& parser,
+                                           size_t device_count) {
     // Convert path to params.
-    auto params = get_modbase_params(paths);
+    auto params = get_modbase_params(paths, device_count);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -620,13 +621,15 @@ int duplex(int argc, char* argv[]) {
                     input_pod5_files.get(), batch_params, skip_model_compatibility_check, device);
 
             temp_model_paths = models.temp_paths;
-
+            size_t device_count = 1;
 #if DORADO_CUDA_BUILD
             auto initial_device_info = utils::get_cuda_device_info(device, false);
             cli::log_requested_cuda_devices(initial_device_info);
+            device_count = initial_device_info.size();
 #endif
 
-            const auto modbase_params = validate_modbase_params(models.mods_model_paths, parser);
+            const auto modbase_params =
+                    validate_modbase_params(models.mods_model_paths, parser, device_count);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(models.mods_model_paths, device,
