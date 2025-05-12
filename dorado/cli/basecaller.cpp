@@ -271,7 +271,8 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                           utils::arg_parse::ArgParser& parser, size_t device_count) {
+                                           utils::arg_parse::ArgParser& parser,
+                                           size_t device_count) {
     // Convert path to params.
     auto params = get_modbase_params(paths, device_count);
 

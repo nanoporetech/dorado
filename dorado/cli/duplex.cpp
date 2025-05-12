@@ -250,7 +250,8 @@ DuplexModels load_models(const std::string& model_arg,
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                           utils::arg_parse::ArgParser& parser, size_t device_count) {
+                                           utils::arg_parse::ArgParser& parser,
+                                           size_t device_count) {
     // Convert path to params.
     auto params = get_modbase_params(paths, device_count);
 
@@ -629,7 +630,8 @@ int duplex(int argc, char* argv[]) {
             device_count = initial_device_info.size();
 #endif
 
-            const auto modbase_params = validate_modbase_params(models.mods_model_paths, parser, device_count);
+            const auto modbase_params =
+                    validate_modbase_params(models.mods_model_paths, parser, device_count);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(models.mods_model_paths, device,
