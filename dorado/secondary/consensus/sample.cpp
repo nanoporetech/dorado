@@ -116,6 +116,12 @@ std::ostream& operator<<(std::ostream& os, const Sample& sample) {
     return os;
 }
 
+std::string sample_to_string(const Sample& sample) {
+    std::ostringstream oss;
+    oss << sample;
+    return oss.str();
+}
+
 void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
     if (lh.seq_id != rh.seq_id) {
         std::ostringstream oss;

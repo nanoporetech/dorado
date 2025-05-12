@@ -293,7 +293,8 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
                              const bool tag_keep_missing,
                              const std::string& read_group,
                              const int32_t min_mapq,
-                             const bool symmetric_indels)
+                             const bool symmetric_indels,
+                             const bool clip_to_zero)
         : m_normalise_type{normalise_type},
           m_dtypes{dtypes},
           m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
@@ -303,6 +304,7 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
           m_read_group{read_group},
           m_min_mapq{min_mapq},
           m_symmetric_indels{symmetric_indels},
+          m_clip_to_zero{clip_to_zero},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
 secondary::Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
@@ -342,8 +344,14 @@ secondary::Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
         return {};
     }
 
-    return counts_to_features(pileup_tensors, seq_id, m_symmetric_indels, m_feature_indices,
-                              m_normalise_type);
+    secondary::Sample sample = counts_to_features(pileup_tensors, seq_id, m_symmetric_indels,
+                                                  m_feature_indices, m_normalise_type);
+
+    if (m_clip_to_zero) {
+        sample.features = torch::clamp_min(sample.features, 0);
+    }
+
+    return sample;
 }
 
 at::Tensor EncoderCounts::collate(std::vector<at::Tensor> batch) const {

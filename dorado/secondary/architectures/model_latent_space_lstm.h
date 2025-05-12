@@ -48,7 +48,7 @@ public:
                    const bool batch_first,
                    const bool reverse);
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(const at::Tensor& x);
 
 private:
     torch::nn::LSTM m_lstm;

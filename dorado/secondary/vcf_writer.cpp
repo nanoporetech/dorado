@@ -1,5 +1,6 @@
 #include "vcf_writer.h"
 
+#include "dorado_version.h"
 #include "utils/container_utils.h"
 #include "utils/ssize.h"
 
@@ -59,7 +60,7 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
     }
 
     // Add mandatory INFO and FORMAT fields
-    bcf_hdr_append(m_header.get(), "##dorado_version=");
+    bcf_hdr_append(m_header.get(), ("##dorado_version=" + std::string(DORADO_VERSION)).c_str());
     bcf_hdr_append(m_header.get(),
                    "##INFO=<ID=DP,Number=1,Type=Integer,Description=\"Total Depth\">");
     bcf_hdr_append(m_header.get(),

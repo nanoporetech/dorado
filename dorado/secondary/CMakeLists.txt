@@ -79,6 +79,7 @@ target_link_libraries(dorado_secondary
         dorado_utils
         dorado_torch_utils
     PRIVATE
+        dorado_version
         htslib
         spdlog::spdlog
         toml11::toml11

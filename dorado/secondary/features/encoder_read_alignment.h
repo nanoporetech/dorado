@@ -37,6 +37,7 @@ public:
                          const bool row_per_read,
                          const bool include_dwells,
                          const bool include_haplotype,
+                         const bool clip_to_zero,
                          const bool right_align_insertions,
                          const std::optional<std::filesystem::path>& phasing_bin);
 
@@ -65,6 +66,7 @@ private:
     bool m_row_per_read = false;
     bool m_include_dwells = true;
     bool m_include_haplotype = false;
+    bool m_clip_to_zero = false;
     bool m_right_align_insertions = false;
     std::optional<std::filesystem::path> m_phasing_bin;
 };
