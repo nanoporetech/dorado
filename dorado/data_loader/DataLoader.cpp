@@ -8,12 +8,9 @@
 #include "utils/thread_naming.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
-#include "vbz_plugin_user_utils.h"
 
 #include <ATen/Functions.h>
 #include <cxxpool.h>
-#include <highfive/H5Easy.hpp>
-#include <highfive/H5File.hpp>
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
@@ -21,7 +18,6 @@
 #include <cctype>
 #include <ctime>
 #include <filesystem>
-#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <vector>
@@ -36,78 +32,35 @@ static_assert(sizeof(dorado::ReadID) == sizeof(read_id_t));
 // 37 = number of bytes in UUID (32 hex digits + 4 dashes + null terminator)
 const uint32_t POD5_READ_ID_LEN = 37;
 
-void string_reader(HighFive::Attribute& attribute, std::string& target_str) {
-    // Load as a variable string if possible
-    if (attribute.getDataType().isVariableStr()) {
-        attribute.read(target_str);
-        return;
-    }
-
-    // Process as a fixed length string
-    // Create landing buffer and H5 datatype
-    size_t size = attribute.getDataType().getSize();
-    std::vector<char> target_array(size);
-    hid_t dtype = H5Tcopy(H5T_C_S1);
-    H5Tset_size(dtype, size);
-
-    // Copy to landing buffer
-    if (H5Aread(attribute.getId(), dtype, target_array.data()) < 0) {
-        throw std::runtime_error("Error during H5Aread of fixed length string");
-    }
-
-    // Extract to string
-    target_str = std::string(target_array.data(), size);
-    // It's possible the null terminator appears before the end of the string
-    size_t eol_pos = target_str.find(char(0));
-    if (eol_pos < target_str.size()) {
-        target_str.resize(eol_pos);
-    }
-}
-
-std::string get_string_attribute(const HighFive::Group& group, const std::string& attr_name) {
-    std::string attribute_string;
-    if (group.hasAttribute(attr_name)) {
-        HighFive::Attribute attribute = group.getAttribute(attr_name);
-        string_reader(attribute, attribute_string);
-    }
-    return attribute_string;
-}
-
-std::optional<std::vector<std::filesystem::directory_entry>> filter_fast5_for_mixed_datasets(
+std::vector<std::filesystem::directory_entry> collect_pod5_dataset(
         const std::vector<std::filesystem::directory_entry>& files) {
     std::vector<std::filesystem::directory_entry> pod5_entries;
-    std::vector<std::filesystem::directory_entry> fast5_entries;
+    bool fast5_found = false;
 
     for (const auto& entry : files) {
-        auto entry_path = std::filesystem::path(entry);
-        std::string ext = entry_path.extension().string();
-        std::transform(ext.begin(), ext.end(), ext.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        const auto ext = utils::get_extension(entry);
         if (ext == ".fast5") {
-            fast5_entries.push_back(entry);
+            fast5_found = true;
         } else if (ext == ".pod5") {
             pod5_entries.push_back(entry);
         }
     }
 
-    if (!pod5_entries.empty() && !fast5_entries.empty()) {
+    if (fast5_found && pod5_entries.empty()) {
         spdlog::error(
-                "Data folder contains both POD5 and FAST5 files. FAST5 loading is unoptimized and "
-                "will result in poor performance. Please basecall FAST5 separately or convert your "
-                "dataset to POD5: https://pod5-file-format.readthedocs.io/en/latest/docs/"
-                "tools.html#pod5-convert-fast5");
-        // Note: once we drop POD5 support we can remove the use of optional here and in the caller
-        return std::nullopt;
-    }
-
-    if (!fast5_entries.empty()) {
-        spdlog::warn(
-                "Deprecation Warning: FAST5 support in Dorado will be dropped in an "
-                "upcoming release. FAST5 loading is unoptimized and will result in poor "
-                "performance. Please convert your dataset to POD5: "
+                "FAST5 support in Dorado was removed in version 1.0.0. "
+                "Please convert your dataset to POD5: "
                 "https://pod5-file-format.readthedocs.io/en/latest/docs/"
                 "tools.html#pod5-convert-fast5");
-        return fast5_entries;
+        throw std::runtime_error("FAST5 files are not supported.");
+    }
+
+    if (fast5_found && !pod5_entries.empty()) {
+        spdlog::warn(
+                "Skipping FAST5 files as support was dropped in Dorado version 1.0.0. "
+                "Please convert your FAST5 dataset to POD5: "
+                "https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                "tools.html#pod5-convert-fast5");
     }
 
     return pod5_entries;
@@ -293,21 +246,16 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
             if (m_loaded_read_count == m_max_reads) {
                 break;
             }
-            auto entry_path = std::filesystem::path(entry);
-            std::string ext = entry_path.extension().string();
-            std::transform(ext.begin(), ext.end(), ext.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            if (ext == ".fast5") {
-                throw std::runtime_error(
-                        "Traversing reads by channel is only available for POD5. "
-                        "Encountered FAST5 at " +
-                        entry_path.string());
-            } else if (ext == ".pod5") {
-                auto& channel_to_read_ids = m_file_channel_read_order_map.at(entry_path.string());
-                auto& read_ids = channel_to_read_ids[channel];
-                if (!read_ids.empty()) {
-                    load_pod5_reads_from_file_by_read_ids(entry_path.string(), read_ids);
-                }
+
+            if (!utils::has_pod5_extension(entry)) {
+                throw std::logic_error("Expected pod5 file");
+            }
+
+            const auto path = std::filesystem::path(entry);
+            auto& channel_to_read_ids = m_file_channel_read_order_map.at(path.string());
+            auto& read_ids = channel_to_read_ids[channel];
+            if (!read_ids.empty()) {
+                load_pod5_reads_from_file_by_read_ids(path.string(), read_ids);
             }
         }
         // Erase sorted list as it's not needed anymore.
@@ -325,9 +273,7 @@ void DataLoader::load_reads_unrestricted(
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-        if (ext == ".fast5") {
-            load_fast5_reads_from_file(entry.path().string());
-        } else if (ext == ".pod5") {
+        if (ext == ".pod5") {
             load_pod5_reads_from_file(entry.path().string());
         }
     }
@@ -580,109 +526,6 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     }
 }
 
-void DataLoader::load_fast5_reads_from_file(const std::string& path) {
-    // Read the file into a vector of torch tensors
-    H5Easy::File file(path, H5Easy::File::ReadOnly);
-    HighFive::Group reads = file.getGroup("/");
-    int num_reads = int(reads.getNumberObjects());
-
-    for (int i = 0; i < num_reads && m_loaded_read_count < m_max_reads; i++) {
-        auto read_id = reads.getObjectName(i);
-        HighFive::Group read = reads.getGroup(read_id);
-
-        // Fetch the digitisation parameters
-        HighFive::Group channel_id_group = read.getGroup("channel_id");
-        HighFive::Attribute digitisation_attr = channel_id_group.getAttribute("digitisation");
-        HighFive::Attribute range_attr = channel_id_group.getAttribute("range");
-        HighFive::Attribute offset_attr = channel_id_group.getAttribute("offset");
-        HighFive::Attribute sampling_rate_attr = channel_id_group.getAttribute("sampling_rate");
-        HighFive::Attribute channel_number_attr = channel_id_group.getAttribute("channel_number");
-
-        int32_t channel_number;
-        if (channel_number_attr.getDataType().string().substr(0, 6) == "String") {
-            std::string channel_number_string;
-            string_reader(channel_number_attr, channel_number_string);
-            std::istringstream channel_stream(channel_number_string);
-            channel_stream >> channel_number;
-        } else {
-            channel_number_attr.read(channel_number);
-        }
-
-        float digitisation;
-        digitisation_attr.read(digitisation);
-        float range;
-        range_attr.read(range);
-        float offset;
-        offset_attr.read(offset);
-        float sampling_rate;
-        sampling_rate_attr.read(sampling_rate);
-
-        HighFive::Group raw = read.getGroup("Raw");
-        auto ds = raw.getDataSet("Signal");
-        if (ds.getDataType().string() != "Integer16") {
-            throw std::runtime_error("Invalid FAST5 Signal data type of " +
-                                     ds.getDataType().string());
-        }
-
-        auto options = at::TensorOptions().dtype(at::kShort);
-        auto samples = at::empty(ds.getElementCount(), options);
-        ds.read(samples.data_ptr<int16_t>());
-
-        HighFive::Attribute mux_attr = raw.getAttribute("start_mux");
-        HighFive::Attribute read_number_attr = raw.getAttribute("read_number");
-        HighFive::Attribute start_time_attr = raw.getAttribute("start_time");
-        HighFive::Attribute read_id_attr = raw.getAttribute("read_id");
-        uint32_t mux;
-        uint32_t read_number;
-        uint64_t start_time;
-        mux_attr.read(mux);
-        read_number_attr.read(read_number);
-        start_time_attr.read(start_time);
-        string_reader(read_id_attr, read_id);
-
-        std::string filename = std::filesystem::path(path).filename().string();
-
-        HighFive::Group tracking_id_group = read.getGroup("tracking_id");
-        std::string exp_start_time = get_string_attribute(tracking_id_group, "exp_start_time");
-        std::string flow_cell_id = get_string_attribute(tracking_id_group, "flow_cell_id");
-        std::string flow_cell_product_code =
-                get_string_attribute(tracking_id_group, "flow_cell_product_code");
-        std::string device_id = get_string_attribute(tracking_id_group, "device_id");
-        std::string group_protocol_id =
-                get_string_attribute(tracking_id_group, "group_protocol_id");
-
-        auto start_time_str = utils::adjust_time(exp_start_time,
-                                                 static_cast<uint32_t>(start_time / sampling_rate));
-
-        auto new_read = std::make_unique<SimplexRead>();
-        new_read->read_common.sample_rate = uint64_t(sampling_rate);
-        new_read->read_common.raw_data = samples;
-        new_read->digitisation = digitisation;
-        new_read->range = range;
-        new_read->offset = offset;
-        new_read->scaling = range / digitisation;
-        new_read->read_common.read_id = read_id;
-        new_read->read_common.num_trimmed_samples = 0;
-        new_read->read_common.attributes.mux = mux;
-        new_read->read_common.attributes.read_number = read_number;
-        new_read->read_common.attributes.channel_number = channel_number;
-        new_read->read_common.attributes.start_time = start_time_str;
-        new_read->read_common.attributes.filename = filename;
-        new_read->read_common.flowcell_id = flow_cell_id;
-        new_read->read_common.flow_cell_product_code = flow_cell_product_code;
-        new_read->read_common.position_id = device_id;
-        new_read->read_common.experiment_id = group_protocol_id;
-        new_read->read_common.is_duplex = false;
-
-        if (!m_allowed_read_ids || (m_allowed_read_ids->find(new_read->read_common.read_id) !=
-                                    m_allowed_read_ids->end())) {
-            initialise_read(new_read->read_common);
-            m_pipeline.push_message(std::move(new_read));
-            m_loaded_read_count++;
-        }
-    }
-}
-
 void DataLoader::initialise_read(ReadCommon& read_common) const {
     for (const auto& initialiser : m_read_initialisers) {
         initialiser(read_common);
@@ -711,22 +554,16 @@ DataLoader::DataLoader(Pipeline& pipeline,
           m_ignored_read_ids(std::move(read_ignore_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
     assert(m_num_worker_threads > 0);
-    static std::once_flag vbz_init_flag;
-    std::call_once(vbz_init_flag, vbz_register);
 }
 
-std::optional<DataLoader::InputFiles> DataLoader::InputFiles::search(
-        const std::filesystem::path& path,
-        bool recursive) {
-    auto entries = filter_fast5_for_mixed_datasets(utils::fetch_directory_entries(path, recursive));
-    if (!entries.has_value()) {
-        return std::nullopt;
-    }
+DataLoader::InputFiles DataLoader::InputFiles::search_pod5s(const std::filesystem::path& path,
+                                                            bool recursive) {
+    auto entries = collect_pod5_dataset(utils::fetch_directory_entries(path, recursive));
 
     // Intentionally returning a valid object even if there are 0 entries since duplex uses that
     // to differentiate between different modes of operation.
     InputFiles files;
-    files.m_entries = std::move(*entries);
+    files.m_entries = std::move(entries);
     return files;
 }
 

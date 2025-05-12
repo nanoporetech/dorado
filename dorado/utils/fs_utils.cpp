@@ -17,6 +17,25 @@ namespace fs = std::filesystem;
 
 namespace dorado::utils {
 
+std::string get_extension(const std::filesystem::path& path) {
+    std::string ext = path.extension().string();
+    std::transform(ext.begin(), ext.end(), ext.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    return ext;
+};
+
+std::string get_extension(const std::filesystem::directory_entry& entry) {
+    return get_extension(std::filesystem::path(entry));
+}
+
+bool has_pod5_extension(const std::filesystem::path& path) {
+    return get_extension(path) == ".pod5";
+}
+
+bool has_pod5_extension(const std::filesystem::directory_entry& entry) {
+    return get_extension(entry) == ".pod5";
+}
+
 bool has_write_permission(const fs::path& directory) {
     if (!fs::exists(directory)) {
         try {

@@ -83,7 +83,7 @@ protected:
         read->read_common.attributes.read_number = 12345;
         read->read_common.attributes.channel_number = 5;
         read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read->read_common.attributes.filename = "test.fast5";
+        read->read_common.attributes.filename = "test.pod5";
         read->read_common.client_info = client_info;
         return read;
     }

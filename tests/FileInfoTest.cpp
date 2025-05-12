@@ -17,29 +17,15 @@ namespace {
 const auto& dir_entries = utils::fetch_directory_entries;
 }
 
-CATCH_TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5, read ids list.",
-                TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5 throws", TEST_GROUP) {
     auto data_path = get_fast5_data_dir();
-    const auto folder_entries = dir_entries(data_path, false);
-    CATCH_SECTION("fast5 file only, no read ids list") {
-        CATCH_CHECK(get_num_reads(folder_entries, std::nullopt, {}) == 1);
-    }
-
-    CATCH_SECTION("fast5 file and read ids with 0 reads") {
-        auto read_list = std::unordered_set<std::string>();
-        CATCH_CHECK(get_num_reads(folder_entries, read_list, {}) == 0);
-    }
-    CATCH_SECTION("fast5 file and read ids with 2 reads") {
-        auto read_list = std::unordered_set<std::string>();
-        read_list.insert("1");
-        read_list.insert("2");
-        CATCH_CHECK(get_num_reads(folder_entries, read_list, {}) == 1);
-    }
+    CATCH_CHECK_THROWS_AS(get_num_reads(dir_entries(data_path, false), std::nullopt, {}),
+                          std::runtime_error);
 }
 
-CATCH_TEST_CASE(TEST_GROUP "Find sample rate from fast5", TEST_GROUP) {
+CATCH_TEST_CASE(TEST_GROUP "Find sample rate from fast5 throws", TEST_GROUP) {
     auto data_path = get_fast5_data_dir();
-    CATCH_CHECK(get_sample_rate(dir_entries(data_path, false)) == 6024);
+    CATCH_CHECK_THROWS_AS(get_sample_rate(dir_entries(data_path, false)), std::runtime_error);
 }
 
 CATCH_TEST_CASE(TEST_GROUP "Test calculating number of reads from pod5, read ids list.",

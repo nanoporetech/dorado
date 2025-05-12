@@ -86,9 +86,8 @@ include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
+include(cmake/Zlib.cmake)
 
-include(cmake/HDF5.cmake)
-include(cmake/VbzPlugin.cmake)
 include(cmake/Koi.cmake)
 include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
@@ -365,17 +364,11 @@ target_include_directories(dorado_lib
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/hdf_plugins/vbz_plugin
         ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 
 enable_testing()
-
-if(NOT SKIP_HDF_PLUGINS)
-  # Can skip this if we're consuming the lib from a parent project that already has hdf_plugins
-  add_hdf_vbz_plugin()
-endif()
 
 if (DORADO_ENABLE_PCH)
     target_precompile_headers(dorado_lib REUSE_FROM dorado_torch_utils)

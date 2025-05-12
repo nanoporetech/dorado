@@ -31,7 +31,6 @@ add_executable(dorado_tests
     DuplexSplitTest.cpp
     fasta_reader_test.cpp
     fastq_reader_test.cpp
-    Fast5DataLoaderTest.cpp
     FastxRandomReaderTest.cpp
     FileInfoTest.cpp
     gpu_monitor_test.cpp

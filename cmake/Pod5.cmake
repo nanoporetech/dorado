@@ -18,14 +18,8 @@ endif()
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(LIB_DIR "lib64")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
-      if((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
-        set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-gcc8-arm64.tar.gz")
-        set(POD5_HASH "0f980f367d37ee5ae5d6d27647160d54d5fbb84b119feb55a8c905d8a192046a")
-        set(LIB_DIR "lib")
-      else()
-        set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-arm64.tar.gz")
-        set(POD5_HASH "d6586a3c5a44f5683318ad7d2e4f6b020ad1e947b05898a82fb0e611f7bff486")
-      endif()
+      set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-arm64.tar.gz")
+      set(POD5_HASH "d6586a3c5a44f5683318ad7d2e4f6b020ad1e947b05898a82fb0e611f7bff486")
     else()
       set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-x64.tar.gz")
       set(POD5_HASH "3cb319ab31ce931dd7c87532b6985167efa29d3a386be1883622e62ebed6c507")
@@ -35,6 +29,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libpod5_format.a
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libarrow.a
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libjemalloc_pic.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/${LIB_DIR}/libzstd.a
       )
     else()
       set(POD5_LIBRARIES ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.so)
@@ -46,6 +41,7 @@ elseif(APPLE)
       set(POD5_LIBRARIES
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.a
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libarrow.a
+        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libzstd.a
       )
     else()
       set(POD5_LIBRARIES ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.dylib)
@@ -56,6 +52,7 @@ elseif(WIN32)
     set(POD5_LIBRARIES
       ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
       ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/arrow_static.lib
+      ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/zstd_static.lib
       bcrypt.lib
     )
 endif()
