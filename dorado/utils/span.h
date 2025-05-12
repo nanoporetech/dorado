@@ -19,6 +19,7 @@ public:
     T* data() const { return m_data; }
     size_t size() const { return m_size; }
     int64_t ssize() const { return static_cast<int64_t>(m_size); }
+    bool empty() const { return m_size == 0; }
 
 private:
     T* m_data = nullptr;

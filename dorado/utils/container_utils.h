@@ -36,12 +36,12 @@ std::string print_container_as_string(const T& data, const std::string& delimite
 
 /**
  * \brief Parses a string of form "[1, 17]" into a std::vector.
- * \param input Input string needs to begin with '[' and end
- *          with ']', values are comma separated, whitespaces are allowed.
+ * \param input Input string with one or more delimited values. Can start and end with (), [], {} and <>.
+ * \param delimiter Value delimiter, e.g. ','.
  * \returns Vector of parsed integers.
  *
  * Can throw.
  */
-std::vector<int32_t> parse_int32_vector(const std::string& input);
+std::vector<int32_t> parse_int32_vector(const std::string& input, char delimiter);
 
 }  // namespace dorado::utils

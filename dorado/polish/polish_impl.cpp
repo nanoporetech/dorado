@@ -1421,8 +1421,10 @@ std::vector<secondary::Variant> call_variants(
                 const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
                 for (const auto& vc_sample : joined_samples) {
-                    std::vector<secondary::Variant> variants =
-                            secondary::decode_variants(decoder, vc_sample, draft, ambig_ref, gvcf);
+                    std::vector<secondary::Variant> variants = secondary::general_decode_variants(
+                            decoder, vc_sample.seq_id, vc_sample.positions_major,
+                            vc_sample.positions_minor, vc_sample.logits, draft, ambig_ref, gvcf,
+                            true, true, true);
 
                     ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
 

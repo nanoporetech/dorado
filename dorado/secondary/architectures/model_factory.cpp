@@ -194,7 +194,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         const int32_t bases_embedding_size =
                 std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
         const std::vector<int32_t> kernel_sizes =
-                utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"));
+                utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"), ',');
         const bool use_dwells =
                 (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
 

@@ -196,49 +196,38 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         const std::vector<std::vector<ConsensusResult>> c = decoder.decode_bases(logits);
 
         // This shouldn't be possible.
-        if ((std::size(c) != 1) || (std::size(c.front()) != 1)) {
+        if ((std::size(c) != 1) || (std::empty(c.front()))) {
             spdlog::warn(
                     "Unexpected number of consensus sequences generated from a single sample: "
-                    "c.size = {}. Skipping consensus of this sample.",
-                    std::size(c));
+                    "c.size = {}, c[0].size = {}. Skipping consensus of this sample.",
+                    std::size(c), (std::empty(c) ? -1 : std::size(c.front())));
             continue;
         }
 
         // Sequences for comparison.
-        const std::string& call_with_gaps = c.front().front().seq;
         const std::string draft_with_gaps = extract_draft_with_gaps(
                 draft, vc_sample.positions_major, vc_sample.positions_minor);
-        assert(std::size(call_with_gaps) == std::size(draft_with_gaps));
+        const std::vector<ConsensusResult>& calls_with_gaps = c.front();
 
-        const auto check_is_diff = [](const char base1, const char base2) {
-            return (base1 != base2) || (base1 == '*' && base2 == '*');
-        };
-
-        // Check if all positions are diffs, or if all positions are gaps in both sequences.
-        {
-            int64_t count = 0;
-            for (int64_t j = 0; j < dorado::ssize(call_with_gaps); ++j) {
-                if (check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
-                    ++count;
-                }
-            }
-            if (count == dorado::ssize(call_with_gaps)) {
-                // Merge the entire sample with the next one. We need at least one non-diff non-gap pos.
-                queue.emplace_back(vc_sample);
-                continue;
-            }
-        }
+        // Use std::nullopt to be more strict about merging/breaking on variants.
+        const std::vector<bool> is_variant = find_polyploid_variants(
+                vc_sample.positions_minor, draft_with_gaps, calls_with_gaps, std::nullopt);
 
         const int64_t num_positions = dorado::ssize(vc_sample.positions_major);
 
         // Find a location where to split the sample.
         int64_t last_non_var_start = 0;
         for (int64_t j = (num_positions - 1); j >= 0; --j) {
-            if ((vc_sample.positions_minor[j] == 0) &&
-                !check_is_diff(call_with_gaps[j], draft_with_gaps[j])) {
+            if ((vc_sample.positions_minor[j] == 0) && !is_variant[j]) {
                 last_non_var_start = j;
                 break;
             }
+        }
+
+        // All positions differ. Merge the entire sample with the next one.
+        if (last_non_var_start <= 0) {
+            queue.emplace_back(vc_sample);
+            continue;
         }
 
         // Split the sample.
