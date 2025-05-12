@@ -35,8 +35,12 @@ void PolyACalculatorNode::input_thread_fn() {
             continue;
         }
 
-        // Poly-tail selection is enabled, so adjust default value of poly-tail length.
-        read->read_common.rna_poly_tail_length = ReadCommon::POLY_TAIL_NO_ANCHOR_FOUND;
+        // Poly-tail selection is enabled, so adjust default value of poly-tail length and signal ranges
+        read->read_common.rna_poly_tail_length = ReadCommon::POLY_TAIL_NOT_FOUND;
+        read->read_common.poly_tail_signal_anchor = ReadCommon::POLY_TAIL_NOT_FOUND;
+        read->read_common.poly_tail_signal_boundaries = std::array{
+                std::make_pair(ReadCommon::POLY_TAIL_NOT_FOUND, ReadCommon::POLY_TAIL_NOT_FOUND),
+                std::make_pair(ReadCommon::POLY_TAIL_NOT_FOUND, ReadCommon::POLY_TAIL_NOT_FOUND)};
 
         auto calculator = selector->get_calculator(read->read_common.barcode);
         if (!calculator) {
@@ -46,14 +50,28 @@ void PolyACalculatorNode::input_thread_fn() {
         }
 
         auto signal_info = calculator->determine_signal_anchor_and_strand(*read);
-
         if (signal_info.signal_anchor >= 0) {
-            int num_bases = calculator->calculate_num_bases(*read, signal_info);
+            read->read_common.poly_tail_signal_anchor =
+                    signal_info.signal_anchor + read->read_common.num_trimmed_samples;
+
+            int num_bases = 0;
+            auto polya_tail_info = calculator->calculate_num_bases(*read, signal_info);
+
+            if (polya_tail_info.num_bases >= 0) {
+                num_bases += polya_tail_info.num_bases;
+            }
+
+            read->read_common.poly_tail_signal_boundaries[0] = polya_tail_info.signal_range;
             if (signal_info.split_tail) {
-                auto split_bases = std::max(
-                        0, calculator->calculate_num_bases(*read, {signal_info.is_fwd_strand, 0, 0,
-                                                                   signal_info.split_tail}));
-                num_bases += split_bases;
+                auto split_poly_tail_info = calculator->calculate_num_bases(
+                        *read, {signal_info.is_fwd_strand, 0, 0, signal_info.split_tail});
+
+                read->read_common.poly_tail_signal_boundaries[1] =
+                        split_poly_tail_info.signal_range;
+
+                if (split_poly_tail_info.num_bases > 0) {
+                    polya_tail_info.num_bases += split_poly_tail_info.num_bases;
+                }
             }
 
             if (num_bases > 0 && num_bases < calculator->max_tail_length()) {
