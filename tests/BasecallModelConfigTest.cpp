@@ -151,70 +151,15 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
     CATCH_CHECK(config.has_normalised_basecaller_params());
 }
 
-CATCH_TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 model load", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test dna_r9.4.1 hac@v3.3 deprecated model load", CUT_TAG) {
     const fs::path path = fs::path(get_data_dir("model_configs/dna_r9.4.1_e8_hac@v3.3"));
     CATCH_CHECK_THROWS_AS(load_model_config(path), std::runtime_error);
 }
 
-CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 model load", CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 fast@v4.0.0 deprecated model load", CUT_TAG) {
     const fs::path path =
             fs::path(get_data_dir("model_configs/dna_r10.4.1_e8.2_260bps_fast@v4.0.0"));
-    const BasecallModelConfig config = load_model_config(path);
-
-    CATCH_CHECK(config.model_path == path);
-    CATCH_CHECK(config.bias == false);
-    CATCH_CHECK(config.num_features == 1);
-    CATCH_CHECK(config.stride == 5);
-    CATCH_CHECK(config.lstm_size == 96);
-    CATCH_CHECK(config.blank_score == 2.0f);
-    CATCH_CHECK(config.scale == 1.0f);
-    CATCH_CHECK(config.state_len == 3);
-    CATCH_CHECK(config.outsize == 256);
-    CATCH_CHECK(config.clamp == false);
-    CATCH_CHECK(config.out_features.has_value() == false);
-    CATCH_CHECK(config.sample_type == SampleType::DNA);
-
-    CATCH_CHECK(config.qbias == -3.0f);
-    CATCH_CHECK(config.qscale == 1.04f);
-    CATCH_CHECK(config.sample_rate == -1);
-
-    SignalNormalisationParams sig;
-    // r9.4.1 model does not use quantile scaling
-    sig.strategy = ScalingStrategy::QUANTILE;
-    CATCH_CHECK(config.signal_norm_params.strategy == sig.strategy);
-
-    const QuantileScalingParams &qsp = config.signal_norm_params.quantile;
-    CATCH_CHECK(qsp.quantile_a == sig.quantile.quantile_a);
-    CATCH_CHECK(qsp.quantile_b == sig.quantile.quantile_b);
-    CATCH_CHECK(qsp.scale_multiplier == sig.quantile.scale_multiplier);
-    CATCH_CHECK(qsp.shift_multiplier == sig.quantile.shift_multiplier);
-
-    const StandardisationScalingParams &ssp = config.signal_norm_params.standardisation;
-    CATCH_CHECK(ssp.standardise == false);
-    CATCH_CHECK(ssp.standardise == sig.standardisation.standardise);
-    CATCH_CHECK(ssp.mean == sig.standardisation.mean);
-    CATCH_CHECK(ssp.stdev == sig.standardisation.stdev);
-
-    ConvParams conv1 = config.convs[0];
-    CATCH_CHECK(conv1.activation == Activation::SWISH);
-    CATCH_CHECK(conv1.insize == 1);
-    CATCH_CHECK(conv1.size == 16);  // default first_conv value
-    CATCH_CHECK(conv1.stride == 1);
-    CATCH_CHECK(conv1.winlen == 5);
-
-    ConvParams conv2 = config.convs[1];
-    CATCH_CHECK(conv2.activation == Activation::SWISH);
-    CATCH_CHECK(conv2.insize == 16);
-    CATCH_CHECK(conv2.size == 16);
-    CATCH_CHECK(conv2.stride == 1);
-    CATCH_CHECK(conv2.winlen == 5);
-
-    ConvParams conv3 = config.convs[2];
-    CATCH_CHECK(conv3.activation == Activation::SWISH);
-    CATCH_CHECK(conv3.insize == 16);
-    CATCH_CHECK(conv3.size == 96);
-    CATCH_CHECK(conv3.stride == 5);
-    CATCH_CHECK(conv3.winlen == 19);
+    CATCH_CHECK_THROWS_AS(load_model_config(path), std::runtime_error);
 }
 
 CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 hac@v4.2.0 model load", CUT_TAG) {

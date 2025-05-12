@@ -351,6 +351,8 @@ Mapping of deprecated chemistries to a tuple of {name, version dropped, last ver
 const std::unordered_map<Chemistry, std::array<std::string, 3>> deprecated = {
         {Chemistry::RNA002_70BPS, {"RNA002", "v1.0.0", "v0.9.6"}},
         {Chemistry::DNA_R9_4_1_E8, {"DNA r9.4.1 e8", "v1.0.0", "v0.9.6"}},
+        {Chemistry::DNA_R10_4_1_E8_2_260BPS, {"DNA r10.4.1 e8.2 4kHz", "v1.0.0", "v0.9.6"}},
+        {Chemistry::DNA_R10_4_1_E8_2_400BPS_4KHZ, {"DNA r10.4.1 e8.2 4kHz", "v1.0.0", "v0.9.6"}},
 };
 
 /*
