@@ -61,7 +61,8 @@ const std::array s_general_fields = {
 };
 
 const std::array s_polya_fields = {
-        "poly_tail_length"sv,
+        "poly_tail_length"sv, "poly_tail_start"sv, "poly_tail_end"sv,
+        "poly_tail2_start"sv, "poly_tail2_end"sv,
 };
 
 const std::array s_barcoding_fields = {
@@ -236,8 +237,21 @@ void SummaryData::write_rows_from_reader(
 
         if (m_field_flags & POLYA_FIELDS) {
             // get polyA from pt:i tag
-            auto polya_length = reader.get_tag<int>("pt");
+            int polya_length = reader.has_tag("pt") ? reader.get_tag<int>("pt")
+                                                    : ReadCommon::POLY_TAIL_NOT_FOUND;
             writer << m_separator << polya_length;
+
+            std::array<int, 5> polya_stats;
+            std::fill_n(std::begin(polya_stats), std::size(polya_stats),
+                        ReadCommon::POLY_TAIL_NOT_FOUND);
+            if (reader.has_tag("pa")) {
+                auto polya_stats_tag = reader.get_array<int>("pa");
+                std::copy_n(std::begin(polya_stats_tag), std::size(polya_stats_tag),
+                            std::begin(polya_stats));
+            }
+            writer << m_separator << polya_stats[0] << m_separator << polya_stats[1] << m_separator
+                   << polya_stats[2] << m_separator << polya_stats[3] << m_separator
+                   << polya_stats[4];
         }
 
         if (m_field_flags & BARCODING_FIELDS) {
