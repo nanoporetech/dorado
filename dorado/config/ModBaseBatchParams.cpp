@@ -30,6 +30,7 @@ constexpr std::size_t threads_conv_lstm_v2{8};
 
 constexpr std::size_t runners_per_caller{2};
 constexpr std::size_t runners_per_caller_conv_lstm_v2{4};
+constexpr std::size_t runners_per_caller_conv_lstm_v2_multi_gpu{2};
 
 constexpr float methylation_threshold{0.05f};
 };  // namespace DefaultModBaseParameters
@@ -48,7 +49,7 @@ std::string ModBaseBatchParams::to_string() const {
     // clang-format on
 }
 
-ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& paths) {
+ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& paths, size_t device_count) {
     const bool is_chunked_model =
             !paths.empty() && ((get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V2) ||
                                (get_modbase_model_type(paths.front()) == ModelType::CONV_LSTM_V3));
@@ -61,7 +62,7 @@ ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& 
                                                 : DefaultModBaseParameters::threads);
     const std::size_t runners_per_caller = utils::get_dev_opt(
             "modbase_runners", is_chunked_model
-                                       ? DefaultModBaseParameters::runners_per_caller_conv_lstm_v2
+                                       ? (device_count > 1 ? DefaultModBaseParameters::runners_per_caller_conv_lstm_v2_multi_gpu : DefaultModBaseParameters::runners_per_caller_conv_lstm_v2)
                                        : DefaultModBaseParameters::runners_per_caller);
     if (runners_per_caller <= 0 || threads <= 0) {
         throw std::runtime_error("Modbase parameters must be positive integers.");
