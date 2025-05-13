@@ -57,7 +57,7 @@ void PolyACalculatorNode::input_thread_fn() {
             int num_bases = 0;
             auto polya_tail_info = calculator->calculate_num_bases(*read, signal_info);
 
-            if (polya_tail_info.num_bases >= 0) {
+            if (polya_tail_info.num_bases > 0) {
                 num_bases += polya_tail_info.num_bases;
             }
 
