@@ -269,7 +269,7 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
 
     auto [num_samples_per_base, stddev] = estimate_samples_per_base(read);
     if (num_samples_per_base == 0) {
-        return {-1, {-1, -1}};
+        return {};
     }
 
     // Walk through signal. Require a minimum of length 10 poly-A since below that
@@ -279,7 +279,7 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
                                     num_samples_per_base, stddev);
 
     if (std::tie(signal_start, signal_end) == std::make_tuple(-1, -1)) {
-        return {-1, {-1, -1}};
+        return {};
     }
 
     auto signal_len = signal_end - signal_start;
