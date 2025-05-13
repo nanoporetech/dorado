@@ -3,6 +3,7 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 
+#include <stdexcept>
 #include <string>
 
 #if DORADO_CUDA_BUILD
@@ -26,15 +27,18 @@ LSTMStackImpl::LSTMStackImpl(int num_layers, int size, bool reverse_first_)
 };
 
 at::Tensor LSTMStackImpl::forward(at::Tensor x) {
-    // Input is [N, T, C], contiguity optional
-    for (size_t i = 0; i < rnns.size(); ++i) {
-        if (i != 0 && reverse_first) {
-            x = x.flip(1);
-        }
-        x = std::get<0>(rnns[i](x));
+    if (!reverse_first) {
+        // The modbase v3 (not reverse_first) use of LSTMStack is in the CUDA implementation.
+        throw std::logic_error("LSTMStack::forward is not implemented for !reverse_first");
     }
+
+    // Input is [N, T, C], contiguity optional
+    for (auto &rnn : rnns) {
+        x = std::get<0>(rnn(x.flip(1)));
+    }
+
     // Output is [N, T, C], contiguous
-    return ((rnns.size() & 1) != reverse_first) ? x.flip(1) : x;
+    return (rnns.size() & 1) ? x.flip(1) : x;
 }
 
 #if DORADO_CUDA_BUILD
