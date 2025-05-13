@@ -27,18 +27,17 @@ LSTMStackImpl::LSTMStackImpl(int num_layers, int size, bool reverse_first_)
 };
 
 at::Tensor LSTMStackImpl::forward(at::Tensor x) {
-    if (!reverse_first) {
-        // The modbase v3 (not reverse_first) use of LSTMStack is in the CUDA implementation.
-        throw std::logic_error("LSTMStack::forward is not implemented for !reverse_first");
-    }
-
     // Input is [N, T, C], contiguity optional
-    for (auto &rnn : rnns) {
-        x = std::get<0>(rnn(x.flip(1)));
+    bool is_reverse = !reverse_first;
+    for (size_t i = 0; i < rnns.size(); ++i) {
+        if (i != 0 || reverse_first) {
+            x = x.flip(1);
+            is_reverse = !is_reverse;
+        }
+        x = std::get<0>(rnns[i](x));
     }
-
     // Output is [N, T, C], contiguous
-    return (rnns.size() & 1) ? x.flip(1) : x;
+    return is_reverse ? x.flip(1) : x;
 }
 
 #if DORADO_CUDA_BUILD
