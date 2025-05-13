@@ -3,6 +3,7 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 
+#include <stdexcept>
 #include <string>
 
 #if DORADO_CUDA_BUILD
@@ -27,14 +28,16 @@ LSTMStackImpl::LSTMStackImpl(int num_layers, int size, bool reverse_first_)
 
 at::Tensor LSTMStackImpl::forward(at::Tensor x) {
     // Input is [N, T, C], contiguity optional
+    bool is_reverse = !reverse_first;
     for (size_t i = 0; i < rnns.size(); ++i) {
-        if (i != 0 && reverse_first) {
+        if (i != 0 || reverse_first) {
             x = x.flip(1);
+            is_reverse = !is_reverse;
         }
         x = std::get<0>(rnns[i](x));
     }
     // Output is [N, T, C], contiguous
-    return ((rnns.size() & 1) != reverse_first) ? x.flip(1) : x;
+    return is_reverse ? x.flip(1) : x;
 }
 
 #if DORADO_CUDA_BUILD
