@@ -18,7 +18,15 @@ enum class ModelType {
     SLOT_ATTENTION_CONSENSUS,
 };
 
+enum class ParameterLoadingStrategy {
+    LOAD_WEIGHTS,
+    NO_OP,
+};
+
 ModelType parse_model_type(const std::string& type);
+
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
+                                              const ParameterLoadingStrategy param_strategy);
 
 std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config);
 

@@ -145,7 +145,8 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
 
 }  // namespace
 
-std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
+                                              const ParameterLoadingStrategy param_strategy) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);
@@ -172,10 +173,19 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
     if (config.model_file == "model.pt") {
         // Load a TorchScript model. Parameters are not important here.
         spdlog::debug("Loading a TorchScript model.");
+
+        if (param_strategy != ParameterLoadingStrategy::LOAD_WEIGHTS) {
+            throw std::runtime_error(
+                    "TorchScript model cannot be loaded without loading the model.pt file.");
+        }
+
         model = std::make_unique<ModelTorchScript>(config.model_dir / config.model_file);
         model->set_normalise(false);
 
-    } else if (model_type == ModelType::GRU) {
+        return model;
+    }
+
+    if (model_type == ModelType::GRU) {
         spdlog::debug("Constructing a GRU model.");
 
         const int32_t num_features = std::stoi(get_value(config.model_kwargs, "num_features"));
@@ -187,9 +197,6 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
 
         model = std::make_unique<ModelGRU>(num_features, num_classes, gru_size, n_layers,
                                            bidirectional);
-
-        // Set the weights of the internally constructed model.
-        load_parameters(*model, config.model_dir / config.model_file);
 
     } else if (model_type == ModelType::LATENT_SPACE_LSTM) {
         spdlog::debug("Constructing a LATENT_SPACE_LSTM model.");
@@ -217,8 +224,6 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         model = std::make_unique<ModelLatentSpaceLSTM>(
                 num_classes, lstm_size, cnn_size, kernel_sizes, pooler_type, use_dwells,
                 bases_alphabet_size, bases_embedding_size, bidirectional);
-
-        load_parameters(*model, config.model_dir / config.model_file);
 
     } else if (model_type == ModelType::SLOT_ATTENTION_CONSENSUS) {
         spdlog::debug("Constructing a SLOT_ATTENTION_CONSENSUS model.");
@@ -257,13 +262,20 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
         // deactivate normalization after phasing.
         model->set_normalise(false);
 
-        load_parameters(*model, config.model_dir / config.model_file);
-
     } else {
         throw std::runtime_error("Unsupported model type!");
     }
 
+    // Set the weights of the internally constructed model. This is optional for testing purposes.
+    if (param_strategy == ParameterLoadingStrategy::LOAD_WEIGHTS) {
+        load_parameters(*model, config.model_dir / config.model_file);
+    }
+
     return model;
+}
+
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
+    return model_factory(config, ParameterLoadingStrategy::LOAD_WEIGHTS);
 }
 
 }  // namespace dorado::secondary
