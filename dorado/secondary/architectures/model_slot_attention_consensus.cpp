@@ -117,14 +117,13 @@ std::pair<at::Tensor, at::Tensor> SlotAttentionImpl::forward(at::Tensor x,
         /// Original line from Medaka:
         ///     at::Tensor dots = torch::einsum("bsd,brd->bsr", {q, k}) * m_scale;
         /// Alternative, should be more efficient with the same result:
-        at::Tensor dots = torch::bmm(q, k.transpose(1, 2)) * m_scale;
-        dots += bias;
+        at::Tensor dots = torch::bmm(q, k.transpose(1, 2)).mul_(m_scale).add_(bias);
 
         q = at::Tensor{};  // Clear memory.
 
-        attn = torch::softmax(dots, 1) + m_epsilon;
+        attn = torch::softmax(dots, 1).add_(m_epsilon);
         attn.masked_fill_(mask, 0);
-        attn /= attn.nansum(-1, /*keepdim=*/true);
+        attn.div_(attn.nansum(-1, /*keepdim=*/true));
 
         dots = at::Tensor{};  // Clear memory.
 
@@ -137,7 +136,7 @@ std::pair<at::Tensor, at::Tensor> SlotAttentionImpl::forward(at::Tensor x,
         updates = at::Tensor{};  // Clear memory.
 
         slots = slots.reshape({b, -1, d});
-        slots += m_mlp->forward(m_norm_pre_ff(slots));
+        slots.add_(m_mlp->forward(m_norm_pre_ff(slots)));
     }
 
     return {slots, attn};
@@ -230,19 +229,19 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
     at::Tensor embeddings = m_base_embedder->forward(in_x.select(-1, 0).to(torch::kLong));
 
     // Strand embeddings.
-    embeddings += m_strand_embedder->forward(in_x.select(-1, 2).to(torch::kLong) + 1);
+    embeddings.add_(m_strand_embedder->forward(in_x.select(-1, 2).to(torch::kLong) + 1));
 
     // Haplotag embeddings.
     if (m_use_haplotags) {
-        embeddings += m_haplotag_embedder->forward(in_x.select(-1, -1).to(torch::kLong));
+        embeddings.add_(m_haplotag_embedder->forward(in_x.select(-1, -1).to(torch::kLong)));
     }
 
-    at::Tensor scaled_q_scores = (in_x.select(-1, 1) / 25 - 1).unsqueeze(-1);
+    at::Tensor scaled_q_scores = (in_x.select(-1, 1) / 25).add_(-1).unsqueeze(-1);
 
     std::vector<at::Tensor> features{std::move(embeddings), std::move(scaled_q_scores)};
 
     if (m_use_mapqc) {
-        at::Tensor scaled_mapqc = (in_x.select(-1, 3) / 25 - 1).unsqueeze(-1);
+        at::Tensor scaled_mapqc = (in_x.select(-1, 3) / 25).add(-1).unsqueeze(-1);
         features.emplace_back(std::move(scaled_mapqc));
     }
 
