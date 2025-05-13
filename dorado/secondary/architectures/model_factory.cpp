@@ -22,6 +22,8 @@ ModelType parse_model_type(const std::string& type) {
         return ModelType::GRU;
     } else if (type == "LatentSpaceLSTM") {
         return ModelType::LATENT_SPACE_LSTM;
+    } else if (type == "SlotAttentionConsensus") {
+        return ModelType::SLOT_ATTENTION_CONSENSUS;
     }
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }
@@ -62,6 +64,12 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
     try {
         const c10::Dict<c10::IValue, c10::IValue> weights =
                 torch::jit::pickle_load(bytes).toGenericDict();
+
+        if (spdlog::default_logger()->level() == spdlog::level::debug) {
+            for (const auto& w : weights) {
+                spdlog::debug("[pt_param] w.key() = {}", w.key().toStringRef());
+            }
+        }
 
         auto params = model.named_parameters(true /*recurse*/);
         auto buffers = model.named_buffers(true /*recurse*/);
@@ -137,7 +145,8 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
 
 }  // namespace
 
-std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
+                                              const ParameterLoadingStrategy param_strategy) {
     const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
                               const std::string& key) -> std::string {
         const auto it = dict.find(key);
@@ -164,9 +173,19 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
     if (config.model_file == "model.pt") {
         // Load a TorchScript model. Parameters are not important here.
         spdlog::debug("Loading a TorchScript model.");
-        model = std::make_unique<ModelTorchScript>(config.model_dir / config.model_file);
 
-    } else if (model_type == ModelType::GRU) {
+        if (param_strategy != ParameterLoadingStrategy::LOAD_WEIGHTS) {
+            throw std::runtime_error(
+                    "TorchScript model cannot be loaded without loading the model.pt file.");
+        }
+
+        model = std::make_unique<ModelTorchScript>(config.model_dir / config.model_file);
+        model->set_normalise(false);
+
+        return model;
+    }
+
+    if (model_type == ModelType::GRU) {
         spdlog::debug("Constructing a GRU model.");
 
         const int32_t num_features = std::stoi(get_value(config.model_kwargs, "num_features"));
@@ -178,9 +197,6 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
 
         model = std::make_unique<ModelGRU>(num_features, num_classes, gru_size, n_layers,
                                            bidirectional);
-
-        // Set the weights of the internally constructed model.
-        load_parameters(*model, config.model_dir / config.model_file);
 
     } else if (model_type == ModelType::LATENT_SPACE_LSTM) {
         spdlog::debug("Constructing a LATENT_SPACE_LSTM model.");
@@ -209,13 +225,57 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
                 num_classes, lstm_size, cnn_size, kernel_sizes, pooler_type, use_dwells,
                 bases_alphabet_size, bases_embedding_size, bidirectional);
 
-        load_parameters(*model, config.model_dir / config.model_file);
+    } else if (model_type == ModelType::SLOT_ATTENTION_CONSENSUS) {
+        spdlog::debug("Constructing a SLOT_ATTENTION_CONSENSUS model.");
+
+        const int32_t num_slots = std::stoi(get_value(config.model_kwargs, "num_slots"));
+        const int32_t classes_per_slot =
+                std::stoi(get_value(config.model_kwargs, "classes_per_slot"));
+        const int32_t read_embedding_size =
+                std::stoi(get_value(config.model_kwargs, "read_embedding_size"));
+        const int32_t cnn_size = std::stoi(get_value(config.model_kwargs, "cnn_size"));
+        const std::vector<int32_t> kernel_sizes =
+                utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"), ',');
+        const std::string pooler_type = get_value(config.model_kwargs, "pooler_type");
+        const bool use_mapqc =
+                (get_value(config.model_kwargs, "use_mapqc") == "true") ? true : false;
+        const bool use_dwells =
+                (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
+        const bool use_haplotags =
+                (get_value(config.model_kwargs, "use_haplotags") == "true") ? true : false;
+        const int32_t bases_alphabet_size =
+                std::stoi(get_value(config.model_kwargs, "bases_alphabet_size"));
+        const int32_t bases_embedding_size =
+                std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
+        const bool add_lstm = (get_value(config.model_kwargs, "add_lstm") == "true") ? true : false;
+        const bool use_reference =
+                (get_value(config.model_kwargs, "use_reference") == "true") ? true : false;
+
+        const std::unordered_map<std::string, std::string> pooler_args;
+
+        model = std::make_unique<ModelSlotAttentionConsensus>(
+                num_slots, classes_per_slot, read_embedding_size, cnn_size, kernel_sizes,
+                pooler_type, pooler_args, use_mapqc, use_dwells, use_haplotags, bases_alphabet_size,
+                bases_embedding_size, add_lstm, use_reference);
+
+        // The SlotAttentionConsensus model normalizes internally because of phasing, so
+        // deactivate normalization after phasing.
+        model->set_normalise(false);
 
     } else {
         throw std::runtime_error("Unsupported model type!");
     }
 
+    // Set the weights of the internally constructed model. This is optional for testing purposes.
+    if (param_strategy == ParameterLoadingStrategy::LOAD_WEIGHTS) {
+        load_parameters(*model, config.model_dir / config.model_file);
+    }
+
     return model;
+}
+
+std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config) {
+    return model_factory(config, ParameterLoadingStrategy::LOAD_WEIGHTS);
 }
 
 }  // namespace dorado::secondary

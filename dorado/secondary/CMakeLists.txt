@@ -21,6 +21,8 @@ add_library(dorado_secondary
     architectures/model_gru.h
     architectures/model_latent_space_lstm.cpp
     architectures/model_latent_space_lstm.h
+    architectures/model_slot_attention_consensus.cpp
+    architectures/model_slot_attention_consensus.h
     architectures/model_torch_base.cpp
     architectures/model_torch_base.h
     architectures/model_torch_script.cpp

@@ -13,6 +13,7 @@ namespace dorado::secondary {
 
 enum class LabelSchemeType {
     HAPLOID,
+    DIPLOID,
 };
 
 class DecoderBase {
