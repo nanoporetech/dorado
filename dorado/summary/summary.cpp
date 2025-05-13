@@ -241,12 +241,13 @@ void SummaryData::write_rows_from_reader(
                                                     : ReadCommon::POLY_TAIL_NOT_FOUND;
             writer << m_separator << polya_length;
 
-            std::array<int, 5> polya_stats;
+            std::array<int, 4> polya_stats;
             std::fill_n(std::begin(polya_stats), std::size(polya_stats),
                         ReadCommon::POLY_TAIL_NOT_FOUND);
             if (reader.has_tag("pa")) {
                 auto polya_stats_tag = reader.get_array<int>("pa");
-                std::copy_n(std::begin(polya_stats_tag), std::size(polya_stats_tag),
+                // skip the anchor info, we only output the ranges
+                std::copy_n(std::next(std::begin(polya_stats_tag)), std::size(polya_stats),
                             std::begin(polya_stats));
             }
             for (const auto& stat : polya_stats) {
