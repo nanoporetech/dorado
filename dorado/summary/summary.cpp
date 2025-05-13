@@ -249,9 +249,9 @@ void SummaryData::write_rows_from_reader(
                 std::copy_n(std::begin(polya_stats_tag), std::size(polya_stats_tag),
                             std::begin(polya_stats));
             }
-            writer << m_separator << polya_stats[0] << m_separator << polya_stats[1] << m_separator
-                   << polya_stats[2] << m_separator << polya_stats[3] << m_separator
-                   << polya_stats[4];
+            for (const auto& stat : polya_stats) {
+                writer << m_separator << stat;
+            }
         }
 
         if (m_field_flags & BARCODING_FIELDS) {
