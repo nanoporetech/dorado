@@ -30,8 +30,8 @@ if [[ ! -e "${model}" ]]; then
 fi
 
 # Test commands
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} > $output_dir/output.bam 2>$test_output_file
-grep "Simplex reads basecalled: 1" $test_output_file
+$dorado_bin basecaller ${model} $data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz/ -b ${batch} > $output_dir/output.bam 2>$test_output_file
+grep "Simplex reads basecalled: 3" $test_output_file
 ret_val=$?
 if [ $ret_val -ne 0 ]; then
     echo "Couldn't find number of reads called in output"
