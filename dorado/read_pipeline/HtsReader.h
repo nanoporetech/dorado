@@ -14,6 +14,7 @@
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
+#include <vector>
 
 namespace dorado {
 
@@ -35,8 +36,12 @@ public:
     // If reading directly into a pipeline need to set the client info on the messages
     void set_client_info(std::shared_ptr<ClientInfo> client_info);
     std::size_t read(Pipeline& pipeline, std::size_t max_reads);
+
     template <typename T>
     T get_tag(const char* tagname);
+    template <typename T>
+    std::vector<T> get_array(const char* tagname);
+
     bool has_tag(const char* tagname);
     void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
@@ -79,6 +84,28 @@ T HtsReader::get_tag(const char* tagname) {
         tag_value = val ? val : T{};
     }
 
+    return tag_value;
+}
+
+template <typename T>
+std::vector<T> HtsReader::get_array(const char* tagname) {
+    uint8_t* tag = bam_aux_get(record.get(), tagname);
+    if (!tag) {
+        return {};
+    }
+
+    uint32_t len = bam_auxB_len(tag);
+    std::vector<T> tag_value;
+    tag_value.reserve(len);
+    for (uint32_t idx = 0; idx < len; ++idx) {
+        if constexpr (std::is_integral_v<T>) {
+            tag_value.push_back(static_cast<T>(bam_auxB2i(tag, idx)));
+        } else if constexpr (std::is_floating_point_v<T>) {
+            tag_value.push_back(static_cast<T>(bam_auxB2f(tag, idx)));
+        } else {
+            throw std::logic_error("Invalid type for array tag.");
+        }
+    }
     return tag_value;
 }
 

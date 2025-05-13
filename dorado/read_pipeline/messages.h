@@ -7,6 +7,7 @@
 
 #include <ATen/core/TensorBody.h>
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <limits>
@@ -40,7 +41,7 @@ class ClientInfo;
 
 class ReadCommon {
 public:
-    static constexpr int POLY_TAIL_NO_ANCHOR_FOUND = -1;
+    static constexpr int POLY_TAIL_NOT_FOUND = -1;
     static constexpr int POLY_TAIL_NOT_ENABLED = -2;
     at::Tensor raw_data;  // Loaded from source file
 
@@ -117,6 +118,11 @@ public:
 
     // Track length of estimated polyA tail in bases.
     int rna_poly_tail_length{POLY_TAIL_NOT_ENABLED};
+    // Raw signal position used as the anchor for the poly tail search.
+    int poly_tail_signal_anchor{POLY_TAIL_NOT_ENABLED};
+    // Estimated ranges for the poly tail signal. This may have multiple entries (for plasmids) if a split tail is detected
+    std::array<std::pair<int, int>, 2> poly_tail_signal_boundaries;
+
     // Track position of end of RNA adapter in signal space. If the RNA adapter is
     // trimmed, this will be 0. Otherwise it will be the position in the signal
     // where the adapter ends.
