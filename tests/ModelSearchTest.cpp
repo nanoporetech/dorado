@@ -38,18 +38,6 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch get_simplex_model_name", TEST_TAG
     CATCH_SECTION("get_simplex_model_name simplex spot checks") {
         // Check given the model definitions the same model can be found
         auto [chemistry, mvp, expected] = GENERATE(table<CC, MVP, std::string>({
-                std::make_tuple(CC::DNA_R10_4_1_E8_2_260BPS, MVP{MV::HAC, VV::v3_5_2},
-                                "dna_r10.4.1_e8.2_260bps_hac@v3.5.2"),
-                std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v3_5_2},
-                                "dna_r10.4.1_e8.2_400bps_sup@v3.5.2"),
-                std::make_tuple(CC::DNA_R10_4_1_E8_2_260BPS, MVP{MV::FAST, VV::v4_0_0},
-                                "dna_r10.4.1_e8.2_260bps_fast@v4.0.0"),
-                std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::HAC, VV::v4_0_0},
-                                "dna_r10.4.1_e8.2_400bps_hac@v4.0.0"),
-                std::make_tuple(CC::DNA_R10_4_1_E8_2_260BPS, MVP{MV::SUP, VV::v4_1_0},
-                                "dna_r10.4.1_e8.2_260bps_sup@v4.1.0"),
-                std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v4_1_0},
-                                "dna_r10.4.1_e8.2_400bps_sup@v4.1.0"),
                 std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::SUP, VV::v4_2_0},
                                 "dna_r10.4.1_e8.2_400bps_sup@v4.2.0"),
                 std::make_tuple(CC::DNA_R10_4_1_E8_2_APK_5KHZ, MVP{MV::SUP, VV::v5_0_0},
@@ -74,19 +62,6 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch get_stereo_model_name", TEST_TAG)
         // Check given the model definitions the same model can be found
         auto [chemistry, mvp, expected_simplex, expected_stereo] =
                 GENERATE(table<CC, MVP, std::string, std::string>({
-                        // 4kHz
-                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::HAC, VV::v4_0_0},
-                                        "dna_r10.4.1_e8.2_400bps_hac@v4.0.0",
-                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
-                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v4_0_0},
-                                        "dna_r10.4.1_e8.2_400bps_sup@v4.0.0",
-                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
-                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::HAC, VV::v4_1_0},
-                                        "dna_r10.4.1_e8.2_400bps_hac@v4.1.0",
-                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
-                        std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_4KHZ, MVP{MV::SUP, VV::v4_1_0},
-                                        "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
-                                        "dna_r10.4.1_e8.2_4khz_stereo@v1.1"),
                         // 5kHz
                         std::make_tuple(CC::DNA_R10_4_1_E8_2_400BPS_5KHZ, MVP{MV::HAC, VV::v4_2_0},
                                         "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",

@@ -401,7 +401,7 @@ build_archive:linux:arm64:jammy:
     - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_dorado_archive
-    - .on_nightly_or_manual    
+    - .on_nightly_or_manual
 
 build_archive:linux:x86:centos7:cuda11:
   image: ${DORADO_DOCKER_ROOT}/dorado-centos7-cuda-${CUDA}.0:1.0
@@ -451,7 +451,7 @@ build_archive:macos:arm:
   stage: test
   variables:
     GIT_STRATEGY: none
-    MODEL: dna_r10.4.1_e8.2_400bps_hac@v4.1.0
+    MODEL: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
     BATCH: 384
     NO_TEST_DORADO_CORRECT: 0
     NO_TEST_DORADO_POLISH: 0
@@ -553,15 +553,15 @@ test:macos:arm:
       # CUDA environment
       - RUNNER_TAG: "nvidia-docker"
         IMAGE:
-        - "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
-        - "nvidia/cuda:${CUDA}.0-devel-ubuntu22.04"
-        - "nvidia/cuda:${CUDA}.0-devel-ubuntu24.04"
+          - "nvidia/cuda:${CUDA}.0-devel-ubuntu20.04"
+          - "nvidia/cuda:${CUDA}.0-devel-ubuntu22.04"
+          - "nvidia/cuda:${CUDA}.0-devel-ubuntu24.04"
       # CPU environment
       - RUNNER_TAG: "docker-as"
         IMAGE:
-        - "${DORADO_DOCKER_EXT}/ubuntu:20.04"
-        - "${DORADO_DOCKER_EXT}/ubuntu:22.04"
-        - "${DORADO_DOCKER_EXT}/ubuntu:24.04"
+          - "${DORADO_DOCKER_EXT}/ubuntu:20.04"
+          - "${DORADO_DOCKER_EXT}/ubuntu:22.04"
+          - "${DORADO_DOCKER_EXT}/ubuntu:24.04"
 # CUDA 11 build
 test_archive:linux:x86:cuda11:
   extends:
