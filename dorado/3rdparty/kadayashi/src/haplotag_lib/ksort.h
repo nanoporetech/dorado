@@ -63,10 +63,19 @@
 #ifndef AC_KSORT_H
 #define AC_KSORT_H
 
+#include <stddef.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 
 namespace kadayashi {
+
+// The ksort uses POSIX rand48() which is not available on Windows.
+#ifndef _MSC_VER
+inline double drand48_wrap() { return drand48(); }
+#else
+inline double drand48_wrap() { return (static_cast<double>(rand()) / RAND_MAX); }
+#endif
 
 typedef struct {
     void *left, *right;
@@ -83,11 +92,11 @@ typedef struct {
 #define KSORT_INIT(name, type_t, __sort_lt)                                          \
     void ks_mergesort_##name(size_t n, type_t array[], type_t temp[]) {              \
         type_t *a2[2], *a, *b;                                                       \
-        int curr, shift;                                                             \
+        int64_t curr, shift;                                                         \
                                                                                      \
         a2[0] = array;                                                               \
         a2[1] = temp ? temp : (type_t *)malloc(sizeof(type_t) * n);                  \
-        for (curr = 0, shift = 0; (1ul << shift) < n; ++shift) {                     \
+        for (curr = 0, shift = 0; (((size_t)(1)) << shift) < n; ++shift) {           \
             a = a2[curr];                                                            \
             b = a2[1 - curr];                                                        \
             if (shift == 0) {                                                        \
@@ -106,7 +115,7 @@ typedef struct {
                     }                                                                \
                 }                                                                    \
             } else {                                                                 \
-                size_t i, step = 1ul << shift;                                       \
+                size_t i, step = ((size_t)(1)) << shift;                             \
                 for (i = 0; i < n; i += step << 1) {                                 \
                     type_t *p, *j, *k, *ea, *eb;                                     \
                     if (n < i + step) {                                              \
@@ -186,9 +195,9 @@ typedef struct {
     }                                                                                \
     void ks_shuffle_##name(size_t n, type_t a[]) {                                   \
         int i, j;                                                                    \
-        for (i = n; i > 1; --i) {                                                    \
+        for (i = ((int)n); i > 1; --i) {                                             \
             type_t tmp;                                                              \
-            j = (int)(drand48() * i);                                                \
+            j = (int)(drand48_wrap() * i);                                           \
             tmp = a[j];                                                              \
             a[j] = a[i - 1];                                                         \
             a[i - 1] = tmp;                                                          \
@@ -199,7 +208,7 @@ typedef struct {
         int i;                                                                       \
         size_t k, pop = n;                                                           \
         for (i = (int)r, k = 0; i >= 0; --i) {                                       \
-            double z = 1., x = drand48();                                            \
+            double z = 1., x = drand48_wrap();                                       \
             type_t tmp;                                                              \
             while (x < z)                                                            \
                 z -= z * i / (pop--);                                                \
