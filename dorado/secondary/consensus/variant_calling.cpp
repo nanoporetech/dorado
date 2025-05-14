@@ -10,7 +10,6 @@
 #include "utils/ssize.h"
 
 #include <ATen/ATen.h>
-#include <IntervalTree.h>
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
 
@@ -26,6 +25,7 @@
 
 // #define DEBUG_VC_DATA_DUMP
 // #define DEBUG_VARIANT_REGIONS
+// #define DEBUG_NORMALIZE_VARIANT
 
 namespace dorado::secondary {
 
@@ -312,7 +312,7 @@ Variant construct_variant(const std::string_view draft,
         var.pos = positions_major[var.rstart];
         var.ref = draft[var.pos] + var.ref;
         const char base = draft[var.pos];
-        for (auto& alt : var.alts) {
+        for (std::string& alt : var.alts) {
             alt = base + std::move(alt);
         }
     };
@@ -357,7 +357,7 @@ Variant construct_variant(const std::string_view draft,
             cons_view.emplace_back(val.seq);
         }
         var = normalize_variant(ref_seq_with_gaps, cons_view, positions_major, positions_minor,
-                                var);
+                                symbol_set, var, ambig_ref);
     }
 
     // If the ALT field is still is empty, set it to a '.'. This can happen when a deletion is
@@ -392,78 +392,291 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
         return variants;
     }
 
-    std::vector<Variant> filtered;
-
-    // Create interval trees if merge_overlapping is required.
-    interval_tree::IntervalTree<int64_t, int64_t> tree;
-    if (merge_overlapping) {
-        std::vector<interval_tree::Interval<int64_t, int64_t>> intervals;
-        for (int64_t i = 0; i < dorado::ssize(variants); ++i) {
-            // NOTE: interval_tree has an inclusive end coordinate.
-            intervals.emplace_back(interval_tree::Interval<int64_t, int64_t>(
-                    variants[i].rstart, variants[i].rend - 1, i));
-        }
-        tree = interval_tree::IntervalTree<int64_t, int64_t>(std::move(intervals));
+    if (std::empty(variants)) {
+        return {};
     }
 
-    std::unordered_set<int64_t> seen;
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[merge_sorted_variants] Merging overlapping/adjacent. merge_overlapping = "
+              << merge_overlapping << ", merge_adjacent = " << merge_adjacent << "\n";
+#endif
 
-    for (int64_t i = 0; i < dorado::ssize(variants); ++i) {
-        if (seen.count(i)) {
+    std::vector<Variant> filtered;
+    int64_t furthest_rend = variants[0].rend;
+    int64_t prev_i = 0;
+    for (int64_t i = 1; i < dorado::ssize(variants); ++i) {
+        const Variant& v1 = variants[prev_i];
+        const Variant& v2 = variants[i];
+        const bool is_overlapping = (v2.rstart < furthest_rend) && (v2.rend >= v1.rstart);
+        const bool is_adjacent = (v2.rstart == furthest_rend);
+
+        if ((merge_overlapping && is_overlapping) || (merge_adjacent && is_adjacent)) {
+            furthest_rend = v2.rend;
             continue;
         }
 
-        const Variant& var = variants[i];
+        Variant new_var = construct_variant(
+                draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
+                variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
+                probs_3D, symbol_set, symbol_lookup);
 
-        std::unordered_set<int64_t> variants_to_merge{i};
-
-        if (merge_overlapping) {
-            // NOTE: interval_tree has an inclusive end coordinate.
-            std::vector<interval_tree::Interval<int64_t, int64_t>> hits =
-                    tree.findOverlapping(var.rstart, var.rend - 1);
-            // Expand the set of variants to merge.
-            for (const interval_tree::Interval<int64_t, int64_t>& ival : hits) {
-                variants_to_merge.emplace(ival.value);
-            }
+        if (is_valid(new_var)) {
+            filtered.emplace_back(std::move(new_var));
         }
 
-        if (merge_adjacent) {
-            for (int64_t j = (i + 1); j < dorado::ssize(variants); ++j) {
-                if (variants[j].rstart != variants[j - 1].rend) {
-                    break;
-                }
-                variants_to_merge.emplace(j);
-            }
-        }
+        furthest_rend = v2.rend;
+        prev_i = i;
+    }
+    {  // Remaining.
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[merge_sorted_variants] Remaining:\n";
+#endif
+        Variant new_var = construct_variant(
+                draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
+                variants[prev_i].seq_id, variants[prev_i].rstart, furthest_rend, true, ambig_ref,
+                normalize, probs_3D, symbol_set, symbol_lookup);
 
-        for (const int64_t id : variants_to_merge) {
-            seen.emplace(id);
-        }
-
-        if (std::size(variants_to_merge) <= 1) {
-            filtered.emplace_back(var);
-
-        } else {
-            // Find the region bounding box.
-            int64_t min_rstart = var.rstart;
-            int64_t max_rend = var.rend;
-            for (const int64_t id : variants_to_merge) {
-                min_rstart = std::min(min_rstart, variants[id].rstart);
-                max_rend = std::max(max_rend, variants[id].rend);
-            }
-
-            Variant new_var =
-                    construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
-                                      cons_seqs_with_gaps, var.seq_id, min_rstart, max_rend, true,
-                                      ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
-
-            if (is_valid(new_var)) {
-                filtered.emplace_back(std::move(new_var));
-            }
+        if (is_valid(new_var)) {
+            filtered.emplace_back(std::move(new_var));
         }
     }
 
     return filtered;
+}
+
+std::tuple<bool, int64_t, int64_t> find_previous_ref_pos(
+        const std::vector<int64_t>& positions_major,
+        const std::vector<int64_t>& positions_minor,
+        const int64_t rstart) {
+    // Bounds check.
+    if ((rstart <= 0) || (rstart >= dorado::ssize(positions_major))) {
+        return {false, rstart, -1};
+    }
+
+    const int64_t ref_pos = positions_major[rstart];
+    const int64_t prev_ref_pos = ref_pos - 1;
+
+    // Can't go left.
+    if (ref_pos <= 0) {
+        return {false, rstart, ref_pos};
+    }
+
+    // Move.
+    int64_t rpos = rstart;
+    while ((rpos >= 0) &&
+           ((positions_major[rpos] > prev_ref_pos) ||
+            ((positions_major[rpos] == prev_ref_pos) && (positions_minor[rpos] != 0)))) {
+        --rpos;
+    }
+
+    // Major not found, window begins with a minor position.
+    if (rpos < 0) {
+        return {false, rpos, ref_pos};
+    }
+
+    // Could not find the requested position.
+    if ((positions_major[rpos] != prev_ref_pos) || (positions_minor[rpos] != 0)) {
+        return {false, rpos, ref_pos};
+    }
+
+    // Found a valid position.
+    return {true, rpos, prev_ref_pos};
+}
+
+std::tuple<bool, int64_t, int64_t> find_ref_pos(const std::vector<int64_t>& positions_major,
+                                                const std::vector<int64_t>& positions_minor,
+                                                const int64_t rstart,
+                                                const int64_t requested_ref_pos) {
+    const int64_t len = dorado::ssize(positions_major);
+
+    // Bounds check.
+    if ((requested_ref_pos < 0) || (rstart < 0) || (rstart >= len)) {
+        return {false, -1, -1};
+    }
+
+    // Move. The `rpos` will be an inclusive end coordinate, so check the bounds.
+    int64_t rpos = rstart;
+    while ((rpos < len) &&
+           ((positions_major[rpos] < requested_ref_pos) ||
+            ((positions_major[rpos] == requested_ref_pos) && (positions_minor[rpos] != 0)))) {
+        ++rpos;
+    }
+
+    // Major not found, window begins with a minor position.
+    if (rpos >= len) {
+        return {false, rpos, requested_ref_pos};
+    }
+
+    // Could not find the requested position.
+    if ((positions_major[rpos] != requested_ref_pos) || (positions_minor[rpos] != 0)) {
+        return {false, rpos, requested_ref_pos};
+    }
+
+    // The `rpos` coordinate here is an inclusive one.
+    return {true, rpos, requested_ref_pos};
+}
+
+bool prepend_ref_base(Variant& var,
+                      const std::string_view ref_with_gaps,
+                      const std::vector<std::string_view>& cons_seqs_with_gaps,
+                      const std::vector<int64_t>& positions_major,
+                      const std::vector<int64_t>& positions_minor,
+                      const std::unordered_set<char>& symbol_set,
+                      const bool ambig_ref_allowed) {
+    const auto [can_go_left, new_rstart, new_ref_pos] =
+            find_previous_ref_pos(positions_major, positions_minor, var.rstart);
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[prepend_ref_base] before var = " << var << "\n";
+    std::cerr << "[prepend_ref_base] can_go_left = " << can_go_left
+              << ", new_rstart = " << new_rstart << ", new_ref_pos = " << new_ref_pos << "\n";
+#endif
+
+    if (!can_go_left) {
+        return false;
+    }
+
+    // Prevent extension into ambiguous references.
+    bool bases_valid = true;
+    for (int64_t i = new_rstart; i < var.rstart; ++i) {
+        if (!ambig_ref_allowed && (symbol_set.count(ref_with_gaps[i]) == 0)) {
+            bases_valid = false;
+            break;
+        }
+    }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[prepend_ref_base] bases_valid = " << bases_valid << "\n";
+#endif
+
+    if (!bases_valid) {
+        return false;
+    }
+
+    // Collect all prefixes for all consensus sequences and the ref, to prevent extension into variants.
+    std::vector<std::string> prefixes;
+    const int64_t span = var.rstart - new_rstart;
+    prefixes.emplace_back(ref_with_gaps.substr(new_rstart, span));
+    for (const std::string_view seq : cons_seqs_with_gaps) {
+        prefixes.emplace_back(seq.substr(new_rstart, span));
+    }
+
+    // Create a set to count unique prefixes.
+    const std::unordered_set<std::string> prefix_set(std::cbegin(prefixes), std::cend(prefixes));
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[prepend_ref_base] std::size(prefix_set) = " << std::size(prefix_set)
+              << " (should be <= 1), var = " << var << "\n";
+#endif
+
+    // Check if there is more than 1 unique prefix - if so, this is a variant and stop extension.
+    if (std::size(prefix_set) > 1) {
+        return false;
+    }
+
+    // Remove the deletions and prepend the prefix sequence.
+    for (int64_t i = 0; i < dorado::ssize(prefixes); ++i) {
+        std::string& p = prefixes[i];
+        p.erase(std::remove(std::begin(p), std::end(p), '*'), std::end(p));
+    }
+
+    // Finally, extend to the left.
+    var.pos = positions_major[new_rstart];
+    var.rstart = new_rstart;
+    var.ref = prefixes[0] + var.ref;
+    for (int64_t i = 0; i < dorado::ssize(var.alts); ++i) {
+        var.alts[i] = prefixes[i + 1] + var.alts[i];
+    }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[prepend_ref_base] finished: var = " << var << "\n";
+#endif
+
+    return true;
+}
+
+bool append_ref_base(Variant& var,
+                     const std::string_view ref_with_gaps,
+                     const std::vector<std::string_view>& cons_seqs_with_gaps,
+                     const std::vector<int64_t>& positions_major,
+                     const std::vector<int64_t>& positions_minor,
+                     const std::unordered_set<char>& symbol_set,
+                     const bool ambig_ref_allowed) {
+    // Do not rely on var.rend because bases might have been trimmed from
+    // the back of the variant and var.rend left intact to track the entire region span.
+    // Instead, find the desired reference coordinate for the new base,
+    // then find the region pos (rpos) and add it.
+    // Only the var.rstart should be considered valid.
+    const int64_t next_ref_pos = var.pos + dorado::ssize(var.ref);
+
+    // Search for the major position which matches the next_ref_pos,
+    // starting from var.rstart.
+    const auto [can_go_right, new_rend_inclusive, new_ref_pos] =
+            find_ref_pos(positions_major, positions_minor, var.rstart, next_ref_pos);
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[append_ref_base] before var = " << var << "\n";
+    std::cerr << "[append_ref_base] can_go_right = " << can_go_right
+              << ", new_rend_inclusive = " << new_rend_inclusive
+              << ", new_ref_pos = " << new_ref_pos
+              << ", len(positions_major) = " << std::size(positions_major) << ", coords = ["
+              << positions_major.front() << " - " << positions_major.back() << "]\n";
+#endif
+
+    if (!can_go_right) {
+        return false;
+    }
+
+    // Prevent extension into ambiguous references.
+    bool bases_valid = var.rstart <= new_rend_inclusive;
+    for (int64_t i = var.rstart; i < (new_rend_inclusive + 1); ++i) {
+        if (!ambig_ref_allowed && (symbol_set.count(ref_with_gaps[i]) == 0)) {
+            bases_valid = false;
+            break;
+        }
+    }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[append_ref_base] bases_valid = " << bases_valid << "\n";
+#endif
+
+    if (!bases_valid) {
+        return false;
+    }
+
+    // Collect all prefixes for all consensus sequences and the ref.
+    std::vector<char> suffixes;
+    suffixes.emplace_back(ref_with_gaps[new_rend_inclusive]);
+    for (const std::string_view seq : cons_seqs_with_gaps) {
+        suffixes.emplace_back(seq[new_rend_inclusive]);
+    }
+
+    // Create a set to count unique prefixes.
+    const std::unordered_set<char> suffix_set(std::cbegin(suffixes), std::cend(suffixes));
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[append_ref_base] std::size(suffix_set) = " << std::size(suffix_set)
+              << " (should be <= 1), var = " << var << "\n";
+#endif
+
+    // Check if there is more than 1 unique suffix - this is a variant then, stop extension.
+    if (std::size(suffix_set) > 1) {
+        return false;
+    }
+
+    // Finally, extend.
+    const int64_t total_span = (new_rend_inclusive + 1) - var.rstart;
+    var.ref = remove_gaps(ref_with_gaps.substr(var.rstart, total_span));
+    for (int64_t i = 0; i < dorado::ssize(var.alts); ++i) {
+        var.alts[i] = remove_gaps(cons_seqs_with_gaps[i].substr(var.rstart, total_span));
+    }
+    var.rend = new_rend_inclusive + 1;
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[append_ref_base] finished: var = " << var << "\n";
+#endif
+
+    return true;
 }
 
 }  // namespace
@@ -472,7 +685,9 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<std::string_view>& cons_seqs_with_gaps,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
-                          const Variant& variant) {
+                          const std::unordered_set<char>& symbol_set,
+                          const Variant& variant,
+                          const bool ambig_ref) {
     const bool all_same_as_ref =
             std::all_of(std::cbegin(variant.alts), std::cend(variant.alts),
                         [&variant](const std::string_view s) { return s == variant.ref; });
@@ -482,6 +697,11 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     }
 
     const auto trim_start = [](Variant& var, const bool rev) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] (trim_start) Checking if start can be trimmed. var = "
+                  << var << "\n";
+#endif
+
         // Get the sequences and reverse if needed.
         std::vector<std::string> seqs{var.ref};
         seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
@@ -502,6 +722,10 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                                       return dorado::ssize(a) < dorado::ssize(b);
                                   }));
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] (trim_start) min_len = " << min_len << "\n";
+#endif
+
         // Never trim the last base.
         int64_t start_pos = 0;
         for (int64_t i = 0; i < (min_len - 1); ++i) {
@@ -517,6 +741,11 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             }
             ++start_pos;
         }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] (trim_start) start_pos = " << start_pos << "\n";
+#endif
+
         // Trim.
         if (start_pos > 0) {
             for (auto& seq : seqs) {
@@ -534,20 +763,14 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         var.ref = seqs[0];
         var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
         var.pos += start_pos;
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] (trim_start) done: var = " << var << "\n";
+#endif
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
-                                     &positions_minor](Variant& var) {
-        const auto find_previous_major = [&](int64_t rpos) {
-            while (rpos > 0) {
-                --rpos;
-                if (positions_minor[rpos] == 0) {
-                    break;
-                }
-            }
-            return rpos;
-        };
-
+                                     &positions_minor, &symbol_set, &ambig_ref](Variant& var) {
         const auto reset_var = [](const Variant& v) {
             std::vector<std::string> seqs{v.ref};
             seqs.insert(std::end(seqs), std::cbegin(v.alts), std::cend(v.alts));
@@ -557,9 +780,20 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         std::vector<std::string> seqs{var.ref};
         seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
 
-        bool changed = true;
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "----------------------\n";
+        std::cerr << "[normalize_variant] input ref  : " << var.ref << "\n";
+        for (size_t i = 0; i < std::size(var.alts); ++i) {
+            std::cerr << "[normalize_variant] input seq " << i << ": " << var.alts << "\n";
+        }
+        std::cerr << "[normalize_variant] input var  : {" << var << "}\n";
 
+#endif
+        bool changed = true;
         while (changed) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant] while iteration\n";
+#endif
             changed = false;
 
             // Keep a copy if we need to bail.
@@ -568,6 +802,10 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             const bool all_non_empty =
                     std::all_of(std::cbegin(seqs), std::cend(seqs),
                                 [](const std::string_view s) { return !std::empty(s); });
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant] all_non_empty = " << all_non_empty << "\n";
+#endif
 
             // Trim the last base if identical (right trim).
             if (all_non_empty) {
@@ -580,6 +818,10 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     }
                 }
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant] (trim back) all_same = " << all_same << "\n";
+#endif
+
                 // Trim right.
                 if (all_same) {
                     for (auto& seq : seqs) {
@@ -590,88 +832,86 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     var.ref = seqs[0];
                     var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                 }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant] (trim back) done\n";
+#endif
             }
 
             const bool any_empty =
                     std::any_of(std::cbegin(seqs), std::cend(seqs),
                                 [](const std::string_view s) { return std::empty(s); });
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant] any_empty = " << any_empty << "\n";
+#endif
+
             // Extend. Prepend/append a base if any seq is empty.
             if (any_empty) {
-                // If we can't extend to the left, take one reference base to the right.
-                if ((var.pos == 0) || (var.rstart == 0)) {
-                    // If this variant is at the beginning of the ref, append a ref base.
-                    const int64_t ref_pos = dorado::ssize(seqs[0]);
-                    int64_t found_idx = -1;
-                    for (int64_t idx = 0; idx < dorado::ssize(positions_major); ++idx) {
-                        if ((positions_major[idx] == ref_pos) && (positions_minor[idx] == 0)) {
-                            found_idx = idx;
-                            break;
-                        }
-                    }
-                    changed = false;
-                    if (found_idx >= 0) {
-                        // Found a candidate base, append it.
-                        const char base = ref_with_gaps[found_idx];
-                        for (auto& seq : seqs) {
-                            seq += base;
-                        }
-                        var.rend = found_idx + 1;
-                        var.ref = seqs[0];
-                        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
-                        changed = true;
-                    } else {
-                        // Revert any trimming and stop if a base wasn't found.
-                        // E.g. the variant regions covers the full window.
-                        std::tie(var, seqs) = reset_var(var_before_change);
-                        changed = false;
-                    }
-                    break;
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant] (extend) input var: " << var << "\n";
+#endif
+
+                bool used_right_extend = false;
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant] (extending) attempting to extend left\n";
+#endif
+
+                changed = prepend_ref_base(var, ref_with_gaps, cons_seqs_with_gaps, positions_major,
+                                           positions_minor, symbol_set, ambig_ref);
+
+                if (!changed) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+                    std::cerr << "[normalize_variant] (extending) attempting to extend right\n";
+#endif
+                    // std::tie(var, seqs) = reset_var(var_before_change);
+                    changed = append_ref_base(var, ref_with_gaps, cons_seqs_with_gaps,
+                                              positions_major, positions_minor, symbol_set,
+                                              ambig_ref);
+                    used_right_extend = true;
+                }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant] (extend) after extension, changed = " << changed
+                          << ", used_right_extend = " << used_right_extend << "\n";
+#endif
+
+                if (changed) {
+                    // Reset the seqs because the extension functions don't care about them.
+                    seqs = {var.ref};
+                    seqs.insert(std::end(seqs), std::cbegin(var.alts), std::cend(var.alts));
                 } else {
-                    const int64_t new_rstart = find_previous_major(var.rstart);
-                    const int64_t span = var.rstart - new_rstart;
+                    // Reset and bail.
+                    std::tie(var, seqs) = reset_var(var_before_change);
+#ifdef DEBUG_NORMALIZE_VARIANT
+                    std::cerr << "[normalize_variant] (extend) break: bailing and resetting var: "
+                                 "var = "
+                              << var << "\n\n";
+#endif
+                    break;
+                }
 
-                    // Sanity check. Revert any trimming if for any reason we cannot extend to the left.
-                    if (span == 0) {
-                        std::tie(var, seqs) = reset_var(var_before_change);
-                        changed = false;
-                        break;
-                    }
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant] (extend) after extension: changed = " << changed
+                          << ", var = " << var << "\n";
+#endif
 
-                    // Collect all prefixes for all consensus sequences and the ref.
-                    std::vector<std::string> prefixes;
-                    prefixes.emplace_back(ref_with_gaps.substr(new_rstart, span));
-                    for (const std::string_view seq : cons_seqs_with_gaps) {
-                        prefixes.emplace_back(seq.substr(new_rstart, span));
-                    }
-
-                    // Create a set to count unique prefixes.
-                    const std::unordered_set<std::string> prefix_set(std::cbegin(prefixes),
-                                                                     std::cend(prefixes));
-
-                    // Check if there is more than 1 unique prefix - this is a variant then, stop extension.
-                    // Revert trimming if it was applied.
-                    if (std::size(prefix_set) > 1) {
-                        std::tie(var, seqs) = reset_var(var_before_change);
-                        changed = false;
-                        break;
-                    }
-
-                    // Remove the deletions and prepend the prefix sequence.
-                    for (int64_t i = 0; i < dorado::ssize(seqs); ++i) {
-                        std::string& p = prefixes[i];
-                        p.erase(std::remove(std::begin(p), std::end(p), '*'), std::end(p));
-                        seqs[i] = p + seqs[i];
-                    }
-
-                    // Finally, extend to the left.
-                    var.pos = positions_major[new_rstart];
-                    var.rstart = new_rstart;
-                    var.ref = seqs[0];
-                    var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
-                    changed = true;
+                if (used_right_extend) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+                    std::cerr << "[normalize_variant] (extend) breaking because used_right_extend "
+                                 "== true. var = "
+                              << var << "\n\n";
+#endif
+                    // Stop normalization because we can't go left any further and we would just
+                    // be trimming and adding bases indefinitely.
+                    break;
                 }
             }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "\n";
+#endif
         }
         var.ref = seqs[0];
         var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
@@ -726,6 +966,15 @@ std::vector<Variant> general_decode_variants(
     constexpr float MIN_QUAL = 3.0f;
 
     const int64_t num_columns = dorado::ssize(positions_major);
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "==================================\n";
+    std::cerr << "[general_decode_variants] region: seq_id = " << seq_id << "\n";
+    if (!std::empty(positions_major)) {
+        std::cerr << "[general_decode_variants] region coords: " << positions_major.front() << "-"
+                  << (positions_major.back() + 1) << "\n";
+    }
+#endif
 
     // Validate inputs.
     if (seq_id < 0) {
@@ -814,7 +1063,7 @@ std::vector<Variant> general_decode_variants(
 #ifdef DEBUG_VARIANT_REGIONS
     std::vector<std::string_view> cons_view;
     cons_view.reserve(std::size(cons_seqs_with_gaps));
-    for (const ConsensusResult val : cons_seqs_with_gaps) {
+    for (const ConsensusResult& val : cons_seqs_with_gaps) {
         cons_view.emplace_back(val.seq);
     }
 #endif
@@ -823,12 +1072,12 @@ std::vector<Variant> general_decode_variants(
     {
         std::vector<std::string_view> cons_view2;
         cons_view2.reserve(std::size(cons_seqs_with_gaps));
-        for (const ConsensusResult val : cons_seqs_with_gaps) {
+        for (const ConsensusResult& val : cons_seqs_with_gaps) {
             cons_view2.emplace_back(val.seq);
         }
-        std::cerr << "seq_id = " << seq_id << '\n';
+        std::cerr << "[general_decode_variants] seq_id = " << seq_id << '\n';
         print_slice(std::cerr, ref_seq_with_gaps, cons_view2, positions_major, positions_minor,
-                    is_variant, 0, -1);
+                    is_variant, 0, -1, 0, -1);
     }
 #endif
 
@@ -846,6 +1095,8 @@ std::vector<Variant> general_decode_variants(
 
 #ifdef DEBUG_VARIANT_REGIONS
         {
+            std::cerr << "[general_decode_variants] region: rstart = " << rstart
+                      << ", rend = " << rend << ", is_var = " << is_var << "\n";
             std::cerr << "[variant slice] var = " << var << '\n';
             const int64_t s = std::max<int64_t>(0, var.rstart - 5);
             const int64_t e = std::min(dorado::ssize(positions_major), var.rend + 5);

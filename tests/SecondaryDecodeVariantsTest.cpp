@@ -166,7 +166,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "No normalization. One deletion variant, one haplotype.",
+            "No normalization. One deletion variant, one haplotype. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
             "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
             {
                 Variant{0, 2, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 2, 3},
@@ -184,7 +184,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Normalization. Single reference base which is deleted in the alt.",
+            "Normalization. Single reference base which is deleted in the alt. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
             "A", {"*"}, {0}, {0}, false, false, true, false, false,
             {
                 Variant{0, 0, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 0, 1},
@@ -279,6 +279,155 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             false,
         },
 
+        ///////////////////////////////////////
+        /// Prepending/appending a ref base ///
+        /// if any alt is empty.            ///
+        ///////////////////////////////////////
+        // No normalization - no prepending or appending.
+        TestCase{
+            "No normalization. Cannot prepend a base before a large deletion.",
+             "AAGCCATTACA",
+            {"A*******ACA",
+             "A*******ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, false, false, false,
+            {
+                Variant{0, 1, "AGCCATT", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 1, 8},
+            },
+            false,
+        },
+
+        TestCase{
+            "No normalization. Cannot append a base after a large deletion.",
+             "AGCCATTACA",
+            {"*******ACA",
+             "*******ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, false, false, false,
+            {
+                Variant{0, 0, "AGCCATT", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 0, 7},
+            },
+            false,
+        },
+
+        TestCase{
+            "No normalization, so cannot prepend/append. Ambiguous reference NOT allowed. (Appending case.) N bases flank a large deletion. Cannot prepend a ref base because it is an N and ambig_ref == false.",
+             "ANNNNNAGCCATTACA",
+            {"A************ACA",
+             "A************ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, false, false, false,
+            {
+                Variant{0, 6, "AGCCATT", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 6, 13},
+            },
+            false,
+        },
+
+        TestCase{
+            "No normalization, so cannot prepend/append. Ambiguous reference IS allowed. With normalization this would be a prepending case (N bases flank a large deletion, but are also themselves deleted; prepends the ref base at position 0).",
+             "ANNNNNAGCCATTACA",
+            {"A************ACA",
+             "A************ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            true, false, false, false, false,
+            {
+                Variant{0, 1, "NNNNNAGCCATT", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 1, 13},
+            },
+            false,
+        },
+
+        TestCase{
+            "No normalization, so cannot prepend/append. Ambiguous reference IS allowed. With normalization this would be an appending case (N bases are also deleted but at the very front of the region; this would append the base because there is nothing to prepend).",
+             "NNNNNAGCCATTACA",
+            {"************ACA",
+             "************ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            true, false, false, false, false,
+            {
+                Variant{0, 0, "NNNNNAGCCATT", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 0, 12},
+            },
+            false,
+        },
+
+        // With normalization, prepending/appending should work.
+        TestCase{
+            "Prepend a base before a large deletion.",
+             "AAGCCATTACA",
+            {"A*******ACA",
+             "A*******ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, true, false, false,
+            {
+                Variant{0, 0, "AAGCCATT", {"A"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 0, 8},
+            },
+            false,
+        },
+
+        TestCase{
+            "Append a base after a large deletion.",
+             "AGCCATTACA",
+            {"*******ACA",
+             "*******ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, true, false, false,
+            {
+                Variant{0, 0, "AGCCATTA", {"A"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 0, 8},
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference NOT allowed. (Appending case.) N bases flank a large deletion. Cannot prepend a ref base because it is an N and ambig_ref == false.",
+             "ANNNNNAGCCATTACA",
+            {"A************ACA",
+             "A************ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, true, false, false,
+            {
+                Variant{0, 6, "AGCCATTA", {"A"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 6, 14},
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference IS allowed. (Prepending case.) N bases flank a large deletion, but are also themselves deleted. Prepends the ref base at position 0.",
+            // Appends the base again because the Ns are also variants (not allowed) even though ambig_ref is true.",
+             "ANNNNNAGCCATTACA",
+            {"A************ACA",
+             "A************ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            true, false, true, false, false,
+            {
+                Variant{0, 0, "ANNNNNAGCCATT", {"A"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 0, 13},
+            },
+            false,
+        },
+
+        TestCase{
+            "Ambiguous reference IS allowed. (Appending case.) N bases are also deleted but at the very front of the region. This appends the base because there is nothing to prepend.",
+             "NNNNNAGCCATTACA",
+            {"************ACA",
+             "************ACA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            true, false, true, false, false,
+            {
+                Variant{0, 0, "NNNNNAGCCATTA", {"A"}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 0, 13},
+            },
+            false,
+        },
+        ///////////////////////////////////////
+        ///////////////////////////////////////
+
         ///// Diploid test 1. /////
         // Diploid case with minor reference positions.
         //           <same>
@@ -321,7 +470,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop.
         //           H2: CACCA           CACC            ACC         CC
         TestCase{
-            "Diploid 1, test 1. No normalization and no filtering of overlapping variants.",
+            "Diploid 1, test 1. No normalization and no filtering of overlapping variants. Report all variants but put dots because empty ALT fields are not allowed in the VCF.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*ACC*A*",
@@ -331,7 +480,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             false, false, false, false, false,
             {
                 Variant{0, 3, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},    // V2
+                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},          // V2
                 Variant{0, 8, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 9, 10},          // V3
             },
             false,
@@ -393,7 +542,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop. No left trim because H1 would be empty.
         //           H2: CAACA           CAAC            AAC         AC
         TestCase{
-            "Diploid 2, test 1. No normalization and no filtering of overlapping variants.",
+            "Diploid 2, test 1. No normalization and no filtering of overlapping variants. Report all variants but put dots because empty ALT fields are not allowed in the VCF.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*AAC*A*",
@@ -403,7 +552,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             false, false, false, false, false,
             {
                 Variant{0, 3, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},    // V2
+                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},          // V2
                 Variant{0, 8, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 9, 10},          // V3
             },
             false,
@@ -485,7 +634,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  CA          =>  CA          =>  C           Stop. No left trim because H1 would be empty.
         //           H2: CAAAA           CAAA            CAA             CAA             CAA
         TestCase{
-            "Diploid 3, test 1. No normalization and no filtering of overlapping variants.",
+            "Diploid 3, test 1. No normalization and no filtering of overlapping variants. Report all variants, but put dots because empty ALT fields are not allowed in the VCF.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*AAA*A*",
@@ -518,7 +667,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             false,
         },
         TestCase{
-            "Diploid 3, test 3. Merge adjacent variants.",
+            "Diploid 3, test 3. Merge adjacent variants but not overlapping variants.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*AAA*A*",
@@ -531,6 +680,38 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             false,
         },
+        TestCase{
+            "Diploid 3, test 4. Merge adjacent variants AND overlapping variants.",
+             "ACCAAA*AAA",
+            {"ACC*A***AA",
+             "ACC*AAA*A*",
+            },
+            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
+            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            false, false, true, true, true,
+            {
+                Variant{0, 2, "CAAA", {"C", "CA"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 2, 10},
+            },
+            false,
+        },
+
+        TestCase{
+            "Small edge case for normalization, concretely, for right-extension. Initial variant: TCCCATT -> left ext because H0 is empty: TTCCCATT/T/TTCCCATT in region [0, 18] "
+            "-> trim: TTCCCAT//TTCCCAT -> right extension (this is the edge case because rend = 18, but last base in this deletion is trimmed, so just bluntly appending a ref base "
+            "to existing ref and alt fields would produce an artifact). The right extension should either not run or should reach the A/A/A column. In this case, we stop it preemptively "
+            "and keep the previous version of the variant.",
+             "T*****TCCCATT*****AGCAATCACCGCCAATTTCTAATTTCATCAATATTTCTATCACCTCAAAATAA",
+            {"T*****************AGCAATCACCGCCAATTTCTAATTTCATCAATATTTCTATCACCTCAAAATAA",
+             "T*****TCCCATT*****AGCAATCACCGCCAATTTCTAATTTCATCAATATTTCTATCACCTCAAAATAA"},
+            {0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
+            {0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            false, false, true, true, true,
+            {
+                Variant{0, 0, "TTCCCATT", {"T"}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 0, 18},
+            },
+            false,
+        },
+
     }));
     // clang-format on
 
