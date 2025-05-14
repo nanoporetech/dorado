@@ -93,7 +93,7 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     const int old_overlap = m_overlap.val;
     const int new_overlap = std::max(1, old_overlap / stride) * stride;
     if (set_value(m_overlap, Value{new_overlap, Priority::FORCE})) {
-        spdlog::info("Normalised: overlap {} -> {}", old_overlap, new_overlap);
+        spdlog::debug("Normalised: overlap {} -> {}", old_overlap, new_overlap);
     }
 
     // Make sure chunk size is a multiple of `chunk_size_granularity`, and greater than `overlap`
@@ -102,7 +102,7 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     const int new_chunk_size = (std::max(min_chunk_size, old_chunk_size) / chunk_size_granularity) *
                                chunk_size_granularity;
     if (set_value(m_chunk_size, Value{new_chunk_size, Priority::FORCE})) {
-        spdlog::info("Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
+        spdlog::debug("Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
     }
 }
 
