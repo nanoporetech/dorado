@@ -1,14 +1,23 @@
 #ifndef KADAYASHI_TYPES_H
 #define KADAYASHI_TYPES_H
 
-// clang-format off
 #include "kvec.h"
 
+// Suppress the MSVC `warning C4146: unary minus operator applied to unsigned type, result still unsigned`
+// in Khash. This happens likely because of kroundup32 which has a `--(x)` and `x` is of type `khint_t`
+// which is unsigned.
+// TODO: Khash should be replaced with STL as soon as possible.
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif  // _WIN32
 #include <htslib/khash.h>
 #include <htslib/khash_str2int.h>
+#ifdef _WIN32
+#pragma warning(pop)
+#endif  // _WIN32
 
 #include <assert.h>
-// clang-format on
 
 struct hts_idx_t;
 struct bamfile_t;
@@ -76,10 +85,17 @@ typedef kvec_t(vu16_t) vu16_v;
 typedef kvec_t(vu32_t) vu32_v;
 typedef kvec_t(kstring_t *) kstring_v;
 
+#ifdef _WIN32
+#pragma warning(push)
+#pragma warning(disable : 4146)
+#endif  // _WIN32
 // hashtables
 KHASH_MAP_INIT_STR(htstri_t, int)
 KHASH_MAP_INIT_INT(htu32_t, uint32_t)
 KHASH_MAP_INIT_INT(htu64_t, uint64_t)
+#ifdef _WIN32
+#pragma warning(pop)
+#endif  // _WIN32
 
 typedef struct {
     char *fn;
