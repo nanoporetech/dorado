@@ -891,11 +891,19 @@ std::vector<Variant> general_decode_variants(
         return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
     });
 
-    for (Variant& var : variants) {
-        var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
+    // Normalize variants.
+    std::vector<Variant> normalized_variants;
+    normalized_variants.reserve(std::size(variants));
+    for (const Variant& var : variants) {
+        Variant new_var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
+
+        // Sanity check.
+        if (is_valid(new_var)) {
+            normalized_variants.emplace_back(std::move(new_var));
+        }
     }
 
-    return variants;
+    return normalized_variants;
 }
 
 }  // namespace dorado::secondary

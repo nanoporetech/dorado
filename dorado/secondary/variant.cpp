@@ -41,11 +41,18 @@ bool operator==(const Variant& lhs, const Variant& rhs) {
 }
 
 bool is_valid(const Variant& var) {
+    if (std::empty(var.ref)) {
+        return false;
+    }
     if (std::empty(var.alts)) {
         return false;
     }
     if (std::all_of(std::cbegin(var.alts), std::cend(var.alts),
                     [&var](const std::string_view val) { return val == var.ref; })) {
+        return false;
+    }
+    if (std::any_of(std::cbegin(var.alts), std::cend(var.alts),
+                    [](const std::string_view val) { return std::empty(val); })) {
         return false;
     }
     return true;
