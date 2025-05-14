@@ -225,8 +225,8 @@ int download(int argc, char* argv[]) {
         }
         try {
             const auto actual_path = downloader.get(info, "your");
-            spdlog::debug(" - downloaded model: '{}' into '{}'", info.name,
-                          fs::canonical((actual_path)).string());
+            spdlog::info("Downloaded model: '{}' into '{}'", info.name,
+                         fs::canonical((actual_path)).string());
         } catch (const std::exception& e) {
             spdlog::debug("downloader exception: {}", e.what());
             spdlog::error("Failed to download model: {}", info.name);
