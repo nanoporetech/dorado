@@ -490,6 +490,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     const float alpha = params.deepnorm_alpha;
 
     auto f16_opts = x_f16.options().dtype(torch::kF16);
+    auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
 
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
@@ -543,11 +544,17 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
             fc1_weight_interleaved =
                     torch::index_select(fc1_weight_interleaved, 2, fc1_weight_shuffle_index)
                             .contiguous();
-        }
 
-        t_fc1_wts_i8 = utils::quantize_tensor(fc1_weight_interleaved, -1);
-        t_fc1_wts_i8.scale.reciprocal_();
-        t_fc1_wts_i8.t = t_fc1_wts_i8.t.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
+            t_fc1_wts_f8.t = fc1_weight_interleaved.to(torch::kFloat8_e4m3fn)
+                                     .view({E / 16, 16, C / 16, 16})
+                                     .transpose(1, 2)
+                                     .contiguous();
+        } else {
+            t_fc1_wts_i8 = utils::quantize_tensor(fc1_weight_interleaved, -1);
+            t_fc1_wts_i8.scale.reciprocal_();
+            t_fc1_wts_i8.t =
+                    t_fc1_wts_i8.t.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
+        }
 
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 8, 8}).transpose(1, 2).contiguous();
@@ -568,19 +575,23 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, f16_opts);
     auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, f16_opts);
     auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
+    auto t_rms_out = torch::empty({N, T / 16, C / 16, 16, 16}, f8_opts);
     auto t_fc1_out = torch::empty({N * T / 16, t_fc2_wts.size(1), 16, t_fc2_wts.size(3)},
                                   t_fc2_wts.options());
     auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
 
     //Define Koi Tensors for the above buffers.
     auto &x = scaled_tensor.t;
-    bool use_i8 = x.dtype() == torch::kI8;
+    const bool use_i8 = (x.dtype() == torch::kI8);
+    const bool use_f8 = t_fc1_wts_f8.t.numel();
     auto &wqkv_weights = use_i8 ? wqkv_weights_i8 : wqkv_weights_f16;
-    auto &t_fc1_wts = use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16;
+    auto &t_fc1_wts = use_f8 ? t_fc1_wts_f8 : (use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16);
     KoiTensorExt in_f16(x_f16, {'N', 'T', 'C', 't', 'c'});
     KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'}, scaled_tensor.scale, 'C');
     KoiTensorExt *in_i8_ptr = use_i8 ? &in : nullptr;
-    KoiTensorExt in_mk(x.flatten(0, 1), {'M', 'K', 'm', 'k'}, scaled_tensor.scale, 'K');
+    KoiTensorExt in_mk =
+            use_f8 ? KoiTensorExt{t_rms_out.flatten(0, 1), {'M', 'K', 'm', 'k'}}
+                   : KoiTensorExt{x.flatten(0, 1), {'M', 'K', 'm', 'k'}, scaled_tensor.scale, 'K'};
     KoiTensorExt weights_qkv(wqkv_weights.t, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'},
                              wqkv_weights.scale, 'C');
     KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
@@ -588,6 +599,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     KoiTensorExt out_attn_mk(t_out_attn.flatten(2, 3).flatten(0, 1), {'M', 'K', 'm', 'k'});
     KoiTensorExt out_proj_mn(t_out_proj.flatten(0, 1), {'M', 'N', 'm', 'n'});
     KoiTensorExt out_proj_ntc(t_out_proj, {'N', 'T', 'C', 't', 'c'});
+    KoiTensorExt out_rms_f8(t_rms_out, {{'N', 'T', 'C', 't', 'c'}});
     KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
     KoiTensorExt fc1_out(t_fc1_out, {'M', 'N', 'm', 'n'});
     KoiTensorExt fc1_out_mk(t_fc1_out, {'M', 'K', 'm', 'k'});
@@ -624,7 +636,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1", 3);
         res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
-                                   in_i8_ptr);
+                                   use_f8 ? &out_rms_f8 : nullptr, use_f8 ? nullptr : in_i8_ptr);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
@@ -643,7 +655,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2", 3);
         res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in_f16, alpha, &res2_weights, &in_f16,
-                                   in_i8_ptr);
+                                   nullptr, in_i8_ptr);
     }
     // TODO: handle result
     if (res != KOI_SUCCESS) {
