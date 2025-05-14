@@ -360,6 +360,14 @@ Variant construct_variant(const std::string_view draft,
                                 var);
     }
 
+    // If the ALT field is still is empty, set it to a '.'. This can happen when a deletion is
+    // flanked by unreachable positions on both ends.
+    const bool any_empty = std::any_of(std::cbegin(var.alts), std::cend(var.alts),
+                                       [](const std::string_view val) { return std::empty(val); });
+    if (std::empty(var.alts) || any_empty) {
+        var.alts = {"."};
+    }
+
     var.qual = round_float(compute_consensus_quality(probs_3D, cons_seqs_with_gaps, symbol_lookup,
                                                      var.rstart, var.rend),
                            3);
