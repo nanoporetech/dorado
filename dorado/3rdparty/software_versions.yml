@@ -96,6 +96,25 @@ intervaltree:
     license: intervaltree/LICENSE
     files:
         - intervaltree
+
+ksort:
+    description: >
+        Sorting library from the klib library. Modified from the original version to enable cross-platform building.
+    version: "ec5310f8d7cf87c262f9f354a52c58641d3cb51a"
+    url: https://github.com/attractivechaos/klib
+    license: kadayashi/src/haplotag_lib/ksort.h
+    files:
+        - kadayashi/src/haplotag_lib/ksort.h
+
+kvec:
+    description: >
+        Vector manipulation from the klib library. Modified from the original version to enable cross-platform building.
+    version: "7aa0927bb0da67bd2317bb7dc7fe7c462598a2d5"
+    url: https://github.com/attractivechaos/klib
+    license: kadayashi/include/kvec.h
+    files:
+        - kadayashi/include/kvec.h
+
 minimap2:
     description: >
         Sequence alignment program
