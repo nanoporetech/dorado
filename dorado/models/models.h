@@ -42,6 +42,7 @@ const ModelList& modified_models();
 const ModelList& modified_deprecated_models();
 const ModelList& correction_models();
 const ModelList& polish_models();
+const ModelList& variant_models();
 
 std::vector<std::string> simplex_model_names();
 std::vector<std::string> stereo_model_names();

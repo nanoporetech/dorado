@@ -33,6 +33,7 @@ void print_models(bool yaml) {
     all_models["modification models"] = models::modified_models;
     all_models["correction models"] = models::correction_models;
     all_models["polish models"] = models::polish_models;
+    all_models["variant models"] = models::variant_models;
 
     if (yaml) {
         for (const auto& [type, models] : all_models) {
@@ -63,8 +64,8 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
 
     if (model_complex.is_path()) {
         if (model_arg == "all") {
-            const auto& all_groups = {simplex_models(), modified_models(), stereo_models(),
-                                      correction_models(), polish_models()};
+            const auto& all_groups = {simplex_models(),    modified_models(), stereo_models(),
+                                      correction_models(), polish_models(),   variant_models()};
             for (const auto& group : all_groups) {
                 for (const auto& info : group) {
                     models.push_back(info);

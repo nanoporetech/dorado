@@ -1188,6 +1188,27 @@ const std::vector<ModelInfo> models = {
 
 }  // namespace polisher
 
+namespace variant_caller {
+
+const std::vector<ModelInfo> models = {
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant@v1.0",
+                "1a291a9e259ce5b331f678aae3b9fd1460c1ead1acef10949bd7952744500e2d",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant@v1.0",
+                "cbb495e7a73efcaea720dda1bff03de3d302a18e11ba3bf56ccc316c63805dab",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
+                ModsVariantPair{},
+        },
+};
+
+}  // namespace variant_caller
+
 const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
 const std::vector<ModelInfo>& simplex_deprecated_models() { return simplex::deprecated; }
 const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
@@ -1195,6 +1216,7 @@ const std::vector<ModelInfo>& modified_models() { return modified::models; }
 const std::vector<ModelInfo>& modified_deprecated_models() { return modified::deprecated; }
 const std::vector<ModelInfo>& correction_models() { return correction::models; }
 const std::vector<ModelInfo>& polish_models() { return polisher::models; }
+const std::vector<ModelInfo>& variant_models() { return variant_caller::models; }
 
 namespace {
 std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
@@ -1222,7 +1244,7 @@ std::vector<std::string> modified_model_variants() {
 // Returns true if model_name matches any configured model
 bool is_valid_model(const std::string& model_name) {
     for (const auto& collection : {simplex::models, stereo::models, modified::models,
-                                   correction::models, polisher::models}) {
+                                   correction::models, polisher::models, variant_caller::models}) {
         for (const ModelInfo& model_info : collection) {
             if (model_info.name == model_name) {
                 return true;
@@ -1318,6 +1340,7 @@ ModelInfo get_model_info(const std::string& model_name) {
     const auto& stereo_model_infos = stereo_models();
     const auto& correction_model_infos = correction_models();
     const auto& polish_model_infos = polish_models();
+    const auto& variant_model_infos = variant_models();
 
     auto is_name_match = [&model_name](const ModelInfo& info) { return info.name == model_name; };
     std::vector<ModelInfo> matches;
@@ -1331,6 +1354,8 @@ ModelInfo get_model_info(const std::string& model_name) {
                  std::back_inserter(matches), is_name_match);
     std::copy_if(polish_model_infos.begin(), polish_model_infos.end(), std::back_inserter(matches),
                  is_name_match);
+    std::copy_if(variant_model_infos.begin(), variant_model_infos.end(),
+                 std::back_inserter(matches), is_name_match);
 
     if (matches.empty()) {
         throw_on_deprecated_model(model_name);
@@ -1542,6 +1567,31 @@ std::string get_supported_model_info(const std::filesystem::path& model_download
                         for (const auto& polish_model : polish_matches) {
                             if (model_exists_in_folder(polish_model.name, model_download_folder)) {
                                 result += "        \"" + polish_model.name + "\":{\n";
+                                result += "\n        },\n";
+                            }
+                        }
+                        result = result.substr(0, result.length() - 2);  // trim last ",\n"
+                        result += "\n      }";
+                    }
+                }
+
+                // Variant calling models.
+                {
+                    const auto variant_model_matches =
+                            find_models(variant_models(), variant.first, simplex_model.simplex,
+                                        ModsVariantPair());
+                    bool variant_models_available = false;
+                    for (const auto& variant_model : variant_model_matches) {
+                        if (model_exists_in_folder(variant_model.name, model_download_folder)) {
+                            variant_models_available = true;
+                            break;
+                        }
+                    }
+                    if (variant_models_available) {
+                        result += ",\n      \"variant_models\":{\n";
+                        for (const auto& variant_model : variant_model_matches) {
+                            if (model_exists_in_folder(variant_model.name, model_download_folder)) {
+                                result += "        \"" + variant_model.name + "\":{\n";
                                 result += "\n        },\n";
                             }
                         }
