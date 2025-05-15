@@ -1,5 +1,7 @@
 #include "kits.h"
 
+#include "utils/string_utils.h"
+
 #include <algorithm>
 #include <array>
 #include <cstdlib>
@@ -438,7 +440,7 @@ const std::unordered_map<SampleType, SampleTypeInfo>& sample_types() {
 }
 
 SampleType get_sample_type(const std::string& sample_type) {
-    return get_code(sample_type, SampleType::UNKNOWN, sample_types());
+    return get_code(utils::to_uppercase(sample_type), SampleType::UNKNOWN, sample_types());
 }
 
 SampleType get_sample_type_from_model_name(const std::string& model_name) {
