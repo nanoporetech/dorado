@@ -85,6 +85,7 @@ target_link_libraries(dorado_secondary
         htslib
         spdlog::spdlog
         toml11::toml11
+        kadayashi::haplotag_lib
 )
 
 enable_warnings_as_errors(dorado_secondary)
