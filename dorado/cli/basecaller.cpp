@@ -559,7 +559,18 @@ void setup(const std::vector<std::string>& args,
                 utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"}, "ID", "basecaller");
         hts_set_log_level(initial_hts_log_level);
 
-        auto tokens = cli::extract_token_from_cli(pg_keys["CL"]);
+        std::vector<std::string> tokens;
+        try {
+            tokens = cli::extract_token_from_cli(pg_keys["CL"]);
+        } catch (const std::exception& e) {
+            spdlog::debug("Caught error: '{}'", e.what());
+            spdlog::error(
+                    "Failed to parse resume parameters as --resume-from file 'CL' (Command Line) "
+                    "header is invalid. This might happen if the HTS file headers were dropped "
+                    "with the default samtools '--no-headers' argument.");
+            std::exit(EXIT_FAILURE);
+        }
+
         // First token is the dorado binary name. Remove that because the
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
