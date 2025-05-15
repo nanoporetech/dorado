@@ -110,7 +110,7 @@ void destroy_read_t(read_t *h, int include_self) {
 void destroy_chunk_t(chunk_t *h, int include_self) {
     for (size_t i = 0; i < h->reads.n; i++) {
         destroy_read_t(&h->reads.a[i], 0);
-        free(h->qnames[i]->s);
+        hts_free(h->qnames[i]->s);
         free(h->qnames[i]);
         if (h->compat0) {
             free(h->compat0[i]);

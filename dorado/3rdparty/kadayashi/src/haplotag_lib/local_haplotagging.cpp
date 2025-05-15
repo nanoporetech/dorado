@@ -1369,13 +1369,13 @@ static vu64_t *get_lowcmp_mask(faidx_t *fai, const char *refname, int ref_start,
                     __func__, refname, ref_start, ref_end, refseq_l);
         }
         if (refseq_s) {
-            free(refseq_s);
+            hts_free(refseq_s);
         }
         return NULL;
     }
     vu64_t *ret = TRF_heuristic(refseq_s, refseq_l, ref_start);
     if (refseq_s) {
-        free(refseq_s);
+        hts_free(refseq_s);
     }
     return ret;
 }
