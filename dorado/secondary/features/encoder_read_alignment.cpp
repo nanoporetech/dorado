@@ -168,9 +168,9 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                     "missing_out_indices.size() = {}",
                     n, std::size(missing_in_indices), std::size(missing_out_indices));
             spdlog::trace("[reorder_reads] n = {}, missing_in_indices: {}", n,
-                          utils::print_container_as_string(missing_in_indices, ", "));
+                          utils::print_container_as_string(missing_in_indices, ", ", true));
             spdlog::trace("[reorder_reads] n = {}, missing_out_indices: {}", n,
-                          utils::print_container_as_string(missing_out_indices, ", "));
+                          utils::print_container_as_string(missing_out_indices, ", ", true));
 
             // Fill out the gaps in the array with some of the extra indices.
             for (size_t i = 0;
@@ -331,6 +331,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype,
+                                           const bool clip_to_zero,
                                            const bool right_align_insertions,
                                            const std::optional<std::filesystem::path>& phasing_bin)
         : m_dtypes{dtypes},
@@ -344,6 +345,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::vector<std::string>& dtype
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
           m_include_haplotype{include_haplotype},
+          m_clip_to_zero{clip_to_zero},
           m_right_align_insertions{right_align_insertions},
           m_phasing_bin{phasing_bin} {}
 
@@ -392,6 +394,10 @@ secondary::Sample EncoderReadAlignment::encode_region(secondary::BamFile& bam_fi
                              std::move(tensors.read_ids_left),
                              std::move(tensors.read_ids_right)};
 
+    if (m_clip_to_zero) {
+        sample.features = torch::clamp_min(sample.features, 0);
+    }
+
     return sample;
 }
 
@@ -434,6 +440,11 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch) const {
                                  torch::indexing::Slice(0, depths[i]), torch::indexing::Slice()},
                                 batch[i]);
         }
+    } else {
+        spdlog::warn(
+                "Unsupported feature shape when collating samples. Shape: [{}], expected 3 "
+                "dimensions. Returning an uninitialized features tensor.",
+                utils::tensor_shape_as_string(batch.front()));
     }
 
     return features;

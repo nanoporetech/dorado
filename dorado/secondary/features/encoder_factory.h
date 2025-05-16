@@ -25,6 +25,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::string& read_group,
         const std::string& tag_name,
         const int32_t tag_value,
+        const bool clip_to_zero,
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
         const std::optional<std::filesystem::path>& phasing_bin_fn);

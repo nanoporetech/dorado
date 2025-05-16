@@ -4,73 +4,458 @@
 #include "consensus_utils.h"
 #include "sample_trimming.h"
 #include "secondary/batching.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/rle.h"
+#include "utils/span.h"
 #include "utils/ssize.h"
 
 #include <ATen/ATen.h>
+#include <IntervalTree.h>
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
 #include <iomanip>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
 
+// #define DEBUG_VC_DATA_DUMP
+// #define DEBUG_VARIANT_REGIONS
+
 namespace dorado::secondary {
 
 namespace {
 
-std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
-                                  const std::string& reference,
-                                  const std::string& prediction) {
-    const bool lengths_valid = (std::size(minor) == std::size(reference)) &&
-                               (std::size(reference) == std::size(prediction));
-    if (!lengths_valid) {
-        std::ostringstream oss;
-        oss << "Cannot find variant columns because sequences are not of equal length. minor.size "
-               "= "
-            << std::size(minor) << ", reference.size = " << std::size(reference)
-            << ", prediction.size = " << std::size(prediction);
-        throw std::runtime_error(oss.str());
-    }
+std::string remove_gaps(const std::string_view seq) {
+    std::string ret;
+    ret.reserve(std::size(seq));
+    std::copy_if(std::cbegin(seq), std::cend(seq), std::back_inserter(ret),
+                 [](const char c) { return c != '*'; });
+    return ret;
+}
 
-    const int64_t len = dorado::ssize(prediction);
-    std::vector<bool> ret(len, false);
+float round_float(float val, const int32_t decimal_places) {
+    const float f = std::pow(10.0f, static_cast<float>(decimal_places));
+    val = std::round(val * f) / f;
+    return val;
+}
 
-    int64_t insert_length = 0;
-    bool is_var = (reference[0] != prediction[0]);  // Assume start on major.
-    ret[0] = is_var;
-
-    for (int64_t i = 1; i < len; ++i) {
-        if (minor[i] == 0) {
-            // Start of new reference position.
-            if (is_var) {
-                // If we saw any vars in an insert run, set all inserts to true.
-                for (int64_t j = (i - insert_length); j < i; ++j) {
-                    ret[j] = true;
-                }
-            }
-            is_var = (reference[i] != prediction[i]);
-            ret[i] = is_var;
-            insert_length = 0;
-        } else {
-            insert_length += 1;
-            is_var = (is_var || (reference[i] != prediction[i]));
+bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map,
+                          const std::string_view query) {
+    for (const char c : query) {
+        if (symbol_map.count(c) == 0) {
+            return false;
         }
     }
+    return true;
+}
 
-    // Set any remaining inserts.
-    if (is_var) {
-        for (int64_t j = (len - insert_length); j <= (len - 1); ++j) {
-            ret[j] = true;
-        }
+/**
+ * \brief Compute the phred quality from a given probability, with a max QV cap.
+ */
+float phred(float err, const float cap) {
+    err = std::clamp(err, std::pow(10.0f, -cap / 10.0f), 1.0f);
+    const float q = -10.0f * std::log10(err);
+    return std::min(q, cap);
+}
+
+/**
+ * \brief Create a lookup table of valid symbols.
+ */
+std::array<int32_t, 256> create_symbol_lookup(const std::string_view symbols) {
+    std::array<int32_t, 256> ret;
+    std::fill(std::begin(ret), std::end(ret), -1);
+    for (int32_t i = 0; i < dorado::ssize(symbols); ++i) {
+        ret[static_cast<int32_t>(symbols[i])] = i;
     }
+    return ret;
+}
+
+/**
+ * \brief Utility function to compute a log probability of a subsequence occurring for
+ *          a specified haplotype.
+ * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
+ *                  Dimensions: [seq_len x num_haplotypes x num_classes].
+ * \param seq Input sequence, used to access class probabilities.
+ * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
+ * \param rstart Region start (start of the subsequence in seq). Zero-based.
+ * \param rend Region end (end of the subsequence in seq). Non-inclusive.
+ * \param hap_id Haplotype ID, needed to access class probabilities for that particular haplotype in the probs_3D tensor.
+ * \param substitute_n If true, the `N` bases in the input sequence will be replaced with `*` symbols. Useful for computing the probability of a reference.
+ * \returns A single value with the log probability of that subsequence occurring for the specified haplotype, given the class probabilities obtained through inference.
+ */
+float compute_subseq_log_prob(
+        const at::Tensor& probs_3D,  // Tensor sliced to the [rstart, rend] range
+        // const dorado::Span<const float> prob_data,
+        const std::string_view seq,
+        const std::array<int32_t, 256>& symbol_lookup,
+        const int64_t rstart,
+        const int64_t rend,
+        const int64_t hap_id,
+        const bool substitute_n) {
+    if (std::size(probs_3D.sizes()) != 3) {
+        throw std::runtime_error(
+                "Tensor of probabilities given to compute_subseq_quality is of wrong shape. Input "
+                "shape: " +
+                utils::tensor_shape_as_string(probs_3D) + ", but expected 3 dimensions.");
+    }
+
+    const int64_t num_pos = probs_3D.size(0);
+    const int64_t num_haplotypes = probs_3D.size(1);
+    const int64_t num_classes = probs_3D.size(2);
+
+    const dorado::Span<const float> data(
+            probs_3D.data_ptr<float>(),
+            static_cast<size_t>(num_pos * num_haplotypes * num_classes));
+
+    if (std::empty(data)) {
+        return 0.0f;
+    }
+
+    float total = 0.0f;
+    for (int64_t pos = rstart; pos < rend; ++pos) {
+        const char base = (substitute_n && (seq[pos] == 'N')) ? '*' : seq[pos];
+        const int32_t class_id = symbol_lookup[base];
+
+        const int64_t idx = pos * num_haplotypes * num_classes + hap_id * num_classes + class_id;
+        const float prob = std::max(1e-10f, data[idx]);
+        const float log_prob = std::log(prob);
+
+        total += log_prob;
+    }
+
+    return total;
+}
+
+/**
+ * \brief Utility function to compute the maximum log probability of a reference sequence
+ *          occurring for any input haplotype.
+ *          If there is more than one haplotype, log prob is computed for every haplotype
+ *          and only the maximum value is returned.
+ * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
+ *                  Dimensions: [seq_len x num_haplotypes x num_classes].
+ * \param ref_seq_with_gaps Input sequence, used to access class probabilities.
+ * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
+ * \param rstart Region start (start of the subsequence in seq). Zero-based.
+ * \param rend Region end (end of the subsequence in seq). Non-inclusive.
+ * \returns Maximum log probability of the reference sequence occurring for any input haplotype predictions.
+ */
+float compute_ref_quality(
+        const at::Tensor& probs_3D,  // Probabilities for a single sample (not batch).
+        const std::string_view ref_seq_with_gaps,
+        const std::array<int32_t, 256>& symbol_lookup,
+        const int64_t rstart,
+        const int64_t rend) {
+    if (std::size(probs_3D.sizes()) != 3) {
+        throw std::runtime_error(
+                "Tensor of probabilities given to compute_quality is of wrong shape. Input "
+                "shape: " +
+                utils::tensor_shape_as_string(probs_3D) + ", but expected 3 dimensions.");
+    }
+
+    const int64_t num_haplotypes = probs_3D.size(1);
+
+    float ret = 0.0f;
+    for (int64_t hap_id = 0; hap_id < num_haplotypes; ++hap_id) {
+        const float log_prob = compute_subseq_log_prob(probs_3D, ref_seq_with_gaps, symbol_lookup,
+                                                       rstart, rend, hap_id, true);
+        ret = (hap_id == 0) ? log_prob : std::max(ret, log_prob);
+    }
+    ret = phred(1.0f - std::exp(ret), 70.0f);
+
+    ret = std::max(0.0f, ret);
 
     return ret;
+}
+
+/**
+ * \brief Utility function to compute the log probability of a predicted sequence across all haplotypes (accumulated).
+ * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
+ *                  Dimensions: [seq_len x num_haplotypes x num_classes].
+ * \param ref_seq_with_gaps Input sequence, used to access class probabilities.
+ * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
+ * \param rstart Region start (start of the subsequence in seq). Zero-based.
+ * \param rend Region end (end of the subsequence in seq). Non-inclusive.
+ * \returns Log probability of the predicted sequence occurring across all haplotypes in the input prob tensor.
+ */
+float compute_consensus_quality(
+        const at::Tensor& probs_3D,  // Probabilities for a single sample (not batch).
+        const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+        const std::array<int32_t, 256>& symbol_lookup,
+        const int64_t rstart,
+        const int64_t rend) {
+    if (std::size(probs_3D.sizes()) != 3) {
+        throw std::runtime_error(
+                "Tensor of probabilities given to compute_quality is of wrong shape. Input "
+                "shape: " +
+                utils::tensor_shape_as_string(probs_3D) + ", but expected 3 dimensions.");
+    }
+
+    const int64_t num_haplotypes = probs_3D.size(1);
+
+    if (dorado::ssize(cons_seqs_with_gaps) != num_haplotypes) {
+        throw std::runtime_error(
+                "Number of haplotypes in the tensor differs from the number of haplotype consensus "
+                "sequences provided to compute_consensus_quality. Tensor shape: " +
+                utils::tensor_shape_as_string(probs_3D) + ", number of consensus sequences: " +
+                std::to_string(dorado::ssize(cons_seqs_with_gaps)));
+    }
+
+    float total = 0.0f;
+    for (int64_t hap_id = 0; hap_id < num_haplotypes; ++hap_id) {
+        const float log_prob = compute_subseq_log_prob(probs_3D, cons_seqs_with_gaps[hap_id].seq,
+                                                       symbol_lookup, rstart, rend, hap_id, false);
+        total += log_prob;
+    }
+    total = phred(1.0f - std::exp(total), 70.0f);
+
+    total = std::max(0.0f, total);
+
+    return total;
+}
+
+/**
+ * \brief Utility function to normalize the genotype information of a variant.
+ *          For a given variant, it deduplicates and enumerates alt alleles, creates the
+ *          GT and GQ tags and sets the filter tag.
+ * \param var Input variant for normalization.
+ * \param ploidy The ploidy of the dataset, needed to sanity check the number of alts.
+ * \param min_qual Minimum variant quality to mark the variant as PASS.
+ * \returns New variant with normalized genotyping information.
+ */
+Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual) {
+    Variant ret = var;
+
+    if (dorado::ssize(var.alts) > ploidy) {
+        spdlog::warn(
+                "Number of alts ({}) is larger than ploidy ({})! Marking this variant for removal.",
+                std::size(var.alts), ploidy);
+        ret.alts.clear();
+        return ret;
+    }
+
+    const int32_t gq = static_cast<int32_t>(std::round(var.qual));
+
+    // This is a gVCF record.
+    if (std::empty(var.alts) || (var.filter == ".") ||
+        (var.alts == std::vector<std::string>{"."})) {
+        ret.alts = {"."};
+        ret.genotype = {{"GT", "0"}, {"GQ", std::to_string(gq)}};
+        ret.filter = ".";
+        return ret;
+    }
+
+    // Create unique and sorted alts for the return variant.
+    std::unordered_set<std::string> unique_alts;
+    for (const std::string_view alt : var.alts) {
+        if (alt != var.ref) {
+            unique_alts.emplace(alt);
+        }
+    }
+    ret.alts = std::vector<std::string>(std::cbegin(unique_alts), std::cend(unique_alts));
+    std::stable_sort(std::begin(ret.alts), std::end(ret.alts));
+
+    // Look-up table: alt -> numeric ID. +1 is because ref is the zeroth allele.
+    std::unordered_map<std::string, int64_t> alt_dict;
+    for (int64_t i = 0; i < dorado::ssize(ret.alts); ++i) {
+        alt_dict[ret.alts[i]] = i + 1;
+    }
+    alt_dict[var.ref] = 0;
+
+    std::vector<int32_t> alleles(std::size(var.alts));
+    for (int64_t i = 0; i < dorado::ssize(var.alts); ++i) {
+        const auto it = alt_dict.find(var.alts[i]);
+        if (it == std::cend(alt_dict)) {
+            continue;
+        }
+        alleles[i] = it->second;
+    }
+    std::sort(std::begin(alleles), std::end(alleles));
+
+    std::ostringstream oss_gt;
+    for (int64_t i = 0; i < dorado::ssize(alleles); ++i) {
+        if (i > 0) {
+            oss_gt << '/';
+        }
+        oss_gt << alleles[i];
+    }
+
+    ret.genotype = {{"GT", oss_gt.str()}, {"GQ", std::to_string(gq)}};
+    ret.filter = (var.qual >= min_qual) ? "PASS" : "LowQual";
+
+    return ret;
+}
+
+Variant construct_variant(const std::string_view draft,
+                          const std::vector<int64_t>& positions_major,
+                          const std::vector<int64_t>& positions_minor,
+                          const std::string_view ref_seq_with_gaps,
+                          const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+                          const int32_t seq_id,
+                          const int64_t rstart,
+                          const int64_t rend,
+                          const bool is_var,
+                          const bool ambig_ref,
+                          const bool normalize,
+                          const at::Tensor& probs_3D,
+                          const std::unordered_set<char>& symbol_set,
+                          const std::array<int32_t, 256>& symbol_lookup) {
+    const auto prepend_major_ref_base = [&positions_major, &positions_minor, &draft](Variant& var) {
+        while ((var.rstart > 0) && (positions_minor[var.rstart] != 0)) {
+            --var.rstart;
+        }
+        var.pos = positions_major[var.rstart];
+        var.ref = draft[var.pos] + var.ref;
+        const char base = draft[var.pos];
+        for (auto& alt : var.alts) {
+            alt = base + std::move(alt);
+        }
+    };
+
+    // Get the reference and the predictions for the variant stretch.
+    const std::string_view var_ref_with_gaps(std::data(ref_seq_with_gaps) + rstart,
+                                             static_cast<size_t>(rend - rstart));
+
+    // Mutable ref and pred sequences - a ref base may be prepended later.
+    std::string var_ref = remove_gaps(var_ref_with_gaps);
+
+    std::vector<std::string> var_preds;
+    for (int64_t hap_id = 0; hap_id < dorado::ssize(cons_seqs_with_gaps); ++hap_id) {
+        const std::string_view var_pred_with_gaps(
+                std::data(cons_seqs_with_gaps[hap_id].seq) + rstart,
+                static_cast<size_t>(rend - rstart));
+        var_preds.emplace_back(remove_gaps(var_pred_with_gaps));
+    }
+
+    if (is_var && std::all_of(std::cbegin(var_preds), std::cend(var_preds),
+                              [&var_ref](const std::string_view val) { return val == var_ref; })) {
+        return {};
+    } else if (!ambig_ref && !is_subset_of_symbols(symbol_set, var_ref)) {
+        return {};
+    }
+
+    Variant var{
+            seq_id, positions_major[rstart],    var_ref, var_preds, "PASS", {},
+            0.0f,   {{"GT", "1"}, {"GQ", "0"}}, rstart,  rend,
+    };
+
+    // Check if variant starts on insert, prepend previous ref base.
+    if (positions_minor[var.rstart] != 0) {
+        prepend_major_ref_base(var);
+    }
+
+    if (normalize) {
+        // Create a vector of views for normalize_variant.
+        std::vector<std::string_view> cons_view;
+        cons_view.reserve(std::size(cons_seqs_with_gaps));
+        for (const ConsensusResult& val : cons_seqs_with_gaps) {
+            cons_view.emplace_back(val.seq);
+        }
+        var = normalize_variant(ref_seq_with_gaps, cons_view, positions_major, positions_minor,
+                                var);
+    }
+
+    var.qual = round_float(compute_consensus_quality(probs_3D, cons_seqs_with_gaps, symbol_lookup,
+                                                     var.rstart, var.rend),
+                           3);
+
+    return var;
+}
+
+std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
+                                           const bool merge_overlapping,
+                                           const bool merge_adjacent,
+                                           const std::string_view draft,
+                                           const std::vector<int64_t>& positions_major,
+                                           const std::vector<int64_t>& positions_minor,
+                                           const std::string_view ref_seq_with_gaps,
+                                           const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+                                           const bool ambig_ref,
+                                           const bool normalize,
+                                           const at::Tensor& probs_3D,
+                                           const std::unordered_set<char>& symbol_set,
+                                           const std::array<int32_t, 256>& symbol_lookup) {
+    if (!merge_overlapping && !merge_adjacent) {
+        return variants;
+    }
+
+    std::vector<Variant> filtered;
+
+    // Create interval trees if merge_overlapping is required.
+    interval_tree::IntervalTree<int64_t, int64_t> tree;
+    if (merge_overlapping) {
+        std::vector<interval_tree::Interval<int64_t, int64_t>> intervals;
+        for (int64_t i = 0; i < dorado::ssize(variants); ++i) {
+            // NOTE: interval_tree has an inclusive end coordinate.
+            intervals.emplace_back(interval_tree::Interval<int64_t, int64_t>(
+                    variants[i].rstart, variants[i].rend - 1, i));
+        }
+        tree = interval_tree::IntervalTree<int64_t, int64_t>(std::move(intervals));
+    }
+
+    std::unordered_set<int64_t> seen;
+
+    for (int64_t i = 0; i < dorado::ssize(variants); ++i) {
+        if (seen.count(i)) {
+            continue;
+        }
+
+        const Variant& var = variants[i];
+
+        std::unordered_set<int64_t> variants_to_merge{i};
+
+        if (merge_overlapping) {
+            // NOTE: interval_tree has an inclusive end coordinate.
+            std::vector<interval_tree::Interval<int64_t, int64_t>> hits =
+                    tree.findOverlapping(var.rstart, var.rend - 1);
+            // Expand the set of variants to merge.
+            for (const interval_tree::Interval<int64_t, int64_t>& ival : hits) {
+                variants_to_merge.emplace(ival.value);
+            }
+        }
+
+        if (merge_adjacent) {
+            for (int64_t j = (i + 1); j < dorado::ssize(variants); ++j) {
+                if (variants[j].rstart != variants[j - 1].rend) {
+                    break;
+                }
+                variants_to_merge.emplace(j);
+            }
+        }
+
+        for (const int64_t id : variants_to_merge) {
+            seen.emplace(id);
+        }
+
+        if (std::size(variants_to_merge) <= 1) {
+            filtered.emplace_back(var);
+
+        } else {
+            // Find the region bounding box.
+            int64_t min_rstart = var.rstart;
+            int64_t max_rend = var.rend;
+            for (const int64_t id : variants_to_merge) {
+                min_rstart = std::min(min_rstart, variants[id].rstart);
+                max_rend = std::max(max_rend, variants[id].rend);
+            }
+
+            Variant new_var =
+                    construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
+                                      cons_seqs_with_gaps, var.seq_id, min_rstart, max_rend, true,
+                                      ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
+
+            if (is_valid(new_var)) {
+                filtered.emplace_back(std::move(new_var));
+            }
+        }
+    }
+
+    return filtered;
 }
 
 }  // namespace
@@ -82,7 +467,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const Variant& variant) {
     const bool all_same_as_ref =
             std::all_of(std::cbegin(variant.alts), std::cend(variant.alts),
-                        [&variant](const std::string& s) { return s == variant.ref; });
+                        [&variant](const std::string_view s) { return s == variant.ref; });
 
     if (all_same_as_ref) {
         return variant;
@@ -113,7 +498,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         int64_t start_pos = 0;
         for (int64_t i = 0; i < (min_len - 1); ++i) {
             bool bases_same = true;
-            for (size_t j = 1; j < std::size(seqs); ++j) {
+            for (int64_t j = 1; j < dorado::ssize(seqs); ++j) {
                 if (seqs[j][i] != seqs[0][i]) {
                     bases_same = false;
                     break;
@@ -139,7 +524,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         }
         // Assign.
         var.ref = seqs[0];
-        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
         var.pos += start_pos;
     };
 
@@ -180,7 +565,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             if (all_non_empty) {
                 // Check if the last base is identical in all seqs.
                 bool all_same = true;
-                for (size_t i = 1; i < std::size(seqs); ++i) {
+                for (int64_t i = 1; i < dorado::ssize(seqs); ++i) {
                     if (seqs[i].back() != seqs[0].back()) {
                         all_same = false;
                         break;
@@ -195,7 +580,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     }
                     changed = true;
                     var.ref = seqs[0];
-                    var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                    var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                 }
             }
 
@@ -225,7 +610,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                         }
                         var.rend = found_idx + 1;
                         var.ref = seqs[0];
-                        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                         changed = true;
                     } else {
                         // Revert any trimming and stop if a base wasn't found.
@@ -248,13 +633,13 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     // Collect all prefixes for all consensus sequences and the ref.
                     std::vector<std::string> prefixes;
                     prefixes.emplace_back(ref_with_gaps.substr(new_rstart, span));
-                    for (const auto& seq : cons_seqs_with_gaps) {
+                    for (const std::string_view seq : cons_seqs_with_gaps) {
                         prefixes.emplace_back(seq.substr(new_rstart, span));
                     }
 
                     // Create a set to count unique prefixes.
-                    const std::unordered_set<std::string> prefix_set(std::begin(prefixes),
-                                                                     std::end(prefixes));
+                    const std::unordered_set<std::string> prefix_set(std::cbegin(prefixes),
+                                                                     std::cend(prefixes));
 
                     // Check if there is more than 1 unique prefix - this is a variant then, stop extension.
                     // Revert trimming if it was applied.
@@ -265,7 +650,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     }
 
                     // Remove the deletions and prepend the prefix sequence.
-                    for (size_t i = 0; i < std::size(seqs); ++i) {
+                    for (int64_t i = 0; i < dorado::ssize(seqs); ++i) {
                         std::string& p = prefixes[i];
                         p.erase(std::remove(std::begin(p), std::end(p), '*'), std::end(p));
                         seqs[i] = p + seqs[i];
@@ -275,13 +660,13 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     var.pos = positions_major[new_rstart];
                     var.rstart = new_rstart;
                     var.ref = seqs[0];
-                    var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+                    var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                     changed = true;
                 }
             }
         }
         var.ref = seqs[0];
-        var.alts = std::vector<std::string>(std::begin(seqs) + 1, std::end(seqs));
+        var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
     };
 
     Variant ret = variant;
@@ -318,114 +703,126 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     return ret;
 }
 
-std::vector<Variant> decode_variants(const DecoderBase& decoder,
-                                     const VariantCallingSample& vc_sample,
-                                     const std::string& draft,
-                                     const bool ambig_ref,
-                                     const bool gvcf) {
-    // Validate that all vectors/tensors are of equal length.
-    vc_sample.validate();
+std::vector<Variant> general_decode_variants(
+        const DecoderBase& decoder,
+        const int32_t seq_id,
+        const std::vector<int64_t>& positions_major,
+        const std::vector<int64_t>& positions_minor,
+        const at::Tensor& probs,  // Probabilities for a single sample (not batch).
+        const std::string_view draft,
+        const bool ambig_ref,
+        const bool return_all,
+        const bool normalize,
+        const bool merge_overlapping,
+        const bool merge_adjacent) {
+    constexpr float MIN_QUAL = 3.0f;
 
-    // No work to do.
-    if (std::empty(vc_sample.positions_major)) {
-        return {};
+    const int64_t num_columns = dorado::ssize(positions_major);
+
+    // Validate inputs.
+    if (seq_id < 0) {
+        throw std::runtime_error("Sequence ID is negative in general_decode_variants: " +
+                                 std::to_string(seq_id));
     }
-
-    // Check that the sample begins on a non-insertion base.
-    if (vc_sample.positions_minor.front() != 0) {
+    if (std::size(positions_major) != std::size(positions_minor)) {
         std::ostringstream oss;
-        oss << "The first position of a sample must not be an insertion. sample = " << vc_sample;
+        oss << "Size of positions_major (" << std::size(positions_major)
+            << ") and positions_minor (" << std::size(positions_minor)
+            << ") differs in general_decode_variants.";
         throw std::runtime_error(oss.str());
     }
+    if (!probs.defined()) {
+        throw std::runtime_error(
+                "The tensor of probabilities is not defined in general_decode_variants.");
+    }
+    if (probs.size(0) != num_columns) {
+        std::ostringstream oss;
+        oss << "Input probs tensor is of incorrect size. probs.size = " << probs.size(0)
+            << ", num_columns = " << num_columns;
+        throw std::runtime_error(oss.str());
+    }
+    if ((std::size(probs.sizes()) < 2) || (std::size(probs.sizes()) > 3)) {
+        throw std::runtime_error("Input probs tensor is of unexpected size. Tensor dimensions: " +
+                                 std::to_string(probs.sizes().size()) + ", expected 2 or 3.");
+    }
 
-    // Helper lambdas.
-    const auto remove_gaps = [](const std::string_view seq) {
-        std::string ret;
-        ret.reserve(std::size(seq));
-        std::copy_if(std::begin(seq), std::end(seq), std::back_inserter(ret),
-                     [](char c) { return c != '*'; });
-        return ret;
-    };
-    const auto is_subset_of_symbols = [](const std::unordered_set<char>& symbol_map,
-                                         const std::string& query) {
-        for (const char c : query) {
-            if (symbol_map.count(c) == 0) {
-                return false;
-            }
-        }
-        return true;
-    };
-    const auto create_symbol_lookup = [](const std::string& symbols) {
-        std::array<int32_t, 256> ret;
-        std::fill(std::begin(ret), std::end(ret), -1);
-        for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
-            ret[static_cast<int32_t>(symbols[i])] = i;
-        }
-        return ret;
-    };
-    const auto encode_seq = [](const std::array<int32_t, 256>& symbol_lookup,
-                               const std::string_view seq, const bool substitute_n) {
-        std::vector<int32_t> ret(std::size(seq));
-        for (int64_t i = 0; i < dorado::ssize(seq); ++i) {
-            const char c = (substitute_n && (seq[i] == 'N')) ? '*' : seq[i];
-            ret[i] = symbol_lookup[c];
-        }
-        return ret;
-    };
-    const auto phred = [](float err, const float cap) {
-        err = std::clamp(err, std::pow(10.0f, -cap / 10.0f), 1.0f);
-        const float q = -10.0f * std::log10(err);
-        return std::min(q, cap);
-    };
-    const auto compute_seq_quality = [&encode_seq, &phred](
-                                             const std::array<int32_t, 256>& symbol_lookup,
-                                             const at::Tensor& class_probs,
-                                             const std::string_view seq, const bool substitute_n) {
-        const std::vector<int32_t> encoded = encode_seq(symbol_lookup, seq, substitute_n);
-        float sum = 0.0f;
-        for (size_t i = 0; i < std::size(encoded); ++i) {
-            const int32_t j = encoded[i];
-            const float prob = class_probs[i][j].item<float>();
-            const float err = 1.0f - prob;
-            sum += phred(err, 70.0f);
-        }
-        return sum;
-    };
-    const auto round_float = [](float val, const int32_t decimal_places) {
-        const float f = std::pow(10.0f, static_cast<float>(decimal_places));
-        val = std::round(val * f) / f;
-        return val;
-    };
-
-    // Alphabet for the label scheme.
-    const std::string symbols = decoder.get_label_scheme_symbols();
-    const std::unordered_set<char> symbol_set(std::begin(symbols), std::end(symbols));
-    const std::array<int32_t, 256> symbol_lookup = create_symbol_lookup(symbols);
-
-    // Predicted sequence with gaps.
-    const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-    const std::vector<std::vector<ConsensusResult>> c = decoder.decode_bases(logits);
-
-    // This shouldn't be possible.
-    if ((std::size(c) != 1) || (std::size(c.front()) != 1)) {
-        spdlog::warn(
-                "Unexpected number of consensus sequences generated from a single sample: "
-                "c.size = {}. Skipping consensus of this sample.",
-                std::size(c));
+    // No work to do.
+    if (std::empty(positions_major)) {
         return {};
     }
 
-    const std::string& cons_seq_with_gaps = c.front().front().seq;
+    if (positions_minor[0] != 0) {
+        spdlog::warn(
+                "The first position of a sample must be a major position. Region: {}:{}-{}. "
+                "Returning zero variants for this sample.",
+                seq_id, positions_major.front() + 1, positions_major.back());
+        return {};
+    }
+
+    // Systematize the input probabilities to support the legacy case (shape [num_pos x num_classes])
+    // and the new case (shape [num_pos x num_haps x num_classes]).
+    const at::Tensor probs_3D = (std::size(probs.sizes()) == 2) ? probs.unsqueeze(1) : probs;
+
+    // Symbols and lookup.
+    const std::string symbols = decoder.get_label_scheme_symbols();
+    const std::unordered_set<char> symbol_set(std::cbegin(symbols), std::cend(symbols));
+    const std::array<int32_t, 256> symbol_lookup = create_symbol_lookup(symbols);
+
+    // Get raw probability data.
+    const size_t batch_size = 1;
+    const size_t seq_len = std::size(positions_major);
+    const size_t num_haplotypes = static_cast<size_t>(probs_3D.size(1));
+    const size_t num_classes = std::size(symbols);
+    const dorado::Span<const float> raw_probs_data(
+            probs_3D.data_ptr<float>(), batch_size * seq_len * num_haplotypes * num_classes);
+
+    // Consensus sequences.
+    const std::vector<std::vector<ConsensusResult>> cons_seqs_with_gaps_all =
+            decode_batch_bases_impl(symbols, raw_probs_data, batch_size, seq_len, num_haplotypes,
+                                    num_classes);
+
+    if (std::size(cons_seqs_with_gaps_all) != 1) {
+        spdlog::warn(
+                "Unexpected number of decoded samples in general_decode_variants. Output size: {}, "
+                "expected 1. Returning zero variants for this sample.",
+                std::size(cons_seqs_with_gaps_all));
+        return {};
+    }
+
+    const std::vector<ConsensusResult>& cons_seqs_with_gaps = cons_seqs_with_gaps_all.front();
 
     // Draft sequence with gaps.
     const std::string ref_seq_with_gaps =
-            extract_draft_with_gaps(draft, vc_sample.positions_major, vc_sample.positions_minor);
+            extract_draft_with_gaps(draft, positions_major, positions_minor);
 
     // Candidate variant positions.
     const std::vector<bool> is_variant =
-            variant_columns(vc_sample.positions_minor, ref_seq_with_gaps, cons_seq_with_gaps);
+            find_polyploid_variants(positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
+                                    (!ambig_ref) ? std::optional(symbol_set) : std::nullopt);
+
     const std::vector<std::tuple<int64_t, int64_t, bool>> runs =
             dorado::run_length_encode(is_variant);
+
+#ifdef DEBUG_VARIANT_REGIONS
+    std::vector<std::string_view> cons_view;
+    cons_view.reserve(std::size(cons_seqs_with_gaps));
+    for (const ConsensusResult val : cons_seqs_with_gaps) {
+        cons_view.emplace_back(val.seq);
+    }
+#endif
+
+#ifdef DEBUG_VC_DATA_DUMP
+    {
+        std::vector<std::string_view> cons_view2;
+        cons_view2.reserve(std::size(cons_seqs_with_gaps));
+        for (const ConsensusResult val : cons_seqs_with_gaps) {
+            cons_view2.emplace_back(val.seq);
+        }
+        std::cerr << "seq_id = " << seq_id << '\n';
+        print_slice(std::cerr, ref_seq_with_gaps, cons_view2, positions_major, positions_minor,
+                    is_variant, 0, -1);
+    }
+#endif
 
     // Extract variants.
     std::vector<Variant> variants;
@@ -435,102 +832,68 @@ std::vector<Variant> decode_variants(const DecoderBase& decoder,
             continue;
         }
 
-        // Get the reference and the predictions for the variant stretch.
-        const std::string_view var_ref_with_gaps(std::data(ref_seq_with_gaps) + rstart,
-                                                 static_cast<size_t>(rend - rstart));
-        const std::string_view var_pred_with_gaps(std::data(cons_seq_with_gaps) + rstart,
-                                                  static_cast<size_t>(rend - rstart));
+        Variant var = construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
+                                        cons_seqs_with_gaps, seq_id, rstart, rend, is_var,
+                                        ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
 
-        // Mutable ref and pred sequences - a ref base may be prepended later.
-        std::string var_ref = remove_gaps(var_ref_with_gaps);
-        std::string var_pred = remove_gaps(var_pred_with_gaps);
+#ifdef DEBUG_VARIANT_REGIONS
+        {
+            std::cerr << "[variant slice] var = " << var << '\n';
+            const int64_t s = std::max<int64_t>(0, var.rstart - 5);
+            const int64_t e = std::min(dorado::ssize(positions_major), var.rend + 5);
+            print_slice(std::cerr, ref_seq_with_gaps, cons_view, positions_major, positions_minor,
+                        is_variant, s, e, var.rstart, var.rend);
+            std::cerr << '\n';
+        }
+#endif
 
-        // Verbatim comment from Medaka:
-        //      "del followed by insertion can lead to non-variant"
-        //      "maybe skip things if reference contains ambiguous symbols"
-        if ((var_ref == var_pred) && is_var) {
-            continue;
-        } else if (!ambig_ref && !is_subset_of_symbols(symbol_set, var_ref)) {
+        if (!is_valid(var)) {
             continue;
         }
-
-        // Calculate probabilities.
-        const at::Tensor var_probs = vc_sample.logits.slice(0, rstart, rend);
-        const float ref_qv = compute_seq_quality(symbol_lookup, var_probs, var_ref_with_gaps, true);
-        const float pred_qv =
-                compute_seq_quality(symbol_lookup, var_probs, var_pred_with_gaps, false);
-
-        // Variant data.
-        const float qual = pred_qv - ref_qv;
-        const int32_t qual_i = static_cast<int32_t>(std::round(qual));
-        const std::vector<std::pair<std::string, int32_t>> genotype{
-                {"GT", 1},
-                {"GQ", qual_i},
-        };
-        const int64_t var_pos = vc_sample.positions_major[rstart];
-
-        Variant var{
-                vc_sample.seq_id,     var_pos,  var_ref, {var_pred}, "PASS", {},
-                round_float(qual, 3), genotype, rstart,  rend,
-        };
-
-        // Variant starts on insert - prepend ref base.
-        if ((vc_sample.positions_minor[var.rstart] != 0) && !std::empty(var.alts)) {
-            while ((var.rstart > 0) && (vc_sample.positions_minor[var.rstart] != 0)) {
-                --var.rstart;
-            }
-            var.pos = vc_sample.positions_major[var.rstart];
-            var.ref = draft[var.pos] + var.ref;
-            var.alts[0] = draft[var.pos] + var.alts[0];
-        }
-
-        var = normalize_variant(ref_seq_with_gaps, {cons_seq_with_gaps}, vc_sample.positions_major,
-                                vc_sample.positions_minor, var);
 
         variants.emplace_back(std::move(var));
     }
 
-    if (gvcf) {
-        for (int64_t i = 0; i < dorado::ssize(vc_sample.positions_major); ++i) {
+    if (merge_overlapping || merge_adjacent) {
+        std::sort(std::begin(variants), std::end(variants), [](const Variant& a, const Variant& b) {
+            return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
+        });
+
+        variants = merge_sorted_variants(variants, merge_overlapping, merge_adjacent, draft,
+                                         positions_major, positions_minor, ref_seq_with_gaps,
+                                         cons_seqs_with_gaps, ambig_ref, normalize, probs_3D,
+                                         symbol_set, symbol_lookup);
+    }
+
+    if (return_all) {
+        for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
             // Skip non-reference positions.
-            if (vc_sample.positions_minor[i] != 0) {
+            if (positions_minor[i] != 0) {
                 continue;
             }
 
-            const int64_t pos = vc_sample.positions_major[i];
+            const int64_t pos = positions_major[i];
             const std::string ref(1, draft[pos]);
-            const int32_t ref_encoded =
-                    (draft[pos] != 'N') ? symbol_lookup[draft[pos]] : symbol_lookup['*'];
 
-            const float qual = phred(1.0f - vc_sample.logits[i][ref_encoded].item<float>(), 70.0f);
-            const int32_t qual_i = static_cast<int32_t>(std::round(qual));
-
-            const std::vector<std::pair<std::string, int32_t>> genotype{
-                    {"GT", 0},
-                    {"GQ", qual_i},
+            Variant var{
+                    seq_id, pos, ref, {"."}, ".", {}, 0.0f, {{"GT", "0"}, {"GQ", "0"}}, i, (i + 1),
             };
 
-            // clang-format off
-            Variant variant{
-                vc_sample.seq_id,
-                pos,
-                ref,
-                {"."},
-                ".",
-                {},
-                round_float(qual, 3),
-                genotype,
-                i, (i + 1),
-            };
-            // clang-format on
+            var.qual = round_float(compute_ref_quality(probs_3D, ref_seq_with_gaps, symbol_lookup,
+                                                       var.rstart, var.rend),
+                                   3);
 
-            variants.emplace_back(std::move(variant));
+            variants.emplace_back(std::move(var));
         }
     }
 
-    std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
+    std::sort(std::begin(variants), std::end(variants), [](const Variant& a, const Variant& b) {
         return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
     });
+
+    for (Variant& var : variants) {
+        var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
+    }
 
     return variants;
 }

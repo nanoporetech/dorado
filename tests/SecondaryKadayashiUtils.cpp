@@ -45,7 +45,8 @@ std::unordered_map<std::string, int32_t> load_from_tsv(const std::filesystem::pa
 
 CATCH_TEST_CASE("Nonexistent input path, should throw", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-01-supertiny";
+    const std::filesystem::path test_data_dir =
+            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = "nonexistent.bin";
 
     // Results.
@@ -54,7 +55,8 @@ CATCH_TEST_CASE("Nonexistent input path, should throw", TEST_GROUP) {
 
 CATCH_TEST_CASE("Start coordinate < 0, should return empty", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-01-supertiny";
+    const std::filesystem::path test_data_dir =
+            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = test_data_dir / "in.phased.bin";
 
     // Results.
@@ -66,7 +68,8 @@ CATCH_TEST_CASE("Start coordinate < 0, should return empty", TEST_GROUP) {
 
 CATCH_TEST_CASE("End coordinate <= 0, should return empty", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-01-supertiny";
+    const std::filesystem::path test_data_dir =
+            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = test_data_dir / "in.phased.bin";
 
     // Check the case when the end coordinate is zero.
@@ -86,7 +89,8 @@ CATCH_TEST_CASE("End coordinate <= 0, should return empty", TEST_GROUP) {
 
 CATCH_TEST_CASE("Missing reference, should return empty", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-01-supertiny";
+    const std::filesystem::path test_data_dir =
+            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = test_data_dir / "in.phased.bin";
 
     // Results.
@@ -98,7 +102,8 @@ CATCH_TEST_CASE("Missing reference, should return empty", TEST_GROUP) {
 
 CATCH_TEST_CASE("Input file is truncated and reading fails, should throw", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-01-supertiny";
+    const std::filesystem::path test_data_dir =
+            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = test_data_dir / "in.phased.bin";
 
     // Temporary location for a generated truncated file.
@@ -127,7 +132,8 @@ CATCH_TEST_CASE("Input file is truncated and reading fails, should throw", TEST_
 
 CATCH_TEST_CASE("Load phasing_bin", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-01-supertiny";
+    const std::filesystem::path test_data_dir =
+            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = test_data_dir / "in.phased.bin";
     const std::filesystem::path in_tsv_fn = test_data_dir / "in.phased.tsv";
 

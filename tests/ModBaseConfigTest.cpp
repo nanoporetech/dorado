@@ -24,7 +24,6 @@ void check_conv_params(const ConvParams& c, const ConvParams& expect) {
 }
 }  // namespace
 
-const auto _5mCG = get_data_dir("model_configs/dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1");
 const auto _5mCG_5hmCG =
         get_data_dir("model_configs/dna_r10.4.1_e8.2_260bps_sup@v4.0.0_5mCG_5hmCG@v2");
 const auto _pseU = get_data_dir("model_configs/rna004_130bps_sup@v5.0.0_pseU@v1");
@@ -62,13 +61,6 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
     auto [path, general, mods, context, refine] =
             // clang-format off
             GENERATE_COPY(table<fs::path, Gen, Mod, Ctx, Rmt>({
-            std::make_tuple(
-                _5mCG, 
-                Gen{ModelType::CONV_V1, 64, 9, 2, 3, 3, std::nullopt}, 
-                Mod{{"m"}, {"5mC"}, "CG", 0},
-                Ctx{50, 50, 100, 4, 4, false, false}, 
-                Rmt{}
-            ),
             std::make_tuple(
                 _5mCG_5hmCG, 
                 Gen{ModelType::CONV_LSTM_V1, 256, 9, 3, 3, 3, std::nullopt},

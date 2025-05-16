@@ -31,7 +31,6 @@ add_executable(dorado_tests
     DuplexSplitTest.cpp
     fasta_reader_test.cpp
     fastq_reader_test.cpp
-    Fast5DataLoaderTest.cpp
     FastxRandomReaderTest.cpp
     FileInfoTest.cpp
     gpu_monitor_test.cpp
@@ -79,11 +78,13 @@ add_executable(dorado_tests
     SecondaryKadayashiUtils.cpp
     SecondaryNormalizeVariantsTest.cpp
     SecondaryMergeVCSamplesTest.cpp
+    SecondaryModelFactory.cpp
     SecondarySampleTest.cpp
     SecondaryTrimTest.cpp
     SecondaryWindowTest.cpp
     RleTest.cpp
     CorrectionWindowTest.cpp
+    KadayashiTest.cpp
 )
 
 if (DORADO_GPU_BUILD)
@@ -113,6 +114,7 @@ target_link_libraries(dorado_tests_common
         dorado_utils
         dorado_compat
         dorado_secondary
+        kadayashi::haplotag_lib
         Catch2::Catch2
 )
 target_compile_definitions(dorado_tests_common

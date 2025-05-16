@@ -17,7 +17,7 @@ struct Variant {
     std::string filter;
     std::unordered_map<std::string, std::string> info;
     float qual = 0.0f;
-    std::vector<std::pair<std::string, int32_t>> genotype;
+    std::vector<std::pair<std::string, std::string>> genotype;
     int64_t rstart = 0;
     int64_t rend = 0;
 };
@@ -25,5 +25,7 @@ struct Variant {
 std::ostream& operator<<(std::ostream& os, const Variant& v);
 
 bool operator==(const Variant& lhs, const Variant& rhs);
+
+bool is_valid(const Variant& var);
 
 }  // namespace dorado::secondary

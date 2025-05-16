@@ -64,11 +64,9 @@ inline size_t CountSinkReads(const std::filesystem::path& data_path,
 
     dorado::DataLoader loader(*pipeline, device, num_worker_threads, max_reads,
                               std::move(read_list), std::move(read_ignore_list));
-    auto input_files = dorado::DataLoader::InputFiles::search(data_path, false);
-    if (!input_files.has_value()) {
-        throw std::runtime_error("No files in " + data_path.string());
-    }
-    loader.load_reads(*input_files, dorado::ReadOrder::UNRESTRICTED);
+
+    auto input_pod5_files = dorado::DataLoader::InputFiles::search_pod5s(data_path, false);
+    loader.load_reads(input_pod5_files, dorado::ReadOrder::UNRESTRICTED);
     pipeline.reset();
     return messages.size();
 }

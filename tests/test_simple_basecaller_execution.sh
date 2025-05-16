@@ -6,20 +6,19 @@ set -ex
 set -o pipefail
 
 if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <dorado executable> [4k model] [batch size] [5k model] [5k v43 model] [rna004 model] [model speed] [model version]"
+    echo "Usage: $0 <dorado executable> [5k model] [batch size] [5k v43 model] [rna004 model] [model speed] [model version]"
     exit 1
 fi
 
 test_dir=$(dirname $0)
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
-model_name=${2:-dna_r10.4.1_e8.2_400bps_hac@v4.1.0}
+model_name_5k=${2:-dna_r10.4.1_e8.2_400bps_hac@v5.0.0}
 batch=${3:-384}
-model_name_5k=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.2.0}
-model_name_5k_v43=${5:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
-model_name_rna004=${6:-rna004_130bps_hac@v3.0.1}
+model_name_5k_v43=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
+model_name_rna004=${5:-rna004_130bps_hac@v3.0.1}
 
-model_speed=${7:-"hac"}
-version=${8:-"v4.2.0"}
+model_speed=${6:-"hac"}
+version=${7:-"v5.0.0"}
 model_complex="${model_speed}@${version}"
 
 data_dir=$test_dir/data
@@ -32,8 +31,6 @@ test_output_file=$test_dir/${output_dir_name}_output.log
 echo dorado download models
 $dorado_bin download --list
 $dorado_bin download --list-structured
-$dorado_bin download --model ${model_name} --directory ${output_dir}
-model=${output_dir}/${model_name}
 $dorado_bin download --model ${model_name_5k} --directory ${output_dir}
 model_5k=${output_dir}/${model_name_5k}
 $dorado_bin download --model ${model_name_5k_v43} --directory ${output_dir}
@@ -51,44 +48,47 @@ dorado_check_bam_not_empty() {
     fi
 }
 
+pod5_data=$data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz
+echo using pod5_data: $pod5_data
+
 echo dorado basecaller test stage
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq > $output_dir/ref.fq
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq > $output_dir/ref.fq
+$dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
 if ! uname -r | grep -q -E 'tegra|minit'; then
-    $dorado_bin basecaller ${model} $data_dir/pod5 -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+    $dorado_bin basecaller ${model_5k} $pod5_data/ -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
     dorado_check_bam_not_empty
 fi
 
-$dorado_bin basecaller $model_complex,5mCG_5hmCG $data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz/ -b ${batch} --emit-moves > $output_dir/calls.bam
+$dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ -b ${batch} --emit-moves > $output_dir/calls.bam
 
 # Check that the read group has the required model info in its header
-if ! grep -q "basecall_model=${model_name}" $output_dir/calls.sam; then
+if ! grep -q "basecall_model=${model_name_5k}" $output_dir/calls.sam; then
     echo "Output SAM file does not contain basecall model name in header!"
     exit 1
 fi
-if ! grep -q "modbase_models=${model_name}_5mCG_5hmCG" $output_dir/calls.sam; then
+if ! grep -q "modbase_models=${model_name_5k}_5mCG_5hmCG" $output_dir/calls.sam; then
     echo "Output SAM file does not contain modbase model name in header!"
     exit 1
 fi
 
 echo dorado basecaller mixed model complex and --modified-bases
-$dorado_bin basecaller $model_complex $data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz/ -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+$dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
 samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
 samtools view -h $output_dir/calls.bam | grep "MN:i:"
 
 set +e
-if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
+if $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
     echo "Error: dorado basecaller should fail with combination of emit-fastq and reference!"
     exit 1
 fi
-if $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
-    echo  "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
+if $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
+    echo "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
     exit 1
 fi
 if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then
-    echo  "Error: dorado basecaller should fail with multiple modbase configs having overlapping mods!"
+    echo "Error: dorado basecaller should fail with multiple modbase configs having overlapping mods!"
     exit 1
 fi
 set -e
@@ -105,7 +105,7 @@ $dorado_bin summary $output_dir/calls.bam
 
 echo redirecting stderr to stdout: check output is still valid
 # The debug layer prints to stderr to say that it's enabled, so disable it for this test.
-env -u MTL_DEBUG_LAYER $dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
+env -u MTL_DEBUG_LAYER $dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
 dorado_check_bam_not_empty
 
 echo dorado aligner test stage
@@ -117,9 +117,9 @@ cp $output_dir/calls.sam $output_dir/folder/calls.sam
 cp $output_dir/calls.sam $output_dir/folder/subfolder/calls.sam
 $dorado_bin aligner $output_dir/ref.fq $output_dir/folder -o $output_dir/aligner_out
 dorado_check_bam_not_empty
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
-$dorado_bin basecaller ${model} $data_dir/pod5 -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
 # Check that the aligner strips old alignment tags
 $dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam
@@ -169,7 +169,7 @@ dorado_aligner_options_test() (
 
         # sort and cut output for comparison
         filter_header="grep -ve ^@PG -e ^@HD"
-        sort $output_dir/dorado-$i.sam | $filter_header | cut -f-11> $output_dir/dorado-$i.ssam
+        sort $output_dir/dorado-$i.sam | $filter_header | cut -f-11 > $output_dir/dorado-$i.ssam
 
         # compare with minimap2 output
         if $MM2 -a $mm2_opt $REF $RDS 2>err > $output_dir/minimap2-$i.sam; then
@@ -252,13 +252,12 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     fi
 fi
 
-if command -v truncate > /dev/null
-then
+if command -v truncate > /dev/null; then
     echo dorado basecaller resume feature
     # n.b. some of these options (--skip, --mm2-opts) won't affect the basecall but are included to test that we can resume with them present
-    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check  > $output_dir/tmp.bam
+    $dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
-    $dorado_bin basecaller -b ${batch} ${model} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
+    $dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
     samtools quickcheck -u $output_dir/calls.bam
     num_reads=$(samtools view -c $output_dir/calls.bam)
     if [[ $num_reads -ne "4" ]]; then
@@ -314,19 +313,19 @@ file1=$data_dir/adapter_trim/lsk110_single_read.fastq
 file2=$output_dir/lsk110_single_read_trimmed.fastq
 $dorado_bin trim --sequencing-kit SQK-LSK114 --emit-fastq $file1 > $file2
 if cmp --silent -- "$file1" "$file2"; then
-  echo "Adapter was not trimmed. Input and output reads are identical."
-  exit 1
+    echo "Adapter was not trimmed. Input and output reads are identical."
+    exit 1
 fi
 
 echo "dorado test poly(A) tail estimation"
-$dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
+$dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
 samtools quickcheck -u $output_dir/cdna_polya.bam
 num_estimated_reads=$(samtools view $output_dir/cdna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
 if [[ $num_estimated_reads -ne "2" ]]; then
     echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
     exit 1
 fi
-$dorado_bin basecaller -b ${batch} ${model} $data_dir/poly_a/r10_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
+$dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
 samtools quickcheck -u $output_dir/no_detect_cdna_polya.bam
 if [[ $? -ne "0" ]]; then
     echo "PolyA tail estimation with custom config file failed."
@@ -342,14 +341,15 @@ fi
 
 echo dorado basecaller barcoding read groups
 test_barcoding_read_groups() (
-    while (( "$#" >= 2 )); do
+    while (("$#" >= 2 )); do
         barcode=$1
         export expected_read_groups_${barcode}=$2
         shift 2
     done
     sample_sheet=$1
     output_name=read_group_test${sample_sheet:+_sample_sheet}
-    $dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} $data_dir/barcode_demux/read_group_test --no-trim > $output_dir/${output_name}.bam
+    demux_data=$data_dir/barcode_demux/read_group_test
+    $dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} ${demux_data} --no-trim > $output_dir/${output_name}.bam
 
     samtools quickcheck -u $output_dir/${output_name}.bam
     split_dir=$output_dir/${output_name}
@@ -377,7 +377,7 @@ test_barcoding_read_groups() (
         elif [[ $bam =~ "/0d85015e-6a4e-400c-a80f-c187c65a6d03_" ]]; then
             # Demuxed file, so trim the run_id from the prefix and the .bam from the suffix.
             barcode=${bam#*0d85015e-6a4e-400c-a80f-c187c65a6d03_}
-            barcode=${barcode%.bam*}            
+            barcode=${barcode%.bam*}
         else
             barcode="unclassified"
         fi
@@ -386,7 +386,7 @@ test_barcoding_read_groups() (
         expected=${!expected:-0}
         num_read_groups=$(samtools view -c ${bam})
         if [[ $num_read_groups -ne $expected ]]; then
-            echo "Barcoding read group has incorrect number of reads. '${bam}': ${num_read_groups} != ${expected}"
+            echo "Barcoding read group '${barcode}' has incorrect number of reads. '${bam}': ${num_read_groups} != ${expected}"
             exit 1
         fi
         exit 0
@@ -395,7 +395,7 @@ test_barcoding_read_groups() (
         check_barcodes $bam
     done
 
-    $dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/barcode_demux/read_group_test --no-trim > $output_dir/${output_name}-demux.bam
+    $dorado_bin basecaller -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
     $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
 
     for bam in $output_dir/${output_name}-demux/*.bam; do
@@ -403,14 +403,14 @@ test_barcoding_read_groups() (
     done
 )
 
-# There should be 4 reads with BC01, 3 with BC04, and 2 unclassified groups.
-test_barcoding_read_groups barcode01 4 barcode04 3 unclassified 2
+# There should be 4 reads with BC01, 2 with BC04, 1 with barcode 68, and 1 unclassified groups.
+test_barcoding_read_groups barcode01 4 barcode04 2 barcode68 1 unclassified 1
 # There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
-test_barcoding_read_groups patient_id_1 4 unclassified 5 $data_dir/barcode_demux/sample_sheet.csv
+test_barcoding_read_groups patient_id_1 4 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
 
 # Test demux only on a pre-classified BAM file
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
-for bam in $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_unclassified.bam ; do
+for bam in $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_unclassified.bam; do
     if [ ! -f $bam ]; then
         echo "Missing expected bam file $bam.  Generated files:"
         ls -l $output_dir/demux_only_test/

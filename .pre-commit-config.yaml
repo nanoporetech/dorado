@@ -30,7 +30,7 @@ repos:
     rev: 'v19.1.7'
     hooks:
       - id: clang-format
-        exclude: 'dorado/3rdparty/'
+        exclude: '^dorado/3rdparty/(?!kadayashi/)'
   - repo: https://github.com/falkben/pre-commit-prepend-jira-issue
     rev: 'v0.0.2'
     hooks:

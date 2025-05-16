@@ -36,6 +36,12 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                      int64_t idx_start,
                                      int64_t idx_end);
 
+/**
+ * \brief Given a vector of variant calling samples, it returns a new vector of VariantCallingSample objects
+ *          where neighboring input samples are merged if hteir positions are adjacent and on the same sequence.
+ * \param vc_samples Input variant calling samples. Should be sorted by the start position (positions_major[0]).
+ * \return A new vector of VariantCallingSample where any adjacent samples from the input are merged into a single sample.
+ */
 std::vector<VariantCallingSample> merge_vc_samples(
         const std::vector<VariantCallingSample>& vc_samples);
 

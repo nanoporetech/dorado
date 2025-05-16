@@ -116,6 +116,15 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     if (rna_poly_tail_length != ReadCommon::POLY_TAIL_NOT_ENABLED) {
         bam_aux_append(aln, "pt", 'i', sizeof(rna_poly_tail_length),
                        (uint8_t *)&rna_poly_tail_length);
+
+        std::vector<int> poly_tail{
+                poly_tail_signal_anchor,
+                poly_tail_signal_boundaries[0].first,
+                poly_tail_signal_boundaries[0].second,
+                poly_tail_signal_boundaries[1].first,
+                poly_tail_signal_boundaries[1].second,
+        };
+        bam_aux_update_array(aln, "pa", 'i', (int)poly_tail.size(), poly_tail.data());
     }
 }
 

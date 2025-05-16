@@ -83,7 +83,7 @@ protected:
         read->read_common.attributes.read_number = 12345;
         read->read_common.attributes.channel_number = 5;
         read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
-        read->read_common.attributes.filename = "test.fast5";
+        read->read_common.attributes.filename = "test.pod5";
         read->read_common.client_info = client_info;
         return read;
     }
@@ -159,20 +159,9 @@ TempDir download_model(const std::string& model) {
 DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
     using SampleType = dorado::models::SampleType;
     auto pipeline_restart = GENERATE(false, true);
-    auto model_type = GENERATE(SampleType::DNA, SampleType::RNA002, SampleType::RNA004);
+    auto model_type = GENERATE(SampleType::DNA, SampleType::RNA004);
     CATCH_CAPTURE(pipeline_restart);
     CATCH_CAPTURE(model_type);
-
-    if (model_type == SampleType::RNA002) {
-        auto trim_adapter = GENERATE(true, false);
-        auto rna_adapter = GENERATE(true, false);
-        CATCH_CAPTURE(trim_adapter);
-        CATCH_CAPTURE(rna_adapter);
-        auto adapter_info = std::make_shared<dorado::demux::AdapterInfo>();
-        adapter_info->trim_adapters = trim_adapter;
-        adapter_info->trim_adapters = rna_adapter;
-        client_info->contexts().register_context<const dorado::demux::AdapterInfo>(adapter_info);
-    }
 
     set_pipeline_restart(pipeline_restart);
 
@@ -275,7 +264,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // Grab the modbase parameters from the models.
     const std::vector<std::filesystem::path> modbase_paths{modbase_model, modbase_model_6mA};
-    const auto modbase_params = get_modbase_params(modbase_paths);
+    const auto modbase_params = get_modbase_params(modbase_paths, 1);
 
     // Create runners
     std::string device;
@@ -332,7 +321,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
 
     set_pipeline_restart(pipeline_restart);
 
-    const auto modbase_threshold = get_modbase_params({}).threshold;
+    const auto modbase_threshold = get_modbase_params({}, 1).threshold;
     run_smoke_test<dorado::ReadToBamTypeNode>(emit_moves, 2, modbase_threshold, nullptr, 1000);
 }
 

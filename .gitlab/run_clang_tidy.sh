@@ -49,7 +49,6 @@ cmake \
 cmake \
   --build ${build_dir} \
   --target htslib_project \
-  --target vbz_hdf_plugin \
   -j ${num_jobs}
 
 # Remove any 3rdparty .clang-tidy's otherwise we check them for errors.

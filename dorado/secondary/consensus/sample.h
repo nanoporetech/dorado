@@ -68,4 +68,6 @@ void debug_print_sample(std::ostream& os,
 
 std::ostream& operator<<(std::ostream& os, const Sample& sample);
 
+std::string sample_to_string(const Sample& sample);
+
 }  // namespace dorado::secondary

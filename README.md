@@ -64,10 +64,9 @@ AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.
 
 ## Performance tips
 
-1. For optimal performance, Dorado requires POD5 file input. Please [convert your .fast5 files](https://github.com/nanoporetech/pod5-file-format) before basecalling.
-2. Dorado will automatically detect your GPU's free memory and select an appropriate batch size.
-3. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a heterogeneous collection of GPUs, select the faster GPUs using the `--device` flag (e.g., `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
-4. On Windows systems with Nvidia GPUs, open Nvidia Control Panel, navigate into “Manage 3D settings” and then set “CUDA - Sysmem Fallback Policy” to “Prefer No Sysmem Fallback”.  This will provide a significant performance improvement.
+1. Dorado will automatically detect your GPU's free memory and select an appropriate batch size.
+2. Dorado will automatically run in multi-GPU `cuda:all` mode. If you have a heterogeneous collection of GPUs, select the faster GPUs using the `--device` flag (e.g., `--device cuda:0,2`). Not doing this will have a detrimental impact on performance.
+3. On Windows systems with Nvidia GPUs, open Nvidia Control Panel, navigate into “Manage 3D settings” and then set “CUDA - Sysmem Fallback Policy” to “Prefer No Sysmem Fallback”.  This will provide a significant performance improvement.
 
 ## Running
 
@@ -76,7 +75,7 @@ To see all options and their defaults, run `dorado -h` and `dorado <subcommand> 
 
 ### Model selection foreword
 
-Dorado can automatically select a basecalling model using a selection of model speed (`fast`, `hac`, `sup`) and the pod5 data. This feature is **not** supported for fast5 data. If the model does not exist locally, dorado will automatically download the model and use it.
+Dorado can automatically select a basecalling model using a selection of model speed (`fast`, `hac`, `sup`) and the pod5 data. If the model does not exist locally, dorado will automatically download the model and use it.
 
 Dorado continues to support model paths.
 
@@ -84,7 +83,7 @@ For details read [Automatic model selection complex](#automatic-model-selection-
 
 ### Simplex basecalling
 
-To run Dorado basecalling, using the automatically downloaded `hac` model on a directory of POD5 files or a single POD5 file _(.fast5 files are supported, but will not be as performant)_.
+To run Dorado basecalling, using the automatically downloaded `hac` model on a directory of POD5 files or a single POD5 file.
 
 ```
 $ dorado basecaller hac pod5s/ > calls.bam
@@ -148,7 +147,7 @@ The software automatically searches for primer sequences used in Oxford Nanopore
 
 ### RNA adapter trimming
 
-Adapters for RNA002 and RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
+Adapters for RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
 
 ### Modified basecalling
 
@@ -232,8 +231,6 @@ The `dorado summary` command outputs a tab-separated file with read level sequen
 ```
 $ dorado summary <bam> > summary.tsv
 ```
-
-Note that summary generation is only available for reads basecalled from POD5 files. Reads basecalled from .fast5 files are not compatible with the summary command.
 
 ### Barcode Classification
 
@@ -593,7 +590,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
 
-- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna002` or `rna004`, depending on the kit.
+- **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna004`.
 
 - **Pore Type (`r10.4.1`)**: This section corresponds to the type of flow cell used. For instance, FLO-MIN114/FLO-FLG114 is indicated by `r10.4.1`, while FLO-MIN106D/FLO-FLG001 is signified by `r9.4.1`.
 
@@ -623,28 +620,6 @@ The versioning of modification models is bound to the basecalling model. This me
 | dna_r10.4.1_e8.2_400bps_fast@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.2.0 | 5mCG_5hmCG | v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.2.0 | 5mCG_5hmCG<br />5mC_5hmC<br />5mC<br />6mA<br />| v3.1<br />v1<br />v2<br />v3| 5 kHz |
-| dna_r10.4.1_e8.2_400bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_fast@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_hac@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_sup@v4.1.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_fast@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_hac@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_sup@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_fast@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_hac@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_sup@v4.0.0 | 5mCG_5hmCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_fast@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_hac@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_260bps_sup@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_fast@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_hac@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r10.4.1_e8.2_400bps_sup@v3.5.2 | 5mCG | v2 | 4 kHz |
-| dna_r9.4.1_e8_sup@v3.6 |  |  | 4 kHz |
-| dna_r9.4.1_e8_fast@v3.4 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 | 4 kHz |
-| dna_r9.4.1_e8_hac@v3.3 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 |4 kHz |
-| dna_r9.4.1_e8_sup@v3.3 | 5mCG_5hmCG<br />5mCG | v0<br />v0.1 |4 kHz |
 
 ### **RNA models:**
 
@@ -661,9 +636,6 @@ The versioning of modification models is bound to the basecalling model. This me
 | rna004_130bps_fast@v3.0.1 | | | 4 kHz |
 | rna004_130bps_hac@v3.0.1 | | | 4 kHz |
 | rna004_130bps_sup@v3.0.1 | m6A_DRACH | v1 | 4 kHz |
-| rna002_70bps_fast@v3 | | | 3 kHz |
-| rna002_70bps_hac@v3 | | | 3 kHz |
-
 
 ## Automatic model selection complex
 
@@ -775,9 +747,8 @@ dorado basecaller --batchsize 64 ...
 
 Low GPU utilization can lead to reduced basecalling speed. This problem can be identified using tools such as `nvidia-smi` and `nvtop`. Low GPU utilization often stems from I/O bottlenecks in basecalling. Here are a few steps you can take to improve the situation:
 
-1. Opt for POD5 instead of .fast5: POD5 has superior I/O performance and will enhance the basecall speed in I/O constrained environments.
-2. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
-3. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
+1. Transfer data to the local disk before basecalling: Slow basecalling often occurs because network disks cannot supply Dorado with adequate speed. To mitigate this, make sure your data is as close to your host machine as possible.
+2. Choose SSD over HDD: Particularly for duplex basecalling, using a local SSD can offer significant speed advantages. This is due to the duplex basecalling algorithm's reliance on heavy random access of data.
 
 ### Windows PowerShell encoding
 

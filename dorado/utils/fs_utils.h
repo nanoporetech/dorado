@@ -10,6 +10,12 @@ namespace dorado::utils {
 
 const std::string TEMP_MODELS_DIR_PREFIX{".temp_dorado_model-"};
 
+std::string get_extension(const std::filesystem::path& path);
+std::string get_extension(const std::filesystem::directory_entry& entry);
+
+bool has_pod5_extension(const std::filesystem::path& path);
+bool has_pod5_extension(const std::filesystem::directory_entry& entry);
+
 // True if the caller has permission to write to files in directory. If directory
 // does not exist, then it is created. Exceptions are discarded but error messages are issued.
 bool has_write_permission(const std::filesystem::path& directory);

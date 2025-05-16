@@ -60,6 +60,11 @@ const std::array s_general_fields = {
         "mean_qscore_template"sv,
 };
 
+const std::array s_polya_fields = {
+        "poly_tail_length"sv, "poly_tail_start"sv, "poly_tail_end"sv,
+        "poly_tail2_start"sv, "poly_tail2_end"sv,
+};
+
 const std::array s_barcoding_fields = {
         "barcode"sv,
 };
@@ -85,7 +90,8 @@ SummaryData::SummaryData(FieldFlags flags) { set_fields(flags); }
 void SummaryData::set_separator(char s) { m_separator = s; }
 
 void SummaryData::set_fields(FieldFlags flags) {
-    if (flags == 0 || flags > (GENERAL_FIELDS | BARCODING_FIELDS | ALIGNMENT_FIELDS)) {
+    if (flags == 0 ||
+        flags > (GENERAL_FIELDS | BARCODING_FIELDS | ALIGNMENT_FIELDS | POLYA_FIELDS)) {
         throw std::runtime_error(
                 "Invalid value of flags option in SummaryData::set_fields method.");
     }
@@ -100,6 +106,14 @@ void SummaryData::process_file(const std::string& filename, std::ostream& writer
         m_field_flags |= ALIGNMENT_FIELDS;
     }
     auto read_group_exp_start_time = utils::get_read_group_info(reader.header(), "DT");
+    auto command_line_cl =
+            utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
+
+    // If dorado was run with --estimate-poly-a option, output polyA related fields in the summary
+    if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
+        m_field_flags |= POLYA_FIELDS;
+    }
+
     write_header(writer);
     write_rows_from_reader(reader, writer, read_group_exp_start_time);
 }
@@ -136,6 +150,11 @@ void SummaryData::write_header(std::ostream& writer) {
     if (m_field_flags & GENERAL_FIELDS) {
         for (size_t i = 0; i < s_general_fields.size(); ++i) {
             writer << m_separator << s_general_fields[i];
+        }
+    }
+    if (m_field_flags & POLYA_FIELDS) {
+        for (size_t i = 0; i < s_polya_fields.size(); ++i) {
+            writer << m_separator << s_polya_fields[i];
         }
     }
     if (m_field_flags & BARCODING_FIELDS) {
@@ -214,6 +233,26 @@ void SummaryData::write_rows_from_reader(
                    << m_separator << start_time << m_separator << duration << m_separator
                    << template_start_time << m_separator << template_duration << m_separator
                    << seqlen << m_separator << mean_qscore;
+        }
+
+        if (m_field_flags & POLYA_FIELDS) {
+            // get polyA from pt:i tag
+            int polya_length = reader.has_tag("pt") ? reader.get_tag<int>("pt")
+                                                    : ReadCommon::POLY_TAIL_NOT_FOUND;
+            writer << m_separator << polya_length;
+
+            std::array<int, 4> polya_stats;
+            std::fill_n(std::begin(polya_stats), std::size(polya_stats),
+                        ReadCommon::POLY_TAIL_NOT_FOUND);
+            if (reader.has_tag("pa")) {
+                auto polya_stats_tag = reader.get_array<int>("pa");
+                // skip the anchor info, we only output the ranges
+                std::copy_n(std::next(std::begin(polya_stats_tag)), std::size(polya_stats),
+                            std::begin(polya_stats));
+            }
+            for (const auto& stat : polya_stats) {
+                writer << m_separator << stat;
+            }
         }
 
         if (m_field_flags & BARCODING_FIELDS) {

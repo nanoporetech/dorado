@@ -61,13 +61,14 @@ ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,
                                      const int32_t out_dim,
                                      const std::vector<int32_t>& kernel_sizes,
                                      const std::vector<int32_t>& channel_dims,
-                                     bool use_batch_norm)
+                                     bool use_batch_norm,
+                                     const bool add_expansion_layer)
         : m_convs{make_1d_conv_layers(kernel_sizes,
                                       num_in_features,
                                       channel_dims,
                                       use_batch_norm,
                                       ActivationType::RELU)},
-          m_expansion_layer{torch::nn::Linear(channel_dims.back(), out_dim)}
+          m_expansion_layer{nullptr}
 
 {
     if (std::size(kernel_sizes) != std::size(channel_dims)) {
@@ -78,8 +79,12 @@ ReadLevelConvImpl::ReadLevelConvImpl(const int32_t num_in_features,
                 ", channel_dims.size() = " + std::to_string(std::size(channel_dims)));
     }
 
+    if (add_expansion_layer) {
+        m_expansion_layer = torch::nn::Linear(channel_dims.back(), out_dim);
+        register_module("expansion_layer", m_expansion_layer);
+    }
+
     register_module("convs", m_convs);
-    register_module("expansion_layer", m_expansion_layer);
 }
 
 torch::Tensor ReadLevelConvImpl::forward(torch::Tensor x) { return m_convs->forward(std::move(x)); }
@@ -101,14 +106,13 @@ ReversibleLSTM::ReversibleLSTM(const int32_t input_size,
     register_module("lstm", m_lstm);
 }
 
-torch::Tensor ReversibleLSTM::forward(torch::Tensor x) {
+torch::Tensor ReversibleLSTM::forward(const torch::Tensor& x) {
     const int32_t flip_dim = m_batch_first ? 1 : 0;
+    torch::Tensor output;
     if (m_reverse) {
-        x = x.flip(flip_dim);
-    }
-    auto output = std::get<0>(m_lstm->forward(x));
-    if (m_reverse) {
-        output = output.flip(flip_dim);
+        output = std::get<0>(m_lstm->forward(x.flip(flip_dim))).flip(flip_dim);
+    } else {
+        output = std::get<0>(m_lstm->forward(x));
     }
     return output;
 }
@@ -139,6 +143,7 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
                             m_lstm_size,
                             m_kernel_sizes,
                             std::vector<int32_t>(std::size(m_kernel_sizes), m_cnn_size),
+                            true,
                             true),
           m_pre_pool_expansion_layer(m_cnn_size, m_lstm_size),
           m_pooler(MeanPooler()),

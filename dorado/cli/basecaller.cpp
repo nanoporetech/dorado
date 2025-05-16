@@ -83,15 +83,15 @@ namespace {
 /**
  * Class caching directory entries for a folder, along with the path.
  */
-class InputFolderInfo final {
+class InputPod5FolderInfo final {
     const std::filesystem::path m_data_path;
-    const DataLoader::InputFiles m_input_files;
+    const DataLoader::InputFiles m_pod5_files;
 
 public:
-    InputFolderInfo(std::filesystem::path data_path, DataLoader::InputFiles input_files)
-            : m_data_path(std::move(data_path)), m_input_files(std::move(input_files)) {}
+    InputPod5FolderInfo(std::filesystem::path data_path, DataLoader::InputFiles pod5_files)
+            : m_data_path(std::move(data_path)), m_pod5_files(std::move(pod5_files)) {}
     const std::filesystem::path& path() const { return m_data_path; }
-    const DataLoader::InputFiles& files() const { return m_input_files; }
+    const DataLoader::InputFiles& files() const { return m_pod5_files; }
 };
 
 void set_basecaller_params(const argparse::ArgumentParser& arg,
@@ -115,7 +115,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     parser.visible.add_argument("model").help(
             "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
             "modbases, or path to existing model directory.");
-    parser.visible.add_argument("data").help("The data directory or file (POD5/FAST5 format).");
+    parser.visible.add_argument("data").help("The data directory or POD5 file path.");
     {
         // Default "Optional arguments" group
         parser.visible.add_argument("-v", "--verbose")
@@ -140,7 +140,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("-r", "--recursive")
                 .default_value(false)
                 .implicit_value(true)
-                .help("Recursively scan through directories to load FAST5 and POD5 files.");
+                .help("Recursively scan through directories to load POD5 files.");
         parser.visible.add_argument("-l", "--read-ids")
                 .help("A file with a newline-delimited list of reads to basecall. If not provided, "
                       "all reads will be basecalled.")
@@ -271,9 +271,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                           utils::arg_parse::ArgParser& parser) {
+                                           utils::arg_parse::ArgParser& parser,
+                                           size_t device_count) {
     // Convert path to params.
-    auto params = get_modbase_params(paths);
+    auto params = get_modbase_params(paths, device_count);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
@@ -304,7 +305,7 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
 
 void setup(const std::vector<std::string>& args,
            const BasecallModelConfig& model_config,
-           const InputFolderInfo& input_folder_info,
+           const InputPod5FolderInfo& pod5_folder_info,
            const std::vector<fs::path>& modbase_models,
            const std::string& device,
            const std::string& ref,
@@ -334,16 +335,15 @@ void setup(const std::vector<std::string>& args,
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
     const std::string modbase_model_names = models::extract_model_names_from_paths(modbase_models);
 
-    if (!file_info::is_read_data_present(input_folder_info.files().get())) {
-        std::string err =
-                "No POD5 or FAST5 data found in path: " + input_folder_info.path().string();
+    if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
+        std::string err = "No POD5 data found in path: " + pod5_folder_info.path().string();
         throw std::runtime_error(err);
     }
 
     auto read_list = utils::load_read_list(read_list_file_path);
-    size_t num_reads = file_info::get_num_reads(input_folder_info.files().get(), read_list, {});
+    size_t num_reads = file_info::get_num_reads(pod5_folder_info.files().get(), read_list, {});
     if (num_reads == 0) {
-        spdlog::error("No POD5 or FAST5 reads found in path: " + input_folder_info.path().string());
+        spdlog::error("No reads found in path: " + pod5_folder_info.path().string());
         std::exit(EXIT_FAILURE);
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
@@ -356,7 +356,7 @@ void setup(const std::vector<std::string>& args,
         bool inspect_ok = true;
         models::SamplingRate data_sample_rate = 0;
         try {
-            data_sample_rate = file_info::get_sample_rate(input_folder_info.files().get());
+            data_sample_rate = file_info::get_sample_rate(pod5_folder_info.files().get());
         } catch (const std::exception& e) {
             inspect_ok = false;
             spdlog::warn(
@@ -443,7 +443,7 @@ void setup(const std::vector<std::string>& args,
                 num_runners, 0);
     }
 
-    auto read_groups = file_info::load_read_groups(input_folder_info.files().get(), model_name,
+    auto read_groups = file_info::load_read_groups(pod5_folder_info.files().get(), model_name,
                                                    modbase_model_names);
 
     const bool adapter_trimming_enabled =
@@ -559,7 +559,18 @@ void setup(const std::vector<std::string>& args,
                 utils::extract_pg_keys_from_hdr(resume_from_file, {"CL"}, "ID", "basecaller");
         hts_set_log_level(initial_hts_log_level);
 
-        auto tokens = cli::extract_token_from_cli(pg_keys["CL"]);
+        std::vector<std::string> tokens;
+        try {
+            tokens = cli::extract_token_from_cli(pg_keys["CL"]);
+        } catch (const std::exception& e) {
+            spdlog::debug("Caught error: '{}'", e.what());
+            spdlog::error(
+                    "Failed to parse resume parameters as --resume-from file 'CL' (Command Line) "
+                    "header is invalid. This might happen if the HTS file headers were dropped "
+                    "with the default samtools '--no-headers' argument.");
+            std::exit(EXIT_FAILURE);
+        }
+
         // First token is the dorado binary name. Remove that because the
         // sub parser only knows about the `basecaller` command.
         tokens.erase(tokens.begin());
@@ -617,7 +628,7 @@ void setup(const std::vector<std::string>& args,
 
     auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
-    loader.load_reads(input_folder_info.files(), ReadOrder::UNRESTRICTED);
+    loader.load_reads(pod5_folder_info.files(), ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
@@ -678,12 +689,15 @@ int basecaller(int argc, char* argv[]) {
 
     const std::filesystem::path data_path = parser.visible.get<std::string>("data");
     const bool recursive_file_loading = parser.visible.get<bool>("--recursive");
-    auto input_files = DataLoader::InputFiles::search(data_path, recursive_file_loading);
-    if (!input_files.has_value()) {
-        // search() will have logged an error message for us.
+
+    DataLoader::InputFiles input_pod5s;
+    try {
+        input_pod5s = DataLoader::InputFiles::search_pod5s(data_path, recursive_file_loading);
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to load pod5 data: '{}'", e.what());
         return EXIT_FAILURE;
     }
-    const InputFolderInfo input_folder_info(data_path, std::move(*input_files));
+    const InputPod5FolderInfo pod5_folder_info(data_path, std::move(input_pod5s));
 
     const auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
     const auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
@@ -856,10 +870,10 @@ int basecaller(int argc, char* argv[]) {
             return EXIT_FAILURE;
         }
     } else {
-        const auto chemistry =
-                file_info::get_unique_sequencing_chemistry(input_folder_info.files().get());
-        const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
         try {
+            const auto chemistry =
+                    file_info::get_unique_sequencing_chemistry(pod5_folder_info.files().get());
+            const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
             model_path = downloader.get(model_search.simplex(), "simplex");
             if (!check_model_path(model_path)) {
                 throw std::runtime_error("Downloaded simplex model is invalid.");
@@ -884,8 +898,14 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
-    auto model_config = load_model_config(model_path);
-    set_basecaller_params(parser.visible, model_config, device);
+    BasecallModelConfig model_config;
+    try {
+        model_config = load_model_config(model_path);
+        set_basecaller_params(parser.visible, model_config, device);
+    } catch (const std::exception& e) {
+        spdlog::error(e.what());
+        return EXIT_FAILURE;
+    }
 
     spdlog::info("> Creating basecall pipeline");
 
@@ -900,10 +920,15 @@ int basecaller(int argc, char* argv[]) {
     const bool run_batchsize_benchmarks = parser.hidden.get<bool>("--emit-batchsize-benchmarks") ||
                                           parser.hidden.get<bool>("--run-batchsize-benchmarks");
 
-    const auto modbase_params = validate_modbase_params(mods_model_paths, parser);
+    size_t device_count = 1;
+#if DORADO_CUDA_BUILD
+    auto initial_device_info = utils::get_cuda_device_info(device, false);
+    device_count = initial_device_info.size();
+#endif
+    const auto modbase_params = validate_modbase_params(mods_model_paths, parser, device_count);
 
     try {
-        setup(args, model_config, input_folder_info, mods_model_paths, device,
+        setup(args, model_config, pod5_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
               modbase_params, std::move(hts_file), parser.visible.get<bool>("--emit-moves"),

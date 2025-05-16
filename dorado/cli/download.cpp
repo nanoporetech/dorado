@@ -59,6 +59,8 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
     std::vector<ModelInfo> models;
 
     const auto model_arg = model_complex.raw;
+    throw_on_deprecated_model(model_complex.raw);
+
     if (model_complex.is_path()) {
         if (model_arg == "all") {
             const auto& all_groups = {simplex_models(), modified_models(), stereo_models(),
@@ -88,8 +90,8 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
 
     if (!data.empty()) {
         const auto folder_entries = utils::fetch_directory_entries(data.string(), recursive);
-        const auto chemisty = file_info::get_unique_sequencing_chemistry(folder_entries);
-        auto model_search = models::ModelComplexSearch(model_complex, chemisty, true);
+        const auto chemistry = file_info::get_unique_sequencing_chemistry(folder_entries);
+        auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
 
         try {
             if (model_complex.has_model_variant()) {
@@ -189,8 +191,14 @@ int download(int argc, char* argv[]) {
     const auto data = parser.get<std::string>("--data");
     const auto recursive = parser.get<bool>("--recursive");
 
-    const auto model_complex = model_resolution::parse_model_argument(model_arg);
-    const auto model_infos = get_model_infos(model_complex, data, recursive);
+    std::vector<ModelInfo> model_infos;
+    try {
+        const auto model_complex = model_resolution::parse_model_argument(model_arg);
+        model_infos = get_model_infos(model_complex, data, recursive);
+    } catch (const std::exception& e) {
+        spdlog::error(e.what());
+        return EXIT_FAILURE;
+    }
 
     std::filesystem::path models_directory;
     auto models_directory_opt = model_resolution::get_models_directory(parser);
@@ -217,8 +225,8 @@ int download(int argc, char* argv[]) {
         }
         try {
             const auto actual_path = downloader.get(info, "your");
-            spdlog::debug(" - downloaded model: '{}' into '{}'", info.name,
-                          fs::canonical((actual_path)).string());
+            spdlog::info("Downloaded model: '{}' into '{}'", info.name,
+                         fs::canonical((actual_path)).string());
         } catch (const std::exception& e) {
             spdlog::debug("downloader exception: {}", e.what());
             spdlog::error("Failed to download model: {}", info.name);
