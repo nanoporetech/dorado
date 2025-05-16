@@ -1,10 +1,13 @@
 #pragma once
 
 #include "secondary/bam_file.h"
+#include "secondary/features/haplotag_source.h"
 
 #include <cstdint>
 #include <string>
 #include <vector>
+
+struct faidx_t;
 
 namespace dorado::secondary {
 
@@ -50,7 +53,7 @@ public:
  * \param min_mapq Mininimum mapping quality.
  * \param row_per_read Place each new read on a new row.
  * \param include_dwells Include dwells channel in features.
- * \param include_haplotype Include haplotag channel in features.
+ * \param include_haplotype_column Include haplotag channel in features.
  * \param max_reads Maximum allowed read depth.
  * \returns ReadAlignmentData object which contains the features, positions and read IDs.
  *
@@ -69,6 +72,7 @@ public:
  *  there previous read has terminated, if one exists.
  */
 ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
+                                           faidx_t *fai_ptr,  // Can be nullptr.
                                            const std::string &chr_name,
                                            const int64_t start,  // Zero-based.
                                            const int64_t end,    // Non-inclusive.
@@ -81,7 +85,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const int32_t min_mapq,
                                            const bool row_per_read,
                                            const bool include_dwells,
-                                           const bool include_haplotype,
+                                           const bool include_haplotype_column,
+                                           const secondary::HaplotagSource hap_source,
                                            const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,
                                            const bool right_align_insertions);

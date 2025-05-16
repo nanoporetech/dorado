@@ -346,6 +346,8 @@ add_library(dorado_lib
     dorado/polish/polish_impl.h
     dorado/polish/polish_progress_tracker.cpp
     dorado/polish/polish_progress_tracker.h
+    dorado/variant/variant_progress_tracker.cpp
+    dorado/variant/variant_progress_tracker.h
 )
 
 enable_warnings_as_errors(dorado_lib)
@@ -404,6 +406,7 @@ if(NOT DORADO_DISABLE_DORADO)
         dorado/cli/summary.cpp
         dorado/cli/correct.cpp
         dorado/cli/polish.cpp
+        dorado/cli/variant.cpp
         dorado/cli/cli.h
         dorado/cli/cli_utils.h
         dorado/cli/model_resolution.h

@@ -286,7 +286,8 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
 
 }  // namespace
 
-EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
+EncoderCounts::EncoderCounts(const std::filesystem::path& in_bam_aln_fn,
+                             const NormaliseType normalise_type,
                              const std::vector<std::string>& dtypes,
                              const std::string& tag_name,
                              const int32_t tag_value,
@@ -295,7 +296,8 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
                              const int32_t min_mapq,
                              const bool symmetric_indels,
                              const bool clip_to_zero)
-        : m_normalise_type{normalise_type},
+        : m_bam_file{secondary::BamFile(in_bam_aln_fn)},
+          m_normalise_type{normalise_type},
           m_dtypes{dtypes},
           m_num_dtypes{static_cast<int32_t>(std::size(m_dtypes)) + 1},
           m_tag_name{tag_name},
@@ -307,11 +309,10 @@ EncoderCounts::EncoderCounts(const NormaliseType normalise_type,
           m_clip_to_zero{clip_to_zero},
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
 
-secondary::Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
-                                               const std::string& ref_name,
+secondary::Sample EncoderCounts::encode_region(const std::string& ref_name,
                                                const int64_t ref_start,
                                                const int64_t ref_end,
-                                               const int32_t seq_id) const {
+                                               const int32_t seq_id) {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
@@ -319,8 +320,10 @@ secondary::Sample EncoderCounts::encode_region(secondary::BamFile& bam_file,
     // NOTE: the `num_qstrat` is passed into the `num_homop` parameter as is done in `pileup_counts` in features.py.
     CountsResult pileup_tensors;
     try {
+        std::unique_lock<std::mutex> lock(m_mtx);
+
         PileupData pileup =
-                calculate_pileup(bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes,
+                calculate_pileup(m_bam_file, ref_name, ref_start, ref_end, m_num_dtypes, m_dtypes,
                                  num_qstrat, m_tag_name, m_tag_value, m_tag_keep_missing,
                                  weibull_summation, m_read_group, m_min_mapq);
 

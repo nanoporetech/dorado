@@ -8,6 +8,7 @@
 #include <torch/types.h>
 
 #include <cstdint>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -21,9 +22,8 @@ struct CountsResult {
 
 class EncoderCounts : public EncoderBase {
 public:
-    EncoderCounts() = default;
-
-    EncoderCounts(const NormaliseType normalise_type,
+    EncoderCounts(const std::filesystem::path& in_bam_aln_fn,
+                  const NormaliseType normalise_type,
                   const std::vector<std::string>& dtypes,
                   const std::string& tag_name,
                   const int32_t tag_value,
@@ -35,11 +35,10 @@ public:
 
     ~EncoderCounts() = default;
 
-    secondary::Sample encode_region(secondary::BamFile& bam_file,
-                                    const std::string& ref_name,
+    secondary::Sample encode_region(const std::string& ref_name,
                                     const int64_t ref_start,
                                     const int64_t ref_end,
-                                    const int32_t seq_id) const override;
+                                    const int32_t seq_id) override;
 
     at::Tensor collate(std::vector<at::Tensor> batch) const override;
 
@@ -47,6 +46,7 @@ public:
             std::vector<secondary::Sample> samples) const override;
 
 private:
+    secondary::BamFile m_bam_file;
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
     std::vector<std::string> m_dtypes;
     int32_t m_num_dtypes = 1;
@@ -58,6 +58,7 @@ private:
     bool m_symmetric_indels = false;
     bool m_clip_to_zero = false;
     FeatureIndicesType m_feature_indices;
+    std::mutex m_mtx;
 };
 
 }  // namespace dorado::secondary

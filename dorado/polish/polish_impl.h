@@ -41,9 +41,8 @@ struct DeviceInfo {
 };
 
 struct PolisherResources {
-    std::unique_ptr<secondary::EncoderBase> encoder;
+    std::vector<std::unique_ptr<secondary::EncoderBase>> encoders;
     std::unique_ptr<secondary::DecoderBase> decoder;
-    std::vector<secondary::BamFile> bam_handles;
     std::vector<DeviceInfo> devices;
     std::vector<std::shared_ptr<secondary::ModelTorchBase>> models;
     std::vector<c10::optional<c10::Stream>> streams;
@@ -72,6 +71,7 @@ struct DecodeData {
  * \brief Creates all resources required to run polishing.
  */
 PolisherResources create_resources(const secondary::ModelConfig& model_config,
+                                   const std::filesystem::path& in_ref_fn,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
@@ -82,6 +82,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
+                                   const std::optional<secondary::HaplotagSource>& haptag_source,
                                    const std::optional<std::filesystem::path>& phasing_bin_fn);
 
 /**
@@ -125,14 +126,15 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
  *                                  while coordinates of each BAM region interval are global and produced before draft batching on the client side.
  */
 std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
-merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_samples,
-                                        const secondary::EncoderBase& encoder,
-                                        const Span<const secondary::Window> bam_regions,
-                                        const Span<const secondary::Interval> bam_region_intervals,
-                                        const int32_t num_threads,
-                                        const int32_t window_len,
-                                        const int32_t window_overlap,
-                                        const int32_t window_interval_offset);
+merge_and_split_bam_regions_in_parallel(
+        std::vector<secondary::Sample>& window_samples,
+        const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+        const Span<const secondary::Window> bam_regions,
+        const Span<const secondary::Interval> bam_region_intervals,
+        const int32_t num_threads,
+        const int32_t window_len,
+        const int32_t window_overlap,
+        const int32_t window_interval_offset);
 
 /**
  * \brief For each input window (region of the draft) runs the given encoder and produces a sample.
@@ -140,8 +142,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
  *          Encoding is parallelized, where the actual number of threads is min(bam_handles.size(), num_threads, windows.size()).
  */
 std::vector<secondary::Sample> encode_windows_in_parallel(
-        std::vector<secondary::BamFile>& bam_handles,
-        const secondary::EncoderBase& encoder,
+        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const secondary::Window> windows,
         const int32_t num_threads);
@@ -181,7 +182,8 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
                                const std::vector<c10::optional<c10::Stream>>& streams,
-                               const secondary::EncoderBase& encoder);
+                               const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+                               const std::vector<std::pair<std::string, int64_t>>& draft_lens);
 
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,

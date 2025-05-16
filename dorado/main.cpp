@@ -79,6 +79,7 @@ int main(int argc, char* argv[]) {
             {"trim", &dorado::trim},
             {"correct", &dorado::correct},
             {"polish", &dorado::polish},
+            {"variant", &dorado::variant_caller},
     };
 
     std::vector<std::string> arguments(argv + 1, argv + argc);

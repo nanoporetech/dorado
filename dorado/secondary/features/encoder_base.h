@@ -48,11 +48,10 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual secondary::Sample encode_region(secondary::BamFile& bam_file,
-                                            const std::string& ref_name,
+    virtual secondary::Sample encode_region(const std::string& ref_name,
                                             const int64_t ref_start,
                                             const int64_t ref_end,
-                                            const int32_t seq_id) const = 0;
+                                            const int32_t seq_id) = 0;
 
     virtual at::Tensor collate(std::vector<at::Tensor> batch) const = 0;
 

@@ -31,6 +31,7 @@
 // #define DEBUG_POLISH_SAMPLE_CONSTRUCTION
 // #define DEBUG_INFERENCE_DATA
 // #define DEBUG_VC_DATA
+// #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
 
 namespace dorado::polisher {
 
@@ -67,6 +68,7 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
 }  // namespace
 
 PolisherResources create_resources(const secondary::ModelConfig& model_config,
+                                   const std::filesystem::path& in_ref_fn,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
                                    const int32_t num_bam_threads,
@@ -77,6 +79,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
+                                   const std::optional<secondary::HaplotagSource>& haptag_source,
                                    const std::optional<std::filesystem::path>& phasing_bin_fn) {
     PolisherResources resources;
 
@@ -147,19 +150,18 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
     };
     std::tie(resources.models, resources.streams) = create_models();
 
-    spdlog::info("Creating the encoder.");
-    resources.encoder =
-            encoder_factory(model_config, read_group, tag_name, tag_value, true,
-                            tag_keep_missing_override, min_mapq_override, phasing_bin_fn);
+    // Open the BAM file for each thread.
+    const int32_t max_num_encoders =
+            std::max(num_bam_threads, static_cast<int32_t>(std::size(resources.models)));
+    spdlog::info("Creating {} encoders.", max_num_encoders);
+    for (int32_t i = 0; i < max_num_encoders; ++i) {
+        resources.encoders.emplace_back(encoder_factory(
+                model_config, in_ref_fn, in_aln_bam_fn, read_group, tag_name, tag_value, true,
+                tag_keep_missing_override, min_mapq_override, haptag_source, phasing_bin_fn));
+    }
 
     spdlog::info("Creating the decoder.");
     resources.decoder = decoder_factory(model_config);
-
-    // Open the BAM file for each thread.
-    spdlog::info("Creating {} BAM handles.", num_bam_threads);
-    for (int32_t i = 0; i < num_bam_threads; ++i) {
-        resources.bam_handles.emplace_back(secondary::BamFile(in_aln_bam_fn));
-    }
 
     return resources;
 }
@@ -469,14 +471,15 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
 }  // namespace
 
 std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
-merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_samples,
-                                        const secondary::EncoderBase& encoder,
-                                        const Span<const secondary::Window> bam_regions,
-                                        const Span<const secondary::Interval> bam_region_intervals,
-                                        const int32_t num_threads,
-                                        const int32_t window_len,
-                                        const int32_t window_overlap,
-                                        const int32_t window_interval_offset) {
+merge_and_split_bam_regions_in_parallel(
+        std::vector<secondary::Sample>& window_samples,
+        const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+        const Span<const secondary::Window> bam_regions,
+        const Span<const secondary::Interval> bam_region_intervals,
+        const int32_t num_threads,
+        const int32_t window_len,
+        const int32_t window_overlap,
+        const int32_t window_interval_offset) {
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
     const auto debug_print_samples =
             [](std::ostream& os, const std::vector<secondary::Sample>& samples,
@@ -494,7 +497,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
 
     utils::ScopedProfileRange spr1("merge_and_split_bam_regions_in_parallel", 3);
 
-    const auto worker = [&](const int32_t start, const int32_t end,
+    const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
                             std::vector<std::vector<secondary::Sample>>& results_samples,
                             std::vector<std::vector<secondary::TrimInfo>>& results_trims) {
         utils::ScopedProfileRange spr2("merge_and_split_bam_regions_in_parallel-worker", 4);
@@ -532,7 +535,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
 #endif
 
             // Merge adjacent samples.
-            local_samples = encoder.merge_adjacent_samples(local_samples);
+            local_samples = encoders[tid]->merge_adjacent_samples(local_samples);
 
             spdlog::trace("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
                           bam_region_id, std::size(local_samples));
@@ -581,8 +584,10 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
     std::vector<std::vector<secondary::TrimInfo>> merged_trims(std::size(bam_region_intervals));
 
     // Process BAM regions in parallel.
+    const int32_t max_num_threads =
+            std::min(num_threads, static_cast<int32_t>(std::size(encoders)));
     const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
-            static_cast<int32_t>(std::size(bam_region_intervals)), num_threads);
+            static_cast<int32_t>(std::size(bam_region_intervals)), max_num_threads);
 
     spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
                   std::size(bam_region_intervals), std::size(thread_chunks));
@@ -593,8 +598,8 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
     futures.reserve(std::size(thread_chunks));
     for (size_t tid = 0; tid < std::size(thread_chunks); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
-        futures.emplace_back(pool.push(worker, chunk_start, chunk_end, std::ref(merged_samples),
-                                       std::ref(merged_trims)));
+        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
+                                       std::ref(merged_samples), std::ref(merged_trims)));
     }
     try {
         for (auto& f : futures) {
@@ -629,8 +634,7 @@ merge_and_split_bam_regions_in_parallel(std::vector<secondary::Sample>& window_s
 }
 
 std::vector<secondary::Sample> encode_windows_in_parallel(
-        std::vector<secondary::BamFile>& bam_handles,
-        const secondary::EncoderBase& encoder,
+        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const secondary::Window> windows,
         const int32_t num_threads) {
@@ -651,14 +655,14 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
                         start, end, i, name, window.start, window.end,
                         100.0 * static_cast<double>(i - start) / (end - start));
             }
-            results[i] = encoder.encode_region(bam_handles[thread_id], name, window.start,
-                                               window.end, window.seq_id);
+            results[i] = encoders[thread_id]->encode_region(name, window.start, window.end,
+                                                            window.seq_id);
         }
     };
 
     const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
             static_cast<int32_t>(std::size(windows)),
-            std::min(num_threads, static_cast<int32_t>(std::size(bam_handles))));
+            std::min(num_threads, static_cast<int32_t>(std::size(encoders))));
 
     spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
                   std::size(thread_chunks));
@@ -787,7 +791,7 @@ void sample_producer(PolisherResources& resources,
 
             // Encode samples in parallel. Non-const by design, data will be moved.
             std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
-                    resources.bam_handles, *resources.encoder, draft_lens,
+                    resources.encoders, draft_lens,
                     Span<const secondary::Window>(std::data(windows) + window_id_start,
                                                   num_windows),
                     num_threads);
@@ -797,8 +801,9 @@ void sample_producer(PolisherResources& resources,
                     "{}",
                     num_regions, std::size(region_samples));
 
+            // Passing only one const encoder because it only calls const functions without sideeffects.
             auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
-                    region_samples, *resources.encoder,
+                    region_samples, resources.encoders,
                     Span<const secondary::Window>(std::data(bam_regions) + region_id_start,
                                                   num_regions),
                     Span<const secondary::Interval>(
@@ -862,21 +867,40 @@ void sample_producer(PolisherResources& resources,
     infer_data.terminate();
 }
 
-void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
-                               utils::AsyncQueue<DecodeData>& decode_queue,
-                               std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
-                               const std::vector<c10::optional<c10::Stream>>& streams,
-                               const secondary::EncoderBase& encoder) {
+void infer_samples_in_parallel(
+        utils::AsyncQueue<InferenceData>& batch_queue,
+        utils::AsyncQueue<DecodeData>& decode_queue,
+        std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
+        const std::vector<c10::optional<c10::Stream>>& streams,
+        const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+        [[maybe_unused]] const std::vector<std::pair<std::string, int64_t>>& draft_lens) {
     utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
 
     if (std::empty(models)) {
         throw std::runtime_error("No models have been initialized, cannot run inference.");
     }
 
-    auto batch_infer = [&encoder](secondary::ModelTorchBase& model, const InferenceData& batch,
-                                  const int32_t tid) {
+    auto batch_infer = [&encoders, &draft_lens](secondary::ModelTorchBase& model,
+                                                const InferenceData& batch, const int32_t tid) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
+
+        (void)draft_lens;
+
+#ifdef DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
+        // Debug write tensors for each sample, individually.
+        {
+            for (int64_t ii = 0; ii < dorado::ssize(batch.samples); ++ii) {
+                const int64_t seq_id = batch.samples[ii].seq_id;
+                const std::string& seq_name = draft_lens[seq_id].first;
+                const int64_t s = batch.samples[ii].start();
+                const int64_t e = batch.samples[ii].end();
+                utils::save_tensor(batch.samples[ii].features,
+                                   "debug.tensor_in.seq_" + seq_name + "." + std::to_string(s) +
+                                           "_" + std::to_string(e) + ".pt");
+            }
+        }
+#endif
 
         // We can simply stack these since all windows are of the same size. (Smaller windows are set aside.)
         timer::TimerHighRes timer_collate;
@@ -889,7 +913,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             for (const auto& sample : batch.samples) {
                 batch_features.emplace_back(sample.features);
             }
-            batch_features_tensor = encoder.collate(std::move(batch_features));
+            batch_features_tensor = encoders[tid]->collate(std::move(batch_features));
             time_collate = timer_collate.GetElapsedMilliseconds();
         }
 
@@ -945,6 +969,21 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
             }
 #endif
         }
+
+#ifdef DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
+        // Debug write output tensors for each sample, individually.
+        {
+            for (int64_t ii = 0; ii < output.size(0); ++ii) {
+                const int64_t seq_id = batch.samples[ii].seq_id;
+                const std::string& seq_name = draft_lens[seq_id].first;
+                const int64_t s = batch.samples[ii].start();
+                const int64_t e = batch.samples[ii].end();
+                utils::save_tensor(output[ii], "debug.tensor_out.seq_" + seq_name + "." +
+                                                       std::to_string(s) + "_" + std::to_string(e) +
+                                                       ".pt");
+            }
+        }
+#endif
 
         // Debug output.
         {
@@ -1018,7 +1057,13 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
         }
     };
 
-    const size_t num_threads = std::size(models);
+    if (std::size(models) > std::size(encoders)) {
+        spdlog::warn("There are more models than there are encoders! Num models: " +
+                     std::to_string(std::size(models)) + ", num encoders: " +
+                     std::to_string(std::size(encoders)) + ". Using fewer models.");
+    }
+
+    const size_t num_threads = std::min(std::size(models), std::size(encoders));
     cxxpool::thread_pool pool{num_threads};
 
     std::vector<std::future<void>> futures;
