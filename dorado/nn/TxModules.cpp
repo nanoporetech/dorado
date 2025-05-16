@@ -59,6 +59,8 @@ struct KoiTensorExt : public KoiTensor {
             return KOI_F16;
         } else if (t.dtype() == torch::kF32) {
             return KOI_F32;
+        } else if (t.dtype() == torch::kFloat8_e4m3fn) {
+            return KOI_E4M3;
         } else if (t.dtype() == torch::kI8) {
             return KOI_I8;
         }
@@ -102,10 +104,12 @@ using Slice = torch::indexing::Slice;
 
 #if DORADO_CUDA_BUILD && !DORADO_TX2
 void apply_rounding(at::Tensor &t, int remove_bits) {
-    // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
-    // TODO: this is slightly dangerous as it will turn numbers close to +/-65304 into +/-inf
-    t.view(torch::kI16).add_(1 << (remove_bits - 1));
-    t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
+    if (t.dtype() == torch::kF16) {
+        // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
+        // TODO: this is slightly dangerous as it will turn numbers close to +/-65304 into +/-inf
+        t.view(torch::kI16).add_(1 << (remove_bits - 1));
+        t.view(torch::kI16).bitwise_and_(0x10000 - (1 << remove_bits));
+    }
 }
 #endif
 
@@ -486,6 +490,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     const float alpha = params.deepnorm_alpha;
 
     auto f16_opts = x_f16.options().dtype(torch::kF16);
+    auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
 
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
@@ -530,14 +535,39 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // Quantize SwiGLU weights, interleave, and rearrange as tiled
         auto fc1_weight_interleaved =
                 ff->fc1->weight.unflatten(0, {2, -1, 16}).transpose(0, 1).contiguous();
-        t_fc1_wts_i8 = utils::quantize_tensor(fc1_weight_interleaved, -1);
-        t_fc1_wts_i8.scale.reciprocal_();
-        t_fc1_wts_i8.t = t_fc1_wts_i8.t.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
+
+        bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
+                      utils::get_dev_opt<bool>("koi_use_f8", true);
+        if (use_f8) {
+            const auto fc1_weight_shuffle_index =
+                    torch::tensor({0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15},
+                                  x_f16.options().dtype(torch::kI32));
+            fc1_weight_interleaved =
+                    torch::index_select(fc1_weight_interleaved, 2, fc1_weight_shuffle_index)
+                            .contiguous();
+
+            t_fc1_wts_f8.t = fc1_weight_interleaved.to(torch::kFloat8_e4m3fn)
+                                     .view({E / 16, 16, C / 16, 16})
+                                     .transpose(1, 2)
+                                     .contiguous();
+        } else {
+            t_fc1_wts_i8 = utils::quantize_tensor(fc1_weight_interleaved, -1);
+            t_fc1_wts_i8.scale.reciprocal_();
+            t_fc1_wts_i8.t =
+                    t_fc1_wts_i8.t.view({E / 16, 16, C / 16, 16}).transpose(1, 2).contiguous();
+        }
 
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 8, 8}).transpose(1, 2).contiguous();
 
-        t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1, 2).contiguous();
+        if (use_f8) {
+            t_fc2_wts = ff->fc2->weight.to(torch::kFloat8_e4m3fn)
+                                .view({C / 16, 16, E / 32, 16})
+                                .transpose(1, 2)
+                                .contiguous();
+        } else {
+            t_fc2_wts = ff->fc2->weight.view({C / 16, 16, E / 16, 8}).transpose(1, 2).contiguous();
+        }
 
         this->remove_bits();
     }
@@ -546,18 +576,23 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto qkv = torch::empty({N, T / 16, 3, H, D / 8, 16, 8}, f16_opts);
     auto t_out_attn = torch::empty({N, T / 16, H, D / 8, 16, 8}, f16_opts);
     auto t_out_proj = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
-    auto t_fc1_out = torch::empty({N * T / 16, E / 16, 16, 8}, f16_opts);
+    auto t_rms_out = torch::empty({N, T / 16, C / 16, 16, 16}, f8_opts);
+    auto t_fc1_out = torch::empty({N * T / 16, t_fc2_wts.size(1), 16, t_fc2_wts.size(3)},
+                                  t_fc2_wts.options());
     auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
 
     //Define Koi Tensors for the above buffers.
     auto &x = scaled_tensor.t;
-    bool use_i8 = x.dtype() == torch::kI8;
+    const bool use_i8 = (x.dtype() == torch::kI8);
+    const bool use_f8 = t_fc1_wts_f8.t.numel();
     auto &wqkv_weights = use_i8 ? wqkv_weights_i8 : wqkv_weights_f16;
-    auto &t_fc1_wts = use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16;
+    auto &t_fc1_wts = use_f8 ? t_fc1_wts_f8 : (use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16);
     KoiTensorExt in_f16(x_f16, {'N', 'T', 'C', 't', 'c'});
     KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'}, scaled_tensor.scale, 'C');
     KoiTensorExt *in_i8_ptr = use_i8 ? &in : nullptr;
-    KoiTensorExt in_mk(x.flatten(0, 1), {'M', 'K', 'm', 'k'}, scaled_tensor.scale, 'K');
+    KoiTensorExt in_mk =
+            use_f8 ? KoiTensorExt{t_rms_out.flatten(0, 1), {'M', 'K', 'm', 'k'}}
+                   : KoiTensorExt{x.flatten(0, 1), {'M', 'K', 'm', 'k'}, scaled_tensor.scale, 'K'};
     KoiTensorExt weights_qkv(wqkv_weights.t, {KOI_DIM_MAT_Q_K_V, 'H', 'D', 'C', 'd', 'c'},
                              wqkv_weights.scale, 'C');
     KoiTensorExt out_qkv(qkv, {'N', 'T', KOI_DIM_MAT_Q_K_V, 'H', 'D', 't', 'd'});
@@ -565,6 +600,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     KoiTensorExt out_attn_mk(t_out_attn.flatten(2, 3).flatten(0, 1), {'M', 'K', 'm', 'k'});
     KoiTensorExt out_proj_mn(t_out_proj.flatten(0, 1), {'M', 'N', 'm', 'n'});
     KoiTensorExt out_proj_ntc(t_out_proj, {'N', 'T', 'C', 't', 'c'});
+    KoiTensorExt out_rms_f8(t_rms_out, {{'N', 'T', 'C', 't', 'c'}});
     KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
     KoiTensorExt fc1_out(t_fc1_out, {'M', 'N', 'm', 'n'});
     KoiTensorExt fc1_out_mk(t_fc1_out, {'M', 'K', 'm', 'k'});
@@ -601,7 +637,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1", 3);
         res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
-                                   in_i8_ptr);
+                                   use_f8 ? &out_rms_f8 : nullptr, use_f8 ? nullptr : in_i8_ptr);
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
@@ -620,7 +656,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2", 3);
         res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in_f16, alpha, &res2_weights, &in_f16,
-                                   in_i8_ptr);
+                                   nullptr, in_i8_ptr);
     }
     // TODO: handle result
     if (res != KOI_SUCCESS) {
@@ -818,17 +854,20 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD && !DORADO_TX2
     // TODO: make sure these are all the requirements
-    bool is_sup_model = (params.d_model == 512) && (params.nhead == 8) &&
-                        (params.attn_window.first == 127) && (params.attn_window.second == 128) &&
-                        (params.dim_feedforward == 2048);
-    use_koi_tiled = is_sup_model && options.device().is_cuda() &&
-                    koi_tc_is_available(KOI_F16) == KOI_SUCCESS;
+    const bool is_sup_model =
+            (params.d_model == 512) && (params.nhead == 8) && (params.attn_window.first == 127) &&
+            (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+    const bool is_hyp_model =
+            (params.d_model == 1536) && (params.nhead == 24) && (params.attn_window.first == 255) &&
+            (params.attn_window.second == 256) && (params.dim_feedforward == 6144);
+    use_koi_tiled = (is_sup_model || is_hyp_model) && options.device().is_cuda() &&
+                    (koi_tc_is_available(KOI_F16) == KOI_SUCCESS);
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 
 #if !DORADO_ORIN
     // Custom Volta flag
     use_koi_volta_tiled = is_sup_model && options.device().is_cuda() &&
-                          koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS;
+                          (koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS);
     spdlog::debug("TxEncoderStack: use_koi_volta_tiled {}.", use_koi_volta_tiled);
 #endif
 #endif
