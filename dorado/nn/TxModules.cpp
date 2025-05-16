@@ -536,8 +536,9 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         auto fc1_weight_interleaved =
                 ff->fc1->weight.unflatten(0, {2, -1, 16}).transpose(0, 1).contiguous();
 
-        const bool use_fp8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS);
-        if (use_fp8) {
+        bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
+                      utils::get_dev_opt<bool>("koi_use_f8", true);
+        if (use_f8) {
             const auto fc1_weight_shuffle_index =
                     torch::tensor({0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15},
                                   x_f16.options().dtype(torch::kI32));
@@ -559,7 +560,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 8, 8}).transpose(1, 2).contiguous();
 
-        if (use_fp8) {
+        if (use_f8) {
             t_fc2_wts = ff->fc2->weight.to(torch::kFloat8_e4m3fn)
                                 .view({C / 16, 16, E / 32, 16})
                                 .transpose(1, 2)
