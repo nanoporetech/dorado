@@ -200,6 +200,10 @@ bamfile_t *init_bamfile_t_with_opened_files(samFile *fp_bam,
     h->bai = fp_bai;
     h->header = fp_header;
     h->aln = bam_init1();
+    if (!h->aln) {
+        free(h);
+        return NULL;
+    }
     return h;
 }
 void destroy_holder_bamfile_t(bamfile_t *h, int include_self) {
@@ -2083,25 +2087,7 @@ static int vg_init_scores_for_a_location(vg_t *vg, uint32_t var_idx, int do_wipe
 
                 uint32_t bests[4];
                 vgnode_t *n1 = &vg->nodes[var_idx];
-                //for (uint8_t self_combo = 0; self_combo < 4; self_combo++) {
-                //    uint32_t score[4];
-                //    for (uint8_t prev_combo = 0; prev_combo < 4; prev_combo++) {
-                //        int both_hom = ((self_combo == 0 || self_combo == 3) &&
-                //                        (prev_combo == 0 || prev_combo == 3));
-                //        int s1 = GET_VGN_VAL2(vg, i, prev_combo);
-                //        int s2 = counter[(prev_combo >> 1) << 1 | (self_combo >> 1)];
-                //        int s3 = both_hom ? 0 : counter[((prev_combo & 1) << 1) | (self_combo & 1)];
-                //        score[prev_combo] = s1 + s2 + s3;
-                //    }
-                //    int source;
-                //    bests[self_combo] = max_of_u32_array(score, 4, &source);
-                //    n1->scores[self_combo] = bests[self_combo];
-                //    n1->scores_source[self_combo] = source;
-                //}
-                //int best_i;
-                //max_of_u32_array(bests, 4, &best_i);
-                //n1->best_score_i = best_i;
-                for (int tmpi = 0; tmpi < 4; tmpi++) {
+                for (int tmpi = 0; tmpi < 4; ++tmpi) {
                     n1->scores[tmpi] = vg->nodes[i].scores[tmpi];
                     bests[tmpi] = n1->scores[tmpi];
                 }
@@ -2567,13 +2553,14 @@ void *kadayashi_local_haptagging_dvr_single_region1(samFile *fp_bam,
     //    if no read can be tagged or there was any error
     //    when tagging reads.
 
-    bamfile_t *hf = init_bamfile_t_with_opened_files(fp_bam, fp_bai, fp_header);
-    if (!hf) {
+    kh_str2int_t *qname2tag = (kh_str2int_t *)khash_str2int_init();
+    if (!qname2tag) {
         return NULL;
     }
 
-    kh_str2int_t *qname2tag = (kh_str2int_t *)khash_str2int_init();
-    if (!qname2tag) {
+    bamfile_t *hf = init_bamfile_t_with_opened_files(fp_bam, fp_bai, fp_header);
+    if (!hf) {
+        khash_str2int_destroy_free(qname2tag);
         return NULL;
     }
 
