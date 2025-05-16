@@ -647,6 +647,10 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     const bool run_dwell_check =
             !bacteria && (legacy_bc_models.count(model_config.basecaller_model) == 0);
 
+    const bool label_scheme_is_compatible =
+            secondary::parse_label_scheme_type(model_config.label_scheme_type) ==
+            secondary::LabelSchemeType::HAPLOID;
+
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
         if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
@@ -662,6 +666,12 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
             throw std::runtime_error{
                     "Input data does not contain move tables, but a model which requires move "
                     "tables has been chosen."};
+        }
+
+        if (!label_scheme_is_compatible) {
+            throw std::runtime_error{
+                    "Incompatible model label scheme! Expected HaploidLabelScheme but got " +
+                    model_config.label_scheme_type + "."};
         }
 
     } else {
@@ -681,6 +691,11 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
             spdlog::warn(
                     "Input data does not contain move tables, but a model which requires move "
                     "tables has been chosen. This may produce inferior results.");
+        }
+
+        if (!label_scheme_is_compatible) {
+            spdlog::warn("Incompatible model label scheme! Expected HaploidLabelScheme but got " +
+                         model_config.label_scheme_type + ". This may produce unexpected results.");
         }
     }
 
