@@ -186,15 +186,24 @@ static vchar_t *nt4seq2seq(vu8_t *h, int l) {
 bamfile_t *init_bamfile_t_with_opened_files(samFile *fp_bam,
                                             hts_idx_t *fp_bai,
                                             sam_hdr_t *fp_header) {
-    assert(fp_bam);
-    assert(fp_bai);
-    assert(fp_header);
+    if (!fp_bam || !fp_bai || !fp_header) {
+        return NULL;
+    }
     bamfile_t *h = (bamfile_t *)calloc(1, sizeof(bamfile_t));
-    assert(h);
+    if (!h) {
+        if (DEBUG_LOCAL_HAPLOTAGGING) {
+            fprintf(stderr, "[E::%s] calloc failed\n", __func__);
+        }
+        return NULL;
+    }
     h->fp = fp_bam;
     h->bai = fp_bai;
     h->header = fp_header;
     h->aln = bam_init1();
+    if (!h->aln) {
+        free(h);
+        return NULL;
+    }
     return h;
 }
 void destroy_holder_bamfile_t(bamfile_t *h, int include_self) {
@@ -1584,6 +1593,10 @@ chunk_t *unphased_varcall_a_chunk(bamfile_t *hf,
     bam_destroy1(aln);
     hts_itr_destroy(bamitr);
 
+    if (debug_print && DEBUG_LOCAL_HAPLOTAGGING) {
+        fprintf(stderr, "[dbg::%s] chunk has %d reads\n", __func__, (int)ck->reads.n);
+    }
+
     if (ck->reads.n < 2 || failed) {
         destroy_chunk_t(ck, 1);
         return NULL;
@@ -2012,13 +2025,19 @@ static int vg_init_scores_for_a_location(vg_t *vg, uint32_t var_idx, int do_wipe
     if (var_idx != 0 && !do_wipeout) {
         // reuse values from a previous position
         int i = 0;
-        int diff = 15;
+        int diff = 5;
         for (int k = var_idx - 1; k > 0; k--) {
             uint32_t pos2 = ck->varcalls->a[k].pos;
+            if (debug_print) {
+                fprintf(stderr, "trying pos_resume %d (k=%d)\n", pos2, k);
+            }
             if (pos - pos2 > 50000) {
                 break;  // too far
             }
             if (!vg->next_link_is_broken[k - 1]) {
+                if (debug_print) {
+                    fprintf(stderr, "trying pos_resume %d (k=%d) checkpoint 1\n", pos2, k);
+                }
                 if (pos - pos2 > 300 && (pos - pos2 < 5000 ||
                                          i == 0)) {  // search within 5kb or until finally found one
                     uint32_t tmpcounter[4] = {0, 0, 0, 0};
@@ -2026,6 +2045,12 @@ static int vg_init_scores_for_a_location(vg_t *vg, uint32_t var_idx, int do_wipe
                         tmpcounter[tmpi] = vg->nodes[k].scores[tmpi];
                     }
                     int tmpdiff = diff_of_top_two(tmpcounter);
+                    if (debug_print) {
+                        fprintf(stderr,
+                                "trying pos_resume %d (k=%d) checkpoint 2; %d %d %d %d ; %d\n",
+                                pos2, k, tmpcounter[0], tmpcounter[1], tmpcounter[2], tmpcounter[3],
+                                tmpdiff);
+                    }
                     if (tmpdiff > diff) {
                         diff = tmpdiff;
                         i = k;
@@ -2062,20 +2087,9 @@ static int vg_init_scores_for_a_location(vg_t *vg, uint32_t var_idx, int do_wipe
 
                 uint32_t bests[4];
                 vgnode_t *n1 = &vg->nodes[var_idx];
-                for (uint8_t self_combo = 0; self_combo < 4; self_combo++) {
-                    uint32_t score[4];
-                    for (uint8_t prev_combo = 0; prev_combo < 4; prev_combo++) {
-                        int both_hom = ((self_combo == 0 || self_combo == 3) &&
-                                        (prev_combo == 0 || prev_combo == 3));
-                        int s1 = GET_VGN_VAL2(vg, i, prev_combo);
-                        int s2 = counter[(prev_combo >> 1) << 1 | (self_combo >> 1)];
-                        int s3 = both_hom ? 0 : counter[((prev_combo & 1) << 1) | (self_combo & 1)];
-                        score[prev_combo] = s1 + s2 + s3;
-                    }
-                    int source;
-                    bests[self_combo] = max_of_u32_array(score, 4, &source);
-                    n1->scores[self_combo] = bests[self_combo];
-                    n1->scores_source[self_combo] = static_cast<uint8_t>(source);
+                for (int tmpi = 0; tmpi < 4; ++tmpi) {
+                    n1->scores[tmpi] = vg->nodes[i].scores[tmpi];
+                    bests[tmpi] = n1->scores[tmpi];
                 }
                 int best_i;
                 max_of_u32_array(bests, 4, &best_i);
