@@ -74,8 +74,8 @@ models::ChemistryKey get_chemistry_key(const RunInfoDictData_t* const run_info_d
 
 SimplexReadPtr process_pod5_thread_fn(
         size_t row,
-        Pod5ReadRecordBatch* batch,
-        Pod5FileReader* file,
+        const Pod5ReadRecordBatch* batch,
+        const Pod5FileReader* file,
         const std::string& path,
         const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
         const std::unordered_map<std::string, size_t>& read_id_to_index) {
@@ -189,7 +189,7 @@ SimplexReadPtr process_pod5_thread_fn(
     return new_read;
 }
 
-bool can_process_pod5_row(Pod5ReadRecordBatch_t* batch,
+bool can_process_pod5_row(const Pod5ReadRecordBatch_t* batch,
                           int row,
                           const std::optional<std::unordered_set<std::string>>& allowed_read_ids,
                           const std::unordered_set<std::string>& ignored_read_ids) {
