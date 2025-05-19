@@ -88,20 +88,17 @@ add_library(dorado_utils
 target_compile_definitions(dorado_utils
     PUBLIC
         ENABLE_PER_READ_TRACE=$<BOOL:${DORADO_PER_READ_TRACE}>
-        DORADO_GPU_BUILD=$<BOOL:${DORADO_GPU_BUILD}>
-        DORADO_CUDA_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<NOT:$<BOOL:${APPLE}>>>
-        DORADO_METAL_BUILD=$<AND:$<BOOL:${DORADO_GPU_BUILD}>,$<BOOL:${APPLE}>>
+        DORADO_CUDA_BUILD=$<NOT:$<BOOL:${APPLE}>>
+        DORADO_METAL_BUILD=$<BOOL:${APPLE}>
 )
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
     target_compile_definitions(dorado_utils
         PUBLIC
-            DORADO_TX2=$<VERSION_LESS:${CUDAToolkit_VERSION},11.0>
             DORADO_ORIN=$<VERSION_GREATER_EQUAL:${CUDAToolkit_VERSION},11.0>
     )
 else()
     target_compile_definitions(dorado_utils
         PUBLIC
-            DORADO_TX2=0
             DORADO_ORIN=0
     )
 endif()

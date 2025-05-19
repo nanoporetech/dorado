@@ -14,20 +14,19 @@ add_library(dorado_torch_utils
     trim.h
 )
 
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        target_sources(dorado_torch_utils
-            PRIVATE
-            metal_utils.cpp
-            metal_utils.h
-        )
-    else()
-        target_sources(dorado_torch_utils
-            PRIVATE
-            cuda_utils.cpp
-            cuda_utils.h
-        )
-    endif()
+
+if(APPLE)
+    target_sources(dorado_torch_utils
+        PRIVATE
+        metal_utils.cpp
+        metal_utils.h
+    )
+else()
+    target_sources(dorado_torch_utils
+        PRIVATE
+        cuda_utils.cpp
+        cuda_utils.h
+    )
 endif()
 
 target_include_directories(dorado_torch_utils
@@ -69,18 +68,16 @@ if(APPLE)
         PUBLIC
             ${APPLE_FWK_FOUNDATION}
     )
-    if (DORADO_GPU_BUILD)
-        find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
-        find_library(APPLE_FWK_METAL Metal REQUIRED)
-        find_library(IOKIT IOKit REQUIRED)
-        add_dependencies(dorado_torch_utils metal-lib)
-        target_link_libraries(dorado_torch_utils
-            PUBLIC
-                ${APPLE_FWK_QUARTZ_CORE}
-                ${APPLE_FWK_METAL}
-                ${IOKIT}
-        )
-    endif()
+    find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
+    find_library(APPLE_FWK_METAL Metal REQUIRED)
+    find_library(IOKIT IOKit REQUIRED)
+    add_dependencies(dorado_torch_utils metal-lib)
+    target_link_libraries(dorado_torch_utils
+        PUBLIC
+            ${APPLE_FWK_QUARTZ_CORE}
+            ${APPLE_FWK_METAL}
+            ${IOKIT}
+    )
 endif()
 
 # GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.

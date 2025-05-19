@@ -16,7 +16,7 @@ add_library(dorado_nn STATIC
 )
 
 
-if (DORADO_GPU_BUILD AND APPLE)
+if (APPLE)
     target_sources(dorado_nn
         PRIVATE
         metal/MetalModules.cpp

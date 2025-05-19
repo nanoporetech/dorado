@@ -65,9 +65,6 @@ set(DORADO_3RD_PARTY_SOURCE ${CMAKE_CURRENT_SOURCE_DIR}/dorado/3rdparty)
 set(DORADO_3RD_PARTY_DOWNLOAD ${CMAKE_CURRENT_BINARY_DIR}/download
     CACHE PATH "Location to download 3rdparty libraries into")
 
-# All builds are now GPU builds
-set(DORADO_GPU_BUILD TRUE)
-
 find_package(CUDAToolkit QUIET)
 
 if(${CUDAToolkit_FOUND})
@@ -93,7 +90,7 @@ include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
 include(cmake/OpenSSL.cmake)
 include(cmake/Htslib.cmake)
-if (DORADO_GPU_BUILD AND APPLE)
+if (APPLE)
     include(cmake/Metal.cmake)
 endif()
 

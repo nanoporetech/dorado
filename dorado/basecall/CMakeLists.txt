@@ -19,29 +19,27 @@ add_library(dorado_basecall STATIC
     model/TxModel.h
 )
 
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        target_sources(dorado_basecall
-            PRIVATE
-            MetalCaller.cpp
-            MetalCaller.h
-            MetalModelRunner.cpp
-            MetalModelRunner.h
-            model/MetalCRFModel.cpp
-            model/MetalCRFModel.h
-        )
-    else()
-        target_sources(dorado_basecall
-            PRIVATE
-            CudaModelRunner.cpp
-            CudaModelRunner.h
-            CudaCaller.cpp
-            CudaCaller.h
-            decode/CUDADecoder.cpp
-            decode/CUDADecoder.h
-        )
-        target_link_libraries(dorado_basecall PRIVATE dorado_benchmarks)
-    endif()
+if(APPLE)
+    target_sources(dorado_basecall
+        PRIVATE
+        MetalCaller.cpp
+        MetalCaller.h
+        MetalModelRunner.cpp
+        MetalModelRunner.h
+        model/MetalCRFModel.cpp
+        model/MetalCRFModel.h
+    )
+else()
+    target_sources(dorado_basecall
+        PRIVATE
+        CudaModelRunner.cpp
+        CudaModelRunner.h
+        CudaCaller.cpp
+        CudaCaller.h
+        decode/CUDADecoder.cpp
+        decode/CUDADecoder.h
+    )
+    target_link_libraries(dorado_basecall PRIVATE dorado_benchmarks)
 endif()
 
 target_include_directories(dorado_basecall
