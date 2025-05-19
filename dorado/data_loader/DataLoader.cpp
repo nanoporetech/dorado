@@ -289,6 +289,12 @@ void DataLoader::load_reads_unrestricted(
 }
 
 void DataLoader::load_reads(const InputFiles& input_files, ReadOrder traversal_order) {
+    if (pod5_init() != POD5_OK) {
+        throw std::runtime_error(
+                fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
+    }
+    auto pod5_cleanup = utils::PostCondition([] { pod5_terminate(); });
+
     switch (traversal_order) {
     case ReadOrder::BY_CHANNEL:
         load_reads_by_channel(input_files.get());
@@ -311,7 +317,6 @@ void DataLoader::load_read_channels(const std::vector<std::filesystem::directory
         if (ext != ".pod5") {
             continue;
         }
-        pod5_init();
 
         // Use a std::map to store by sorted channel order.
         const auto file_string = file_path.string();
@@ -386,8 +391,6 @@ void DataLoader::load_read_channels(const std::vector<std::filesystem::directory
 
 void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                        const std::vector<ReadID>& read_ids) {
-    pod5_init();
-
     // Open the file ready for walking:
     // TODO: The earlier implementation was caching the pod5 readers into a
     // map and re-using it during each iteration. However, we found a leak
@@ -482,8 +485,6 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 }
 
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
-    pod5_init();
-
     // Open the file ready for walking:
     Pod5FileReader_t* file = pod5_open_file(path.c_str());
     if (!file) {
