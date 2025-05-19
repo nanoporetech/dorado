@@ -23,21 +23,37 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
         }
 
         pod5_init();
-        // Open the file ready for walking:
-        Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
+        // Open the file
+        const auto file_path = entry.path().string();
+        Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
-                          pod5_get_error_string());
+            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            continue;
+        }
+        auto cleanup_file = utils::PostCondition([&file] {
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader: {}", pod5_get_error_string());
+            }
+        });
+
+        // First get the run info count
+        run_info_index_t run_info_count = 0;
+        if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+            spdlog::error("Failed to query run info count: {}", pod5_get_error_string());
             continue;
         }
 
-        // First get the run info count
-        run_info_index_t run_info_count;
-        pod5_get_file_run_info_count(file, &run_info_count);
         for (run_info_index_t idx = 0; idx < run_info_count; idx++) {
-            RunInfoDictData_t* run_info_data;
-            pod5_get_file_run_info(file, idx, &run_info_data);
+            RunInfoDictData_t* run_info_data = nullptr;
+            if (pod5_get_file_run_info(file, idx, &run_info_data) != POD5_OK) {
+                continue;
+            }
+            auto cleanup_run_info = utils::PostCondition([&run_info_data] {
+                if (pod5_free_run_info(run_info_data) != POD5_OK) {
+                    spdlog::error("Failed to free run info: {}", pod5_get_error_string());
+                }
+            });
 
             auto exp_start_time_ms = run_info_data->acquisition_start_time_ms;
             std::string flowcell_id = run_info_data->flow_cell_id;
@@ -46,10 +62,6 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
             std::string sample_id = run_info_data->sample_id;
             std::string position_id = run_info_data->sequencer_position;
             std::string experiment_id = run_info_data->experiment_name;
-
-            if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                spdlog::error("Failed to free run info");
-            }
 
             std::string id = std::string(run_id).append("_").append(model_name);
             read_groups[id] = ReadGroup{
@@ -63,9 +75,6 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
                     std::move(position_id),
                     std::move(experiment_id),
             };
-        }
-        if (pod5_close_and_free_reader(file) != POD5_OK) {
-            spdlog::error("Failed to close and free POD5 reader");
         }
     }
 
@@ -86,20 +95,28 @@ size_t get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_fi
         }
 
         pod5_init();
-        // Open the file ready for walking:
-        Pod5FileReader_t* file = pod5_open_file(entry.path().string().c_str());
 
-        size_t read_count;
-        pod5_get_read_count(file, &read_count);
+        // Open the file
+        const auto file_path = entry.path().string();
+        Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", entry.path().string().c_str(),
+            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            continue;
+        }
+        auto cleanup_file = utils::PostCondition([&file] {
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader: {}", pod5_get_error_string());
+            }
+        });
+
+        size_t read_count = 0;
+        if (pod5_get_read_count(file, &read_count) != POD5_OK) {
+            spdlog::error("Failed to query read count of {}: {}", file_path,
                           pod5_get_error_string());
+            continue;
         }
 
         num_reads += read_count;
-        if (pod5_close_and_free_reader(file) != POD5_OK) {
-            spdlog::error("Failed to close and free POD5 reader");
-        }
     }
 
     // Remove the reads in the ignore list from the total dataset read count.
@@ -128,66 +145,55 @@ bool is_pod5_data_present(const std::vector<std::filesystem::directory_entry>& d
 }
 
 uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& dir_files) {
-    std::optional<uint16_t> sample_rate = std::nullopt;
-
     for (const auto& entry : dir_files) {
         if (!utils::has_pod5_extension(entry)) {
             continue;
         }
 
+        // Open the file
         auto file_path = entry.path().string();
         pod5_init();
-        // Open the file ready for walking:
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
-
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path.c_str(), pod5_get_error_string());
-        } else {
-            auto free_pod5 = [&]() {
-                if (pod5_close_and_free_reader(file) != POD5_OK) {
-                    spdlog::error("Failed to close and free POD5 reader for file {}",
-                                  file_path.c_str());
-                }
-            };
+            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            continue;
+        }
+        auto cleanup_file = utils::PostCondition([&file, &file_path]() {
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader for file {}: {}", file_path,
+                              pod5_get_error_string());
+            }
+        });
 
-            auto post = utils::PostCondition(free_pod5);
-
-            // First get the run info count
-            run_info_index_t run_info_count;
-            if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
-                spdlog::error("Failed to fetch POD5 run info count for file {} : {}",
-                              file_path.c_str(), pod5_get_error_string());
+        // First get the run info count
+        run_info_index_t run_info_count = 0;
+        if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+            spdlog::error("Failed to fetch POD5 run info count for file {} : {}", file_path,
+                          pod5_get_error_string());
+            continue;
+        }
+        if (run_info_count > static_cast<run_info_index_t>(0)) {
+            RunInfoDictData_t* run_info_data = nullptr;
+            if (pod5_get_file_run_info(file, 0, &run_info_data) != POD5_OK) {
+                spdlog::error(
+                        "Failed to fetch POD5 run info dict for file {} and run info index 0: {}",
+                        file_path, pod5_get_error_string());
                 continue;
             }
-            if (run_info_count > static_cast<run_info_index_t>(0)) {
-                RunInfoDictData_t* run_info_data;
-                if (pod5_get_file_run_info(file, 0, &run_info_data) != POD5_OK) {
-                    spdlog::error(
-                            "Failed to fetch POD5 run info dict for file {} and run info "
-                            "index 0: {}",
-                            file_path.c_str(), pod5_get_error_string());
-                    continue;
-                }
-                sample_rate = run_info_data->sample_rate;
-
+            auto cleanup_run_info = utils::PostCondition([&run_info_data, &file_path] {
                 if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                    spdlog::error("Failed to free POD5 run info for file {} and run info index 0",
-                                  file_path.c_str());
+                    spdlog::error(
+                            "Failed to free POD5 run info for file {} and run info index 0: {}",
+                            file_path, pod5_get_error_string());
                 }
-            }
-        }
+            });
 
-        // Break out of loop if sample rate is found.
-        if (sample_rate) {
-            break;
+            // Break out of loop if sample rate is found.
+            return run_info_data->sample_rate;
         }
     }
 
-    if (sample_rate) {
-        return *sample_rate;
-    } else {
-        throw std::runtime_error("Unable to determine sample rate for data.");
-    }
+    throw std::runtime_error("Unable to determine sample rate for data.");
 }
 
 static std::set<models::ChemistryKey> get_sequencing_chemistries(
@@ -201,52 +207,48 @@ static std::set<models::ChemistryKey> get_sequencing_chemistries(
         const auto file_path = std::filesystem::path(entry).string();
 
         pod5_init();
-        // Open the file ready for walking:
+        // Open the file
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
-
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path.c_str(), pod5_get_error_string());
-        } else {
-            auto free_pod5 = [&]() {
-                if (pod5_close_and_free_reader(file) != POD5_OK) {
-                    spdlog::error("Failed to close and free POD5 reader for file {}",
-                                  file_path.c_str());
-                }
-            };
+            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            continue;
+        }
+        auto cleanup_file = utils::PostCondition([&file, &file_path] {
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader for file {}: {}", file_path,
+                              pod5_get_error_string());
+            }
+        });
 
-            auto post = utils::PostCondition(free_pod5);
+        // First get the run info count
+        run_info_index_t run_info_count = 0;
+        if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
+            spdlog::error("Failed to fetch POD5 run info count for file {} : {}", file_path,
+                          pod5_get_error_string());
+            continue;
+        }
 
-            // First get the run info count
-            run_info_index_t run_info_count;
-            if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
-                spdlog::error("Failed to fetch POD5 run info count for file {} : {}",
-                              file_path.c_str(), pod5_get_error_string());
-
+        for (run_info_index_t ri_idx = 0; ri_idx < run_info_count; ri_idx++) {
+            RunInfoDictData_t* run_info_data = nullptr;
+            if (pod5_get_file_run_info(file, ri_idx, &run_info_data) != POD5_OK) {
+                spdlog::error(
+                        "Failed to fetch POD5 run info dict for file {} and run info index {}: {}",
+                        file_path, ri_idx, pod5_get_error_string());
                 continue;
             }
-
-            for (run_info_index_t ri_idx = 0; ri_idx < run_info_count; ri_idx++) {
-                RunInfoDictData_t* run_info_data;
-                if (pod5_get_file_run_info(file, ri_idx, &run_info_data) != POD5_OK) {
-                    spdlog::error(
-                            "Failed to fetch POD5 run info dict for file {} and run info "
-                            "index {}: {}",
-                            file_path.c_str(), ri_idx, pod5_get_error_string());
-                } else {
-                    const auto chemistry_key = models::get_chemistry_key(
-                            run_info_data->flow_cell_product_code, run_info_data->sequencing_kit,
-                            run_info_data->sample_rate);
-                    spdlog::trace("POD5: {} {}", file_path.c_str(), to_string(chemistry_key));
-                    chemistries.insert(chemistry_key);
-                }
+            auto cleanup_run_info = utils::PostCondition([&run_info_data, &file_path] {
                 if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                    spdlog::error(
-                            "Failed to free POD5 run info for file {} and run info index: "
-                            "{}",
-                            file_path.c_str(), ri_idx);
+                    spdlog::error("Failed to free POD5 run info for file {}: {}", file_path,
+                                  pod5_get_error_string());
                 }
-            }
-        };
+            });
+
+            const auto chemistry_key = models::get_chemistry_key(
+                    run_info_data->flow_cell_product_code, run_info_data->sequencing_kit,
+                    run_info_data->sample_rate);
+            spdlog::trace("POD5: {} {}", file_path, to_string(chemistry_key));
+            chemistries.insert(chemistry_key);
+        }
     }
 
     return chemistries;
