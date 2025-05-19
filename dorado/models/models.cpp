@@ -1319,6 +1319,35 @@ const std::vector<ModelInfo> models = {
                 ModsVariantPair{},
         },
 
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl",
+                "89a08e1338671a37c1e839bc93b66d85cc453a64a375b71e9e4a7821b54afec7",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl_mv",
+                "926622e8942c7af1a771164b6e3f3a22f1e0e7ccd44f4eda0ceb33cba2b27fff",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl",
+                "544f65ab65b6539286803e63fef1077721a9f9cbe2ba69465a79ad4f683fb0cd",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl_mv",
+                "0e98434ae7f57da8157d57fb6836c196baac51ce24daf82d117e3f73d3691ea2",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_2_0},
+                ModsVariantPair{},
+        },
+
         // Bacterial models.
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0",
