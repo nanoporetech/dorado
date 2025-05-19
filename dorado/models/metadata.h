@@ -20,17 +20,21 @@ enum class ModelVariant : uint16_t {
 
 // Enumeration of modifications codes
 enum class ModsVariant : uint8_t {
+    M_2OmeG,
     M_4mC_5mC,
     M_5mC_5hmC,
     M_5mCG,
     M_5mCG_5hmCG,
     M_5mC,
     M_m5C,
+    M_m5C_2OmeC,
     M_6mA,
     M_m6A,
     M_m6A_DRACH,
     M_inosine_m6A,
+    M_inosine_m6A_2OmeA,
     M_pseU,
+    M_pseU_2OmeU,
     NONE  // NONE must be last
 };
 
@@ -49,6 +53,7 @@ enum class ModelVersion : uint8_t {
     v4_3_0,
     v5_0_0,
     v5_1_0,
+    v5_2_0,
     NONE  // NONE must be last
 };
 
