@@ -18,9 +18,9 @@
 #else  // _WIN32
 #include <dlfcn.h>
 #endif  // _WIN32
-#if DORADO_ORIN || DORADO_TX2
+#if DORADO_ORIN
 #include <torch/torch.h>
-#endif  // DORADO_ORIN || DORADO_TX2
+#endif  // DORADO_ORIN
 #endif  // HAS_NVML
 
 #include <spdlog/spdlog.h>
@@ -540,9 +540,9 @@ class DeviceInfoCache final {
                 spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
             }
         }
-#if DORADO_ORIN || DORADO_TX2
+#if DORADO_ORIN
         if (device_count == 0) {
-            // TX2/Orin may not have NVML, in which case ask torch how many devices it thinks there are.
+            // Orin may not have NVML, in which case ask torch how many devices it thinks there are.
             device_count = torch::cuda::device_count();
             spdlog::info("Setting device count to {} as reported from torch", device_count);
         }
@@ -670,29 +670,6 @@ std::optional<std::string> read_version_from_proc() {
 }
 #endif
 
-#if DORADO_TX2
-std::optional<std::string> read_version_from_tegra_release() {
-    std::ifstream version_file("/etc/nv_tegra_release", std::ios_base::in | std::ios_base::binary);
-    if (!version_file.is_open()) {
-        spdlog::warn("No nv_tegra_release file found in /etc");
-        return std::nullopt;
-    }
-
-    // First line should contain the version.
-    std::string line;
-    if (!std::getline(version_file, line)) {
-        spdlog::warn("Failed to read first line from nv_tegra_release file");
-        return std::nullopt;
-    }
-
-    auto info = detail::parse_nvidia_tegra_line(line);
-    if (!info.has_value()) {
-        spdlog::warn("Failed to parse version line from nv_tegra_release file: '{}'", line);
-    }
-    return info;
-}
-#endif  // DORADO_TX2
-
 }  // namespace
 
 std::optional<DeviceStatusInfo> get_device_status_info(unsigned int device_index) {
@@ -728,18 +705,6 @@ std::optional<std::string> get_nvidia_driver_version() {
             version = read_version_from_proc();
         }
 #endif  // __linux__
-#if DORADO_TX2
-        if (!version) {
-            version = read_version_from_tegra_release();
-        }
-        if (!version && running_in_docker()) {
-            // The docker images we run in aren't representative of running natively on a
-            // device, so we fake a version number to allow the tests to pass. On a real
-            // machine we'll have grabbed the version from the tegra release file.
-            spdlog::warn("Can't query version when running inside a docker container on TX2");
-            version = "0.0.1";
-        }
-#endif  // DORADO_TX2
         return version;
     }();
     return cached_version;

@@ -117,10 +117,6 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
 }
 
 void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
-#if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
-    (void)wm;
-    throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
-#else
     // Working memory is laid out as [T+3][N][C] in memory, where the reverse LSTM
     // layers (even index) use [1:-2] as input and [2:-1] as output, whereas the
     // forward LSTM layers (odd index) use [2:-1] as input and [1:-2] as output.
@@ -189,7 +185,6 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
 
         wm.is_input_to_rev_lstm = !reverse;
     }
-#endif  // DORADO_TX2
 }
 
 void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {

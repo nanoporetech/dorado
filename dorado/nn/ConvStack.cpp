@@ -205,9 +205,6 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                     std::to_string(params.insize));
         }
     } else if (cutlass_conv) {
-#if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
-        throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
-#else
         utils::ScopedProfileRange spr2("linear conv", 3);
         auto out_type = (output_layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
         in.slice(1, 0, padding) = 0;
@@ -224,7 +221,6 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                     std::string("Koi convolution (host_linear) failed with in size ") +
                     std::to_string(params.insize));
         }
-#endif  // DORADO_TX2
     } else {
         utils::ScopedProfileRange spr2("window conv", 3);
         // The window tensor is either NTC or TNC, depending on whether the first two

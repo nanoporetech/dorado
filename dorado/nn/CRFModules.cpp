@@ -77,9 +77,6 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
             out_2D += linear->bias;
         }
     } else {
-#if DORADO_TX2  // Koi for TX2 does not have Cutlass kernels
-        throw std::logic_error("No Cutlass kernels in Jetson TX2 build.");
-#else
         utils::ScopedProfileRange spr("koi_linear", 2);
         auto in_ntc = wm.get_current_NTC_view();
         auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
@@ -100,7 +97,6 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
         if (res != KOI_SUCCESS) {
             throw std::runtime_error(std::string("Linear layer error:") + std::to_string(res));
         }
-#endif  // ifdef DORADO_TX2 else
     }
 }
 #endif

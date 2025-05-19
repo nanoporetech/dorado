@@ -209,12 +209,6 @@ std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
     int64_t T_in = m_batch_dims[batch_dims_idx].T_in;
     int64_t T_out = m_batch_dims[batch_dims_idx].T_out;
     int64_t C_in = m_num_input_features;
-#if DORADO_TX2
-    // The libtorch version on TX2 doesn't support `Tensor::view()` with a dtype of a different
-    // size, so we use separate tensors here.
-    auto input = torch::empty({N, C_in, T_in}, opts.dtype(m_options.dtype()));
-    auto output = torch::empty({3, N, T_out}, opts.dtype(torch::kInt8));
-#else
     auto scalar_type = c10::typeMetaToScalarType(m_options.dtype());
     // A runner's input and output buffers are never in use simultaneously, thus they can be mapped
     // to the same backing tensor.
@@ -223,7 +217,6 @@ std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
     auto storage = torch::empty({std::max(input_bytes, output_bytes)}, opts.dtype(torch::kInt8));
     auto input = storage.slice(0, 0, input_bytes).view(scalar_type).view({N, C_in, T_in});
     auto output = storage.slice(0, 0, output_bytes).view({3, N, T_out});
-#endif
     return {input, output};
 }
 
