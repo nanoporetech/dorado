@@ -1,9 +1,9 @@
 #pragma once
 
-#include "file_info/file_info.h"
-#include "models/kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
+
+#include <cxxpool.h>
 
 #include <array>
 #include <filesystem>
@@ -11,7 +11,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -77,7 +76,7 @@ private:
     Pipeline& m_pipeline;  // Where should the loaded reads go?
     std::atomic<size_t> m_loaded_read_count{0};
     std::string m_device;
-    size_t m_num_worker_threads{1};
+    cxxpool::thread_pool m_thread_pool;
     size_t m_max_reads{0};
     std::optional<std::unordered_set<std::string>> m_allowed_read_ids;
     std::unordered_set<std::string> m_ignored_read_ids;

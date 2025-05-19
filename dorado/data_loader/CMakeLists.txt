@@ -6,11 +6,11 @@ add_library(dorado_io_lib
 target_link_libraries(dorado_io_lib
 PUBLIC
     dorado_lib
+    cxxpool
 PRIVATE
     spdlog::spdlog
     pod5_libs
     ${ZLIB_LIBRARIES}
-    cxxpool
 )
 
 enable_warnings_as_errors(dorado_io_lib)

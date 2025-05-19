@@ -10,7 +10,6 @@
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
-#include <cxxpool.h>
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
@@ -439,9 +438,6 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         throw std::runtime_error("Plan traveral didn't yield correct number of reads");
     }
 
-    // Create static threadpool so it is reused across calls to this function.
-    static cxxpool::thread_pool pool{m_num_worker_threads};
-
     uint32_t row_offset = 0;
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
         if (m_loaded_read_count == m_max_reads) {
@@ -463,9 +459,10 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_thread_fn, row, batch, file,
-                                            std::cref(path), std::cref(m_reads_by_channel),
-                                            std::cref(m_read_id_to_index)));
+                futures.push_back(m_thread_pool.push([row, batch, file, &path, this] {
+                    return process_pod5_thread_fn(row, batch, file, path, m_reads_by_channel,
+                                                  m_read_id_to_index);
+                }));
             }
         }
 
@@ -504,8 +501,6 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         return;
     }
 
-    cxxpool::thread_pool pool{m_num_worker_threads};
-
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
         if (m_loaded_read_count == m_max_reads) {
             break;
@@ -534,9 +529,10 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
             if (can_process_pod5_row(batch, int(row), m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_thread_fn, row, batch, file,
-                                            std::cref(path), std::cref(m_reads_by_channel),
-                                            std::cref(m_read_id_to_index)));
+                futures.push_back(m_thread_pool.push([row, batch, file, &path, this] {
+                    return process_pod5_thread_fn(row, batch, file, path, m_reads_by_channel,
+                                                  m_read_id_to_index);
+                }));
             }
         }
 
@@ -573,11 +569,11 @@ DataLoader::DataLoader(Pipeline& pipeline,
                        std::unordered_set<std::string> read_ignore_list)
         : m_pipeline(pipeline),
           m_device(device),
-          m_num_worker_threads(num_worker_threads),
+          m_thread_pool(num_worker_threads),
           m_allowed_read_ids(std::move(read_list)),
           m_ignored_read_ids(std::move(read_ignore_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
-    assert(m_num_worker_threads > 0);
+    assert(m_thread_pool.n_threads() > 0);
 }
 
 DataLoader::InputFiles DataLoader::InputFiles::search_pod5s(const std::filesystem::path& path,
