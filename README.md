@@ -399,8 +399,8 @@ Additionally, `dorado polish` can output a VCF file containing records for all v
 
 ##### Consensus
 ```
-# Align the reads using dorado aligner, sort and index
-dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aligned_reads.bam
+# Align unmapped reads to a reference using dorado aligner, sort and index
+dorado aligner <draft.fasta> <unmapped_reads.bam> | samtools sort --threads <num_threads> > aligned_reads.bam
 samtools index aligned_reads.bam
 
 # Call consensus
@@ -422,14 +422,14 @@ dorado polish <aligned_reads> <draft> --vcf > polished_assembly.vcf
 dorado polish <aligned_reads> <draft> --gvcf > polished_assembly.all.vcf
 ```
 
-Specifying the `--vcf` or `--gvcf` flags will output a VCF file to stdout instead of the consensus sequences.
+Specifying `--vcf` or `--gvcf` flags will output a VCF file to stdout instead of the consensus sequences.
 
 ##### Output to a folder
 ```
 dorado polish <aligned_reads> <draft> -o <output_dir>
 ```
 
-Specifying the `-o` will write multiple files to a given output directory (and create the directory if it doesn't exist):
+Specifying `-o` will write multiple files to a given output directory (and create the directory if it doesn't exist):
 - Consensus file: `<output_dir>/consensus.fasta` by default, or `<output_dir>/consensus.fastq` if `--qualities` is specified.
 - VCF file: `<output_dir>/variants.vcf` which contains only variant calls by default, or records for all positions if `--gvcf` is specified.
 
@@ -438,7 +438,7 @@ Specifying the `-o` will write multiple files to a given output directory (and c
 Dorado `polish` will automatically select the compute resources to perform polishing. It can use one or more GPU devices, or the CPU, to call consensus.
 
 To specify resources manually use:
-- `-x / --device` - to specify specific GPU resources (if available). For more information see here.
+- `-x / --device` - to specify specific GPU resources (if available).
 - `--threads` -  to set the maximum number of threads to be used for everything but the inference.
 - `--infer-threads` -  to set the number of CPU threads for inference (when "--device cpu" is used).
 - `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
@@ -574,6 +574,92 @@ Example usage:
 ```
 dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aln.bam
 samtools index aln.bam
+```
+
+## Variant Calling - Alpha preview release
+
+Dorado `variant` is an early-stage diploid small variant caller, released for experimental use and evaluation purposes.
+This version is intended for feedback and should not yet be considered production-ready.
+
+> **Should I use `polish` or `variant`?**
+Dorado variant is a short variant caller for diploid samples aligned to a haploid species reference (e.g. GRCh38) whereas `polish` is intended for workflows involving reads aligned to a haplotype-resolved (or haploid) draft assembly.
+
+Although `dorado polish` can also generate a VCF file of variants, there are some substantial distinctions between the two tools.
+| `dorado polish`             | `dorado variant`             |
+| -------------------- | -------------------- |
+| - Polishing of draft assemblies<br>- Input is a haplotype-resolved draft assembly<br>- Output is a polished sequence<br>- Optionally, a VCF/gVCF of diffs is output<br>- Uses specialised polishing models| - Diploid variant calling<br>- Input is a reference genome<br>- Output is a VCF/gVCF of called diploid variants<br>- Uses specialised variant calling models|
+
+#### Quick Start
+
+```
+# Align the reads using dorado aligner, sort and index
+dorado aligner <ref.fasta> <reads.bam> | samtools sort --threads <num_threads> > aligned_reads.bam
+samtools index aligned_reads.bam
+
+# Call variants
+dorado variant <aligned_reads.bam> <ref.fasta> > variants.vcf
+```
+
+For this preview release, current models require signal-level information encoded in the move tables in the input BAM file. This requires the `--emit-moves` flag to be set during basecalling.
+
+
+##### Output to a folder
+```
+dorado variant <aligned_reads> <reference> -o <output_dir>
+```
+
+Specifying `-o` will write the output to one or more files stored in the given output directory (and create the directory if it doesn't exist). Concretely:
+- VCF file: `<output_dir>/variants.vcf` which contains only variant calls by default, or records for all positions if `--gvcf` is specified.
+
+#### Resources
+
+Dorado `variant` will automatically select the compute resources to perform variant calling. It can use one or more GPU devices. Variant calling can be performed on CPU-only, but we highly recommend to run on GPU for desired performance. High-memory GPUs are recommended to run this tool.
+
+To specify resources manually use:
+- `-x / --device` - to specify specific GPU resources (if available).
+- `--threads` - to set the maximum number of threads to be used for everything but the inference.
+- `--infer-threads` - number of inference workers to use (per device). For CPU-only runs, this specifies the number of CPU inference threads.
+- `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
+
+Example:
+```
+dorado variant aligned_reads.bam reference.fasta --device cuda:0 --threads 24 > variants.vcf
+```
+
+#### Models
+
+By default, `variant` queries the BAM and selects the best model for the basecalled reads, if supported.
+
+Alternatively, a model can be selected through the command line in the following way:
+```
+--model <value>
+```
+| Value    | Description |
+| -------- | ------- |
+| auto  | Determine the best compatible model based on input data. |
+| \<basecaller_model\> | Simplex basecaller model name (e.g. `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`) |
+| \<variant_model\> | Variant calling model name (e.g. `dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0`) |
+| \<path\> | Local path on disk where the model can be loaded from. |
+
+When the `auto` or the`<basecaller_model>` syntax is used the most recent version of a compatible model will be selected for variant calling.
+
+Current variant calling models require the presence of move tables in the input BAM file. Move tables need to be exported during basecalling.
+
+If a non-compatible model is selected for the input data, or if there are multiple read groups in the input dataset which were generated using different basecaller models, `dorado variant` will report an error and stop execution.
+
+##### Supported basecaller models
+- `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
+
+More models will be supported in the near future. This is an alpha release.
+
+#### Memory Consumption
+The default inference batch size (`10`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
+```
+dorado variant aligned_reads.bam reference.fasta --batchsize <number> > variants.vcf
+```
+or the number of inference workers:
+```
+dorado variant aligned_reads.bam reference.fasta --infer-threads 1 > variants.vcf
 ```
 
 ## Available basecalling models
