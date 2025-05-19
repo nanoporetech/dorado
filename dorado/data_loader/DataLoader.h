@@ -48,9 +48,6 @@ public:
 
     void load_reads(const InputFiles& input_files, ReadOrder traversal_order);
 
-    std::string get_name() const { return "Dataloader"; }
-    stats::NamedStats sample_stats() const;
-
     struct ReadSortInfo {
         std::string read_id;
         int32_t mux;
@@ -74,7 +71,7 @@ private:
     void initialise_read(ReadCommon& read) const;
 
     Pipeline& m_pipeline;  // Where should the loaded reads go?
-    std::atomic<size_t> m_loaded_read_count{0};
+    size_t m_loaded_read_count{0};
     std::string m_device;
     cxxpool::thread_pool m_thread_pool;
     size_t m_max_reads{0};

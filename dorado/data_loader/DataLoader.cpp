@@ -591,7 +591,4 @@ const std::vector<std::filesystem::directory_entry>& DataLoader::InputFiles::get
     return m_entries;
 }
 
-stats::NamedStats DataLoader::sample_stats() const {
-    return stats::NamedStats{{"loaded_read_count", static_cast<double>(m_loaded_read_count)}};
-}
 }  // namespace dorado
