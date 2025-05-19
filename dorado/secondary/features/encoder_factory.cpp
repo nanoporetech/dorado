@@ -104,6 +104,9 @@ std::unique_ptr<EncoderBase> encoder_factory(
             hap_source_final = HaplotagSource::UNPHASED;
         }
 
+        spdlog::debug("Haplotag source: {}",
+                      secondary::haplotag_source_to_string(hap_source_final));
+
         std::unique_ptr<EncoderReadAlignment> ret = std::make_unique<EncoderReadAlignment>(
                 in_ref_fn, in_bam_aln_fn, config.feature_encoder_dtypes, tag_name, tag_value,
                 tag_keep_missing, read_group, min_mapq, max_reads, row_per_read, include_dwells,

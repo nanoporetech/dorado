@@ -278,8 +278,6 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
         throw std::runtime_error{"[calculate_read_alignment] BamFile not opened properly!"};
     }
 
-    spdlog::debug("Haplotag source: {}", secondary::haplotag_source_to_string(hap_source));
-
     // Load haplotags, either from file or compute in place.
     const std::unordered_map<std::string, int32_t> kadayashi_qn2tag =
             [&hap_source, &in_haplotag_bin_fn, &fp, &idx, &hdr, &fai_ptr, &chr_name, start, end]() {
