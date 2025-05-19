@@ -288,13 +288,6 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
 
     // First set of batch dimensions.
     std::set<int> T_outs({calculate_T_out(requested_chunk_size)});
-#if DORADO_TX2
-    requested_batch_size = (requested_batch_size == 0) ? 256 : requested_batch_size;
-    requested_batch_size = std::min(256, utils::pad_to(requested_batch_size, batch_granularity));
-    int T_out = *(T_outs.begin());
-    m_batch_dims.push_back({requested_batch_size, T_out * stride, T_out});
-    return;
-#endif
 
     // For high throughput simplex basecalling we use additional, shorter chunk sizes to handle
     // short reads better. As either of the queues might fill so slowly that we hit the
