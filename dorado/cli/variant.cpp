@@ -75,7 +75,7 @@ struct Options {
     int32_t threads = 0;
     int32_t infer_threads = 1;
     std::string device_str;
-    int32_t batch_size = 16;
+    int32_t batch_size = 10;
     int64_t ref_batch_size = 200'000'000;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
@@ -162,7 +162,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_group("Advanced options");
         parser->visible.add_argument("-b", "--batchsize")
                 .help("Batch size for inference.")
-                .default_value(16)
+                .default_value(10)
                 .scan<'i', int>();
         parser->visible.add_argument("--ref-batchsize")
                 .help("Approximate batch size for processing input reference sequences.")
