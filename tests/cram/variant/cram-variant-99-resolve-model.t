@@ -109,6 +109,7 @@ Negative test: no dwells in data, but the model uses them for polishing.
   Exit code: 1
   1
   [error] Caught exception: Input data does not contain move tables, but a model which requires move tables has been chosen.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: Basecaller model specified in the BAM does not match the Basecaller model specified in the Variant Calling model.
   $ rm -rf out; mkdir -p out
@@ -127,6 +128,7 @@ Negative test: Basecaller model specified in the BAM does not match the Basecall
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   [error] Caught exception: Variant calling model is not compatible with the input BAM!
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Passing test with warnings: no dwells in data, but the model uses them for polishing.
 Using `--skip-model-compatibility-check`.
@@ -149,6 +151,7 @@ Using `--skip-model-compatibility-check`.
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
   [warning] Input data does not contain move tables, but a model which requires move tables has been chosen. This may produce inferior results.
 
 Passing test with warnings: Basecaller model specified in the BAM does not match the Basecaller model specified in the Variant Calling model.
@@ -168,6 +171,7 @@ Using `--skip-model-compatibility-check`.
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
 
 Negative test: A Polishing model is provided instead of a Variant Calling model. This should fail.
@@ -185,6 +189,7 @@ Negative test: A Polishing model is provided instead of a Variant Calling model.
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   [error] Caught exception: Incompatible model label scheme! Expected DiploidLabelScheme but got HaploidLabelScheme.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Passing test with warnings: A Polishing model is provided instead of a Variant Calling model
 Using `--skip-model-compatibility-check`.
@@ -201,6 +206,7 @@ Using `--skip-model-compatibility-check`.
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
   [warning] Incompatible model label scheme! Expected DiploidLabelScheme but got HaploidLabelScheme. This may produce unexpected results.
 
 ##############################################
