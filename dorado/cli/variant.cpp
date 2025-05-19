@@ -843,6 +843,10 @@ void run_variant_calling(const Options& opt,
 
 int variant_caller(int argc, char* argv[]) {
     try {
+        spdlog::warn(
+                "This is an alpha preview of Dorado Variant. Results should be considered "
+                "experimental.");
+
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
         int verbosity = 0;

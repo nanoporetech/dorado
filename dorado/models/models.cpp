@@ -1371,13 +1371,6 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
                 ModsVariantPair{},
         },
-        ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0",
-                "77c5d1db4e5acca8da76a32ea971ab2b6024e1704a565393fa4b5815404f24ea",
-                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-                ModelVariantPair{ModelVariant::SUP, VV::v5_0_0},
-                ModsVariantPair{},
-        },
 };
 
 }  // namespace variant_caller

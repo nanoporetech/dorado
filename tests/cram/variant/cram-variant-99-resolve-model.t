@@ -16,7 +16,7 @@ HAC. Auto-resolve the `dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0` model
   1
   1
 
-SUP. Auto-resolve the `dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0` model from the BAM file and download it.
+Attempt to download a model which is not available.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > ### Create the synthetic data with no dwells.
@@ -30,9 +30,10 @@ SUP. Auto-resolve the `dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0` model
   > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
-  Exit code: 0
-  1
-  1
+  Exit code: 1
+  0
+  0
+  Caught exception: Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0'.
 
 ##############################################
 ### Test auto-resolve from the Basecaller  ###
@@ -108,6 +109,7 @@ Negative test: no dwells in data, but the model uses them for polishing.
   Exit code: 1
   1
   [error] Caught exception: Input data does not contain move tables, but a model which requires move tables has been chosen.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: Basecaller model specified in the BAM does not match the Basecaller model specified in the Variant Calling model.
   $ rm -rf out; mkdir -p out
@@ -126,6 +128,7 @@ Negative test: Basecaller model specified in the BAM does not match the Basecall
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   [error] Caught exception: Variant calling model is not compatible with the input BAM!
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Passing test with warnings: no dwells in data, but the model uses them for polishing.
 Using `--skip-model-compatibility-check`.
@@ -148,6 +151,7 @@ Using `--skip-model-compatibility-check`.
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
   [warning] Input data does not contain move tables, but a model which requires move tables has been chosen. This may produce inferior results.
 
 Passing test with warnings: Basecaller model specified in the BAM does not match the Basecaller model specified in the Variant Calling model.
@@ -167,6 +171,7 @@ Using `--skip-model-compatibility-check`.
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
 
 Negative test: A Polishing model is provided instead of a Variant Calling model. This should fail.
@@ -184,6 +189,7 @@ Negative test: A Polishing model is provided instead of a Variant Calling model.
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   [error] Caught exception: Incompatible model label scheme! Expected DiploidLabelScheme but got HaploidLabelScheme.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Passing test with warnings: A Polishing model is provided instead of a Variant Calling model
 Using `--skip-model-compatibility-check`.
@@ -200,6 +206,7 @@ Using `--skip-model-compatibility-check`.
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
   [warning] Incompatible model label scheme! Expected DiploidLabelScheme but got HaploidLabelScheme. This may produce unexpected results.
 
 ##############################################
