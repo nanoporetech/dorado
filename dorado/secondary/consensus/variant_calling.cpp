@@ -360,6 +360,14 @@ Variant construct_variant(const std::string_view draft,
                                 var);
     }
 
+    // If the ALT field is still is empty, set it to a '.'. This can happen when a deletion is
+    // flanked by unreachable positions on both ends.
+    const bool any_empty = std::any_of(std::cbegin(var.alts), std::cend(var.alts),
+                                       [](const std::string_view val) { return std::empty(val); });
+    if (std::empty(var.alts) || any_empty) {
+        var.alts = {"."};
+    }
+
     var.qual = round_float(compute_consensus_quality(probs_3D, cons_seqs_with_gaps, symbol_lookup,
                                                      var.rstart, var.rend),
                            3);
@@ -891,11 +899,19 @@ std::vector<Variant> general_decode_variants(
         return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
     });
 
-    for (Variant& var : variants) {
-        var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
+    // Normalize variants.
+    std::vector<Variant> normalized_variants;
+    normalized_variants.reserve(std::size(variants));
+    for (const Variant& var : variants) {
+        Variant new_var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
+
+        // Sanity check.
+        if (is_valid(new_var)) {
+            normalized_variants.emplace_back(std::move(new_var));
+        }
     }
 
-    return variants;
+    return normalized_variants;
 }
 
 }  // namespace dorado::secondary

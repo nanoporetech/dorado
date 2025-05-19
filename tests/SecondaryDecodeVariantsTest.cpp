@@ -169,7 +169,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "No normalization. One deletion variant, one haplotype.",
             "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, false, false, false, false, false,
             {
-                Variant{0, 2, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 2, 3},
+                Variant{0, 2, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 2, 3},
             },
             false,
         },
@@ -187,7 +187,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. Single reference base which is deleted in the alt.",
             "A", {"*"}, {0}, {0}, false, false, true, false, false,
             {
-                Variant{0, 0, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1"}, {"GQ", "70"}}, 0, 1},
+                Variant{0, 0, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 0, 1},
             },
             false,
         },
@@ -321,7 +321,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop.
         //           H2: CACCA           CACC            ACC         CC
         TestCase{
-            "Diploid 1, test 1. No normalization and no filtering of overlapping variants. Report all variants as they are.",
+            "Diploid 1, test 1. No normalization and no filtering of overlapping variants.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*ACC*A*",
@@ -330,9 +330,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             false, false, false, false, false,
             {
-                Variant{0, 3, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"", "CC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 5, 8},    // V2
-                Variant{0, 8, "A", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 9, 10},          // V3
+                Variant{0, 3, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 3, 4},           // V1
+                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},    // V2
+                Variant{0, 8, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 9, 10},          // V3
             },
             false,
         },
@@ -393,7 +393,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop. No left trim because H1 would be empty.
         //           H2: CAACA           CAAC            AAC         AC
         TestCase{
-            "Diploid 2, test 1. No normalization and no filtering of overlapping variants. Report all variants as they are.",
+            "Diploid 2, test 1. No normalization and no filtering of overlapping variants.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*AAC*A*",
@@ -402,9 +402,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             false, false, false, false, false,
             {
-                Variant{0, 3, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"", "AC"}, "PASS", {}, 70.0f, {{"GT", "1/2"}, {"GQ", "70"}}, 5, 8},    // V2
-                Variant{0, 8, "A", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 9, 10},          // V3
+                Variant{0, 3, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 3, 4},           // V1
+                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},    // V2
+                Variant{0, 8, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 9, 10},          // V3
             },
             false,
         },
@@ -485,7 +485,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  CA          =>  CA          =>  C           Stop. No left trim because H1 would be empty.
         //           H2: CAAAA           CAAA            CAA             CAA             CAA
         TestCase{
-            "Diploid 3, test 1. No normalization and no filtering of overlapping variants. Report all variants as they are.",
+            "Diploid 3, test 1. No normalization and no filtering of overlapping variants.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
              "ACC*AAA*A*",
@@ -494,9 +494,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             false, false, false, false, false,
             {
-                Variant{0, 3, "A", {""}, "PASS", {}, 70.0f, {{"GT", "1/1"}, {"GQ", "70"}}, 3, 4},       // V1
-                Variant{0, 5, "AA", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 5, 8},      // V2
-                Variant{0, 8, "A", {""}, "PASS", {}, 70.0f, {{"GT", "0/1"}, {"GQ", "70"}}, 9, 10},      // V3
+                Variant{0, 3, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 3, 4},       // V1
+                Variant{0, 5, "AA", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 5, 8},      // V2
+                Variant{0, 8, "A", {"."}, ".", {}, 70.0f, {{"GT", "0"}, {"GQ", "70"}}, 9, 10},      // V3
             },
             false,
         },
