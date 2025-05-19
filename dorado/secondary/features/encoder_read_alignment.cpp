@@ -14,6 +14,12 @@
 #include <unordered_map>
 #include <unordered_set>
 
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#endif
+
 namespace dorado::secondary {
 
 namespace {
@@ -83,19 +89,19 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                 auto padding =
                         torch::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
 
-                spdlog::trace("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
-                              utils::tensor_shape_as_string(chunk),
-                              utils::tensor_shape_as_string(padding));
+                LOG_TRACE("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
+                          utils::tensor_shape_as_string(chunk),
+                          utils::tensor_shape_as_string(padding));
 
                 auto concated = torch::cat({std::move(chunk), std::move(padding)}, 1);
 
-                spdlog::trace("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
-                              utils::tensor_shape_as_string(concated));
+                LOG_TRACE("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
+                          utils::tensor_shape_as_string(concated));
 
                 padded_chunks.emplace_back(std::move(concated));
             } else {
-                spdlog::trace("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
-                              utils::tensor_shape_as_string(chunk));
+                LOG_TRACE("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
+                          utils::tensor_shape_as_string(chunk));
 
                 padded_chunks.emplace_back(std::move(chunk));
             }
@@ -111,7 +117,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
     const auto reorder_reads = [](std::vector<at::Tensor> chunks,
                                   const std::vector<std::vector<std::string>>& read_ids_in,
                                   const std::vector<std::vector<std::string>>& read_ids_out) {
-        spdlog::trace("[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
+        LOG_TRACE("[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
 
         if (std::size(chunks) < 2) {
             return chunks;
@@ -125,7 +131,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             auto& chunk = chunks[n];
             const auto& rids_in = read_ids_in[n];
 
-            spdlog::trace(
+            LOG_TRACE(
                     "[reorder_reads] n = {}, rids_out.size() = {}, rids_in.size() = {}, "
                     "chunk.shape = {}",
                     n, std::size(rids_out), std::size(rids_in),
@@ -163,14 +169,14 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                 }
             }
 
-            spdlog::trace(
+            LOG_TRACE(
                     "[reorder_reads] n = {}, missing_in_indices.size() = {}, "
                     "missing_out_indices.size() = {}",
                     n, std::size(missing_in_indices), std::size(missing_out_indices));
-            spdlog::trace("[reorder_reads] n = {}, missing_in_indices: {}", n,
-                          utils::print_container_as_string(missing_in_indices, ", ", true));
-            spdlog::trace("[reorder_reads] n = {}, missing_out_indices: {}", n,
-                          utils::print_container_as_string(missing_out_indices, ", ", true));
+            LOG_TRACE("[reorder_reads] n = {}, missing_in_indices: {}", n,
+                      utils::print_container_as_string(missing_in_indices, ", ", true));
+            LOG_TRACE("[reorder_reads] n = {}, missing_out_indices: {}", n,
+                      utils::print_container_as_string(missing_out_indices, ", ", true));
 
             // Fill out the gaps in the array with some of the extra indices.
             for (size_t i = 0;
@@ -185,7 +191,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                                    std::end(missing_in_indices));
             }
 
-            spdlog::trace("[reorder_reads] n = {}, creating an empty reordered_chunk.", n);
+            LOG_TRACE("[reorder_reads] n = {}, creating an empty reordered_chunk.", n);
 
             // Permute.
             auto reordered_chunk = torch::zeros(
@@ -205,7 +211,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
 
             reordered_chunks.emplace_back(std::move(reordered_chunk));
 
-            spdlog::trace("[reorder_reads] n = {}, updating the previous out column.", n);
+            LOG_TRACE("[reorder_reads] n = {}, updating the previous out column.", n);
 
             // Update read_ids_out for the next chunk.
             if ((n + 1) < dorado::ssize(chunks)) {
@@ -218,7 +224,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                 }
             }
 
-            spdlog::trace("[reorder_reads] n = {}, done.", n);
+            LOG_TRACE("[reorder_reads] n = {}, done.", n);
         }
 
         return reordered_chunks;
@@ -278,7 +284,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         auto& sample = samples[i];
 
         if (std::empty(sample.positions_major)) {
-            spdlog::trace("[merge_adjacent_samples_read_matrix] Empty sample: i = {}", i);
+            LOG_TRACE("[merge_adjacent_samples_read_matrix] Empty sample: i = {}", i);
             continue;
         }
 
@@ -291,29 +297,28 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             // New or contiguous chunk.
             last_end = sample.end();
             buffer_ids.emplace_back(i);
-            spdlog::trace("[merge_adjacent_samples_read_matrix] Emplacing to buffer_ids, i = {}",
-                          i);
+            LOG_TRACE("[merge_adjacent_samples_read_matrix] Emplacing to buffer_ids, i = {}", i);
 
         } else {
             // Discontinuity found, finalize the current chunk.
             last_end = sample.end();
             results.emplace_back(merge_samples(buffer_ids));
             buffer_ids = std::vector{i};
-            spdlog::trace(
+            LOG_TRACE(
                     "[merge_adjacent_samples_read_matrix] Merging samples in buffer, resetting the "
                     "buffer. i = {}",
                     i);
-            spdlog::trace("[merge_adjacent_samples_read_matrix] Merged.");
+            LOG_TRACE("[merge_adjacent_samples_read_matrix] Merged.");
         }
     }
 
     if (!std::empty(buffer_ids)) {
-        spdlog::trace(
+        LOG_TRACE(
                 "[merge_adjacent_samples_read_matrix] Final merging samples in buffer, resetting "
                 "the buffer. buffer_ids.size() = {}",
                 std::size(buffer_ids));
         results.emplace_back(merge_samples(buffer_ids));
-        spdlog::trace("[merge_adjacent_samples_read_matrix] Merged.");
+        LOG_TRACE("[merge_adjacent_samples_read_matrix] Merged.");
     }
 
     return results;
