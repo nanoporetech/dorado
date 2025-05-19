@@ -16,13 +16,16 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
         const std::vector<std::filesystem::directory_entry>& dir_files,
         const std::string& model_name,
         const std::string& modbase_model_names) {
+    if (pod5_init() != POD5_OK) {
+        throw std::runtime_error(
+                fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
+    }
+
     std::unordered_map<std::string, ReadGroup> read_groups;
     for (const auto& entry : dir_files) {
         if (!utils::has_pod5_extension(entry)) {
             continue;
         }
-
-        pod5_init();
 
         // Open the file
         const auto file_path = entry.path().string();
@@ -84,6 +87,11 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
 size_t get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_files,
                      std::optional<std::unordered_set<std::string>> read_list,
                      const std::unordered_set<std::string>& ignore_read_list) {
+    if (pod5_init() != POD5_OK) {
+        throw std::runtime_error(
+                fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
+    }
+
     size_t num_reads = 0;
     for (const auto& entry : dir_files) {
         const auto ext = utils::get_extension(entry);
@@ -93,8 +101,6 @@ size_t get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_fi
         } else if (ext != ".pod5") {
             continue;
         }
-
-        pod5_init();
 
         // Open the file
         const auto file_path = entry.path().string();
@@ -145,6 +151,11 @@ bool is_pod5_data_present(const std::vector<std::filesystem::directory_entry>& d
 }
 
 uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& dir_files) {
+    if (pod5_init() != POD5_OK) {
+        throw std::runtime_error(
+                fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
+    }
+
     for (const auto& entry : dir_files) {
         if (!utils::has_pod5_extension(entry)) {
             continue;
@@ -152,7 +163,6 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
 
         // Open the file
         auto file_path = entry.path().string();
-        pod5_init();
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
             spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
@@ -198,6 +208,11 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
 
 static std::set<models::ChemistryKey> get_sequencing_chemistries(
         const std::vector<std::filesystem::directory_entry>& dir_files) {
+    if (pod5_init() != POD5_OK) {
+        throw std::runtime_error(
+                fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
+    }
+
     std::set<models::ChemistryKey> chemistries;
     for (const auto& entry : dir_files) {
         if (!utils::has_pod5_extension(entry)) {
@@ -206,7 +221,6 @@ static std::set<models::ChemistryKey> get_sequencing_chemistries(
 
         const auto file_path = std::filesystem::path(entry).string();
 
-        pod5_init();
         // Open the file
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
