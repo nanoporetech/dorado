@@ -16,7 +16,7 @@ HAC. Auto-resolve the `dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0` model
   1
   1
 
-SUP. Auto-resolve the `dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0` model from the BAM file and download it.
+Attempt to download a model which is not available.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > ### Create the synthetic data with no dwells.
@@ -30,9 +30,10 @@ SUP. Auto-resolve the `dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0` model
   > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
-  Exit code: 0
-  1
-  1
+  Exit code: 1
+  0
+  0
+  Caught exception: Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0'.
 
 ##############################################
 ### Test auto-resolve from the Basecaller  ###
