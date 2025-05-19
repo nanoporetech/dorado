@@ -233,7 +233,7 @@ ParserPtr create_cli(int& verbosity) {
                       "the same option in the model config.")
                 .scan<'i', int>();
         parser->visible.add_argument("--min-depth")
-                .help("Sites with depth lower than this value will not be polished.")
+                .help("Sites with depth lower than this value will not be processed.")
                 .default_value(0)
                 .scan<'i', int>();
     }
