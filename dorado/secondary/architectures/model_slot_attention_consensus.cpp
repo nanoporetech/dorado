@@ -323,7 +323,6 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::quick_phase(
     const at::Tensor span_reads_mask = (features.select(-1, 0) == 0).sum(0) == 0;
     const int64_t n_span_reads = span_reads_mask.sum().item<int64_t>();
     if (n_span_reads < 2) {
-        spdlog::debug("Found less than 2 spanning reads.");
         return {std::move(hap_probs_unphased), torch::zeros(n_reads)};
     }
 

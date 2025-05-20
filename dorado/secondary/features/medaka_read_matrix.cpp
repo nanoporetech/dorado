@@ -25,6 +25,12 @@
 #define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
 #define bam1_seqi(s, i) (bam_seqi((s), (i)))
 
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#endif
+
 namespace {
 
 static constexpr int32_t BASE_FEATLEN = 4;  // Minimal number of feature channels.
@@ -278,8 +284,6 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
         throw std::runtime_error{"[calculate_read_alignment] BamFile not opened properly!"};
     }
 
-    spdlog::debug("Haplotag source: {}", secondary::haplotag_source_to_string(hap_source));
-
     // Load haplotags, either from file or compute in place.
     const std::unordered_map<std::string, int32_t> kadayashi_qn2tag =
             [&hap_source, &in_haplotag_bin_fn, &fp, &idx, &hdr, &fai_ptr, &chr_name, start, end]() {
@@ -287,15 +291,14 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                     return query_bin_file_get_qname2tag(in_haplotag_bin_fn, chr_name, start, end);
 
                 } else if (hap_source == secondary::HaplotagSource::COMPUTE) {
-                    spdlog::trace("Running Kadayashi on region: {}:{}-{}", chr_name, (start + 1),
-                                  end);
+                    LOG_TRACE("Running Kadayashi on region: {}:{}-{}", chr_name, (start + 1), end);
 
                     std::unordered_map<std::string, int32_t> ret =
                             kadayashi::kadayashi_dvr_single_region_wrapper(
                                     fp, idx, hdr, fai_ptr, chr_name.c_str(), start, end,
                                     !KDYS_DISABLE_REGION_EXPANSION, 5, 5, 0.2f, 10, 200,
                                     KDYS_DISABLE_MAX_READ_CAP);
-                    spdlog::trace("Kadayashi done on region: {}:{}-{}", chr_name, (start + 1), end);
+                    LOG_TRACE("Kadayashi done on region: {}:{}-{}", chr_name, (start + 1), end);
 
                     return ret;
                 }

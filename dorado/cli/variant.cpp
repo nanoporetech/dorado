@@ -210,7 +210,7 @@ ParserPtr create_cli(int& verbosity) {
                       "the same option in the model config.")
                 .scan<'i', int>();
         parser->visible.add_argument("--min-depth")
-                .help("Sites with depth lower than this value will not be polished.")
+                .help("Sites with depth lower than this value will not be processed.")
                 .default_value(0)
                 .scan<'i', int>();
         parser->visible.add_argument("--pass-qual-filter")
@@ -225,7 +225,7 @@ ParserPtr create_cli(int& verbosity) {
                       "of computing it.")
                 .flag()
                 .default_value(false);
-        parser->visible.add_argument("--phasing-bin")
+        parser->hidden.add_argument("--phasing-bin")
                 .help("The .bin file containing phasing information for reads in the given BAM.");
         parser->visible.add_argument("--unphased")
                 .help("Deactivate phasing.")
@@ -336,7 +336,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.pass_min_qual = parser.visible.get<float>("pass-qual-filter");
 
-    opt.phasing_bin_path = parser.visible.present<std::string>("phasing-bin");
+    opt.phasing_bin_path = parser.hidden.present<std::string>("phasing-bin");
     opt.hp_tag_from_bam = parser.visible.get<bool>("hp-tag");
     opt.unphased = parser.visible.get<bool>("unphased");
     opt.haplotag_source = (opt.phasing_bin_path)  ? secondary::HaplotagSource::BIN_FILE
