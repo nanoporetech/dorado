@@ -286,6 +286,10 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_strin
 }
 
 std::string get_cuda_gpu_names(const std::string &device_string) {
+    if (device_string == "cpu") {
+        return {};
+    }
+
     auto dev_info = utils::get_cuda_device_info(device_string, false);  // ignore unused GPUs
     std::set<std::string> gpu_strs;
     std::string gpu_names;
