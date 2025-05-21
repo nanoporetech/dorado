@@ -459,21 +459,14 @@ Alternatively, a model can be selected through the command line in the following
 | Value    | Description |
 | -------- | ------- |
 | auto  | Determine the best compatible model based on input data. |
-| \<basecaller_model\> | Simplex basecaller model name (e.g. `dna_r10.4.1_e8.2_400bps_sup@v5.0.0`) |
-| \<polishing_model\> | Polishing model name (e.g. `dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl_mv`) |
+| \<basecaller_model\> | Simplex basecaller model name (e.g. `dna_r10.4.1_e8.2_400bps_sup@v5.2.0`) |
+| \<polishing_model\> | Polishing model name (e.g. `dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl_mv`) |
 | \<path\> | Local path on disk where the model will be loaded from. |
 
-When `auto` or `<basecaller_model>` syntax is used and the input is a v5.0.0 dataset, the data will be queried for the presence move tables and an best polishing model selected for the data. Move tables need to be exported during basecalling. If available, this allows for higher polishing accuracy. 
+When `auto` or `<basecaller_model>` syntax is used and the input is a v5.2.0 dataset, the data will be queried for the presence move tables and an best polishing model selected for the data. Move tables need to be exported during basecalling. If available, this allows for higher polishing accuracy.
 
 If a non-compatible model is selected for the input data, or there are multiple read groups in the input dataset which were generated using different basecaller models, `dorado polish` will report an error and stop execution.
 
-##### Supported basecaller models
-- `dna_r10.4.1_e8.2_400bps_sup@v5.0.0`
-- `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
-- `dna_r10.4.1_e8.2_400bps_sup@v4.3.0`
-- `dna_r10.4.1_e8.2_400bps_hac@v4.3.0`
-- `dna_r10.4.1_e8.2_400bps_sup@v4.2.0`
-- `dna_r10.4.1_e8.2_400bps_hac@v4.2.0`
 
 ##### Move Table Aware Models
 
@@ -674,7 +667,7 @@ $ dorado download --model all
 
 The names of Dorado models are systematically structured, each segment corresponding to a different aspect of the model, which include both chemistry and run settings. Below is a sample model name explained:
 
-`dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
+`dna_r10.4.1_e8.2_400bps_hac@v5.2.0`
 
 - **Analyte Type (`dna`)**: This denotes the type of analyte being sequenced. For DNA sequencing, it is represented as `dna`. If you are using a Direct RNA Sequencing Kit, this will be `rna004`.
 
@@ -686,7 +679,7 @@ The names of Dorado models are systematically structured, each segment correspon
 
 - **Model Type (`hac`)**: This represents the size of the model, where larger models yield more accurate basecalls but take more time. The three types of models are `fast`, `hac`, and `sup`. The `fast` model is the quickest, `sup` is the most accurate, and `hac` provides a balance between speed and accuracy. For most users, the `hac` model is recommended.
 
-- **Model Version Number (`v5.0.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
+- **Model Version Number (`v5.2.0`)**: This denotes the version of the model. Model updates are regularly released, and higher version numbers typically signify greater accuracy.
 
 
 ### **DNA models:**
@@ -697,9 +690,12 @@ The versioning of modification models is bound to the basecalling model. This me
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
-| **dna_r10.4.1_e8.2_400bps_fast@v5.0.0** | | | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_hac@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v3<br />v3<br />v3<br />v3 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v5.0.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v3<br />v3<br />v3<br />v3 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_fast@v5.2.0** | | | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v5.2.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v5.2.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
+| dna_r10.4.1_e8.2_400bps_fast@v5.0.0 | | | 5 kHz |
+| dna_r10.4.1_e8.2_400bps_hac@v5.0.0 | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v3<br />v3<br />v3<br />v3 | 5 kHz |
+| dna_r10.4.1_e8.2_400bps_sup@v5.0.0 | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v3<br />v3<br />v3<br />v3 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v4.3.0 | | | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v4.3.0 | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v4.3.0 | 5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v2 | 5 kHz |
@@ -713,9 +709,12 @@ The versioning of modification models is bound to the basecalling model. This me
 
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
-| **rna004_130bps_fast@v5.1.0** | | | 4 kHz |
-| **rna004_130bps_hac@v5.1.0** | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
-| **rna004_130bps_sup@v5.1.0** | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
+| **rna004_130bps_fast@v5.2.0** | | | 4 kHz |
+| **rna004_130bps_hac@v5.2.0** | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
+| **rna004_130bps_sup@v5.2.0** | m5C_2OmeC<br />m6A_DRACH<br />inosine_m6A_2OmeA<br />pseU_2OmeU<br />2OmeG | v1<br />v1<br />v1<br />v1<br />v1 | 4 kHz |
+| rna004_130bps_fast@v5.1.0 | | | 4 kHz |
+| rna004_130bps_hac@v5.1.0 | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
+| rna004_130bps_sup@v5.1.0 | m5C<br />m6A_DRACH<br />inosine_m6A<br />pseU | v1<br />v1<br />v1<br />v1 | 4 kHz |
 | rna004_130bps_fast@v5.0.0 | | | 4 kHz |
 | rna004_130bps_hac@v5.0.0 | m6A<br />m6A_DRACH<br />pseU | v1<br />v1<br />v1 | 4 kHz |
 | rna004_130bps_sup@v5.0.0 | m6A<br />m6A_DRACH<br />pseU | v1<br />v1<br />v1 | 4 kHz |

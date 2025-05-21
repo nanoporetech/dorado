@@ -34,7 +34,6 @@
       }" \
       "${MLHUB_TRIGGER_URL}"
 
-
 mlhub:sre_5k_400bps_v4_3:
   extends: .mlhub_sre
   variables:
@@ -49,6 +48,14 @@ mlhub:sre_5k_400bps_v5:
     TITLE: "SRE: 5k 400bps v5.0.0"
     SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
     MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v5.0.0","dna_r10.4.1_e8.2_400bps_hac@v5.0.0","dna_r10.4.1_e8.2_400bps_sup@v5.0.0"]'
+    DUPLEX_MODELS: "[]"
+
+mlhub:sre_5k_400bps_v52:
+  extends: .mlhub_sre
+  variables:
+    TITLE: "SRE: 5k 400bps v5.2.0"
+    SRE_CONFIG: "dna_r10.4.1-e8.2-5khz-400bps-prom.json"
+    MODELS: '["dna_r10.4.1_e8.2_400bps_fast@v5.2.0","dna_r10.4.1_e8.2_400bps_hac@v5.2.0","dna_r10.4.1_e8.2_400bps_sup@v5.2.0"]'
     DUPLEX_MODELS: "[]"
 
 mlhub:sre_5k_400bps_duplex:

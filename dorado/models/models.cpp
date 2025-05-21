@@ -544,6 +544,12 @@ const std::vector<ModelInfo> models = {
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelVariantPair{ModelVariant::NONE, VV::v5_0_0},
         },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_5khz_stereo@v1.3",
+                "6942f2d13b6509ae88eb3bd4f7a9f149b72edce817b800fe22fded6c7566dc10",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelVariantPair{ModelVariant::NONE, VV::v5_2_0},
+        },
 };
 
 }  // namespace stereo
