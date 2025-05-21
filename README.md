@@ -1,6 +1,6 @@
 # Dorado
 
-Dorado is a high-performance, easy-to-use, open source basecaller for Oxford Nanopore reads.
+Dorado is a high-performance, easy-to-use, open source analysis engine for Oxford Nanopore reads.
 
 Detailed information about Dorado and its features is available in the [Dorado Documentation](https://dorado-docs.readthedocs.io/en/latest/).
 
@@ -24,10 +24,10 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-0.9.6-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-linux-x64.tar.gz)
- - [dorado-0.9.6-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-linux-arm64.tar.gz)
- - [dorado-0.9.6-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-osx-arm64.zip)
- - [dorado-0.9.6-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-0.9.6-win64.zip)
+ - [dorado-1.0.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.0.0-linux-x64.tar.gz)
+ - [dorado-1.0.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.0.0-linux-arm64.tar.gz)
+ - [dorado-1.0.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.0.0-osx-arm64.zip)
+ - [dorado-1.0.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.0.0-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 

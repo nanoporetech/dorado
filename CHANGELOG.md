@@ -2,6 +2,41 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.0.0] (21 May 2025)
+
+We are pleased to announce the release of Dorado v1.0, delivering new models and capabilities for Oxford Nanopore data analysis. This release introduces:
+* New v5.2 basecalling model support for DNA and RNA, including:
+  * More accurate HAC basecalling
+  * Increased canonical basecalling accuracy in DNA with high `6mA` density
+  * New 2'Ome modification models for RNA: `2OmeG`, `m5C_2OmeC`, `inosine_m6A_2OmeA`, and `pseU_2OmeU`
+  * More accurate DNA modification models, including a significant reduction in false positive rates for `6mA`
+  * Significant speed enhancements to all-context modification models in both DNA and RNA, when using NVIDIA GPUs
+* A preview release of the new Dorado `variant` command for small variant calling
+  * This is currently only available with v5.0 HAC basecalls. Compatibility with v5.2 models will be coming soon.
+* Poly(A) updates, including:
+  * The new `pa:B:i` tag, described in the [Dorado SAM spec](https://dorado-docs.readthedocs.io/en/latest/basecaller/sam_spec)
+* Other fixes and improvements, including updates to logging and improved error messages
+
+This release also removes support for Fast5 files and basecalling models for DNA R10.4.1 4kHz data, DNA R9.4.1, and RNA002. Support for these conditions will continue to be available with [Dorado 0.9.6](https://github.com/nanoporetech/dorado/tree/release-v0.9) and Fast5 files can be converted to POD5 using our [online conversion tool](https://pod5.nanoporetech.com/) or the [POD5 Python tools](https://pod5-file-format.readthedocs.io/en/latest/index.html).
+
+* 90db41a8c3f66877795d7a9adda6280d7a452753 - New v5.2.0 basecalling models for DNA and RNA
+* 63bfbad0260c754518ce9539bd5f251aafc4250f - Preview release of new Dorado `variant` command for small variant calling
+* 4df8bfef24bcd1325048c7fdc756548799f8d161 - Improve speed of basecalling with modified bases
+* f0a82e3878f10aa89ed5762c116aeb8a674c9362 - Add `pa:B:i` tag with signal positions related to the poly(A/T) estimation
+* e1414d6e78c4b8e4b998d5951238396bff590e2e - Add poly(A/T) tail length to Dorado `summary` file
+* cd7998e120f1d5f779f5fdf7d407cd81d94dbf91 - Add beta support for RNA barcoding kit
+* 746a1724eb2145cab325d116ada9b3e641a43f86 - Remove support for fast5 files
+* e15a69b1df5dc2ac0caded64adbb9b1b999fcfa4 - Remove support for DNA R10.4.1 4kHz basecalling models
+* 8b7ef0fbab63e5a702753a6f306c2b27d84d139f - Remove support for DNA R9.4.1 and RNA002 basecalling models
+* d689102ae19d26b1dfd300f18cf2911867ef7df4 - Add `[info]` log line showing the mapping of CUDA device index to device name
+* af0e4fd386b7d5b9210b66ccf42bb4f42b92c18f - Improve error message when `--resume-from` file is missing CL header
+* 8dbcc104d9556e2ddae72b20c662cd504b0ad08f - Tweak logging, including adding a success message from Dorado `downloader`
+* 0afabf3fd295dc0a2a7f80986224b25a3f5bce60 - Reduce Transformer and modified base batch sizes when using Apple Silicon
+* d3dcc834de7e56ff923a9bfb0f335f0726ce8dbb - Build Dorado as C++20
+* c63060e8c69987156fb398bb56f6cb18d26da6e8 - Move default build to Rocky 8 to support Linux systems using glibc >= 2.28
+* 967b1177b80f37a5d453964c40404360e43be752 - Use higher performance FP8 code path for Transformer models on C.C 8.9, 9.0, 10.0 and 12.x
+
+
 # [0.9.6] (16 Apr 2025)
 
 This release of Dorado introduces fixes and improvements following the Dorado 0.9.5 release, including a fix to support v5 SUP basecalling models on Turing (Compute Capability 7.5) GPUs and a fix to correct mapQ values reported by Dorado aligner.
