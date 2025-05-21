@@ -1,9 +1,9 @@
 #pragma once
 
-#include "file_info/file_info.h"
-#include "models/kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
+
+#include <cxxpool.h>
 
 #include <array>
 #include <filesystem>
@@ -11,7 +11,6 @@
 #include <map>
 #include <memory>
 #include <optional>
-#include <set>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -49,9 +48,6 @@ public:
 
     void load_reads(const InputFiles& input_files, ReadOrder traversal_order);
 
-    std::string get_name() const { return "Dataloader"; }
-    stats::NamedStats sample_stats() const;
-
     struct ReadSortInfo {
         std::string read_id;
         int32_t mux;
@@ -75,9 +71,9 @@ private:
     void initialise_read(ReadCommon& read) const;
 
     Pipeline& m_pipeline;  // Where should the loaded reads go?
-    std::atomic<size_t> m_loaded_read_count{0};
+    size_t m_loaded_read_count{0};
     std::string m_device;
-    size_t m_num_worker_threads{1};
+    cxxpool::thread_pool m_thread_pool;
     size_t m_max_reads{0};
     std::optional<std::unordered_set<std::string>> m_allowed_read_ids;
     std::unordered_set<std::string> m_ignored_read_ids;

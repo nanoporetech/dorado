@@ -10,7 +10,6 @@
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
-#include <cxxpool.h>
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
@@ -74,30 +73,39 @@ models::ChemistryKey get_chemistry_key(const RunInfoDictData_t* const run_info_d
 
 SimplexReadPtr process_pod5_thread_fn(
         size_t row,
-        Pod5ReadRecordBatch* batch,
-        Pod5FileReader* file,
+        const Pod5ReadRecordBatch* batch,
+        const Pod5FileReader* file,
         const std::string& path,
         const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
         const std::unordered_map<std::string, size_t>& read_id_to_index) {
     utils::set_thread_name("process_pod5");
     uint16_t read_table_version = 0;
-    ReadBatchRowInfo_t read_data;
+    ReadBatchRowInfo_t read_data{};
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
                                           &read_table_version) != POD5_OK) {
-        spdlog::error("Failed to get read {}", row);
+        spdlog::error("Failed to get read {}: {}", row, pod5_get_error_string());
+        return nullptr;
     }
 
     //Retrieve global information for the run
-    RunInfoDictData_t* run_info_data;
+    RunInfoDictData_t* run_info_data = nullptr;
     if (pod5_get_run_info(batch, read_data.run_info, &run_info_data) != POD5_OK) {
-        spdlog::error("Failed to get Run Info {}{}", row, pod5_get_error_string());
+        spdlog::error("Failed to get Run Info {}: {}", row, pod5_get_error_string());
+        return nullptr;
     }
+    auto cleanup = utils::PostCondition([&run_info_data] {
+        if (pod5_free_run_info(run_info_data) != POD5_OK) {
+            spdlog::error("Failed to free run info: {}", pod5_get_error_string());
+        }
+    });
+
     auto run_acquisition_start_time_ms = run_info_data->acquisition_start_time_ms;
     auto run_sample_rate = run_info_data->sample_rate;
 
-    char read_id_tmp[POD5_READ_ID_LEN];
+    char read_id_tmp[POD5_READ_ID_LEN]{};
     if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
-        spdlog::error("Failed to format read id");
+        spdlog::error("Failed to format read id: {}", pod5_get_error_string());
+        return nullptr;
     }
     std::string read_id_str(read_id_tmp);
 
@@ -107,6 +115,7 @@ SimplexReadPtr process_pod5_thread_fn(
     if (pod5_get_read_complete_signal(file, batch, row, read_data.num_samples,
                                       samples.data_ptr<int16_t>()) != POD5_OK) {
         spdlog::error("Failed to get read {} signal: {}", row, pod5_get_error_string());
+        return nullptr;
     }
 
     auto new_read = std::make_unique<SimplexRead>();
@@ -146,14 +155,15 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.chemistry = condition_info.chemistry();
 
     pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
-    char end_reason_string_value[200];
+    char end_reason_string_value[200]{};
     size_t end_reason_string_value_size = sizeof(end_reason_string_value);
 
     pod5_error_t pod5_ret =
             pod5_get_end_reason(batch, read_data.end_reason, &end_reason_value,
                                 end_reason_string_value, &end_reason_string_value_size);
     if (pod5_ret != POD5_OK) {
-        spdlog::error("Failed to get read end_reason {} {}", row, pod5_get_error_string());
+        spdlog::error("Failed to get read end_reason {}: {}", row, pod5_get_error_string());
+        return nullptr;
     } else if (end_reason_value == POD5_END_REASON_UNBLOCK_MUX_CHANGE ||
                end_reason_value == POD5_END_REASON_MUX_CHANGE) {
         new_read->read_common.attributes.is_end_reason_mux_change = true;
@@ -175,27 +185,25 @@ SimplexReadPtr process_pod5_thread_fn(
         }
     }
 
-    if (pod5_free_run_info(run_info_data) != POD5_OK) {
-        spdlog::error("Failed to free run info");
-    }
     return new_read;
 }
 
-bool can_process_pod5_row(Pod5ReadRecordBatch_t* batch,
+bool can_process_pod5_row(const Pod5ReadRecordBatch_t* batch,
                           int row,
                           const std::optional<std::unordered_set<std::string>>& allowed_read_ids,
                           const std::unordered_set<std::string>& ignored_read_ids) {
     uint16_t read_table_version = 0;
-    ReadBatchRowInfo_t read_data;
+    ReadBatchRowInfo_t read_data{};
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
                                           &read_table_version) != POD5_OK) {
-        spdlog::error("Failed to get read {}", row);
+        spdlog::error("Failed to get read {}: {}", row, pod5_get_error_string());
         return false;
     }
 
-    char read_id_tmp[POD5_READ_ID_LEN];
+    char read_id_tmp[POD5_READ_ID_LEN]{};
     if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
-        spdlog::error("Failed to format read id");
+        spdlog::error("Failed to format read id: {}", pod5_get_error_string());
+        return false;
     }
 
     std::string read_id_str(read_id_tmp);
@@ -280,6 +288,12 @@ void DataLoader::load_reads_unrestricted(
 }
 
 void DataLoader::load_reads(const InputFiles& input_files, ReadOrder traversal_order) {
+    if (pod5_init() != POD5_OK) {
+        throw std::runtime_error(
+                fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
+    }
+    auto pod5_cleanup = utils::PostCondition([] { pod5_terminate(); });
+
     switch (traversal_order) {
     case ReadOrder::BY_CHANNEL:
         load_reads_by_channel(input_files.get());
@@ -302,23 +316,28 @@ void DataLoader::load_read_channels(const std::vector<std::filesystem::directory
         if (ext != ".pod5") {
             continue;
         }
-        pod5_init();
 
         // Use a std::map to store by sorted channel order.
-        m_file_channel_read_order_map.emplace(file_path.string(), channel_to_read_id_t());
-        auto& channel_to_read_id = m_file_channel_read_order_map[file_path.string()];
+        const auto file_string = file_path.string();
+        auto& channel_to_read_id = m_file_channel_read_order_map[file_string];
 
         // Open the file ready for walking:
-        Pod5FileReader_t* file = pod5_open_file(file_path.string().c_str());
-
+        Pod5FileReader_t* file = pod5_open_file(file_string.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path.string().c_str(),
-                          pod5_get_error_string());
+            spdlog::error("Failed to open file {}: {}", file_string, pod5_get_error_string());
             continue;
         }
+        auto cleanup_file = utils::PostCondition([&file, &file_string] {
+            if (pod5_close_and_free_reader(file) != POD5_OK) {
+                spdlog::error("Failed to close and free POD5 reader for file {}: {}", file_string,
+                              pod5_get_error_string());
+            }
+        });
+
         std::size_t batch_count = 0;
         if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
             spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+            continue;
         }
 
         for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
@@ -327,19 +346,24 @@ void DataLoader::load_read_channels(const std::vector<std::filesystem::directory
                 spdlog::error("Failed to get batch: {}", pod5_get_error_string());
                 continue;
             }
+            auto cleanup_batch = utils::PostCondition([&batch] {
+                if (pod5_free_read_batch(batch) != POD5_OK) {
+                    spdlog::error("Failed to release batch: {}", pod5_get_error_string());
+                }
+            });
 
             std::size_t batch_row_count = 0;
             if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
-                spdlog::error("Failed to get batch row count");
+                spdlog::error("Failed to get batch row count: {}", pod5_get_error_string());
                 continue;
             }
 
             for (std::size_t row = 0; row < batch_row_count; ++row) {
                 uint16_t read_table_version = 0;
-                ReadBatchRowInfo_t read_data;
+                ReadBatchRowInfo_t read_data{};
                 if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION,
                                                       &read_data, &read_table_version) != POD5_OK) {
-                    spdlog::error("Failed to get read {}", row);
+                    spdlog::error("Failed to get read {}: ", row, pod5_get_error_string());
                     continue;
                 }
 
@@ -355,26 +379,17 @@ void DataLoader::load_read_channels(const std::vector<std::filesystem::directory
 
                 char read_id_tmp[POD5_READ_ID_LEN];
                 if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
-                    spdlog::error("Failed to format read id");
+                    spdlog::error("Failed to format read id: {}", pod5_get_error_string());
                 }
                 std::string rid(read_id_tmp);
                 m_reads_by_channel[channel].push_back({rid, read_data.well, read_data.read_number});
             }
-
-            if (pod5_free_read_batch(batch) != POD5_OK) {
-                spdlog::error("Failed to release batch");
-            }
-        }
-        if (pod5_close_and_free_reader(file) != POD5_OK) {
-            spdlog::error("Failed to close and free POD5 reader");
         }
     }
 }
 
 void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                                        const std::vector<ReadID>& read_ids) {
-    pod5_init();
-
     // Open the file ready for walking:
     // TODO: The earlier implementation was caching the pod5 readers into a
     // map and re-using it during each iteration. However, we found a leak
@@ -382,19 +397,16 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     // and closed everytime. So the caching logic was reverted until the
     // leak is fixed in pod5 API.
     Pod5FileReader_t* file = pod5_open_file(path.c_str());
-
     if (!file) {
         spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
         return;
     }
-
-    auto free_pod5 = [&]() {
+    auto cleanup_file = utils::PostCondition([&file, &path] {
         if (pod5_close_and_free_reader(file) != POD5_OK) {
-            spdlog::error("Failed to close and free POD5 reader for file {}", path.c_str());
+            spdlog::error("Failed to close and free POD5 reader for file {}: {}", path,
+                          pod5_get_error_string());
         }
-    };
-
-    auto post = utils::PostCondition(free_pod5);
+    });
 
     std::vector<uint8_t> read_id_array(POD5_READ_ID_SIZE * read_ids.size());
     for (size_t i = 0; i < read_ids.size(); i++) {
@@ -405,6 +417,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     std::size_t batch_count = 0;
     if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
         spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+        return;
     }
 
     std::vector<std::uint32_t> traversal_batch_counts(batch_count);
@@ -414,7 +427,8 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                            traversal_batch_counts.data(),
                                            traversal_batch_rows.data(), &find_success_count);
     if (err != POD5_OK) {
-        spdlog::error("Couldn't create plan for {} with reads {}", path, read_ids.size());
+        spdlog::error("Couldn't create plan for {} with reads {}: {}", path, read_ids.size(),
+                      pod5_get_error_string());
         return;
     }
 
@@ -423,9 +437,6 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
                       read_ids.size());
         throw std::runtime_error("Plan traveral didn't yield correct number of reads");
     }
-
-    // Create static threadpool so it is reused across calls to this function.
-    static cxxpool::thread_pool pool{m_num_worker_threads};
 
     uint32_t row_offset = 0;
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
@@ -437,28 +448,33 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             spdlog::error("Failed to get batch: {}", pod5_get_error_string());
             continue;
         }
+        auto cleanup_batch = utils::PostCondition([&batch] {
+            if (pod5_free_read_batch(batch) != POD5_OK) {
+                spdlog::error("Failed to release batch: {}", pod5_get_error_string());
+            }
+        });
 
         std::vector<std::future<SimplexReadPtr>> futures;
         for (std::size_t row_idx = 0; row_idx < traversal_batch_counts[batch_index]; row_idx++) {
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
 
             if (can_process_pod5_row(batch, row, m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_thread_fn, row, batch, file,
-                                            std::cref(path), std::cref(m_reads_by_channel),
-                                            std::cref(m_read_id_to_index)));
+                futures.push_back(m_thread_pool.push([row, batch, file, &path, this] {
+                    return process_pod5_thread_fn(row, batch, file, path, m_reads_by_channel,
+                                                  m_read_id_to_index);
+                }));
             }
         }
 
         for (auto& v : futures) {
             auto read = v.get();
+            if (!read) {
+                continue;
+            }
             initialise_read(read->read_common);
             check_read(read);
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
-        }
-
-        if (pod5_free_read_batch(batch) != POD5_OK) {
-            spdlog::error("Failed to release batch");
         }
 
         row_offset += traversal_batch_counts[batch_index];
@@ -466,21 +482,24 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 }
 
 void DataLoader::load_pod5_reads_from_file(const std::string& path) {
-    pod5_init();
-
     // Open the file ready for walking:
     Pod5FileReader_t* file = pod5_open_file(path.c_str());
-
     if (!file) {
         spdlog::error("Failed to open file {}: {}", path, pod5_get_error_string());
+        return;
     }
+    auto file_cleanup = utils::PostCondition([&file, &path] {
+        if (pod5_close_and_free_reader(file) != POD5_OK) {
+            spdlog::error("Failed to close and free POD5 reader for file {}: {}", path,
+                          pod5_get_error_string());
+        }
+    });
 
     std::size_t batch_count = 0;
     if (pod5_get_read_batch_count(&batch_count, file) != POD5_OK) {
         spdlog::error("Failed to query batch count: {}", pod5_get_error_string());
+        return;
     }
-
-    cxxpool::thread_pool pool{m_num_worker_threads};
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
         if (m_loaded_read_count == m_max_reads) {
@@ -489,11 +508,18 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
         Pod5ReadRecordBatch_t* batch = nullptr;
         if (pod5_get_read_batch(&batch, file, batch_index) != POD5_OK) {
             spdlog::error("Failed to get batch: {}", pod5_get_error_string());
+            continue;
         }
+        auto cleanup_batch = utils::PostCondition([&batch] {
+            if (pod5_free_read_batch(batch) != POD5_OK) {
+                spdlog::error("Failed to release batch: {}", pod5_get_error_string());
+            }
+        });
 
         std::size_t batch_row_count = 0;
         if (pod5_get_read_batch_row_count(&batch_row_count, batch) != POD5_OK) {
-            spdlog::error("Failed to get batch row count");
+            spdlog::error("Failed to get batch row count: {}", pod5_get_error_string());
+            continue;
         }
         batch_row_count = std::min(batch_row_count, m_max_reads - m_loaded_read_count);
 
@@ -503,9 +529,10 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
 
             if (can_process_pod5_row(batch, int(row), m_allowed_read_ids, m_ignored_read_ids)) {
-                futures.push_back(pool.push(process_pod5_thread_fn, row, batch, file,
-                                            std::cref(path), std::cref(m_reads_by_channel),
-                                            std::cref(m_read_id_to_index)));
+                futures.push_back(m_thread_pool.push([row, batch, file, &path, this] {
+                    return process_pod5_thread_fn(row, batch, file, path, m_reads_by_channel,
+                                                  m_read_id_to_index);
+                }));
             }
         }
 
@@ -516,13 +543,6 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }
-
-        if (pod5_free_read_batch(batch) != POD5_OK) {
-            spdlog::error("Failed to release batch");
-        }
-    }
-    if (pod5_close_and_free_reader(file) != POD5_OK) {
-        spdlog::error("Failed to close and free POD5 reader");
     }
 }
 
@@ -549,11 +569,11 @@ DataLoader::DataLoader(Pipeline& pipeline,
                        std::unordered_set<std::string> read_ignore_list)
         : m_pipeline(pipeline),
           m_device(device),
-          m_num_worker_threads(num_worker_threads),
+          m_thread_pool(num_worker_threads),
           m_allowed_read_ids(std::move(read_list)),
           m_ignored_read_ids(std::move(read_ignore_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;
-    assert(m_num_worker_threads > 0);
+    assert(m_thread_pool.n_threads() > 0);
 }
 
 DataLoader::InputFiles DataLoader::InputFiles::search_pod5s(const std::filesystem::path& path,
@@ -571,7 +591,4 @@ const std::vector<std::filesystem::directory_entry>& DataLoader::InputFiles::get
     return m_entries;
 }
 
-stats::NamedStats DataLoader::sample_stats() const {
-    return stats::NamedStats{{"loaded_read_count", static_cast<double>(m_loaded_read_count)}};
-}
 }  // namespace dorado
