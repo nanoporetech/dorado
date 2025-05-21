@@ -43,7 +43,7 @@ std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_strin
                                                  bool include_unused);
 
 // Given a string representing cuda devices (e.g "cuda:0,1,3") returns a string containing
-// the set of types of gpu that will be used.
+// the set of types of gpu that will be used. If "cpu" returns empty string.
 std::string get_cuda_gpu_names(const std::string &device_string);
 
 // Reports the amount of available memory (in bytes) for a given device.
