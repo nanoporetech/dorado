@@ -33,7 +33,9 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<std::string_view>& cons_seqs_with_gaps,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
-                          const Variant& variant);
+                          const std::unordered_set<char>& symbol_set,
+                          const Variant& variant,
+                          bool ambig_variant);
 
 /**
  * \brief Decodes polyploid variants from a given tensor of probabilities for a single inference sample (not a batch).

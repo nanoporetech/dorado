@@ -279,11 +279,11 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
     if (test_case.expect_throw) {
         CATCH_CHECK_THROWS(normalize_variant(test_case.ref_seq_with_gaps, test_case.consensus_seqs,
                                              test_case.pos_major, test_case.pos_minor,
-                                             test_case.variant));
+                                             {'A', 'C', 'G', 'T', '*'}, test_case.variant, false));
     } else {
-        const Variant result =
-                normalize_variant(test_case.ref_seq_with_gaps, test_case.consensus_seqs,
-                                  test_case.pos_major, test_case.pos_minor, test_case.variant);
+        const Variant result = normalize_variant(
+                test_case.ref_seq_with_gaps, test_case.consensus_seqs, test_case.pos_major,
+                test_case.pos_minor, {'A', 'C', 'G', 'T', '*'}, test_case.variant, false);
         CATCH_CHECK(test_case.expected == result);
     }
 }
