@@ -1,5 +1,7 @@
 #include "read_output_progress_stats.h"
 
+#include "utils/thread_naming.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -107,6 +109,8 @@ void ReadOutputProgressStats::start() {
     }
 
     m_reporting_thread = std::thread([this] {
+        utils::set_thread_name("progress_report");
+
         std::unique_lock lock(m_mutex);
         m_monitoring_start_time = progress_clock::now();
         m_interval_start = m_monitoring_start_time;

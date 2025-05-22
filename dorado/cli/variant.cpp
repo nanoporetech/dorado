@@ -23,6 +23,7 @@
 #include "utils/log_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
+#include "utils/thread_naming.h"
 #include "variant/variant_progress_tracker.h"
 
 #include <ATen/Parallel.h>
@@ -774,16 +775,22 @@ void run_variant_calling(const Options& opt,
                 utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
                 utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
 
-                std::thread thread_sample_producer = std::thread(
-                        &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
-                        std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
-                        opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
+                std::thread thread_sample_producer([&resources, &bam_regions, &draft_lens, &opt,
+                                                    &batch_queue] {
+                    utils::set_thread_name("variant_produce");
+                    polisher::sample_producer(resources, bam_regions, draft_lens, opt.threads,
+                                              opt.batch_size, opt.window_len, opt.window_overlap,
+                                              opt.bam_subchunk, batch_queue);
+                });
 
-                std::thread thread_sample_decoder = std::thread(
-                        &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                        std::ref(vc_input_data), std::ref(decode_queue), std::ref(stats),
-                        std::cref(*resources.decoder), opt.threads, opt.min_depth,
-                        /*collect_vc_data=*/true);
+                std::thread thread_sample_decoder([&all_results_cons, &vc_input_data, &decode_queue,
+                                                   &stats, &resources, &opt] {
+                    utils::set_thread_name("variant_decode");
+                    polisher::decode_samples_in_parallel(all_results_cons, vc_input_data,
+                                                         decode_queue, stats, *resources.decoder,
+                                                         opt.threads, opt.min_depth,
+                                                         /*collect_vc_data=*/true);
+                });
 
                 polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
                                                     resources.streams, resources.encoders,
