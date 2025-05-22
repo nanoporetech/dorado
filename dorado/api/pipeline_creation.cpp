@@ -65,9 +65,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     const bool is_rna = is_rna_model(model_config);
     NodeHandle first_node_handle = PipelineDescriptor::InvalidNodeHandle;
-    NodeHandle last_node_handle = PipelineDescriptor::InvalidNodeHandle;
-
-    NodeHandle current_node_handle = PipelineDescriptor::InvalidNodeHandle;
 
     // For RNA model, read splitting happens first before any basecalling.
     if (enable_read_splitter && is_rna) {
@@ -77,24 +74,23 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         auto rna_splitter_node = pipeline_desc.add_node<ReadSplitNode>({}, std::move(rna_splitter),
                                                                        splitter_node_threads, 1000);
         first_node_handle = rna_splitter_node;
-        current_node_handle = rna_splitter_node;
     }
 
     auto scaler_node =
             pipeline_desc.add_node<ScalerNode>({}, model_config.signal_norm_params,
                                                model_config.sample_type, scaler_node_threads, 1000);
-    if (current_node_handle != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(current_node_handle, scaler_node);
+    if (first_node_handle != PipelineDescriptor::InvalidNodeHandle) {
+        pipeline_desc.add_node_sink(first_node_handle, scaler_node);
     } else {
         first_node_handle = scaler_node;
     }
-    current_node_handle = scaler_node;
+    NodeHandle current_node_handle = scaler_node;
+
     auto basecaller_node =
             pipeline_desc.add_node<BasecallerNode>({}, std::move(runners), overlap, model_name,
                                                    1000, "BasecallerNode", mean_qscore_start_pos);
     pipeline_desc.add_node_sink(current_node_handle, basecaller_node);
     current_node_handle = basecaller_node;
-    last_node_handle = basecaller_node;
 
     // For DNA, read splitting happens after basecall.
     if (enable_read_splitter && !is_rna) {
@@ -106,7 +102,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                                                                        splitter_node_threads, 1000);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
-        last_node_handle = dna_splitter_node;
     }
 
     if (!modbase_runners.empty()) {
@@ -114,7 +109,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                                                         modbase_node_threads, model_config.stride);
         pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
         current_node_handle = mod_base_caller_node;
-        last_node_handle = mod_base_caller_node;
     }
 
     // if we've been provided a source node, connect it to the start of our pipeline
@@ -124,7 +118,7 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
 
     // if we've been provided a sink node, connect it to the end of our pipeline
     if (sink_node_handle != PipelineDescriptor::InvalidNodeHandle) {
-        pipeline_desc.add_node_sink(last_node_handle, sink_node_handle);
+        pipeline_desc.add_node_sink(current_node_handle, sink_node_handle);
     }
 }
 

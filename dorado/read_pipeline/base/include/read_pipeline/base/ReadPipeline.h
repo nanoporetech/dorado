@@ -21,9 +21,6 @@ using NodeHandle = int;
 class PipelineDescriptor {
     friend class Pipeline;
 
-    std::vector<std::unique_ptr<MessageSink>> m_nodes;
-    std::vector<std::vector<NodeHandle>> m_node_sink_handles;
-
     struct NodeDescriptor {
         std::unique_ptr<MessageSink> node;
         std::vector<NodeHandle> sink_handles;

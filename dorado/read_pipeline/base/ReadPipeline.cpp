@@ -102,7 +102,7 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
         auto &node = m_nodes.at(i);
         const auto &sink_handles = descriptor.m_node_descriptors.at(i).sink_handles;
         for (const auto sink_handle : sink_handles) {
-            node->add_sink(dynamic_cast<MessageSink &>(*m_nodes.at(sink_handle)));
+            node->add_sink(*m_nodes.at(sink_handle));
         }
         // Start the node.
         node->restart();
@@ -112,7 +112,7 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
 void Pipeline::push_message(Message &&message) {
     assert(!m_nodes.empty());
     const auto source_node_index = m_source_to_sink_order.front();
-    dynamic_cast<MessageSink &>(*m_nodes.at(source_node_index)).push_message(std::move(message));
+    m_nodes.at(source_node_index)->push_message(std::move(message));
 }
 
 stats::NamedStats Pipeline::terminate(const FlushOptions &flush_options) {
