@@ -63,10 +63,13 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
           // TODO -- more principled calculation of output queue size
           m_processed_chunks(10 * max_reads) {
     init_modbase_info();
+
+    m_processed_chunks.set_name("processed_chunks");
     for (size_t i = 0; i < m_runners[0]->num_models(); i++) {
-        m_chunk_queues.emplace_back(
+        auto& queue = m_chunk_queues.emplace_back(
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<ModBaseChunk>>>(m_batch_size *
                                                                                    5));
+        queue->set_name("chunk_queue_" + std::to_string(i));
     }
 }
 
@@ -588,9 +591,12 @@ void ModBaseCallerNode::output_worker_thread() {
 std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const {
     stats::NamedStats stats = stats::from_obj(m_work_queue);
     for (const auto& runner : m_runners) {
-        const auto runner_stats = stats::from_obj(*runner);
-        stats.insert(runner_stats.begin(), runner_stats.end());
+        stats.merge(stats::from_obj(*runner));
     }
+    for (const auto& chunk_queue : m_chunk_queues) {
+        stats.merge(stats::from_obj(*chunk_queue));
+    }
+    stats.merge(stats::from_obj(m_processed_chunks));
     stats["batches_called"] = double(m_num_batches_called);
     stats["partial_batches_called"] = double(m_num_partial_batches_called);
     stats["input_chunks_sleeps"] = double(m_num_input_chunks_sleeps);
