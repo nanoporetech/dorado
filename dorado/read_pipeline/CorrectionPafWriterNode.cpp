@@ -27,10 +27,6 @@ void CorrectionPafWriterNode::input_thread_fn() {
     }
 }
 
-stats::NamedStats CorrectionPafWriterNode::sample_stats() const {
-    return stats::from_obj(m_work_queue);
-}
-
 void CorrectionPafWriterNode::terminate(const FlushOptions &) { stop_input_processing(); }
 
 }  // namespace dorado

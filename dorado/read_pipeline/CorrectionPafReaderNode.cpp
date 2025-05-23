@@ -89,7 +89,7 @@ CorrectionPafReaderNode::CorrectionPafReaderNode(const std::string_view paf_file
           m_skip_set{std::move(skip_set)} {}
 
 stats::NamedStats CorrectionPafReaderNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer);
     return stats;
 }

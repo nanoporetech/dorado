@@ -9,6 +9,8 @@ namespace dorado {
 MessageSink::MessageSink(size_t max_messages, int num_input_threads)
         : m_work_queue(max_messages), m_num_input_threads(num_input_threads) {}
 
+stats::NamedStats MessageSink::sample_stats() const { return stats::from_obj(m_work_queue); }
+
 void MessageSink::push_message_internal(Message &&message) {
 #ifndef NDEBUG
     const auto status =

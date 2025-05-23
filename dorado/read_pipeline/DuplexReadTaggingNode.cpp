@@ -104,8 +104,4 @@ void DuplexReadTaggingNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "duplex_tagging");
 }
 
-stats::NamedStats DuplexReadTaggingNode::sample_stats() const {
-    return stats::from_obj(m_work_queue);
-}
-
 }  // namespace dorado

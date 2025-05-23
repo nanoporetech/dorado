@@ -619,7 +619,7 @@ void CorrectionInferenceNode::terminate(const FlushOptions&) {
 }
 
 stats::NamedStats CorrectionInferenceNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_reads_corrected"] = double(num_reads.load());
     stats["total_reads_in_input"] = total_reads_in_input;
     return stats;

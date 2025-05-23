@@ -19,7 +19,6 @@ public:
     DuplexReadTaggingNode();
     ~DuplexReadTaggingNode() { stop_input_processing(); }
     std::string get_name() const override { return "DuplexReadTaggingNode"; }
-    stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { stop_input_processing(); }
     void restart() override;
 

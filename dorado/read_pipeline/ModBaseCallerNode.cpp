@@ -589,7 +589,7 @@ void ModBaseCallerNode::output_worker_thread() {
 }
 
 std::unordered_map<std::string, double> ModBaseCallerNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     for (const auto& runner : m_runners) {
         stats.merge(stats::from_obj(*runner));
     }

@@ -20,7 +20,6 @@ public:
     SubreadTaggerNode(int num_worker_threads, size_t max_reads);
     ~SubreadTaggerNode() { terminate_impl(); }
     std::string get_name() const override { return "SubreadTaggerNode"; }
-    ::dorado::stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override { terminate_impl(); }
     void restart() override { start_threads(); }
 

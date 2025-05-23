@@ -134,7 +134,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 }
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_barcodes_demuxed"] = m_num_records.load();
     {
         for (const auto& [bc_name, bc_count] : m_barcode_count) {

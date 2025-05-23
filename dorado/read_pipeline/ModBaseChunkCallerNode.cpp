@@ -995,7 +995,7 @@ void ModBaseChunkCallerNode::output_thread_fn() {
 }
 
 std::unordered_map<std::string, double> ModBaseChunkCallerNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     for (const auto& runner : m_runners) {
         stats.merge(stats::from_obj(*runner));
     }

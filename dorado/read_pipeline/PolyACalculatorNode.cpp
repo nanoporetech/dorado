@@ -103,7 +103,7 @@ PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, size_t max_r
 void PolyACalculatorNode::terminate_impl() { stop_input_processing(); }
 
 stats::NamedStats PolyACalculatorNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["reads_not_estimated"] = static_cast<double>(num_not_called.load());
     stats["reads_estimated"] = static_cast<double>(num_called.load());
     stats["average_tail_length"] = static_cast<double>(

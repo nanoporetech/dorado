@@ -12,6 +12,7 @@ public:
     MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
             : MessageSink(max_messages, 0), m_messages(messages) {}
     ~MessageSinkToVector() { terminate_impl(); }
+    std::string get_name() const override { return "sink"; }
     void terminate(const dorado::FlushOptions&) override { terminate_impl(); }
     void restart() override {
         start_input_queue();

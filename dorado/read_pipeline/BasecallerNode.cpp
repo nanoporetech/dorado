@@ -484,7 +484,7 @@ void BasecallerNode::restart() {
 }
 
 stats::NamedStats BasecallerNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     for (const auto &runner : m_model_runners) {
         stats.merge(stats::from_obj(*runner));
     }

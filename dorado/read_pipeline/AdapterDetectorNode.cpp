@@ -176,7 +176,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
 }
 
 stats::NamedStats AdapterDetectorNode::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
+    auto stats = MessageSink::sample_stats();
     stats["num_reads_processed"] = m_num_records.load();
     stats["num_untrimmed_short_reads"] = m_num_untrimmed_short_reads.load();
     return stats;

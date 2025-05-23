@@ -12,7 +12,6 @@ public:
     CorrectionPafWriterNode();
     ~CorrectionPafWriterNode();
     std::string get_name() const override { return "CorrectionPafWriterNode"; }
-    stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions &) override;
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "paf_writer");

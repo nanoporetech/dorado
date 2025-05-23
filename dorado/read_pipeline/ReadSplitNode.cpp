@@ -73,7 +73,7 @@ ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
         : MessageSink(max_reads, num_worker_threads), m_splitter(std::move(splitter)) {}
 
 stats::NamedStats ReadSplitNode::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_input_reads_pushed"] = static_cast<double>(m_num_input_reads_pushed.load());
     stats["num_reads_split"] = static_cast<double>(m_num_reads_split.load());
     stats["total_num_reads_pushed"] = static_cast<double>(m_total_num_reads_pushed.load());

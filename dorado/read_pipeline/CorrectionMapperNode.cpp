@@ -367,7 +367,7 @@ CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
 }
 
 stats::NamedStats CorrectionMapperNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_reads_aligned"] = m_alignments_processed.load();
     stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer.load());
     stats["index_seqs"] = m_index_seqs;
