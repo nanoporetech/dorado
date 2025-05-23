@@ -38,6 +38,8 @@ class AsyncQueue {
     // Stats for monitoring queue usage.
     int64_t m_num_pushes = 0;
     int64_t m_num_pops = 0;
+    // Name of the queue, for logging and stat collection.
+    std::string m_name = "queue";
 
     // Sets item to the next element in the queue and
     // notifies a waiting thread that the queue is not full.
@@ -258,7 +260,10 @@ public:
         return m_items.size();
     }
 
-    std::string get_name() const { return "queue"; }
+    // Note: this is only && since clang-tidy complains if it's by value.
+    void set_name(std::string&& name) { m_name = std::move(name); }
+
+    const std::string& get_name() const { return m_name; }
 
     std::unordered_map<std::string, double> sample_stats() const {
         std::unordered_map<std::string, double> stats;

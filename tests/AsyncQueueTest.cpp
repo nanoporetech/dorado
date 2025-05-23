@@ -141,3 +141,10 @@ CATCH_TEST_CASE(TEST_GROUP ": process_and_pop_n") {
     CATCH_CHECK(popped_items == expected);
     CATCH_CHECK(queue.size() == 0);
 }
+
+CATCH_TEST_CASE(TEST_GROUP ": name") {
+    AsyncQueue<int> queue(1);
+    CATCH_CHECK(queue.get_name() == "queue");
+    queue.set_name("test");
+    CATCH_CHECK(queue.get_name() == "test");
+}
