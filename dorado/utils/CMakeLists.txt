@@ -35,6 +35,7 @@ add_library(dorado_utils
     gzip_reader.h
     hts_file.cpp
     hts_file.h
+    jthread.h
     locale_utils.cpp
     locale_utils.h
     log_utils.cpp
