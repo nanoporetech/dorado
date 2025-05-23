@@ -332,11 +332,10 @@ secondary::Sample EncoderCounts::encode_region(const std::string& ref_name,
         pileup_tensors = counts_data_to_tensors(pileup, n_rows);
 
     } catch (const std::exception& e) {
-        spdlog::warn(
-                "[EncoderCounts] Could not encode region: {}:{}-{}! Caught error: '{}'. Returning "
-                "empty.",
-                ref_name, ref_start + 1, ref_end, e.what());
-        return {};
+        std::ostringstream oss;
+        oss << "[EncoderCounts] Could not encode region: " << ref_name << ':' << (ref_start + 1)
+            << '-' << ref_end << "! Original message: '" << e.what() << "'";
+        throw std::runtime_error{oss.str()};
     }
 
     if (!pileup_tensors.counts.numel()) {
