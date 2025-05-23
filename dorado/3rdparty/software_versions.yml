@@ -168,7 +168,7 @@ streamvbyte:
 toml11:
     description: >
         TOML for Modern C++
-    version: "v4.2.0"
+    version: "v4.4.0"
     url: https://github.com/ToruNiina/toml11
     license: toml11/LICENSE
     files:
