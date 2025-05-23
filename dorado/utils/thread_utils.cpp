@@ -1,16 +1,24 @@
 #include "thread_utils.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <array>
+#include <atomic>
+#include <chrono>
+#include <cstdlib>
+#include <cstring>
+#include <thread>
 
 #ifdef _WIN32
 #include <Windows.h>
-
-#elif defined(__APPLE__) || defined(__linux__)
+#elif defined(__APPLE__)
 #include <pthread.h>
-
-#include <cstring>
+#elif defined(__linux__)
+#include <pthread.h>
+#include <sched.h>
 #endif
+
 namespace dorado::utils {
 
 void set_thread_name(const char* name) {
@@ -50,6 +58,151 @@ void set_thread_name(const char* name) {
 #else
     pthread_setname_np(pthread_self(), limited_name.data());
 #endif
+#endif
+}
+
+#ifdef __linux__
+static void pin_current_thread_to_cpu(std::size_t cpu_id) {
+    const auto num_threads = std::thread::hardware_concurrency();
+    cpu_set_t* cpuset = CPU_ALLOC(num_threads);
+    const auto cpusetsize = CPU_ALLOC_SIZE(num_threads);
+    CPU_ZERO(cpuset);
+    CPU_SET(cpu_id, cpuset);
+
+    const auto handle = pthread_self();
+    const int err = pthread_setaffinity_np(handle, cpusetsize, cpuset);
+    if (err != 0) {
+        spdlog::error("[{}] Failed to pin thread to core {}: {}", handle, cpu_id, err);
+    }
+
+    CPU_FREE(cpuset);
+}
+#endif
+
+void run_load_balancers() {
+#ifdef __linux__
+    using Clock = std::chrono::steady_clock;
+    static constexpr Clock::duration check_every = std::chrono::milliseconds(500);
+
+    static const bool pin_balancers = [] {
+        const char* envvar = getenv("pin_balancers");
+        const bool should = envvar != nullptr && envvar[0] == '1';
+        spdlog::info("pin_balancers={} ({})", envvar ? envvar : "", should ? "yes" : "no");
+        return should;
+    }();
+
+    static auto run_balancer_thread = [](std::size_t thread_id,
+                                         const std::atomic<std::size_t>& threads_to_spin) {
+        if (pin_balancers) {
+            // TODO: should spread them out, something like this:
+            //   thread: 0 1 2 3 4 5 6 7
+            //   cpu:    0 4 2 6 1 5 3 7
+            // Looks like https://oeis.org/A030109
+            pin_current_thread_to_cpu(thread_id);
+        }
+
+        // Helper to do some work.
+        auto do_work = [](std::size_t loop_count) {
+            auto start = Clock::now();
+            volatile float val = 1 + rand();
+            for (std::size_t i = 0; i < loop_count; i++) {
+                val = std::sqrt(val) + 1.f;
+            }
+            return Clock::now() - start;
+        };
+
+        constexpr std::size_t min_loop_count = 1'000'000;
+        std::size_t loop_count = min_loop_count;
+        auto last_check_time = Clock::now();
+        bool active = false;
+        while (true) {
+            // See if we should be active.
+            const auto now = Clock::now();
+            if (now - last_check_time > check_every) {
+                active = thread_id < threads_to_spin.load(std::memory_order_relaxed);
+                last_check_time = now;
+            }
+
+            if (!active) {
+                // Nothing to do.
+                std::this_thread::sleep_for(check_every);
+                continue;
+            }
+
+            // Do some work, adjusting how long we work for.
+            const auto work_duration = do_work(loop_count);
+            if (work_duration < check_every / 2) {
+                loop_count *= 1.5;
+            } else if (work_duration > check_every) {
+                loop_count /= 2;
+            }
+            loop_count = std::max(min_loop_count, loop_count);
+        }
+    };
+
+    static auto run_monitor_thread = [] {
+        const auto num_cpus = std::thread::hardware_concurrency();
+        std::atomic<std::size_t> threads_to_spin{0};
+
+        // Kick off balancer threads.
+        std::vector<std::thread> balancers(num_cpus);
+        for (std::size_t thread_id = 0; thread_id < num_cpus; thread_id++) {
+            balancers[thread_id] = std::thread([thread_id, &threads_to_spin] {
+                run_balancer_thread(thread_id, threads_to_spin);
+            });
+        }
+
+        auto get_cpu_usage = [] {
+            static timespec last_cpu_time{};
+            static timespec last_wall_time{};
+
+            timespec current_cpu_time{};
+            timespec current_wall_time{};
+            clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &current_cpu_time);
+            clock_gettime(CLOCK_MONOTONIC, &current_wall_time);
+
+            const double cpu_time = (current_cpu_time.tv_sec - last_cpu_time.tv_sec) +
+                                    1e-9 * (current_cpu_time.tv_nsec - last_cpu_time.tv_nsec);
+            const double wall_time = (current_wall_time.tv_sec - last_wall_time.tv_sec) +
+                                     1e-9 * (current_wall_time.tv_nsec - last_wall_time.tv_nsec);
+
+            last_cpu_time = current_cpu_time;
+            last_wall_time = current_wall_time;
+
+            return cpu_time / wall_time;
+        };
+        get_cpu_usage();  // reset it
+
+        // Read off target CPU usage.
+        double target_output = 0.7;
+        if (const char* envvar = getenv("target_output"); envvar != nullptr) {
+            target_output = std::atof(envvar);
+        }
+        target_output = std::clamp(target_output, 0.0, 1.0);
+        target_output *= num_cpus;
+        spdlog::info("target_output={}", target_output);
+
+        // Monitor resource usage and keep us at the requested CPU usage.
+        double previous_input = 0;
+        while (true) {
+            std::this_thread::sleep_for(check_every);
+
+            // Adjust the current resource usage.
+            // TODO: PID controller
+            const double current_output = get_cpu_usage();
+            double current_input = previous_input;
+            current_input += (target_output - current_output) / 2;
+            current_input = std::clamp(current_input, 0.0, static_cast<double>(num_cpus));
+
+            threads_to_spin.store(current_input, std::memory_order_relaxed);
+            previous_input = current_input;
+        }
+    };
+
+    [[maybe_unused]] static auto thread_starter = [] {
+        std::thread(run_monitor_thread).detach();
+        return true;
+    }();
 #endif
 }
 

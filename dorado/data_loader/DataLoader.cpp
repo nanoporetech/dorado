@@ -294,6 +294,8 @@ void DataLoader::load_reads(const InputFiles& input_files, ReadOrder traversal_o
     }
     auto pod5_cleanup = utils::PostCondition([] { pod5_terminate(); });
 
+    utils::run_load_balancers();
+
     switch (traversal_order) {
     case ReadOrder::BY_CHANNEL:
         load_reads_by_channel(input_files.get());
