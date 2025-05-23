@@ -9,6 +9,9 @@ namespace dorado {
 MessageSink::MessageSink(size_t max_messages, int num_input_threads)
         : m_work_queue(max_messages), m_num_input_threads(num_input_threads) {}
 
+// Intentionally out-of-line for avoid vtable generation in every TU.
+MessageSink::~MessageSink() = default;
+
 stats::NamedStats MessageSink::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 void MessageSink::push_message_internal(Message &&message) {

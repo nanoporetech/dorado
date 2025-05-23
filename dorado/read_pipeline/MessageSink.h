@@ -27,7 +27,7 @@ class MessageSink {
 public:
     MessageSink(size_t max_messages, int num_input_threads);
 
-    virtual ~MessageSink() = default;
+    virtual ~MessageSink();
 
     // StatsSampler will ignore nodes with an empty name.
     virtual std::string get_name() const = 0;
