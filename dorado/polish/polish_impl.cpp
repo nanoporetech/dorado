@@ -469,8 +469,22 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
     return results;
 }
 
-}  // namespace
-
+/**
+ * \brief This function performs the following operations:
+ *          1. Merges adjacent samples, which were split for efficiency of computing the pileup.
+ *          2. Checks for discontinuities in any of the samples (based on major positions) and splits them.
+ *          3. Splits the merged samples into equally sized pieces which will be used for inference to prevent memory usage spikes.
+ * \param window_samples Input samples which will be merged and split. Non-const to enable moving of data.
+ * \param encoder Encoder used to produce the sample tensors. It is needed becaue of the secondary::EncoderBase::merge_adjacent_samples() function.
+ * \param bam_regions BAM region coordinates. This is a Span to facilitate batching of BAM regions from the outside.
+ * \param bam_region_intervals Range of IDs of window_samples which comprise this BAM region. E.g. BAM region 0 uses window_samples[0:5], BAM region 1 uses window_samples[5:9], etc.
+ *                              This is a Span to facilitate batching of BAM regions from the outside and avoid copying vectors.
+ * \param num_threads Number of threads for procesing.
+ * \param window_len Length of the window to split the final samples into.
+ * \param window_overlap Overlap between neighboring windows when splitting.
+ * \param window_interval_offset Used for batching bam_region_intervals, because window_samples.size() matches the total size of bam_region_intervals,
+ *                                  while coordinates of each BAM region interval are global and produced before draft batching on the client side.
+ */
 std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
 merge_and_split_bam_regions_in_parallel(
         std::vector<secondary::Sample>& window_samples,
@@ -665,6 +679,11 @@ merge_and_split_bam_regions_in_parallel(
     return {results_samples, results_trims};
 }
 
+/**
+ * \brief For each input window (region of the draft) runs the given encoder and produces a sample.
+ *          The BamFile handels are used to fetch the pileup data and encode regions.
+ *          Encoding is parallelized, where the actual number of threads is min(bam_handles.size(), num_threads, windows.size()).
+ */
 std::vector<secondary::Sample> encode_windows_in_parallel(
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         std::atomic<bool>& worker_terminate,
@@ -749,6 +768,8 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
 
     return results;
 }
+
+}  // namespace
 
 std::vector<secondary::Window> create_windows_from_regions(
         const std::vector<secondary::Region>& regions,
