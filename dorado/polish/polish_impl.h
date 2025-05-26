@@ -79,12 +79,12 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::filesystem::path& in_ref_fn,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
-                                   const int32_t num_bam_threads,
-                                   const int32_t num_inference_threads,
-                                   const bool full_precision,
+                                   int32_t num_bam_threads,
+                                   int32_t num_inference_threads,
+                                   bool full_precision,
                                    const std::string& read_group,
                                    const std::string& tag_name,
-                                   const int32_t tag_value,
+                                   int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
                                    const std::optional<secondary::HaplotagSource>& haptag_source,
@@ -111,7 +111,7 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
         const std::string& header,
         const std::vector<std::vector<secondary::ConsensusResult>>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
-        const bool fill_gaps,
+        bool fill_gaps,
         const std::optional<char>& fill_char);
 
 /**
@@ -121,8 +121,8 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
 std::vector<secondary::Window> create_windows_from_regions(
         const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
-        const int32_t bam_chunk_len,
-        const int32_t window_overlap);
+        int32_t bam_chunk_len,
+        int32_t window_overlap);
 
 /**
  * \brief Fetches the decode data from an async queue, decodes the consensus and collects
@@ -143,10 +143,10 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 std::atomic<bool>& worker_terminate,
                                 polisher::WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
-                                const int32_t num_threads,
-                                const int32_t min_depth,
-                                const bool collect_vc_data,
-                                const bool continue_on_exception);
+                                int32_t num_threads,
+                                int32_t min_depth,
+                                bool collect_vc_data,
+                                bool continue_on_exception);
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
@@ -175,7 +175,7 @@ std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_cons
         const secondary::Interval& region_batch,
         const std::vector<std::vector<secondary::ConsensusResult>>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const bool fill_gaps,
+        bool fill_gaps,
         const std::optional<char>& fill_char,
         hts_io::FastxRandomReader& draft_reader);
 
