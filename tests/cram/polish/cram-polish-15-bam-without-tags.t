@@ -95,9 +95,9 @@ This should fail by default.
   > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "Caught exception" out/out.fasta.stderr | sed -E 's/.*(Caught exception.*)/\1/g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input data does not contain move tables, but a model which requires move tables has been chosen.
+  Input data does not contain move tables, but a model which requires move tables has been chosen.
 
 The input BAM _has_ move tables, but the specified model was trained without the move tables.
 This should fail by default.
@@ -108,9 +108,9 @@ This should fail by default.
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "Caught exception" out/out.fasta.stderr | sed -E 's/.*(Caught exception.*)/\1/g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input data has move tables, but a model without move table support has been chosen.
+  Input data has move tables, but a model without move table support has been chosen.
 
 The input BAM is stripped of all tags (no move tables) but the specified model was trained using the move tables.
 Permit this using `--skip-model-compatibility-check` but check for an emitted warning.
