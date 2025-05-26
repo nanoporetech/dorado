@@ -779,7 +779,7 @@ void run_variant_calling(const Options& opt,
                     std::ostringstream oss;
                     oss << batch_interval.start << "-" << batch_interval.end << "/"
                         << std::size(input_regions) << ", bases: " << batch_bases;
-                    tracker.set_description("Polishing draft sequences: " + oss.str());
+                    tracker.set_description("Processing sequences: " + oss.str());
                 }
 
                 // Each item is one batch for inference.
