@@ -23,6 +23,30 @@ namespace dorado::utils {
 
 namespace {
 
+class CPUUsage {
+    timespec last_cpu_time{};
+    timespec last_wall_time{};
+
+public:
+    // Returns the average CPU usage since the last time this was called.
+    double poll() {
+        timespec current_cpu_time{};
+        timespec current_wall_time{};
+        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &current_cpu_time);
+        clock_gettime(CLOCK_MONOTONIC, &current_wall_time);
+
+        const double cpu_time = (current_cpu_time.tv_sec - last_cpu_time.tv_sec) +
+                                1e-9 * (current_cpu_time.tv_nsec - last_cpu_time.tv_nsec);
+        const double wall_time = (current_wall_time.tv_sec - last_wall_time.tv_sec) +
+                                 1e-9 * (current_wall_time.tv_nsec - last_wall_time.tv_nsec);
+
+        last_cpu_time = current_cpu_time;
+        last_wall_time = current_wall_time;
+
+        return cpu_time / wall_time;
+    }
+};
+
 std::atomic<bool> s_spinners_enabled{false};
 
 }  // namespace
@@ -158,27 +182,6 @@ static void init_load_balancers() {
             });
         }
 
-        auto get_cpu_usage = [] {
-            static timespec last_cpu_time{};
-            static timespec last_wall_time{};
-
-            timespec current_cpu_time{};
-            timespec current_wall_time{};
-            clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &current_cpu_time);
-            clock_gettime(CLOCK_MONOTONIC, &current_wall_time);
-
-            const double cpu_time = (current_cpu_time.tv_sec - last_cpu_time.tv_sec) +
-                                    1e-9 * (current_cpu_time.tv_nsec - last_cpu_time.tv_nsec);
-            const double wall_time = (current_wall_time.tv_sec - last_wall_time.tv_sec) +
-                                     1e-9 * (current_wall_time.tv_nsec - last_wall_time.tv_nsec);
-
-            last_cpu_time = current_cpu_time;
-            last_wall_time = current_wall_time;
-
-            return cpu_time / wall_time;
-        };
-        get_cpu_usage();  // reset it
-
         // Read off target CPU usage.
         double target_output = 0.7;
         if (const char* envvar = getenv("target_output"); envvar != nullptr) {
@@ -189,6 +192,8 @@ static void init_load_balancers() {
         spdlog::info("target_output={}", target_output);
 
         // Monitor resource usage and keep us at the requested CPU usage.
+        CPUUsage cpu_usage;
+        cpu_usage.poll();  // poll and discard initial input
         double previous_input = 0;
         while (true) {
             std::this_thread::sleep_for(check_every);
@@ -197,14 +202,14 @@ static void init_load_balancers() {
             if (!s_spinners_enabled.load(std::memory_order_relaxed)) {
                 threads_to_spin.store(0, std::memory_order_relaxed);
                 // Poll but discard.
-                get_cpu_usage();
+                cpu_usage.poll();
                 previous_input = 0;
                 continue;
             }
 
             // Adjust the current resource usage.
             // TODO: PID controller
-            const double current_output = get_cpu_usage();
+            const double current_output = cpu_usage.poll();
             double current_input = previous_input;
             current_input += (target_output - current_output) / 2;
             current_input = std::clamp(current_input, 0.0, static_cast<double>(num_cpus));
