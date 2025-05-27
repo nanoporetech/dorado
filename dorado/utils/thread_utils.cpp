@@ -123,24 +123,6 @@ void set_thread_name(const char* name) {
 #endif
 }
 
-#ifdef __linux__
-static void pin_current_thread_to_cpu(std::size_t cpu_id) {
-    const auto num_threads = std::thread::hardware_concurrency();
-    cpu_set_t* cpuset = CPU_ALLOC(num_threads);
-    const auto cpusetsize = CPU_ALLOC_SIZE(num_threads);
-    CPU_ZERO(cpuset);
-    CPU_SET(cpu_id, cpuset);
-
-    const auto handle = pthread_self();
-    const int err = pthread_setaffinity_np(handle, cpusetsize, cpuset);
-    if (err != 0) {
-        spdlog::error("[{}] Failed to pin thread to core {}: {}", handle, cpu_id, err);
-    }
-
-    CPU_FREE(cpuset);
-}
-#endif
-
 static void init_load_balancers() {
 #ifdef __linux__
     using Clock = std::chrono::steady_clock;
@@ -148,23 +130,8 @@ static void init_load_balancers() {
     // Not doing so would cause the PID to overshoot since it'd be acting on stale data.
     static constexpr Clock::duration poll_every = std::chrono::milliseconds(500);
 
-    static const bool pin_balancers = [] {
-        const char* envvar = getenv("pin_balancers");
-        const bool should = envvar != nullptr && envvar[0] == '1';
-        spdlog::info("pin_balancers={} ({})", envvar ? envvar : "", should ? "yes" : "no");
-        return should;
-    }();
-
     static auto run_balancer_thread = [](std::size_t thread_id,
                                          const std::atomic<std::size_t>& threads_to_spin) {
-        if (pin_balancers) {
-            // TODO: should spread them out, something like this:
-            //   thread: 0 1 2 3 4 5 6 7
-            //   cpu:    0 4 2 6 1 5 3 7
-            // Looks like https://oeis.org/A030109
-            pin_current_thread_to_cpu(thread_id);
-        }
-
         // Helper to do some work.
         auto do_work = [](std::size_t loop_count) {
             auto start = Clock::now();
@@ -217,12 +184,12 @@ static void init_load_balancers() {
         }
 
         // Read off target CPU usage.
-        double target_output = 0.7;
-        if (const char* envvar = getenv("target_output"); envvar != nullptr) {
+        double target_output = 0.7;  // ~70% gives good performance on our test machine.
+        if (const char* envvar = getenv("DORADO_TARGET_USAGE"); envvar != nullptr) {
             target_output = std::atof(envvar);
         }
         target_output = std::clamp(target_output, 0.0, 1.0);
-        spdlog::info("target_output={}", target_output);
+        spdlog::info("DORADO_TARGET_USAGE={}", target_output);
 
         // Monitor resource usage and keep us at the requested CPU usage.
         SystemCPUUsage cpu_usage;
