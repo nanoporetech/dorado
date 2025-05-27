@@ -382,7 +382,7 @@ build_archive:linux:arm64:jammy:
     - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda11:
-  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:test
+  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.0
   variables:
     CUDA: "11.8"
   script:
@@ -394,7 +394,7 @@ build_archive:linux:x86:cuda11:
     - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda12:
-  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:test
+  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: ""
   script:
