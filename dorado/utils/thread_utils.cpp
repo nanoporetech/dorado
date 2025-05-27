@@ -21,6 +21,12 @@
 
 namespace dorado::utils {
 
+namespace {
+
+std::atomic<bool> s_spinners_enabled{false};
+
+}  // namespace
+
 void set_thread_name(const char* name) {
 #if defined(_WIN32)
     // There is an alternative thread name mechanism based on throwing an exception. We don't bother
@@ -79,7 +85,7 @@ static void pin_current_thread_to_cpu(std::size_t cpu_id) {
 }
 #endif
 
-void run_load_balancers() {
+static void init_load_balancers() {
 #ifdef __linux__
     using Clock = std::chrono::steady_clock;
     static constexpr Clock::duration check_every = std::chrono::milliseconds(500);
@@ -187,6 +193,15 @@ void run_load_balancers() {
         while (true) {
             std::this_thread::sleep_for(check_every);
 
+            // If we're not enabled then don't do any prediction.
+            if (!s_spinners_enabled.load(std::memory_order_relaxed)) {
+                threads_to_spin.store(0, std::memory_order_relaxed);
+                // Poll but discard.
+                get_cpu_usage();
+                previous_input = 0;
+                continue;
+            }
+
             // Adjust the current resource usage.
             // TODO: PID controller
             const double current_output = get_cpu_usage();
@@ -205,5 +220,13 @@ void run_load_balancers() {
     }();
 #endif
 }
+
+void start_busy_work() {
+    // Init them if they haven't been already.
+    init_load_balancers();
+    s_spinners_enabled.store(true, std::memory_order_relaxed);
+}
+
+void stop_busy_work() { s_spinners_enabled.store(false, std::memory_order_relaxed); }
 
 }  // namespace dorado::utils

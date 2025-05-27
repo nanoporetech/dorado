@@ -9,6 +9,7 @@ namespace dorado::utils {
 void set_thread_name(const char* name);
 
 // Run some busy work to keep the CPU clocked up at full speed.
-void run_load_balancers();
+void start_busy_work();
+void stop_busy_work();
 
 }  // namespace dorado::utils
