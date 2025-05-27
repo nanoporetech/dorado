@@ -8,6 +8,10 @@
 #include <chrono>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
+#include <optional>
+#include <sstream>
+#include <string>
 #include <thread>
 
 #ifdef _WIN32
@@ -23,27 +27,55 @@ namespace dorado::utils {
 
 namespace {
 
-class CPUUsage {
-    timespec last_cpu_time{};
-    timespec last_wall_time{};
+class SystemCPUUsage {
+    struct Timings {
+        std::size_t cpu, wall;
+    };
+    Timings m_last_timings{};
+
+    std::optional<Timings> read_timings() {
+        // Read the total CPU line from proc.
+        std::ifstream proc_stat("/proc/stat");
+        std::string first_line;
+        if (!std::getline(proc_stat, first_line)) {
+            spdlog::error("Failed to read /proc/stat");
+            return std::nullopt;
+        }
+        std::istringstream cpu_line(first_line);
+
+        // Read off everything until idle and store that separately.
+        std::string cpu;
+        std::size_t user = 0, nice = 0, system = 0, idle = 0;
+        cpu_line >> cpu >> user >> nice >> system >> idle;
+        if (cpu != "cpu" || !cpu_line) {
+            spdlog::error("Failed to parse /proc/stat");
+            return std::nullopt;
+        }
+
+        // Read off the rest of the timings.
+        std::size_t cpu_total = user + nice + system;
+        std::size_t timing = 0;
+        while ((cpu_line >> timing)) {
+            cpu_total += timing;
+        }
+
+        Timings timings;
+        timings.cpu = cpu_total;
+        timings.wall = cpu_total + idle;
+        return timings;
+    }
 
 public:
-    // Returns the average CPU usage since the last time this was called.
-    double poll() {
-        timespec current_cpu_time{};
-        timespec current_wall_time{};
-        clock_gettime(CLOCK_PROCESS_CPUTIME_ID, &current_cpu_time);
-        clock_gettime(CLOCK_MONOTONIC, &current_wall_time);
-
-        const double cpu_time = (current_cpu_time.tv_sec - last_cpu_time.tv_sec) +
-                                1e-9 * (current_cpu_time.tv_nsec - last_cpu_time.tv_nsec);
-        const double wall_time = (current_wall_time.tv_sec - last_wall_time.tv_sec) +
-                                 1e-9 * (current_wall_time.tv_nsec - last_wall_time.tv_nsec);
-
-        last_cpu_time = current_cpu_time;
-        last_wall_time = current_wall_time;
-
-        return cpu_time / wall_time;
+    // Returns the average system CPU % since the last time this was called.
+    std::optional<double> poll() {
+        const auto current_timings = read_timings();
+        if (!current_timings.has_value()) {
+            return std::nullopt;
+        }
+        const double cpu_delta = static_cast<double>(current_timings->cpu - m_last_timings.cpu);
+        const double wall_delta = static_cast<double>(current_timings->wall - m_last_timings.wall);
+        m_last_timings = *current_timings;
+        return cpu_delta / wall_delta;
     }
 };
 
@@ -112,7 +144,9 @@ static void pin_current_thread_to_cpu(std::size_t cpu_id) {
 static void init_load_balancers() {
 #ifdef __linux__
     using Clock = std::chrono::steady_clock;
-    static constexpr Clock::duration check_every = std::chrono::milliseconds(500);
+    // Kernel timings aren't updated that frequently, so we have to wait a while between polls.
+    // Not doing so would cause the PID to overshoot since it'd be acting on stale data.
+    static constexpr Clock::duration poll_every = std::chrono::milliseconds(500);
 
     static const bool pin_balancers = [] {
         const char* envvar = getenv("pin_balancers");
@@ -148,22 +182,22 @@ static void init_load_balancers() {
         while (true) {
             // See if we should be active.
             const auto now = Clock::now();
-            if (now - last_check_time > check_every) {
+            if (now - last_check_time > poll_every) {
                 active = thread_id < threads_to_spin.load(std::memory_order_relaxed);
                 last_check_time = now;
             }
 
             if (!active) {
                 // Nothing to do.
-                std::this_thread::sleep_for(check_every);
+                std::this_thread::sleep_for(poll_every);
                 continue;
             }
 
             // Do some work, adjusting how long we work for.
             const auto work_duration = do_work(loop_count);
-            if (work_duration < check_every / 2) {
+            if (work_duration < poll_every / 2) {
                 loop_count *= 1.5;
-            } else if (work_duration > check_every) {
+            } else if (work_duration > poll_every) {
                 loop_count /= 2;
             }
             loop_count = std::max(min_loop_count, loop_count);
@@ -188,33 +222,34 @@ static void init_load_balancers() {
             target_output = std::atof(envvar);
         }
         target_output = std::clamp(target_output, 0.0, 1.0);
-        target_output *= num_cpus;
         spdlog::info("target_output={}", target_output);
 
         // Monitor resource usage and keep us at the requested CPU usage.
-        CPUUsage cpu_usage;
+        SystemCPUUsage cpu_usage;
         cpu_usage.poll();  // poll and discard initial input
         double previous_input = 0;
         while (true) {
-            std::this_thread::sleep_for(check_every);
+            std::this_thread::sleep_for(poll_every);
+            const auto current_output = cpu_usage.poll();
 
             // If we're not enabled then don't do any prediction.
-            if (!s_spinners_enabled.load(std::memory_order_relaxed)) {
+            if (!s_spinners_enabled.load(std::memory_order_relaxed) ||
+                !current_output.has_value()) {
                 threads_to_spin.store(0, std::memory_order_relaxed);
-                // Poll but discard.
-                cpu_usage.poll();
+                // Reset previous input so that we don't overload the machine
+                // when we're next enabled.
                 previous_input = 0;
                 continue;
             }
 
             // Adjust the current resource usage.
             // TODO: PID controller
-            const double current_output = cpu_usage.poll();
             double current_input = previous_input;
-            current_input += (target_output - current_output) / 2;
-            current_input = std::clamp(current_input, 0.0, static_cast<double>(num_cpus));
+            current_input += (target_output - current_output.value()) / 2;
+            current_input = std::clamp(current_input, 0.0, 1.0);
 
-            threads_to_spin.store(current_input, std::memory_order_relaxed);
+            const std::size_t num_cpus_to_spin = current_input * num_cpus;
+            threads_to_spin.store(num_cpus_to_spin, std::memory_order_relaxed);
             previous_input = current_input;
         }
     };
