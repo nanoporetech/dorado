@@ -5,7 +5,7 @@
 #include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
 #include "utils/fs_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
 

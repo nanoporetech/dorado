@@ -6,7 +6,7 @@
 #include "read_utils.h"
 #include "stitch.h"
 #include "utils/stats.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>

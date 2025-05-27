@@ -8,7 +8,7 @@
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>

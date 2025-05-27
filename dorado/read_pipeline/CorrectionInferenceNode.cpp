@@ -10,7 +10,7 @@
 #include "utils/paf_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 #include "utils/types.h"
 
 #include <stdexcept>

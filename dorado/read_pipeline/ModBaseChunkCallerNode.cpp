@@ -7,7 +7,7 @@
 #include "utils/dev_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
