@@ -172,6 +172,8 @@ static void init_load_balancers() {
     };
 
     static auto run_monitor_thread = [] {
+        set_thread_name("busy_monitor");
+
         const auto num_cpus = std::thread::hardware_concurrency();
         std::atomic<std::size_t> threads_to_spin{0};
 
@@ -191,6 +193,7 @@ static void init_load_balancers() {
         std::vector<std::thread> balancers(num_cpus);
         for (std::size_t thread_id = 0; thread_id < num_cpus; thread_id++) {
             balancers[thread_id] = std::thread([thread_id, &threads_to_spin] {
+                set_thread_name(("busy_cpu_" + std::to_string(thread_id)).c_str());
                 run_balancer_thread(thread_id, threads_to_spin);
             });
         }
