@@ -2,12 +2,14 @@
 
 #include "modbase/ModBaseContext.h"
 #include "modbase/encode_kmer.h"
+#include "read_pipeline/ModBaseChunkCallerNode.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
 #include <cstddef>
+#include <cstdint>
 #include <cstring>
 #include <stdexcept>
 #include <string>
@@ -218,6 +220,88 @@ CATCH_TEST_CASE("Encode sequence for modified basecalling", TEST_GROUP) {
     CATCH_CHECK(res.tail_samples_needed == ctx.tail_samples_needed);
 }
 
+using Intervals = std::vector<std::pair<uint64_t, uint64_t>>;
+
+CATCH_TEST_CASE("Encode sequence to signal skips", TEST_GROUP) {
+    // clang-format off
+    auto [seq_to_sig_map, merged_chunks, expected, desc] =
+    GENERATE((table<std::vector<uint64_t>, Intervals, std::vector<bool>, std::string>(
+        {{{}, {}, {}, "empty input"},
+        {{0}, {{0, 1}}, {0}, "single input"},
+        {{0, 5, 10, 15}, {{0, 15}}, {0, 0, 0, 0}, "all"},
+        {{0, 5, 10, 15}, {{0, 1}}, {0, 1, 1, 1}, "first"},
+        {{0, 5, 10, 15}, {{15, 17}}, {1, 1, 1, 0}, "last"},
+        {{0, 5, 10, 15}, {{5, 10}}, {1, 0, 0, 1}, "inclusive"},
+        {{0, 3, 5, 10, 12, 15}, {{5, 10}}, {1, 1, 0, 0, 1, 1}, "inclusive 2"},
+        {{0, 5, 10, 15}, {{4, 11}}, {0, 0, 0, 1}, "exclusive"},
+        {{0, 3, 5, 10, 12, 15}, {{4, 11}}, {1, 0, 0, 0, 1, 1}, "exclusive 2"},
+        {{0, 3, 6, 9, 12, 15, 18, 21, 24}, {{4,10}, {14,16}}, {1, 0, 0, 0, 0, 0, 1, 1, 1}, "multi 1"},
+        {{0, 3, 6, 9, 12, 15, 18, 21, 24}, {{4,10}, {20,21}}, {1, 0, 0, 0, 1, 1, 0, 0, 1}, "multi 2"},
+        // Miss cannot happen as a chunk will always span a base
+        {{0, 5, 10, 15}, {{6, 9}}, {1, 1, 1, 1}, "internal miss"},
+        {{0, 5, 10, 15}, {{20, 21}}, {1, 1, 1, 1}, "after miss"},
+    })));
+
+    // clang-format on
+    CATCH_CAPTURE(desc, seq_to_sig_map, merged_chunks, expected);
+    const std::vector<bool> result =
+            dorado::ModBaseChunkCallerNode::get_skip_positions(seq_to_sig_map, merged_chunks);
+    CATCH_CAPTURE(result);
+    CATCH_CHECK(result == expected);
+}
+
+CATCH_TEST_CASE("Encode kmer for chunk mods models skips - stride 2", TEST_GROUP) {
+    const size_t BLOCK_STRIDE = 2;
+    std::string sequence{"TATTCAGTAC"};
+    auto seq_ints = dorado::utils::sequence_to_ints(sequence);
+    //                         T  A     T        T  C     A     G        T     A  C
+    std::vector<uint8_t> moves{1, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 1, 0, 0};
+    auto seq_to_sig_map = dorado::utils::moves_to_map(moves, BLOCK_STRIDE,
+                                                      moves.size() * BLOCK_STRIDE, std::nullopt);
+
+    const size_t whole_context = moves.size() * BLOCK_STRIDE;
+
+    auto test_chunk_enc = [&](size_t kmer_len, size_t padding, bool is_centered,
+                              const Intervals& merged_chunks,
+                              const std::vector<bool>& expected_skips,
+                              const std::string& expected_bases) {
+        const auto skips =
+                dorado::ModBaseChunkCallerNode::get_skip_positions(seq_to_sig_map, merged_chunks);
+        auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, skips, kmer_len, whole_context,
+                                        padding, is_centered);
+
+        CATCH_CAPTURE(seq_ints, seq_to_sig_map, skips, expected_skips, expected_bases);
+        CATCH_CAPTURE(whole_context, kmer_len, padding, is_centered);
+        CATCH_CHECK(result.size() == (whole_context + 2 * padding) * 4 * kmer_len);
+        CATCH_CHECK(skips == expected_skips);
+        CATCH_CHECK(decode_bases(result, kmer_len) == expected_bases);
+    };
+
+    CATCH_SECTION("1mer not centered") {
+        const size_t kmer_len = 1, padding = 0;
+        const bool is_centered = false;
+        //                     t, a, T, T,  C,  A,  g,  t,  a,  c
+        // seq_to_sig_map := { 0, 2, 6, 12, 14, 18, 22, 28, 32, 34, 40 }
+        const Intervals merged_chunks = {{8, 20}};
+        const std::vector<bool> expected_skips = {1, 1, 0, 0, 0, 0, 1, 1, 1, 1, 1};
+        std::string kmer_bases =
+                "N N N N N N T T T T T T T T C C C C A A A A N N N N N N N N N N N N N N N N N N";
+        test_chunk_enc(kmer_len, padding, is_centered, merged_chunks, expected_skips, kmer_bases);
+    }
+
+    CATCH_SECTION("1mer not centered") {
+        const size_t kmer_len = 1, padding = 0;
+        const bool is_centered = false;
+        //                     t, A, T, T,  C,  a,  G,  T,  A,  c
+        // seq_to_sig_map := { 0, 2, 6, 12, 14, 18, 22, 28, 32, 34, 40 }
+        const Intervals merged_chunks = {{2, 17}, {27, 32}};
+        const std::vector<bool> expected_skips = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 1};
+        std::string kmer_bases =
+                "N N A A A A T T T T T T T T C C C C N N N N G G G G G G T T T T A A N N N N N N";
+        test_chunk_enc(kmer_len, padding, is_centered, merged_chunks, expected_skips, kmer_bases);
+    }
+}
+
 CATCH_TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
     const size_t BLOCK_STRIDE = 2;
     std::string sequence{"TATTCAGTAC"};
@@ -231,8 +315,8 @@ CATCH_TEST_CASE("Encode kmer for chunk mods models - stride 2", TEST_GROUP) {
 
     auto test_chunk_enc = [&](size_t kmer_len, size_t padding, bool is_centered,
                               const std::string& expected_bases) {
-        auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, kmer_len, whole_context, padding,
-                                        is_centered);
+        auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, {}, kmer_len, whole_context,
+                                        padding, is_centered);
 
         CATCH_CAPTURE(seq_ints, seq_to_sig_map, whole_context);
         CATCH_CAPTURE(kmer_len, padding, is_centered);
@@ -455,8 +539,8 @@ CATCH_TEST_CASE("Encode kmer for chuck mods models - stride 5", TEST_GROUP) {
 
     auto test_chunk_enc = [&](size_t kmer_len, size_t padding, bool is_centered,
                               const std::string& expected_bases) {
-        auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, kmer_len, whole_context, padding,
-                                        is_centered);
+        auto result = encode_kmer_chunk(seq_ints, seq_to_sig_map, {}, kmer_len, whole_context,
+                                        padding, is_centered);
 
         CATCH_CAPTURE(seq_ints, seq_to_sig_map, whole_context);
         CATCH_CAPTURE(kmer_len, padding, is_centered);
