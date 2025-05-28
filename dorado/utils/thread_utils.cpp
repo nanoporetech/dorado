@@ -131,7 +131,8 @@ static void init_load_balancers() {
     static constexpr Clock::duration poll_every = std::chrono::milliseconds(500);
 
     static auto run_balancer_thread = [](std::size_t thread_id,
-                                         const std::atomic<std::size_t>& threads_to_spin) {
+                                         const std::atomic<std::size_t>& threads_to_spin,
+                                         const std::atomic<bool>& finished) {
         // Helper to do some work.
         auto do_work = [](std::size_t loop_count) {
             auto start = Clock::now();
@@ -146,7 +147,7 @@ static void init_load_balancers() {
         std::size_t loop_count = min_loop_count;
         auto last_check_time = Clock::now();
         bool active = false;
-        while (true) {
+        while (!finished.load(std::memory_order_relaxed)) {
             // See if we should be active.
             const auto now = Clock::now();
             if (now - last_check_time > poll_every) {
@@ -171,7 +172,7 @@ static void init_load_balancers() {
         }
     };
 
-    static auto run_monitor_thread = [] {
+    static auto run_monitor_thread = [](const std::atomic<bool>& finished) {
         set_thread_name("busy_monitor");
 
         const auto num_cpus = std::thread::hardware_concurrency();
@@ -192,9 +193,9 @@ static void init_load_balancers() {
         // Kick off balancer threads.
         std::vector<std::thread> balancers(num_cpus);
         for (std::size_t thread_id = 0; thread_id < num_cpus; thread_id++) {
-            balancers[thread_id] = std::thread([thread_id, &threads_to_spin] {
+            balancers[thread_id] = std::thread([thread_id, &threads_to_spin, &finished] {
                 set_thread_name(("busy_cpu_" + std::to_string(thread_id)).c_str());
-                run_balancer_thread(thread_id, threads_to_spin);
+                run_balancer_thread(thread_id, threads_to_spin, finished);
             });
         }
 
@@ -202,7 +203,7 @@ static void init_load_balancers() {
         SystemCPUUsage cpu_usage;
         cpu_usage.poll();  // poll and discard initial input
         double previous_input = 0;
-        while (true) {
+        while (!finished.load(std::memory_order_relaxed)) {
             std::this_thread::sleep_for(poll_every);
             const auto current_output = cpu_usage.poll();
 
@@ -226,11 +227,26 @@ static void init_load_balancers() {
             threads_to_spin.store(num_cpus_to_spin, std::memory_order_relaxed);
             previous_input = current_input;
         }
+
+        // Threads will have been signalled to stop so join them.
+        for (auto& thread : balancers) {
+            thread.join();
+        }
     };
 
-    [[maybe_unused]] static auto thread_starter = [] {
-        std::thread(run_monitor_thread).detach();
-        return true;
+    [[maybe_unused]] static auto thread_runner = [] {
+        struct ThreadRunner {
+            std::atomic<bool> m_finished{false};
+            std::thread m_thread;
+            ThreadRunner() {
+                m_thread = std::thread([this] { run_monitor_thread(m_finished); });
+            }
+            ~ThreadRunner() {
+                m_finished.store(true, std::memory_order_relaxed);
+                m_thread.join();
+            }
+        };
+        return ThreadRunner();
     }();
 #endif
 }
