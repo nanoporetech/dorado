@@ -48,7 +48,7 @@ class SystemCPUUsage {
         std::size_t user = 0, nice = 0, system = 0, idle = 0;
         cpu_line >> cpu >> user >> nice >> system >> idle;
         if (cpu != "cpu" || !cpu_line) {
-            spdlog::error("Failed to parse /proc/stat");
+            spdlog::error("Failed to parse /proc/stat cpu line");
             return std::nullopt;
         }
 
@@ -134,7 +134,7 @@ static void init_load_balancers() {
                                          const std::atomic<std::size_t>& threads_to_spin,
                                          const std::atomic<bool>& finished) {
         // Helper to do some work.
-        auto do_work = [](std::size_t loop_count) {
+        auto do_work = [](const std::size_t loop_count) {
             auto start = Clock::now();
             volatile float val = 1 + rand();
             for (std::size_t i = 0; i < loop_count; i++) {
@@ -234,7 +234,7 @@ static void init_load_balancers() {
                 return;
             }
             const double target_output = std::clamp(std::atof(envvar), 0.0, 1.0);
-            spdlog::debug("Attempting to maintain CPU usage of {}%",
+            spdlog::debug("Attempting to maintain a minimum CPU usage of {}%",
                           static_cast<int>(target_output * 100));
 
             // Spin up the monitor thread.
