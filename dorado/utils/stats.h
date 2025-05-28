@@ -70,7 +70,7 @@ StatsReporter make_stats_reporter(const T& node) {
 template <class T>
 NamedStats from_obj(const T& obj) {
     NamedStats prefixed_stats;
-    const auto prefix = obj.get_name();
+    const auto& prefix = obj.get_name();
     const auto obj_stats = obj.sample_stats();
     for (const auto& [name, value] : obj_stats) {
         prefixed_stats[std::string(prefix).append(".").append(name)] = value;

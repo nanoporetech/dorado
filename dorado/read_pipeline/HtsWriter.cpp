@@ -116,7 +116,7 @@ int HtsWriter::write(bam1_t* const record) {
 }
 
 stats::NamedStats HtsWriter::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["unique_simplex_reads_written"] = static_cast<double>(m_processed_read_ids.size());
     stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
     stats["split_reads_written"] = static_cast<double>(m_split_reads_written.load());

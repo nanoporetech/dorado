@@ -50,7 +50,7 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
           m_num_duplex_reads_filtered(0) {}
 
 stats::NamedStats ReadFilterNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["simplex_reads_filtered"] = static_cast<double>(m_num_simplex_reads_filtered);
     stats["duplex_reads_filtered"] = static_cast<double>(m_num_duplex_reads_filtered);
     return stats;

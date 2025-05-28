@@ -224,7 +224,7 @@ void AlignerNode::restart() {
 }
 
 stats::NamedStats AlignerNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["queued_tasks"] = double(m_task_executor.num_tasks_in_flight());
     return stats;
 }

@@ -27,13 +27,11 @@ class MessageSink {
 public:
     MessageSink(size_t max_messages, int num_input_threads);
 
-    virtual ~MessageSink() = default;
+    virtual ~MessageSink();
 
     // StatsSampler will ignore nodes with an empty name.
-    virtual std::string get_name() const { return std::string(""); }
-    virtual stats::NamedStats sample_stats() const {
-        return std::unordered_map<std::string, double>();
-    }
+    virtual std::string get_name() const = 0;
+    virtual stats::NamedStats sample_stats() const;
 
     // Adds a message to the input queue.  This can block if the sink's queue is full.
     template <typename Msg>
@@ -90,9 +88,6 @@ protected:
         return status == utils::AsyncQueueStatus::Success;
     }
 
-    // Queue of work items for this node.
-    utils::AsyncQueue<Message> m_work_queue;
-
     // Mark the input queue as active, and start input processing threads executing the
     // supplied functor.
     void start_input_processing(const std::function<void()>& input_thread_fn,
@@ -102,6 +97,9 @@ protected:
     void stop_input_processing();
 
 private:
+    // Queue of work items for this node.
+    utils::AsyncQueue<Message> m_work_queue;
+
     // The sinks to which this node can send messages.
     std::vector<std::reference_wrapper<MessageSink>> m_sinks;
 

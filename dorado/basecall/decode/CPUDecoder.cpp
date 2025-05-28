@@ -1,6 +1,7 @@
 #include "CPUDecoder.h"
 
 #include "beam_search.h"
+#include "utils/thread_naming.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
@@ -111,6 +112,7 @@ std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) const 
     threads.reserve(num_threads);
     for (int i = 0; i < num_threads; ++i) {
         threads.emplace_back([&, i]() {
+            utils::set_thread_name("cpu_beam_search");
             at::InferenceMode inference_mode_guard;
 
             int t_first_chunk =

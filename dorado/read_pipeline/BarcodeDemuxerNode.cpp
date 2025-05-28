@@ -158,7 +158,7 @@ void BarcodeDemuxerNode::finalise_hts_files(
 }
 
 stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["demuxed_reads_written"] = m_processed_reads.load();
     return stats;
 }

@@ -138,7 +138,7 @@ void TrimmerNode::process_read(SimplexRead& read) {
 }
 
 stats::NamedStats TrimmerNode::sample_stats() const {
-    auto stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_reads_trimmed"] = m_num_records.load();
     return stats;
 }

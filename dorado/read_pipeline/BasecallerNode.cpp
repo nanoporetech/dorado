@@ -427,11 +427,13 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
         m_low_latency_batch_timeout_ms = 0;
     }
 
+    m_processed_chunks.set_name("processed_chunks");
     auto chunk_queue_size = CalcMaxChunksIn(m_model_runners) / m_chunk_sizes.size();
     for (auto s : m_chunk_sizes) {
-        m_chunk_in_queues.push_back(
+        auto &queue = m_chunk_in_queues.emplace_back(
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<BasecallingChunk>>>(
                         chunk_queue_size));
+        queue->set_name("chunk_queue_size_" + std::to_string(s));
         spdlog::debug("BasecallerNode chunk size {}", s);
     }
 }
@@ -482,11 +484,14 @@ void BasecallerNode::restart() {
 }
 
 stats::NamedStats BasecallerNode::sample_stats() const {
-    stats::NamedStats stats = stats::from_obj(m_work_queue);
+    stats::NamedStats stats = MessageSink::sample_stats();
     for (const auto &runner : m_model_runners) {
-        const auto runner_stats = stats::from_obj(*runner);
-        stats.insert(runner_stats.begin(), runner_stats.end());
+        stats.merge(stats::from_obj(*runner));
     }
+    for (const auto &chunk_queue : m_chunk_in_queues) {
+        stats.merge(stats::from_obj(*chunk_queue));
+    }
+    stats.merge(stats::from_obj(m_processed_chunks));
     stats["batches_called"] = double(m_num_batches_called);
     stats["partial_batches_called"] = double(m_num_partial_batches_called);
     stats["call_chunks_ms"] = double(m_call_chunks_ms);
