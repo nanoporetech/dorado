@@ -510,45 +510,117 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     };
 
     // clang-format off
-    const std::unordered_map<std::string, std::string> compatible_bacterial_bc_models {
+    // Set of all basecaller models supported by polish.
+    const std::unordered_set<std::string> all_basecaller_models{
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v5.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v5.2.0",
+    };
+    // Look-up table from a basecaller model to a polish model (base)name.
+    const std::unordered_map<std::string, std::string> lut_basecaller_to_polish_model {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl"},
+    };
+    // Look-up table from a basecaller model to a bacterial model name.
+    const std::unordered_map<std::string, std::string> lut_basecaller_to_bacterial_model {
         {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
     };
-    const std::unordered_map<std::string, std::string> legacy_bc_models {
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},
+    // Look-up table of basecaller model compatibilities. I.e. if the polishing model for one basecaller model is
+    // compatible with the polishing model for another basecaller model, this table gives this relation.
+    // At the moment, this is a 1-to-1 relation, unlike the bacterial models.
+    const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_polish {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0"}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0"}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0"}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0"}},
+    };
+    // Look-up table of basecaller model compatibilities for the bacterial models.
+    // E.g. bacterial model for `dna_r10.4.1_e8.2_400bps_hac@v5.2.0` is fully compatible (and at the moment
+    // identical) to `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`, `dna_r10.4.1_e8.2_400bps_sup@v4.3.0`, etc.
+    // This is important for forward compatibility of existing models to avoid having to create a new copy of an
+    // existing model every time a new basecaller model is released and the polishing model stays the same.
+    const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_bacterial {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", all_basecaller_models},
+    };
+    // Set of legacy polishing models.
+    const std::unordered_set<std::string> legacy_bc_models {
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
     };
     // clang-format on
 
-    const auto determine_model_name = [&bacteria, &compatible_bacterial_bc_models,
-                                       &legacy_bc_models,
+    const auto determine_model_name = [&bacteria, &lut_basecaller_to_polish_model,
+                                       &lut_basecaller_to_bacterial_model, &legacy_bc_models,
                                        &bam_info](const std::string& basecaller_model) {
         if (bacteria) {
             // Resolve a bacterial model.
-            const auto it = compatible_bacterial_bc_models.find(basecaller_model);
-            if (it == std::cend(compatible_bacterial_bc_models)) {
+            const auto it = lut_basecaller_to_bacterial_model.find(basecaller_model);
+            if (it == std::cend(lut_basecaller_to_bacterial_model)) {
                 throw std::runtime_error(
-                        "There are no bacterial models compatible with basecaller model: '" +
+                        "There are no bacterial models for the basecaller model: '" +
                         basecaller_model + "'.");
             }
             return it->second;
         } else {
-            // First check if this is a legacy model.
-            const auto it_legacy = legacy_bc_models.find(basecaller_model);
-            if (it_legacy != std::cend(legacy_bc_models)) {
-                return it_legacy->second;
+            const auto it = lut_basecaller_to_polish_model.find(basecaller_model);
+            if (it == std::cend(lut_basecaller_to_polish_model)) {
+                throw std::runtime_error(
+                        "There are no polishing models for the basecaller model: '" +
+                        basecaller_model + "'.");
             }
-
-            // Otherwise, this is a current model.
+            const bool is_legacy_model = legacy_bc_models.count(basecaller_model) > 0;
             const std::string polish_model_suffix =
-                    std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
-            return basecaller_model + polish_model_suffix;
+                    ((!is_legacy_model && bam_info.has_dwells) ? "_mv" : "");
+            return it->second + polish_model_suffix;
+        }
+    };
+    const auto get_compatible_model_set =
+            [&bacteria, &lut_compatible_basecallers_for_polish,
+             &lut_compatible_basecallers_for_bacterial](
+                    const std::string& basecaller_model) -> std::unordered_set<std::string> {
+        if (bacteria) {
+            const auto it = lut_compatible_basecallers_for_bacterial.find(basecaller_model);
+            if (it == std::cend(lut_compatible_basecallers_for_bacterial)) {
+                return {};
+            }
+            return it->second;
+        } else {
+            const auto it = lut_compatible_basecallers_for_polish.find(basecaller_model);
+            if (it == std::cend(lut_compatible_basecallers_for_polish)) {
+                return {};
+            }
+            return it->second;
         }
     };
     const auto sets_intersect = [](const std::unordered_set<std::string>& set1,
@@ -652,9 +724,25 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
             secondary::parse_label_scheme_type(model_config.label_scheme_type) ==
             secondary::LabelSchemeType::HAPLOID;
 
+    const auto check_models_supported =
+            [&sets_intersect, &get_compatible_model_set,
+             &model_config](const std::unordered_set<std::string>& basecaller_models) {
+                // Every model from the input BAM needs to be supported by the selected polishing model.
+                for (const std::string& model : basecaller_models) {
+                    const std::unordered_set<std::string> compatible_models =
+                            get_compatible_model_set(model);
+                    const bool valid =
+                            sets_intersect(compatible_models, model_config.supported_basecallers);
+                    if (!valid) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
-        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+        if (!check_models_supported(bam_info.basecaller_models)) {
             throw std::runtime_error{"Polishing model is not compatible with the input BAM!"};
         }
 
@@ -677,7 +765,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
 
     } else {
         // Allow to use a polishing model trained on a wrong basecaller model, but emit a warning.
-        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+        if (!check_models_supported(bam_info.basecaller_models)) {
             spdlog::warn(
                     "Polishing model is not compatible with the input BAM. This may produce "
                     "inferior results.");
