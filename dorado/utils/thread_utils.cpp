@@ -175,6 +175,18 @@ static void init_load_balancers() {
         const auto num_cpus = std::thread::hardware_concurrency();
         std::atomic<std::size_t> threads_to_spin{0};
 
+        // Read off target CPU usage.
+        double target_output = 0.0;
+        if (const char* envvar = getenv("DORADO_TARGET_USAGE"); envvar != nullptr) {
+            target_output = std::atof(envvar);
+        }
+        target_output = std::clamp(target_output, 0.0, 1.0);
+
+        if (target_output == 0) {
+            // Nothing to do.
+            return;
+        }
+
         // Kick off balancer threads.
         std::vector<std::thread> balancers(num_cpus);
         for (std::size_t thread_id = 0; thread_id < num_cpus; thread_id++) {
@@ -182,14 +194,6 @@ static void init_load_balancers() {
                 run_balancer_thread(thread_id, threads_to_spin);
             });
         }
-
-        // Read off target CPU usage.
-        double target_output = 0.7;  // ~70% gives good performance on our test machine.
-        if (const char* envvar = getenv("DORADO_TARGET_USAGE"); envvar != nullptr) {
-            target_output = std::atof(envvar);
-        }
-        target_output = std::clamp(target_output, 0.0, 1.0);
-        spdlog::info("DORADO_TARGET_USAGE={}", target_output);
 
         // Monitor resource usage and keep us at the requested CPU usage.
         SystemCPUUsage cpu_usage;
