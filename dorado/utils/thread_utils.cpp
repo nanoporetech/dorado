@@ -172,23 +172,12 @@ static void init_load_balancers() {
         }
     };
 
-    static auto run_monitor_thread = [](const std::atomic<bool>& finished) {
+    static auto run_monitor_thread = [](const double target_output,
+                                        const std::atomic<bool>& finished) {
         set_thread_name("busy_monitor");
 
         const auto num_cpus = std::thread::hardware_concurrency();
         std::atomic<std::size_t> threads_to_spin{0};
-
-        // Read off target CPU usage.
-        double target_output = 0.0;
-        if (const char* envvar = getenv("DORADO_TARGET_USAGE"); envvar != nullptr) {
-            target_output = std::atof(envvar);
-        }
-        target_output = std::clamp(target_output, 0.0, 1.0);
-
-        if (target_output == 0) {
-            // Nothing to do.
-            return;
-        }
 
         // Kick off balancer threads.
         std::vector<std::thread> balancers(num_cpus);
@@ -234,20 +223,33 @@ static void init_load_balancers() {
         }
     };
 
-    [[maybe_unused]] static auto thread_runner = [] {
-        struct ThreadRunner {
-            std::atomic<bool> m_finished{false};
-            std::thread m_thread;
-            ThreadRunner() {
-                m_thread = std::thread([this] { run_monitor_thread(m_finished); });
+    [[maybe_unused]] static struct ThreadRunner {
+        std::atomic<bool> m_finished{false};
+        std::thread m_thread;
+
+        ThreadRunner() {
+            // Read off target CPU usage.
+            const char* envvar = getenv("DORADO_TARGET_CPU_USAGE");
+            if (envvar == nullptr) {
+                return;
             }
-            ~ThreadRunner() {
+            const double target_output = std::clamp(std::atof(envvar), 0.0, 1.0);
+            spdlog::debug("Attempting to maintain CPU usage of {}%",
+                          static_cast<int>(target_output * 100));
+
+            // Spin up the monitor thread.
+            m_thread = std::thread(
+                    [this, target_output] { run_monitor_thread(target_output, m_finished); });
+        }
+
+        ~ThreadRunner() {
+            // Stop the thread if we started one.
+            if (m_thread.joinable()) {
                 m_finished.store(true, std::memory_order_relaxed);
                 m_thread.join();
             }
-        };
-        return ThreadRunner();
-    }();
+        }
+    } thread_runner;
 #endif
 }
 
