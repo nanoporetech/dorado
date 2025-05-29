@@ -12,7 +12,7 @@
 #include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
 #include "utils/bam_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>

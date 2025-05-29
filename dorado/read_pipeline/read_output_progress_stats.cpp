@@ -1,6 +1,6 @@
 #include "read_output_progress_stats.h"
 
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <spdlog/spdlog.h>
 

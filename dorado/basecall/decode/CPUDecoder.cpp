@@ -1,7 +1,7 @@
 #include "CPUDecoder.h"
 
 #include "beam_search.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>

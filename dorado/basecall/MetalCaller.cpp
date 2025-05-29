@@ -7,7 +7,7 @@
 #include "torch_utils/metal_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <spdlog/spdlog.h>
 

@@ -1,6 +1,6 @@
 #include "MessageSink.h"
 
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <cassert>
 

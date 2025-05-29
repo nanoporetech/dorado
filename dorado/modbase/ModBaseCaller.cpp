@@ -5,7 +5,7 @@
 #include "config/ModBaseModelConfig.h"
 #include "nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>

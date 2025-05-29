@@ -6,7 +6,7 @@
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/sys_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>

@@ -2,7 +2,7 @@
 
 #include "torch_utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <cxxpool.h>
 #include <edlib.h>

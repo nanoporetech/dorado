@@ -1,6 +1,6 @@
 #include "SubreadTaggerNode.h"
 
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <spdlog/spdlog.h>
 

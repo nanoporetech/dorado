@@ -23,7 +23,7 @@
 #include "utils/log_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 
 #include <ATen/Parallel.h>
 #include <htslib/faidx.h>

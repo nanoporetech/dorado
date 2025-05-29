@@ -5,7 +5,7 @@
 #include "read_pipeline/messages.h"
 #include "utils/PostCondition.h"
 #include "utils/fs_utils.h"
-#include "utils/thread_naming.h"
+#include "utils/thread_utils.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
 
@@ -293,6 +293,8 @@ void DataLoader::load_reads(const InputFiles& input_files, ReadOrder traversal_o
                 fmt::format("Failed to initialise POD5: {}", pod5_get_error_string()));
     }
     auto pod5_cleanup = utils::PostCondition([] { pod5_terminate(); });
+
+    utils::start_busy_work();
 
     switch (traversal_order) {
     case ReadOrder::BY_CHANNEL:
