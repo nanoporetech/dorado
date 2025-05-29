@@ -94,7 +94,7 @@ Negative test: data has dwells, but the model does not support them.
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   1
-  [error] Caught exception: Input data has move tables, but a model without move table support has been chosen.
+  [error] Input data has move tables, but a model without move table support has been chosen.
 
 Negative test: no dwells in data, but the model uses them for polishing.
   $ rm -rf out; mkdir -p out
@@ -114,7 +114,7 @@ Negative test: no dwells in data, but the model uses them for polishing.
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   1
-  [error] Caught exception: Input data does not contain move tables, but a model which requires move tables has been chosen.
+  [error] Input data does not contain move tables, but a model which requires move tables has been chosen.
 
 Negative test: Basecaller model specified in the BAM does not match the Basecaller model specified in the Polishing model.
   $ rm -rf out; mkdir -p out
@@ -130,7 +130,7 @@ Negative test: Basecaller model specified in the BAM does not match the Basecall
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Caught exception: Polishing model is not compatible with the input BAM!
+  [error] Polishing model is not compatible with the input BAM!
 
 Negative test: no bacterial model is compatible with the model listed in the input BAM file.
   $ rm -rf out; mkdir -p out
@@ -145,7 +145,7 @@ Negative test: no bacterial model is compatible with the model listed in the inp
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Caught exception: There are no bacterial models for the basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
+  [error] There are no bacterial models for the basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
 
 Passing test with warnings: data has dwells, but the model does not support them.
 Using `--skip-model-compatibility-check`.
@@ -229,7 +229,7 @@ Negative test: Cannot resolve the model, it does not match a Basecaller model, a
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Could not resolve model from string: 'unknown'.
+  Could not resolve model from string: 'unknown'.
 
 Negative test: Empty model string provided.
   $ rm -rf out; mkdir -p out
@@ -240,7 +240,7 @@ Negative test: Empty model string provided.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Could not resolve model from string: ''.
+  Could not resolve model from string: ''.
 
 Negative test: BAM has a model which is not available for download in auto mode.
   $ rm -rf out; mkdir -p out
@@ -255,7 +255,7 @@ Negative test: BAM has a model which is not available for download in auto mode.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: There are no polishing models for the basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
+  There are no polishing models for the basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
 
 Negative test: using 'auto' but the BAM has no models listed (no RG tags).
   $ rm -rf out; mkdir -p out
@@ -270,7 +270,7 @@ Negative test: using 'auto' but the BAM has no models listed (no RG tags).
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header.
+  Input BAM file has no basecaller models listed in the header.
 
 Negative test: Using `auto` and `--skip-model-compatibility-check`, but BAM has no models listed (no RG tags), so this should fail even without compatibility check.
   $ rm -rf out; mkdir -p out
@@ -285,4 +285,4 @@ Negative test: Using `auto` and `--skip-model-compatibility-check`, but BAM has 
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.
+  Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.

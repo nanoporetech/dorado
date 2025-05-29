@@ -20,6 +20,7 @@
 #include "utils/fai_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/io_utils.h"
+#include "utils/jthread.h"
 #include "utils/log_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
@@ -32,6 +33,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstddef>
@@ -103,6 +105,8 @@ struct Options {
     std::optional<std::filesystem::path> phasing_bin_path;
     bool hp_tag_from_bam = false;
     bool unphased = false;
+
+    bool continue_on_error = false;
 };
 
 /// \brief Define the CLI options.
@@ -152,7 +156,7 @@ ParserPtr create_cli(int& verbosity) {
                       "output is to stdout.")
                 .default_value("");
         parser->visible.add_argument("-m", "--model")
-                .help("Path to correction model folder.")
+                .help("Path to the model folder.")
                 .default_value("auto");
         parser->visible.add_argument("--gvcf").help("Output a gVCF instead of a VCF.").flag();
         parser->visible.add_argument("--ambig-ref")
@@ -252,6 +256,10 @@ ParserPtr create_cli(int& verbosity) {
         parser->hidden.add_argument("--skip-model-compatibility-check")
                 .help("Allow any model to be applied on the data.")
                 .flag();
+        parser->hidden.add_argument("--continue-on-error")
+                .help("Continue the process even if an exception is thrown. This "
+                      "may leave some regions unprocessed.")
+                .flag();
     }
 
     return parser;
@@ -315,6 +323,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.queue_size = parser.hidden.get<int>("queue-size");
     opt.any_bam = parser.hidden.get<bool>("any-bam");
     opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
+    opt.continue_on_error = parser.hidden.get<bool>("continue-on-error");
     opt.read_group = (parser.visible.is_used("--RG")) ? parser.visible.get<std::string>("RG") : "";
     opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
     opt.tag_name = parser.visible.get<std::string>("tag-name");
@@ -717,6 +726,8 @@ void run_variant_calling(const Options& opt,
 
     int64_t total_batch_bases = 0;
 
+    std::atomic<bool> worker_terminate{false};
+
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
@@ -768,50 +779,78 @@ void run_variant_calling(const Options& opt,
                     std::ostringstream oss;
                     oss << batch_interval.start << "-" << batch_interval.end << "/"
                         << std::size(input_regions) << ", bases: " << batch_bases;
-                    tracker.set_description("Polishing draft sequences: " + oss.str());
+                    tracker.set_description("Processing sequences: " + oss.str());
                 }
 
                 // Each item is one batch for inference.
                 utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
                 utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
 
-                std::thread thread_sample_producer([&resources, &bam_regions, &draft_lens, &opt,
-                                                    &batch_queue] {
-                    utils::set_thread_name("variant_produce");
-                    polisher::sample_producer(resources, bam_regions, draft_lens, opt.threads,
-                                              opt.batch_size, opt.window_len, opt.window_overlap,
-                                              opt.bam_subchunk, batch_queue);
-                });
+                // Create a thread for the sample producer.
+                polisher::WorkerReturnStatus wrs_sample_producer;
+                std::shared_ptr<std::thread> thread_sample_producer = utils::make_jthread(
+                        std::thread([&resources, &bam_regions, &draft_lens, &opt, &batch_queue,
+                                     &worker_terminate, &wrs_sample_producer] {
+                            utils::set_thread_name("variant_produce");
+                            polisher::sample_producer(resources, bam_regions, draft_lens,
+                                                      opt.threads, opt.batch_size, opt.window_len,
+                                                      opt.window_overlap, opt.bam_subchunk,
+                                                      opt.continue_on_error, batch_queue,
+                                                      worker_terminate, wrs_sample_producer);
+                        }));
 
-                std::thread thread_sample_decoder([&all_results_cons, &vc_input_data, &decode_queue,
-                                                   &stats, &resources, &opt] {
-                    utils::set_thread_name("variant_decode");
-                    polisher::decode_samples_in_parallel(all_results_cons, vc_input_data,
-                                                         decode_queue, stats, *resources.decoder,
-                                                         opt.threads, opt.min_depth,
-                                                         /*collect_vc_data=*/true);
-                });
-
-                polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                                    resources.streams, resources.encoders,
-                                                    draft_lens);
-
-                if (thread_sample_producer.joinable()) {
-                    thread_sample_producer.join();
+                if (!thread_sample_producer) {
+                    throw std::runtime_error{"Could not create the producer!"};
                 }
-                if (thread_sample_decoder.joinable()) {
-                    thread_sample_decoder.join();
+
+                // Create a thread for the sample decoder.
+                polisher::WorkerReturnStatus wrs_decoder;
+                std::shared_ptr<std::thread> thread_sample_decoder = utils::make_jthread(
+                        std::thread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
+                                     &resources, &opt, &worker_terminate, &wrs_decoder] {
+                            utils::set_thread_name("variant_decode");
+                            polisher::decode_samples_in_parallel(
+                                    all_results_cons, vc_input_data, decode_queue, stats,
+                                    worker_terminate, wrs_decoder, *resources.decoder, opt.threads,
+                                    opt.min_depth,
+                                    /*collect_vc_data=*/true, opt.continue_on_error);
+                        }));
+
+                if (!thread_sample_decoder) {
+                    throw std::runtime_error{"Could not create the decoder!"};
+                }
+
+                // Run the inference worker on the main thread.
+                polisher::infer_samples_in_parallel(
+                        batch_queue, decode_queue, resources.models, worker_terminate,
+                        resources.streams, resources.encoders, draft_lens, opt.continue_on_error);
+
+                // Join the workers.
+                if (thread_sample_producer->joinable()) {
+                    thread_sample_producer->join();
+                }
+                if (thread_sample_decoder->joinable()) {
+                    thread_sample_decoder->join();
+                }
+
+                // Propagate worker errors into the main thread.
+                if (wrs_sample_producer.exception_thrown) {
+                    throw std::runtime_error{wrs_sample_producer.message};
+                }
+                if (wrs_decoder.exception_thrown) {
+                    throw std::runtime_error{wrs_decoder.message};
                 }
             }
 
         } catch (const std::exception& e) {
-            // Emit a warning, but do not continue the loop, so that the empty sequences are written.
-            spdlog::warn(
-                    "Exception caught when running inference on the batch interval of drafts: [{}, "
-                    "{}). "
-                    "Skipping this batch and optionally outputting unpolished sequences. Original "
-                    "exception: \"{}\"",
-                    batch_interval.start, batch_interval.end, e.what());
+            if (!opt.continue_on_error) {
+                throw;
+            } else {
+                spdlog::warn(
+                        "Exception caught when running inference on the batch interval of drafts: "
+                        "[{}, {}). Skipping this batch. Original exception: \"{}\"",
+                        batch_interval.start, batch_interval.end, e.what());
+            }
         }
 
         // Variant calling.
@@ -819,9 +858,10 @@ void run_variant_calling(const Options& opt,
             utils::ScopedProfileRange spr1("run-variant_calling", 1);
 
             std::vector<secondary::Variant> variants = polisher::call_variants(
-                    batch_interval, vc_input_data, draft_readers, draft_lens, *resources.decoder,
-                    opt.ambig_ref, opt.out_format == VariantCallingFormatEnum::GVCF, opt.threads,
-                    stats);
+                    worker_terminate, stats, batch_interval, vc_input_data, draft_readers,
+                    draft_lens, *resources.decoder, opt.ambig_ref,
+                    opt.out_format == VariantCallingFormatEnum::GVCF, opt.threads,
+                    opt.continue_on_error);
 
             std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
                 return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
@@ -837,11 +877,15 @@ void run_variant_calling(const Options& opt,
             total_batch_bases += batch_bases;
             stats.set("processed", static_cast<double>(total_batch_bases));
         } catch (const std::exception& e) {
-            spdlog::warn(
-                    "Exception caught when calling variants in the batch interval of drafts: [{}, "
-                    "{}). Not producing variant calls for this batch of drafts. Original "
-                    "exception: \"{}\"",
-                    batch_interval.start, batch_interval.end, e.what());
+            if (!opt.continue_on_error) {
+                throw;
+            } else {
+                spdlog::warn(
+                        "Exception caught when calling variants in the batch interval of drafts: "
+                        "[{}, {}). Not producing variant calls for this batch of drafts. Original "
+                        "exception: \"{}\"",
+                        batch_interval.start, batch_interval.end, e.what());
+            }
         }
     }
 }
@@ -967,7 +1011,7 @@ int variant_caller(int argc, char* argv[]) {
 #endif
 
     } catch (const std::exception& e) {
-        spdlog::error("Caught exception: {}", e.what());
+        spdlog::error(e.what());
         return EXIT_FAILURE;
     } catch (...) {
         spdlog::error("Caught an unknown exception!");

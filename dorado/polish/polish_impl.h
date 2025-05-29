@@ -67,6 +67,11 @@ struct DecodeData {
     std::vector<secondary::TrimInfo> trims;
 };
 
+struct WorkerReturnStatus {
+    bool exception_thrown{false};
+    std::string message;
+};
+
 /**
  * \brief Creates all resources required to run polishing.
  */
@@ -74,12 +79,12 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::filesystem::path& in_ref_fn,
                                    const std::filesystem::path& in_aln_bam_fn,
                                    const std::string& device_str,
-                                   const int32_t num_bam_threads,
-                                   const int32_t num_inference_threads,
-                                   const bool full_precision,
+                                   int32_t num_bam_threads,
+                                   int32_t num_inference_threads,
+                                   bool full_precision,
                                    const std::string& read_group,
                                    const std::string& tag_name,
-                                   const int32_t tag_value,
+                                   int32_t tag_value,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
                                    const std::optional<secondary::HaplotagSource>& haptag_source,
@@ -106,46 +111,8 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
         const std::string& header,
         const std::vector<std::vector<secondary::ConsensusResult>>& sample_results,
         const std::vector<std::pair<int64_t, int32_t>>& samples_for_seq,
-        const bool fill_gaps,
+        bool fill_gaps,
         const std::optional<char>& fill_char);
-
-/**
- * \brief This function performs the following operations:
- *          1. Merges adjacent samples, which were split for efficiency of computing the pileup.
- *          2. Checks for discontinuities in any of the samples (based on major positions) and splits them.
- *          3. Splits the merged samples into equally sized pieces which will be used for inference to prevent memory usage spikes.
- * \param window_samples Input samples which will be merged and split. Non-const to enable moving of data.
- * \param encoder Encoder used to produce the sample tensors. It is needed becaue of the secondary::EncoderBase::merge_adjacent_samples() function.
- * \param bam_regions BAM region coordinates. This is a Span to facilitate batching of BAM regions from the outside.
- * \param bam_region_intervals Range of IDs of window_samples which comprise this BAM region. E.g. BAM region 0 uses window_samples[0:5], BAM region 1 uses window_samples[5:9], etc.
- *                              This is a Span to facilitate batching of BAM regions from the outside and avoid copying vectors.
- * \param num_threads Number of threads for procesing.
- * \param window_len Length of the window to split the final samples into.
- * \param window_overlap Overlap between neighboring windows when splitting.
- * \param window_interval_offset Used for batching bam_region_intervals, because window_samples.size() matches the total size of bam_region_intervals,
- *                                  while coordinates of each BAM region interval are global and produced before draft batching on the client side.
- */
-std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
-merge_and_split_bam_regions_in_parallel(
-        std::vector<secondary::Sample>& window_samples,
-        const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
-        const Span<const secondary::Window> bam_regions,
-        const Span<const secondary::Interval> bam_region_intervals,
-        const int32_t num_threads,
-        const int32_t window_len,
-        const int32_t window_overlap,
-        const int32_t window_interval_offset);
-
-/**
- * \brief For each input window (region of the draft) runs the given encoder and produces a sample.
- *          The BamFile handels are used to fetch the pileup data and encode regions.
- *          Encoding is parallelized, where the actual number of threads is min(bam_handles.size(), num_threads, windows.size()).
- */
-std::vector<secondary::Sample> encode_windows_in_parallel(
-        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
-        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const dorado::Span<const secondary::Window> windows,
-        const int32_t num_threads);
 
 /**
  * \brief Creates windows from given input draft sequences or regions. If regions vector is empty, it will split all
@@ -154,8 +121,8 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
 std::vector<secondary::Window> create_windows_from_regions(
         const std::vector<secondary::Region>& regions,
         const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup,
-        const int32_t bam_chunk_len,
-        const int32_t window_overlap);
+        int32_t bam_chunk_len,
+        int32_t window_overlap);
 
 /**
  * \brief Fetches the decode data from an async queue, decodes the consensus and collects
@@ -172,48 +139,58 @@ std::vector<secondary::Window> create_windows_from_regions(
 void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResult>>& results_cons,
                                 std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
-                                secondary::Stats& polish_stats,
+                                secondary::Stats& stats,
+                                std::atomic<bool>& worker_terminate,
+                                polisher::WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
-                                const int32_t num_threads,
-                                const int32_t min_depth,
-                                const bool collect_vc_data);
+                                int32_t num_threads,
+                                int32_t min_depth,
+                                bool collect_vc_data,
+                                bool continue_on_exception);
 
 void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                utils::AsyncQueue<DecodeData>& decode_queue,
                                std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
+                               std::atomic<bool>& worker_terminate,
                                const std::vector<c10::optional<c10::Stream>>& streams,
                                const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
-                               const std::vector<std::pair<std::string, int64_t>>& draft_lens);
+                               const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                               bool continue_on_exception);
 
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                     const int32_t num_threads,
-                     const int32_t batch_size,
-                     const int32_t window_len,
-                     const int32_t window_overlap,
-                     const int32_t bam_subchunk_len,
-                     utils::AsyncQueue<InferenceData>& infer_data);
+                     int32_t num_threads,
+                     int32_t batch_size,
+                     int32_t window_len,
+                     int32_t window_overlap,
+                     int32_t bam_subchunk_len,
+                     bool continue_on_exception,
+                     utils::AsyncQueue<InferenceData>& infer_data,
+                     std::atomic<bool>& worker_terminate,
+                     WorkerReturnStatus& ret_status);
 
 /// \brief Dimensions: [draft_id x part_id x haplotype_id]
 std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_consensus_seqs(
         const secondary::Interval& region_batch,
         const std::vector<std::vector<secondary::ConsensusResult>>& all_results_cons,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const bool fill_gaps,
+        bool fill_gaps,
         const std::optional<char>& fill_char,
         hts_io::FastxRandomReader& draft_reader);
 
 // Explicit full qualification of the Interval so it is not confused with the one from the IntervalTree library.
 std::vector<secondary::Variant> call_variants(
+        std::atomic<bool>& worker_terminate,
+        secondary::Stats& stats,
         const secondary::Interval& region_batch,
         const std::vector<secondary::VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const secondary::DecoderBase& decoder,
-        const bool ambig_ref,
-        const bool gvcf,
-        const int32_t num_threads,
-        secondary::Stats& polish_stats);
+        bool ambig_ref,
+        bool gvcf,
+        int32_t num_threads,
+        bool continue_on_exception);
 
 }  // namespace dorado::polisher
