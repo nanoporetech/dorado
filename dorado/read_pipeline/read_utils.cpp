@@ -149,6 +149,7 @@ void mux_change_trim_read(ReadCommon& read_common) {
     const std::pair<int, int> trim_interval = {0, int(trim_seq_idx)};
     read_common.seq = utils::trim_sequence(read_common.seq, trim_interval);
     read_common.qstring = utils::trim_sequence(read_common.qstring, trim_interval);
+    read_common.pre_trim_seq_length = read_common.seq.length();
 
     // Trim the signal
     const size_t trim_signal_idx = read_common.moves.size() * read_common.model_stride;
