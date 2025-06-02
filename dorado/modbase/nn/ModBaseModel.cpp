@@ -90,7 +90,6 @@ struct ModsConvImpl : Module {
 
     ModsConvImpl(const config::ConvParams& params)
             : name("conv_act_" + std::to_string(params.size)) {
-        spdlog::debug("{} {}", name, params.to_string());
         conv = register_module("conv",
                                Conv1d(Conv1dOptions(params.insize, params.size, params.winlen)
                                               .stride(params.stride)
@@ -484,7 +483,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
                 force_dtype = utils::get_dev_opt("modbase_i8", true)
                                       ? nn::TensorLayout::CUTLASS_TNC_I8
                                       : nn::TensorLayout::CUTLASS_TNC_F16;
-                spdlog::debug("Set modbase merge_conv CUTLASS dtype: {}",
+                spdlog::trace("Set modbase merge_conv CUTLASS dtype: {}",
                               to_string(force_dtype.value()));
             }
 
@@ -631,12 +630,12 @@ dorado::utils::ModuleWrapper load_modbase_model(const config::ModBaseModelConfig
     case config::ModelType::CONV_LSTM_V3: {
 #if DORADO_CUDA_BUILD
         static bool use_torch = utils::get_dev_opt("modbase_torch", false);
-        if (!use_torch) {
+        if (options.device().is_cuda() && !use_torch) {
             auto model = model::ModBaseConvLSTMV3CUDAModel(config, batchsize);
             return populate_model(std::move(model), config.model_path, options);
         }
 #endif
-        spdlog::debug("Loading ModBaseConvLSTMV3Model - Torch only");
+        spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
         auto model = model::ModBaseConvLSTMV3Model(config);
         return populate_model(std::move(model), config.model_path, options);
     }
