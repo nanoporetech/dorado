@@ -40,7 +40,8 @@ FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
     fai_format_options fmt = FAI_NONE;
 
     if (utils::ends_with(path_str, ".fasta") || utils::ends_with(path_str, ".fa") ||
-        utils::ends_with(path_str, ".fasta.gz") || utils::ends_with(path_str, ".fa.gz")) {
+        utils::ends_with(path_str, ".fna") || utils::ends_with(path_str, ".fasta.gz") ||
+        utils::ends_with(path_str, ".fa.gz") || utils::ends_with(path_str, ".fna.gz")) {
         fmt = FAI_FASTA;
 
     } else if (utils::ends_with(path_str, ".fastq") || utils::ends_with(path_str, ".fq") ||
