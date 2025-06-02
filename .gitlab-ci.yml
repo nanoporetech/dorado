@@ -77,7 +77,7 @@ variables:
   before_script:
     - echo Dorado dependency stage
     - apt-get update
-    - apt-get install -y --no-install-recommends samtools curl
+    - apt-get install -y --no-install-recommends samtools curl tabix
 
 .set_parallel_jobs:
   - |
