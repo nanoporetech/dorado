@@ -505,10 +505,12 @@ void setup(const std::vector<std::string>& args,
     client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);
 
     if (estimate_poly_a) {
+        poly_tail::PolyTailCalibrationCoeffs calibration{
+                .speed = model_config.polya_speed_correction,
+                .offset = model_config.polya_offset_correction};
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
-                        polya_config, is_rna_model(model_config), is_rna_adapter,
-                        model_config.polya_speed_correction, model_config.polya_offset_correction);
+                        polya_config, is_rna_model(model_config), is_rna_adapter, calibration);
         client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
                 poly_tail_calc_selector);
         current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(

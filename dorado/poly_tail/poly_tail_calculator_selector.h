@@ -1,5 +1,7 @@
 #pragma once
 
+#include "poly_tail_calculator.h"
+
 #include <filesystem>
 #include <iosfwd>
 #include <memory>
@@ -17,13 +19,11 @@ public:
     PolyTailCalculatorSelector(const std::filesystem::path& config,
                                bool is_rna,
                                bool is_rna_adapter,
-                               float speed_calibration,
-                               float offset_calibration);
+                               const PolyTailCalibrationCoeffs& calibration);
     PolyTailCalculatorSelector(std::istream& config_stream,
                                bool is_rna,
                                bool is_rna_adapter,
-                               float speed_calibration,
-                               float offset_calibration);
+                               const PolyTailCalibrationCoeffs& calibration);
 
     std::shared_ptr<const PolyTailCalculator> get_calculator(const std::string& name) const;
 
@@ -31,8 +31,7 @@ private:
     void init(std::istream& config_stream,
               bool is_rna,
               bool is_rna_adapter,
-              float speed_calibration,
-              float offset_calibration);
+              const PolyTailCalibrationCoeffs& calibration);
 
     mutable std::mutex m_lut_mutex;
     std::unordered_map<std::string, std::shared_ptr<const PolyTailCalculator>> m_lut;

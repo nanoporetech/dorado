@@ -120,8 +120,8 @@ struct BasecallModelConfig {
     std::filesystem::path model_path;
 
     // polya translocation speed calibration coefficients
-    float polya_speed_correction{1.f};
-    float polya_offset_correction{0.f};
+    std::optional<float> polya_speed_correction;
+    std::optional<float> polya_offset_correction;
 
     // Start position for mean Q-score calculation for
     // short reads.

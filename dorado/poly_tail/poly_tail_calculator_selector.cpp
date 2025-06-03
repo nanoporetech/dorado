@@ -10,14 +10,14 @@
 
 namespace dorado::poly_tail {
 
-PolyTailCalculatorSelector::PolyTailCalculatorSelector(const std::filesystem::path& config,
-                                                       bool is_rna,
-                                                       bool is_rna_adapter,
-                                                       float speed_calibration,
-                                                       float offset_calibration) {
+PolyTailCalculatorSelector::PolyTailCalculatorSelector(
+        const std::filesystem::path& config,
+        bool is_rna,
+        bool is_rna_adapter,
+        const PolyTailCalibrationCoeffs& calibration) {
     if (config.empty()) {
         std::stringstream buffer("");
-        init(buffer, is_rna, is_rna_adapter, speed_calibration, offset_calibration);
+        init(buffer, is_rna, is_rna_adapter, calibration);
         return;
     }
 
@@ -32,32 +32,30 @@ PolyTailCalculatorSelector::PolyTailCalculatorSelector(const std::filesystem::pa
 
     std::stringstream buffer;
     buffer << file.rdbuf();
-    init(buffer, is_rna, is_rna_adapter, speed_calibration, offset_calibration);
+    init(buffer, is_rna, is_rna_adapter, calibration);
 }
 
-PolyTailCalculatorSelector::PolyTailCalculatorSelector(std::istream& config_stream,
-                                                       bool is_rna,
-                                                       bool is_rna_adapter,
-                                                       float speed_calibration,
-                                                       float offset_calibration) {
-    init(config_stream, is_rna, is_rna_adapter, speed_calibration, offset_calibration);
+PolyTailCalculatorSelector::PolyTailCalculatorSelector(
+        std::istream& config_stream,
+        bool is_rna,
+        bool is_rna_adapter,
+        const PolyTailCalibrationCoeffs& calibration) {
+    init(config_stream, is_rna, is_rna_adapter, calibration);
 }
 
 void PolyTailCalculatorSelector::init(std::istream& config_stream,
                                       bool is_rna,
                                       bool is_rna_adapter,
-                                      float speed_calibration,
-                                      float offset_calibration) {
-    assert(speed_calibration > 0.f);
+                                      const PolyTailCalibrationCoeffs& calibration) {
     auto configs = prepare_configs(config_stream);
-    m_default = PolyTailCalculatorFactory::create(configs.back(), is_rna, is_rna_adapter,
-                                                  speed_calibration, offset_calibration);
+    m_default =
+            PolyTailCalculatorFactory::create(configs.back(), is_rna, is_rna_adapter, calibration);
     configs.pop_back();
 
     std::lock_guard<std::mutex> lock(m_lut_mutex);
     for (const auto& config : configs) {
-        m_lut[config.barcode_id] = PolyTailCalculatorFactory::create(
-                config, is_rna, is_rna_adapter, speed_calibration, offset_calibration);
+        m_lut[config.barcode_id] =
+                PolyTailCalculatorFactory::create(config, is_rna, is_rna_adapter, calibration);
     }
 }
 

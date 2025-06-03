@@ -3,6 +3,7 @@
 #include "poly_tail_config.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -35,12 +36,15 @@ struct PolyTailLengthInfo {
     std::pair<int, int> signal_range = {-1, -1};
 };
 
+struct PolyTailCalibrationCoeffs {
+    std::optional<float> speed;
+    std::optional<float> offset;
+};
+
 class PolyTailCalculator {
 public:
-    PolyTailCalculator(PolyTailConfig config, float speed_calibration, float offset_calibration)
-            : m_config(std::move(config)),
-              m_speed_calibration(speed_calibration),
-              m_offset_calibration(offset_calibration) {}
+    PolyTailCalculator(PolyTailConfig config, const PolyTailCalibrationCoeffs& calibration)
+            : m_config(std::move(config)), m_calibration(calibration) {}
 
     virtual ~PolyTailCalculator() = default;
 
@@ -83,17 +87,16 @@ protected:
                                                 float std_samples_per_base) const;
 
     const PolyTailConfig m_config;
-    const float m_speed_calibration;
-    const float m_offset_calibration;
+    const PolyTailCalibrationCoeffs m_calibration;
 };
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(const PolyTailConfig& config,
-                                                            bool is_rna,
-                                                            bool is_rna_adapter,
-                                                            float speed_calibration,
-                                                            float offset_calibration);
+    static std::shared_ptr<const PolyTailCalculator> create(
+            const PolyTailConfig& config,
+            bool is_rna,
+            bool is_rna_adapter,
+            const PolyTailCalibrationCoeffs& calibration);
 };
 
 }  // namespace dorado::poly_tail
