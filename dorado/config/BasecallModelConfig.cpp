@@ -103,8 +103,15 @@ void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &co
                                          config.model_path.string());
             }
         } else {
-            config.polya_speed_correction = toml::find<float>(polya, "speed_correction");
-            config.polya_offset_correction = toml::find<float>(polya, "offset_correction");
+            if (polya.contains("speed_correction") || polya.contains("offset_correction")) {
+                if (!(polya.contains("speed_correction") && polya.contains("offset_correction"))) {
+                    throw std::runtime_error(
+                            "model config error - must contain both 'polya.speed_correction' and "
+                            "'polya.offset_correction' or neither.");
+                }
+                config.polya_speed_correction = toml::find<float>(polya, "speed_correction");
+                config.polya_offset_correction = toml::find<float>(polya, "offset_correction");
+            }
         }
     }
 }
