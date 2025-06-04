@@ -1,4 +1,4 @@
-#include "scoped_trace_log.h"
+#include "utils/scoped_trace_log.h"
 
 #include <spdlog/spdlog.h>
 

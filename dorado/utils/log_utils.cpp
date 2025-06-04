@@ -1,6 +1,6 @@
-#include "log_utils.h"
+#include "utils/log_utils.h"
 
-#include "tty_utils.h"
+#include "utils/tty_utils.h"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>

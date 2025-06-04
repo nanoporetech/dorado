@@ -1,88 +1,91 @@
 add_library(dorado_utils
+    # Public
+    include/utils/alignment_utils.h
+    include/utils/arg_parse_ext.h
+    include/utils/AsyncQueue.h
+    include/utils/bam_utils.h
+    include/utils/barcode_kits.h
+    include/utils/basecaller_utils.h
+    include/utils/cigar.h
+    include/utils/concurrency/async_task_executor.h
+    include/utils/concurrency/detail/priority_task_queue.h
+    include/utils/concurrency/multi_queue_thread_pool.h
+    include/utils/concurrency/synchronisation.h
+    include/utils/concurrency/task_priority.h
+    include/utils/crypto_utils.h
+    include/utils/dev_utils.h
+    include/utils/fasta_fastq_utils.h
+    include/utils/fasta_reader.h
+    include/utils/fastq_reader.h
+    include/utils/fs_utils.h
+    include/utils/gzip_reader.h
+    include/utils/hts_file.h
+    include/utils/jthread.h
+    include/utils/locale_utils.h
+    include/utils/log_utils.h
+    include/utils/math_utils.h
+    include/utils/memory_utils.h
+    include/utils/MergeHeaders.h
+    include/utils/overlap.h
+    include/utils/parameters.h
+    include/utils/PostCondition.h
+    include/utils/SampleSheet.h
+    include/utils/scoped_trace_log.h
+    include/utils/sequence_utils.h
+    include/utils/stats.h
+    include/utils/stream_utils.h
+    include/utils/sys_stats.h
+    include/utils/sys_utils.h
+    include/utils/thread_utils.h
+    include/utils/time_utils.h
+    include/utils/timer_high_res.h
+    include/utils/tty_utils.h
+    include/utils/types.h
+    include/utils/uuid_utils.h
+    include/utils/paf_utils.h
+    include/utils/fai_utils.h
+    include/utils/container_utils.h
+    include/utils/io_utils.h
+    include/utils/rle.h
+    include/utils/ssize.h
+    include/utils/span.h
+
+    # Private
     alignment_utils.cpp
-    alignment_utils.h
-    arg_parse_ext.h
-    AsyncQueue.h
     bam_utils.cpp
-    bam_utils.h
     barcode_kits.cpp
-    barcode_kits.h
     basecaller_utils.cpp
-    basecaller_utils.h
     cigar.cpp
-    cigar.h
     concurrency/async_task_executor.cpp
-    concurrency/async_task_executor.h
     concurrency/detail/priority_task_queue.cpp
-    concurrency/detail/priority_task_queue.h
     concurrency/multi_queue_thread_pool.cpp
-    concurrency/multi_queue_thread_pool.h
-    concurrency/synchronisation.h
-    concurrency/task_priority.h
-    crypto_utils.h
     crypto_utils.cpp
     dev_utils.cpp
-    dev_utils.h
     fasta_fastq_utils.cpp
-    fasta_fastq_utils.h
     fasta_reader.cpp
-    fasta_reader.h
     fastq_reader.cpp
-    fastq_reader.h
     fs_utils.cpp
-    fs_utils.h
     gzip_reader.cpp
-    gzip_reader.h
     hts_file.cpp
-    hts_file.h
-    jthread.h
     locale_utils.cpp
-    locale_utils.h
     log_utils.cpp
-    log_utils.h
-    math_utils.h
     memory_utils.cpp
-    memory_utils.h
     MergeHeaders.cpp
-    MergeHeaders.h
-    overlap.h
     parameters.cpp
-    parameters.h
-    PostCondition.h
     SampleSheet.cpp
-    SampleSheet.h
     scoped_trace_log.cpp
-    scoped_trace_log.h
     sequence_utils.cpp
-    sequence_utils.h
     stats.cpp
-    stats.h
-    stream_utils.h
     sys_stats.cpp
-    sys_stats.h
     sys_utils.cpp
-    sys_utils.h
     thread_utils.cpp
-    thread_utils.h
     time_utils.cpp
-    time_utils.h
-    timer_high_res.h
-    tty_utils.h
     types.cpp
-    types.h
     uuid_utils.cpp
-    uuid_utils.h
     paf_utils.cpp
-    paf_utils.h
     fai_utils.cpp
-    fai_utils.h
     container_utils.cpp
-    container_utils.h
     io_utils.cpp
-    io_utils.h
-    rle.h
-    ssize.h
-    span.h
  )
 
 target_compile_definitions(dorado_utils
@@ -104,15 +107,17 @@ else()
 endif()
 
 target_include_directories(dorado_utils
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
     INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
+        ${CMAKE_CURRENT_SOURCE_DIR}/.. # TODO: remove this once dependents are fixed
 )
 
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_utils
     SYSTEM
     PUBLIC
-    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
 )
 
 target_link_libraries(dorado_utils

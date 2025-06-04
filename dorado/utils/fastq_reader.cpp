@@ -1,7 +1,7 @@
-#include "fastq_reader.h"
+#include "utils/fastq_reader.h"
 
-#include "gzip_reader.h"
-#include "types.h"
+#include "utils/gzip_reader.h"
+#include "utils/types.h"
 
 #include <htslib/hfile.h>
 #include <htslib/hts.h>

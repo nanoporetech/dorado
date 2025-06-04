@@ -1,6 +1,6 @@
-#include "stats.h"
+#include "utils/stats.h"
 
-#include "thread_utils.h"
+#include "utils/thread_utils.h"
 
 #include <ostream>
 #include <set>

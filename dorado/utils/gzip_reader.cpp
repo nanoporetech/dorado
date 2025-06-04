@@ -1,4 +1,4 @@
-#include "gzip_reader.h"
+#include "utils/gzip_reader.h"
 
 #include <zlib.h>
 

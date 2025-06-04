@@ -1,9 +1,9 @@
-#include "SampleSheet.h"
+#include "utils/SampleSheet.h"
 
-#include "PostCondition.h"
-#include "barcode_kits.h"
-#include "string_utils.h"
-#include "types.h"
+#include "utils/PostCondition.h"
+#include "utils/barcode_kits.h"
+#include "utils/string_utils.h"
+#include "utils/types.h"
 
 #include <algorithm>
 #include <fstream>
