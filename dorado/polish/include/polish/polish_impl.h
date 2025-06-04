@@ -142,7 +142,7 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 secondary::Stats& stats,
                                 std::atomic<bool>& worker_terminate,
-                                polisher::WorkerReturnStatus& ret_status,
+                                WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
                                 int32_t num_threads,
                                 int32_t min_depth,

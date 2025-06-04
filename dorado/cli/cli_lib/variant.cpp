@@ -820,37 +820,29 @@ void run_variant_calling(const Options& opt,
 
                 // Create a thread for the sample producer.
                 polisher::WorkerReturnStatus wrs_sample_producer;
-                std::shared_ptr<std::thread> thread_sample_producer = utils::make_jthread(
-                        std::thread([&resources, &bam_regions, &draft_lens, &opt, &usable_mem,
-                                     &batch_queue, &worker_terminate, &wrs_sample_producer] {
+                auto thread_sample_producer =
+                        utils::jthread([&resources, &bam_regions, &draft_lens, &opt, &usable_mem,
+                                        &batch_queue, &worker_terminate, &wrs_sample_producer] {
                             utils::set_thread_name("variant_produce");
                             polisher::sample_producer(
                                     resources, bam_regions, draft_lens, opt.threads, opt.batch_size,
                                     opt.window_len, opt.window_overlap, opt.bam_subchunk,
                                     usable_mem, opt.continue_on_error, batch_queue,
                                     worker_terminate, wrs_sample_producer);
-                        }));
-
-                if (!thread_sample_producer) {
-                    throw std::runtime_error{"Could not create the producer!"};
-                }
+                        });
 
                 // Create a thread for the sample decoder.
                 polisher::WorkerReturnStatus wrs_decoder;
-                std::shared_ptr<std::thread> thread_sample_decoder = utils::make_jthread(
-                        std::thread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
-                                     &resources, &opt, &worker_terminate, &wrs_decoder] {
+                auto thread_sample_decoder =
+                        utils::jthread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
+                                        &resources, &opt, &worker_terminate, &wrs_decoder] {
                             utils::set_thread_name("variant_decode");
                             polisher::decode_samples_in_parallel(
                                     all_results_cons, vc_input_data, decode_queue, stats,
                                     worker_terminate, wrs_decoder, *resources.decoder, opt.threads,
                                     opt.min_depth,
                                     /*collect_vc_data=*/true, opt.continue_on_error);
-                        }));
-
-                if (!thread_sample_decoder) {
-                    throw std::runtime_error{"Could not create the decoder!"};
-                }
+                        });
 
                 // Run the inference worker on the main thread.
                 polisher::infer_samples_in_parallel(
@@ -858,12 +850,8 @@ void run_variant_calling(const Options& opt,
                         resources.streams, resources.encoders, draft_lens, opt.continue_on_error);
 
                 // Join the workers.
-                if (thread_sample_producer->joinable()) {
-                    thread_sample_producer->join();
-                }
-                if (thread_sample_decoder->joinable()) {
-                    thread_sample_decoder->join();
-                }
+                thread_sample_producer.join();
+                thread_sample_decoder.join();
 
                 // Propagate worker errors into the main thread.
                 if (wrs_sample_producer.exception_thrown) {
