@@ -66,6 +66,7 @@ public:
 
     std::shared_ptr<BarcodeScoreResult> barcoding_result;
     PrimerClassification primer_classification{};
+    // NB: refers to read length before adapter/primer/barcode trimming, but after mux change trim or read splitting
     std::size_t pre_trim_seq_length{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
