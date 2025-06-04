@@ -102,7 +102,7 @@ variables:
   - !reference [.set_parallel_jobs]
   - !reference [.setup_ccache]
   - echo "BUILD_OPTIONS '${BUILD_OPTIONS}'"
-  - cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=${BUILD_TYPE} -D DORADO_ENABLE_BENCHMARK_TESTS=ON
+  - eval cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=${BUILD_TYPE} -D DORADO_ENABLE_BENCHMARK_TESTS=ON
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
 .run_dorado_cmake_ctest:
@@ -329,7 +329,7 @@ build:windows:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G \"Visual Studio 16 2019\""
 
 build:windows:debug:
   variables:
@@ -346,7 +346,7 @@ build:windows_koi_from_source:
     - .on_nightly_or_manual
   before_script:
     - !reference ["build:windows", before_script]
-    - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN}"
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -G \"Visual Studio 16 2019\""
   artifacts: null
 
 build:windows:no_ccache:
@@ -355,7 +355,7 @@ build:windows:no_ccache:
     - .on_nightly_or_manual
   before_script:
     - !reference ["build:windows", before_script]
-    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON"
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON -G \"Visual Studio 16 2019\""
   artifacts: null
 
 build:macos:arm:
@@ -408,7 +408,7 @@ build_archive:linux:x86:cuda12:
 build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4"
+    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G \"Visual Studio 16 2019\""
   extends:
     - .windows_runner
     - .build_dorado_archive
