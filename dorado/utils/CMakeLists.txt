@@ -94,7 +94,7 @@ target_compile_definitions(dorado_utils
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
     target_compile_definitions(dorado_utils
         PUBLIC
-            DORADO_ORIN=TRUE
+            DORADO_ORIN=1
     )
 else()
     target_compile_definitions(dorado_utils
