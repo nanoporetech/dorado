@@ -27,7 +27,7 @@ Fails because the basecaller model cannot be determined.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header.
+  Input BAM file has no basecaller models listed in the header.
 
 Zero read groups in the input and auto model selection.
 Fails even with `--skip-model-compatibility-check`, because a model cannot be auto resolved with this feature.
@@ -40,7 +40,7 @@ Fails even with `--skip-model-compatibility-check`, because a model cannot be au
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.
+  Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.
 
 Zero read groups in the input, and a model is specified by path.
 Fails because it still cannot match the model to the RG basecaller name in the BAM file (since there are no @RG header lines).
@@ -54,7 +54,7 @@ Fails because it still cannot match the model to the RG basecaller name in the B
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header.
+  Input BAM file has no basecaller models listed in the header.
 
 Zero read groups in the input, and a model is specified by path.
 Allowed with`--skip-model-compatibility-check`.
@@ -89,7 +89,7 @@ This does not help because this option only ignores RG checking after model sele
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header.
+  Input BAM file has no basecaller models listed in the header.
 
 Zero read groups in the input and `--RG` option provided.
 Fails because a read group was selected, but there are no read groups in the BAM file.
@@ -103,7 +103,7 @@ Fails because a read group was selected, but there are no read groups in the BAM
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: No @RG headers found in the input BAM, but user-specified RG was given. RG: 'bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E'
+  No @RG headers found in the input BAM, but user-specified RG was given. RG: 'bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E'
 
 Zero read groups in the input, and both `--RG` and `--ignore-read-groups` options provided.
 Fails because a read group was selected, but there are no read groups in the BAM file.
@@ -118,7 +118,7 @@ The option `--ignore-read-groups` cannot help if a specific read group was reque
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: No @RG headers found in the input BAM, but user-specified RG was given. RG: 'bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E'
+  No @RG headers found in the input BAM, but user-specified RG was given. RG: 'bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E'
 
 Two read groups are present in the input BAM, but only one basecaller model.
 Fails because only one RG is allowed.
@@ -132,7 +132,7 @@ Fails because only one RG is allowed.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: The input BAM contains more than one read group. Please specify --RG to select which read group to process.
+  The input BAM contains more than one read group. Please specify --RG to select which read group to process.
 
 Two read groups are present in the input BAM, but only one basecaller model.
 Allow multiple read groups with `--ignore-read-groups`.
@@ -191,7 +191,7 @@ Fails because the requested read group does not exist.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: No @RG headers found in the input BAM, but user-specified RG was given. RG: 'nonexistent-read-group'
+  No @RG headers found in the input BAM, but user-specified RG was given. RG: 'nonexistent-read-group'
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 There is a cascade of exceptions that would be triggered in this case.
@@ -206,7 +206,7 @@ Fails because only one RG is allowed.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: The input BAM contains more than one read group. Please specify --RG to select which read group to process.
+  The input BAM contains more than one read group. Please specify --RG to select which read group to process.
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 Ignore the RG check using `--ignore-read-groups`.
@@ -221,7 +221,7 @@ Fails because multiple basecaller models are present.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has a mix of different basecaller models. Only one basecaller model can be processed.
+  Input BAM file has a mix of different basecaller models. Only one basecaller model can be processed.
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 Ignore the RG check using `--ignore-read-groups`.
@@ -299,7 +299,7 @@ Fails because the basecaller model for the second group is not supported (per te
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Polishing model is not compatible with the input BAM!
+  Polishing model is not compatible with the input BAM!
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 Select the second read group with `--RG`.
