@@ -1016,7 +1016,7 @@ void run_polishing(const Options& opt,
                 // Propagate worker errors into the main thread.
                 if (wrs_sample_producer.exception_thrown) {
                     throw std::runtime_error{wrs_sample_producer.message};
-            }
+                }
                 if (wrs_decoder.exception_thrown) {
                     throw std::runtime_error{wrs_decoder.message};
                 }
@@ -1026,12 +1026,12 @@ void run_polishing(const Options& opt,
             if (!opt.continue_on_error) {
                 throw;
             } else {
-            spdlog::warn(
+                spdlog::warn(
                         "Exception caught when running inference on the batch interval of drafts: "
                         "[{}, {}). Skipping this batch and optionally outputting unpolished "
                         "sequences. Original exception: \"{}\"",
-                    batch_interval.start, batch_interval.end, e.what());
-        }
+                        batch_interval.start, batch_interval.end, e.what());
+            }
         }
 
         // Write the consensus. If a sequence has no inferred samples, it can be
@@ -1079,7 +1079,7 @@ void run_polishing(const Options& opt,
                         "[{}, {}). Skipping this batch. Original exception: \"{}\"",
                         batch_interval.start, batch_interval.end, e.what());
                 continue;
-        }
+            }
         }
 
         // Variant calling.
@@ -1113,13 +1113,13 @@ void run_polishing(const Options& opt,
             if (!opt.continue_on_error) {
                 throw;
             } else {
-            spdlog::warn(
+                spdlog::warn(
                         "Exception caught when calling variants in the batch interval of drafts: "
                         "[{}, {}). Not producing variant calls for this batch of drafts. Original "
-                    "exception: \"{}\"",
-                    batch_interval.start, batch_interval.end, e.what());
+                        "exception: \"{}\"",
+                        batch_interval.start, batch_interval.end, e.what());
+            }
         }
-    }
     }
 }
 
