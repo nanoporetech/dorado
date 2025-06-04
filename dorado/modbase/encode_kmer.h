@@ -12,6 +12,7 @@ std::vector<int8_t> encode_kmer_context(const std::vector<int>& seq,
 
 std::vector<int8_t> encode_kmer_chunk(const std::vector<int>& seq,
                                       const std::vector<uint64_t>& seq_mappings,
+                                      const std::vector<bool>& base_skips,
                                       size_t kmer_len,
                                       size_t context_samples,
                                       size_t padding_samples,
