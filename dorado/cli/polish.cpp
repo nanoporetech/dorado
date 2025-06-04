@@ -20,15 +20,18 @@
 #include "utils/fai_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/io_utils.h"
+#include "utils/jthread.h"
 #include "utils/log_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
+#include "utils/thread_naming.h"
 
 #include <ATen/Parallel.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cctype>
 #include <chrono>
 #include <cstddef>
@@ -109,6 +112,7 @@ struct Options {
     bool ambig_ref = false;
     bool run_variant_calling = false;
     bool write_consensus = false;
+    bool continue_on_error = false;
 };
 
 /// \brief Define the CLI options.
@@ -157,7 +161,7 @@ ParserPtr create_cli(int& verbosity) {
                       "output is to stdout.")
                 .default_value("");
         parser->visible.add_argument("-m", "--model")
-                .help("Path to correction model folder.")
+                .help("Path to the model folder.")
                 .default_value("auto");
         parser->visible.add_argument("--bacteria")
                 .help("Optimise polishing for plasmids and bacterial genomes.")
@@ -256,6 +260,10 @@ ParserPtr create_cli(int& verbosity) {
         parser->hidden.add_argument("--skip-model-compatibility-check")
                 .help("Allow any model to be applied on the data.")
                 .flag();
+        parser->hidden.add_argument("--continue-on-error")
+                .help("Continue the process even if an exception is thrown. This "
+                      "may leave some regions unprocessed.")
+                .flag();
     }
 
     return parser;
@@ -323,6 +331,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.queue_size = parser.hidden.get<int>("queue-size");
     opt.any_bam = parser.hidden.get<bool>("any-bam");
     opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
+    opt.continue_on_error = parser.hidden.get<bool>("continue-on-error");
 
     opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
     opt.fill_char = (parser.visible.is_used("--fill-char"))
@@ -509,45 +518,117 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     };
 
     // clang-format off
-    const std::unordered_map<std::string, std::string> compatible_bacterial_bc_models {
+    // Set of all basecaller models supported by polish.
+    const std::unordered_set<std::string> all_basecaller_models{
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v5.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v5.2.0",
+    };
+    // Look-up table from a basecaller model to a polish model (base)name.
+    const std::unordered_map<std::string, std::string> lut_basecaller_to_polish_model {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},    // Legacy.
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl"},
+    };
+    // Look-up table from a basecaller model to a bacterial model name.
+    const std::unordered_map<std::string, std::string> lut_basecaller_to_bacterial_model {
         {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
         {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
     };
-    const std::unordered_map<std::string, std::string> legacy_bc_models {
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},
+    // Look-up table of basecaller model compatibilities. I.e. if the polishing model for one basecaller model is
+    // compatible with the polishing model for another basecaller model, this table gives this relation.
+    // At the moment, this is a 1-to-1 relation, unlike the bacterial models.
+    const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_polish {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0"}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0"}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0"}},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0"}},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0"}},
+    };
+    // Look-up table of basecaller model compatibilities for the bacterial models.
+    // E.g. bacterial model for `dna_r10.4.1_e8.2_400bps_hac@v5.2.0` is fully compatible (and at the moment
+    // identical) to `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`, `dna_r10.4.1_e8.2_400bps_sup@v4.3.0`, etc.
+    // This is important for forward compatibility of existing models to avoid having to create a new copy of an
+    // existing model every time a new basecaller model is released and the polishing model stays the same.
+    const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_bacterial {
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", all_basecaller_models},
+        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", all_basecaller_models},
+    };
+    // Set of legacy polishing models.
+    const std::unordered_set<std::string> legacy_bc_models {
+        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
     };
     // clang-format on
 
-    const auto determine_model_name = [&bacteria, &compatible_bacterial_bc_models,
-                                       &legacy_bc_models,
+    const auto determine_model_name = [&bacteria, &lut_basecaller_to_polish_model,
+                                       &lut_basecaller_to_bacterial_model, &legacy_bc_models,
                                        &bam_info](const std::string& basecaller_model) {
         if (bacteria) {
             // Resolve a bacterial model.
-            const auto it = compatible_bacterial_bc_models.find(basecaller_model);
-            if (it == std::cend(compatible_bacterial_bc_models)) {
+            const auto it = lut_basecaller_to_bacterial_model.find(basecaller_model);
+            if (it == std::cend(lut_basecaller_to_bacterial_model)) {
                 throw std::runtime_error(
-                        "There are no bacterial models compatible with basecaller model: '" +
+                        "There are no bacterial models for the basecaller model: '" +
                         basecaller_model + "'.");
             }
             return it->second;
         } else {
-            // First check if this is a legacy model.
-            const auto it_legacy = legacy_bc_models.find(basecaller_model);
-            if (it_legacy != std::cend(legacy_bc_models)) {
-                return it_legacy->second;
+            const auto it = lut_basecaller_to_polish_model.find(basecaller_model);
+            if (it == std::cend(lut_basecaller_to_polish_model)) {
+                throw std::runtime_error(
+                        "There are no polishing models for the basecaller model: '" +
+                        basecaller_model + "'.");
             }
-
-            // Otherwise, this is a current model.
+            const bool is_legacy_model = legacy_bc_models.count(basecaller_model) > 0;
             const std::string polish_model_suffix =
-                    std::string("_polish_rl") + (bam_info.has_dwells ? "_mv" : "");
-            return basecaller_model + polish_model_suffix;
+                    ((!is_legacy_model && bam_info.has_dwells) ? "_mv" : "");
+            return it->second + polish_model_suffix;
+        }
+    };
+    const auto get_compatible_model_set =
+            [&bacteria, &lut_compatible_basecallers_for_polish,
+             &lut_compatible_basecallers_for_bacterial](
+                    const std::string& basecaller_model) -> std::unordered_set<std::string> {
+        if (bacteria) {
+            const auto it = lut_compatible_basecallers_for_bacterial.find(basecaller_model);
+            if (it == std::cend(lut_compatible_basecallers_for_bacterial)) {
+                return {};
+            }
+            return it->second;
+        } else {
+            const auto it = lut_compatible_basecallers_for_polish.find(basecaller_model);
+            if (it == std::cend(lut_compatible_basecallers_for_polish)) {
+                return {};
+            }
+            return it->second;
         }
     };
     const auto sets_intersect = [](const std::unordered_set<std::string>& set1,
@@ -566,6 +647,19 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         spdlog::info("Input data contains move tables.");
     } else {
         spdlog::info("Input data does not contain move tables.");
+    }
+
+    // Check if any of the input models is a stereo, to report a clear error that this is not supported.
+    for (const std::string& model : bam_info.basecaller_models) {
+        if (model.find("stereo") != std::string::npos) {
+            std::ostringstream oss;
+            oss << "Duplex basecalling models are not supported. Model: '" << model << "'.";
+            if (!any_model) {
+                throw std::runtime_error{oss.str()};
+            } else {
+                spdlog::warn("{} This may produce inferior results.", oss.str());
+            }
+        }
     }
 
     // Fail only if not explicitly permitting any model, or if any model is allowed but user specified
@@ -651,9 +745,25 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
             secondary::parse_label_scheme_type(model_config.label_scheme_type) ==
             secondary::LabelSchemeType::HAPLOID;
 
+    const auto check_models_supported =
+            [&sets_intersect, &get_compatible_model_set,
+             &model_config](const std::unordered_set<std::string>& basecaller_models) {
+                // Every model from the input BAM needs to be supported by the selected polishing model.
+                for (const std::string& model : basecaller_models) {
+                    const std::unordered_set<std::string> compatible_models =
+                            get_compatible_model_set(model);
+                    const bool valid =
+                            sets_intersect(compatible_models, model_config.supported_basecallers);
+                    if (!valid) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
-        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+        if (!check_models_supported(bam_info.basecaller_models)) {
             throw std::runtime_error{"Polishing model is not compatible with the input BAM!"};
         }
 
@@ -676,7 +786,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
 
     } else {
         // Allow to use a polishing model trained on a wrong basecaller model, but emit a warning.
-        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+        if (!check_models_supported(bam_info.basecaller_models)) {
             spdlog::warn(
                     "Polishing model is not compatible with the input BAM. This may produce "
                     "inferior results.");
@@ -810,6 +920,8 @@ void run_polishing(const Options& opt,
 
     int64_t total_batch_bases = 0;
 
+    std::atomic<bool> worker_terminate{false};
+
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
@@ -868,42 +980,77 @@ void run_polishing(const Options& opt,
                 utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
                 utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
 
-                std::thread thread_sample_producer = std::thread(
-                        &polisher::sample_producer, std::ref(resources), std::cref(bam_regions),
-                        std::cref(draft_lens), opt.threads, opt.batch_size, opt.window_len,
-                        opt.window_overlap, opt.bam_subchunk, std::ref(batch_queue));
+                // Create a thread for the sample producer.
+                polisher::WorkerReturnStatus wrs_sample_producer;
+                std::shared_ptr<std::thread> thread_sample_producer = utils::make_jthread(
+                        std::thread([&resources, &bam_regions, &draft_lens, &opt, &batch_queue,
+                                     &worker_terminate, &wrs_sample_producer] {
+                            utils::set_thread_name("polish_produce");
+                            polisher::sample_producer(resources, bam_regions, draft_lens,
+                                                      opt.threads, opt.batch_size, opt.window_len,
+                                                      opt.window_overlap, opt.bam_subchunk,
+                                                      opt.continue_on_error, batch_queue,
+                                                      worker_terminate, wrs_sample_producer);
+                        }));
 
-                std::thread thread_sample_decoder = std::thread(
-                        &polisher::decode_samples_in_parallel, std::ref(all_results_cons),
-                        std::ref(vc_input_data), std::ref(decode_queue), std::ref(stats),
-                        std::cref(*resources.decoder), opt.threads, opt.min_depth,
-                        opt.run_variant_calling);
-
-                polisher::infer_samples_in_parallel(batch_queue, decode_queue, resources.models,
-                                                    resources.streams, resources.encoders,
-                                                    draft_lens);
-
-                if (thread_sample_producer.joinable()) {
-                    thread_sample_producer.join();
+                if (!thread_sample_producer) {
+                    throw std::runtime_error{"Could not create the producer!"};
                 }
-                if (thread_sample_decoder.joinable()) {
-                    thread_sample_decoder.join();
+
+                // Create a thread for the sample decoder.
+                polisher::WorkerReturnStatus wrs_decoder;
+                std::shared_ptr<std::thread> thread_sample_decoder = utils::make_jthread(
+                        std::thread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
+                                     &resources, &opt, &worker_terminate, &wrs_decoder] {
+                            utils::set_thread_name("polish_decode");
+                            polisher::decode_samples_in_parallel(
+                                    all_results_cons, vc_input_data, decode_queue, stats,
+                                    worker_terminate, wrs_decoder, *resources.decoder, opt.threads,
+                                    opt.min_depth, opt.run_variant_calling, opt.continue_on_error);
+                        }));
+
+                if (!thread_sample_decoder) {
+                    throw std::runtime_error{"Could not create the decoder!"};
+                }
+
+                // Run the inference worker on the main thread.
+                polisher::infer_samples_in_parallel(
+                        batch_queue, decode_queue, resources.models, worker_terminate,
+                        resources.streams, resources.encoders, draft_lens, opt.continue_on_error);
+
+                // Join the workers.
+                if (thread_sample_producer->joinable()) {
+                    thread_sample_producer->join();
+                }
+                if (thread_sample_decoder->joinable()) {
+                    thread_sample_decoder->join();
+                }
+
+                // Propagate worker errors into the main thread.
+                if (wrs_sample_producer.exception_thrown) {
+                    throw std::runtime_error{wrs_sample_producer.message};
+                }
+                if (wrs_decoder.exception_thrown) {
+                    throw std::runtime_error{wrs_decoder.message};
                 }
             }
 
         } catch (const std::exception& e) {
-            // Emit a warning, but do not continue the loop, so that the empty sequences are written.
-            spdlog::warn(
-                    "Exception caught when polishing the batch interval of drafts: [{}, {}). "
-                    "Skipping this batch and optionally outputting unpolished sequences. Original "
-                    "exception: \"{}\"",
-                    batch_interval.start, batch_interval.end, e.what());
+            if (!opt.continue_on_error) {
+                throw;
+            } else {
+                spdlog::warn(
+                        "Exception caught when running inference on the batch interval of drafts: "
+                        "[{}, {}). Skipping this batch and optionally outputting unpolished "
+                        "sequences. Original exception: \"{}\"",
+                        batch_interval.start, batch_interval.end, e.what());
+            }
         }
 
         // Write the consensus. If a sequence has no inferred samples, it can be
         // written verbatim to the output.
         // If this fails, stop execution.
-        {
+        try {
             utils::ScopedProfileRange spr1("run-construct_consensus_and_write", 1);
 
             // Round the counter, in case some samples were dropped.
@@ -936,6 +1083,16 @@ void run_polishing(const Options& opt,
                                             (opt.out_format == OutputFormat::FASTQ));
                 }
             }
+        } catch (const std::exception& e) {
+            if (!opt.continue_on_error) {
+                throw;
+            } else {
+                spdlog::warn(
+                        "Exception caught when writing consensus sequences on interval of drafts: "
+                        "[{}, {}). Skipping this batch. Original exception: \"{}\"",
+                        batch_interval.start, batch_interval.end, e.what());
+                continue;
+            }
         }
 
         // Variant calling.
@@ -945,9 +1102,10 @@ void run_polishing(const Options& opt,
             // Run variant calling, optionally.
             if (opt.run_variant_calling) {
                 std::vector<secondary::Variant> variants = polisher::call_variants(
-                        batch_interval, vc_input_data, draft_readers, draft_lens,
-                        *resources.decoder, opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF,
-                        opt.threads, stats);
+                        worker_terminate, stats, batch_interval, vc_input_data, draft_readers,
+                        draft_lens, *resources.decoder, opt.ambig_ref,
+                        opt.vc_type == VariantCallingEnum::GVCF, opt.threads,
+                        opt.continue_on_error);
 
                 std::sort(std::begin(variants), std::end(variants),
                           [](const auto& a, const auto& b) {
@@ -965,12 +1123,15 @@ void run_polishing(const Options& opt,
                 stats.set("processed", static_cast<double>(total_batch_bases));
             }
         } catch (const std::exception& e) {
-            spdlog::warn(
-                    "Exception caught when calling variants in the batch interval of drafts: [{}, "
-                    "{}). Not producing variant calls for this batch of drafts. Original "
-                    "exception: \"{}\"",
-                    batch_interval.start, batch_interval.end, e.what());
-            continue;
+            if (!opt.continue_on_error) {
+                throw;
+            } else {
+                spdlog::warn(
+                        "Exception caught when calling variants in the batch interval of drafts: "
+                        "[{}, {}). Not producing variant calls for this batch of drafts. Original "
+                        "exception: \"{}\"",
+                        batch_interval.start, batch_interval.end, e.what());
+            }
         }
     }
 }
@@ -1077,7 +1238,7 @@ int polish(int argc, char* argv[]) {
         spdlog::info("Done!");
 
     } catch (const std::exception& e) {
-        spdlog::error("Caught exception: {}", e.what());
+        spdlog::error(e.what());
         return EXIT_FAILURE;
     } catch (...) {
         spdlog::error("Caught an unknown exception!");

@@ -54,7 +54,7 @@ Unknown contig name is specified.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: sequence name for region 'nonexistent_contig:0--1' does not exist in the input sequence file.
+  Region validation failed: sequence name for region 'nonexistent_contig:0--1' does not exist in the input sequence file.
 
 Failing region: input region ends after contig length.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -67,7 +67,7 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: coordinates for region 'contig_1:1-999999' are not valid. Sequence length: 10000
+  Region validation failed: coordinates for region 'contig_1:1-999999' are not valid. Sequence length: 10000
 
 Region: only the start coordinate is specified. Clamp to [start, contig_len] interval.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -112,7 +112,7 @@ Region completely out of coordinate range of the target.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: coordinates for region 'contig_1:50000-55000' are not valid. Sequence length: 10000
+  Region validation failed: coordinates for region 'contig_1:50000-55000' are not valid. Sequence length: 10000
 
 Single valid region is specified.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -199,7 +199,7 @@ Fails because region overlap is not allowed.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
+  Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
 
 Zero length region.
   $ rm -rf out; mkdir -p out
@@ -211,7 +211,7 @@ Zero length region.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: coordinates for region 'contig_1:502-501' are not valid. Sequence length: 10000
+  Region validation failed: coordinates for region 'contig_1:502-501' are not valid. Sequence length: 10000
 
 Wrong region coordinates.
   $ rm -rf out; mkdir -p out
@@ -223,7 +223,7 @@ Wrong region coordinates.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: coordinates for region 'contig_1:700-500' are not valid. Sequence length: 10000
+  Region validation failed: coordinates for region 'contig_1:700-500' are not valid. Sequence length: 10000
 
 Loading from a BED file with multiple regions.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -295,4 +295,4 @@ Fails because region overlap is not allowed.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
+  Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.

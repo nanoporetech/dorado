@@ -17,6 +17,7 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <atomic>
 #include <cassert>
 #include <memory>
 #include <stdexcept>
@@ -468,18 +469,34 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
     return results;
 }
 
-}  // namespace
-
+/**
+ * \brief This function performs the following operations:
+ *          1. Merges adjacent samples, which were split for efficiency of computing the pileup.
+ *          2. Checks for discontinuities in any of the samples (based on major positions) and splits them.
+ *          3. Splits the merged samples into equally sized pieces which will be used for inference to prevent memory usage spikes.
+ * \param window_samples Input samples which will be merged and split. Non-const to enable moving of data.
+ * \param encoder Encoder used to produce the sample tensors. It is needed becaue of the secondary::EncoderBase::merge_adjacent_samples() function.
+ * \param bam_regions BAM region coordinates. This is a Span to facilitate batching of BAM regions from the outside.
+ * \param bam_region_intervals Range of IDs of window_samples which comprise this BAM region. E.g. BAM region 0 uses window_samples[0:5], BAM region 1 uses window_samples[5:9], etc.
+ *                              This is a Span to facilitate batching of BAM regions from the outside and avoid copying vectors.
+ * \param num_threads Number of threads for procesing.
+ * \param window_len Length of the window to split the final samples into.
+ * \param window_overlap Overlap between neighboring windows when splitting.
+ * \param window_interval_offset Used for batching bam_region_intervals, because window_samples.size() matches the total size of bam_region_intervals,
+ *                                  while coordinates of each BAM region interval are global and produced before draft batching on the client side.
+ */
 std::pair<std::vector<secondary::Sample>, std::vector<secondary::TrimInfo>>
 merge_and_split_bam_regions_in_parallel(
         std::vector<secondary::Sample>& window_samples,
+        std::atomic<bool>& worker_terminate,
         const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         const Span<const secondary::Window> bam_regions,
         const Span<const secondary::Interval> bam_region_intervals,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap,
-        const int32_t window_interval_offset) {
+        const int32_t window_interval_offset,
+        const bool continue_on_exception) {
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
     const auto debug_print_samples =
             [](std::ostream& os, const std::vector<secondary::Sample>& samples,
@@ -499,83 +516,102 @@ merge_and_split_bam_regions_in_parallel(
 
     const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
                             std::vector<std::vector<secondary::Sample>>& results_samples,
-                            std::vector<std::vector<secondary::TrimInfo>>& results_trims) {
+                            std::vector<std::vector<secondary::TrimInfo>>& results_trims,
+                            WorkerReturnStatus& ret_val) {
         utils::ScopedProfileRange spr2("merge_and_split_bam_regions_in_parallel-worker", 4);
 
         for (int32_t bam_region_id = start; bam_region_id < end; ++bam_region_id) {
-            // Get the interval of samples for this BAM region and subtract the offset due to batching.
-            secondary::Interval interval = bam_region_intervals[bam_region_id];
-            interval.start -= window_interval_offset;
-            interval.end -= window_interval_offset;
-
-            spdlog::trace("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
-                          bam_region_id, interval.start, interval.end);
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
-#endif
-
-            std::vector<secondary::Sample> local_samples;
-
-            // Split all samples on discontinuities.
-            for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
-                auto& sample = window_samples[sample_id];
-                std::vector<secondary::Sample> disc_samples =
-                        split_sample_on_discontinuities(sample);
-                local_samples.insert(std::end(local_samples),
-                                     std::make_move_iterator(std::begin(disc_samples)),
-                                     std::make_move_iterator(std::end(disc_samples)));
+            if (worker_terminate) {
+                return;
             }
 
-            spdlog::trace(
-                    "- [bam_region_id = {}] (1) After splitting on discontinuities: "
-                    "local_samples = {}",
-                    bam_region_id, std::size(local_samples));
+            try {
+                // Get the interval of samples for this BAM region and subtract the offset due to batching.
+                secondary::Interval interval = bam_region_intervals[bam_region_id];
+                interval.start -= window_interval_offset;
+                interval.end -= window_interval_offset;
+
+                spdlog::trace("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
+                              bam_region_id, interval.start, interval.end);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+                debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
 #endif
 
-            // Merge adjacent samples.
-            local_samples = encoders[tid]->merge_adjacent_samples(local_samples);
+                std::vector<secondary::Sample> local_samples;
 
-            spdlog::trace("- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
-                          bam_region_id, std::size(local_samples));
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-            // Bluntly split samples for inference.
-            local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
-
-            spdlog::trace(
-                    "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
-                    "window_len = {}, window_overlap = {}",
-                    bam_region_id, std::size(local_samples), window_len, window_overlap);
-#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
-            debug_print_samples(std::cerr, local_samples, 0, -1, -1);
-#endif
-
-            // Compute sample trimming coordinates.
-            const secondary::Window& reg = bam_regions[bam_region_id];
-            results_trims[bam_region_id] = trim_samples(
-                    local_samples, std::optional<secondary::RegionInt>(
-                                           {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
-
-            // Filter local_samples on non-valid trims before returning.
-            std::vector<secondary::Sample> filt_local_samples;
-            std::vector<secondary::TrimInfo> filt_trims;
-            filt_local_samples.reserve(std::size(local_samples));
-            filt_trims.reserve(std::size(local_samples));
-            assert(std::size(local_samples) == std::size(results_trims[bam_region_id]));
-            for (size_t sample_id = 0; sample_id < std::size(local_samples); ++sample_id) {
-                auto& trim = results_trims[bam_region_id][sample_id];
-                if (!secondary::is_trim_info_valid(trim)) {
-                    continue;
+                // Split all samples on discontinuities.
+                for (int32_t sample_id = interval.start; sample_id < interval.end; ++sample_id) {
+                    auto& sample = window_samples[sample_id];
+                    std::vector<secondary::Sample> disc_samples =
+                            split_sample_on_discontinuities(sample);
+                    local_samples.insert(std::end(local_samples),
+                                         std::make_move_iterator(std::begin(disc_samples)),
+                                         std::make_move_iterator(std::end(disc_samples)));
                 }
-                filt_local_samples.emplace_back(std::move(local_samples[sample_id]));
-                filt_trims.emplace_back(std::move(trim));
+
+                spdlog::trace(
+                        "- [bam_region_id = {}] (1) After splitting on discontinuities: "
+                        "local_samples = {}",
+                        bam_region_id, std::size(local_samples));
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+                // Merge adjacent samples.
+                local_samples = encoders[tid]->merge_adjacent_samples(local_samples);
+
+                spdlog::trace(
+                        "- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
+                        bam_region_id, std::size(local_samples));
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+                // Bluntly split samples for inference.
+                local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
+
+                spdlog::trace(
+                        "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
+                        "window_len = {}, window_overlap = {}",
+                        bam_region_id, std::size(local_samples), window_len, window_overlap);
+#ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
+                debug_print_samples(std::cerr, local_samples, 0, -1, -1);
+#endif
+
+                // Compute sample trimming coordinates.
+                const secondary::Window& reg = bam_regions[bam_region_id];
+                results_trims[bam_region_id] = trim_samples(
+                        local_samples,
+                        std::optional<secondary::RegionInt>(
+                                {reg.seq_id, reg.start_no_overlap, reg.end_no_overlap}));
+
+                // Filter local_samples on non-valid trims before returning.
+                std::vector<secondary::Sample> filt_local_samples;
+                std::vector<secondary::TrimInfo> filt_trims;
+                filt_local_samples.reserve(std::size(local_samples));
+                filt_trims.reserve(std::size(local_samples));
+                assert(std::size(local_samples) == std::size(results_trims[bam_region_id]));
+                for (size_t sample_id = 0; sample_id < std::size(local_samples); ++sample_id) {
+                    auto& trim = results_trims[bam_region_id][sample_id];
+                    if (!secondary::is_trim_info_valid(trim)) {
+                        continue;
+                    }
+                    filt_local_samples.emplace_back(std::move(local_samples[sample_id]));
+                    filt_trims.emplace_back(std::move(trim));
+                }
+                results_samples[bam_region_id] = std::move(filt_local_samples);
+                results_trims[bam_region_id] = std::move(filt_trims);
+            } catch (const std::exception& e) {
+                if (continue_on_exception) {
+                    spdlog::warn("Caught exception in merge_and_split_bam_regions: '{}'", e.what());
+                } else {
+                    ret_val = {.exception_thrown = true,
+                               .message = "Caught exception in merge_and_split_bam_regions: '" +
+                                          std::string(e.what()) + "'"};
+                    worker_terminate = true;
+                    return;
+                }
             }
-            results_samples[bam_region_id] = std::move(filt_local_samples);
-            results_trims[bam_region_id] = std::move(filt_trims);
         }
     };
 
@@ -596,18 +632,28 @@ merge_and_split_bam_regions_in_parallel(
     cxxpool::thread_pool pool{std::size(thread_chunks)};
     std::vector<std::future<void>> futures;
     futures.reserve(std::size(thread_chunks));
+    std::vector<WorkerReturnStatus> worker_return_vals(std::size(thread_chunks));
     for (size_t tid = 0; tid < std::size(thread_chunks); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
         futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
-                                       std::ref(merged_samples), std::ref(merged_trims)));
+                                       std::ref(merged_samples), std::ref(merged_trims),
+                                       std::ref(worker_return_vals[tid])));
     }
-    try {
-        for (auto& f : futures) {
-            f.get();
+
+    for (auto& f : futures) {
+        f.get();
+    }
+
+    for (size_t tid = 0; tid < std::size(worker_return_vals); ++tid) {
+        const WorkerReturnStatus& rv = worker_return_vals[tid];
+        if (!rv.exception_thrown) {
+            continue;
         }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from merge-samples task: ") +
-                                 e.what()};
+        if (!continue_on_exception) {
+            throw std::runtime_error{"(merge-samples) " + rv.message};
+        } else {
+            spdlog::warn("(merge-samples) " + rv.message);
+        }
     }
 
     // Flatten the samples obtained for each BAM region.
@@ -633,30 +679,51 @@ merge_and_split_bam_regions_in_parallel(
     return {results_samples, results_trims};
 }
 
+/**
+ * \brief For each input window (region of the draft) runs the given encoder and produces a sample.
+ *          The BamFile handels are used to fetch the pileup data and encode regions.
+ *          Encoding is parallelized, where the actual number of threads is min(bam_handles.size(), num_threads, windows.size()).
+ */
 std::vector<secondary::Sample> encode_windows_in_parallel(
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+        std::atomic<bool>& worker_terminate,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const dorado::Span<const secondary::Window> windows,
-        const int32_t num_threads) {
+        const int32_t num_threads,
+        const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
 
     // Worker function, each thread computes tensors for a set of windows assigned to it.
     const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
-                            std::vector<secondary::Sample>& results) {
+                            std::vector<secondary::Sample>& results, WorkerReturnStatus& ret_val) {
         utils::ScopedProfileRange spr2("encode_windows_in_parallel-worker", 4);
 
         for (int32_t i = start; i < end; ++i) {
-            const auto& window = windows[i];
-            const std::string& name = draft_lens[window.seq_id].first;
-            if (thread_id == 0) {
-                spdlog::trace(
-                        "[start = {}, end = {}] Encoding i = {}, region = "
-                        "{}:{}-{} ({} %).",
-                        start, end, i, name, window.start, window.end,
-                        100.0 * static_cast<double>(i - start) / (end - start));
+            if (worker_terminate) {
+                return;
             }
-            results[i] = encoders[thread_id]->encode_region(name, window.start, window.end,
-                                                            window.seq_id);
+            try {
+                const auto& window = windows[i];
+                const std::string& name = draft_lens[window.seq_id].first;
+                if (thread_id == 0) {
+                    spdlog::trace(
+                            "[start = {}, end = {}] Encoding i = {}, region = "
+                            "{}:{}-{} ({} %).",
+                            start, end, i, name, window.start, window.end,
+                            100.0 * static_cast<double>(i - start) / (end - start));
+                }
+                results[i] = encoders[thread_id]->encode_region(name, window.start, window.end,
+                                                                window.seq_id);
+
+            } catch (const std::exception& e) {
+                if (continue_on_exception) {
+                    spdlog::warn(e.what());
+                } else {
+                    ret_val = {.exception_thrown = true, .message = e.what()};
+                    worker_terminate = true;
+                    return;
+                }
+            }
         }
     };
 
@@ -674,23 +741,35 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
 
     std::vector<secondary::Sample> results(std::size(windows));
 
+    std::vector<WorkerReturnStatus> worker_return_vals(std::size(thread_chunks));
+
     // Add jobs to the pool.
     for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
-        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end, std::ref(results)));
+        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end, std::ref(results),
+                                       std::ref(worker_return_vals[tid])));
     }
 
-    // Join and catch errors.
-    try {
-        for (auto& f : futures) {
-            f.get();
+    for (auto& f : futures) {
+        f.get();
+    }
+
+    for (size_t tid = 0; tid < std::size(worker_return_vals); ++tid) {
+        const WorkerReturnStatus& rv = worker_return_vals[tid];
+        if (!rv.exception_thrown) {
+            continue;
         }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from encoding task: ") + e.what()};
+        if (!continue_on_exception) {
+            throw std::runtime_error{rv.message};
+        } else {
+            spdlog::warn(rv.message);
+        }
     }
 
     return results;
 }
+
+}  // namespace
 
 std::vector<secondary::Window> create_windows_from_regions(
         const std::vector<secondary::Region>& regions,
@@ -744,7 +823,10 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_len,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
-                     utils::AsyncQueue<InferenceData>& infer_data) {
+                     const bool continue_on_exception,
+                     utils::AsyncQueue<InferenceData>& infer_data,
+                     std::atomic<bool>& worker_terminate,
+                     WorkerReturnStatus& ret_status) {
     utils::ScopedProfileRange spr1("sample_producer", 2);
 
     spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
@@ -791,10 +873,10 @@ void sample_producer(PolisherResources& resources,
 
             // Encode samples in parallel. Non-const by design, data will be moved.
             std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
-                    resources.encoders, draft_lens,
+                    resources.encoders, worker_terminate, draft_lens,
                     Span<const secondary::Window>(std::data(windows) + window_id_start,
                                                   num_windows),
-                    num_threads);
+                    num_threads, continue_on_exception);
 
             spdlog::trace(
                     "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = "
@@ -803,12 +885,13 @@ void sample_producer(PolisherResources& resources,
 
             // Passing only one const encoder because it only calls const functions without sideeffects.
             auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
-                    region_samples, resources.encoders,
+                    region_samples, worker_terminate, resources.encoders,
                     Span<const secondary::Window>(std::data(bam_regions) + region_id_start,
                                                   num_regions),
                     Span<const secondary::Interval>(
                             std::data(bam_region_intervals) + region_id_start, num_regions),
-                    num_threads, window_len, window_overlap, window_id_start);
+                    num_threads, window_len, window_overlap, window_id_start,
+                    continue_on_exception);
 
             if (std::size(samples) != std::size(trims)) {
                 throw std::runtime_error(
@@ -846,8 +929,18 @@ void sample_producer(PolisherResources& resources,
                 }
             }
         } catch (const std::exception& e) {
+            if (!continue_on_exception) {
+                // Cannot throw because this is a worker function intended to run on a separate thread.
+                // Instead, communicate the error and return.
+                ret_status = {.exception_thrown = true, .message = e.what()};
+                worker_terminate = true;
+                infer_data.terminate();
+                return;
+            }
+
             spdlog::warn(
-                    "Caught exception in the sample producer. Skipping the remaining regions in "
+                    "Caught exception in the sample producer. Skipping the remaining regions "
+                    "in "
                     "current batch (region_id_start = {}, region_id_end = {}). Exception: {}",
                     region_id_start, region_id_end, e.what());
             continue;
@@ -871,9 +964,11 @@ void infer_samples_in_parallel(
         utils::AsyncQueue<InferenceData>& batch_queue,
         utils::AsyncQueue<DecodeData>& decode_queue,
         std::vector<std::shared_ptr<secondary::ModelTorchBase>>& models,
+        std::atomic<bool>& worker_terminate,
         const std::vector<c10::optional<c10::Stream>>& streams,
         const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
-        [[maybe_unused]] const std::vector<std::pair<std::string, int64_t>>& draft_lens) {
+        [[maybe_unused]] const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("infer_samples_in_parallel", 2);
 
     if (std::empty(models)) {
@@ -955,8 +1050,8 @@ void infer_samples_in_parallel(
 
             try {
                 output = model.predict_on_batch(std::move(batch_features_tensor));
-            } catch (std::exception& e) {
-                spdlog::error("ERROR! Exception caught: {}", e.what());
+            } catch (const std::exception& e) {
+                spdlog::error("Exception caught: {}", e.what());
                 throw;
             }
 
@@ -1001,7 +1096,8 @@ void infer_samples_in_parallel(
     };
 
     const auto worker = [&](const int32_t tid, secondary::ModelTorchBase& model,
-                            [[maybe_unused]] const c10::optional<c10::Stream>& stream) {
+                            [[maybe_unused]] const c10::optional<c10::Stream>& stream,
+                            WorkerReturnStatus& ret_val) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-worker", 3);
 
 #if DORADO_CUDA_BUILD
@@ -1010,7 +1106,7 @@ void infer_samples_in_parallel(
 
         at::InferenceMode infer_guard;
 
-        while (true) {
+        while (!worker_terminate) {
             utils::ScopedProfileRange spr3("infer_samples_in_parallel-worker-while", 4);
 
             spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
@@ -1049,10 +1145,18 @@ void infer_samples_in_parallel(
                 decode_queue.try_push(std::move(out_item));
 
             } catch (const std::exception& e) {
-                spdlog::warn(
-                        "Caught exception when inferring a batch of samples. Skipping this "
-                        "batch. Exception: {}",
-                        e.what());
+                if (continue_on_exception) {
+                    spdlog::warn(
+                            "Caught exception while inferring a batch of samples: '{}'. Skipping "
+                            "this batch.",
+                            e.what());
+                } else {
+                    ret_val = {.exception_thrown = true,
+                               .message = "Caught exception while inferring a batch of samples: '" +
+                                          std::string(e.what()) + "'"};
+                    worker_terminate = true;
+                    return;
+                }
             }
         }
     };
@@ -1066,22 +1170,33 @@ void infer_samples_in_parallel(
     const size_t num_threads = std::min(std::size(models), std::size(encoders));
     cxxpool::thread_pool pool{num_threads};
 
+    std::vector<WorkerReturnStatus> worker_return_vals(num_threads);
+
     std::vector<std::future<void>> futures;
     futures.reserve(num_threads);
 
     for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid, std::ref(*models[tid]), streams[tid]));
+        futures.emplace_back(pool.push(worker, tid, std::ref(*models[tid]), streams[tid],
+                                       std::ref(worker_return_vals[tid])));
     }
 
-    try {
-        for (auto& f : futures) {
-            f.get();
-        }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from inference task: ") + e.what()};
+    for (auto& f : futures) {
+        f.get();
     }
 
     decode_queue.terminate();
+
+    for (size_t tid = 0; tid < std::size(worker_return_vals); ++tid) {
+        const WorkerReturnStatus& rv = worker_return_vals[tid];
+        if (!rv.exception_thrown) {
+            continue;
+        }
+        if (!continue_on_exception) {
+            throw std::runtime_error{"(infer-samples) " + rv.message};
+        } else {
+            spdlog::warn("(infer-samples) " + rv.message);
+        }
+    }
 
     spdlog::debug("[infer_samples_in_parallel] Finished running inference.");
 }
@@ -1090,10 +1205,13 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 std::vector<secondary::VariantCallingSample>& results_vc_data,
                                 utils::AsyncQueue<DecodeData>& decode_queue,
                                 secondary::Stats& stats,
+                                std::atomic<bool>& worker_terminate,
+                                polisher::WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
-                                const bool collect_vc_data) {
+                                const bool collect_vc_data,
+                                const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("decode_samples_in_parallel", 2);
 
     auto batch_decode = [&decoder, &stats, min_depth](const DecodeData& item, const int32_t tid) {
@@ -1229,11 +1347,12 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
 
     const auto worker = [&](const int32_t tid,
                             std::vector<std::vector<secondary::ConsensusResult>>& thread_results,
-                            std::vector<secondary::VariantCallingSample>& thread_vc_data) {
+                            std::vector<secondary::VariantCallingSample>& thread_vc_data,
+                            WorkerReturnStatus& ret_val) {
         utils::ScopedProfileRange spr2("decode_samples_in_parallel-worker", 3);
         at::InferenceMode infer_guard;
 
-        while (true) {
+        while (!worker_terminate) {
             utils::ScopedProfileRange spr3("decode_samples_in_parallel-worker-while", 4);
 
             DecodeData item;
@@ -1293,6 +1412,14 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                 }
 
             } catch (const std::exception& e) {
+                if (!continue_on_exception) {
+                    ret_val = {.exception_thrown = true,
+                               .message = std::string("Caught exception while decoding samples: '" +
+                                                      std::string(e.what()) + "'")};
+                    worker_terminate = true;
+                    return;
+                }
+
                 spdlog::warn(
                         "Caught an exception when decoding a batch of samples. Skipping this "
                         "batch. Exception: {}",
@@ -1307,20 +1434,35 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
 
     cxxpool::thread_pool pool{static_cast<size_t>(num_threads)};
 
+    std::vector<WorkerReturnStatus> worker_return_vals(num_threads);
+
     std::vector<std::future<void>> futures;
     futures.reserve(num_threads);
 
     for (int32_t tid = 0; tid < static_cast<int32_t>(num_threads); ++tid) {
         futures.emplace_back(pool.push(worker, tid, std::ref(thread_results[tid]),
-                                       std::ref(thread_vc_data[tid])));
+                                       std::ref(thread_vc_data[tid]),
+                                       std::ref(worker_return_vals[tid])));
     }
 
-    try {
-        for (auto& f : futures) {
-            f.get();
+    for (auto& f : futures) {
+        f.get();
+    }
+
+    for (size_t tid = 0; tid < std::size(worker_return_vals); ++tid) {
+        const WorkerReturnStatus& rv = worker_return_vals[tid];
+        if (!rv.exception_thrown) {
+            continue;
         }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception from inference task: ") + e.what()};
+        if (!continue_on_exception) {
+            // Cannot throw because this is a worker function intended to run on a separate thread.
+            // Instead, communicate the error and return.
+            ret_status = rv;
+            worker_terminate = true;
+            return;
+        } else {
+            spdlog::warn(rv.message);
+        }
     }
 
     // Flatten the results.
@@ -1420,6 +1562,8 @@ std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_cons
 }
 
 std::vector<secondary::Variant> call_variants(
+        std::atomic<bool>& worker_terminate,
+        secondary::Stats& stats,
         const secondary::Interval& region_batch,
         const std::vector<secondary::VariantCallingSample>& vc_input_data,
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
@@ -1428,7 +1572,7 @@ std::vector<secondary::Variant> call_variants(
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
-        secondary::Stats& stats) {
+        const bool continue_on_exception) {
     // Group samples by sequence ID.
     std::vector<std::vector<std::pair<int64_t, int32_t>>> groups(region_batch.length());
     for (int32_t i = 0; i < dorado::ssize(vc_input_data); ++i) {
@@ -1455,7 +1599,7 @@ std::vector<secondary::Variant> call_variants(
     // Worker for parallel processing.
     const auto worker = [&](const int32_t tid, const int32_t start, const int32_t end,
                             std::vector<std::vector<secondary::Variant>>& results,
-                            secondary::Stats& ps) {
+                            secondary::Stats& ps, WorkerReturnStatus& ret_val) {
         if ((start < 0) || (start >= end) || (end > dorado::ssize(results))) {
             throw std::runtime_error("Worker group_id is out of bounds! start = " +
                                      std::to_string(start) + ", end = " + std::to_string(end) +
@@ -1463,6 +1607,10 @@ std::vector<secondary::Variant> call_variants(
         }
 
         for (int32_t group_id = start; group_id < end; ++group_id) {
+            if (worker_terminate) {
+                return;
+            }
+
             const int64_t seq_id = group_id + region_batch.start;
             const std::string& header = draft_lens[seq_id].first;
 
@@ -1484,7 +1632,6 @@ std::vector<secondary::Variant> call_variants(
                 const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
 
                 // Break and merge samples on non-variant positions.
-                // const auto joined_samples = join_samples(vc_input_data, group, trims, draft, decoder);
                 const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
 
                 for (const auto& vc_sample : joined_samples) {
@@ -1500,12 +1647,22 @@ std::vector<secondary::Variant> call_variants(
                                              std::make_move_iterator(std::end(variants)));
                 }
             } catch (const std::exception& e) {
-                spdlog::warn(
-                        "Caught an exception in the call_variants::worker (tid = {}, group_id = "
-                        "{}, seq_id = {}, header = '{}'). Not returning any variants for this "
-                        "group. Original exception: '{}'",
-                        tid, group_id, seq_id, header, e.what());
+                std::ostringstream oss;
+                oss << "Caught an exception in the call_variants::worker (tid = " << tid
+                    << ", group_id = " << group_id << ", seq_id = " << seq_id << ", header = '"
+                    << header
+                    << "'). Not returning any variants for this group. Original message: '"
+                    << e.what() << "'";
+
                 results[group_id].clear();
+
+                if (!continue_on_exception) {
+                    ret_val = {.exception_thrown = true, .message = oss.str()};
+                    worker_terminate = true;
+                    return;
+                }
+
+                spdlog::warn(oss.str());
             }
         }
     };
@@ -1523,6 +1680,8 @@ std::vector<secondary::Variant> call_variants(
 
     // Reserve the space for results for each individual group.
     std::vector<std::vector<secondary::Variant>> thread_results(std::size(groups));
+
+    std::vector<WorkerReturnStatus> worker_return_vals(std::size(thread_chunks));
 
 #ifdef DEBUG_VC_DATA
     {
@@ -1572,17 +1731,25 @@ std::vector<secondary::Variant> call_variants(
     for (int32_t tid = 0; tid < static_cast<int32_t>(std::size(thread_chunks)); ++tid) {
         const auto [chunk_start, chunk_end] = thread_chunks[tid];
         futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end,
-                                       std::ref(thread_results), std::ref(stats)));
+                                       std::ref(thread_results), std::ref(stats),
+                                       std::ref(worker_return_vals[tid])));
     }
 
     // Join and catch exceptions.
-    try {
-        for (auto& f : futures) {
-            f.get();
+    for (auto& f : futures) {
+        f.get();
+    }
+
+    for (size_t tid = 0; tid < std::size(worker_return_vals); ++tid) {
+        const WorkerReturnStatus& rv = worker_return_vals[tid];
+        if (!rv.exception_thrown) {
+            continue;
         }
-    } catch (const std::exception& e) {
-        throw std::runtime_error{std::string("Caught exception when computing variants: ") +
-                                 e.what()};
+        if (!continue_on_exception) {
+            throw std::runtime_error{"(call variants) " + rv.message};
+        } else {
+            spdlog::warn("(call variants) " + rv.message);
+        }
     }
 
     // Flatten the results.

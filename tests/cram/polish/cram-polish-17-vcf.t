@@ -93,4 +93,4 @@ Both --vcf and --gvcf are specified, this should fail.
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Both --vcf and --gvcf are specified. Only one of these options can be used.
+  Both --vcf and --gvcf are specified. Only one of these options can be used.

@@ -381,11 +381,10 @@ secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_nam
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);
     } catch (const std::exception& e) {
-        spdlog::warn(
-                "[EncoderReadAlignment] Could not encode region: {}:{}-{}! Caught error: '{}'. "
-                "Returning empty.",
-                ref_name, ref_start + 1, ref_end, e.what());
-        return {};
+        std::ostringstream oss;
+        oss << "[EncoderReadAlignment] Could not encode region: " << ref_name << ':'
+            << (ref_start + 1) << '-' << ref_end << "! Original message: '" << e.what() << "'";
+        throw std::runtime_error{oss.str()};
     }
 
     if (!tensors.counts.numel()) {

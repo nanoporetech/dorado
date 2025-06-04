@@ -33,7 +33,7 @@ Attempt to download a model which is not available.
   Exit code: 1
   0
   0
-  Caught exception: Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0'.
+  Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0'.
 
 ##############################################
 ### Test auto-resolve from the Basecaller  ###
@@ -108,7 +108,7 @@ Negative test: no dwells in data, but the model uses them for polishing.
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   1
-  [error] Caught exception: Input data does not contain move tables, but a model which requires move tables has been chosen.
+  [error] Input data does not contain move tables, but a model which requires move tables has been chosen.
   [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: Basecaller model specified in the BAM does not match the Basecaller model specified in the Variant Calling model.
@@ -127,7 +127,7 @@ Negative test: Basecaller model specified in the BAM does not match the Basecall
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Caught exception: Variant calling model is not compatible with the input BAM!
+  [error] Variant calling model is not compatible with the input BAM!
   [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Passing test with warnings: no dwells in data, but the model uses them for polishing.
@@ -188,7 +188,7 @@ Negative test: A Polishing model is provided instead of a Variant Calling model.
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Caught exception: Incompatible model label scheme! Expected DiploidLabelScheme but got HaploidLabelScheme.
+  [error] Incompatible model label scheme! Expected DiploidLabelScheme but got HaploidLabelScheme.
   [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Passing test with warnings: A Polishing model is provided instead of a Variant Calling model
@@ -222,7 +222,7 @@ Negative test: Cannot resolve the model, it does not match a Basecaller model, a
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Could not resolve model from string: 'unknown'.
+  Could not resolve model from string: 'unknown'.
 
 Negative test: Empty model string provided.
   $ rm -rf out; mkdir -p out
@@ -233,7 +233,7 @@ Negative test: Empty model string provided.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Could not resolve model from string: ''.
+  Could not resolve model from string: ''.
 
 Negative test: BAM has a model which is not available for download in auto mode.
   $ rm -rf out; mkdir -p out
@@ -248,7 +248,7 @@ Negative test: BAM has a model which is not available for download in auto mode.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
+  Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
 
 Negative test: using 'auto' but the BAM has no models listed (no RG tags).
   $ rm -rf out; mkdir -p out
@@ -263,7 +263,7 @@ Negative test: using 'auto' but the BAM has no models listed (no RG tags).
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header.
+  Input BAM file has no basecaller models listed in the header.
 
 Negative test: Using `auto` and `--skip-model-compatibility-check`, but BAM has no models listed (no RG tags), so this should fail even without compatibility check.
   $ rm -rf out; mkdir -p out
@@ -278,4 +278,4 @@ Negative test: Using `auto` and `--skip-model-compatibility-check`, but BAM has 
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 1
-  Caught exception: Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.
+  Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.

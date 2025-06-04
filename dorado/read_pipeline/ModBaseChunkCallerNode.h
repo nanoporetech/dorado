@@ -56,6 +56,11 @@ class ModBaseChunkCallerNode : public MessageSink {
     };
 
 public:
+    struct EncodingData {
+        std::vector<uint64_t> seq_to_sig_map;
+        std::vector<int> int_seq;
+    };
+
     ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                            size_t num_threads,
                            size_t canonical_stride,
@@ -89,6 +94,10 @@ public:
             const int64_t context_samples_before,
             const int64_t context_samples_after,
             const bool end_align_last_chunk);
+
+    static std::vector<bool> get_skip_positions(
+            const std::vector<uint64_t>& seq_to_sig_map,
+            const std::vector<std::pair<uint64_t, uint64_t>>& merged_chunks);
 
 private:
     using ModBaseChunks = std::vector<std::unique_ptr<ModBaseChunkCallerNode::ModBaseChunk>>;
@@ -146,18 +155,24 @@ private:
     std::atomic<int64_t> m_num_partial_batches_called{0};
     std::atomic<int64_t> m_num_samples_processed_incl_padding{0};
 
+    std::atomic<size_t> m_num_chunks{0};
+    std::atomic<int64_t> m_model_ms{0};
+    std::atomic<int64_t> m_sequence_encode_ms{0};
+
     const bool m_pad_end_align{0};
+    // Used to minimise the CPU work to encode CG contexts
+    const bool m_minimal_encode{false};
 
     void validate_runners() const;
 
     void initialise_base_mod_probs(ReadCommon& read) const;
 
-    bool populate_modbase_data(ModBaseData& modbase_data,
-                               const modbase::RunnerPtr& runner,
-                               const std::string& seq,
-                               const at::Tensor& signal,
-                               const std::vector<uint8_t>& moves,
-                               const std::string& read_id) const;
+    std::optional<EncodingData> populate_modbase_data(ModBaseData& modbase_data,
+                                                      const modbase::RunnerPtr& runner,
+                                                      const std::string& seq,
+                                                      const at::Tensor& signal,
+                                                      const std::vector<uint8_t>& moves,
+                                                      const std::string& read_id) const;
 
     bool populate_hits_seq(PerBaseIntVec& context_hits_seq,
                            const std::string& seq,
@@ -175,7 +190,12 @@ private:
     void populate_encoded_kmer(std::vector<int8_t>& encoded_kmer,
                                const size_t raw_samples,
                                const std::vector<int>& int_seq,
-                               const std::vector<uint64_t>& seq_to_sig_map) const;
+                               const std::vector<uint64_t>& seq_to_sig_map,
+                               const std::vector<bool>& base_skips) const;
+
+    std::vector<bool> get_minimal_encoding_skips(const modbase::RunnerPtr& runner,
+                                                 const std::vector<ModBaseChunks>& chunks_by_caller,
+                                                 const EncodingData& encoding_data) const;
 
     template <typename ReadType>
     void add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
@@ -188,6 +208,10 @@ private:
     std::vector<ModBaseChunks> get_chunks(const modbase::RunnerPtr& runner,
                                           const std::shared_ptr<WorkingRead>& working_read,
                                           const bool is_template) const;
+
+    std::vector<std::pair<uint64_t, uint64_t>> merge_chunks(
+            const std::vector<ModBaseChunks>& chunks_by_caller,
+            const std::vector<uint64_t>& chunk_sizes) const;
 };
 
 }  // namespace dorado

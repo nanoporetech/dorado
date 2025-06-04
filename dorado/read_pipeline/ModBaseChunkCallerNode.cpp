@@ -7,6 +7,7 @@
 #include "utils/dev_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/stats.h"
 #include "utils/thread_naming.h"
 #include "utils/types.h"
 
@@ -37,10 +38,26 @@
 
 namespace {
 using namespace std::chrono_literals;
-
-}  // namespace
+}
 
 namespace dorado {
+namespace {
+
+bool activate_minimal_cg_encoding(const std::vector<modbase::RunnerPtr>& model_runners) {
+    if (model_runners.empty() || model_runners[0]->num_models() > 1) {
+        return false;
+    }
+
+    if (model_runners[0]->model_params(0).mods.motif == "CG" &&
+        utils::get_dev_opt("modbase_min_encode", 1)) {
+        spdlog::trace("Activated minimal encoding for CG context");
+        return true;
+    }
+
+    return false;
+};
+
+}  // namespace
 
 constexpr auto FORCE_TIMEOUT = 100ms;
 
@@ -86,7 +103,8 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
           m_kmer_len(m_runners.at(0)->model_params(0).context.kmer_len),
           m_is_rna_model(m_runners.at(0)->model_params(0).context.reverse),
           m_processed_chunks(m_runners.size() * 8 * m_batch_size),
-          m_pad_end_align(utils::get_dev_opt<bool>("modbase_pad_end_align", 0)) {
+          m_pad_end_align(utils::get_dev_opt<bool>("modbase_pad_end_align", 0)),
+          m_minimal_encode(activate_minimal_cg_encoding(m_runners)) {
     init_modbase_info();
     validate_runners();
 
@@ -326,15 +344,15 @@ void ModBaseChunkCallerNode::populate_hits_sig(PerBaseIntVec& per_base_hits_sig,
     }
 }
 
-void ModBaseChunkCallerNode::populate_encoded_kmer(
-        std::vector<int8_t>& encoded_kmer,
-        const std::size_t signal_len,
-        const std::vector<int>& int_seq,
-        const std::vector<uint64_t>& seq_to_sig_map) const {
+void ModBaseChunkCallerNode::populate_encoded_kmer(std::vector<int8_t>& encoded_kmer,
+                                                   const std::size_t signal_len,
+                                                   const std::vector<int>& int_seq,
+                                                   const std::vector<uint64_t>& seq_to_sig_map,
+                                                   const std::vector<bool>& base_skips) const {
     nvtx3::scoped_range range{"pop_enc_kmer"};
     if (m_sequence_stride_ratio == 1) {
-        encoded_kmer = modbase::encode_kmer_chunk(int_seq, seq_to_sig_map, m_kmer_len, signal_len,
-                                                  0, true);
+        encoded_kmer = modbase::encode_kmer_chunk(int_seq, seq_to_sig_map, base_skips, m_kmer_len,
+                                                  signal_len, 0, true);
         return;
     }
 
@@ -345,8 +363,136 @@ void ModBaseChunkCallerNode::populate_encoded_kmer(
             seq_to_sig_map.cbegin(), seq_to_sig_map.cend(), std::back_inserter(strided_s2s),
             [ssr = m_sequence_stride_ratio](const std::uint64_t value) { return value / ssr; });
 
-    encoded_kmer = modbase::encode_kmer_chunk(int_seq, strided_s2s, m_kmer_len,
+    encoded_kmer = modbase::encode_kmer_chunk(int_seq, strided_s2s, base_skips, m_kmer_len,
                                               signal_len / m_sequence_stride_ratio, 0, true);
+}
+
+std::vector<bool> ModBaseChunkCallerNode::get_minimal_encoding_skips(
+        const modbase::RunnerPtr& runner,
+        const std::vector<ModBaseChunks>& chunks_by_caller,
+        const EncodingData& encoding_data) const {
+    if (!m_minimal_encode) {
+        return {};
+    }
+
+    nvtx3::scoped_range range{"min_encode"};
+    std::vector<uint64_t> chunk_sizes;
+    chunk_sizes.reserve(runner->num_models());
+    for (size_t model_id = 0; model_id < runner->num_models(); model_id++) {
+        chunk_sizes.push_back(
+                static_cast<uint64_t>(runner->model_params(model_id).context.chunk_size));
+    }
+
+    // Get contiguous intervals from all models and chunks.
+    const auto merged_chunks = merge_chunks(chunks_by_caller, chunk_sizes);
+    if (merged_chunks.empty()) {
+        throw std::runtime_error("Failed to merge modbase chunks");
+    }
+
+    return get_skip_positions(encoding_data.seq_to_sig_map, merged_chunks);
+}
+
+std::vector<std::pair<uint64_t, uint64_t>> ModBaseChunkCallerNode::merge_chunks(
+        const std::vector<ModBaseChunks>& chunks_by_caller,
+        const std::vector<uint64_t>& chunk_sizes) const {
+    nvtx3::scoped_range range{"merge_chunks"};
+
+    using Item = std::tuple<uint64_t, size_t, size_t>;
+
+    // Sort the minHeap by chunk_size
+    auto cmp = [](const Item& a, const Item& b) { return std::get<0>(a) > std::get<0>(b); };
+    std::priority_queue<Item, std::vector<Item>, decltype(cmp)> minHeap(cmp);
+
+    size_t max_chunks = 0;
+    // Initialize heap with the first element of each non‐empty list
+    for (size_t model_id = 0; model_id < chunk_sizes.size(); ++model_id) {
+        if (!chunks_by_caller[model_id].empty()) {
+            minHeap.emplace(chunks_by_caller[model_id][0]->signal_start, model_id, 0);
+            max_chunks += chunks_by_caller[model_id].size();
+        }
+    }
+
+    // Contiguous intervals from all models and chunks.
+    std::vector<std::pair<uint64_t, uint64_t>> merged;
+    merged.reserve(max_chunks);
+
+    // Push new interval - if it overlaps with previous interval merge it.
+    // Because the minHeap is sorted by the chunk_start we can do this in one pass.
+    auto push_interval = [&](const uint64_t start, const uint64_t end) {
+        if (merged.empty() || start > merged.back().second) {
+            // Add new interval
+            merged.emplace_back(start, end);
+        } else {
+            // Extend the interval
+            merged.back().second = std::max(merged.back().second, end);
+        }
+    };
+
+    // Do all the work in the heap.
+    while (!minHeap.empty()) {
+        const auto [chunk_start, model_id, chunk_index] = minHeap.top();
+        minHeap.pop();
+
+        // Add / merge this interval
+        push_interval(chunk_start, chunk_start + chunk_sizes.at(model_id));
+
+        // Add the next chunk from this model if any
+        const size_t next_index = chunk_index + 1;
+        if (next_index < chunks_by_caller[model_id].size()) {
+            minHeap.emplace(chunks_by_caller[model_id][next_index]->signal_start, model_id,
+                            next_index);
+        }
+    }
+
+    return merged;
+}
+
+std::vector<bool> ModBaseChunkCallerNode::get_skip_positions(
+        const std::vector<uint64_t>& seq_to_sig_map,
+        const std::vector<std::pair<uint64_t, uint64_t>>& merged_chunks) {
+    if (seq_to_sig_map.empty() || merged_chunks.empty()) {
+        return {};
+    }
+
+    nvtx3::scoped_range range{"encode_skips"};
+
+    std::vector<bool> skips(seq_to_sig_map.size(), true);
+
+    // const size_t N = seq_to_sig_map.size();
+    for (auto [start, end] : merged_chunks) {
+        // Find left edge where signal_pos >= start
+        auto it_left = std::lower_bound(seq_to_sig_map.begin(), seq_to_sig_map.end(), start);
+        if (it_left == seq_to_sig_map.end()) {
+            // all positions are less than start → no overlap
+            continue;
+        }
+        size_t left = it_left - seq_to_sig_map.begin();
+
+        // Find right edge where signal_pos <= end
+        auto it_right = std::upper_bound(seq_to_sig_map.begin(), seq_to_sig_map.end(), end);
+        if (it_right == seq_to_sig_map.begin()) {
+            // all positions are greater than end → no overlap
+            continue;
+        }
+        size_t right = (it_right - seq_to_sig_map.begin()) - 1;
+
+        // if the interval is empty, continue:
+        if (left > right) {
+            continue;
+        }
+
+        // Mark all internal positions of chunk
+        for (size_t i = left; i <= right; ++i) {
+            skips[i] = false;
+        }
+
+        // Include the left neighbour - right is ignored because encoding is left -> right
+        if (left > 0 && start > seq_to_sig_map[left - 1] && start < seq_to_sig_map[left]) {
+            skips[left - 1] = false;
+        }
+    }
+
+    return skips;
 }
 
 void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
@@ -482,12 +628,13 @@ void ModBaseChunkCallerNode::add_read_to_working_set(std::unique_ptr<ReadType> r
     }
 }
 
-bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
-                                                   const modbase::RunnerPtr& runner,
-                                                   const std::string& seq,
-                                                   const at::Tensor& signal,
-                                                   const std::vector<uint8_t>& moves,
-                                                   const std::string& read_id) const {
+std::optional<ModBaseChunkCallerNode::EncodingData> ModBaseChunkCallerNode::populate_modbase_data(
+        ModBaseData& mbd,
+        const modbase::RunnerPtr& runner,
+        const std::string& seq,
+        const at::Tensor& signal,
+        const std::vector<uint8_t>& moves,
+        const std::string& read_id) const {
     // For RNA: Pad signal length to be evenly divisible by the canonical stride so that the
     // sequence to signal mapping is always stride aligned and not offset by any remainder
     // in the last move (which becomes the first move when reversed).
@@ -495,7 +642,7 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
             m_is_rna_model ? utils::pad_to(signal.size(0), m_canonical_stride) : signal.size(0);
 
     if (!populate_hits_seq(mbd.per_base_hits_seq, seq, runner)) {
-        return false;
+        return std::nullopt;
     }
 
     std::vector<uint64_t> seq_to_sig_map = get_seq_to_sig_map(moves, signal_len, seq.size() + 1);
@@ -503,7 +650,6 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
 
     populate_hits_sig(mbd.per_base_hits_sig, mbd.per_base_hits_seq, seq_to_sig_map);
     populate_signal(mbd.signal, seq_to_sig_map, signal, int_seq, runner);
-    populate_encoded_kmer(mbd.encoded_kmers, signal_len, int_seq, seq_to_sig_map);
 
     if (signal_len != static_cast<size_t>(mbd.signal.size(0))) {
         spdlog::error("Modbase signal length is incorrect for read:'{}' - {}!={}", read_id,
@@ -511,16 +657,7 @@ bool ModBaseChunkCallerNode::populate_modbase_data(ModBaseData& mbd,
         throw std::runtime_error("Modbase signal processing failed.");
     }
 
-    const std::size_t enc_kmer_size = mbd.encoded_kmers.size();
-    const std::size_t expected =
-            (signal_len / m_sequence_stride_ratio) * m_kmer_len * utils::BaseInfo::NUM_BASES;
-    if (enc_kmer_size != expected) {
-        spdlog::error("Modbase kmer encoding failed for read:'{}' - {}!={}", read_id, enc_kmer_size,
-                      expected);
-        throw std::runtime_error("Modbase kmer encoding failed.");
-    }
-
-    return true;
+    return EncodingData{std::move(seq_to_sig_map), std::move(int_seq)};
 }
 
 void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
@@ -532,21 +669,37 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     auto& read = read_ptr->read_common;
     const std::string read_id = read.read_id;
 
-    stats::Timer timer;
-
     initialise_base_mod_probs(read);
 
     auto working_read = std::make_shared<WorkingRead>();
     auto& modbase_data = working_read->template_data;
 
-    if (!populate_modbase_data(modbase_data, runner, read.seq, read.raw_data, read.moves,
-                               read_id)) {
+    const auto encoding_data = populate_modbase_data(modbase_data, runner, read.seq, read.raw_data,
+                                                     read.moves, read_id);
+    if (!encoding_data) {
         send_message_to_sink(std::move(read_ptr));
         return;
     }
 
     constexpr bool kIsTemplate = true;
     std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
+
+    {
+        stats::Timer timer;
+        const auto base_skips =
+                get_minimal_encoding_skips(runner, chunks_by_caller, *encoding_data);
+        populate_encoded_kmer(modbase_data.encoded_kmers, modbase_data.signal.size(0),
+                              encoding_data->int_seq, encoding_data->seq_to_sig_map, base_skips);
+        m_sequence_encode_ms += timer.GetElapsedMS();
+    }
+    const std::size_t enc_kmer_size = modbase_data.encoded_kmers.size();
+    const std::size_t expected = (modbase_data.signal.size(0) / m_sequence_stride_ratio) *
+                                 m_kmer_len * utils::BaseInfo::NUM_BASES;
+    if (enc_kmer_size != expected) {
+        spdlog::error("Modbase kmer encoding failed for read:'{}' - {}!={}", read_id, enc_kmer_size,
+                      expected);
+        throw std::runtime_error("Modbase kmer encoding failed.");
+    }
 
     add_read_to_working_set(std::move(read_ptr), std::move(working_read));
 
@@ -571,8 +724,6 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
     auto& read_common = read_ptr->read_common;
     auto& read_stereo = read_ptr->stereo_feature_inputs;
     const std::string read_id = read_common.read_id;
-
-    stats::Timer timer;
 
     initialise_base_mod_probs(read_common);
 
@@ -625,9 +776,17 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
             auto signal = simplex_signal.slice(0, moves_offset * m_canonical_stride,
                                                moves_offset * m_canonical_stride + new_signal_len);
 
-            if (!populate_modbase_data(modbase_data, runner, new_seq, signal, new_move_table,
-                                       read_id)) {
+            const auto encoding_data = populate_modbase_data(modbase_data, runner, new_seq, signal,
+                                                             new_move_table, read_id);
+            if (!encoding_data) {
                 continue;
+            }
+
+            {
+                stats::Timer timer;
+                populate_encoded_kmer(modbase_data.encoded_kmers, modbase_data.signal.size(0),
+                                      encoding_data->int_seq, encoding_data->seq_to_sig_map, {});
+                m_sequence_encode_ms += timer.GetElapsedMS();
             }
 
             auto& chunks_by_caller =
@@ -768,8 +927,11 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
             if (batched_chunks.size() != size_t(m_batch_size)) {
                 ++m_num_partial_batches_called;
             }
+            stats::Timer timer;
             // Input tensor is full, let's get scores.
             call_batch(worker_id, model_id, batched_chunks);
+            m_model_ms += timer.GetElapsedMS();
+            m_num_chunks += batched_chunks.size();
         }
 
         previous_chunk_count = batched_chunks.size();
@@ -777,7 +939,10 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
 
     // Basecall any remaining chunks.
     if (!batched_chunks.empty()) {
+        stats::Timer timer;
         call_batch(worker_id, model_id, batched_chunks);
+        m_model_ms += timer.GetElapsedMS();
+        m_num_chunks += batched_chunks.size();
     }
 
     // Reduce the count of active model callers.  If this was the last active
@@ -794,7 +959,6 @@ void ModBaseChunkCallerNode::call_batch(
         std::vector<std::unique_ptr<ModBaseChunk>>& batched_chunks) {
     nvtx3::scoped_range loop{"call_batch"};
 
-    dorado::stats::Timer timer;
     // Results shape (N, strides*preds)
     auto results = m_runners.at(worker_id)->call_chunks(static_cast<int>(model_id),
                                                         static_cast<int>(batched_chunks.size()));
@@ -997,6 +1161,9 @@ std::unordered_map<std::string, double> ModBaseChunkCallerNode::sample_stats() c
         const auto runner_stats = stats::from_obj(*runner);
         stats.insert(runner_stats.begin(), runner_stats.end());
     }
+    stats["sequence_encode_ms"] = double(m_sequence_encode_ms);
+    stats["modbase_model_ms"] = double(m_model_ms);
+    stats["chunks_called"] = double(m_num_chunks);
     stats["batches_called"] = double(m_num_batches_called);
     stats["partial_batches_called"] = double(m_num_partial_batches_called);
     stats["samples_incl_padding"] = double(m_num_samples_processed_incl_padding);
