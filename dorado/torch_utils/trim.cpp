@@ -1,4 +1,4 @@
-#include "trim.h"
+#include "torch_utils/trim.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>

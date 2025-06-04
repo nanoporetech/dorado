@@ -1,45 +1,41 @@
 add_library(dorado_torch_utils
-    auto_detect_device.h    
+    # Public
+    include/torch_utils/auto_detect_device.h
+    include/torch_utils/cuda_utils.h
+    include/torch_utils/duplex_utils.h
+    include/torch_utils/gpu_monitor.h
+    include/torch_utils/gpu_profiling.h
+    include/torch_utils/metal_utils.h
+    include/torch_utils/module_utils.h
+    include/torch_utils/tensor_utils.h
+    include/torch_utils/torch_utils.h
+    include/torch_utils/trim.h
+
+    # Private
     duplex_utils.cpp
-    duplex_utils.h
     gpu_monitor.cpp
-    gpu_monitor.h
-    gpu_profiling.h
-    module_utils.h
     tensor_utils.cpp
-    tensor_utils.h
     torch_utils.cpp
-    torch_utils.h
     trim.cpp
-    trim.h
 )
 
-
 if(APPLE)
-    target_sources(dorado_torch_utils
-        PRIVATE
-        metal_utils.cpp
-        metal_utils.h
-    )
+    target_sources(dorado_torch_utils PRIVATE metal_utils.cpp)
 else()
-    target_sources(dorado_torch_utils
-        PRIVATE
-        cuda_utils.cpp
-        cuda_utils.h
-    )
+    target_sources(dorado_torch_utils PRIVATE cuda_utils.cpp)
 endif()
 
 target_include_directories(dorado_torch_utils
-    INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 # 3rdparty libs should be considered SYSTEM headers
 target_include_directories(dorado_torch_utils
     SYSTEM
     PUBLIC
-    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-    ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
+        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+        ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
 
 target_link_libraries(dorado_torch_utils

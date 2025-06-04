@@ -1,4 +1,4 @@
-#include "metal_utils.h"
+#include "torch_utils/metal_utils.h"
 
 #include <CoreFoundation/CoreFoundation.h>
 #include <IOKit/IOKitLib.h>
