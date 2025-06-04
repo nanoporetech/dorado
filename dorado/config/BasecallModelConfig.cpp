@@ -44,6 +44,7 @@ namespace {
 // Workaround GCC-13 dangling reference warnings by passing an lvalue instead of a temporary
 const std::string QSCORE{"qscore"};
 const std::string POLYA{"poly_a"};
+const std::string CALIBRATION_COEFFS{"calibration_coefficients"};
 const std::string RUN_INFO{"run_info"};
 const std::string SCALING{"scaling"};
 const std::string NORM{"normalisation"};
@@ -84,9 +85,9 @@ void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_
 void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains(keys::POLYA)) {
         const auto &polya = toml::find(config_toml, keys::POLYA);
-        if (polya.contains("calibration_coefficients")) {
+        if (polya.contains(keys::CALIBRATION_COEFFS)) {
             // handle old style models
-            const auto &coeffs = toml::find(polya, "calibration_coefficients");
+            const auto &coeffs = toml::find(polya, keys::CALIBRATION_COEFFS);
             if (coeffs.is_array()) {
                 const auto &coeffs_array = coeffs.as_array();
                 if (std::size(coeffs_array) > 1) {
