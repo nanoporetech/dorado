@@ -1,3 +1,7 @@
+add_subdirectory(architectures)
+add_subdirectory(consensus)
+add_subdirectory(features)
+
 add_library(dorado_secondary
     bam_file.cpp
     bam_file.h
@@ -13,54 +17,7 @@ add_library(dorado_secondary
     variant.h
     vcf_writer.cpp
     vcf_writer.h
-    architectures/model_config.cpp
-    architectures/model_config.h
-    architectures/model_factory.cpp
-    architectures/model_factory.h
-    architectures/model_gru.cpp
-    architectures/model_gru.h
-    architectures/model_latent_space_lstm.cpp
-    architectures/model_latent_space_lstm.h
-    architectures/model_slot_attention_consensus.cpp
-    architectures/model_slot_attention_consensus.h
-    architectures/model_torch_base.cpp
-    architectures/model_torch_base.h
-    architectures/model_torch_script.cpp
-    architectures/model_torch_script.h
-    consensus/consensus_result.h
-    consensus/consensus_utils.cpp
-    consensus/consensus_utils.h
-    consensus/sample.cpp
-    consensus/sample.h
-    consensus/sample_trimming.cpp
-    consensus/sample_trimming.h
-    consensus/variant_calling.cpp
-    consensus/variant_calling.h
-    consensus/variant_calling_sample.cpp
-    consensus/variant_calling_sample.h
-    consensus/window.cpp
-    consensus/window.h
-    features/decoder_base.cpp
-    features/decoder_base.h
-    features/decoder_factory.cpp
-    features/decoder_factory.h
-    features/encoder_base.h
-    features/encoder_counts.cpp
-    features/encoder_counts.h
-    features/encoder_factory.cpp
-    features/encoder_factory.h
-    features/encoder_read_alignment.cpp
-    features/encoder_read_alignment.h
-    features/haplotag_source.h
-    features/kadayashi_utils.cpp
-    features/kadayashi_utils.h
-    features/medaka_bamiter.cpp
-    features/medaka_bamiter.h
-    features/medaka_counts.cpp
-    features/medaka_counts.h
-    features/medaka_read_matrix.cpp
-    features/medaka_read_matrix.h
- )
+)
 
 target_include_directories(dorado_secondary
     INTERFACE
@@ -71,22 +28,22 @@ target_include_directories(dorado_secondary
 target_include_directories(dorado_secondary
     SYSTEM
     PUBLIC
-    ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
-    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-    ${DORADO_3RD_PARTY_SOURCE}/intervaltree
+        ${DORADO_3RD_PARTY_SOURCE}/intervaltree
 )
 
 target_link_libraries(dorado_secondary
     PUBLIC
-        torch_lib
-        dorado_utils
         dorado_torch_utils
+        dorado_utils
     PRIVATE
+        cxxpool
+        dorado_secondary_architectures
+        dorado_secondary_consensus
+        dorado_secondary_features
         dorado_version
         htslib
-        spdlog::spdlog
-        toml11::toml11
         kadayashi::haplotag_lib
+        spdlog::spdlog
 )
 
 enable_warnings_as_errors(dorado_secondary)
