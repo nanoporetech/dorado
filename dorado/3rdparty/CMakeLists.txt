@@ -30,6 +30,12 @@ add_subdirectory(argparse EXCLUDE_FROM_ALL)
 # catch2
 add_subdirectory(catch2 EXCLUDE_FROM_ALL)
 
+# cpp-httplib
+add_library(httplib INTERFACE)
+target_include_directories(httplib SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/cpp-httplib
+)
+
 # cxxpool
 apply_3rdparty_patch(cxxpool)
 add_library(cxxpool INTERFACE)
