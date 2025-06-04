@@ -476,15 +476,6 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
 
         return ret;
     };
-    const auto sets_intersect = [](const std::unordered_set<std::string>& set1,
-                                   const std::unordered_set<std::string>& set2) {
-        for (const auto& val : set1) {
-            if (set2.count(val) > 0) {
-                return true;
-            }
-        }
-        return false;
-    };
 
     std::filesystem::path model_dir;
 
@@ -492,6 +483,19 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         spdlog::info("Input data contains move tables.");
     } else {
         spdlog::info("Input data does not contain move tables.");
+    }
+
+    // Check if any of the input models is a stereo, to report a clear error that this is not supported.
+    for (const std::string& model : bam_info.basecaller_models) {
+        if (model.find("stereo") != std::string::npos) {
+            std::ostringstream oss;
+            oss << "Duplex basecalling models are not supported. Model: '" << model << "'.";
+            if (!any_model) {
+                throw std::runtime_error{oss.str()};
+            } else {
+                spdlog::warn("{} This may produce inferior results.", oss.str());
+            }
+        }
     }
 
     // Fail only if not explicitly permitting any model, or if any model is allowed but the user has specified
@@ -575,9 +579,21 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
             secondary::parse_label_scheme_type(model_config.label_scheme_type) ==
             secondary::LabelSchemeType::DIPLOID;
 
+    const auto check_models_supported =
+            [&model_config](const std::unordered_set<std::string>& basecaller_models) {
+                // Every model from the input BAM needs to be supported.
+                for (const std::string& model : basecaller_models) {
+                    const bool valid = model_config.supported_basecallers.count(model);
+                    if (!valid) {
+                        return false;
+                    }
+                }
+                return true;
+            };
+
     if (!any_model) {
         // Verify that the basecaller model of the loaded config is compatible with the BAM.
-        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+        if (!check_models_supported(bam_info.basecaller_models)) {
             throw std::runtime_error{"Variant calling model is not compatible with the input BAM!"};
         }
 
@@ -600,7 +616,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
 
     } else {
         // Allow to use a model trained on a wrong basecaller model, but emit a warning.
-        if (!sets_intersect(bam_info.basecaller_models, model_config.supported_basecallers)) {
+        if (!check_models_supported(bam_info.basecaller_models)) {
             spdlog::warn(
                     "Variant calling model is not compatible with the input BAM. This may produce "
                     "inferior results.");

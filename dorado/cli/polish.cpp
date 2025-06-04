@@ -649,6 +649,19 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         spdlog::info("Input data does not contain move tables.");
     }
 
+    // Check if any of the input models is a stereo, to report a clear error that this is not supported.
+    for (const std::string& model : bam_info.basecaller_models) {
+        if (model.find("stereo") != std::string::npos) {
+            std::ostringstream oss;
+            oss << "Duplex basecalling models are not supported. Model: '" << model << "'.";
+            if (!any_model) {
+                throw std::runtime_error{oss.str()};
+            } else {
+                spdlog::warn("{} This may produce inferior results.", oss.str());
+            }
+        }
+    }
+
     // Fail only if not explicitly permitting any model, or if any model is allowed but user specified
     // auto model resolution (in which case, the model name needs to be available in the input BAM file).
     if (!any_model ||
