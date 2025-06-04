@@ -1,7 +1,6 @@
+#include "config/ModBaseBatchParams.h"
 
-#include "ModBaseBatchParams.h"
-
-#include "ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 #include "utils/dev_utils.h"
 
 #include <spdlog/spdlog.h>
