@@ -69,7 +69,6 @@ unsigned int get_device_count();
 /// Implementation details, exposed for testing.
 namespace detail {
 std::optional<std::string> parse_nvidia_version_line(std::string_view line);
-std::optional<std::string> parse_nvidia_tegra_line(const std::string& line);
 
 // check whether the given device can queried via NVML
 bool is_accessible_device(unsigned int device_index);

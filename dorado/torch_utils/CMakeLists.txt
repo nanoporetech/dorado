@@ -64,16 +64,13 @@ endif()
 
 if(APPLE)
     find_library(APPLE_FWK_FOUNDATION Foundation REQUIRED)
-    target_link_libraries(dorado_torch_utils
-        PUBLIC
-            ${APPLE_FWK_FOUNDATION}
-    )
     find_library(APPLE_FWK_QUARTZ_CORE QuartzCore REQUIRED)
     find_library(APPLE_FWK_METAL Metal REQUIRED)
     find_library(IOKIT IOKit REQUIRED)
     add_dependencies(dorado_torch_utils metal-lib)
     target_link_libraries(dorado_torch_utils
         PUBLIC
+            ${APPLE_FWK_FOUNDATION}
             ${APPLE_FWK_QUARTZ_CORE}
             ${APPLE_FWK_METAL}
             ${IOKIT}

@@ -98,6 +98,13 @@ DEFINE_TEST("parse_nvidia_version_line parameterised test") {
                     "378.13",
             },
             {
+                    "Valid version line from an Orin",
+                    "NVRM version: NVIDIA UNIX Open Kernel Module for aarch64  540.4.0  Release "
+                    "Build  (buildbrain@mobile-u64-6336-d8000)  Tue Jan  7 17:35:12 PST 2025",
+                    true,
+                    "540.4.0",
+            },
+            {
                     "Missing <info> and patch version",
                     "NVRM version: module name  123.456",
                     true,

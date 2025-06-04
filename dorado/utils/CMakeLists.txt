@@ -94,7 +94,7 @@ target_compile_definitions(dorado_utils
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
     target_compile_definitions(dorado_utils
         PUBLIC
-            DORADO_ORIN=$<VERSION_GREATER_EQUAL:${CUDAToolkit_VERSION},11.0>
+            DORADO_ORIN=TRUE
     )
 else()
     target_compile_definitions(dorado_utils

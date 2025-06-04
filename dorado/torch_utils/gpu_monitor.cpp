@@ -747,21 +747,6 @@ std::optional<std::string> parse_nvidia_version_line(std::string_view line) {
     return std::string(line.substr(version_begin, version_end - version_begin));
 }
 
-std::optional<std::string> parse_nvidia_tegra_line(const std::string &line) {
-    // Based off of the following:
-    // https://forums.developer.nvidia.com/t/how-do-i-know-what-version-of-l4t-my-jetson-tk1-is-running/38893
-
-    // Simple regex should do it.
-    const std::regex search("^# R(\\d+) \\(release\\), REVISION: (\\d+)\\.(\\d+)");
-    std::smatch match;
-    if (!std::regex_search(line, match, search)) {
-        return std::nullopt;
-    }
-
-    // Reconstruct the version.
-    return match[1].str() + "." + match[2].str() + "." + match[3].str();
-}
-
 bool is_accessible_device([[maybe_unused]] unsigned int device_index) {
 #if HAS_NVML
     return DeviceInfoCache::instance().get_device_handle(device_index).has_value();
