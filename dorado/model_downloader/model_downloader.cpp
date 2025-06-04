@@ -1,4 +1,4 @@
-#include "model_downloader.h"
+#include "model_downloader/model_downloader.h"
 
 #include "downloader.h"
 #include "models/models.h"

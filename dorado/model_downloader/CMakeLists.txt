@@ -1,7 +1,10 @@
 add_library(dorado_model_downloader_lib STATIC
-    downloader.h
+    # Public
+    include/model_downloader/model_downloader.h
+
+    # Private
     downloader.cpp
-    model_downloader.h
+    downloader.h
     model_downloader.cpp
 )
 
@@ -25,6 +28,11 @@ target_link_libraries(dorado_model_downloader_lib
         httplib
         OpenSSL::SSL
         spdlog::spdlog
+)
+
+target_include_directories(dorado_model_downloader_lib
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 enable_warnings_as_errors(dorado_model_downloader_lib)
