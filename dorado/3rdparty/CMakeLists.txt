@@ -55,6 +55,12 @@ target_compile_definitions(spdlog PUBLIC
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(elzip EXCLUDE_FROM_ALL)
 
+# intervaltree
+add_library(intervaltree INTERFACE)
+target_include_directories(intervaltree SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/intervaltree
+)
+
 # minimap
 option(ONT_MM2_EXE "Build minimap2 exe" OFF)
 add_subdirectory(ont-minimap2 EXCLUDE_FROM_ALL)

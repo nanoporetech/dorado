@@ -24,13 +24,6 @@ target_include_directories(dorado_secondary
     ${CMAKE_CURRENT_SOURCE_DIR}/..
 )
 
-# 3rdparty libs should be considered SYSTEM headers
-target_include_directories(dorado_secondary
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/intervaltree
-)
-
 target_link_libraries(dorado_secondary
     PUBLIC
         dorado_secondary_architectures
@@ -42,6 +35,7 @@ target_link_libraries(dorado_secondary
         cxxpool
         dorado_version
         htslib
+        intervaltree
         kadayashi::haplotag_lib
         spdlog::spdlog
 )
