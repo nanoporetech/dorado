@@ -3,7 +3,6 @@ add_library(dorado_nn STATIC
     ConvStack.h
     CRFModules.cpp
     CRFModules.h
-    KoiUtils.cpp
     KoiUtils.h
     LinearUpsample.cpp
     LinearUpsample.h
@@ -13,15 +12,13 @@ add_library(dorado_nn STATIC
     TxModules.h
     WorkingMemory.cpp
     WorkingMemory.h
+    metal/MetalModules.h
 )
 
-
 if (APPLE)
-    target_sources(dorado_nn
-        PRIVATE
-        metal/MetalModules.cpp
-        metal/MetalModules.h
-    )
+    target_sources(dorado_nn PRIVATE metal/MetalModules.cpp)
+else()
+    target_sources(dorado_nn PRIVATE KoiUtils.cpp)
 endif()
 
 target_link_libraries(dorado_nn

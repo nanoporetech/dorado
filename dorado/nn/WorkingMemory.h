@@ -4,8 +4,6 @@
 
 namespace dorado::nn {
 
-#if DORADO_CUDA_BUILD
-
 enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C };
 std::string to_string(const TensorLayout & layout);
 
@@ -79,7 +77,5 @@ public:
     int T{0};     // current chunk size (time)
     int C{0};     // current layer size (channels)
 };
-
-#endif
 
 }  // namespace dorado::nn

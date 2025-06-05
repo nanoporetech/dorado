@@ -4,14 +4,7 @@
 
 #include <stdexcept>
 
-#if DORADO_CUDA_BUILD
-#include <ATen/cuda/CUDAContext.h>
-#include <c10/cuda/CUDAGuard.h>
-#endif
-
 namespace dorado::nn {
-
-#if DORADO_CUDA_BUILD
 
 std::string to_string(const TensorLayout &layout) {
     switch (layout) {
@@ -109,7 +102,5 @@ void WorkingMemory::allocate_backing_tensor(torch::Device dev) {
                                   at::TensorOptions().device(dev).dtype(torch::kF16));
     current_bytes = 0;
 }
-
-#endif  // if DORADO_CUDA_BUILD
 
 }  // namespace dorado::nn
