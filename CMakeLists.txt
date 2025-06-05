@@ -165,17 +165,18 @@ add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
+add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
-add_subdirectory(dorado/utils)
-add_subdirectory(dorado/torch_utils)
-add_subdirectory(dorado/models)
-add_subdirectory(dorado/model_downloader)
-add_subdirectory(dorado/basecall)
-add_subdirectory(dorado/nn)
-add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/devtools)
+add_subdirectory(dorado/hts_io)
+add_subdirectory(dorado/modbase)
+add_subdirectory(dorado/model_downloader)
+add_subdirectory(dorado/models)
+add_subdirectory(dorado/nn)
 add_subdirectory(dorado/secondary)
+add_subdirectory(dorado/torch_utils)
+add_subdirectory(dorado/utils)
 
 add_library(dorado_lib
     dorado/alignment/alignment_info.h
@@ -323,8 +324,6 @@ add_library(dorado_lib
     dorado/poly_tail/rna_poly_tail_calculator.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
-    dorado/hts_io/FastxRandomReader.cpp
-    dorado/hts_io/FastxRandomReader.h
     dorado/correct/features.cpp
     dorado/correct/features.h
     dorado/correct/windows.cpp
@@ -375,18 +374,19 @@ endif()
 
 target_link_libraries(dorado_lib
     PUBLIC
-        torch_lib
-        htslib
-        edlib
         dorado_basecall
+        dorado_hts_io
         dorado_modbase
-        dorado_version
         dorado_secondary
+        dorado_version
+        edlib
+        htslib
+        torch_lib
     PRIVATE
-        minimap2
-        toml11::toml11
         cxxpool
         kadayashi::haplotag_lib
+        minimap2
+        toml11::toml11
 )
 
 if(NOT DORADO_DISABLE_DORADO)
