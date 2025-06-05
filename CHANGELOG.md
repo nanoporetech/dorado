@@ -2,6 +2,18 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.0.1] (4 June 2025)
+
+This release introduces support in the `--bacteria` mode of Dorado `polish` for data basecalled with v5.2 models and improves the speed of `5mCG_5hmCG` calling with v5.0 and v5.2 models, along with other enhancements and fixes.
+
+* 4356091e91341728778637bd7c7309c68b2b33e4 - Add v5.2 basecalling model support in `--bacteria` mode of Dorado `polish`
+* 062bad259d7a95df5a6ccce17997115d39fadf56 - Reduce CPU usage of `5mCG_5hmCG` with v5.0 or v5.2 basecalling models
+* 956e57ad843c73dc979c64d5e9e322d953b7bc99 - Dorado `polish` and `variant` now fail on exceptions to avoid dropped data
+* 0fb0867504e3d788ca10a9db51a7b7039655d45d - Dorado `polish` and `variant` allow .fna and .fna.gz as input draft/reference
+* 031eadeaa7e51fa04f10c27636eccfd98b48392e - Dorado `polish` and `variant` give a clearer error message that data from duplex models are not supported
+* 2cf0a47d24953929466b136a25c8cb26041af214 - Add `dna_r10.4.1_e8.2_5khz_stereo@v1.4` model (duplicate of `v1.3`) to avoid Dorado `download`
+name collision
+
 # [1.0.0] (21 May 2025)
 
 We are pleased to announce the release of Dorado v1.0, delivering new models and capabilities for Oxford Nanopore data analysis. This release introduces:
