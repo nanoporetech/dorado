@@ -34,21 +34,20 @@ target_include_directories(dorado_torch_utils
 target_include_directories(dorado_torch_utils
     SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
 )
 
 target_link_libraries(dorado_torch_utils
     PUBLIC
-        torch_lib
         date::date
         edlib
         spdlog::spdlog
+        torch_lib
     PRIVATE
         dorado_compat
         dorado_utils
-        minimap2
         htslib
+        minimap2
         toml11::toml11
 )
 

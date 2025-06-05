@@ -362,7 +362,6 @@ target_include_directories(dorado_lib
 target_include_directories(dorado_lib
     SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
         ${DORADO_3RD_PARTY_SOURCE}/indicators/include
 )
 

@@ -42,19 +42,12 @@ else()
     target_link_libraries(dorado_basecall PRIVATE dorado_benchmarks)
 endif()
 
-target_include_directories(dorado_basecall
-    SYSTEM
-    PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-)
-
-
 target_link_libraries(dorado_basecall
     PUBLIC
-        torch_lib
+        dorado_config
         dorado_torch_utils
         dorado_utils
-        dorado_config
+        torch_lib
     PRIVATE
         dorado_nn
         spdlog::spdlog

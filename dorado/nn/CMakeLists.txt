@@ -24,19 +24,14 @@ if (APPLE)
     )
 endif()
 
-target_include_directories(dorado_nn
-    SYSTEM
-    PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-)
-
 target_link_libraries(dorado_nn
     PUBLIC
-        torch_lib
+        dorado_config
         dorado_torch_utils
         dorado_utils
-        dorado_config
+        torch_lib
     PRIVATE
+        nvtx
         spdlog::spdlog
 )
 

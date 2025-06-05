@@ -17,20 +17,13 @@ add_library(dorado_modbase STATIC
     nn/ModBaseModel.h
 )
 
-target_include_directories(dorado_modbase
-    SYSTEM
-    PUBLIC
-    PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-)
-
 target_link_libraries(dorado_modbase
     PUBLIC
-        torch_lib
         dorado_config
+        torch_lib
     PRIVATE
-        dorado_utils
         dorado_torch_utils
+        dorado_utils
         spdlog::spdlog
 )
 

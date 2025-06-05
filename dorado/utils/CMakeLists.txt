@@ -113,23 +113,17 @@ target_include_directories(dorado_utils
         ${CMAKE_CURRENT_SOURCE_DIR}/.. # TODO: remove this once dependents are fixed
 )
 
-# 3rdparty libs should be considered SYSTEM headers
-target_include_directories(dorado_utils
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-)
-
 target_link_libraries(dorado_utils
     PUBLIC
+        argparse::argparse
         date::date
         edlib
+        nvtx
         spdlog::spdlog
-        argparse::argparse
     PRIVATE
         dorado_compat
-        minimap2
         htslib
+        minimap2
         toml11::toml11
 )
 

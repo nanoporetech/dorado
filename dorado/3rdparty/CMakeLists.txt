@@ -73,6 +73,12 @@ endif()
 # Disable warnings from minimap source
 disable_warnings(minimap2)
 
+# NVTX
+add_library(nvtx INTERFACE)
+target_include_directories(nvtx SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+)
+
 # edlib
 apply_3rdparty_patch(edlib)
 set(BUILD_TESTING OFF)
