@@ -87,14 +87,11 @@ add_executable(dorado_tests
     KadayashiTest.cpp
 )
 
-if (DORADO_GPU_BUILD)
-    if(APPLE)
-        target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
-    else()
-        target_sources(dorado_tests PRIVATE cuda_utils_test.cpp)
-    endif()
+if(APPLE)
+    target_sources(dorado_tests PRIVATE MetalLinearTest.cpp)
+else()
+    target_sources(dorado_tests PRIVATE cuda_utils_test.cpp)
 endif()
-
 
 # dorado_smoke_tests
 add_executable(dorado_smoke_tests

@@ -213,7 +213,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             SKIP("No CUDA devices found: " << error_message);
         }
 #else
-        SKIP("Can't test GPU without DORADO_GPU_BUILD");
+        SKIP("Can't test GPU without DORADO_METAL_BUILD or DORADO_CUDA_BUILD");
 #endif
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
@@ -281,7 +281,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
             SKIP("No CUDA devices found: " << error_message);
         }
 #else
-        SKIP("Can't test GPU without DORADO_GPU_BUILD");
+        SKIP("Can't test GPU without DORADO_METAL_BUILD or DORADO_CUDA_BUILD");
 #endif
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.

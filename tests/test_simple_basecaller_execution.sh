@@ -55,10 +55,8 @@ echo dorado basecaller test stage
 $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq > $output_dir/ref.fq
 $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
-if ! uname -r | grep -q -E 'tegra|minit'; then
-    $dorado_bin basecaller ${model_5k} $pod5_data/ -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
-    dorado_check_bam_not_empty
-fi
+$dorado_bin basecaller ${model_5k} $pod5_data/ -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+dorado_check_bam_not_empty
 
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ -b ${batch} --emit-moves > $output_dir/calls.bam
 

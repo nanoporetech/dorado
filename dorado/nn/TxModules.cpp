@@ -102,7 +102,7 @@ using namespace torch::nn;
 namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
 void apply_rounding(at::Tensor &t, int remove_bits) {
     if (t.dtype() == torch::kF16) {
         // Round Float16 tensor elements such that the last `remove_bits` of the mantissa are 0s.
@@ -152,7 +152,7 @@ GatedMLPImpl::GatedMLPImpl(int in_features_, int hidden_features_)
 
 at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     at::Tensor t;
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
     auto use_koi_swiglu = x.is_cuda() && utils::get_dev_opt<bool>("use_koi_swiglu", true) &&
                           koi_can_use_cutlass();
     if (use_koi_swiglu) {
@@ -383,7 +383,7 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
         }
     }
     attn_output_ntc = at::empty({N, T, C}, x.options());
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
     int res = KOI_NOT_SUPPORTED;
     bool use_koi_attention = x.is_cuda() && utils::get_dev_opt<bool>("use_koi_attention", true) &&
                              koi_can_use_cutlass();
@@ -456,7 +456,7 @@ TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOpt
     register_buffer("deepnorm_alpha", deepnorm_alpha);
 };
 
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
 void TxEncoderImpl::remove_bits() {
     // Round weights, zeroing the lowest mantissa bits (this makes the matmuls more
     // power efficient and results in higher performance for a small accuracy drop)
@@ -473,7 +473,7 @@ void TxEncoderImpl::remove_bits() {
 void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16) {
     (void)scaled_tensor;
     (void)x_f16;
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
     const int N = static_cast<int>(x_f16.size(0));
     const int T = static_cast<int>(x_f16.size(1)) * 16;
     const int C = params.d_model;
@@ -667,7 +667,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
 void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     (void)x_f16;
-#if DORADO_CUDA_BUILD && !DORADO_TX2 && !DORADO_ORIN
+#if DORADO_CUDA_BUILD && !DORADO_ORIN
     const int N = static_cast<int>(x_f16.size(0));
     const int T = static_cast<int>(x_f16.size(1)) * 16;
     const int C = params.d_model;
@@ -852,7 +852,7 @@ at::Tensor TxEncoderImpl::forward(at::Tensor x) {
 
 TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
     // TODO: make sure these are all the requirements
     const bool is_sup_model =
             (params.d_model == 512) && (params.nhead == 8) && (params.attn_window.first == 127) &&
@@ -882,7 +882,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
 };
 
 at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
-#if DORADO_CUDA_BUILD && !DORADO_TX2
+#if DORADO_CUDA_BUILD
     if (use_koi_tiled) {
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));
