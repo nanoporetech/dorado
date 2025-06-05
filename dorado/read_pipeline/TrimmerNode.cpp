@@ -8,6 +8,7 @@
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
@@ -57,8 +58,9 @@ std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_in
     }
 
     if (trim_interval.second <= trim_interval.first) {
-        spdlog::debug("Invalid trim interval for read id {}: {}-{}. Trimming will be skipped.",
-                      read_id, trim_interval.first, trim_interval.second);
+        dorado::utils::trace_log(
+                "Invalid trim interval for read id {}: {}-{}. Trimming will be skipped.", read_id,
+                trim_interval.first, trim_interval.second);
         return {false, false, {0, 0}};
     }
 
