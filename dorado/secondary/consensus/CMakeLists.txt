@@ -24,6 +24,7 @@ target_include_directories(dorado_secondary_consensus
 
 target_link_libraries(dorado_secondary_consensus
     PUBLIC
+        dorado_secondary_features
         dorado_torch_utils
         dorado_utils
     PRIVATE

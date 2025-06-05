@@ -1,4 +1,4 @@
-#include "decoder_base.h"
+#include "secondary/features/decoder_base.h"
 
 #include "torch_utils/tensor_utils.h"
 #include "utils/span.h"

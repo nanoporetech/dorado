@@ -1,7 +1,6 @@
 #pragma once
 
-#include "encoder_counts.h"
-#include "encoder_read_alignment.h"
+#include "encoder_base.h"
 #include "haplotag_source.h"
 
 #include <cstdint>

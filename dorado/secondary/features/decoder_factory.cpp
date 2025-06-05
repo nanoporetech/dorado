@@ -1,4 +1,4 @@
-#include "decoder_factory.h"
+#include "secondary/features/decoder_factory.h"
 
 #include "secondary/architectures/model_config.h"
 
