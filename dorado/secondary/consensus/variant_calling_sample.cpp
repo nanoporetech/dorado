@@ -1,8 +1,8 @@
-#include "variant_calling_sample.h"
+#include "secondary/consensus/variant_calling_sample.h"
 
-#include "consensus_utils.h"
-#include "sample.h"
-#include "sample_trimming.h"
+#include "secondary/consensus/consensus_utils.h"
+#include "secondary/consensus/sample.h"
+#include "secondary/consensus/sample_trimming.h"
 #include "secondary/features/decoder_base.h"
 #include "utils/ssize.h"
 

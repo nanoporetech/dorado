@@ -1,9 +1,9 @@
-#include "variant_calling.h"
+#include "secondary/consensus/variant_calling.h"
 
-#include "consensus_result.h"
-#include "consensus_utils.h"
-#include "sample_trimming.h"
 #include "secondary/batching.h"
+#include "secondary/consensus/consensus_result.h"
+#include "secondary/consensus/consensus_utils.h"
+#include "secondary/consensus/sample_trimming.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/rle.h"
 #include "utils/span.h"

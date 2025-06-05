@@ -1,22 +1,25 @@
 add_library(dorado_secondary_consensus
-    consensus_result.h
+    # Public
+    include/secondary/consensus/consensus_result.h
+    include/secondary/consensus/consensus_utils.h
+    include/secondary/consensus/sample_trimming.h
+    include/secondary/consensus/sample.h
+    include/secondary/consensus/variant_calling_sample.h
+    include/secondary/consensus/variant_calling.h
+    include/secondary/consensus/window.h
+
+    # Private
     consensus_utils.cpp
-    consensus_utils.h
-    sample.cpp
-    sample.h
     sample_trimming.cpp
-    sample_trimming.h
-    variant_calling.cpp
-    variant_calling.h
+    sample.cpp
     variant_calling_sample.cpp
-    variant_calling_sample.h
+    variant_calling.cpp
     window.cpp
-    window.h
 )
 
 target_include_directories(dorado_secondary_consensus
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/consensus
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(dorado_secondary_consensus

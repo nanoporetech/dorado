@@ -1,4 +1,4 @@
-#include "sample_trimming.h"
+#include "secondary/consensus/sample_trimming.h"
 
 #include "utils/ssize.h"
 
