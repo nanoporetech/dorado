@@ -1,4 +1,4 @@
-#include "ConvStack.h"
+#include "nn/ConvStack.h"
 
 #include "config/common.h"
 #include "nn/KoiUtils.h"

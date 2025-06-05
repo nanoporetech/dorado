@@ -1,4 +1,4 @@
-#include "WorkingMemory.h"
+#include "nn/WorkingMemory.h"
 
 #include "utils/math_utils.h"
 

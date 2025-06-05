@@ -45,11 +45,11 @@ endif()
 target_link_libraries(dorado_basecall
     PUBLIC
         dorado_config
+        dorado_nn
         dorado_torch_utils
         dorado_utils
         torch_lib
     PRIVATE
-        dorado_nn
         spdlog::spdlog
 )
 

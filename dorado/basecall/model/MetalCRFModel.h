@@ -1,6 +1,6 @@
 #pragma once
 
-#include "nn/metal/MetalModules.h"
+#include "nn/MetalModules.h"
 
 #include <torch/nn.h>
 

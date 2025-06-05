@@ -1,4 +1,4 @@
-#include "KoiUtils.h"
+#include "nn/KoiUtils.h"
 
 #include <ATen/cuda/CUDAContext.h>
 

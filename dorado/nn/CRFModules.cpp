@@ -1,4 +1,4 @@
-#include "CRFModules.h"
+#include "nn/CRFModules.h"
 
 #include "nn/KoiUtils.h"
 #include "torch_utils/gpu_profiling.h"
