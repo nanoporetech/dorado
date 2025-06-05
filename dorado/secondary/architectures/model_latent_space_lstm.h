@@ -1,6 +1,6 @@
 #pragma once
 
-#include "model_torch_base.h"
+#include "secondary/architectures/model_torch_base.h"
 
 #include <ATen/ATen.h>
 #include <torch/nn/modules/activation.h>
@@ -12,7 +12,6 @@
 #include <torch/nn/modules/rnn.h>
 
 #include <cstdint>
-#include <memory>
 #include <string>
 #include <vector>
 

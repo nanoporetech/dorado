@@ -1,7 +1,7 @@
 #pragma once
 
 #include "model_latent_space_lstm.h"
-#include "model_torch_base.h"
+#include "secondary/architectures/model_torch_base.h"
 
 #include <ATen/ATen.h>
 #include <torch/nn/modules/embedding.h>

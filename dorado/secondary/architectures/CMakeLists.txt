@@ -1,8 +1,12 @@
 add_library(dorado_secondary_architectures
+    # Public
+    include/secondary/architectures/model_torch_base.h
+    include/secondary/architectures/model_factory.h
+    include/secondary/architectures/model_config.h
+
+    # Private
     model_config.cpp
-    model_config.h
     model_factory.cpp
-    model_factory.h
     model_gru.cpp
     model_gru.h
     model_latent_space_lstm.cpp
@@ -10,14 +14,13 @@ add_library(dorado_secondary_architectures
     model_slot_attention_consensus.cpp
     model_slot_attention_consensus.h
     model_torch_base.cpp
-    model_torch_base.h
     model_torch_script.cpp
     model_torch_script.h
 )
 
 target_include_directories(dorado_secondary_architectures
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/include/architectures
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 target_link_libraries(dorado_secondary_architectures
