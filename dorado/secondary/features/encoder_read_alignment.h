@@ -1,7 +1,7 @@
 #pragma once
 
 #include "hts_io/FastxRandomReader.h"
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
 #include "secondary/consensus/sample.h"
 #include "secondary/features/encoder_base.h"
 #include "secondary/features/haplotag_source.h"

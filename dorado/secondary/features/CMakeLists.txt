@@ -32,6 +32,7 @@ target_include_directories(dorado_secondary_features
 target_link_libraries(dorado_secondary_features
     PUBLIC
         dorado_secondary_architectures
+        dorado_secondary_common
         dorado_secondary_consensus
         dorado_torch_utils
         dorado_utils

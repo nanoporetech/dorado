@@ -1,7 +1,7 @@
 #include "TestUtils.h"
 #include "hts_io/FastxRandomReader.h"
 #include "local_haplotagging.h"
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
 #include "types.h"
 
 #include <catch2/catch_test_macros.hpp>

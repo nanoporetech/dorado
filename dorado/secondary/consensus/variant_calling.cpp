@@ -1,6 +1,6 @@
 #include "secondary/consensus/variant_calling.h"
 
-#include "secondary/batching.h"
+#include "secondary/common/batching.h"
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/consensus_utils.h"
 #include "secondary/consensus/sample_trimming.h"

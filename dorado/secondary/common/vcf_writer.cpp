@@ -1,4 +1,4 @@
-#include "vcf_writer.h"
+#include "secondary/common/vcf_writer.h"
 
 #include "dorado_version.h"
 #include "utils/container_utils.h"

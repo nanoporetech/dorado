@@ -1,6 +1,6 @@
-#include "bam_info.h"
+#include "secondary/common/bam_info.h"
 
-#include "bam_file.h"
+#include "secondary/common/bam_file.h"
 #include "utils/container_utils.h"
 #include "utils/string_utils.h"
 

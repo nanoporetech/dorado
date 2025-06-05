@@ -1,6 +1,6 @@
 #pragma once
 
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
 #include "secondary/features/haplotag_source.h"
 
 #include <cstdint>

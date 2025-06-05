@@ -2,9 +2,9 @@
 
 #include "hts_io/FastxRandomReader.h"
 #include "sample.h"
+#include "secondary/common/interval.h"
+#include "secondary/common/variant.h"
 #include "secondary/features/decoder_base.h"
-#include "secondary/interval.h"
-#include "secondary/variant.h"
 #include "variant_calling_sample.h"
 
 #include <cstdint>

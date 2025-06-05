@@ -1,6 +1,6 @@
 #pragma once
 
-#include "secondary/interval.h"
+#include "secondary/common/interval.h"
 #include "types.h"
 #include "utils/cigar.h"
 #include "utils/overlap.h"

@@ -2,10 +2,10 @@
 
 #include "hts_io/FastxRandomReader.h"
 #include "secondary/architectures/model_factory.h"
-#include "secondary/batching.h"
+#include "secondary/common/batching.h"
+#include "secondary/common/region.h"
 #include "secondary/consensus/consensus_utils.h"
 #include "secondary/consensus/variant_calling.h"
-#include "secondary/region.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"

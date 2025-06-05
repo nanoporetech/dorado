@@ -1,7 +1,7 @@
+#include "secondary/common/variant.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/consensus/variant_calling_sample.h"
 #include "secondary/features/decoder_base.h"
-#include "secondary/variant.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"
 

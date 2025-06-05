@@ -1,4 +1,4 @@
-#include "bam_file.h"
+#include "secondary/common/bam_file.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>

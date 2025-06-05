@@ -1,6 +1,6 @@
+#include "secondary/common/region.h"
 #include "secondary/consensus/sample.h"
 #include "secondary/consensus/sample_trimming.h"
-#include "secondary/region.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>

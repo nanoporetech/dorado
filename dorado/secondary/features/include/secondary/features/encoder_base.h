@@ -1,6 +1,6 @@
 #pragma once
 
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/sample.h"
 
