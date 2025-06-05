@@ -8,8 +8,7 @@ class RNAPolyTailCalculator : public PolyTailCalculator {
 public:
     RNAPolyTailCalculator(PolyTailConfig config,
                           bool is_rna_adapter,
-                          float speed_calibration,
-                          float offset_calibration);
+                          const PolyTailCalibrationCoeffs& calibration);
     SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const override;
 
 protected:
