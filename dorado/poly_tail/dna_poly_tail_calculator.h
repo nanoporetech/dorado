@@ -1,6 +1,6 @@
 #pragma once
 
-#include "poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator.h"
 
 namespace dorado::poly_tail {
 

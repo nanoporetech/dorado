@@ -174,6 +174,7 @@ add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/nn)
+add_subdirectory(dorado/poly_tail)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/utils)
@@ -310,18 +311,6 @@ add_library(dorado_lib
     dorado/splitter/myers.h
     dorado/splitter/splitter_utils.cpp
     dorado/splitter/splitter_utils.h
-    dorado/poly_tail/dna_poly_tail_calculator.cpp
-    dorado/poly_tail/dna_poly_tail_calculator.h
-    dorado/poly_tail/plasmid_poly_tail_calculator.cpp
-    dorado/poly_tail/plasmid_poly_tail_calculator.h
-    dorado/poly_tail/poly_tail_calculator.cpp
-    dorado/poly_tail/poly_tail_calculator.h
-    dorado/poly_tail/poly_tail_calculator_selector.cpp
-    dorado/poly_tail/poly_tail_calculator_selector.h
-    dorado/poly_tail/poly_tail_config.cpp
-    dorado/poly_tail/poly_tail_config.h
-    dorado/poly_tail/rna_poly_tail_calculator.cpp
-    dorado/poly_tail/rna_poly_tail_calculator.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
     dorado/correct/features.cpp
@@ -376,6 +365,7 @@ target_link_libraries(dorado_lib
         dorado_basecall
         dorado_hts_io
         dorado_modbase
+        dorado_poly_tail
         dorado_secondary
         dorado_version
         edlib

@@ -1,7 +1,7 @@
-#include "poly_tail_calculator_selector.h"
+#include "poly_tail/poly_tail_calculator_selector.h"
 
-#include "poly_tail_calculator.h"
-#include "poly_tail_config.h"
+#include "poly_tail/poly_tail_calculator.h"
+#include "poly_tail/poly_tail_config.h"
 #include "utils/types.h"
 
 #include <cassert>

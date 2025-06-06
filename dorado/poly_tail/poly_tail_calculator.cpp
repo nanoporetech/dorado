@@ -1,8 +1,8 @@
-#include "poly_tail_calculator.h"
+#include "poly_tail/poly_tail_calculator.h"
 
 #include "dna_poly_tail_calculator.h"
 #include "plasmid_poly_tail_calculator.h"
-#include "poly_tail_config.h"
+#include "poly_tail/poly_tail_config.h"
 #include "read_pipeline/messages.h"
 #include "rna_poly_tail_calculator.h"
 #include "utils/log_utils.h"
