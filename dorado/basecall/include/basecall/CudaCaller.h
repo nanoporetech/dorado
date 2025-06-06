@@ -1,9 +1,9 @@
 
 #pragma once
 
+#include "DecodedChunk.h"
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
-#include "decode/Decoder.h"
 #include "utils/stats.h"
 
 #include <c10/cuda/CUDAStream.h>
@@ -20,6 +20,10 @@
 #include <vector>
 
 namespace dorado::basecall {
+
+namespace decode {
+class Decoder;
+}  // namespace decode
 
 class CudaCaller {
 public:

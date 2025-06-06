@@ -1,7 +1,7 @@
-#include "MetalCaller.h"
+#include "basecall/MetalCaller.h"
 
-#include "ModelRunnerBase.h"
-#include "crf_utils.h"
+#include "basecall/ModelRunnerBase.h"
+#include "basecall/crf_utils.h"
 #include "decode/beam_search.h"
 #include "model/MetalCRFModel.h"
 #include "model/TxModel.h"

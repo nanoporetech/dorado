@@ -1,6 +1,6 @@
-#include "ModelRunner.h"
+#include "basecall/ModelRunner.h"
 
-#include "crf_utils.h"
+#include "basecall/crf_utils.h"
 #include "decode/Decoder.h"
 #include "model/CRFModel.h"
 

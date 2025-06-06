@@ -1,43 +1,48 @@
 add_subdirectory(benchmarks)
 
 add_library(dorado_basecall STATIC
+    # Public
+    include/basecall/crf_utils.h
+    include/basecall/CudaCaller.h
+    include/basecall/CudaModelRunner.h
+    include/basecall/DecodedChunk.h
+    include/basecall/DecodedChunk.h
+    include/basecall/MetalCaller.h
+    include/basecall/MetalModelRunner.h
+    include/basecall/ModelRunner.h
+    include/basecall/ModelRunnerBase.h
+
+    # Private
     crf_utils.cpp
-    crf_utils.h
-    ModelRunner.cpp
-    ModelRunner.h
-    ModelRunnerBase.cpp
-    ModelRunnerBase.h
     decode/beam_search.cpp
     decode/beam_search.h
     decode/CPUDecoder.cpp
     decode/CPUDecoder.h
+    decode/CUDADecoder.h
     decode/Decoder.cpp
     decode/Decoder.h
     model/CRFModel.cpp
     model/CRFModel.h
+    model/MetalCRFModel.h
     model/TxModel.cpp
     model/TxModel.h
+    ModelRunner.cpp
+    ModelRunnerBase.cpp
 )
 
 if(APPLE)
     target_sources(dorado_basecall
         PRIVATE
-        MetalCaller.cpp
-        MetalCaller.h
-        MetalModelRunner.cpp
-        MetalModelRunner.h
-        model/MetalCRFModel.cpp
-        model/MetalCRFModel.h
+            MetalCaller.cpp
+            MetalModelRunner.cpp
+            model/MetalCRFModel.cpp
     )
 else()
     target_sources(dorado_basecall
         PRIVATE
-        CudaModelRunner.cpp
-        CudaModelRunner.h
-        CudaCaller.cpp
-        CudaCaller.h
-        decode/CUDADecoder.cpp
-        decode/CUDADecoder.h
+            CudaCaller.cpp
+            CudaModelRunner.cpp
+            decode/CUDADecoder.cpp
     )
     target_link_libraries(dorado_basecall PRIVATE dorado_benchmarks)
 endif()
@@ -56,6 +61,11 @@ target_link_libraries(dorado_basecall
 if (TARGET koi)
     target_link_libraries(dorado_basecall PRIVATE koi)
 endif()
+
+target_include_directories(dorado_basecall
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
+)
 
 enable_warnings_as_errors(dorado_basecall)
 

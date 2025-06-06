@@ -1,9 +1,9 @@
 #define NS_PRIVATE_IMPLEMENTATION
 #define MTL_PRIVATE_IMPLEMENTATION
 
-#include "MetalModelRunner.h"
+#include "basecall/MetalModelRunner.h"
 
-#include "MetalCaller.h"
+#include "basecall/MetalCaller.h"
 
 #include <ATen/TensorIndexing.h>
 #include <spdlog/spdlog.h>

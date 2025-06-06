@@ -1,7 +1,8 @@
-#include "CudaCaller.h"
+#include "basecall/CudaCaller.h"
 
+#include "basecall/crf_utils.h"
 #include "benchmarks/CudaChunkBenchmarks.h"
-#include "crf_utils.h"
+#include "decode/Decoder.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
