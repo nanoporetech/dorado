@@ -1,6 +1,7 @@
 #pragma once
 
-#include "decode/Decoder.h"
+#include "DecodedChunk.h"
+#include "config/BasecallModelConfig.h"
 #include "model/MetalCRFModel.h"
 #include "model/TxModel.h"
 

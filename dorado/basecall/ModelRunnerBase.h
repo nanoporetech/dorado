@@ -1,6 +1,6 @@
 #pragma once
 
-#include "decode/Decoder.h"
+#include "DecodedChunk.h"
 #include "utils/stats.h"
 
 #include <string>

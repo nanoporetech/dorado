@@ -27,6 +27,8 @@ ModelRunner::ModelRunner(const config::BasecallModelConfig &model_config, const 
             at::zeros({N, C, T}, at::TensorOptions().dtype(m_decoder->dtype()).device(at::kCPU));
 }
 
+ModelRunner::~ModelRunner() = default;
+
 std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {
     at::InferenceMode guard;
     dorado::stats::Timer timer;

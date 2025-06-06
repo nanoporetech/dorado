@@ -2,7 +2,6 @@
 
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
-#include "decode/Decoder.h"
 #include "utils/stats.h"
 
 #include <torch/nn.h>
@@ -10,11 +9,17 @@
 #include <atomic>
 #include <string>
 
+namespace dorado::basecall::decode {
+class Decoder;
+}  // namespace dorado::basecall::decode
+
 namespace dorado::basecall {
 
 class ModelRunner final : public ModelRunnerBase {
 public:
     ModelRunner(const config::BasecallModelConfig &model_config, const std::string &device);
+    ~ModelRunner();
+
     void accept_chunk(int chunk_idx, const at::Tensor &chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const config::BasecallModelConfig &config() const final { return m_config; };
