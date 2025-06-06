@@ -165,6 +165,7 @@ add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
+add_subdirectory(dorado/alignment)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
@@ -182,27 +183,6 @@ add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/utils)
 
 add_library(dorado_lib
-    dorado/alignment/alignment_info.h
-    dorado/alignment/alignment_processing_items.cpp
-    dorado/alignment/alignment_processing_items.h
-    dorado/alignment/bed_file.cpp
-    dorado/alignment/bed_file.h
-    dorado/alignment/BedFileAccess.cpp
-    dorado/alignment/BedFileAccess.h
-    dorado/alignment/IndexFileAccess.cpp
-    dorado/alignment/IndexFileAccess.h
-    dorado/alignment/minimap2_args.cpp
-    dorado/alignment/minimap2_args.h
-    dorado/alignment/minimap2_wrappers.h
-    dorado/alignment/Minimap2Aligner.cpp
-    dorado/alignment/Minimap2Aligner.h
-    dorado/alignment/Minimap2Index.cpp
-    dorado/alignment/Minimap2Index.h
-    dorado/alignment/Minimap2IndexSupportTypes.h
-    dorado/alignment/Minimap2Options.cpp
-    dorado/alignment/Minimap2Options.h
-    dorado/alignment/sam_utils.cpp
-    dorado/alignment/sam_utils.h
     dorado/api/caller_creation.cpp
     dorado/api/caller_creation.h
     dorado/api/runner_creation.cpp
@@ -342,6 +322,7 @@ endif()
 
 target_link_libraries(dorado_lib
     PUBLIC
+        dorado_alignment
         dorado_basecall
         dorado_hts_io
         dorado_modbase

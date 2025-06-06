@@ -1,4 +1,4 @@
-#include "BedFileAccess.h"
+#include "alignment/BedFileAccess.h"
 
 #include <cassert>
 

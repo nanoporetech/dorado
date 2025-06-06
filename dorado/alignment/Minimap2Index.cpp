@@ -1,6 +1,6 @@
-#include "Minimap2Index.h"
+#include "alignment/Minimap2Index.h"
 
-#include "minimap2_wrappers.h"
+#include "alignment/minimap2_wrappers.h"
 
 #include <spdlog/spdlog.h>
 

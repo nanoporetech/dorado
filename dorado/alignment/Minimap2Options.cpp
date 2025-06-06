@@ -1,7 +1,7 @@
-#include "Minimap2Options.h"
+#include "alignment/Minimap2Options.h"
 
-#include "minimap2_args.h"
-#include "minimap2_wrappers.h"
+#include "alignment/minimap2_args.h"
+#include "alignment/minimap2_wrappers.h"
 
 namespace dorado::alignment {
 

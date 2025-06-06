@@ -1,4 +1,4 @@
-#include "alignment_processing_items.h"
+#include "alignment/alignment_processing_items.h"
 
 #include "utils/PostCondition.h"
 #include "utils/fastq_reader.h"

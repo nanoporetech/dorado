@@ -115,6 +115,7 @@ target_link_libraries(dorado_utils
     PUBLIC
         argparse::argparse
         date::date
+        dorado_version
         edlib
         nvtx
         spdlog::spdlog

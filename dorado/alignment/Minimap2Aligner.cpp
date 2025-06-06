@@ -1,4 +1,4 @@
-#include "Minimap2Aligner.h"
+#include "alignment/Minimap2Aligner.h"
 
 #include "sam_utils.h"
 #include "utils/PostCondition.h"

@@ -8,6 +8,7 @@
 #include "read_pipeline/CorrectionPafReaderNode.h"
 #include "read_pipeline/CorrectionPafWriterNode.h"
 #include "read_pipeline/HtsWriter.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
