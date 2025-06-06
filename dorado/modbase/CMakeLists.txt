@@ -1,18 +1,21 @@
 add_library(dorado_modbase STATIC
+    # Public
+    include/modbase/encode_kmer.h
+    include/modbase/ModBaseCaller.h
+    include/modbase/ModBaseContext.h
+    include/modbase/ModBaseEncoder.h
+    include/modbase/ModBaseRunner.h
+    include/modbase/MotifMatcher.h
+
+    # Private
     encode_kmer.cpp
-    encode_kmer.h
     ModBaseCaller.cpp
-    ModBaseCaller.h
     ModBaseContext.cpp
-    ModBaseContext.h
-    ModbaseEncoder.cpp
-    ModbaseEncoder.h
+    ModBaseEncoder.cpp
     ModBaseRunner.cpp
-    ModBaseRunner.h
-    ModbaseScaler.cpp
-    ModbaseScaler.h
+    ModBaseScaler.cpp
+    ModBaseScaler.h
     MotifMatcher.cpp
-    MotifMatcher.h
     nn/ModBaseModel.cpp
     nn/ModBaseModel.h
 )
@@ -26,6 +29,11 @@ target_link_libraries(dorado_modbase
         dorado_torch_utils
         dorado_utils
         spdlog::spdlog
+)
+
+target_include_directories(dorado_modbase
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 enable_warnings_as_errors(dorado_modbase)

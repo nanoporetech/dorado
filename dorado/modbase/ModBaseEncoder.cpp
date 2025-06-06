@@ -1,6 +1,6 @@
-#include "ModbaseEncoder.h"
+#include "modbase/ModBaseEncoder.h"
 
-#include "encode_kmer.h"
+#include "modbase/encode_kmer.h"
 #include "utils/sequence_utils.h"
 
 #include <nvtx3/nvtx3.hpp>

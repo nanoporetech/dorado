@@ -2,8 +2,8 @@
 
 #include "config/ModBaseModelConfig.h"
 #include "modbase/ModBaseContext.h"
+#include "modbase/ModBaseEncoder.h"
 #include "modbase/ModBaseRunner.h"
-#include "modbase/ModbaseEncoder.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"

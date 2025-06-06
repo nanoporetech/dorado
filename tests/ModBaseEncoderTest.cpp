@@ -1,6 +1,5 @@
-#include "modbase/ModbaseEncoder.h"
+#include "modbase/ModBaseEncoder.h"
 
-#include "modbase/ModBaseContext.h"
 #include "modbase/encode_kmer.h"
 #include "read_pipeline/ModBaseChunkCallerNode.h"
 #include "utils/sequence_utils.h"

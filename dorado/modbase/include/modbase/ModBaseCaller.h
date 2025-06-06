@@ -1,7 +1,7 @@
 #pragma once
 
-#include "MotifMatcher.h"
 #include "config/ModBaseModelConfig.h"
+#include "modbase/MotifMatcher.h"
 #include "torch_utils/module_utils.h"
 #include "utils/stats.h"
 #if DORADO_CUDA_BUILD
