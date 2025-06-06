@@ -8,8 +8,6 @@ option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" ON)
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-include(cmake/Warnings.cmake)
-
 find_package(htslib REQUIRED)
 find_package(ZLIB REQUIRED)
 
