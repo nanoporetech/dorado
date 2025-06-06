@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dorado {
@@ -11,6 +12,25 @@ class SimplexRead;
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;
 
 namespace splitter {
+
+using PosRange = std::pair<uint64_t, uint64_t>;
+using PosRanges = std::vector<PosRange>;
+
+template <typename T>
+struct SampleRange {
+    //inclusive
+    uint64_t start_sample;
+    //exclusive
+    uint64_t end_sample;
+    uint64_t argmax_sample;
+    T max_val;
+
+    SampleRange(uint64_t start, uint64_t end, uint64_t argmax, T max)
+            : start_sample(start), end_sample(end), argmax_sample(argmax), max_val(max) {}
+};
+
+template <typename T>
+using SampleRanges = std::vector<SampleRange<T>>;
 
 struct RNASplitSettings {
     int16_t pore_thr = 1500;

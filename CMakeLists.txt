@@ -177,6 +177,7 @@ add_subdirectory(dorado/nn)
 add_subdirectory(dorado/poly_tail)
 add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/secondary)
+add_subdirectory(dorado/splitter)
 add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/utils)
 
@@ -290,14 +291,6 @@ add_library(dorado_lib
     dorado/read_pipeline/read_output_progress_stats.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
-    dorado/splitter/DuplexReadSplitter.cpp
-    dorado/splitter/DuplexReadSplitter.h
-    dorado/splitter/RNAReadSplitter.cpp
-    dorado/splitter/RNAReadSplitter.h
-    dorado/splitter/myers.cpp
-    dorado/splitter/myers.h
-    dorado/splitter/splitter_utils.cpp
-    dorado/splitter/splitter_utils.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
     dorado/correct/features.cpp
@@ -355,6 +348,7 @@ target_link_libraries(dorado_lib
         dorado_poly_tail
         dorado_read_pipeline
         dorado_secondary
+        dorado_splitter
         dorado_version
         edlib
         htslib

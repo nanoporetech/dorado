@@ -1,4 +1,4 @@
-#include "DuplexReadSplitter.h"
+#include "splitter/DuplexReadSplitter.h"
 
 #include "myers.h"
 #include "read_pipeline/base/messages.h"
