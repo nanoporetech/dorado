@@ -130,6 +130,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     target_link_libraries(${TEST_BIN}
         PRIVATE
             dorado_basecall
+            dorado_cli_utils
             dorado_file_info
             dorado_io_lib
             dorado_lib

@@ -361,53 +361,7 @@ target_link_libraries(dorado_lib
 )
 
 if(NOT DORADO_DISABLE_DORADO)
-    add_executable(dorado
-        dorado/main.cpp
-        dorado/cli/aligner.cpp
-        dorado/cli/basecall_output_args.cpp
-        dorado/cli/basecall_output_args.h
-        dorado/cli/demux.cpp
-        dorado/cli/duplex.cpp
-        dorado/cli/trim.cpp
-        dorado/cli/basecaller.cpp
-        dorado/cli/download.cpp
-        dorado/cli/summary.cpp
-        dorado/cli/correct.cpp
-        dorado/cli/polish.cpp
-        dorado/cli/variant.cpp
-        dorado/cli/cli.h
-        dorado/cli/cli_utils.h
-        dorado/cli/model_resolution.h
-     )
-
-    set_target_properties(dorado
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    )
-
-    if(MSVC)
-        set_property(TARGET dorado APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
-    endif()
-
-    enable_warnings_as_errors(dorado)
-    check_linked_libs(dorado)
-
-    if (DORADO_ENABLE_PCH)
-        target_precompile_headers(dorado REUSE_FROM dorado_lib)
-    endif()
-
-    target_link_libraries(dorado
-        dorado_lib
-        dorado_io_lib
-        dorado_file_info
-        dorado_models_lib
-        dorado_model_downloader_lib
-        dorado_compat
-        minimap2
-        cxxpool
-    )
-
-    install(TARGETS dorado RUNTIME)
+    add_subdirectory(dorado/cli)
 endif()
 
 add_subdirectory(dorado/data_loader)

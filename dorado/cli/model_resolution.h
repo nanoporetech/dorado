@@ -1,6 +1,6 @@
 #pragma once
 
-#include "cli_utils.h"
+#include "cli/utils/cli_utils.h"
 #include "model_downloader/model_downloader.h"
 #include "models/model_complex.h"
 #include "utils/math_utils.h"

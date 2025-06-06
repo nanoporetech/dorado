@@ -1,13 +1,11 @@
 #include "TestUtils.h"
-#include "cli/cli_utils.h"
-#include "cli/model_resolution.h"
+#include "cli/utils/cli_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #define TEST_GROUP "[cli_utils]"
 
 using namespace dorado::cli;
-using namespace dorado::model_resolution;
 
 CATCH_TEST_CASE("CliUtils: Check thread allocation", TEST_GROUP) {
     int aligner_threads, writer_threads;

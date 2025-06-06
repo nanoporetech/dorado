@@ -1,3 +1,5 @@
+#pragma once
+
 namespace dorado {
 
 int basecaller(int argc, char *argv[]);
