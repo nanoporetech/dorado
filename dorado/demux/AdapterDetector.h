@@ -1,15 +1,24 @@
 #pragma once
-#include "adapter_primer_kits.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
-#include <atomic>
 #include <mutex>
 #include <string>
-#include <string_view>
 #include <vector>
 
 namespace dorado {
+
+namespace adapter_primer_kits {
+
+class AdapterPrimerManager;
+
+struct Candidate {
+    std::string name;
+    std::string front_sequence;
+    std::string rear_sequence;
+};
+
+}  // namespace adapter_primer_kits
 
 namespace demux {
 

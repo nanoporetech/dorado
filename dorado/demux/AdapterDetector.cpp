@@ -1,5 +1,6 @@
 #include "AdapterDetector.h"
 
+#include "adapter_primer_kits.h"
 #include "parse_custom_kit.h"
 #include "parse_custom_sequences.h"
 #include "utils/log_utils.h"
@@ -19,6 +20,19 @@
 #include <vector>
 
 namespace {
+
+// The PCS114 and PCB114_24 kits can include UMI tag sequences.
+// When present, the tag will either immediately follow the PCS110 SSP sequence near the beginning
+// of the read, or its RC will immediately precede the RC of the PCS110 SSP sequence near the end
+// of the read. Note that the Vs are wildcards, which could be any of "A", "C", or "G".
+const std::string umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
+
+// This indicates how many bases before the end of the detected SSP primer the UMI search window
+// should begin. Note that the first 3 bases of the UMI tag are also the last 3 bases of the primer.
+constexpr int UMI_WINDOW_FRONT_OVERLAP = 6;
+
+// The total length of the window used to search for the UMI tag.
+constexpr int UMI_WINDOW_LENGTH = 40;
 
 constexpr int ADAPTER_TRIM_LENGTH = 75;
 constexpr int PRIMER_TRIM_LENGTH = 150;
@@ -138,7 +152,7 @@ SingleEndResult AdapterDetector::find_umi_tag(const std::string& seq) {
     // sequence should be just the bit of the read you expect to find the
     // tag in.
     EdlibAlignConfig placement_config = init_edlib_config_for_umi_tags();
-    auto result = align(adapter_primer_kits::umi_search_pattern, seq, -1, placement_config);
+    auto result = align(umi_search_pattern, seq, -1, placement_config);
     if (result.score > 0.f) {
         auto umi_start = result.position.first;
         auto umi_len = result.position.second - umi_start + 1;
@@ -267,19 +281,18 @@ void AdapterDetector::check_for_umi_tags(const AdapterScoreResult& primer_result
     std::string search_window;
     if (classification.orientation == StrandOrientation::FORWARD &&
         primer_results.front.name != UNCLASSIFIED) {
-        auto a = trim_interval.first - adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP;
-        auto b = a + adapter_primer_kits::UMI_WINDOW_LENGTH;
+        auto a = trim_interval.first - UMI_WINDOW_FRONT_OVERLAP;
+        auto b = a + UMI_WINDOW_LENGTH;
         if (a >= 0 && b < int(sequence.size())) {
-            search_window = sequence.substr(a, adapter_primer_kits::UMI_WINDOW_LENGTH);
+            search_window = sequence.substr(a, UMI_WINDOW_LENGTH);
         }
     } else if (classification.orientation == StrandOrientation::REVERSE &&
                primer_results.rear.name != UNCLASSIFIED) {
         // We will search for the UMI pattern within the RC of the search window.
-        auto b = trim_interval.second + adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP;
-        auto a = b - adapter_primer_kits::UMI_WINDOW_LENGTH;
+        auto b = trim_interval.second + UMI_WINDOW_FRONT_OVERLAP;
+        auto a = b - UMI_WINDOW_LENGTH;
         if (a >= 0 && b < int(sequence.size())) {
-            search_window = utils::reverse_complement(
-                    sequence.substr(a, adapter_primer_kits::UMI_WINDOW_LENGTH));
+            search_window = utils::reverse_complement(sequence.substr(a, UMI_WINDOW_LENGTH));
         }
     }
     if (search_window.empty()) {
@@ -293,12 +306,10 @@ void AdapterDetector::check_for_umi_tags(const AdapterScoreResult& primer_result
     classification.umi_tag_sequence = result.name;
     // We need to update the trim interval so that the UMI sequence is trimmed.
     if (classification.orientation == StrandOrientation::FORWARD) {
-        auto new_pos = trim_interval.first - adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP +
-                       result.position.second + 1;
+        auto new_pos = trim_interval.first - UMI_WINDOW_FRONT_OVERLAP + result.position.second + 1;
         trim_interval.first = new_pos;
     } else if (classification.orientation == StrandOrientation::REVERSE) {
-        auto new_pos = trim_interval.second + adapter_primer_kits::UMI_WINDOW_FRONT_OVERLAP -
-                       result.position.second - 1;
+        auto new_pos = trim_interval.second + UMI_WINDOW_FRONT_OVERLAP - result.position.second - 1;
         trim_interval.second = new_pos;
     }
 }
