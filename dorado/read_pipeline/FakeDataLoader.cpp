@@ -1,6 +1,6 @@
 #include "FakeDataLoader.h"
 
-#include "ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 
 #include <ATen/Functions.h>
 

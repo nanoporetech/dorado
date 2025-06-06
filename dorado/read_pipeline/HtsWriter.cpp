@@ -1,6 +1,6 @@
 #include "HtsWriter.h"
 
-#include "ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/sequence_utils.h"
 
 #include <htslib/bgzf.h>

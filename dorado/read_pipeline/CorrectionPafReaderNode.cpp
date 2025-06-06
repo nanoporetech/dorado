@@ -1,7 +1,7 @@
 #include "CorrectionPafReaderNode.h"
 
-#include "ClientInfo.h"
-#include "ReadPipeline.h"
+#include "read_pipeline/base/ClientInfo.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/alignment_utils.h"
 #include "utils/paf_utils.h"
 #include "utils/timer_high_res.h"

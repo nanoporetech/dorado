@@ -1,6 +1,6 @@
 #pragma once
 
-#include "messages.h"
+#include "read_pipeline/base/messages.h"
 
 namespace dorado::utils {
 SimplexReadPtr shallow_copy_read(const SimplexRead& read);

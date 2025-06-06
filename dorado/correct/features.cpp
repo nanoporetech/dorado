@@ -2,7 +2,7 @@
 
 #include "conversions.h"
 #include "correct/types.h"
-#include "read_pipeline/messages.h"
+#include "read_pipeline/base/messages.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/cigar.h"
 #include "utils/sequence_utils.h"

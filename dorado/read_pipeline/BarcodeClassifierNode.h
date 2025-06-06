@@ -1,7 +1,7 @@
 #pragma once
 
-#include "MessageSink.h"
 #include "demux/BarcodeClassifierSelector.h"
+#include "read_pipeline/base/MessageSink.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 

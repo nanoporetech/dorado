@@ -1,4 +1,4 @@
-#include "read_pipeline/context_container.h"
+#include "read_pipeline/base/context_container.h"
 
 // libtorch defines a CHECK macro, but we want catch2's version for testing
 #include <catch2/catch_test_macros.hpp>

@@ -1,7 +1,7 @@
 #pragma once
 
-#include "MessageSink.h"
 #include "config/BasecallModelConfig.h"
+#include "read_pipeline/base/MessageSink.h"
 #include "utils/stats.h"
 
 #include <atomic>

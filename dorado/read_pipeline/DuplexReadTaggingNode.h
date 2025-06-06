@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/stats.h"
 
 #include <memory>

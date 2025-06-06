@@ -175,6 +175,7 @@ add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/nn)
 add_subdirectory(dorado/poly_tail)
+add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/utils)
@@ -239,8 +240,6 @@ add_library(dorado_lib
     dorado/read_pipeline/BasecallerNode.h
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
     dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
-    dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/context_container.h
     dorado/read_pipeline/CorrectionInferenceNode.cpp
     dorado/read_pipeline/CorrectionInferenceNode.h
     dorado/read_pipeline/CorrectionMapperNode.cpp
@@ -249,7 +248,6 @@ add_library(dorado_lib
     dorado/read_pipeline/CorrectionPafReaderNode.h
     dorado/read_pipeline/CorrectionPafWriterNode.cpp
     dorado/read_pipeline/CorrectionPafWriterNode.h
-    dorado/read_pipeline/DefaultClientInfo.h
     dorado/read_pipeline/DuplexReadTaggingNode.cpp
     dorado/read_pipeline/DuplexReadTaggingNode.h
     dorado/read_pipeline/FakeDataLoader.cpp
@@ -258,8 +256,6 @@ add_library(dorado_lib
     dorado/read_pipeline/HtsReader.h
     dorado/read_pipeline/HtsWriter.cpp
     dorado/read_pipeline/HtsWriter.h
-    dorado/read_pipeline/MessageSink.cpp
-    dorado/read_pipeline/MessageSink.h
     dorado/read_pipeline/ModBaseCallerNode.cpp
     dorado/read_pipeline/ModBaseCallerNode.h
     dorado/read_pipeline/ModBaseChunkCallerNode.cpp
@@ -276,8 +272,6 @@ add_library(dorado_lib
     dorado/read_pipeline/ReadFilterNode.h
     dorado/read_pipeline/ReadForwarderNode.cpp
     dorado/read_pipeline/ReadForwarderNode.h
-    dorado/read_pipeline/ReadPipeline.cpp
-    dorado/read_pipeline/ReadPipeline.h
     dorado/read_pipeline/ReadSplitNode.cpp
     dorado/read_pipeline/ReadSplitNode.h
     dorado/read_pipeline/ReadToBamTypeNode.cpp
@@ -292,15 +286,8 @@ add_library(dorado_lib
     dorado/read_pipeline/SubreadTaggerNode.h
     dorado/read_pipeline/TrimmerNode.cpp
     dorado/read_pipeline/TrimmerNode.h
-    dorado/read_pipeline/messages.cpp
-    dorado/read_pipeline/messages.h
-    dorado/read_pipeline/flush_options.h
     dorado/read_pipeline/read_output_progress_stats.cpp
     dorado/read_pipeline/read_output_progress_stats.h
-    dorado/read_pipeline/read_utils.cpp
-    dorado/read_pipeline/read_utils.h
-    dorado/read_pipeline/stereo_features.cpp
-    dorado/read_pipeline/stereo_features.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
     dorado/splitter/DuplexReadSplitter.cpp
@@ -366,6 +353,7 @@ target_link_libraries(dorado_lib
         dorado_hts_io
         dorado_modbase
         dorado_poly_tail
+        dorado_read_pipeline
         dorado_secondary
         dorado_version
         edlib
@@ -456,11 +444,6 @@ if (GENERATE_TEST_COVERAGE)
                 "${CMAKE_BINARY_DIR}/3rdparty/*"
             )
     endif()
-endif()
-
-# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
-if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
-    set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )

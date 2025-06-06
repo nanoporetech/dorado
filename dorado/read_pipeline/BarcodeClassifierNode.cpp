@@ -1,11 +1,11 @@
 #include "BarcodeClassifierNode.h"
 
-#include "ClientInfo.h"
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
-#include "messages.h"
+#include "read_pipeline/base/ClientInfo.h"
+#include "read_pipeline/base/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"

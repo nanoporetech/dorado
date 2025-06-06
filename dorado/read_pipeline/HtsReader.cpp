@@ -1,7 +1,7 @@
 #include "HtsReader.h"
 
-#include "DefaultClientInfo.h"
-#include "ReadPipeline.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/bam_utils.h"
 #include "utils/fastq_reader.h"
 #include "utils/types.h"

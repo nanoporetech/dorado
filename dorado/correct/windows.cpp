@@ -2,7 +2,7 @@
 
 #include "conversions.h"
 #include "features.h"
-#include "read_pipeline/messages.h"
+#include "read_pipeline/base/messages.h"
 #include "torch_utils/gpu_profiling.h"
 #include "types.h"
 #include "utils/paf_utils.h"

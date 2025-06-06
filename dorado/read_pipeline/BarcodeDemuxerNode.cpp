@@ -1,6 +1,6 @@
 #include "BarcodeDemuxerNode.h"
 
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/SampleSheet.h"
 #include "utils/fastq_reader.h"
 #include "utils/hts_file.h"

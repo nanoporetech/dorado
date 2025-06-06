@@ -1,8 +1,8 @@
 #include "PolyACalculatorNode.h"
 
-#include "ClientInfo.h"
 #include "poly_tail/poly_tail_calculator.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
+#include "read_pipeline/base/ClientInfo.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 

@@ -1,10 +1,10 @@
 #include "AdapterDetectorNode.h"
 
-#include "ClientInfo.h"
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
-#include "messages.h"
+#include "read_pipeline/base/ClientInfo.h"
+#include "read_pipeline/base/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"

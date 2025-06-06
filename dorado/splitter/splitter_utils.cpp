@@ -1,7 +1,7 @@
 #include "splitter_utils.h"
 
-#include "read_pipeline/ReadPipeline.h"
-#include "read_pipeline/read_utils.h"
+#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/base/read_utils.h"
 #include "utils/time_utils.h"
 
 #include <ATen/TensorIndexing.h>

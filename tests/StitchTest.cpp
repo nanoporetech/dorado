@@ -1,6 +1,6 @@
 #include "read_pipeline/stitch.h"
 
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/math_utils.h"
 
 #include <catch2/catch_test_macros.hpp>

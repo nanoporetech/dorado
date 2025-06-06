@@ -1,7 +1,7 @@
 #pragma once
 
 #include "Minimap2Index.h"
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 
 #include <minimap.h>
 

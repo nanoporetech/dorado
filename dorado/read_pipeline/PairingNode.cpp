@@ -1,6 +1,6 @@
 #include "PairingNode.h"
 
-#include "ClientInfo.h"
+#include "read_pipeline/base/ClientInfo.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"

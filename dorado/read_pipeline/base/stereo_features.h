@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 
 #include <ATen/Tensor.h>
 

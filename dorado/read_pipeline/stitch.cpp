@@ -1,6 +1,6 @@
 #include "stitch.h"
 
-#include "ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/math_utils.h"
 
 #include <algorithm>

@@ -1,9 +1,9 @@
 #include "TrimmerNode.h"
 
-#include "ClientInfo.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "read_pipeline/base/ClientInfo.h"
 #include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"

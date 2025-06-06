@@ -1,11 +1,11 @@
 #include "AlignerNode.h"
 
-#include "ClientInfo.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
-#include "messages.h"
+#include "read_pipeline/base/ClientInfo.h"
+#include "read_pipeline/base/messages.h"
 #include "utils/concurrency/multi_queue_thread_pool.h"
 
 #include <htslib/sam.h>

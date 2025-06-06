@@ -1,6 +1,6 @@
 #pragma once
 
-#include "MessageSink.h"
+#include "read_pipeline/base/MessageSink.h"
 
 #include <atomic>
 #include <condition_variable>

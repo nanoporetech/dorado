@@ -1,7 +1,7 @@
 #pragma once
 
 #include "modbase/ModBaseRunner.h"
-#include "read_pipeline/MessageSink.h"
+#include "read_pipeline/base/MessageSink.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 

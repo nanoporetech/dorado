@@ -1,7 +1,7 @@
 #include "ResumeLoader.h"
 
-#include "DefaultClientInfo.h"
 #include "HtsReader.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
 #include "utils/tty_utils.h"
 
 #include <htslib/sam.h>

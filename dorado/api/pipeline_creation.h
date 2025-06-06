@@ -1,6 +1,6 @@
 #pragma once
 
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 
 #include <cstdint>
 #include <map>

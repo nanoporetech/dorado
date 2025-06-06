@@ -2,8 +2,8 @@
 #include "TestUtils.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "poly_tail/poly_tail_config.h"
-#include "read_pipeline/DefaultClientInfo.h"
 #include "read_pipeline/PolyACalculatorNode.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
