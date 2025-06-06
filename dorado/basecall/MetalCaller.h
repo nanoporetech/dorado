@@ -2,8 +2,7 @@
 
 #include "DecodedChunk.h"
 #include "config/BasecallModelConfig.h"
-#include "model/MetalCRFModel.h"
-#include "model/TxModel.h"
+#include "torch_utils/metal_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <ATen/core/TensorBody.h>
@@ -18,9 +17,10 @@
 #include <thread>
 #include <vector>
 
-namespace dorado::config {
-struct BasecallModelConfig;
-}
+namespace dorado::basecall::model {
+struct MetalCRFModelImpl;
+struct TxModelImpl;
+}  // namespace dorado::basecall::model
 
 namespace dorado::basecall {
 
@@ -77,6 +77,7 @@ protected:
 class MetalLSTMCaller : public MetalCaller {
 public:
     MetalLSTMCaller(const config::BasecallModelConfig &model_config, float memory_limit_fraction);
+    ~MetalLSTMCaller();
 
     at::Tensor create_input_tensor() const override {
         // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
@@ -98,7 +99,7 @@ private:
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
-    model::MetalCRFModel m_model{nullptr};
+    std::unique_ptr<model::MetalCRFModelImpl> m_model;
     torch::ScalarType m_scores_dtype = torch::kChar;
     torch::ScalarType m_posts_dtype = torch::kShort;
 
@@ -125,6 +126,7 @@ private:
 class MetalTxCaller : public MetalCaller {
 public:
     MetalTxCaller(const config::BasecallModelConfig &model_config);
+    ~MetalTxCaller();
 
     at::Tensor create_input_tensor() const override {
         // NCT
@@ -137,7 +139,7 @@ private:
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
-    model::TxModel m_model{nullptr};
+    std::unique_ptr<model::TxModelImpl> m_model;
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
 
     torch::ScalarType m_scores_dtype = torch::kHalf;
