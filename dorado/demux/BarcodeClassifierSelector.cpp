@@ -1,7 +1,7 @@
-#include "BarcodeClassifierSelector.h"
+#include "demux/BarcodeClassifierSelector.h"
 
-#include "BarcodeClassifier.h"
-#include "barcoding_info.h"
+#include "demux/BarcodeClassifier.h"
+#include "demux/barcoding_info.h"
 
 #include <spdlog/spdlog.h>
 

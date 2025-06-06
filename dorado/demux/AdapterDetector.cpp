@@ -1,8 +1,8 @@
-#include "AdapterDetector.h"
+#include "demux/AdapterDetector.h"
 
 #include "adapter_primer_kits.h"
-#include "parse_custom_kit.h"
-#include "parse_custom_sequences.h"
+#include "demux/parse_custom_kit.h"
+#include "demux/parse_custom_sequences.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"

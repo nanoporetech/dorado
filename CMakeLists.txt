@@ -169,6 +169,7 @@ add_subdirectory(dorado/alignment)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
+add_subdirectory(dorado/demux)
 add_subdirectory(dorado/devtools)
 add_subdirectory(dorado/hts_io)
 add_subdirectory(dorado/modbase)
@@ -189,26 +190,6 @@ add_library(dorado_lib
     dorado/api/runner_creation.h
     dorado/api/pipeline_creation.cpp
     dorado/api/pipeline_creation.h
-    dorado/demux/adapter_primer_kits.cpp
-    dorado/demux/adapter_primer_kits.h
-    dorado/demux/adapter_info.h
-    dorado/demux/AdapterDetector.cpp
-    dorado/demux/AdapterDetector.h
-    dorado/demux/AdapterDetectorSelector.h
-    dorado/demux/AdapterDetectorSelector.cpp
-    dorado/demux/BarcodeClassifier.cpp
-    dorado/demux/BarcodeClassifier.h
-    dorado/demux/BarcodeClassifierSelector.cpp
-    dorado/demux/BarcodeClassifierSelector.h
-    dorado/demux/barcoding_info.h
-    dorado/demux/KitInfoProvider.cpp
-    dorado/demux/KitInfoProvider.h
-    dorado/demux/Trimmer.cpp
-    dorado/demux/Trimmer.h
-    dorado/demux/parse_custom_kit.cpp
-    dorado/demux/parse_custom_kit.h
-    dorado/demux/parse_custom_sequences.cpp
-    dorado/demux/parse_custom_sequences.h
     dorado/read_pipeline/AdapterDetectorNode.cpp
     dorado/read_pipeline/AdapterDetectorNode.h
     dorado/read_pipeline/AlignerNode.cpp
@@ -324,6 +305,7 @@ target_link_libraries(dorado_lib
     PUBLIC
         dorado_alignment
         dorado_basecall
+        dorado_demux
         dorado_hts_io
         dorado_modbase
         dorado_poly_tail

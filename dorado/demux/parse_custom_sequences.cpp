@@ -1,4 +1,4 @@
-#include "parse_custom_sequences.h"
+#include "demux/parse_custom_sequences.h"
 
 #include "utils/fasta_reader.h"
 

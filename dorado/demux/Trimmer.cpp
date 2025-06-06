@@ -1,4 +1,4 @@
-#include "Trimmer.h"
+#include "demux/Trimmer.h"
 
 #include "read_pipeline/base/messages.h"
 #include "torch_utils/trim.h"
