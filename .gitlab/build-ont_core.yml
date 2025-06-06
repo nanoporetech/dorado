@@ -23,7 +23,7 @@
 build:linux:x86:focal:ont_core:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
   variables:
-    BUILD_PRESET: "linux-x64-conan_gcc9-dorado-release"
+    BUILD_PRESET: "linux-x64-conan_gcc11-dorado-release"
   extends:
     - .linux_runner
     - .test_ont_core_compatibility
