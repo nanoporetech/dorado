@@ -109,8 +109,6 @@ endif()
 target_include_directories(dorado_utils
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/.. # TODO: remove this once dependents are fixed
 )
 
 target_link_libraries(dorado_utils

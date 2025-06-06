@@ -9,8 +9,6 @@ add_library(dorado_compat
 target_include_directories(dorado_compat
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/.. # TODO: remove this once dependents are fixed
 )
 
 enable_warnings_as_errors(dorado_compat)

@@ -21,8 +21,6 @@ target_link_libraries(dorado_models_lib
 target_include_directories(dorado_models_lib
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-    INTERFACE
-        ${CMAKE_CURRENT_SOURCE_DIR}/.. # TODO: remove this once dependents are fixed
 )
 
 enable_warnings_as_errors(dorado_models_lib)
