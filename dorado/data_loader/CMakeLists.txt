@@ -1,16 +1,23 @@
 add_library(dorado_io_lib
+    # Public
+    include/data_loader/DataLoader.h
+
+    # Private
     DataLoader.cpp
-    DataLoader.h
 )
 
 target_link_libraries(dorado_io_lib
-PUBLIC
-    dorado_lib
-    cxxpool
-PRIVATE
-    spdlog::spdlog
-    pod5_libs
-    ${ZLIB_LIBRARIES}
+    PUBLIC
+        cxxpool
+        dorado_lib
+    PRIVATE
+        pod5_libs
+        spdlog::spdlog
+)
+
+target_include_directories(dorado_io_lib
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
 enable_warnings_as_errors(dorado_io_lib)
