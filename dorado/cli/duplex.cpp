@@ -19,7 +19,7 @@
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/nodes/DuplexReadTaggingNode.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/nodes/ReadFilterNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 #include "torch_utils/auto_detect_device.h"
@@ -520,7 +520,7 @@ int duplex(int argc, char* argv[]) {
         gpu_names = utils::get_cuda_gpu_names(device);
 #endif
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
+            hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
             std::string err_msg{};
@@ -540,7 +540,7 @@ int duplex(int argc, char* argv[]) {
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
                                                           ref, bed, *minimap_options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
+            hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }

@@ -1,7 +1,7 @@
 #include "hts_io/FastxRandomReader.h"
 
 #include "TestUtils.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/hts_file.h"
 
@@ -38,7 +38,7 @@ CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTA input.", "Fa
     {
         utils::HtsFile hts_file(temp_input_file.string(), utils::HtsFile::OutputMode::FASTA, 2,
                                 false);
-        HtsWriter writer(hts_file, "");
+        HtsWriterNode writer(hts_file, "");
         auto rec = generate_bam_entry(read_id, seq, {});
         writer.write(rec.get());
         hts_file.finalise([](size_t) { /* noop */ });
@@ -61,7 +61,7 @@ CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTQ input.", "Fa
     {
         utils::HtsFile hts_file(temp_input_file.string(), utils::HtsFile::OutputMode::FASTQ, 2,
                                 false);
-        HtsWriter writer(hts_file, "");
+        HtsWriterNode writer(hts_file, "");
         auto rec = generate_bam_entry(read_id, seq, qscore);
         writer.write(rec.get());
         hts_file.finalise([](size_t) { /* noop */ });

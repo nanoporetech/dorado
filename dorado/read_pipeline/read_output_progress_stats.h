@@ -82,7 +82,7 @@ public:
     // Called to indicate the current stats collection has completed.
     // There may be new stats but their counters will be reset to zero.
     // E.g. happens in `dorado aligner` when reading from multiple input files
-    // a new pipeline and HtsWriter is created for each input file
+    // a new pipeline and HtsWriterNode is created for each input file
     void notify_stats_collector_completed(const stats::NamedStats& stats);
 
     // Useful for collector_per_input_file mode (aligner), so that further

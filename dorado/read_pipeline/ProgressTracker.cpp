@@ -150,7 +150,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         return 0.;
     };
 
-    m_num_simplex_reads_written = int(fetch_stat("HtsWriter.unique_simplex_reads_written") +
+    m_num_simplex_reads_written = int(fetch_stat("HtsWriterNode.unique_simplex_reads_written") +
                                       fetch_stat("BarcodeDemuxerNode.demuxed_reads_written"));
 
     m_num_simplex_reads_filtered = int(fetch_stat("ReadFilterNode.simplex_reads_filtered"));
@@ -163,7 +163,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         m_num_duplex_bases_processed = int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
         m_num_bases_processed += m_num_duplex_bases_processed;
     }
-    m_num_duplex_reads_written = int(fetch_stat("HtsWriter.duplex_reads_written"));
+    m_num_duplex_reads_written = int(fetch_stat("HtsWriterNode.duplex_reads_written"));
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
 

@@ -7,7 +7,7 @@
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
@@ -151,7 +151,7 @@ int trim(int argc, char* argv[]) {
     hts_file.set_header(header.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
+    auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
 
     auto trimmer = pipeline_desc.add_node<TrimmerNode>({hts_writer}, 1);
 

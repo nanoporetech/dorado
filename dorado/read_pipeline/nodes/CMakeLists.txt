@@ -11,7 +11,7 @@ add_library(dorado_read_pipeline_nodes STATIC
     include/read_pipeline/nodes/CorrectionPafReaderNode.h
     include/read_pipeline/nodes/CorrectionPafWriterNode.h
     include/read_pipeline/nodes/DuplexReadTaggingNode.h
-    include/read_pipeline/nodes/HtsWriter.h
+    include/read_pipeline/nodes/HtsWriterNode.h
     include/read_pipeline/nodes/ModBaseCallerNode.h
     include/read_pipeline/nodes/ModBaseChunkCallerNode.h
     include/read_pipeline/nodes/NullNode.h
@@ -39,7 +39,7 @@ add_library(dorado_read_pipeline_nodes STATIC
     CorrectionPafReaderNode.cpp
     CorrectionPafWriterNode.cpp
     DuplexReadTaggingNode.cpp
-    HtsWriter.cpp
+    HtsWriterNode.cpp
     ModBaseCallerNode.cpp
     ModBaseChunkCallerNode.cpp
     NullNode.cpp

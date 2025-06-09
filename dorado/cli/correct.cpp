@@ -8,7 +8,7 @@
 #include "read_pipeline/nodes/CorrectionMapperNode.h"
 #include "read_pipeline/nodes/CorrectionPafReaderNode.h"
 #include "read_pipeline/nodes/CorrectionPafWriterNode.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
@@ -494,7 +494,7 @@ int correct(int argc, char* argv[]) {
                     new utils::HtsFile("-", OutputMode::FASTA, correct_writer_threads, false));
 
             // 3. Corrected reads will be written out in FASTA format.
-            const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
+            const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, "");
 
             // 2. Window generation, encoding + inference and decoding to generate final reads.
             pipeline_desc.add_node<CorrectionInferenceNode>(

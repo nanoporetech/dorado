@@ -1,4 +1,4 @@
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/sequence_utils.h"
@@ -16,16 +16,16 @@ namespace dorado {
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
-HtsWriter::HtsWriter(utils::HtsFile& file, std::string gpu_names)
+HtsWriterNode::HtsWriterNode(utils::HtsFile& file, std::string gpu_names)
         : MessageSink(10000, 1), m_file(file), m_gpu_names(std::move(gpu_names)) {
     if (!m_gpu_names.empty()) {
         m_gpu_names = "gpu:" + m_gpu_names;
     }
 }
 
-HtsWriter::~HtsWriter() { stop_input_processing(); }
+HtsWriterNode::~HtsWriterNode() { stop_input_processing(); }
 
-OutputMode HtsWriter::get_output_mode(const std::string& mode) {
+OutputMode HtsWriterNode::get_output_mode(const std::string& mode) {
     if (mode == "sam") {
         return OutputMode::SAM;
     } else if (mode == "bam") {
@@ -36,7 +36,7 @@ OutputMode HtsWriter::get_output_mode(const std::string& mode) {
     throw std::runtime_error("Unknown output mode: " + mode);
 }
 
-void HtsWriter::input_thread_fn() {
+void HtsWriterNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         if (!std::holds_alternative<BamMessage>(message)) {
@@ -90,7 +90,7 @@ void HtsWriter::input_thread_fn() {
     }
 }
 
-int HtsWriter::write(bam1_t* const record) {
+int HtsWriterNode::write(bam1_t* const record) {
     // track stats
     m_total++;
     if (record->core.flag & BAM_FUNMAP) {
@@ -114,7 +114,7 @@ int HtsWriter::write(bam1_t* const record) {
     return m_file.write(record);
 }
 
-stats::NamedStats HtsWriter::sample_stats() const {
+stats::NamedStats HtsWriterNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
     stats["unique_simplex_reads_written"] = static_cast<double>(m_processed_read_ids.size());
     stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
@@ -122,11 +122,11 @@ stats::NamedStats HtsWriter::sample_stats() const {
     return stats;
 }
 
-void HtsWriter::terminate(const FlushOptions&) { stop_input_processing(); }
+void HtsWriterNode::terminate(const FlushOptions&) { stop_input_processing(); }
 
-std::size_t HtsWriter::ProcessedReadIds::size() const { return m_threadsafe_count_of_reads; }
+std::size_t HtsWriterNode::ProcessedReadIds::size() const { return m_threadsafe_count_of_reads; }
 
-void HtsWriter::ProcessedReadIds::add(std::string read_id) {
+void HtsWriterNode::ProcessedReadIds::add(std::string read_id) {
     read_ids.insert(std::move(read_id));
     m_threadsafe_count_of_reads = read_ids.size();
 }

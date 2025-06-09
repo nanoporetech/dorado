@@ -10,7 +10,7 @@
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/AlignerNode.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/read_output_progress_stats.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"
@@ -276,7 +276,7 @@ int aligner(int argc, char* argv[]) {
             hts_file.set_buffer_size(BAM_BUFFER_SIZE);
         }
         PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
+        auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
         auto aligner = pipeline_desc.add_node<AlignerNode>(
                 {hts_writer}, index_file_access, bed_file_access, align_info->reference_file,
                 align_info->bed_file, align_info->minimap_options, aligner_threads);
@@ -293,7 +293,7 @@ int aligner(int argc, char* argv[]) {
         // rather than the pipeline framework.
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
-        auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
+        auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
         hts_file.set_header(header.get());
 
         // All progress reporting is in the post-processing part.

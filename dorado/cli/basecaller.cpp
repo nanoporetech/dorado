@@ -26,7 +26,7 @@
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/nodes/PolyACalculatorNode.h"
 #include "read_pipeline/nodes/ReadFilterNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
@@ -469,7 +469,7 @@ void setup(const std::vector<std::string>& args,
 #if DORADO_CUDA_BUILD
     gpu_names = utils::get_cuda_gpu_names(device);
 #endif
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
+    auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -544,7 +544,7 @@ void setup(const std::vector<std::string>& args,
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
+    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());

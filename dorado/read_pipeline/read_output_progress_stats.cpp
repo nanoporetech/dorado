@@ -56,7 +56,7 @@ auto get_num_reads_written(const stats::NamedStats& stats) {
         return 0;
     };
 
-    return size_t_stat("HtsWriter.unique_simplex_reads_written") +
+    return size_t_stat("HtsWriterNode.unique_simplex_reads_written") +
            size_t_stat("BarcodeDemuxerNode.demuxed_reads_written");
 }
 
@@ -180,7 +180,7 @@ void ReadOutputProgressStats::report_stats(progress_clock::time_point interval_e
         info.interval_reads_processed = m_interval_previous_stat_collectors_total +
                                         m_current_reads_written_count - m_interval_start_count;
 
-        // Total number read from file may be higher than total number written by HtsWriter
+        // Total number read from file may be higher than total number written by HtsWriterNode
         // if input files contained duplicate read_ids. Use the total number written so that
         // the sum of the intervals matches the total number processed.
         info.total_reads_processed =
@@ -243,7 +243,7 @@ void ReadOutputProgressStats::notify_stats_collector_completed(const stats::Name
     assert(m_previous_stat_collectors_total <= m_total_known_readcount &&
            "Expected that update_reads_per_file_estimate called before "
            "notify_stats_collector_completed");
-    // HtsWriter stats don't include any duplicate read_ids, but HtsReader will not filter out duplicate read_ids
+    // HtsWriterNode stats don't include any duplicate read_ids, but HtsReader will not filter out duplicate read_ids
     // so account for any discrepancy in this interval
     auto duplicates_read_ids_this_interval =
             static_cast<std::size_t>(m_total_known_readcount - m_previous_stat_collectors_total);

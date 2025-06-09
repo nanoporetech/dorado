@@ -15,11 +15,11 @@ struct bam1_t;
 
 namespace dorado {
 
-class HtsWriter : public MessageSink {
+class HtsWriterNode : public MessageSink {
 public:
-    HtsWriter(utils::HtsFile& file, std::string gpu_names);
-    ~HtsWriter();
-    std::string get_name() const override { return "HtsWriter"; }
+    HtsWriterNode(utils::HtsFile& file, std::string gpu_names);
+    ~HtsWriterNode();
+    std::string get_name() const override { return "HtsWriterNode"; }
     stats::NamedStats sample_stats() const override;
     void terminate(const FlushOptions&) override;
     void restart() override {

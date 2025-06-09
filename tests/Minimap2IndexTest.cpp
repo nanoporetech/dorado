@@ -3,7 +3,7 @@
 #include "TestUtils.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "utils/hts_file.h"
 #include "utils/stream_utils.h"
 #include "utils/types.h"
@@ -156,7 +156,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     auto temp_dir = tests::make_temp_dir("mm2_split_index_test");
     auto temp_input_file = temp_dir.m_path / "input.fa";
     utils::HtsFile hts_file(temp_input_file.string(), utils::HtsFile::OutputMode::FASTA, 2, false);
-    HtsWriter writer(hts_file, "");
+    HtsWriterNode writer(hts_file, "");
     for (auto& [seq, read_id] : {
                  std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
                                                           "read1"),

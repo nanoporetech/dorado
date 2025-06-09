@@ -1,7 +1,7 @@
 #include "TestUtils.h"
 #include "read_pipeline/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
-#include "read_pipeline/nodes/HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "utils/bam_utils.h"
 #include "utils/hts_file.h"
 #include "utils/stats.h"
@@ -38,13 +38,13 @@ protected:
         hts_file.set_header(reader.header());
 
         PipelineDescriptor pipeline_desc;
-        auto writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
+        auto writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
         pipeline->terminate(DefaultFlushOptions());
 
-        auto& writer_ref = pipeline->get_node_ref<HtsWriter>(writer);
+        auto& writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);
         stats = writer_ref.sample_stats();
 
         hts_file.finalise([](size_t) { /* noop */ });
@@ -71,13 +71,13 @@ CATCH_TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriterTest: Write BAM", TEST_G
 }
 
 CATCH_TEST_CASE("HtsWriterTest: Output mode conversion", TEST_GROUP) {
-    CATCH_CHECK(HtsWriter::get_output_mode("sam") == HtsFile::OutputMode::SAM);
-    CATCH_CHECK(HtsWriter::get_output_mode("bam") == HtsFile::OutputMode::BAM);
-    CATCH_CHECK(HtsWriter::get_output_mode("fastq") == HtsFile::OutputMode::FASTQ);
-    CATCH_CHECK_THROWS_WITH(HtsWriter::get_output_mode("blah"), "Unknown output mode: blah");
+    CATCH_CHECK(HtsWriterNode::get_output_mode("sam") == HtsFile::OutputMode::SAM);
+    CATCH_CHECK(HtsWriterNode::get_output_mode("bam") == HtsFile::OutputMode::BAM);
+    CATCH_CHECK(HtsWriterNode::get_output_mode("fastq") == HtsFile::OutputMode::FASTQ);
+    CATCH_CHECK_THROWS_WITH(HtsWriterNode::get_output_mode("blah"), "Unknown output mode: blah");
 }
 
-CATCH_TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriter: Count reads written", TEST_GROUP) {
+CATCH_TEST_CASE_METHOD(HtsWriterTestsFixture, "HtsWriterTest: Count reads written", TEST_GROUP) {
     CATCH_CHECK_NOTHROW(generate_bam(HtsFile::OutputMode::BAM, 1));
 
     CATCH_CHECK(stats.at("unique_simplex_reads_written") == 6);
@@ -96,7 +96,7 @@ CATCH_TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
     {
         // Write with tags into temporary folder.
         utils::HtsFile hts_file(out_fastq.string(), HtsFile::OutputMode::FASTQ, 2, false);
-        HtsWriter writer(hts_file, "");
+        HtsWriterNode writer(hts_file, "");
         reader.read();
         const auto rg_tag = bam_aux_get(reader.record.get(), "RG");
         CATCH_REQUIRE(rg_tag != nullptr);
@@ -147,7 +147,7 @@ CATCH_TEST_CASE(
         // Write into temporary folder.
         utils::HtsFile hts_file(out_sam.string(), HtsFile::OutputMode::SAM, 2, false);
         hts_file.set_header(fastq_reader.header());
-        HtsWriter writer(hts_file, "");
+        HtsWriterNode writer(hts_file, "");
         writer.write(fastq_reader.record.get());
         hts_file.finalise([](size_t) { /* noop */ });
     }
