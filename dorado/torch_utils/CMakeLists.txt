@@ -30,13 +30,6 @@ target_include_directories(dorado_torch_utils
         ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
 
-# 3rdparty libs should be considered SYSTEM headers
-target_include_directories(dorado_torch_utils
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp/metal-cpp
-)
-
 target_link_libraries(dorado_torch_utils
     PUBLIC
         date::date
@@ -69,6 +62,7 @@ if(APPLE)
             ${APPLE_FWK_QUARTZ_CORE}
             ${APPLE_FWK_METAL}
             ${IOKIT}
+            metal_cpp
     )
 endif()
 
