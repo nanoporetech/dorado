@@ -165,6 +165,10 @@ add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
+# CMake can't REUSE_FROM targets that it doesn't know about, so include
+# torch_utils first for its PCH.
+add_subdirectory(dorado/torch_utils)
+
 add_subdirectory(dorado/alignment)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
@@ -180,7 +184,6 @@ add_subdirectory(dorado/poly_tail)
 add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/splitter)
-add_subdirectory(dorado/torch_utils)
 add_subdirectory(dorado/utils)
 
 add_library(dorado_lib
