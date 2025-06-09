@@ -1,10 +1,10 @@
-#include "windows.h"
+#include "correct/windows.h"
 
-#include "conversions.h"
-#include "features.h"
+#include "correct/conversions.h"
+#include "correct/features.h"
+#include "correct/types.h"
 #include "read_pipeline/base/messages.h"
 #include "torch_utils/gpu_profiling.h"
-#include "types.h"
 #include "utils/paf_utils.h"
 
 #include <spdlog/spdlog.h>

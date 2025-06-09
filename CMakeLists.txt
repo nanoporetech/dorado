@@ -173,6 +173,7 @@ add_subdirectory(dorado/alignment)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
+add_subdirectory(dorado/correct)
 add_subdirectory(dorado/demux)
 add_subdirectory(dorado/devtools)
 add_subdirectory(dorado/hts_io)
@@ -259,20 +260,6 @@ add_library(dorado_lib
     dorado/read_pipeline/stitch.h
     dorado/summary/summary.cpp
     dorado/summary/summary.h
-    dorado/correct/features.cpp
-    dorado/correct/features.h
-    dorado/correct/windows.cpp
-    dorado/correct/windows.h
-    dorado/correct/conversions.cpp
-    dorado/correct/conversions.h
-    dorado/correct/decode.cpp
-    dorado/correct/decode.h
-    dorado/correct/infer.cpp
-    dorado/correct/infer.h
-    dorado/correct/types.cpp
-    dorado/correct/types.h
-    dorado/correct/CorrectionProgressTracker.cpp
-    dorado/correct/CorrectionProgressTracker.h
 )
 
 enable_warnings_as_errors(dorado_lib)
@@ -298,6 +285,7 @@ target_link_libraries(dorado_lib
     PUBLIC
         dorado_alignment
         dorado_basecall
+        dorado_correct
         dorado_demux
         dorado_hts_io
         dorado_modbase

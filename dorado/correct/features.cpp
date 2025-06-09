@@ -1,6 +1,6 @@
-#include "features.h"
+#include "correct/features.h"
 
-#include "conversions.h"
+#include "correct/conversions.h"
 #include "correct/types.h"
 #include "read_pipeline/base/messages.h"
 #include "torch_utils/gpu_profiling.h"

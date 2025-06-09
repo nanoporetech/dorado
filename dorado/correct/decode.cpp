@@ -1,7 +1,7 @@
-#include "decode.h"
+#include "correct/decode.h"
 
-#include "conversions.h"
-#include "types.h"
+#include "correct/conversions.h"
+#include "correct/types.h"
 
 #include <spdlog/spdlog.h>
 
