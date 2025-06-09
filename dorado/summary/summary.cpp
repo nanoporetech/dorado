@@ -1,4 +1,4 @@
-#include "summary.h"
+#include "summary/summary.h"
 
 #include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"

@@ -186,6 +186,7 @@ add_subdirectory(dorado/poly_tail)
 add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/splitter)
+add_subdirectory(dorado/summary)
 add_subdirectory(dorado/utils)
 add_subdirectory(dorado/variant)
 
@@ -208,8 +209,6 @@ add_library(dorado_lib
     dorado/read_pipeline/read_output_progress_stats.h
     dorado/read_pipeline/stitch.cpp
     dorado/read_pipeline/stitch.h
-    dorado/summary/summary.cpp
-    dorado/summary/summary.h
 )
 
 enable_warnings_as_errors(dorado_lib)
