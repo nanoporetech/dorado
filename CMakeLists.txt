@@ -473,3 +473,35 @@ endif()
 if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
     set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
+
+if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )
+    find_library(
+        LIBSTDCPP_LINK_LOCATION
+        NAMES "libstdc++.so.6"
+        HINTS /usr/lib/x86_64-linux-gnu/
+    )
+
+    if (NOT LIBSTDCPP_LINK_LOCATION)
+        message(FATAL_ERROR "Could not find libstdc++")
+    endif()
+
+    # Follow the softlink from LIBSTDCPP_LINK_LOCATION to the real library
+    execute_process(
+        COMMAND "readlink" "-e" "${LIBSTDCPP_LINK_LOCATION}"
+        OUTPUT_VARIABLE LIBSTDCPP_LOCATION
+        RESULT_VARIABLE LIBSTDCPP_READLINK_RESULT
+        OUTPUT_STRIP_TRAILING_WHITESPACE
+    )
+
+    if (NOT LIBSTDCPP_READLINK_RESULT EQUAL 0)
+        message(
+            FATAL_ERROR
+            "Unable to follow ${LIBSTDCPP_LINK_LOCATION} to a real file, return-code ${LIBSTDCPP_READLINK_RESULT}"
+        )
+    endif ()
+
+    install(
+        FILES ${LIBSTDCPP_LOCATION} ${LIBSTDCPP_LINK_LOCATION}
+        DESTINATION lib
+    )
+endif()

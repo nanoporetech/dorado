@@ -39,7 +39,7 @@ std::string get_file_path(int fd) {
 
 #ifdef __linux__
     std::array<char, 256> filePath;
-    std::array<char, 256> procfdPath;
+    std::array<char, 256> procfdPath{};
     std::snprintf(procfdPath.data(), procfdPath.size(), "/proc/self/fd/%d", fd);
     ssize_t len = readlink(procfdPath.data(), filePath.data(), filePath.size() - 1);
     if (len != -1) {
