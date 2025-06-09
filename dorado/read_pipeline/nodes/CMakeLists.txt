@@ -7,8 +7,6 @@ add_library(dorado_read_pipeline_nodes STATIC
     include/read_pipeline/nodes/BasecallerNode.h
     include/read_pipeline/nodes/BaseSpaceDuplexCallerNode.h
     include/read_pipeline/nodes/CorrectionInferenceNode.h
-    include/read_pipeline/nodes/CorrectionMapperNode.h
-    include/read_pipeline/nodes/CorrectionPafReaderNode.h
     include/read_pipeline/nodes/CorrectionPafWriterNode.h
     include/read_pipeline/nodes/DuplexReadTaggingNode.h
     include/read_pipeline/nodes/HtsWriterNode.h
@@ -35,8 +33,6 @@ add_library(dorado_read_pipeline_nodes STATIC
     BaseSpaceDuplexCallerNode.cpp
     CMakeLists.txt
     CorrectionInferenceNode.cpp
-    CorrectionMapperNode.cpp
-    CorrectionPafReaderNode.cpp
     CorrectionPafWriterNode.cpp
     DuplexReadTaggingNode.cpp
     HtsWriterNode.cpp

@@ -7,6 +7,11 @@ add_executable(dorado
     basecaller.cpp
     cli.h
     correct.cpp
+    CorrectionAligner.h
+    CorrectionMapper.cpp
+    CorrectionMapper.h
+    CorrectionPafReader.cpp
+    CorrectionPafReader.h
     demux.cpp
     download.cpp
     duplex.cpp

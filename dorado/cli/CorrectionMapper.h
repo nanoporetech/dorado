@@ -1,10 +1,9 @@
 #pragma once
 
+#include "CorrectionAligner.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
-#include "read_pipeline/base/MessageSink.h"
-#include "read_pipeline/base/messages.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -26,26 +25,25 @@ namespace dorado {
 
 class Pipeline;
 
-class CorrectionMapperNode : public MessageSink {
+class CorrectionMapper : public CorrectionAligner {
 public:
-    CorrectionMapperNode(const std::string& index_file,
-                         int32_t threads,
-                         uint64_t index_size,
-                         std::string furthest_skip_header,
-                         std::unordered_set<std::string> skip_set,
-                         int32_t run_block_id,
-                         int32_t kmer_size,
-                         int32_t window_size,
-                         int32_t min_chain_score,
-                         float mid_occ_frac);
+    CorrectionMapper(const std::string& index_file,
+                     int32_t threads,
+                     uint64_t index_size,
+                     std::string furthest_skip_header,
+                     std::unordered_set<std::string> skip_set,
+                     int32_t run_block_id,
+                     int32_t kmer_size,
+                     int32_t window_size,
+                     int32_t min_chain_score,
+                     float mid_occ_frac);
 
-    ~CorrectionMapperNode() = default;
-    std::string get_name() const override { return "CorrectionMapperNode"; }
+    ~CorrectionMapper() = default;
+    std::string get_name() const override { return "CorrectionMapper"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override {};
-    void restart() override {}
+
     // Main driver function.
-    void process(Pipeline& pipeline);
+    void process(Pipeline& pipeline) override;
 
     bool load_next_index_block();
 

@@ -1,4 +1,4 @@
-#include "read_pipeline/nodes/CorrectionPafReaderNode.h"
+#include "CorrectionPafReader.h"
 
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
@@ -13,7 +13,7 @@
 
 namespace dorado {
 
-void CorrectionPafReaderNode::process(Pipeline& pipeline) {
+void CorrectionPafReader::process(Pipeline& pipeline) {
     timer::TimerHighRes timer;
 
     std::ifstream file(m_paf_file);
@@ -81,15 +81,12 @@ void CorrectionPafReaderNode::process(Pipeline& pipeline) {
     spdlog::debug("PAF reading done in: {:.2f} s", timer.GetElapsedMilliseconds() / 1000.0f);
 }
 
-CorrectionPafReaderNode::CorrectionPafReaderNode(const std::string_view paf_file,
-                                                 std::unordered_set<std::string> skip_set)
-        : MessageSink(1, 1),
-          m_paf_file(paf_file),
-          m_reads_to_infer{0},
-          m_skip_set{std::move(skip_set)} {}
+CorrectionPafReader::CorrectionPafReader(const std::string_view paf_file,
+                                         std::unordered_set<std::string> skip_set)
+        : m_paf_file(paf_file), m_reads_to_infer{0}, m_skip_set{std::move(skip_set)} {}
 
-stats::NamedStats CorrectionPafReaderNode::sample_stats() const {
-    stats::NamedStats stats = MessageSink::sample_stats();
+stats::NamedStats CorrectionPafReader::sample_stats() const {
+    stats::NamedStats stats;
     stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer);
     return stats;
 }

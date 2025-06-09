@@ -1,15 +1,13 @@
-#include "read_pipeline/nodes/CorrectionMapperNode.h"
+#include "CorrectionMapper.h"
 
-#include "HtsReader.h"
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "alignment/Minimap2Options.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
-#include "read_pipeline/base/ClientInfo.h"
+#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
-#include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"
 #include "utils/bam_utils.h"
 #include "utils/thread_utils.h"
@@ -19,15 +17,12 @@
 #include <minimap.h>
 #include <spdlog/spdlog.h>
 
-#include <cassert>
-#include <filesystem>
-
 namespace dorado {
 
-void CorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
-                                              int hits,
-                                              const std::string& qread,
-                                              const std::string& qname) {
+void CorrectionMapper::extract_alignments(const mm_reg1_t* reg,
+                                          int hits,
+                                          const std::string& qread,
+                                          const std::string& qname) {
     for (int j = 0; j < hits; j++) {
         // mapping region
         auto aln = &reg[j];
@@ -109,7 +104,7 @@ void CorrectionMapperNode::extract_alignments(const mm_reg1_t* reg,
     }
 }
 
-void CorrectionMapperNode::input_thread_fn() {
+void CorrectionMapper::input_thread_fn() {
     utils::set_thread_name("errcorr_node");
     BamPtr read;
     MmTbufPtr tbuf(mm_tbuf_init());
@@ -139,7 +134,7 @@ void CorrectionMapperNode::input_thread_fn() {
     }
 }
 
-void CorrectionMapperNode::load_read_fn() {
+void CorrectionMapper::load_read_fn() {
     utils::set_thread_name("errcorr_load");
     HtsReader reader(m_index_file, {});
     while (reader.read()) {
@@ -152,7 +147,7 @@ void CorrectionMapperNode::load_read_fn() {
     }
 }
 
-void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
+void CorrectionMapper::send_data_fn(Pipeline& pipeline) {
     utils::set_thread_name("errcorr_copy");
     while (true) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
@@ -183,7 +178,7 @@ void CorrectionMapperNode::send_data_fn(Pipeline& pipeline) {
     }
 }
 
-bool CorrectionMapperNode::load_next_index_block() {
+bool CorrectionMapper::load_next_index_block() {
     while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index) {
         ++m_current_index;
         return true;
@@ -191,7 +186,7 @@ bool CorrectionMapperNode::load_next_index_block() {
     return false;
 }
 
-void CorrectionMapperNode::process(Pipeline& pipeline) {
+void CorrectionMapper::process(Pipeline& pipeline) {
     if (m_current_index < 0) {
         spdlog::debug(
                 "Not processing because selected block is out of bounds. m_current_index = {}",
@@ -202,7 +197,7 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
     std::thread reader_thread;
     std::vector<std::thread> aligner_threads;
     std::thread copy_thread =
-            std::thread(&CorrectionMapperNode::send_data_fn, this, std::ref(pipeline));
+            std::thread(&CorrectionMapper::send_data_fn, this, std::ref(pipeline));
 
     // If needed, skip all index chunks until we find the one containing this read.
     if (!std::empty(m_furthest_skip_header)) {
@@ -252,10 +247,10 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
         // Create aligner.
         m_aligner = std::make_unique<alignment::Minimap2Aligner>(m_index);
         // 1. Start thread for generating reads.
-        reader_thread = std::thread(&CorrectionMapperNode::load_read_fn, this);
+        reader_thread = std::thread(&CorrectionMapper::load_read_fn, this);
         // 2. Start threads for aligning reads.
         for (int i = 0; i < m_num_threads; i++) {
-            aligner_threads.push_back(std::thread(&CorrectionMapperNode::input_thread_fn, this));
+            aligner_threads.push_back(std::thread(&CorrectionMapper::input_thread_fn, this));
         }
         // 3. Wait for alignments to finish and all reads to be read
         if (reader_thread.joinable()) {
@@ -290,18 +285,17 @@ void CorrectionMapperNode::process(Pipeline& pipeline) {
     }
 }
 
-CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
-                                           const int32_t threads,
-                                           const uint64_t index_size,
-                                           std::string furthest_skip_header,
-                                           std::unordered_set<std::string> skip_set,
-                                           const int32_t run_block_id,
-                                           const int32_t kmer_size,
-                                           const int32_t window_size,
-                                           const int32_t min_chain_score,
-                                           const float mid_occ_frac)
-        : MessageSink(10000, threads),
-          m_index_file(index_file),
+CorrectionMapper::CorrectionMapper(const std::string& index_file,
+                                   const int32_t threads,
+                                   const uint64_t index_size,
+                                   std::string furthest_skip_header,
+                                   std::unordered_set<std::string> skip_set,
+                                   const int32_t run_block_id,
+                                   const int32_t kmer_size,
+                                   const int32_t window_size,
+                                   const int32_t min_chain_score,
+                                   const float mid_occ_frac)
+        : m_index_file(index_file),
           m_num_threads(threads),
           m_reads_queue(5000),
           m_furthest_skip_header{std::move(furthest_skip_header)},
@@ -323,7 +317,7 @@ CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
     mapping_options.mid_occ_frac = mid_occ_frac;
 
     spdlog::trace(
-            "CorrectionMapperNode options: k = {}, w = {}, min_chain_score = {}, mid_occ_frac = {}",
+            "CorrectionMapper options: k = {}, w = {}, min_chain_score = {}, mid_occ_frac = {}",
             kmer_size, window_size, min_chain_score, mid_occ_frac);
 
     // --cs short
@@ -366,8 +360,8 @@ CorrectionMapperNode::CorrectionMapperNode(const std::string& index_file,
     spdlog::debug("Initial index block set to: {}", m_current_index);
 }
 
-stats::NamedStats CorrectionMapperNode::sample_stats() const {
-    stats::NamedStats stats = MessageSink::sample_stats();
+stats::NamedStats CorrectionMapper::sample_stats() const {
+    stats::NamedStats stats;
     stats["num_reads_aligned"] = m_alignments_processed.load();
     stats["num_reads_to_infer"] = static_cast<double>(m_reads_to_infer.load());
     stats["index_seqs"] = m_index_seqs;
@@ -375,8 +369,8 @@ stats::NamedStats CorrectionMapperNode::sample_stats() const {
     return stats;
 }
 
-int CorrectionMapperNode::get_current_index_block_id() const { return m_current_index; }
+int CorrectionMapper::get_current_index_block_id() const { return m_current_index; }
 
-int CorrectionMapperNode::get_index_seqs() const { return m_index_seqs; }
+int CorrectionMapper::get_index_seqs() const { return m_index_seqs; }
 
 }  // namespace dorado
