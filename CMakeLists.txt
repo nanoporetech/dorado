@@ -186,6 +186,7 @@ add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/splitter)
 add_subdirectory(dorado/utils)
+add_subdirectory(dorado/variant)
 
 add_library(dorado_lib
     dorado/api/caller_creation.cpp
@@ -272,8 +273,6 @@ add_library(dorado_lib
     dorado/correct/types.h
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
-    dorado/variant/variant_progress_tracker.cpp
-    dorado/variant/variant_progress_tracker.h
 )
 
 enable_warnings_as_errors(dorado_lib)
