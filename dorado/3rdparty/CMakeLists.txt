@@ -55,6 +55,12 @@ target_compile_definitions(spdlog PUBLIC
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(elzip EXCLUDE_FROM_ALL)
 
+# indicators
+add_library(indicators INTERFACE)
+target_include_directories(indicators SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/indicators/include
+)
+
 # intervaltree
 add_library(intervaltree INTERFACE)
 target_include_directories(intervaltree SYSTEM INTERFACE

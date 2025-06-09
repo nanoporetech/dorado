@@ -288,12 +288,6 @@ target_include_directories(dorado_lib
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/dorado
 )
-# 3rdparty libs should be considered SYSTEM headers
-target_include_directories(dorado_lib
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/indicators/include
-)
 
 enable_testing()
 
@@ -315,6 +309,7 @@ target_link_libraries(dorado_lib
         dorado_version
         edlib
         htslib
+        indicators
         torch_lib
     PRIVATE
         cxxpool
