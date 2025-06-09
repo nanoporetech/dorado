@@ -1,4 +1,4 @@
-#include "read_pipeline/ReadForwarderNode.h"
+#include "read_pipeline/nodes/ReadForwarderNode.h"
 
 #include "read_pipeline/base/ReadPipeline.h"
 

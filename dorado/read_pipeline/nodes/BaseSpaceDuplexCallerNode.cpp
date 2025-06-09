@@ -1,4 +1,4 @@
-#include "BaseSpaceDuplexCallerNode.h"
+#include "read_pipeline/nodes/BaseSpaceDuplexCallerNode.h"
 
 #include "torch_utils/duplex_utils.h"
 #include "utils/sequence_utils.h"

@@ -1,6 +1,6 @@
 #include "MessageSinkUtils.h"
-#include "read_pipeline/NullNode.h"
 #include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/NullNode.h"
 
 #include <catch2/catch_test_macros.hpp>
 

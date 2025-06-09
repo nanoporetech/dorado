@@ -1,4 +1,4 @@
-#include "AdapterDetectorNode.h"
+#include "read_pipeline/nodes/AdapterDetectorNode.h"
 
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"

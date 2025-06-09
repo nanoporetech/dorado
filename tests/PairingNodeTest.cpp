@@ -1,4 +1,4 @@
-#include "read_pipeline/PairingNode.h"
+#include "read_pipeline/nodes/PairingNode.h"
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"

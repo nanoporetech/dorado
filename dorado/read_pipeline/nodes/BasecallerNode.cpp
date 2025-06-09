@@ -1,4 +1,4 @@
-#include "BasecallerNode.h"
+#include "read_pipeline/nodes/BasecallerNode.h"
 
 #include "basecall/ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"

@@ -1,4 +1,4 @@
-#include "BarcodeClassifierNode.h"
+#include "read_pipeline/nodes/BarcodeClassifierNode.h"
 
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"

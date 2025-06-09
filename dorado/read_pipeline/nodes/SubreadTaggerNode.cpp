@@ -1,4 +1,4 @@
-#include "SubreadTaggerNode.h"
+#include "read_pipeline/nodes/SubreadTaggerNode.h"
 
 #include "utils/thread_utils.h"
 

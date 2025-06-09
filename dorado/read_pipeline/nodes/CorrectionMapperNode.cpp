@@ -1,4 +1,4 @@
-#include "CorrectionMapperNode.h"
+#include "read_pipeline/nodes/CorrectionMapperNode.h"
 
 #include "HtsReader.h"
 #include "alignment/Minimap2Aligner.h"

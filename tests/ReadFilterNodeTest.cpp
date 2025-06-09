@@ -1,4 +1,4 @@
-#include "read_pipeline/ReadFilterNode.h"
+#include "read_pipeline/nodes/ReadFilterNode.h"
 
 #include "MessageSinkUtils.h"
 

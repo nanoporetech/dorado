@@ -1,4 +1,4 @@
-#include "BarcodeDemuxerNode.h"
+#include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/SampleSheet.h"

@@ -1,4 +1,4 @@
-#include "CorrectionPafReaderNode.h"
+#include "read_pipeline/nodes/CorrectionPafReaderNode.h"
 
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"

@@ -1,4 +1,4 @@
-#include "ReadForwarderNode.h"
+#include "read_pipeline/nodes/ReadForwarderNode.h"
 
 namespace dorado {
 

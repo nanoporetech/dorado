@@ -1,4 +1,4 @@
-#include "ReadSplitNode.h"
+#include "read_pipeline/nodes/ReadSplitNode.h"
 
 #include "splitter/ReadSplitter.h"
 

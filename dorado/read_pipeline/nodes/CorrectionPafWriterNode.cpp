@@ -1,4 +1,4 @@
-#include "CorrectionPafWriterNode.h"
+#include "read_pipeline/nodes/CorrectionPafWriterNode.h"
 
 #include "utils/paf_utils.h"
 

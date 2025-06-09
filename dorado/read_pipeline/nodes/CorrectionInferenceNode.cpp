@@ -1,4 +1,4 @@
-#include "CorrectionInferenceNode.h"
+#include "read_pipeline/nodes/CorrectionInferenceNode.h"
 
 #include "correct/conversions.h"
 #include "correct/decode.h"

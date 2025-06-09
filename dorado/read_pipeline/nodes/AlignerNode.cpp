@@ -1,4 +1,4 @@
-#include "AlignerNode.h"
+#include "read_pipeline/nodes/AlignerNode.h"
 
 #include "alignment/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"

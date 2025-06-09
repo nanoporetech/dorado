@@ -4,10 +4,10 @@
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
-#include "read_pipeline/AdapterDetectorNode.h"
 #include "read_pipeline/HtsReader.h"
-#include "read_pipeline/TrimmerNode.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/nodes/AdapterDetectorNode.h"
+#include "read_pipeline/nodes/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 

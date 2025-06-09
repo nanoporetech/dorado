@@ -1,4 +1,4 @@
-#include "PairingNode.h"
+#include "read_pipeline/nodes/PairingNode.h"
 
 #include "read_pipeline/base/ClientInfo.h"
 #include "utils/log_utils.h"

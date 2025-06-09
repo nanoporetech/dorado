@@ -1,4 +1,4 @@
-#include "DuplexReadTaggingNode.h"
+#include "read_pipeline/nodes/DuplexReadTaggingNode.h"
 
 #include <spdlog/spdlog.h>
 

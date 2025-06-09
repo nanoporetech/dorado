@@ -1,4 +1,4 @@
-#include "TrimmerNode.h"
+#include "read_pipeline/nodes/TrimmerNode.h"
 
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"

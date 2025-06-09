@@ -1,4 +1,4 @@
-#include "HtsWriter.h"
+#include "read_pipeline/nodes/HtsWriter.h"
 
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/sequence_utils.h"
@@ -6,7 +6,6 @@
 #include <htslib/bgzf.h>
 #include <htslib/kroundup.h>
 #include <htslib/sam.h>
-#include <indicators/progress_bar.hpp>
 #include <spdlog/spdlog.h>
 
 #include <cassert>

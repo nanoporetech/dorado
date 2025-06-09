@@ -1,4 +1,4 @@
-#include "ModBaseChunkCallerNode.h"
+#include "read_pipeline/nodes/ModBaseChunkCallerNode.h"
 
 #include "config/ModBaseModelConfig.h"
 #include "modbase/ModBaseContext.h"

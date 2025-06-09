@@ -1,4 +1,4 @@
-#include "ReadFilterNode.h"
+#include "read_pipeline/nodes/ReadFilterNode.h"
 
 #include <spdlog/spdlog.h>
 

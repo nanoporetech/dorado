@@ -1,4 +1,4 @@
-#include "NullNode.h"
+#include "read_pipeline/nodes/NullNode.h"
 
 namespace dorado {
 

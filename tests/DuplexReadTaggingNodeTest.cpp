@@ -1,4 +1,4 @@
-#include "read_pipeline/DuplexReadTaggingNode.h"
+#include "read_pipeline/nodes/DuplexReadTaggingNode.h"
 
 #include "MessageSinkUtils.h"
 

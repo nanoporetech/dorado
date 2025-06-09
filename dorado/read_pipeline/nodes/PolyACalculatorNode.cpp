@@ -1,4 +1,4 @@
-#include "PolyACalculatorNode.h"
+#include "read_pipeline/nodes/PolyACalculatorNode.h"
 
 #include "poly_tail/poly_tail_calculator.h"
 #include "poly_tail/poly_tail_calculator_selector.h"

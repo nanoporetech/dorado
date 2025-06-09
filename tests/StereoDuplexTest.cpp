@@ -1,6 +1,6 @@
 #include "TestUtils.h"
-#include "read_pipeline/StereoDuplexEncoderNode.h"
 #include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/StereoDuplexEncoderNode.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <torch/torch.h>

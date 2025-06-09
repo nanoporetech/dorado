@@ -1,4 +1,4 @@
-#include "ScalerNode.h"
+#include "read_pipeline/nodes/ScalerNode.h"
 
 #include "config/BasecallModelConfig.h"
 #include "demux/adapter_info.h"

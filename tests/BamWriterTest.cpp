@@ -1,7 +1,7 @@
 #include "TestUtils.h"
 #include "read_pipeline/HtsReader.h"
-#include "read_pipeline/HtsWriter.h"
 #include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/HtsWriter.h"
 #include "utils/bam_utils.h"
 #include "utils/hts_file.h"
 #include "utils/stats.h"

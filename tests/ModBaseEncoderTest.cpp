@@ -1,7 +1,7 @@
 #include "modbase/ModBaseEncoder.h"
 
 #include "modbase/encode_kmer.h"
-#include "read_pipeline/ModBaseChunkCallerNode.h"
+#include "read_pipeline/nodes/ModBaseChunkCallerNode.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch_test_macros.hpp>

@@ -1,4 +1,4 @@
-#include "ReadToBamTypeNode.h"
+#include "read_pipeline/nodes/ReadToBamTypeNode.h"
 
 #include "utils/SampleSheet.h"
 

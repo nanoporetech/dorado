@@ -1,4 +1,4 @@
-#include "read_pipeline/BarcodeDemuxerNode.h"
+#include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
