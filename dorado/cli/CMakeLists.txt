@@ -43,6 +43,7 @@ target_link_libraries(dorado
     dorado_lib
     dorado_model_downloader_lib
     dorado_models_lib
+    dorado_polish
     minimap2
 )
 

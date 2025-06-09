@@ -1,4 +1,4 @@
-#include "polish_impl.h"
+#include "polish/polish_impl.h"
 
 #include "hts_io/FastxRandomReader.h"
 #include "secondary/architectures/model_factory.h"

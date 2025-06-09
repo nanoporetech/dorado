@@ -1,4 +1,4 @@
-#include "polish_progress_tracker.h"
+#include "polish/polish_progress_tracker.h"
 
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"

@@ -180,6 +180,7 @@ add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/models)
 add_subdirectory(dorado/nn)
+add_subdirectory(dorado/polish)
 add_subdirectory(dorado/poly_tail)
 add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/secondary)
@@ -271,10 +272,6 @@ add_library(dorado_lib
     dorado/correct/types.h
     dorado/correct/CorrectionProgressTracker.cpp
     dorado/correct/CorrectionProgressTracker.h
-    dorado/polish/polish_impl.cpp
-    dorado/polish/polish_impl.h
-    dorado/polish/polish_progress_tracker.cpp
-    dorado/polish/polish_progress_tracker.h
     dorado/variant/variant_progress_tracker.cpp
     dorado/variant/variant_progress_tracker.h
 )
