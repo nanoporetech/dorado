@@ -23,7 +23,7 @@ For single-ended barcodes with the `rear_only_barcodes` flag set (see below), e.
 
 ## Specification Format
 
-The custom arrangements are defined using a `toml` file, and custom barcode sequences are passed through a `FASTQ` file.
+The custom arrangements are defined using a `toml` file, and custom barcode sequences are passed through a `FASTA` file.
 
 ### Arrangement File
 
