@@ -1,35 +1,28 @@
-add_library(dorado_correct STATIC
-    # Public
-    include/correct/conversions.h
-    include/correct/decode.h
-    include/correct/features.h
-    include/correct/infer.h
-    include/correct/types.h
-    include/correct/windows.h
-
-    # Private
-    conversions.cpp
-    decode.cpp
-    features.cpp
-    infer.cpp
-    types.cpp
-    windows.cpp
-)
-
-target_link_libraries(dorado_correct
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_correct
+    PUBLIC_DIR
+        correct
+    SOURCES_PUBLIC
+        conversions.h
+        decode.h
+        features.h
+        infer.h
+        types.h
+        windows.h
+    SOURCES_PRIVATE
+        conversions.cpp
+        decode.cpp
+        features.cpp
+        infer.cpp
+        types.cpp
+        windows.cpp
+    DEPENDS_PUBLIC
         dorado_secondary
         dorado_torch_utils
         dorado_utils
         spdlog::spdlog
-    PRIVATE
+    DEPENDS_PRIVATE
         dorado_read_pipeline_base
         toml11::toml11
 )
-
-target_include_directories(dorado_correct
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-enable_warnings_as_errors(dorado_correct)

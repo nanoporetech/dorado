@@ -1,31 +1,24 @@
-add_library(dorado_api STATIC
-    # Public
-    include/api/caller_creation.h
-    include/api/pipeline_creation.h
-    include/api/runner_creation.h
-
-    # Private
-    caller_creation.cpp
-    pipeline_creation.cpp
-    runner_creation.cpp
-)
-
-target_link_libraries(dorado_api
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_api
+    PUBLIC_DIR
+        api
+    SOURCES_PUBLIC
+        caller_creation.h
+        pipeline_creation.h
+        runner_creation.h
+    SOURCES_PRIVATE
+        caller_creation.cpp
+        pipeline_creation.cpp
+        runner_creation.cpp
+    DEPENDS_PUBLIC
         dorado_basecall
         dorado_modbase
         dorado_read_pipeline_base
-    PRIVATE
+    DEPENDS_PRIVATE
         cxxpool
         dorado_read_pipeline_nodes
         dorado_splitter
         dorado_utils
         spdlog::spdlog
 )
-
-target_include_directories(dorado_api
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-enable_warnings_as_errors(dorado_api)

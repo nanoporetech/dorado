@@ -1,24 +1,17 @@
-add_library(dorado_resume_loader STATIC
-    # Public
-    include/resume_loader/ResumeLoader.h
-
-    # Private
-    ResumeLoader.cpp
-)
-
-target_link_libraries(dorado_resume_loader
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_resume_loader
+    PUBLIC_DIR
+        resume_loader
+    SOURCES_PUBLIC
+        ResumeLoader.h
+    SOURCES_PRIVATE
+        ResumeLoader.cpp
+    DEPENDS_PUBLIC
         dorado_read_pipeline_base
-    PRIVATE
+    DEPENDS_PRIVATE
         dorado_utils
         htslib
         indicators
         spdlog::spdlog
 )
-
-target_include_directories(dorado_resume_loader
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-enable_warnings_as_errors(dorado_resume_loader)

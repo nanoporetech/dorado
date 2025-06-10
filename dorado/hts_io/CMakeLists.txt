@@ -1,21 +1,17 @@
-add_library(dorado_hts_io STATIC
-    # Public
-    include/hts_io/FastxRandomReader.h
-
-    # Private
-    FastxRandomReader.cpp
-)
-
-target_link_libraries(dorado_hts_io
-    PRIVATE
+dorado_add_library(
+    NAME
+        dorado_hts_io
+    PUBLIC_DIR
+        hts_io
+    SOURCES_PUBLIC
+        FastxRandomReader.h
+    SOURCES_PRIVATE
+        FastxRandomReader.cpp
+    DEPENDS_PUBLIC
+        # nothing
+    DEPENDS_PRIVATE
         dorado_utils
         htslib
         spdlog::spdlog
+    NO_TORCH
 )
-
-target_include_directories(dorado_hts_io
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-enable_warnings_as_errors(dorado_hts_io)

@@ -79,12 +79,15 @@ else()
 endif()
 message(STATUS "Using CDN URL ${DORADO_CDN_URL} for downloads")
 
+# Repo setup and helpers.
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
-include(cmake/Zlib.cmake)
+include(cmake/DoradoTarget.cmake)
 
+# Third party libs that aren't submodules.
+include(cmake/Zlib.cmake)
 include(cmake/Koi.cmake)
 include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
@@ -94,6 +97,7 @@ if (APPLE)
     include(cmake/Metal.cmake)
 endif()
 
+# Packaging setup.
 include(cmake/InstallRedistLibs.cmake)
 if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)

@@ -1,29 +1,22 @@
-add_library(dorado_splitter STATIC
-    # Public
-    include/splitter/DuplexReadSplitter.h
-    include/splitter/ReadSplitter.h
-    include/splitter/RNAReadSplitter.h
-    include/splitter/myers.h # only public for unit tests
-
-    # Private
-    DuplexReadSplitter.cpp
-    myers.cpp
-    RNAReadSplitter.cpp
-    splitter_utils.cpp
-    splitter_utils.h
-)
-
-target_link_libraries(dorado_splitter
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_splitter
+    PUBLIC_DIR
+        splitter
+    SOURCES_PUBLIC
+        DuplexReadSplitter.h
+        ReadSplitter.h
+        RNAReadSplitter.h
+        myers.h # only public for unit tests
+    SOURCES_PRIVATE
+        DuplexReadSplitter.cpp
+        myers.cpp
+        RNAReadSplitter.cpp
+        splitter_utils.cpp
+        splitter_utils.h
+    DEPENDS_PUBLIC
         dorado_utils
-    PRIVATE
+    DEPENDS_PRIVATE
         dorado_read_pipeline
         spdlog::spdlog
 )
-
-target_include_directories(dorado_splitter
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-enable_warnings_as_errors(dorado_splitter)

@@ -1,37 +1,30 @@
-add_library(dorado_secondary_consensus
-    # Public
-    include/secondary/consensus/consensus_result.h
-    include/secondary/consensus/consensus_utils.h
-    include/secondary/consensus/sample_trimming.h
-    include/secondary/consensus/sample.h
-    include/secondary/consensus/variant_calling_sample.h
-    include/secondary/consensus/variant_calling.h
-    include/secondary/consensus/window.h
-
-    # Private
-    consensus_utils.cpp
-    sample_trimming.cpp
-    sample.cpp
-    variant_calling_sample.cpp
-    variant_calling.cpp
-    window.cpp
-)
-
-target_include_directories(dorado_secondary_consensus
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(dorado_secondary_consensus
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_secondary_consensus
+    PUBLIC_DIR
+        secondary/consensus
+    SOURCES_PUBLIC
+        consensus_result.h
+        consensus_utils.h
+        sample_trimming.h
+        sample.h
+        variant_calling_sample.h
+        variant_calling.h
+        window.h
+    SOURCES_PRIVATE
+        consensus_utils.cpp
+        sample_trimming.cpp
+        sample.cpp
+        variant_calling_sample.cpp
+        variant_calling.cpp
+        window.cpp
+    DEPENDS_PUBLIC
         dorado_hts_io
         dorado_secondary_common
         dorado_secondary_features
         dorado_torch_utils
         dorado_utils
-    PRIVATE
+    DEPENDS_PRIVATE
         cxxpool
         spdlog::spdlog
 )
-
-enable_warnings_as_errors(dorado_secondary_consensus)

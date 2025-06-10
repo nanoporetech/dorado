@@ -1,92 +1,108 @@
-add_library(dorado_utils
-    # Public
-    include/utils/alignment_utils.h
-    include/utils/arg_parse_ext.h
-    include/utils/AsyncQueue.h
-    include/utils/bam_utils.h
-    include/utils/barcode_kits.h
-    include/utils/basecaller_utils.h
-    include/utils/cigar.h
-    include/utils/concurrency/async_task_executor.h
-    include/utils/concurrency/detail/priority_task_queue.h
-    include/utils/concurrency/multi_queue_thread_pool.h
-    include/utils/concurrency/synchronisation.h
-    include/utils/concurrency/task_priority.h
-    include/utils/crypto_utils.h
-    include/utils/dev_utils.h
-    include/utils/fasta_fastq_utils.h
-    include/utils/fasta_reader.h
-    include/utils/fastq_reader.h
-    include/utils/fs_utils.h
-    include/utils/gzip_reader.h
-    include/utils/hts_file.h
-    include/utils/jthread.h
-    include/utils/locale_utils.h
-    include/utils/log_utils.h
-    include/utils/math_utils.h
-    include/utils/memory_utils.h
-    include/utils/MergeHeaders.h
-    include/utils/overlap.h
-    include/utils/parameters.h
-    include/utils/PostCondition.h
-    include/utils/SampleSheet.h
-    include/utils/scoped_trace_log.h
-    include/utils/sequence_utils.h
-    include/utils/stats.h
-    include/utils/stream_utils.h
-    include/utils/sys_stats.h
-    include/utils/sys_utils.h
-    include/utils/thread_utils.h
-    include/utils/time_utils.h
-    include/utils/timer_high_res.h
-    include/utils/tty_utils.h
-    include/utils/types.h
-    include/utils/uuid_utils.h
-    include/utils/paf_utils.h
-    include/utils/fai_utils.h
-    include/utils/container_utils.h
-    include/utils/io_utils.h
-    include/utils/rle.h
-    include/utils/ssize.h
-    include/utils/span.h
-
-    # Private
-    alignment_utils.cpp
-    bam_utils.cpp
-    barcode_kits.cpp
-    basecaller_utils.cpp
-    cigar.cpp
-    concurrency/async_task_executor.cpp
-    concurrency/detail/priority_task_queue.cpp
-    concurrency/multi_queue_thread_pool.cpp
-    crypto_utils.cpp
-    dev_utils.cpp
-    fasta_fastq_utils.cpp
-    fasta_reader.cpp
-    fastq_reader.cpp
-    fs_utils.cpp
-    gzip_reader.cpp
-    hts_file.cpp
-    locale_utils.cpp
-    log_utils.cpp
-    memory_utils.cpp
-    MergeHeaders.cpp
-    parameters.cpp
-    SampleSheet.cpp
-    scoped_trace_log.cpp
-    sequence_utils.cpp
-    stats.cpp
-    sys_stats.cpp
-    sys_utils.cpp
-    thread_utils.cpp
-    time_utils.cpp
-    types.cpp
-    uuid_utils.cpp
-    paf_utils.cpp
-    fai_utils.cpp
-    container_utils.cpp
-    io_utils.cpp
- )
+dorado_add_library(
+    NAME
+        dorado_utils
+    PUBLIC_DIR
+        utils
+    SOURCES_PUBLIC
+        alignment_utils.h
+        arg_parse_ext.h
+        AsyncQueue.h
+        bam_utils.h
+        barcode_kits.h
+        basecaller_utils.h
+        cigar.h
+        concurrency/async_task_executor.h
+        concurrency/detail/priority_task_queue.h
+        concurrency/multi_queue_thread_pool.h
+        concurrency/synchronisation.h
+        concurrency/task_priority.h
+        crypto_utils.h
+        dev_utils.h
+        fasta_fastq_utils.h
+        fasta_reader.h
+        fastq_reader.h
+        fs_utils.h
+        gzip_reader.h
+        hts_file.h
+        jthread.h
+        locale_utils.h
+        log_utils.h
+        math_utils.h
+        memory_utils.h
+        MergeHeaders.h
+        overlap.h
+        parameters.h
+        PostCondition.h
+        SampleSheet.h
+        scoped_trace_log.h
+        sequence_utils.h
+        stats.h
+        stream_utils.h
+        sys_stats.h
+        sys_utils.h
+        thread_utils.h
+        time_utils.h
+        timer_high_res.h
+        tty_utils.h
+        types.h
+        uuid_utils.h
+        paf_utils.h
+        fai_utils.h
+        container_utils.h
+        io_utils.h
+        rle.h
+        ssize.h
+        span.h
+    SOURCES_PRIVATE
+        alignment_utils.cpp
+        bam_utils.cpp
+        barcode_kits.cpp
+        basecaller_utils.cpp
+        cigar.cpp
+        concurrency/async_task_executor.cpp
+        concurrency/detail/priority_task_queue.cpp
+        concurrency/multi_queue_thread_pool.cpp
+        crypto_utils.cpp
+        dev_utils.cpp
+        fasta_fastq_utils.cpp
+        fasta_reader.cpp
+        fastq_reader.cpp
+        fs_utils.cpp
+        gzip_reader.cpp
+        hts_file.cpp
+        locale_utils.cpp
+        log_utils.cpp
+        memory_utils.cpp
+        MergeHeaders.cpp
+        parameters.cpp
+        SampleSheet.cpp
+        scoped_trace_log.cpp
+        sequence_utils.cpp
+        stats.cpp
+        sys_stats.cpp
+        sys_utils.cpp
+        thread_utils.cpp
+        time_utils.cpp
+        types.cpp
+        uuid_utils.cpp
+        paf_utils.cpp
+        fai_utils.cpp
+        container_utils.cpp
+        io_utils.cpp
+    DEPENDS_PUBLIC
+        argparse::argparse
+        date::date
+        dorado_version
+        edlib
+        nvtx
+        spdlog::spdlog
+    DEPENDS_PRIVATE
+        dorado_compat
+        htslib
+        minimap2
+        toml11::toml11
+    NO_TORCH
+)
 
 target_compile_definitions(dorado_utils
     PUBLIC
@@ -95,39 +111,11 @@ target_compile_definitions(dorado_utils
         DORADO_METAL_BUILD=$<BOOL:${APPLE}>
 )
 if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
-    target_compile_definitions(dorado_utils
-        PUBLIC
-            DORADO_ORIN=1
-    )
+    target_compile_definitions(dorado_utils PUBLIC DORADO_ORIN=1)
 else()
-    target_compile_definitions(dorado_utils
-        PUBLIC
-            DORADO_ORIN=0
-    )
+    target_compile_definitions(dorado_utils PUBLIC DORADO_ORIN=0)
 endif()
-
-target_include_directories(dorado_utils
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(dorado_utils
-    PUBLIC
-        argparse::argparse
-        date::date
-        dorado_version
-        edlib
-        nvtx
-        spdlog::spdlog
-    PRIVATE
-        dorado_compat
-        htslib
-        minimap2
-        toml11::toml11
-)
 
 if (NOT APPLE)
     target_link_libraries(dorado_utils PRIVATE OpenSSL::SSL)
 endif()
-
-enable_warnings_as_errors(dorado_utils)

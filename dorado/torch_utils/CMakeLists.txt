@@ -1,42 +1,35 @@
-add_library(dorado_torch_utils
-    # Public
-    include/torch_utils/auto_detect_device.h
-    include/torch_utils/cuda_utils.h
-    include/torch_utils/duplex_utils.h
-    include/torch_utils/gpu_monitor.h
-    include/torch_utils/gpu_profiling.h
-    include/torch_utils/metal_utils.h
-    include/torch_utils/module_utils.h
-    include/torch_utils/tensor_utils.h
-    include/torch_utils/torch_utils.h
-    include/torch_utils/trim.h
-
-    # Private
-    duplex_utils.cpp
-    gpu_monitor.cpp
-    tensor_utils.cpp
-    torch_utils.cpp
-    trim.cpp
-)
-
-if(APPLE)
-    target_sources(dorado_torch_utils PRIVATE metal_utils.cpp)
-else()
-    target_sources(dorado_torch_utils PRIVATE cuda_utils.cpp)
+if (DORADO_ENABLE_PCH)
+    add_subdirectory(pch)
 endif()
 
-target_include_directories(dorado_torch_utils
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-target_link_libraries(dorado_torch_utils
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_torch_utils
+    PUBLIC_DIR
+        torch_utils
+    SOURCES_PUBLIC
+        auto_detect_device.h
+        cuda_utils.h
+        duplex_utils.h
+        gpu_monitor.h
+        gpu_profiling.h
+        metal_utils.h
+        module_utils.h
+        tensor_utils.h
+        torch_utils.h
+        trim.h
+    SOURCES_PRIVATE
+        duplex_utils.cpp
+        gpu_monitor.cpp
+        tensor_utils.cpp
+        torch_utils.cpp
+        trim.cpp
+    DEPENDS_PUBLIC
         date::date
         edlib
         spdlog::spdlog
         torch_lib
-    PRIVATE
+    DEPENDS_PRIVATE
         dorado_compat
         dorado_utils
         htslib
@@ -44,10 +37,10 @@ target_link_libraries(dorado_torch_utils
         toml11::toml11
 )
 
-if (DORADO_ENABLE_PCH)
-    add_subdirectory(pch)
-    target_link_libraries(dorado_torch_utils PUBLIC dorado_pch)
-    target_precompile_headers(dorado_torch_utils REUSE_FROM dorado_pch)
+if(APPLE)
+    target_sources(dorado_torch_utils PRIVATE metal_utils.cpp)
+else()
+    target_sources(dorado_torch_utils PRIVATE cuda_utils.cpp)
 endif()
 
 if(APPLE)
@@ -71,4 +64,3 @@ if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_C
     set_source_files_properties(duplex_utils.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
 
-enable_warnings_as_errors(dorado_torch_utils)

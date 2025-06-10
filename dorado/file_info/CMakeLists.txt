@@ -1,22 +1,15 @@
-add_library(dorado_file_info STATIC
-    # Public
-    include/file_info/file_info.h
-
-    # Private
-    file_info.cpp
-)
-
-target_link_libraries(dorado_file_info
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_file_info
+    PUBLIC_DIR
+        file_info
+    SOURCES_PUBLIC
+        file_info.h
+    SOURCES_PRIVATE
+        file_info.cpp
+    DEPENDS_PUBLIC
         dorado_models_lib
         dorado_utils
-    PRIVATE
+    DEPENDS_PRIVATE
         pod5_libs
 )
-
-target_include_directories(dorado_file_info
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/include
-)
-
-enable_warnings_as_errors(dorado_file_info)
