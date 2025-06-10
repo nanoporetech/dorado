@@ -47,5 +47,5 @@ target_include_directories(dorado_nn
 enable_warnings_as_errors(dorado_nn)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_nn REUSE_FROM dorado_torch_utils)
+    target_precompile_headers(dorado_nn REUSE_FROM dorado_pch)
 endif()

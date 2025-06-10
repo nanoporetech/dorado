@@ -46,7 +46,7 @@ enable_warnings_as_errors(dorado)
 check_linked_libs(dorado)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado REUSE_FROM dorado_lib)
+    target_precompile_headers(dorado REUSE_FROM dorado_pch)
 endif()
 
 target_link_libraries(dorado
@@ -60,6 +60,7 @@ target_link_libraries(dorado
     dorado_models_lib
     dorado_polish
     dorado_summary
+    indicators
     minimap2
 )
 

@@ -43,5 +43,5 @@ target_include_directories(dorado_alignment
 enable_warnings_as_errors(dorado_alignment)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_alignment REUSE_FROM dorado_torch_utils)
+    target_precompile_headers(dorado_alignment REUSE_FROM dorado_pch)
 endif()

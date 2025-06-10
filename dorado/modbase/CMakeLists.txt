@@ -39,5 +39,5 @@ target_include_directories(dorado_modbase
 enable_warnings_as_errors(dorado_modbase)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_modbase REUSE_FROM dorado_torch_utils)
+    target_precompile_headers(dorado_modbase REUSE_FROM dorado_pch)
 endif()

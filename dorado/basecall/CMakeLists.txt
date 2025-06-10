@@ -70,5 +70,5 @@ target_include_directories(dorado_basecall
 enable_warnings_as_errors(dorado_basecall)
 
 if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_basecall REUSE_FROM dorado_torch_utils)
+    target_precompile_headers(dorado_basecall REUSE_FROM dorado_pch)
 endif()

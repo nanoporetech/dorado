@@ -94,6 +94,11 @@ if (APPLE)
     include(cmake/Metal.cmake)
 endif()
 
+include(cmake/InstallRedistLibs.cmake)
+if(NOT DORADO_DISABLE_PACKAGING)
+    include(cmake/DoradoPackaging.cmake)
+endif()
+
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)
@@ -175,8 +180,10 @@ add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
 add_subdirectory(dorado/correct)
+add_subdirectory(dorado/data_loader)
 add_subdirectory(dorado/demux)
 add_subdirectory(dorado/devtools)
+add_subdirectory(dorado/file_info)
 add_subdirectory(dorado/hts_io)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/model_downloader)
@@ -190,27 +197,18 @@ add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/splitter)
 add_subdirectory(dorado/summary)
 add_subdirectory(dorado/utils)
+add_subdirectory(tests)
 
-add_library(dorado_lib
-    dorado/torch_half.cpp # TODO: this keeps it building for now
-)
-
-enable_warnings_as_errors(dorado_lib)
-
-set_target_properties(dorado_lib
-    PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-)
-
-enable_testing()
-
-if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_lib REUSE_FROM dorado_torch_utils)
+if (NOT DORADO_DISABLE_DORADO)
+    add_subdirectory(dorado/cli)
 endif()
 
+# Stopgap target to keep things linking.
+# Eventually this will be removed and dependents should link only
+# to what they need.
+add_library(dorado_lib INTERFACE)
 target_link_libraries(dorado_lib
-    PUBLIC
+    INTERFACE
         dorado_alignment
         dorado_api
         dorado_basecall
@@ -224,29 +222,7 @@ target_link_libraries(dorado_lib
         dorado_secondary
         dorado_splitter
         dorado_version
-        edlib
-        htslib
-        indicators
-        torch_lib
-    PRIVATE
-        cxxpool
-        kadayashi::haplotag_lib
-        minimap2
-        toml11::toml11
 )
-
-if(NOT DORADO_DISABLE_DORADO)
-    add_subdirectory(dorado/cli)
-endif()
-
-add_subdirectory(dorado/data_loader)
-add_subdirectory(dorado/file_info)
-add_subdirectory(tests)
-
-include(cmake/InstallRedistLibs.cmake)
-if(NOT DORADO_DISABLE_PACKAGING)
-    include(cmake/DoradoPackaging.cmake)
-endif()
 
 # For capturing test coverage.
 if (GENERATE_TEST_COVERAGE)
