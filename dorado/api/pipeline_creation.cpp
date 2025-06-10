@@ -1,4 +1,4 @@
-#include "pipeline_creation.h"
+#include "api/pipeline_creation.h"
 
 #include "basecall/ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"

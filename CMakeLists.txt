@@ -170,6 +170,7 @@ enable_testing()
 add_subdirectory(dorado/torch_utils)
 
 add_subdirectory(dorado/alignment)
+add_subdirectory(dorado/api)
 add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
@@ -191,12 +192,7 @@ add_subdirectory(dorado/summary)
 add_subdirectory(dorado/utils)
 
 add_library(dorado_lib
-    dorado/api/caller_creation.cpp
-    dorado/api/caller_creation.h
-    dorado/api/runner_creation.cpp
-    dorado/api/runner_creation.h
-    dorado/api/pipeline_creation.cpp
-    dorado/api/pipeline_creation.h
+    dorado/torch_half.cpp # TODO: this keeps it building for now
 )
 
 enable_warnings_as_errors(dorado_lib)
@@ -221,6 +217,7 @@ endif()
 target_link_libraries(dorado_lib
     PUBLIC
         dorado_alignment
+        dorado_api
         dorado_basecall
         dorado_correct
         dorado_demux
