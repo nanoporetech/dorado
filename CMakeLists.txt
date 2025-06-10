@@ -97,12 +97,6 @@ if (APPLE)
     include(cmake/Metal.cmake)
 endif()
 
-# Packaging setup.
-include(cmake/InstallRedistLibs.cmake)
-if(NOT DORADO_DISABLE_PACKAGING)
-    include(cmake/DoradoPackaging.cmake)
-endif()
-
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)
@@ -227,6 +221,12 @@ target_link_libraries(dorado_lib
         dorado_splitter
         dorado_version
 )
+
+# Packaging setup.
+include(cmake/InstallRedistLibs.cmake)
+if(NOT DORADO_DISABLE_PACKAGING)
+    include(cmake/DoradoPackaging.cmake)
+endif()
 
 # For capturing test coverage.
 if (GENERATE_TEST_COVERAGE)
