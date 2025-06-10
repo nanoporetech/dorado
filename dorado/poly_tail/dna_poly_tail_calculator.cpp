@@ -62,7 +62,7 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
                                             (front_primer.length() + rear_primer.length());
     const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > min_separation;
 
-    SignalAnchorInfo result = {false, -1, trailing_Ts, false};
+    SignalAnchorInfo result = {false, -1, trailing_Ts, -1};
 
     if (proceed) {
         int base_anchor = 0;
@@ -78,7 +78,7 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
                 read.read_common.seq.size() + 1);
         int signal_anchor = int(seq_to_sig_map[base_anchor]);
 
-        result = {fwd, signal_anchor, trailing_Ts, false};
+        result = {fwd, signal_anchor, trailing_Ts, -1};
     } else {
         utils::trace_log("{} primer edit distance too high {}", read.read_common.read_id,
                          std::min(dist_v1, dist_v2));

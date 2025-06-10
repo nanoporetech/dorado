@@ -24,9 +24,9 @@ struct SignalAnchorInfo {
     // Number of additional A/T bases in the polyA
     // stretch from the adapter.
     int trailing_adapter_bases = 0;
-    // Whether the polyA/T tail is split between the front/end of the read
+    // Second anchor to search if the polyA/T tail is split between the front/end of the read
     // This can only be true for plasmids
-    bool split_tail = false;
+    int secondary_anchor = -1;
 };
 
 struct PolyTailLengthInfo {
@@ -34,6 +34,7 @@ struct PolyTailLengthInfo {
     int num_bases = -1;
     // the range of the polyA/T tail in the raw signal
     std::pair<int, int> signal_range = {-1, -1};
+    std::pair<int, int> split_signal_range = {-1, -1};
 };
 
 struct PolyTailCalibrationCoeffs {

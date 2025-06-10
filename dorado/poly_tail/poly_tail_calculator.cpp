@@ -284,6 +284,23 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
     }
 
     auto signal_len = signal_end - signal_start;
+    std::pair<int, int> split_signal_range = {-1, -1};
+    if (signal_info.secondary_anchor) {
+        split_signal_range =
+                determine_signal_bounds(signal_info.secondary_anchor, signal_info.is_fwd_strand,
+                                        read, num_samples_per_base, stddev);
+        auto [sec_signal_start, sec_signal_end] = split_signal_range;
+        if (signal_start < sec_signal_start && sec_signal_start < signal_end) {
+            // regions overlap
+            signal_len = signal_start - sec_signal_end;
+        } else if (sec_signal_start < signal_start && signal_start < sec_signal_end) {
+            // regions overlap other way
+            signal_len = sec_signal_start - signal_end;
+        } else {
+            // disjoint regions
+            signal_len += sec_signal_end - sec_signal_start;
+        }
+    }
 
     float offset_calibration = 0.f;
     if (m_calibration.offset.has_value()) {
@@ -304,9 +321,13 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
             signal_end, signal_len, num_samples_per_base, read.read_common.num_trimmed_samples,
             read.read_common.seq.length());
 
-    return {num_bases,
+    return {
+            num_bases,
             {signal_start + read.read_common.num_trimmed_samples,
-             signal_end + read.read_common.num_trimmed_samples}};
+             signal_end + read.read_common.num_trimmed_samples},
+            {split_signal_range.first + read.read_common.num_trimmed_samples,
+             split_signal_range.second + read.read_common.num_trimmed_samples},
+    };
 }
 
 std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(

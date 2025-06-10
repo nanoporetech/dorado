@@ -54,36 +54,22 @@ void PolyACalculatorNode::input_thread_fn() {
             read->read_common.poly_tail_signal_anchor =
                     signal_info.signal_anchor + read->read_common.num_trimmed_samples;
 
-            int num_bases = 0;
             auto polya_tail_info = calculator->calculate_num_bases(*read, signal_info);
 
-            if (polya_tail_info.num_bases > 0) {
-                num_bases += polya_tail_info.num_bases;
-            }
-
             read->read_common.poly_tail_signal_boundaries[0] = polya_tail_info.signal_range;
-            if (signal_info.split_tail) {
-                auto split_poly_tail_info = calculator->calculate_num_bases(
-                        *read, {signal_info.is_fwd_strand, 0, 0, signal_info.split_tail});
+            read->read_common.poly_tail_signal_boundaries[1] = polya_tail_info.split_signal_range;
 
-                read->read_common.poly_tail_signal_boundaries[1] =
-                        split_poly_tail_info.signal_range;
-
-                if (split_poly_tail_info.num_bases > 0) {
-                    polya_tail_info.num_bases += split_poly_tail_info.num_bases;
-                }
-            }
-
-            if (num_bases > 0 && num_bases < calculator->max_tail_length()) {
+            if (polya_tail_info.num_bases > 0 &&
+                polya_tail_info.num_bases < calculator->max_tail_length()) {
                 // Update debug stats.
-                total_tail_lengths_called += num_bases;
+                total_tail_lengths_called += polya_tail_info.num_bases;
                 ++num_called;
                 if (spdlog::get_level() <= spdlog::level::debug) {
                     std::lock_guard<std::mutex> lock(m_mutex);
-                    tail_length_counts[num_bases]++;
+                    tail_length_counts[polya_tail_info.num_bases]++;
                 }
                 // Set tail length property in the read.
-                read->read_common.rna_poly_tail_length = num_bases;
+                read->read_common.rna_poly_tail_length = polya_tail_info.num_bases;
             } else {
                 // On failure, set tail length to 0 to distinguish from the anchor not having been found.
                 read->read_common.rna_poly_tail_length = 0;

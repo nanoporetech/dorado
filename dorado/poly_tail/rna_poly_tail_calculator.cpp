@@ -50,7 +50,7 @@ float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
 SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
         const SimplexRead& read) const {
     if (!m_rna_adapter) {
-        return SignalAnchorInfo{false, read.read_common.rna_adapter_end_signal_pos, 0, false};
+        return SignalAnchorInfo{false, read.read_common.rna_adapter_end_signal_pos, 0, -1};
     }
 
     const std::string& rna_adapter = m_config.rna_adapter;
@@ -72,7 +72,7 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
     const float adapter_score =
             1.f - static_cast<float>(align_result.editDistance) / rna_adapter.length();
 
-    SignalAnchorInfo result = {false, -1, trailing_Ts, false};
+    SignalAnchorInfo result = {false, -1, trailing_Ts, -1};
 
     if (adapter_score >= threshold) {
         const auto stride = read.read_common.model_stride;
@@ -84,7 +84,7 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
         // RNA sequence is reversed wrt the signal and move table
         const int signal_anchor =
                 int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
-        result = {false, signal_anchor, trailing_Ts, false};
+        result = {false, signal_anchor, trailing_Ts, -1};
     } else {
         utils::trace_log("{} adapter score too low {}", read.read_common.read_id, adapter_score);
     }
