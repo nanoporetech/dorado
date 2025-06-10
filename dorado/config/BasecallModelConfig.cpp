@@ -44,6 +44,7 @@ namespace {
 // Workaround GCC-13 dangling reference warnings by passing an lvalue instead of a temporary
 const std::string QSCORE{"qscore"};
 const std::string POLYA{"poly_a"};
+const std::string CALIBRATION_COEFFS{"calibration_coefficients"};
 const std::string RUN_INFO{"run_info"};
 const std::string SCALING{"scaling"};
 const std::string NORM{"normalisation"};
@@ -84,16 +85,35 @@ void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_
 void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &config_toml) {
     if (config_toml.contains(keys::POLYA)) {
         const auto &polya = toml::find(config_toml, keys::POLYA);
-        if (polya.contains("calibration_coefficients")) {
-            throw std::runtime_error(
-                    "This version of dorado does not support use of "
-                    "'polya.calibration_coefficients'.");
+        if (polya.contains(keys::CALIBRATION_COEFFS)) {
+            // handle old style models
+            const auto &coeffs = toml::find(polya, keys::CALIBRATION_COEFFS);
+            if (coeffs.is_array()) {
+                const auto &coeffs_array = coeffs.as_array();
+                if (std::size(coeffs_array) > 1) {
+                    spdlog::warn(
+                            "'polya.calibration_coefficients' does not support multiple values. "
+                            "Discarding higher order coefficients.");
+                }
+                config.polya_speed_correction =
+                        1.f / static_cast<float>(coeffs_array[0].as_floating());
+            } else if (coeffs.is_floating() || coeffs.is_integer()) {
+                config.polya_speed_correction = 1.f / static_cast<float>(coeffs.as_floating());
+            } else {
+                throw std::runtime_error("Invalid type for polyA calibration coefficients in " +
+                                         config.model_path.string());
+            }
+        } else {
+            if (polya.contains("speed_correction") || polya.contains("offset_correction")) {
+                if (!(polya.contains("speed_correction") && polya.contains("offset_correction"))) {
+                    throw std::runtime_error(
+                            "model config error - must contain both 'polya.speed_correction' and "
+                            "'polya.offset_correction' or neither.");
+                }
+                config.polya_speed_correction = toml::find<float>(polya, "speed_correction");
+                config.polya_offset_correction = toml::find<float>(polya, "offset_correction");
+            }
         }
-        config.polya_speed_correction = toml::find<float>(polya, "speed_correction");
-        config.polya_offset_correction = toml::find<float>(polya, "offset_correction");
-    }
-    if (config.polya_speed_correction == 0) {
-        throw std::runtime_error("model config error - poly_a.speed_correction cannot be <= 0");
     }
 }
 

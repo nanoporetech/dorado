@@ -74,7 +74,8 @@ std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
     }
 
     float stddev = (count > 0 ? std::sqrt(sum_diff_2 / count) : 0.f);
-    return {avg * m_speed_calibration, stddev};
+    float speed_calibration = m_calibration.speed.value_or(1.f);
+    return {avg * speed_calibration, stddev};
 }
 
 std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_anchor,
@@ -283,12 +284,18 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
     }
 
     auto signal_len = signal_end - signal_start;
-    signal_len -= signal_length_adjustment(read, signal_len);
+
+    float offset_calibration = 0.f;
+    if (m_calibration.offset.has_value()) {
+        offset_calibration = m_calibration.offset.value();
+    } else {
+        signal_len -= signal_length_adjustment(read, signal_len);
+    }
     signal_len = std::max(0, signal_len);
 
     int num_bases =
             static_cast<int>(std::round(static_cast<float>(signal_len) / num_samples_per_base -
-                                        signal_info.trailing_adapter_bases - m_offset_calibration));
+                                        signal_info.trailing_adapter_bases - offset_calibration));
 
     utils::trace_log(
             "{} PolyA bases {}, signal anchor {} Signal range is {} {} Signal length "
@@ -306,17 +313,14 @@ std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(
         const PolyTailConfig& config,
         bool is_rna,
         bool is_rna_adapter,
-        float speed_calibration,
-        float offset_calibration) {
+        const PolyTailCalibrationCoeffs& calibration) {
     if (is_rna) {
-        return std::make_unique<RNAPolyTailCalculator>(config, is_rna_adapter, speed_calibration,
-                                                       offset_calibration);
+        return std::make_unique<RNAPolyTailCalculator>(config, is_rna_adapter, calibration);
     }
     if (config.is_plasmid) {
-        return std::make_unique<PlasmidPolyTailCalculator>(config, speed_calibration,
-                                                           offset_calibration);
+        return std::make_unique<PlasmidPolyTailCalculator>(config, calibration);
     }
-    return std::make_unique<DNAPolyTailCalculator>(config, speed_calibration, offset_calibration);
+    return std::make_unique<DNAPolyTailCalculator>(config, calibration);
 }
 
 }  // namespace dorado::poly_tail
