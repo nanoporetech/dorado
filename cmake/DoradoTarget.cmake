@@ -49,4 +49,9 @@ function(dorado_add_library)
         target_link_libraries(${arg_NAME} PRIVATE dorado_pch)
         target_precompile_headers(${arg_NAME} REUSE_FROM dorado_pch)
     endif()
+
+    # Enable coverage if told to do so.
+    if (GENERATE_TEST_COVERAGE)
+        append_coverage_compiler_flags_to_target(${arg_NAME})
+    endif()
 endfunction()

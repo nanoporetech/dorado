@@ -116,6 +116,25 @@ if(DORADO_USING_OLD_CPP_ABI)
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
 endif()
 
+# For capturing test coverage.
+option(GENERATE_TEST_COVERAGE "Build with code coverage enabled" OFF)
+if (GENERATE_TEST_COVERAGE)
+    include(cmake/CodeCoverage.cmake)
+    if (NOT DORADO_DISABLE_TESTS)
+        setup_target_for_coverage_gcovr_html(
+            NAME dorado_test_coverage
+            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
+            DEPENDENCIES dorado_tests
+            BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            EXCLUDE
+                "${DORADO_3RD_PARTY_SOURCE}/*"
+                "${DORADO_3RD_PARTY_DOWNLOAD}/*"
+                "${PROJECT_SOURCE_DIR}/tests/*"
+                "${CMAKE_BINARY_DIR}/3rdparty/*"
+        )
+    endif()
+endif()
+
 set(CHOCO_CCACHE_HINT)
 file(GLOB CHOCO_CACHE_LIST LIST_DIRECTORIES true "C:/ProgramData/chocolatey/lib/ccache/tools/ccache-*")
 if (CHOCO_CACHE_LIST)
@@ -226,27 +245,6 @@ target_link_libraries(dorado_lib
 include(cmake/InstallRedistLibs.cmake)
 if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)
-endif()
-
-# For capturing test coverage.
-if (GENERATE_TEST_COVERAGE)
-    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
-        include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_secondary dorado_file_info)
-            append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
-        endforeach()
-        setup_target_for_coverage_gcovr_html(
-            NAME dorado_test_coverage
-            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
-            DEPENDENCIES dorado_tests
-            BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE
-                "${DORADO_3RD_PARTY_SOURCE}/*"
-                "${DORADO_3RD_PARTY_DOWNLOAD}/*"
-                "${PROJECT_SOURCE_DIR}/tests/*"
-                "${CMAKE_BINARY_DIR}/3rdparty/*"
-            )
-    endif()
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )
