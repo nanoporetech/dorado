@@ -8,7 +8,8 @@ class DNAPolyTailCalculator : public PolyTailCalculator {
 public:
     DNAPolyTailCalculator(PolyTailConfig config, const PolyTailCalibrationCoeffs& calibration)
             : PolyTailCalculator(std::move(config), calibration) {}
-    SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const override;
+    std::vector<SignalAnchorInfo> determine_signal_anchor_and_strand(
+            const SimplexRead& read) const override;
 
 protected:
     float average_samples_per_base(const std::vector<float>& sizes) const override;
