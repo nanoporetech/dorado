@@ -1,6 +1,7 @@
 #include "dna_poly_tail_calculator.h"
 
 #include "read_pipeline/messages.h"
+#include "utils/PostCondition.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
@@ -15,7 +16,7 @@
 
 namespace dorado::poly_tail {
 
-SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
+std::vector<SignalAnchorInfo> DNAPolyTailCalculator::determine_signal_anchor_and_strand(
         const SimplexRead& read) const {
     int trailing_Ts =
             static_cast<int>(dorado::utils::count_trailing_chars(m_config.rear_primer, 'T'));
@@ -54,6 +55,13 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
             edlibAlign(front_primer_rc.data(), int(front_primer_rc.length()), read_bottom.data(),
                        int(read_bottom.length()), align_config);
 
+    auto post = utils::PostCondition([&] {
+        edlibFreeAlignResult(top_v1);
+        edlibFreeAlignResult(bottom_v1);
+        edlibFreeAlignResult(top_v2);
+        edlibFreeAlignResult(bottom_v2);
+    });
+
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
     utils::trace_log("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
@@ -62,34 +70,27 @@ SignalAnchorInfo DNAPolyTailCalculator::determine_signal_anchor_and_strand(
                                             (front_primer.length() + rear_primer.length());
     const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > min_separation;
 
-    SignalAnchorInfo result = {false, -1, trailing_Ts, false};
-
-    if (proceed) {
-        int base_anchor = 0;
-        if (fwd) {
-            base_anchor = bottom_start + bottom_v1.startLocations[0];
-        } else {
-            base_anchor = top_v2.endLocations[0];
-        }
-
-        const auto stride = read.read_common.model_stride;
-        const auto seq_to_sig_map = dorado::utils::moves_to_map(
-                read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
-                read.read_common.seq.size() + 1);
-        int signal_anchor = int(seq_to_sig_map[base_anchor]);
-
-        result = {fwd, signal_anchor, trailing_Ts, false};
-    } else {
+    if (!proceed) {
         utils::trace_log("{} primer edit distance too high {}", read.read_common.read_id,
                          std::min(dist_v1, dist_v2));
+        return {};
     }
 
-    edlibFreeAlignResult(top_v1);
-    edlibFreeAlignResult(bottom_v1);
-    edlibFreeAlignResult(top_v2);
-    edlibFreeAlignResult(bottom_v2);
+    SearchDirection direction = SearchDirection::BACKWARD;
+    int base_anchor = 0;
+    if (fwd) {
+        base_anchor = bottom_start + bottom_v1.startLocations[0];
+    } else {
+        base_anchor = top_v2.endLocations[0];
+        direction = SearchDirection::FORWARD;
+    }
 
-    return result;
+    const auto stride = read.read_common.model_stride;
+    const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
+                                                            read.read_common.get_raw_data_samples(),
+                                                            read.read_common.seq.size() + 1);
+    int signal_anchor = int(seq_to_sig_map[base_anchor]);
+    return {SignalAnchorInfo{direction, signal_anchor, trailing_Ts}};
 }
 
 float DNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
