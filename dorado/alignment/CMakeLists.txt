@@ -11,6 +11,7 @@ add_library(dorado_alignment STATIC
     include/alignment/Minimap2Index.h
     include/alignment/Minimap2IndexSupportTypes.h
     include/alignment/Minimap2Options.h
+    include/alignment/sam_utils.h # only public for unit tests
 
     # Private
     alignment_processing_items.cpp
@@ -22,7 +23,6 @@ add_library(dorado_alignment STATIC
     Minimap2Index.cpp
     Minimap2Options.cpp
     sam_utils.cpp
-    sam_utils.h
 )
 
 target_link_libraries(dorado_alignment

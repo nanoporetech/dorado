@@ -70,7 +70,6 @@ target_link_libraries(dorado_read_pipeline_nodes
 target_include_directories(dorado_read_pipeline_nodes
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${CMAKE_CURRENT_SOURCE_DIR}/.. # TODO
 )
 
 enable_warnings_as_errors(dorado_read_pipeline_nodes)

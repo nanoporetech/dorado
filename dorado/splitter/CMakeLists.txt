@@ -3,11 +3,11 @@ add_library(dorado_splitter STATIC
     include/splitter/DuplexReadSplitter.h
     include/splitter/ReadSplitter.h
     include/splitter/RNAReadSplitter.h
+    include/splitter/myers.h # only public for unit tests
 
     # Private
     DuplexReadSplitter.cpp
     myers.cpp
-    myers.h
     RNAReadSplitter.cpp
     splitter_utils.cpp
     splitter_utils.h

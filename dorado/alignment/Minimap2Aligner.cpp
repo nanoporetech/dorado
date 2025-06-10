@@ -1,6 +1,6 @@
 #include "alignment/Minimap2Aligner.h"
 
-#include "sam_utils.h"
+#include "alignment/sam_utils.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"

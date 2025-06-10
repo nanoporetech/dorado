@@ -203,11 +203,6 @@ set_target_properties(dorado_lib
     ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
 )
 
-target_include_directories(dorado_lib
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/dorado
-)
-
 enable_testing()
 
 if (DORADO_ENABLE_PCH)
