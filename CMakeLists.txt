@@ -205,8 +205,6 @@ add_library(dorado_lib
     dorado/read_pipeline/ResumeLoader.h
     dorado/read_pipeline/read_output_progress_stats.cpp
     dorado/read_pipeline/read_output_progress_stats.h
-    dorado/read_pipeline/stitch.cpp
-    dorado/read_pipeline/stitch.h
 )
 
 enable_warnings_as_errors(dorado_lib)

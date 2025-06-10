@@ -4,7 +4,7 @@
 #include "config/BasecallModelConfig.h"
 #include "models/kits.h"
 #include "read_pipeline/base/read_utils.h"
-#include "stitch.h"
+#include "read_pipeline/base/stitch.h"
 #include "utils/stats.h"
 #include "utils/thread_utils.h"
 

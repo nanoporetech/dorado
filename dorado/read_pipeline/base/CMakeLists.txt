@@ -8,6 +8,7 @@ add_library(dorado_read_pipeline_base STATIC
     include/read_pipeline/base/MessageSink.h
     include/read_pipeline/base/read_utils.h
     include/read_pipeline/base/ReadPipeline.h
+    include/read_pipeline/base/stitch.h
 
     # Private
     messages.cpp
@@ -16,6 +17,7 @@ add_library(dorado_read_pipeline_base STATIC
     ReadPipeline.cpp
     stereo_features.cpp
     stereo_features.h
+    stitch.cpp
 )
 
 target_link_libraries(dorado_read_pipeline_base

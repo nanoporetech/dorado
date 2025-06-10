@@ -1,4 +1,4 @@
-#include "read_pipeline/stitch.h"
+#include "read_pipeline/base/stitch.h"
 
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/math_utils.h"
