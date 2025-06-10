@@ -110,8 +110,6 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     const int kWindow = int(std::round(num_samples_per_base * 5));
     // Maximum gap between intervals that can be combined.
     const int kMaxSampleGap = int(std::round(num_samples_per_base * 2));
-    // Minimum size of intervals considered for merge.
-    const int kMinIntervalSizeForMerge = kWindow * 2;
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = min_avg_val();
 
@@ -159,45 +157,55 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // In the example below, tail estimation should include both stretches
     // of As along with the small gap in the middle.
     // e.g. -----AAAAAAA--AAAAAA-----
-    // 2-sigma range should catch ~97% of the distribution
+    // 3-sigma range should catch ~99% of the distribution
     const int kMaxInterruption = static_cast<int>(std::floor(
-            (num_samples_per_base + 2 * std_samples_per_base) * m_config.tail_interrupt_length));
+            (num_samples_per_base + 3 * std_samples_per_base) * m_config.tail_interrupt_length));
+    // Minimum size of intervals considered for merge.
+    const int kMinIntervalSizeForMerge = kWindow * 2;
+    auto merge_pass = [&](const std::vector<Interval>& input_intervals) -> std::vector<Interval> {
+        std::vector<Interval> merged_intervals;
+        for (size_t i = 0; i < input_intervals.size(); ++i) {
+            Interval current = input_intervals[i];
+            int total_length = current.length();
+            double weighted_sum = current.avg * total_length;
 
-    std::vector<Interval> clustered_intervals;
-    bool merge_intervals = intervals.size() > 1;
-    while (merge_intervals) {  // break when we've stopped making changes
-        merge_intervals = false;
-        clustered_intervals.push_back(intervals.front());
-        int longest_interval = clustered_intervals.front().length();
-        for (auto it = std::next(std::cbegin(intervals)); it != std::cend(intervals); ++it) {
-            const auto& i = *it;
-            auto& last = clustered_intervals.back();
-            bool mean_proximity_ok = std::abs(i.avg - last.avg) < kMeanValueProximity;
-            auto separation = i.start - last.end;
-            bool skip_glitch =
-                    std::abs(separation) < kMaxSampleGap &&
-                    last.length() > kMinIntervalSizeForMerge &&
-                    (i.length() > kMinIntervalSizeForMerge || i.end >= right_end - kStride);
-            bool allow_linker = separation >= 0 && separation < kMaxInterruption;
-            if (mean_proximity_ok && (skip_glitch || allow_linker)) {
-                // retain avg value from the best section to prevent drift for future merges
-                auto& best = (i.length() < last.length()) ? last : i;
-                utils::trace_log("extend interval {}-{} to {}-{}", last.start, last.end, last.start,
-                                 i.end);
-                last = Interval{last.start, i.end, best.avg};
-                longest_interval = std::max(longest_interval, last.length());
-                merge_intervals = true;
-            } else {
-                // drop unmergeable interval (unless it is our current best)
-                if (last.length() < longest_interval && last.length() <= kMinIntervalSizeForMerge) {
-                    clustered_intervals.pop_back();
-                    merge_intervals = true;
+            for (size_t j = i + 1; j < input_intervals.size(); ++j) {
+                const Interval& candidate = input_intervals[j];
+
+                auto separation = candidate.start - current.end;
+                bool skip_glitch = separation < kMaxSampleGap;
+                bool allow_linker = separation >= 0 && separation < kMaxInterruption;
+                if (!(skip_glitch || allow_linker)) {
+                    // next candidate is too far away, no further merges possible
+                    break;
                 }
-                longest_interval = std::max(longest_interval, i.length());
-                clustered_intervals.push_back(i);
+
+                bool mean_proximity_ok =
+                        std::abs(candidate.avg - current.avg) < kMeanValueProximity;
+                bool size_ok = current.length() > kMinIntervalSizeForMerge &&
+                               (candidate.length() > kMinIntervalSizeForMerge ||
+                                candidate.end >= right_end - kStride);
+                if (size_ok && mean_proximity_ok) {
+                    int len = candidate.length();
+                    weighted_sum += candidate.avg * len;
+                    total_length += len;
+                    current.end = std::max(current.end, candidate.end);
+                    current.avg = weighted_sum / total_length;
+                    i = j;  // skip intervals that we've merged across
+                }
             }
+            merged_intervals.push_back(current);
         }
-        intervals = std::exchange(clustered_intervals, {});
+
+        return merged_intervals;
+    };
+
+    while (true) {
+        std::vector<Interval> clustered_intervals = merge_pass(intervals);
+        if (clustered_intervals.size() == intervals.size()) {
+            break;  // No further merges possible
+        }
+        intervals = std::move(clustered_intervals);
     }
 
     int_str = "";
@@ -285,7 +293,7 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
 
     auto signal_len = signal_end - signal_start;
     std::pair<int, int> split_signal_range = {-1, -1};
-    if (signal_info.secondary_anchor) {
+    if (signal_info.secondary_anchor != -1) {
         split_signal_range =
                 determine_signal_bounds(signal_info.secondary_anchor, signal_info.is_fwd_strand,
                                         read, num_samples_per_base, stddev);
@@ -321,12 +329,16 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
             signal_end, signal_len, num_samples_per_base, read.read_common.num_trimmed_samples,
             read.read_common.seq.length());
 
+    if (split_signal_range != std::make_pair(-1, -1)) {
+        split_signal_range.first += read.read_common.num_trimmed_samples;
+        split_signal_range.second += read.read_common.num_trimmed_samples;
+    }
+
     return {
             num_bases,
             {signal_start + read.read_common.num_trimmed_samples,
              signal_end + read.read_common.num_trimmed_samples},
-            {split_signal_range.first + read.read_common.num_trimmed_samples,
-             split_signal_range.second + read.read_common.num_trimmed_samples},
+            split_signal_range,
     };
 }
 
