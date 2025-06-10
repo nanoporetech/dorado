@@ -50,9 +50,9 @@ void PolyACalculatorNode::input_thread_fn() {
         }
 
         auto signal_info = calculator->determine_signal_anchor_and_strand(*read);
-        if (signal_info.signal_anchor >= 0) {
+        if (!std::empty(signal_info)) {
             read->read_common.poly_tail_signal_anchor =
-                    signal_info.signal_anchor + read->read_common.num_trimmed_samples;
+                    signal_info[0].signal_anchor + read->read_common.num_trimmed_samples;
 
             auto polya_tail_info = calculator->calculate_num_bases(*read, signal_info);
 

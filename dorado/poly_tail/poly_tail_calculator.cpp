@@ -33,10 +33,10 @@ struct Interval {
 std::pair<int, int> PolyTailCalculator::signal_range(int signal_anchor,
                                                      int signal_len,
                                                      float samples_per_base,
-                                                     bool fwd) const {
+                                                     SearchDirection direction) const {
     const int kSpread = int(std::round(samples_per_base * max_tail_length()));
-    const float start_scale = fwd ? 1.f : 0.1f;
-    const float end_scale = fwd ? 0.1f : 1.f;
+    const float start_scale = (direction == SearchDirection::BACKWARD) ? 1.f : 0.1f;
+    const float end_scale = (direction == SearchDirection::BACKWARD) ? 0.1f : 1.f;
     return {std::max(0, static_cast<int>(signal_anchor - kSpread * start_scale)),
             std::min(signal_len, static_cast<int>(signal_anchor + kSpread * end_scale))};
 }
@@ -79,7 +79,7 @@ std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
 }
 
 std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_anchor,
-                                                                bool fwd,
+                                                                SearchDirection direction,
                                                                 const dorado::SimplexRead& read,
                                                                 float num_samples_per_base,
                                                                 float std_samples_per_base) const {
@@ -113,7 +113,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     // Floor for average signal value of poly tail.
     const float kMinAvgVal = min_avg_val();
 
-    auto [left_end, right_end] = signal_range(signal_anchor, signal_len, num_samples_per_base, fwd);
+    auto [left_end, right_end] =
+            signal_range(signal_anchor, signal_len, num_samples_per_base, direction);
     utils::trace_log("Bounds left {}, right {}", left_end, right_end);
 
     std::vector<Interval> intervals;
@@ -254,7 +255,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                                               if (l_size != r_size) {
                                                   return l_size < r_size;
                                               } else {
-                                                  if (fwd) {
+                                                  if (direction == SearchDirection::BACKWARD) {
                                                       return std::abs(l.end - signal_anchor) <
                                                              std::abs(r.end - signal_anchor);
                                                   } else {
@@ -272,9 +273,10 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
 PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
         const SimplexRead& read,
-        const SignalAnchorInfo& signal_info) const {
-    utils::trace_log("{} Strand {}; poly A/T signal anchor {}", read.read_common.read_id,
-                     signal_info.is_fwd_strand ? '+' : '-', signal_info.signal_anchor);
+        const std::vector<SignalAnchorInfo>& signal_info) const {
+    if (std::empty(signal_info)) {
+        return {};
+    }
 
     auto [num_samples_per_base, stddev] = estimate_samples_per_base(read);
     if (num_samples_per_base == 0) {
@@ -284,30 +286,38 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
     // Walk through signal. Require a minimum of length 10 poly-A since below that
     // the current algorithm returns a lot of false intervals.
     auto [signal_start, signal_end] =
-            determine_signal_bounds(signal_info.signal_anchor, signal_info.is_fwd_strand, read,
+            determine_signal_bounds(signal_info[0].signal_anchor, signal_info[0].search_dir, read,
                                     num_samples_per_base, stddev);
 
     if (std::tie(signal_start, signal_end) == std::make_tuple(-1, -1)) {
         return {};
     }
 
+    int trailing_bases = signal_info[0].trailing_adapter_bases;
     auto signal_len = signal_end - signal_start;
     std::pair<int, int> split_signal_range = {-1, -1};
-    if (signal_info.secondary_anchor != -1) {
+    if (std::size(signal_info) > 1) {
         split_signal_range =
-                determine_signal_bounds(signal_info.secondary_anchor, signal_info.is_fwd_strand,
+                determine_signal_bounds(signal_info[1].signal_anchor, signal_info[1].search_dir,
                                         read, num_samples_per_base, stddev);
         auto [sec_signal_start, sec_signal_end] = split_signal_range;
-        if (signal_start < sec_signal_start && sec_signal_start < signal_end) {
+        if (signal_start <= sec_signal_start && sec_signal_start <= signal_end) {
             // regions overlap
             signal_len = signal_start - sec_signal_end;
-        } else if (sec_signal_start < signal_start && signal_start < sec_signal_end) {
+        } else if (sec_signal_start <= signal_start && signal_start <= sec_signal_end) {
             // regions overlap other way
             signal_len = sec_signal_start - signal_end;
+        } else if (sec_signal_start <= signal_start && signal_end <= sec_signal_end) {
+            // one region surrounds the other
+            signal_len = sec_signal_end - sec_signal_start;
+        } else if (signal_start <= sec_signal_start && sec_signal_end <= signal_end) {
+            // or vice versa
+            signal_len = signal_end - signal_start;
         } else {
             // disjoint regions
-            signal_len += sec_signal_end - sec_signal_start;
+            signal_len = (signal_end - signal_start) + (sec_signal_end - sec_signal_start);
         }
+        trailing_bases += signal_info[1].trailing_adapter_bases;
     }
 
     float offset_calibration = 0.f;
@@ -320,14 +330,7 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
 
     int num_bases =
             static_cast<int>(std::round(static_cast<float>(signal_len) / num_samples_per_base -
-                                        signal_info.trailing_adapter_bases - offset_calibration));
-
-    utils::trace_log(
-            "{} PolyA bases {}, signal anchor {} Signal range is {} {} Signal length "
-            "{}, samples/base {} trim {} read len {}",
-            read.read_common.read_id, num_bases, signal_info.signal_anchor, signal_start,
-            signal_end, signal_len, num_samples_per_base, read.read_common.num_trimmed_samples,
-            read.read_common.seq.length());
+                                        trailing_bases - offset_calibration));
 
     if (split_signal_range != std::make_pair(-1, -1)) {
         split_signal_range.first += read.read_common.num_trimmed_samples;

@@ -19,7 +19,7 @@ struct Result {
 
 }  // namespace
 
-SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
+std::vector<SignalAnchorInfo> PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
         const SimplexRead& read) const {
     const std::string_view front_flank = m_config.plasmid_front_flank;
     const std::string_view rear_flank = m_config.plasmid_rear_flank;
@@ -74,59 +74,48 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
     // front and rear good but out of order indicates we've cleaved the tail
     bool split_tail = (front_result_score >= threshold) && (rear_result_score >= threshold) &&
                       (rear_result.end < front_result.start);
-    std::array<int, 2> anchors{-1, -1};
-    size_t trailing_tail_bases = 0;
-    int anchor_index = 0;
-    if (fwd) {
-        if (fwd_front.score >= threshold) {
-            trailing_tail_bases += dorado::utils::count_trailing_chars(front_flank, 'A');
-            anchors[anchor_index] = front_result.end;
-            ++anchor_index;
-        }
-
-        if ((split_tail || anchor_index == 0) && fwd_rear.score >= threshold) {
-            anchors[anchor_index] = rear_result.start;
-            trailing_tail_bases += dorado::utils::count_leading_chars(rear_flank, 'A');
-            ++anchor_index;
-        }
-    } else {
-        if (rev_front.score >= threshold) {
-            trailing_tail_bases += dorado::utils::count_trailing_chars(rear_flank_rc, 'T');
-            anchors[anchor_index] = front_result.end;
-            ++anchor_index;
-        }
-
-        if ((split_tail || anchor_index == 0) && rev_rear.score >= threshold) {
-            anchors[anchor_index] = rear_result.start;
-            trailing_tail_bases += dorado::utils::count_leading_chars(front_flank_rc, 'T');
-            ++anchor_index;
-        }
-    }
-
-    assert(anchor_index <= static_cast<int>(std::size(anchors)));
 
     const auto stride = read.read_common.model_stride;
     const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
                                                             read.read_common.get_raw_data_samples(),
                                                             read.read_common.seq.size() + 1);
-    for (int& anchor : anchors) {
-        if (anchor != -1) {
-            anchor = int(seq_to_sig_map[anchor]);
+
+    std::vector<SignalAnchorInfo> signal_info;
+    if (fwd) {
+        if (fwd_front.score >= threshold) {
+            int trailing_tail_bases =
+                    static_cast<int>(dorado::utils::count_trailing_chars(front_flank, 'A'));
+            int anchor = int(seq_to_sig_map[front_result.end]);
+            signal_info.emplace_back(
+                    SignalAnchorInfo{SearchDirection::FORWARD, anchor, trailing_tail_bases});
+        }
+
+        if ((split_tail || std::empty(signal_info)) && fwd_rear.score >= threshold) {
+            int trailing_tail_bases =
+                    static_cast<int>(dorado::utils::count_leading_chars(rear_flank, 'A'));
+            int anchor = int(seq_to_sig_map[rear_result.start]);
+            signal_info.emplace_back(
+                    SignalAnchorInfo{SearchDirection::BACKWARD, anchor, trailing_tail_bases});
+        }
+    } else {
+        if (rev_front.score >= threshold) {
+            int trailing_tail_bases =
+                    static_cast<int>(dorado::utils::count_trailing_chars(rear_flank_rc, 'T'));
+            int anchor = int(seq_to_sig_map[front_result.end]);
+            signal_info.emplace_back(
+                    SignalAnchorInfo{SearchDirection::FORWARD, anchor, trailing_tail_bases});
+        }
+
+        if ((split_tail || std::empty(signal_info)) && rev_rear.score >= threshold) {
+            int trailing_tail_bases =
+                    static_cast<int>(dorado::utils::count_leading_chars(front_flank_rc, 'T'));
+            int anchor = int(seq_to_sig_map[rear_result.start]);
+            signal_info.emplace_back(
+                    SignalAnchorInfo{SearchDirection::BACKWARD, anchor, trailing_tail_bases});
         }
     }
 
-    return {fwd, anchors[0], static_cast<int>(trailing_tail_bases), anchors[1]};
-}
-
-std::pair<int, int> PlasmidPolyTailCalculator::signal_range(int signal_anchor,
-                                                            int signal_len,
-                                                            float samples_per_base,
-                                                            [[maybe_unused]] bool fwd) const {
-    // We don't know if we found the front or rear flank as the anchor,
-    // so search the signal space in both directions
-    const int kSpread = int(std::round(samples_per_base * max_tail_length()));
-    return {std::max(0, static_cast<int>(signal_anchor - kSpread)),
-            std::min(signal_len, static_cast<int>(signal_anchor + kSpread))};
+    return signal_info;
 }
 
 }  // namespace dorado::poly_tail
