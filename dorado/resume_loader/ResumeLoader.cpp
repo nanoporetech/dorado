@@ -1,4 +1,4 @@
-#include "ResumeLoader.h"
+#include "resume_loader/ResumeLoader.h"
 
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"

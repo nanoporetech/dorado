@@ -184,6 +184,7 @@ add_subdirectory(dorado/nn)
 add_subdirectory(dorado/polish)
 add_subdirectory(dorado/poly_tail)
 add_subdirectory(dorado/read_pipeline)
+add_subdirectory(dorado/resume_loader)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/splitter)
 add_subdirectory(dorado/summary)
@@ -199,8 +200,6 @@ add_library(dorado_lib
     dorado/api/pipeline_creation.h
     dorado/read_pipeline/ProgressTracker.cpp
     dorado/read_pipeline/ProgressTracker.h
-    dorado/read_pipeline/ResumeLoader.cpp
-    dorado/read_pipeline/ResumeLoader.h
     dorado/read_pipeline/read_output_progress_stats.cpp
     dorado/read_pipeline/read_output_progress_stats.h
 )
@@ -234,6 +233,7 @@ target_link_libraries(dorado_lib
         dorado_modbase
         dorado_poly_tail
         dorado_read_pipeline
+        dorado_resume_loader
         dorado_secondary
         dorado_splitter
         dorado_version
