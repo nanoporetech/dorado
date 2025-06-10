@@ -5,9 +5,9 @@
 #include "cli.h"
 #include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
-#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/HtsWriterNode.h"
@@ -256,15 +256,15 @@ int aligner(int argc, char* argv[]) {
 
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
-        auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
-        reader->set_client_info(client_info);
+        HtsReader reader(file_info.input, std::nullopt);
+        reader.set_client_info(client_info);
         if (file_info.output != "-" &&
             !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
             return EXIT_FAILURE;
         }
 
-        spdlog::debug("> input fmt: {} aligned: {}", reader->format(), reader->is_aligned);
-        auto header = SamHdrPtr(sam_hdr_dup(reader->header()));
+        spdlog::debug("> input fmt: {} aligned: {}", reader.format(), reader.is_aligned);
+        auto header = SamHdrPtr(sam_hdr_dup(reader.header()));
         utils::add_hd_header_line(header.get());
         add_pg_hdr(header.get());
         dorado::utils::strip_alignment_data_from_header(header.get());
@@ -315,7 +315,7 @@ int aligner(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         spdlog::info("> starting alignment");
-        auto num_reads_in_file = reader->read(*pipeline, max_reads);
+        auto num_reads_in_file = reader.read(*pipeline, max_reads);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.

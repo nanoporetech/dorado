@@ -1,6 +1,6 @@
 #pragma once
 
-#include "HtsReader.h"
+#include "read_pipeline/base/HtsReader.h"  // for ReadMap
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/bam_utils.h"
 

@@ -6,7 +6,7 @@
 #include "alignment/Minimap2Options.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
-#include "read_pipeline/HtsReader.h"
+#include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/alignment_utils.h"
 #include "utils/bam_utils.h"

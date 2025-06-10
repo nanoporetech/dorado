@@ -4,6 +4,7 @@ add_library(dorado_read_pipeline_base STATIC
     include/read_pipeline/base/context_container.h
     include/read_pipeline/base/DefaultClientInfo.h
     include/read_pipeline/base/flush_options.h
+    include/read_pipeline/base/HtsReader.h
     include/read_pipeline/base/messages.h
     include/read_pipeline/base/MessageSink.h
     include/read_pipeline/base/read_utils.h
@@ -11,6 +12,7 @@ add_library(dorado_read_pipeline_base STATIC
     include/read_pipeline/base/stitch.h
 
     # Private
+    HtsReader.cpp
     messages.cpp
     MessageSink.cpp
     read_utils.cpp
@@ -25,9 +27,9 @@ target_link_libraries(dorado_read_pipeline_base
         dorado_models_lib
         dorado_torch_utils
         dorado_utils
+        htslib
     PRIVATE
         dorado_modbase
-        htslib
         spdlog::spdlog
 )
 

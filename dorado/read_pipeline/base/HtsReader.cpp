@@ -1,4 +1,4 @@
-#include "HtsReader.h"
+#include "read_pipeline/base/HtsReader.h"
 
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"

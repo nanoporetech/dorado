@@ -2,7 +2,6 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/HtsReader.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"

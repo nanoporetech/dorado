@@ -1,5 +1,5 @@
 #include "TestUtils.h"
-#include "read_pipeline/HtsReader.h"
+#include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/HtsWriterNode.h"
 #include "utils/bam_utils.h"
