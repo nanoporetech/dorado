@@ -1,3 +1,4 @@
+#include "ProgressTracker.h"
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
@@ -14,7 +15,6 @@
 #include "models/metadata.h"
 #include "models/model_complex.h"
 #include "models/models.h"
-#include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/BaseSpaceDuplexCallerNode.h"

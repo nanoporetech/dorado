@@ -1,7 +1,6 @@
 add_library(dorado_correct STATIC
     # Public
     include/correct/conversions.h
-    include/correct/CorrectionProgressTracker.h
     include/correct/decode.h
     include/correct/features.h
     include/correct/infer.h
@@ -10,7 +9,6 @@ add_library(dorado_correct STATIC
 
     # Private
     conversions.cpp
-    CorrectionProgressTracker.cpp
     decode.cpp
     features.cpp
     infer.cpp
@@ -23,7 +21,6 @@ target_link_libraries(dorado_correct
         dorado_secondary
         dorado_torch_utils
         dorado_utils
-        indicators
         spdlog::spdlog
     PRIVATE
         dorado_read_pipeline_base

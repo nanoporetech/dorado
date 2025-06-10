@@ -12,14 +12,24 @@ add_executable(dorado
     CorrectionMapper.h
     CorrectionPafReader.cpp
     CorrectionPafReader.h
+    CorrectionProgressTracker.cpp
+    CorrectionProgressTracker.h
     demux.cpp
     download.cpp
     duplex.cpp
     main.cpp
     model_resolution.h
+    polish_progress_tracker.cpp
+    polish_progress_tracker.h
     polish.cpp
+    ProgressTracker.cpp
+    ProgressTracker.h
+    read_output_progress_stats.cpp
+    read_output_progress_stats.h
     summary.cpp
     trim.cpp
+    variant_progress_tracker.cpp
+    variant_progress_tracker.h
     variant.cpp
 )
 
@@ -50,7 +60,6 @@ target_link_libraries(dorado
     dorado_models_lib
     dorado_polish
     dorado_summary
-    dorado_variant
     minimap2
 )
 

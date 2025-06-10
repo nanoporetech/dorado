@@ -1,4 +1,4 @@
-#include "correct/CorrectionProgressTracker.h"
+#include "CorrectionProgressTracker.h"
 
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"

@@ -5,7 +5,7 @@
 #include "model_downloader/model_downloader.h"
 #include "models/models.h"
 #include "polish/polish_impl.h"
-#include "polish/polish_progress_tracker.h"
+#include "polish_progress_tracker.h"
 #include "secondary/architectures/model_config.h"
 #include "secondary/common/bam_info.h"
 #include "secondary/common/batching.h"

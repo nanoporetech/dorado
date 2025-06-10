@@ -1,4 +1,4 @@
-#include "variant/variant_progress_tracker.h"
+#include "variant_progress_tracker.h"
 
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"

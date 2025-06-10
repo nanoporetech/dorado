@@ -1,3 +1,4 @@
+#include "ProgressTracker.h"
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
@@ -20,7 +21,6 @@
 #include "models/model_complex.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
-#include "read_pipeline/ProgressTracker.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
 #include "read_pipeline/nodes/AlignerNode.h"

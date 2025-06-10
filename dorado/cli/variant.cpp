@@ -25,7 +25,7 @@
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
-#include "variant/variant_progress_tracker.h"
+#include "variant_progress_tracker.h"
 
 #include <ATen/Parallel.h>
 #include <ATen/autocast_mode.h>
