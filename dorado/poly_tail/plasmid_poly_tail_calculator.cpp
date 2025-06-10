@@ -68,8 +68,8 @@ SignalAnchorInfo PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
 
     float front_result_score = fwd ? fwd_front.score : rev_front.score;
     float rear_result_score = fwd ? fwd_rear.score : rev_rear.score;
-    Result& front_result = fwd ? fwd_front : rev_front;
-    Result& rear_result = fwd ? fwd_rear : rev_rear;
+    const Result& front_result = fwd ? fwd_front : rev_front;
+    const Result& rear_result = fwd ? fwd_rear : rev_rear;
 
     // front and rear good but out of order indicates we've cleaved the tail
     bool split_tail = (front_result_score >= threshold) && (rear_result_score >= threshold) &&
