@@ -3,6 +3,7 @@
 #include "poly_tail_config.h"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <utility>
 #include <vector>
@@ -13,19 +14,19 @@ class SimplexRead;
 
 namespace dorado::poly_tail {
 
+enum class SearchDirection {
+    BACKWARD = 1,
+    FORWARD = 2,
+};
+
 struct SignalAnchorInfo {
-    // Is the strand in forward or reverse direction.
-    bool is_fwd_strand = true;
-    // The start or end anchor for the polyA/T signal
-    // depending on whether the strand is forward or
-    // reverse.
+    // Search direction from the anchor sample in signal space
+    SearchDirection search_dir = SearchDirection::BACKWARD;
+    // The anchor sample for the polyA/T signal search
     int signal_anchor = -1;
     // Number of additional A/T bases in the polyA
     // stretch from the adapter.
     int trailing_adapter_bases = 0;
-    // Whether the polyA/T tail is split between the front/end of the read
-    // This can only be true for plasmids
-    bool split_tail = false;
 };
 
 struct PolyTailLengthInfo {
@@ -33,23 +34,28 @@ struct PolyTailLengthInfo {
     int num_bases = -1;
     // the range of the polyA/T tail in the raw signal
     std::pair<int, int> signal_range = {-1, -1};
+    std::pair<int, int> split_signal_range = {-1, -1};
+};
+
+struct PolyTailCalibrationCoeffs {
+    std::optional<float> speed;
+    std::optional<float> offset;
 };
 
 class PolyTailCalculator {
 public:
-    PolyTailCalculator(PolyTailConfig config, float speed_calibration, float offset_calibration)
-            : m_config(std::move(config)),
-              m_speed_calibration(speed_calibration),
-              m_offset_calibration(offset_calibration) {}
+    PolyTailCalculator(PolyTailConfig config, const PolyTailCalibrationCoeffs& calibration)
+            : m_config(std::move(config)), m_calibration(calibration) {}
 
     virtual ~PolyTailCalculator() = default;
 
     // returns information about the polyA/T tail. signal_anchor = -1 on failure
-    virtual SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const = 0;
+    virtual std::vector<SignalAnchorInfo> determine_signal_anchor_and_strand(
+            const SimplexRead& read) const = 0;
 
     // returns a struct with: number of bases in the polyA/T tail (), start and end of poly(A) in raw signal (all -1 on failure)
     PolyTailLengthInfo calculate_num_bases(const SimplexRead& read,
-                                           const SignalAnchorInfo& signal_info) const;
+                                           const std::vector<SignalAnchorInfo>& signal_info) const;
 
     static int max_tail_length() { return 750; };
 
@@ -71,29 +77,28 @@ protected:
     virtual std::pair<int, int> signal_range(int signal_anchor,
                                              int signal_len,
                                              float samples_per_base,
-                                             bool fwd) const;
+                                             SearchDirection direction) const;
 
     std::pair<float, float> estimate_samples_per_base(const dorado::SimplexRead& read) const;
 
     // Find the signal range near the provided anchor that corresponds to the polyA/T tail
     std::pair<int, int> determine_signal_bounds(int signal_anchor,
-                                                bool fwd,
+                                                SearchDirection direction,
                                                 const SimplexRead& read,
                                                 float num_samples_per_base,
                                                 float std_samples_per_base) const;
 
     const PolyTailConfig m_config;
-    const float m_speed_calibration;
-    const float m_offset_calibration;
+    const PolyTailCalibrationCoeffs m_calibration;
 };
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(const PolyTailConfig& config,
-                                                            bool is_rna,
-                                                            bool is_rna_adapter,
-                                                            float speed_calibration,
-                                                            float offset_calibration);
+    static std::shared_ptr<const PolyTailCalculator> create(
+            const PolyTailConfig& config,
+            bool is_rna,
+            bool is_rna_adapter,
+            const PolyTailCalibrationCoeffs& calibration);
 };
 
 }  // namespace dorado::poly_tail

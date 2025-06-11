@@ -8,9 +8,9 @@ class RNAPolyTailCalculator : public PolyTailCalculator {
 public:
     RNAPolyTailCalculator(PolyTailConfig config,
                           bool is_rna_adapter,
-                          float speed_calibration,
-                          float offset_calibration);
-    SignalAnchorInfo determine_signal_anchor_and_strand(const SimplexRead& read) const override;
+                          const PolyTailCalibrationCoeffs& calibration);
+    std::vector<SignalAnchorInfo> determine_signal_anchor_and_strand(
+            const SimplexRead& read) const override;
 
 protected:
     float average_samples_per_base(const std::vector<float>& sizes) const override;
@@ -21,7 +21,7 @@ protected:
     std::pair<int, int> signal_range(int signal_anchor,
                                      int signal_len,
                                      float samples_per_base,
-                                     bool fwd) const override;
+                                     SearchDirection direction) const override;
 
 private:
     bool m_rna_adapter;

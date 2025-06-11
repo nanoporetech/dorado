@@ -1,6 +1,7 @@
 #include "rna_poly_tail_calculator.h"
 
 #include "read_pipeline/messages.h"
+#include "utils/PostCondition.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
@@ -25,10 +26,8 @@ namespace dorado::poly_tail {
 
 RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config,
                                              bool is_rna_adapter,
-                                             float speed_calibration,
-                                             float offset_calibration)
-        : PolyTailCalculator(std::move(config), speed_calibration, offset_calibration),
-          m_rna_adapter(is_rna_adapter) {}
+                                             const PolyTailCalibrationCoeffs& calibration)
+        : PolyTailCalculator(std::move(config), calibration), m_rna_adapter(is_rna_adapter) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
     const auto log_sum =
@@ -49,10 +48,11 @@ float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
     return (samples_per_base1 + samples_per_base2) / 2;
 }
 
-SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
+std::vector<SignalAnchorInfo> RNAPolyTailCalculator::determine_signal_anchor_and_strand(
         const SimplexRead& read) const {
     if (!m_rna_adapter) {
-        return SignalAnchorInfo{false, read.read_common.rna_adapter_end_signal_pos, 0, false};
+        return {SignalAnchorInfo{SearchDirection::FORWARD,
+                                 read.read_common.rna_adapter_end_signal_pos, 0}};
     }
 
     const std::string& rna_adapter = m_config.rna_adapter;
@@ -69,30 +69,29 @@ SignalAnchorInfo RNAPolyTailCalculator::determine_signal_anchor_and_strand(
             edlibAlign(rna_adapter.data(), int(rna_adapter.length()), read_bottom.data(),
                        int(read_bottom.length()), align_config);
 
+    auto post = utils::PostCondition([&] { edlibFreeAlignResult(align_result); });
+
     utils::trace_log("polytail barcode mask edit dist {}", align_result.editDistance);
 
     const float adapter_score =
             1.f - static_cast<float>(align_result.editDistance) / rna_adapter.length();
 
-    SignalAnchorInfo result = {false, -1, trailing_Ts, false};
-
-    if (adapter_score >= threshold) {
-        const auto stride = read.read_common.model_stride;
-        const auto seq_to_sig_map = dorado::utils::moves_to_map(
-                read.read_common.moves, stride, read.read_common.get_raw_data_samples(),
-                read.read_common.seq.size() + 1);
-
-        const int base_anchor = bottom_start + align_result.startLocations[0];
-        // RNA sequence is reversed wrt the signal and move table
-        const int signal_anchor =
-                int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
-        result = {false, signal_anchor, trailing_Ts, false};
-    } else {
+    if (adapter_score < threshold) {
         utils::trace_log("{} adapter score too low {}", read.read_common.read_id, adapter_score);
+        return {};
     }
 
-    edlibFreeAlignResult(align_result);
-    return result;
+    const auto stride = read.read_common.model_stride;
+    const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
+                                                            read.read_common.get_raw_data_samples(),
+                                                            read.read_common.seq.size() + 1);
+
+    const int base_anchor = bottom_start + align_result.startLocations[0];
+    // RNA sequence is reversed wrt the signal and move table
+    const int signal_anchor =
+            int(seq_to_sig_map[static_cast<int>(seq_view.length()) - base_anchor]);
+    SignalAnchorInfo result = {SearchDirection::FORWARD, signal_anchor, trailing_Ts};
+    return {result};
 }
 
 // Create an offset for dRNA data. There is a tendency to overestimate the length of dRNA
@@ -120,9 +119,10 @@ std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int
 std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,
                                                         int signal_len,
                                                         float samples_per_base,
-                                                        bool fwd) const {
-    assert(!fwd);  // RNA should always be treated as a reverse strand
-    return PolyTailCalculator::signal_range(signal_anchor, signal_len, samples_per_base, fwd);
+                                                        SearchDirection direction) const {
+    // RNA should always search forward of the anchor
+    assert(direction == SearchDirection::FORWARD);
+    return PolyTailCalculator::signal_range(signal_anchor, signal_len, samples_per_base, direction);
 }
 
 }  // namespace dorado::poly_tail
