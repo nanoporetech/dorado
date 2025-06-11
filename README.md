@@ -391,9 +391,11 @@ In case that the available HPC nodes do not have GPUs available, the CPU power o
 
 Dorado `polish` is a high accuracy assembly polishing tool which outperforms similar tools for most ONT-based assemblies.
 
-It takes as input a draft produced by an assembly tool (e.g. Hifiasm or Flye) and reads aligned to that assembly and outputs an updated (polished) version of the assembly.
+It takes as input a draft assembly produced by a tool such as [Hifiasm](https://github.com/chhylp123/hifiasm) or [Flye](https://github.com/mikolmogorov/Flye) and aligned reads and outputs an updated version of the assembly.
 
-Additionally, `dorado polish` can output a VCF file containing records for all variants discovered during polishing, or a gVCF file contatining records for all locations in the input draft sequences.
+Additionally, Dorado `polish` can output a VCF file containing records for all variants discovered during polishing, or a gVCF file containing records for all locations in the input draft sequences.
+
+Note that Dorado `polish` is a **haploid** polishing tool and does _not_ implement any sort of phasing internally. It will take input alignment data _as is_ and run it through the polishing model to produce the consensus sequences. For more information, please take a look at [this section](https://dorado-docs.readthedocs.io/en/latest/assembly/polish/#polishing-diploidpolyploid-assemblies) of Dorado Docs.
 
 #### Quick Start
 
@@ -407,7 +409,7 @@ samtools index aligned_reads.bam
 dorado polish <aligned_reads.bam> <draft.fasta> > polished_assembly.fasta
 ```
 
-In the above example, `<aligned_reads>` is a BAM of reads aligned to a draft by `dorado aligner` and `<draft>` is a FASTA or FASTQ file containing the draft assembly. The draft can be uncompressed or compressed with `bgzip`.
+In the above example, `<aligned_reads>` is a BAM of reads aligned to a draft by Dorado `aligner` and `<draft>` is a FASTA or FASTQ file containing the draft assembly. The draft can be uncompressed or compressed with `bgzip`.
 
 ##### Consensus on bacterial genomes
 ```
@@ -444,6 +446,7 @@ To specify resources manually use:
 - `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
 
 Example:
+
 ```
 dorado polish reads_to_draft.bam draft.fasta --device cuda:0 --threads 24 > consensus.fasta
 ```
@@ -465,15 +468,15 @@ Alternatively, a model can be selected through the command line in the following
 
 When `auto` or `<basecaller_model>` syntax is used and the input is a v5.2.0 dataset, the data will be queried for the presence move tables and an best polishing model selected for the data. Move tables need to be exported during basecalling. If available, this allows for higher polishing accuracy.
 
-If a non-compatible model is selected for the input data, or there are multiple read groups in the input dataset which were generated using different basecaller models, `dorado polish` will report an error and stop execution.
+If a non-compatible model is selected for the input data, or there are multiple read groups in the input dataset which were generated using different basecaller models, Dorado `polish` will report an error and stop execution.
 
 
 ##### Move Table Aware Models
 
 Significantly more accurate assemblies can be produced by giving the polishing model access to additional information about the underlying signal for each read. For more information, see this section from the [NCM 2024](https://youtu.be/IB6DmU40NIU?t=377) secondary analysis update.
 
-Dorado `polish` includes models which can use the move table to get temporal information about each read. These models will be selected automatically if the corresponding `mv` tag is in the input BAM. To do this, pass the `--emit-moves` tag to `dorado basecaller` when basecalling. To check if a BAM contains the move table for reads, use samtools:
-```
+Dorado `polish` includes models which can use the move table to get temporal information about each read. These models will be selected automatically if the corresponding `mv` tag is in the input BAM. To do this, pass the `--emit-moves` tag to Dorado `basecaller` when basecalling. To check if a BAM contains the move table for reads, use samtools:
+```bash
 samtools view --keep-tag "mv" -c <reads_to_draft_bam>
 ```
 
@@ -481,7 +484,17 @@ The output should be equal to the total number of reads in the bam (`samtools vi
 
 If move tables are not available in the BAM, then the non-move table-aware model will be automatically selected.
 
-#### Troubleshooting
+#### FAQ
+
+##### How is Dorado `polish` different from Medaka?
+
+[Medaka](https://github.com/nanoporetech/medaka) and Dorado `polish` are both assembly polishing tools. They accept the same input formats and produce the same output formats, and in principle they could run the same polishing model to produce equivalent results. However, Dorado `polish` is optimised for higher performance, and can support more accurate models with more computationally intensive architectures. For use cases in low-resource settings (small genomes such as bacteria with CPUs only available) Medaka remains the recommended tool. For large genomes or in other instances where speed is important, we suggest trying Dorado `polish`.
+
+##### Should I use `correct` or `polish`?
+
+Dorado `polish` is a post-assembly tool and it is intended to improve the accuracy of pre-existing
+assemblies. Dorado `correct` conversely is a pre-assembly tool and is intended to improve the
+contiguity of an assembly by improving the fidelity of reads used to create it.
 
 ##### "How do I go from raw POD5 data to a polished T2T assembly?"
 Here is a high-level example workflow:
@@ -497,13 +510,26 @@ dorado correct calls.fastq > corrected.fasta
 <some_assembler> --input corrected.fasta > draft_assembly.fasta
 
 # Align original calls to the draft assembly
-dorado aligner calls.bam draft_assembly.fasta > aligned_calls.bam
+dorado aligner draft_assembly.fasta calls.bam > aligned_calls.bam
 
 # Run dorado polish using the raw reads aligned to the draft assembly
-dorado polish aligned_calls.bam draft_assembly.fasta > polished_assembly.fasta 
+dorado polish aligned_calls.bam draft_assembly.fasta > polished_assembly.fasta
 ```
 
-##### Memory consumption
+##### Polishing diploid/polyploid assemblies
+
+Dorado `polish` is a **haploid** polishing tool and does _not_ implement any sort of phasing internally. It will take input alignment data _as is_ and run it through the polishing model to produce the consensus sequences.
+
+In order to polish diploid/polyploid assemblies, it is up to the user to properly separate haplotypes before giving the data to Dorado `polish`.
+
+We are currently working on a set of best practices. In the meantime, an unofficially suggested approach to polish diploid genomes would be to align the reads using the `lr:hqae` [Minimap2 setting](https://github.com/lh3/minimap2/releases/tag/v2.28) as this was specifically designed for alignment back to a diploid genome. This setting is available through Dorado `aligner` using the following option:
+```
+dorado aligner --mm2-opts "-x lr:hqae" <ref> <reads>
+```
+
+##### Troubleshooting
+
+###### GPU Memory Issues
 The default inference batch size (`16`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
 ```
 dorado polish reads_to_draft.bam draft.fasta --batchsize <number> > consensus.fasta
@@ -516,18 +542,18 @@ dorado polish reads_to_draft.bam draft.fasta --device "cpu" > consensus.fasta
 
 Note that using multiple CPU inference threads can cause much higher memory usage.
 
-##### "[error] Caught exception: Could not open index for BAM file: 'aln.bam'!"
+###### "[error] Could not open index for BAM file: 'aln.bam'!"
 Example message:
 ```
 $ dorado polish aln.bam assembly.fasta > polished.fasta
 [2024-12-23 07:18:23.978] [info] Running: "polish" "aln.bam" "assembly.fasta"
 [E::idx_find_and_load] Could not retrieve index file for 'aln.bam'
-[2024-12-23 07:18:23.987] [error] Caught exception: Could not open index for BAM file: 'aln.bam'!
+[2024-12-23 07:18:23.987] [error] Could not open index for BAM file: 'aln.bam'!
 ```
 
 This message means that there the input BAM file does not have an accompanying index file `.bai`. This may also mean that the input BAM file is not sorted, which is a prerequisite for producing the `.bai` index using `samtools`.
 
-`dorado polish` requires input alignments to be produced using `dorado aligner`. When `dorado aligner` outputs alignments to `stdout`, they are not sorted automatically. Instead, `samtools` needs to be used to sort and index the BAM file. For example:
+Dorado `polish` requires input alignments to be produced using Dorado `aligner`. When Dorado `aligner` outputs alignments to `stdout`, they are not sorted automatically. Instead, `samtools` needs to be used to sort and index the BAM file. For example:
 ```
 dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aln.bam
 samtools index aln.bam
@@ -539,11 +565,11 @@ The output from dorado aligner is already sorted when the output is to a folder,
 dorado aligner --output-dir <out_dir> <draft.fasta> <reads.bam>
 ```
 
-##### "[error] Caught exception: Input BAM file has no basecaller models listed in the header."
+###### "[error] Input BAM file has no basecaller models listed in the header."
 
-`dorado polish` requires that the aligned BAM has one or more `@RG` lines in the header. Each `@RG` line needs to contain a basecaller model used for generating the reads in this group. This information is required to determine the compatibility of the selected polishing model, as well as for auto-resolving the model from data.
+Dorado `polish` requires that the aligned BAM has one or more `@RG` lines in the header. Each `@RG` line needs to contain a basecaller model used for generating the reads in this group. This information is required to determine the compatibility of the selected polishing model, as well as for auto-resolving the model from data.
 
-When using `dorado aligner` please provide the input basecalled reads in the BAM format. The basecalled reads BAM file (`e.g. calls.bam`) contains the `@RG` header lines, and this will be propagated into the aligned BAM file.
+When using Dorado `aligner` please provide the input basecalled reads in the BAM format. The basecalled reads BAM file (`e.g. calls.bam`) contains the `@RG` header lines, and this will be propagated into the aligned BAM file.
 
 However, if input reads are given in the `FASTQ`, the output aligned BAM file will _not_ contain `@RG` lines, and it will not be possible to use it for polishing.
 
@@ -551,17 +577,15 @@ Note that, even if the input FASTQ file has header lines in the form of:
 ```
 @74960cfd-0b82-43ed-ae04-05162e3c0a5a qs:f:27.7534 du:f:75.1604 ns:i:375802 ts:i:1858 mx:i:1 ch:i:295 st:Z:2024-08-29T22:06:03.400+00:00 rn:i:585 fn:Z:FBA17175_7da7e070_f8e851a5_5.pod5 sm:f:414.101 sd:f:107.157 sv:Z:pa dx:i:0 RG:Z:f8e851a5d56475e9ecaa43496da18fad316883d8_dna_r10.4.1_e8.2_400bps_sup@v5.0.0
 ```
-`dorado aligner` will not automatically add the `@RG` header lines. BAM input needs to be used for now.
+Dorado `aligner` will not automatically add the `@RG` header lines. BAM input needs to be used for now (not FASTQ):
 
-TL;DR:
-- Use reads in BAM format (not FASTQ) as input for alignment:
 ```
 dorado aligner draft.fasta calls.bam
 ```
 
-##### [error] Caught exception: Input BAM file was not aligned using Dorado.
+###### "[error] Input BAM file was not aligned using Dorado."
 
-`dorado polish` accepts only BAMs aligned with `dorado aligner`. Aligners other than `dorado aligner` are not supported.
+Dorado `polish` accepts only BAMs aligned with Dorado `aligner`. Aligners other than Dorado `aligner` are not supported.
 
 Example usage:
 ```
@@ -569,15 +593,48 @@ dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads>
 samtools index aln.bam
 ```
 
-## Variant Calling - Alpha preview release
+###### "[error] The input BAM contains more than one read group. Please specify --RG to select which read group to process."
+
+It is possible that the input BAM file contains more than 1 read group. In this case, Dorado `polish` requires that a single read group is selected for processing using the `--RG <id>` command line argument. The `<id>` should exactly match the `ID:` field in one of the `@RG` lines in the input BAM/SAM file.
+
+Specifying the `--RG` option will filter out any read which does not belong to that read group and will apply the appropriate polishing model for that read group based on the basecaller model specified in the corresponding `@RG` line in the input BAM file.
+
+Specifying a read group which corresponds to duplex data will not work because Dorado `polish` currently does not have duplex polishing models available.
+
+In case of a duplex BAM - note that by default the simplex parents of the duplex reads will also be present in the output BAM file from Dorado. Consider filtering these out first if this could bias your results.
+
+###### "[error] Duplex basecalling models are not supported."
+
+Dorado `polish` currently supports data generated using only the simplex basecallers.
+
+###### I created a merged BAM file composed of multiple different data types. Why can't I polish it? Using `--ignore-read-groups` does not help either.
+
+In case you created a merged BAM file, one of the following scenarios is possible:
+
+1. **There are zero read groups in the merged BAM file.** Something went wrong in the process of data preparation. There needs to be at least one read group in the BAM file which links the data to a basecaller model.
+2. **The merged BAM file has only one read group.** This is the best option, and merging was performed in a way that all colliding `@RG` headers were merged too. Since there is only one read group, there is also one basecaller model for the entire merged BAM dataset.
+3. **The merged BAM file has more than one read group, but only a single basecaller model.** This can occur when data originally belonged to the same read group but the colliding read groups were not merged in the process (check the `-c` option of `samtools merge`). For example, `samtools merge` will add a unique hash to the end of each read group, because the prefix of the read groups is the same (e.g. `bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-1C79A650` and `bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-6E00935B`). Alternatively, data from multiple sequencing runs were combined, but the same basecaller model was used in all cases.
+    - Using `--ignore-read-groups` will run the process using all data in this case, since it was generated using a single basecaller model.
+    - Alternatively, using `--RG <read_group_id>` will select only reads which belong to this specific read group, and ignore all other reads.
+    - Auto model detection is possible from the BAM file in this case, since only one basecaller model was used to produce the data.
+4. **The merged BAM file has more than one read group and _more than one basecaller model_.** One or more read groups were generated using one particular basecaller model, while some other read groups were generated using another particular basecaller model. (For example, combining old and new data.) Sometimes, users may attempt to combine simplex and duplex reads into the same BAM file.
+    - Dorado `polish`/`variant` can use only one selected model for inference. All currently available models were trained on individual data types (data generated by a single basecaller version) and not on a mixture of data (with the exception of the bacterial methylation polishing model). Running any model on a mixture of data may produce inferior results. This is why Dorado `polish` and Dorado `variant` enforce that only a single basecaller model is present in the input.
+    - In this case, not even `--ignore-read-groups` will work because there was more than one basecaller model used to produce the data in this BAM file.
+    - Using `--RG <read_group_id>` will select only reads which belong to one specific read group, and ignore all other reads.
+    - Using the auto model selection cannot resolve a model from a BAM file if the input BAM file contains multiple models.
+    - Auto model selection in this case is only possible if `--RG` is used.
+    - Duplex basecaller models are not supported by Dorado `polish` or Dorado `variant`.
+
+### Variant Calling - Alpha preview release
 
 Dorado `variant` is an early-stage diploid small variant caller, released for experimental use and evaluation purposes.
 This version is intended for feedback and should not yet be considered production-ready.
 
-> **Should I use `polish` or `variant`?**
+> **Should I use `variant` or `polish`?**
 Dorado variant is a short variant caller for diploid samples aligned to a haploid species reference (e.g. GRCh38) whereas `polish` is intended for workflows involving reads aligned to a haplotype-resolved (or haploid) draft assembly.
 
-Although `dorado polish` can also generate a VCF file of variants, there are some substantial distinctions between the two tools.
+Although Dorado `polish` can also generate a VCF file of variants, there are some substantial distinctions between the two tools.
+
 | `dorado polish`             | `dorado variant`             |
 | -------------------- | -------------------- |
 | - Polishing of draft assemblies<br>- Input is a haplotype-resolved draft assembly<br>- Output is a polished sequence<br>- Optionally, a VCF/gVCF of diffs is output<br>- Uses specialised polishing models| - Diploid variant calling<br>- Input is a reference genome<br>- Output is a VCF/gVCF of called diploid variants<br>- Uses specialised variant calling models|
@@ -597,11 +654,13 @@ For this preview release, current models require signal-level information encode
 
 
 ##### Output to a folder
+
 ```
 dorado variant <aligned_reads> <reference> -o <output_dir>
 ```
 
 Specifying `-o` will write the output to one or more files stored in the given output directory (and create the directory if it doesn't exist). Concretely:
+
 - VCF file: `<output_dir>/variants.vcf` which contains only variant calls by default, or records for all positions if `--gvcf` is specified.
 
 #### Resources
@@ -609,12 +668,14 @@ Specifying `-o` will write the output to one or more files stored in the given o
 Dorado `variant` will automatically select the compute resources to perform variant calling. It can use one or more GPU devices. Variant calling can be performed on CPU-only, but we highly recommend to run on GPU for desired performance. High-memory GPUs are recommended to run this tool.
 
 To specify resources manually use:
+
 - `-x / --device` - to specify specific GPU resources (if available).
 - `--threads` - to set the maximum number of threads to be used for everything but the inference.
 - `--infer-threads` - number of inference workers to use (per device). For CPU-only runs, this specifies the number of CPU inference threads.
 - `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
 
 Example:
+
 ```
 dorado variant aligned_reads.bam reference.fasta --device cuda:0 --threads 24 > variants.vcf
 ```
@@ -624,9 +685,11 @@ dorado variant aligned_reads.bam reference.fasta --device cuda:0 --threads 24 > 
 By default, `variant` queries the BAM and selects the best model for the basecalled reads, if supported.
 
 Alternatively, a model can be selected through the command line in the following way:
+
+```dorado
+dorado variant --model <value> ...
 ```
---model <value>
-```
+
 | Value    | Description |
 | -------- | ------- |
 | auto  | Determine the best compatible model based on input data. |
@@ -634,26 +697,60 @@ Alternatively, a model can be selected through the command line in the following
 | \<variant_model\> | Variant calling model name (e.g. `dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0`) |
 | \<path\> | Local path on disk where the model can be loaded from. |
 
-When the `auto` or the`<basecaller_model>` syntax is used the most recent version of a compatible model will be selected for variant calling.
+When the `auto` or the `<basecaller_model>` syntax is used the most recent version of a compatible model will be selected for variant calling.
 
 Current variant calling models require the presence of move tables in the input BAM file. Move tables need to be exported during basecalling.
 
-If a non-compatible model is selected for the input data, or if there are multiple read groups in the input dataset which were generated using different basecaller models, `dorado variant` will report an error and stop execution.
+If a non-compatible model is selected for the input data, or if there are multiple read groups in the input dataset which were generated using different basecaller models, Dorado `variant` will report an error and stop execution.
 
 ##### Supported basecaller models
+
 - `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`
 
 More models will be supported in the near future. This is an alpha release.
 
-#### Memory Consumption
+#### Common questions and Troubleshooting
+
+##### I created a merged BAM file composed of multiple different data types. Why can't I call variants on this dataset? Using `--ignore-read-groups` does not help either.
+
+Please see the following section in Dorado `polish`:
+[I created a merged BAM file composed of multiple different data types](https://dorado-docs.readthedocs.io/en/latest/assembly/polish/#i-created-a-merged-bam-file-composed-of-multiple-different-data-types-why-cant-i-polish-it-using-ignore-read-groups-does-not-help-either)
+
+
+##### Memory consumption / Torch out-of-memory (OOM) issues
+
 The default inference batch size (`10`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
+
 ```
 dorado variant aligned_reads.bam reference.fasta --batchsize <number> > variants.vcf
 ```
-or the number of inference workers:
+
+or the number of inference workers (the default is `2` workers per device):
+
 ```
 dorado variant aligned_reads.bam reference.fasta --infer-threads 1 > variants.vcf
 ```
+
+Note that the GPU memory consumption also depends on the coverage of the input data, as feature tensor size varies relative to this.
+
+##### "[error] Input BAM file was not aligned using Dorado."
+
+Dorado `variant` accepts only BAMs aligned with Dorado `aligner`. Aligners other than Dorado `aligner` are not supported.
+
+Example usage:
+```
+dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aln.bam
+samtools index aln.bam
+```
+
+##### "[error] Duplex basecalling models are not supported."
+
+Dorado `variant` currently supports data generated using only the simplex basecallers.
+
+##### Does Dorado Variant phase variants?
+
+At this early stage, Dorado `variant` does not yet produce phased VCF variants. This is work in progress.
+
 
 ## Available basecalling models
 
