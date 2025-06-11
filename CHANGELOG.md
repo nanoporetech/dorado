@@ -2,6 +2,13 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.0.2] (12 June 2025)
+
+This release includes improvements to Poly(A/T) estimation.
+
+* 2736eeb235c63fd55feb79e539a4287dd5df20af - Improved split Poly(A/T) tail detection for plasmids.
+* 66638c8c5e5671ffab5d10c9c507de0872e4a3d1 - Allow use of old-style `calibration_coefficients` to support poly(A/T) calling for legacy models.
+
 # [1.0.1] (4 June 2025)
 
 This release introduces support in the `--bacteria` mode of Dorado `polish` for data basecalled with v5.2 models and improves the speed of `5mCG_5hmCG` calling with v5.0 and v5.2 models, along with other enhancements and fixes.
