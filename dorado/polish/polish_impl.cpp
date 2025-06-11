@@ -905,8 +905,8 @@ void sample_producer(PolisherResources& resources,
                 // If any of the samples is of wrong size, create a remainder batch of 1.
                 if (dorado::ssize(samples[i].positions_major) != window_len) {
                     InferenceData remainder_buffer;
-                    remainder_buffer.samples = {std::move(samples[i])};
-                    remainder_buffer.trims = {std::move(trims[i])};
+                    remainder_buffer.samples.emplace_back(std::move(samples[i]));
+                    remainder_buffer.trims.emplace_back(std::move(trims[i]));
                     spdlog::trace(
                             "[producer] Pushing a batch of data to infer_data queue. "
                             "remainder_buffer.samples.size() = {}",
