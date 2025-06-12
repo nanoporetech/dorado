@@ -17,11 +17,12 @@
 #       DEPENDS_PRIVATE
 #           toml11::toml11 # implementation uses toml11 but dependents don't need to know that
 #       NO_TORCH # optionally can be added to say that this target doesn't need the torch pch
+#       POSITION_INDEPENDENT_CODE # optionally can be added for libs that go into shared objects
 #   )
 #
 function(dorado_add_library)
     # Parse the args.
-    set(options NO_TORCH)
+    set(options NO_TORCH POSITION_INDEPENDENT_CODE)
     set(oneValueArgs NAME PUBLIC_DIR)
     set(multiValueArgs SOURCES_PUBLIC SOURCES_PRIVATE DEPENDS_PUBLIC DEPENDS_PRIVATE)
     cmake_parse_arguments(arg "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -43,6 +44,11 @@ function(dorado_add_library)
 
     # All of our code should compile with warnings enabled.
     enable_warnings_as_errors(${arg_NAME})
+
+    # Targets that are compiled into a dynamic library need to be PIC.
+    if (arg_POSITION_INDEPENDENT_CODE)
+        set_target_properties(${arg_NAME} PROPERTIES POSITION_INDEPENDENT_CODE ON)
+    endif()
 
     # Reuse the PCH if it makes use of torch.
     if (arg_NO_TORCH)
