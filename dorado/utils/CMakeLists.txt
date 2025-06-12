@@ -16,6 +16,7 @@ dorado_add_library(
         concurrency/multi_queue_thread_pool.h
         concurrency/synchronisation.h
         concurrency/task_priority.h
+        context_container.h
         crypto_utils.h
         dev_utils.h
         fasta_fastq_utils.h

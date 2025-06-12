@@ -5,7 +5,6 @@ dorado_add_library(
         read_pipeline/base
     SOURCES_PUBLIC
         ClientInfo.h
-        context_container.h
         DefaultClientInfo.h
         flush_options.h
         HtsReader.h
