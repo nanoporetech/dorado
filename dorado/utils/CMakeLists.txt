@@ -101,7 +101,6 @@ dorado_add_library(
         dorado_compat
         htslib
         minimap2
-        toml11::toml11
     NO_TORCH
 )
 
