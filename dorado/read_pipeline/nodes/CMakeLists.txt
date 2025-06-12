@@ -58,6 +58,7 @@ dorado_add_library(
         dorado_utils
     DEPENDS_PRIVATE
         cxxpool
+        dorado_aligner
         dorado_basecall
         dorado_correct
         dorado_demux

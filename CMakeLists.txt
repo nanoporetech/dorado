@@ -192,6 +192,7 @@ enable_testing()
 # torch_utils first for its PCH.
 add_subdirectory(dorado/torch_utils)
 
+add_subdirectory(dorado/aligner)
 add_subdirectory(dorado/alignment)
 add_subdirectory(dorado/api)
 add_subdirectory(dorado/basecall)
@@ -227,6 +228,7 @@ endif()
 add_library(dorado_lib INTERFACE)
 target_link_libraries(dorado_lib
     INTERFACE
+        dorado_aligner
         dorado_alignment
         dorado_api
         dorado_basecall

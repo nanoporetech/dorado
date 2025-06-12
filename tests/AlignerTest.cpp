@@ -1,6 +1,6 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "alignment/Minimap2Aligner.h"
+#include "aligner/Minimap2Aligner.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"

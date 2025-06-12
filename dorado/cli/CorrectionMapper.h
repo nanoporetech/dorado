@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CorrectionAligner.h"
-#include "alignment/Minimap2Aligner.h"
+#include "aligner/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "utils/AsyncQueue.h"

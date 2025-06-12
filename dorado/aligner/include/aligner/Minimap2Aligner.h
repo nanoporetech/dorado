@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Minimap2Index.h"
+#include "alignment/Minimap2Index.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/types.h"
 

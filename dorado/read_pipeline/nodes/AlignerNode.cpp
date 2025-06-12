@@ -1,6 +1,6 @@
 #include "read_pipeline/nodes/AlignerNode.h"
 
-#include "alignment/Minimap2Aligner.h"
+#include "aligner/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
