@@ -45,7 +45,16 @@ function(dorado_add_library)
     enable_warnings_as_errors(${arg_NAME})
 
     # Reuse the PCH if it makes use of torch.
-    if (DORADO_ENABLE_PCH AND NOT arg_NO_TORCH)
+    if (arg_NO_TORCH)
+        # Validate that this target really doesn't link to torch.
+        # We defer this so that links not using this helper function aren't missed.
+        cmake_language(EVAL CODE "
+            cmake_language(DEFER
+                DIRECTORY ${CMAKE_SOURCE_DIR}
+                CALL check_no_dependency_on_torch [[${arg_NAME}]]
+            )
+        ")
+    elseif (DORADO_ENABLE_PCH)
         target_link_libraries(${arg_NAME} PRIVATE dorado_pch)
         target_precompile_headers(${arg_NAME} REUSE_FROM dorado_pch)
     endif()

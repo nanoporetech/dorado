@@ -85,6 +85,7 @@ include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
+include(cmake/DoradoCheckDeps.cmake)
 
 # Third party libs that aren't submodules.
 include(cmake/Zlib.cmake)
