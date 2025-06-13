@@ -7,7 +7,7 @@ function(check_no_dependency_for_target TARGET CHECKER DEPENDENCY_PATH)
     # Keep track of how we got here.
     list(APPEND DEPENDENCY_PATH "${TARGET}")
 
-    # Grab all the dependencies and see if any of them contain torch.
+    # Grab all the dependencies and apply the CHECKER function.
     get_target_property(all_deps "${TARGET}" LINK_LIBRARIES)
     foreach(lib_name IN LISTS all_deps)
         CHECKER("${lib_name}" "${DEPENDENCY_PATH}")
