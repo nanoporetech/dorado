@@ -443,17 +443,17 @@ int correct(int argc, char* argv[]) {
         if (opt.compute_num_blocks) {
             spdlog::debug("Only computing the number of index blocks.");
 
-            CorrectionMapper node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
-                                  opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
-                                  opt.mid_occ_frac);
+            CorrectionMapper aligner(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
+                                     opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
+                                     opt.mid_occ_frac);
 
             // Loop through all index blocks.
-            while (node.load_next_index_block()) {
+            while (aligner.load_next_index_block()) {
             }
 
             // Handle empty sequence files.
             const int64_t num_blocks =
-                    node.get_current_index_block_id() + ((node.get_index_seqs() > 0) ? 1 : 0);
+                    aligner.get_current_index_block_id() + ((aligner.get_index_seqs() > 0) ? 1 : 0);
 
             std::cout << num_blocks << '\n';
 
