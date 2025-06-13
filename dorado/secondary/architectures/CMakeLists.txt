@@ -1,0 +1,29 @@
+dorado_add_library(
+    NAME
+        dorado_secondary_architectures
+    PUBLIC_DIR
+        secondary/architectures
+    SOURCES_PUBLIC
+        model_torch_base.h
+        model_factory.h
+        model_config.h
+    SOURCES_PRIVATE
+        model_config.cpp
+        model_factory.cpp
+        model_gru.cpp
+        model_gru.h
+        model_latent_space_lstm.cpp
+        model_latent_space_lstm.h
+        model_slot_attention_consensus.cpp
+        model_slot_attention_consensus.h
+        model_torch_base.cpp
+        model_torch_script.cpp
+        model_torch_script.h
+    DEPENDS_PUBLIC
+        dorado_secondary_common
+        dorado_torch_utils
+        dorado_utils
+    DEPENDS_PRIVATE
+        spdlog::spdlog
+        toml11::toml11
+)

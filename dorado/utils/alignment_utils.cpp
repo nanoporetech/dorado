@@ -1,4 +1,4 @@
-#include "alignment_utils.h"
+#include "utils/alignment_utils.h"
 
 #include <minimap.h>
 

@@ -1,4 +1,4 @@
-#include "encode_kmer.h"
+#include "modbase/encode_kmer.h"
 
 #include "utils/sequence_utils.h"
 #include "utils/simd.h"

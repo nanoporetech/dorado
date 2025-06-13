@@ -1,9 +1,8 @@
-#include "read_pipeline/BarcodeDemuxerNode.h"
+#include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/HtsReader.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
 #include "utils/SampleSheet.h"
 #include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"

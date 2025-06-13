@@ -1,5 +1,5 @@
 #include "correct/windows.h"
-#include "secondary/interval.h"
+#include "secondary/common/interval.h"
 #include "utils/cigar.h"
 #include "utils/overlap.h"
 

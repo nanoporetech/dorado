@@ -124,23 +124,25 @@ target_compile_definitions(dorado_tests_common
 # Finish setting up each target and add them as tests.
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     if (DORADO_ENABLE_PCH)
-        target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_lib)
+        target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_pch)
     endif()
 
     target_link_libraries(${TEST_BIN}
         PRIVATE
-            dorado_tests_common
-            dorado_lib
-            dorado_models_lib
-            dorado_model_downloader_lib
             dorado_basecall
-            dorado_modbase
-            dorado_secondary
-            minimap2
-            ${ZLIB_LIBRARIES}
-            dorado_io_lib
+            dorado_cli_utils
             dorado_file_info
+            dorado_io_lib
+            dorado_lib
+            dorado_modbase
+            dorado_model_downloader_lib
+            dorado_models_lib
+            dorado_nn
+            dorado_secondary
+            dorado_tests_common
+            minimap2
             toml11::toml11
+            ${ZLIB_LIBRARIES}
     )
 
     enable_warnings_as_errors(${TEST_BIN})

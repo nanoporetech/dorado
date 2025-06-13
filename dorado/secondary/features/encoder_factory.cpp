@@ -1,5 +1,7 @@
-#include "encoder_factory.h"
+#include "secondary/features/encoder_factory.h"
 
+#include "encoder_counts.h"
+#include "encoder_read_alignment.h"
 #include "secondary/architectures/model_config.h"
 
 #include <spdlog/spdlog.h>

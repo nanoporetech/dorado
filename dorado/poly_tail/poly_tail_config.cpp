@@ -1,4 +1,4 @@
-#include "poly_tail_config.h"
+#include "poly_tail/poly_tail_config.h"
 
 #include "utils/sequence_utils.h"
 

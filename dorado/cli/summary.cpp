@@ -1,8 +1,7 @@
 #include "summary/summary.h"
 
-#include "cli/cli.h"
+#include "cli.h"
 #include "dorado_version.h"
-#include "read_pipeline/HtsReader.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/time_utils.h"

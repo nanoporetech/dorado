@@ -1,23 +1,24 @@
-add_library(dorado_config STATIC
-    BatchParams.cpp
-    BatchParams.h
-    BasecallModelConfig.cpp
-    BasecallModelConfig.h
-    common.cpp
-    common.h
-    ModBaseBatchParams.cpp
-    ModBaseBatchParams.h
-    ModBaseModelConfig.cpp
-    ModBaseModelConfig.h
-)
-
-target_link_libraries(dorado_config
-    PUBLIC
+dorado_add_library(
+    NAME
+        dorado_config
+    PUBLIC_DIR
+        config
+    SOURCES_PUBLIC
+        BatchParams.h
+        BasecallModelConfig.h
+        common.h
+        ModBaseBatchParams.h
+        ModBaseModelConfig.h
+    SOURCES_PRIVATE
+        BatchParams.cpp
+        BasecallModelConfig.cpp
+        common.cpp
+        ModBaseBatchParams.cpp
+        ModBaseModelConfig.cpp
+    DEPENDS_PUBLIC
         dorado_models_lib
-    PRIVATE
+    DEPENDS_PRIVATE
         dorado_utils
         spdlog::spdlog
         toml11::toml11
 )
-
-enable_warnings_as_errors(dorado_config)

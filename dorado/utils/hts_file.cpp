@@ -1,4 +1,4 @@
-#include "hts_file.h"
+#include "utils/hts_file.h"
 
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"

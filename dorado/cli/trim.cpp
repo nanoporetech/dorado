@@ -1,14 +1,14 @@
-#include "cli/cli.h"
-#include "cli/cli_utils.h"
+#include "ProgressTracker.h"
+#include "cli.h"
+#include "cli/utils/cli_utils.h"
 #include "demux/adapter_info.h"
 #include "dorado_version.h"
-#include "read_pipeline/AdapterDetectorNode.h"
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/HtsReader.h"
-#include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/ProgressTracker.h"
-#include "read_pipeline/ReadPipeline.h"
-#include "read_pipeline/TrimmerNode.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/AdapterDetectorNode.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
+#include "read_pipeline/nodes/TrimmerNode.h"
 #include "utils/bam_utils.h"
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
@@ -151,7 +151,7 @@ int trim(int argc, char* argv[]) {
     hts_file.set_header(header.get());
 
     PipelineDescriptor pipeline_desc;
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
+    auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
 
     auto trimmer = pipeline_desc.add_node<TrimmerNode>({hts_writer}, 1);
 

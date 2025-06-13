@@ -1,9 +1,9 @@
 #include "medaka_read_matrix.h"
 
-#include "kadayashi_utils.h"
 #include "local_haplotagging.h"
 #include "medaka_bamiter.h"
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
+#include "secondary/features/kadayashi_utils.h"
 #include "utils/ssize.h"
 
 #include <htslib/faidx.h>

@@ -1,4 +1,4 @@
-#include "model_config.h"
+#include "secondary/architectures/model_config.h"
 
 #include <toml.hpp>
 

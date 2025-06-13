@@ -1,0 +1,17 @@
+dorado_add_library(
+    NAME
+        dorado_resume_loader
+    PUBLIC_DIR
+        resume_loader
+    SOURCES_PUBLIC
+        ResumeLoader.h
+    SOURCES_PRIVATE
+        ResumeLoader.cpp
+    DEPENDS_PUBLIC
+        dorado_read_pipeline_base
+    DEPENDS_PRIVATE
+        dorado_utils
+        htslib
+        indicators
+        spdlog::spdlog
+)

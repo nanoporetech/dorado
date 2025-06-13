@@ -1,13 +1,14 @@
-#include "cli/cli.h"
-#include "cli/cli_utils.h"
-#include "correct/CorrectionProgressTracker.h"
+#include "CorrectionMapper.h"
+#include "CorrectionPafReader.h"
+#include "CorrectionProgressTracker.h"
+#include "cli.h"
+#include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
-#include "read_pipeline/CorrectionInferenceNode.h"
-#include "read_pipeline/CorrectionMapperNode.h"
-#include "read_pipeline/CorrectionPafReaderNode.h"
-#include "read_pipeline/CorrectionPafWriterNode.h"
-#include "read_pipeline/HtsWriter.h"
+#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/CorrectionInferenceNode.h"
+#include "read_pipeline/nodes/CorrectionPafWriterNode.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/arg_parse_ext.h"
@@ -442,17 +443,17 @@ int correct(int argc, char* argv[]) {
         if (opt.compute_num_blocks) {
             spdlog::debug("Only computing the number of index blocks.");
 
-            CorrectionMapperNode node(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
-                                      opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
-                                      opt.mid_occ_frac);
+            CorrectionMapper aligner(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
+                                     opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
+                                     opt.mid_occ_frac);
 
             // Loop through all index blocks.
-            while (node.load_next_index_block()) {
+            while (aligner.load_next_index_block()) {
             }
 
             // Handle empty sequence files.
             const int64_t num_blocks =
-                    node.get_current_index_block_id() + ((node.get_index_seqs() > 0) ? 1 : 0);
+                    aligner.get_current_index_block_id() + ((aligner.get_index_seqs() > 0) ? 1 : 0);
 
             std::cout << num_blocks << '\n';
 
@@ -493,7 +494,7 @@ int correct(int argc, char* argv[]) {
                     new utils::HtsFile("-", OutputMode::FASTA, correct_writer_threads, false));
 
             // 3. Corrected reads will be written out in FASTA format.
-            const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, "");
+            const NodeHandle hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, "");
 
             // 2. Window generation, encoding + inference and decoding to generate final reads.
             pipeline_desc.add_node<CorrectionInferenceNode>(
@@ -514,12 +515,12 @@ int correct(int argc, char* argv[]) {
         // Create the entry (input) node (either the mapper or the reader).
         // Aligner stats need to be passed separately since the aligner node
         // is not part of the pipeline, so the stats are not automatically gathered.
-        std::unique_ptr<MessageSink> aligner;
+        std::unique_ptr<CorrectionAligner> aligner;
         if (!std::empty(opt.in_paf_fn)) {
-            aligner = std::make_unique<CorrectionPafReaderNode>(opt.in_paf_fn, std::move(skip_set));
+            aligner = std::make_unique<CorrectionPafReader>(opt.in_paf_fn, std::move(skip_set));
         } else {
             // 1. Alignment node that generates alignments per read to be corrected.
-            aligner = std::make_unique<CorrectionMapperNode>(
+            aligner = std::make_unique<CorrectionMapper>(
                     in_reads_fn, aligner_threads, opt.index_size, furthest_skip_header,
                     std::move(skip_set), (opt.run_block_id) ? *opt.run_block_id : -1, opt.kmer_size,
                     opt.ovl_window_size, opt.min_chain_score, opt.mid_occ_frac);
@@ -540,11 +541,7 @@ int correct(int argc, char* argv[]) {
         spdlog::info("Starting");
 
         // Start the pipeline.
-        if (!std::empty(opt.in_paf_fn)) {
-            dynamic_cast<CorrectionPafReaderNode*>(aligner.get())->process(*pipeline);
-        } else {
-            dynamic_cast<CorrectionMapperNode*>(aligner.get())->process(*pipeline);
-        }
+        aligner->process(*pipeline);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.

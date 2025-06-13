@@ -1,41 +1,32 @@
-add_library(dorado_modbase STATIC
-    encode_kmer.cpp
-    encode_kmer.h
-    ModBaseCaller.cpp
-    ModBaseCaller.h
-    ModBaseContext.cpp
-    ModBaseContext.h
-    ModbaseEncoder.cpp
-    ModbaseEncoder.h
-    ModBaseRunner.cpp
-    ModBaseRunner.h
-    ModbaseScaler.cpp
-    ModbaseScaler.h
-    MotifMatcher.cpp
-    MotifMatcher.h
-    nn/ModBaseModel.cpp
-    nn/ModBaseModel.h
-)
-
-target_include_directories(dorado_modbase
-    SYSTEM
-    PUBLIC
-    PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-)
-
-target_link_libraries(dorado_modbase
-    PUBLIC
-        torch_lib
+dorado_add_library(
+    NAME
+        dorado_modbase
+    PUBLIC_DIR
+        modbase
+    SOURCES_PUBLIC
+        encode_kmer.h
+        ModBaseCaller.h
+        ModBaseContext.h
+        ModBaseEncoder.h
+        ModBaseRunner.h
+        MotifMatcher.h
+    SOURCES_PRIVATE
+        encode_kmer.cpp
+        ModBaseCaller.cpp
+        ModBaseContext.cpp
+        ModBaseEncoder.cpp
+        ModBaseRunner.cpp
+        ModBaseScaler.cpp
+        ModBaseScaler.h
+        MotifMatcher.cpp
+        nn/ModBaseModel.cpp
+        nn/ModBaseModel.h
+    DEPENDS_PUBLIC
         dorado_config
-    PRIVATE
-        dorado_utils
+        torch_lib
+    DEPENDS_PRIVATE
+        dorado_nn
         dorado_torch_utils
+        dorado_utils
         spdlog::spdlog
 )
-
-enable_warnings_as_errors(dorado_modbase)
-
-if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_modbase REUSE_FROM dorado_torch_utils)
-endif()

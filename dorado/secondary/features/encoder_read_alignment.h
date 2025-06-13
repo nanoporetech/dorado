@@ -1,10 +1,10 @@
 #pragma once
 
-#include "encoder_base.h"
-#include "haplotag_source.h"
 #include "hts_io/FastxRandomReader.h"
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
 #include "secondary/consensus/sample.h"
+#include "secondary/features/encoder_base.h"
+#include "secondary/features/haplotag_source.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>

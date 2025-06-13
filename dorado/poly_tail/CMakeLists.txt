@@ -1,0 +1,28 @@
+dorado_add_library(
+    NAME
+        dorado_poly_tail
+    PUBLIC_DIR
+        poly_tail
+    SOURCES_PUBLIC
+        poly_tail_calculator_selector.h
+        poly_tail_calculator.h
+        poly_tail_config.h
+    SOURCES_PRIVATE
+        dna_poly_tail_calculator.cpp
+        dna_poly_tail_calculator.h
+        plasmid_poly_tail_calculator.cpp
+        plasmid_poly_tail_calculator.h
+        poly_tail_calculator_selector.cpp
+        poly_tail_calculator.cpp
+        poly_tail_config.cpp
+        rna_poly_tail_calculator.cpp
+        rna_poly_tail_calculator.h
+    DEPENDS_PUBLIC
+        dorado_utils
+    DEPENDS_PRIVATE
+        dorado_read_pipeline_base
+        dorado_torch_utils
+        edlib
+        spdlog::spdlog
+        toml11::toml11
+)

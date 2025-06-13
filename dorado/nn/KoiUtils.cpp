@@ -1,6 +1,5 @@
-#include "KoiUtils.h"
+#include "nn/KoiUtils.h"
 
-#if DORADO_CUDA_BUILD
 #include <ATen/cuda/CUDAContext.h>
 
 namespace dorado::nn {
@@ -17,5 +16,3 @@ bool koi_can_use_quantised_lstm() {
 }
 
 }  // namespace dorado::nn
-
-#endif

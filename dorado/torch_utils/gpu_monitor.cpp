@@ -1,4 +1,4 @@
-#include "gpu_monitor.h"
+#include "torch_utils/gpu_monitor.h"
 
 #include "utils/sys_utils.h"
 

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ReadSplitter.h"
+#include "splitter/ReadSplitter.h"
 
 #include <ATen/core/TensorBody.h>
 
@@ -10,12 +10,8 @@
 #include <limits>
 #include <optional>
 #include <utility>
-#include <vector>
 
 namespace dorado::splitter {
-
-typedef std::pair<uint64_t, uint64_t> PosRange;
-typedef std::vector<PosRange> PosRanges;
 
 template <class FilterF>
 auto filter_ranges(const PosRanges& ranges, FilterF filter_f) {
@@ -31,22 +27,6 @@ PosRanges merge_ranges(const PosRanges& ranges, uint64_t merge_dist);
 SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
                        PosRange signal_range);
-
-template <typename T>
-struct SampleRange {
-    //inclusive
-    uint64_t start_sample;
-    //exclusive
-    uint64_t end_sample;
-    uint64_t argmax_sample;
-    T max_val;
-
-    SampleRange(uint64_t start, uint64_t end, uint64_t argmax, T max)
-            : start_sample(start), end_sample(end), argmax_sample(argmax), max_val(max) {}
-};
-
-template <typename T>
-using SampleRanges = std::vector<SampleRange<T>>;
 
 template <typename T>
 SampleRanges<T> detect_pore_signal(const at::Tensor& signal,

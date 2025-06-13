@@ -1,7 +1,7 @@
 #pragma once
 
 #include "data_loader/DataLoader.h"
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 
 #include <memory>
 #include <stdexcept>

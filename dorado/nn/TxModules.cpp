@@ -1,4 +1,4 @@
-#include "TxModules.h"
+#include "nn/TxModules.h"
 
 #include "config/BasecallModelConfig.h"
 #include "nn/TxModules.h"

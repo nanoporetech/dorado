@@ -1,6 +1,6 @@
-#include "IndexFileAccess.h"
+#include "alignment/IndexFileAccess.h"
 
-#include "Minimap2Index.h"
+#include "alignment/Minimap2Index.h"
 
 #include <cassert>
 #include <sstream>

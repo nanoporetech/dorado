@@ -1,17 +1,17 @@
+#include "ProgressTracker.h"
 #include "alignment/IndexFileAccess.h"
 #include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
-#include "cli/cli.h"
-#include "cli/cli_utils.h"
+#include "cli.h"
+#include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
-#include "read_pipeline/AlignerNode.h"
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/HtsReader.h"
-#include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/ProgressTracker.h"
-#include "read_pipeline/ReadPipeline.h"
-#include "read_pipeline/read_output_progress_stats.h"
+#include "read_output_progress_stats.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/AlignerNode.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "summary/summary.h"
 #include "utils/PostCondition.h"
 #include "utils/arg_parse_ext.h"
@@ -256,15 +256,15 @@ int aligner(int argc, char* argv[]) {
 
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
-        auto reader = std::make_unique<HtsReader>(file_info.input, std::nullopt);
-        reader->set_client_info(client_info);
+        HtsReader reader(file_info.input, std::nullopt);
+        reader.set_client_info(client_info);
         if (file_info.output != "-" &&
             !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
             return EXIT_FAILURE;
         }
 
-        spdlog::debug("> input fmt: {} aligned: {}", reader->format(), reader->is_aligned);
-        auto header = SamHdrPtr(sam_hdr_dup(reader->header()));
+        spdlog::debug("> input fmt: {} aligned: {}", reader.format(), reader.is_aligned);
+        auto header = SamHdrPtr(sam_hdr_dup(reader.header()));
         utils::add_hd_header_line(header.get());
         add_pg_hdr(header.get());
         dorado::utils::strip_alignment_data_from_header(header.get());
@@ -276,7 +276,7 @@ int aligner(int argc, char* argv[]) {
             hts_file.set_buffer_size(BAM_BUFFER_SIZE);
         }
         PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, hts_file, "");
+        auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
         auto aligner = pipeline_desc.add_node<AlignerNode>(
                 {hts_writer}, index_file_access, bed_file_access, align_info->reference_file,
                 align_info->bed_file, align_info->minimap_options, aligner_threads);
@@ -293,7 +293,7 @@ int aligner(int argc, char* argv[]) {
         // rather than the pipeline framework.
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
-        auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
+        auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
         hts_file.set_header(header.get());
 
         // All progress reporting is in the post-processing part.
@@ -315,7 +315,7 @@ int aligner(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         spdlog::info("> starting alignment");
-        auto num_reads_in_file = reader->read(*pipeline, max_reads);
+        auto num_reads_in_file = reader.read(*pipeline, max_reads);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.

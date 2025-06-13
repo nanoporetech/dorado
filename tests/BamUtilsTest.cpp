@@ -1,5 +1,5 @@
 #include "TestUtils.h"
-#include "read_pipeline/HtsReader.h"
+#include "read_pipeline/base/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"

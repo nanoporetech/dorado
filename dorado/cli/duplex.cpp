@@ -1,27 +1,27 @@
+#include "ProgressTracker.h"
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
-#include "cli/basecall_output_args.h"
-#include "cli/cli.h"
-#include "cli/cli_utils.h"
-#include "cli/model_resolution.h"
+#include "basecall_output_args.h"
+#include "cli.h"
+#include "cli/utils/cli_utils.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
 #include "config/ModBaseModelConfig.h"
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
+#include "model_resolution.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
 #include "models/models.h"
-#include "read_pipeline/AlignerNode.h"
-#include "read_pipeline/BaseSpaceDuplexCallerNode.h"
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/DuplexReadTaggingNode.h"
-#include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/ProgressTracker.h"
-#include "read_pipeline/ReadFilterNode.h"
-#include "read_pipeline/ReadToBamTypeNode.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/nodes/AlignerNode.h"
+#include "read_pipeline/nodes/BaseSpaceDuplexCallerNode.h"
+#include "read_pipeline/nodes/DuplexReadTaggingNode.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
+#include "read_pipeline/nodes/ReadFilterNode.h"
+#include "read_pipeline/nodes/ReadToBamTypeNode.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/duplex_utils.h"
 #include "torch_utils/torch_utils.h"
@@ -520,7 +520,7 @@ int duplex(int argc, char* argv[]) {
         gpu_names = utils::get_cuda_gpu_names(device);
 #endif
         if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
+            hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
             converted_reads_sink = hts_writer;
         } else {
             std::string err_msg{};
@@ -540,7 +540,7 @@ int duplex(int argc, char* argv[]) {
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
                                                           ref, bed, *minimap_options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
+            hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
             pipeline_desc.add_node_sink(aligner, hts_writer);
             converted_reads_sink = aligner;
         }

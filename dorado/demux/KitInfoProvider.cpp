@@ -1,4 +1,4 @@
-#include "KitInfoProvider.h"
+#include "demux/KitInfoProvider.h"
 
 #include "utils/barcode_kits.h"
 

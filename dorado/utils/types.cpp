@@ -1,4 +1,4 @@
-#include "types.h"
+#include "utils/types.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>

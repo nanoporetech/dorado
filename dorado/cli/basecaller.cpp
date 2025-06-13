@@ -1,10 +1,10 @@
+#include "ProgressTracker.h"
 #include "alignment/minimap2_args.h"
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall_output_args.h"
-#include "cli/cli.h"
-#include "cli/cli_utils.h"
-#include "cli/model_resolution.h"
+#include "cli.h"
+#include "cli/utils/cli_utils.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
 #include "config/ModBaseModelConfig.h"
@@ -16,21 +16,21 @@
 #include "demux/parse_custom_sequences.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
+#include "model_resolution.h"
 #include "models/kits.h"
 #include "models/model_complex.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
-#include "read_pipeline/AdapterDetectorNode.h"
-#include "read_pipeline/AlignerNode.h"
-#include "read_pipeline/BarcodeClassifierNode.h"
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/HtsWriter.h"
-#include "read_pipeline/PolyACalculatorNode.h"
-#include "read_pipeline/ProgressTracker.h"
-#include "read_pipeline/ReadFilterNode.h"
-#include "read_pipeline/ReadToBamTypeNode.h"
-#include "read_pipeline/ResumeLoader.h"
-#include "read_pipeline/TrimmerNode.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/nodes/AdapterDetectorNode.h"
+#include "read_pipeline/nodes/AlignerNode.h"
+#include "read_pipeline/nodes/BarcodeClassifierNode.h"
+#include "read_pipeline/nodes/HtsWriterNode.h"
+#include "read_pipeline/nodes/PolyACalculatorNode.h"
+#include "read_pipeline/nodes/ReadFilterNode.h"
+#include "read_pipeline/nodes/ReadToBamTypeNode.h"
+#include "read_pipeline/nodes/TrimmerNode.h"
+#include "resume_loader/ResumeLoader.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
@@ -469,7 +469,7 @@ void setup(const std::vector<std::string>& args,
 #if DORADO_CUDA_BUILD
     gpu_names = utils::get_cuda_gpu_names(device);
 #endif
-    auto hts_writer = pipeline_desc.add_node<HtsWriter>({}, *hts_file, gpu_names);
+    auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -544,7 +544,7 @@ void setup(const std::vector<std::string>& args,
 
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
-    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriter>(hts_writer);
+    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());

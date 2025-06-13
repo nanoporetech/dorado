@@ -1,6 +1,6 @@
-#include "ModBaseContext.h"
+#include "modbase/ModBaseContext.h"
 
-#include "MotifMatcher.h"
+#include "modbase/MotifMatcher.h"
 #include "utils/sequence_utils.h"
 
 #include <sstream>

@@ -2,8 +2,8 @@
 
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
-#include "read_pipeline/HtsReader.h"
-#include "read_pipeline/read_utils.h"
+#include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/read_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <catch2/catch_test_macros.hpp>

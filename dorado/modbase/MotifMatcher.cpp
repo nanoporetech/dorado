@@ -1,4 +1,4 @@
-#include "MotifMatcher.h"
+#include "modbase/MotifMatcher.h"
 
 #include "config/ModBaseModelConfig.h"
 

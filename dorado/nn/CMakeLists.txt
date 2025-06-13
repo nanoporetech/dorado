@@ -1,51 +1,40 @@
-add_library(dorado_nn STATIC
-    ConvStack.cpp
-    ConvStack.h
-    CRFModules.cpp
-    CRFModules.h
-    KoiUtils.cpp
-    KoiUtils.h
-    LinearUpsample.cpp
-    LinearUpsample.h
-    LSTMStack.cpp
-    LSTMStack.h
-    TxModules.cpp
-    TxModules.h
-    WorkingMemory.cpp
-    WorkingMemory.h
-)
-
-
-if (APPLE)
-    target_sources(dorado_nn
-        PRIVATE
-        metal/MetalModules.cpp
-        metal/MetalModules.h
-    )
-endif()
-
-target_include_directories(dorado_nn
-    SYSTEM
-    PRIVATE
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-)
-
-target_link_libraries(dorado_nn
-    PUBLIC
-        torch_lib
+dorado_add_library(
+    NAME
+        dorado_nn
+    PUBLIC_DIR
+        nn
+    SOURCES_PUBLIC
+        ConvStack.h
+        CRFModules.h
+        KoiUtils.h
+        LinearUpsample.h
+        LSTMStack.h
+        MetalModules.h
+        TxModules.h
+        WorkingMemory.h
+    SOURCES_PRIVATE
+        ConvStack.cpp
+        CRFModules.cpp
+        LinearUpsample.cpp
+        LSTMStack.cpp
+        TxModules.cpp
+        WorkingMemory.cpp
+    DEPENDS_PUBLIC
+        dorado_config
         dorado_torch_utils
         dorado_utils
-        dorado_config
-    PRIVATE
+        torch_lib
+    DEPENDS_PRIVATE
+        nvtx
         spdlog::spdlog
 )
 
-if (TARGET koi)
-    target_link_libraries(dorado_nn PRIVATE koi)
+if (APPLE)
+    target_sources(dorado_nn PRIVATE MetalModules.cpp)
+else()
+    target_sources(dorado_nn PRIVATE KoiUtils.cpp)
 endif()
 
-enable_warnings_as_errors(dorado_nn)
-
-if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_nn REUSE_FROM dorado_torch_utils)
+if (TARGET koi)
+    target_link_libraries(dorado_nn PRIVATE koi)
 endif()

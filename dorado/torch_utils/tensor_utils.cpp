@@ -1,4 +1,4 @@
-#include "tensor_utils.h"
+#include "torch_utils/tensor_utils.h"
 
 #include "utils/dev_utils.h"
 #include "utils/simd.h"

@@ -1,6 +1,6 @@
-#include "Trimmer.h"
+#include "demux/Trimmer.h"
 
-#include "read_pipeline/messages.h"
+#include "read_pipeline/base/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"

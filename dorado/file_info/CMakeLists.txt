@@ -1,15 +1,15 @@
-add_library(dorado_file_info STATIC
-    file_info.cpp
-    file_info.h
+dorado_add_library(
+    NAME
+        dorado_file_info
+    PUBLIC_DIR
+        file_info
+    SOURCES_PUBLIC
+        file_info.h
+    SOURCES_PRIVATE
+        file_info.cpp
+    DEPENDS_PUBLIC
+        dorado_models_lib
+        dorado_utils
+    DEPENDS_PRIVATE
+        pod5_libs
 )
-
-target_link_libraries(dorado_file_info
-PUBLIC
-    dorado_models_lib
-    dorado_utils
-PRIVATE
-    pod5_libs
-    ${ZLIB_LIBRARIES}
-)
-
-enable_warnings_as_errors(dorado_file_info)

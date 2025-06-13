@@ -1,4 +1,4 @@
-#include "MergeHeaders.h"
+#include "utils/MergeHeaders.h"
 
 #include "utils/bam_utils.h"
 

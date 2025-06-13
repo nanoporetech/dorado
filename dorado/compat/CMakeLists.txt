@@ -1,11 +1,11 @@
-add_library(dorado_compat
-    compat_utils.cpp
-    compat_utils.h
+dorado_add_library(
+    NAME
+        dorado_compat
+    PUBLIC_DIR
+        compat
+    SOURCES_PUBLIC
+        compat_utils.h
+    SOURCES_PRIVATE
+        compat_utils.cpp
+    NO_TORCH
 )
-
-target_include_directories(dorado_compat
-    INTERFACE
-    ${CMAKE_CURRENT_SOURCE_DIR}/..
-)
-
-enable_warnings_as_errors(dorado_compat)

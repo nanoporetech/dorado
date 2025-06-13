@@ -1,4 +1,4 @@
-#include "parse_custom_kit.h"
+#include "demux/parse_custom_kit.h"
 
 #include <htslib/sam.h>
 #include <toml.hpp>

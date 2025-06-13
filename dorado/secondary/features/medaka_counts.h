@@ -1,7 +1,7 @@
 #pragma once
 
 #include "medaka_bamiter.h"
-#include "secondary/bam_file.h"
+#include "secondary/common/bam_file.h"
 
 #include <array>
 #include <cstdint>

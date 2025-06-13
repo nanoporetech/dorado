@@ -79,12 +79,16 @@ else()
 endif()
 message(STATUS "Using CDN URL ${DORADO_CDN_URL} for downloads")
 
+# Repo setup and helpers.
 include(cmake/DoradoVersion.cmake)
 include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
-include(cmake/Zlib.cmake)
+include(cmake/DoradoTarget.cmake)
+include(cmake/DoradoCheckDeps.cmake)
 
+# Third party libs that aren't submodules.
+include(cmake/Zlib.cmake)
 include(cmake/Koi.cmake)
 include(cmake/Pod5.cmake)
 include(cmake/Torch.cmake)
@@ -111,6 +115,25 @@ if(DORADO_USING_OLD_CPP_ABI)
   # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
   # with the libc++11 ABI and we can't link against it.
   add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
+endif()
+
+# For capturing test coverage.
+option(GENERATE_TEST_COVERAGE "Build with code coverage enabled" OFF)
+if (GENERATE_TEST_COVERAGE)
+    include(cmake/CodeCoverage.cmake)
+    if (NOT DORADO_DISABLE_TESTS)
+        setup_target_for_coverage_gcovr_html(
+            NAME dorado_test_coverage
+            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
+            DEPENDENCIES dorado_tests
+            BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
+            EXCLUDE
+                "${DORADO_3RD_PARTY_SOURCE}/*"
+                "${DORADO_3RD_PARTY_DOWNLOAD}/*"
+                "${PROJECT_SOURCE_DIR}/tests/*"
+                "${CMAKE_BINARY_DIR}/3rdparty/*"
+        )
+    endif()
 endif()
 
 set(CHOCO_CCACHE_HINT)
@@ -165,313 +188,66 @@ add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
+# CMake can't REUSE_FROM targets that it doesn't know about, so include
+# torch_utils first for its PCH.
+add_subdirectory(dorado/torch_utils)
+
+add_subdirectory(dorado/aligner)
+add_subdirectory(dorado/alignment)
+add_subdirectory(dorado/api)
+add_subdirectory(dorado/basecall)
 add_subdirectory(dorado/compat)
 add_subdirectory(dorado/config)
-add_subdirectory(dorado/utils)
-add_subdirectory(dorado/torch_utils)
-add_subdirectory(dorado/models)
-add_subdirectory(dorado/model_downloader)
-add_subdirectory(dorado/basecall)
-add_subdirectory(dorado/nn)
-add_subdirectory(dorado/modbase)
-add_subdirectory(dorado/devtools)
-add_subdirectory(dorado/secondary)
-
-add_library(dorado_lib
-    dorado/alignment/alignment_info.h
-    dorado/alignment/alignment_processing_items.cpp
-    dorado/alignment/alignment_processing_items.h
-    dorado/alignment/bed_file.cpp
-    dorado/alignment/bed_file.h
-    dorado/alignment/BedFileAccess.cpp
-    dorado/alignment/BedFileAccess.h
-    dorado/alignment/IndexFileAccess.cpp
-    dorado/alignment/IndexFileAccess.h
-    dorado/alignment/minimap2_args.cpp
-    dorado/alignment/minimap2_args.h
-    dorado/alignment/minimap2_wrappers.h
-    dorado/alignment/Minimap2Aligner.cpp
-    dorado/alignment/Minimap2Aligner.h
-    dorado/alignment/Minimap2Index.cpp
-    dorado/alignment/Minimap2Index.h
-    dorado/alignment/Minimap2IndexSupportTypes.h
-    dorado/alignment/Minimap2Options.cpp
-    dorado/alignment/Minimap2Options.h
-    dorado/alignment/sam_utils.cpp
-    dorado/alignment/sam_utils.h
-    dorado/api/caller_creation.cpp
-    dorado/api/caller_creation.h
-    dorado/api/runner_creation.cpp
-    dorado/api/runner_creation.h
-    dorado/api/pipeline_creation.cpp
-    dorado/api/pipeline_creation.h
-    dorado/demux/adapter_primer_kits.cpp
-    dorado/demux/adapter_primer_kits.h
-    dorado/demux/adapter_info.h
-    dorado/demux/AdapterDetector.cpp
-    dorado/demux/AdapterDetector.h
-    dorado/demux/AdapterDetectorSelector.h
-    dorado/demux/AdapterDetectorSelector.cpp
-    dorado/demux/BarcodeClassifier.cpp
-    dorado/demux/BarcodeClassifier.h
-    dorado/demux/BarcodeClassifierSelector.cpp
-    dorado/demux/BarcodeClassifierSelector.h
-    dorado/demux/barcoding_info.h
-    dorado/demux/KitInfoProvider.cpp
-    dorado/demux/KitInfoProvider.h
-    dorado/demux/Trimmer.cpp
-    dorado/demux/Trimmer.h
-    dorado/demux/parse_custom_kit.cpp
-    dorado/demux/parse_custom_kit.h
-    dorado/demux/parse_custom_sequences.cpp
-    dorado/demux/parse_custom_sequences.h
-    dorado/read_pipeline/AdapterDetectorNode.cpp
-    dorado/read_pipeline/AdapterDetectorNode.h
-    dorado/read_pipeline/AlignerNode.cpp
-    dorado/read_pipeline/AlignerNode.h
-    dorado/read_pipeline/BarcodeClassifierNode.cpp
-    dorado/read_pipeline/BarcodeClassifierNode.h
-    dorado/read_pipeline/BarcodeDemuxerNode.cpp
-    dorado/read_pipeline/BarcodeDemuxerNode.h
-    dorado/read_pipeline/BasecallerNode.cpp
-    dorado/read_pipeline/BasecallerNode.h
-    dorado/read_pipeline/BaseSpaceDuplexCallerNode.cpp
-    dorado/read_pipeline/BaseSpaceDuplexCallerNode.h
-    dorado/read_pipeline/ClientInfo.h
-    dorado/read_pipeline/context_container.h
-    dorado/read_pipeline/CorrectionInferenceNode.cpp
-    dorado/read_pipeline/CorrectionInferenceNode.h
-    dorado/read_pipeline/CorrectionMapperNode.cpp
-    dorado/read_pipeline/CorrectionMapperNode.h
-    dorado/read_pipeline/CorrectionPafReaderNode.cpp
-    dorado/read_pipeline/CorrectionPafReaderNode.h
-    dorado/read_pipeline/CorrectionPafWriterNode.cpp
-    dorado/read_pipeline/CorrectionPafWriterNode.h
-    dorado/read_pipeline/DefaultClientInfo.h
-    dorado/read_pipeline/DuplexReadTaggingNode.cpp
-    dorado/read_pipeline/DuplexReadTaggingNode.h
-    dorado/read_pipeline/FakeDataLoader.cpp
-    dorado/read_pipeline/FakeDataLoader.h
-    dorado/read_pipeline/HtsReader.cpp
-    dorado/read_pipeline/HtsReader.h
-    dorado/read_pipeline/HtsWriter.cpp
-    dorado/read_pipeline/HtsWriter.h
-    dorado/read_pipeline/MessageSink.cpp
-    dorado/read_pipeline/MessageSink.h
-    dorado/read_pipeline/ModBaseCallerNode.cpp
-    dorado/read_pipeline/ModBaseCallerNode.h
-    dorado/read_pipeline/ModBaseChunkCallerNode.cpp
-    dorado/read_pipeline/ModBaseChunkCallerNode.h
-    dorado/read_pipeline/NullNode.h
-    dorado/read_pipeline/NullNode.cpp
-    dorado/read_pipeline/PairingNode.cpp
-    dorado/read_pipeline/PairingNode.h
-    dorado/read_pipeline/PolyACalculatorNode.cpp
-    dorado/read_pipeline/PolyACalculatorNode.h
-    dorado/read_pipeline/ProgressTracker.cpp
-    dorado/read_pipeline/ProgressTracker.h
-    dorado/read_pipeline/ReadFilterNode.cpp
-    dorado/read_pipeline/ReadFilterNode.h
-    dorado/read_pipeline/ReadForwarderNode.cpp
-    dorado/read_pipeline/ReadForwarderNode.h
-    dorado/read_pipeline/ReadPipeline.cpp
-    dorado/read_pipeline/ReadPipeline.h
-    dorado/read_pipeline/ReadSplitNode.cpp
-    dorado/read_pipeline/ReadSplitNode.h
-    dorado/read_pipeline/ReadToBamTypeNode.cpp
-    dorado/read_pipeline/ReadToBamTypeNode.h
-    dorado/read_pipeline/ResumeLoader.cpp
-    dorado/read_pipeline/ResumeLoader.h
-    dorado/read_pipeline/ScalerNode.cpp
-    dorado/read_pipeline/ScalerNode.h
-    dorado/read_pipeline/StereoDuplexEncoderNode.cpp
-    dorado/read_pipeline/StereoDuplexEncoderNode.h
-    dorado/read_pipeline/SubreadTaggerNode.cpp
-    dorado/read_pipeline/SubreadTaggerNode.h
-    dorado/read_pipeline/TrimmerNode.cpp
-    dorado/read_pipeline/TrimmerNode.h
-    dorado/read_pipeline/messages.cpp
-    dorado/read_pipeline/messages.h
-    dorado/read_pipeline/flush_options.h
-    dorado/read_pipeline/read_output_progress_stats.cpp
-    dorado/read_pipeline/read_output_progress_stats.h
-    dorado/read_pipeline/read_utils.cpp
-    dorado/read_pipeline/read_utils.h
-    dorado/read_pipeline/stereo_features.cpp
-    dorado/read_pipeline/stereo_features.h
-    dorado/read_pipeline/stitch.cpp
-    dorado/read_pipeline/stitch.h
-    dorado/splitter/DuplexReadSplitter.cpp
-    dorado/splitter/DuplexReadSplitter.h
-    dorado/splitter/RNAReadSplitter.cpp
-    dorado/splitter/RNAReadSplitter.h
-    dorado/splitter/myers.cpp
-    dorado/splitter/myers.h
-    dorado/splitter/splitter_utils.cpp
-    dorado/splitter/splitter_utils.h
-    dorado/poly_tail/dna_poly_tail_calculator.cpp
-    dorado/poly_tail/dna_poly_tail_calculator.h
-    dorado/poly_tail/plasmid_poly_tail_calculator.cpp
-    dorado/poly_tail/plasmid_poly_tail_calculator.h
-    dorado/poly_tail/poly_tail_calculator.cpp
-    dorado/poly_tail/poly_tail_calculator.h
-    dorado/poly_tail/poly_tail_calculator_selector.cpp
-    dorado/poly_tail/poly_tail_calculator_selector.h
-    dorado/poly_tail/poly_tail_config.cpp
-    dorado/poly_tail/poly_tail_config.h
-    dorado/poly_tail/rna_poly_tail_calculator.cpp
-    dorado/poly_tail/rna_poly_tail_calculator.h
-    dorado/summary/summary.cpp
-    dorado/summary/summary.h
-    dorado/hts_io/FastxRandomReader.cpp
-    dorado/hts_io/FastxRandomReader.h
-    dorado/correct/features.cpp
-    dorado/correct/features.h
-    dorado/correct/windows.cpp
-    dorado/correct/windows.h
-    dorado/correct/conversions.cpp
-    dorado/correct/conversions.h
-    dorado/correct/decode.cpp
-    dorado/correct/decode.h
-    dorado/correct/infer.cpp
-    dorado/correct/infer.h
-    dorado/correct/types.cpp
-    dorado/correct/types.h
-    dorado/correct/CorrectionProgressTracker.cpp
-    dorado/correct/CorrectionProgressTracker.h
-    dorado/polish/polish_impl.cpp
-    dorado/polish/polish_impl.h
-    dorado/polish/polish_progress_tracker.cpp
-    dorado/polish/polish_progress_tracker.h
-    dorado/variant/variant_progress_tracker.cpp
-    dorado/variant/variant_progress_tracker.h
-)
-
-enable_warnings_as_errors(dorado_lib)
-
-set_target_properties(dorado_lib
-    PROPERTIES
-    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-    ARCHIVE_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/lib"
-)
-
-target_include_directories(dorado_lib
-    PUBLIC
-        ${CMAKE_CURRENT_SOURCE_DIR}/dorado
-)
-# 3rdparty libs should be considered SYSTEM headers
-target_include_directories(dorado_lib
-    SYSTEM
-    PUBLIC
-        ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
-        ${DORADO_3RD_PARTY_SOURCE}/indicators/include
-)
-
-enable_testing()
-
-if (DORADO_ENABLE_PCH)
-    target_precompile_headers(dorado_lib REUSE_FROM dorado_torch_utils)
-endif()
-
-target_link_libraries(dorado_lib
-    PUBLIC
-        torch_lib
-        htslib
-        edlib
-        dorado_basecall
-        dorado_modbase
-        dorado_version
-        dorado_secondary
-    PRIVATE
-        minimap2
-        toml11::toml11
-        cxxpool
-        kadayashi::haplotag_lib
-)
-
-if(NOT DORADO_DISABLE_DORADO)
-    add_executable(dorado
-        dorado/main.cpp
-        dorado/cli/aligner.cpp
-        dorado/cli/basecall_output_args.cpp
-        dorado/cli/basecall_output_args.h
-        dorado/cli/demux.cpp
-        dorado/cli/duplex.cpp
-        dorado/cli/trim.cpp
-        dorado/cli/basecaller.cpp
-        dorado/cli/download.cpp
-        dorado/cli/summary.cpp
-        dorado/cli/correct.cpp
-        dorado/cli/polish.cpp
-        dorado/cli/variant.cpp
-        dorado/cli/cli.h
-        dorado/cli/cli_utils.h
-        dorado/cli/model_resolution.h
-     )
-
-    set_target_properties(dorado
-        PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin"
-    )
-
-    if(MSVC)
-        set_property(TARGET dorado APPEND PROPERTY LINK_OPTIONS "/ignore:4099")
-    endif()
-
-    enable_warnings_as_errors(dorado)
-    check_linked_libs(dorado)
-
-    if (DORADO_ENABLE_PCH)
-        target_precompile_headers(dorado REUSE_FROM dorado_lib)
-    endif()
-
-    target_link_libraries(dorado
-        dorado_lib
-        dorado_io_lib
-        dorado_file_info
-        dorado_models_lib
-        dorado_model_downloader_lib
-        dorado_compat
-        minimap2
-        cxxpool
-    )
-
-    install(TARGETS dorado RUNTIME)
-endif()
-
+add_subdirectory(dorado/correct)
 add_subdirectory(dorado/data_loader)
+add_subdirectory(dorado/demux)
+add_subdirectory(dorado/devtools)
 add_subdirectory(dorado/file_info)
+add_subdirectory(dorado/hts_io)
+add_subdirectory(dorado/modbase)
+add_subdirectory(dorado/model_downloader)
+add_subdirectory(dorado/models)
+add_subdirectory(dorado/nn)
+add_subdirectory(dorado/polish)
+add_subdirectory(dorado/poly_tail)
+add_subdirectory(dorado/read_pipeline)
+add_subdirectory(dorado/resume_loader)
+add_subdirectory(dorado/secondary)
+add_subdirectory(dorado/splitter)
+add_subdirectory(dorado/summary)
+add_subdirectory(dorado/utils)
 add_subdirectory(tests)
 
+if (NOT DORADO_DISABLE_DORADO)
+    add_subdirectory(dorado/cli)
+endif()
+
+# Stopgap target to keep things linking.
+# Eventually this will be removed and dependents should link only
+# to what they need.
+add_library(dorado_lib INTERFACE)
+target_link_libraries(dorado_lib
+    INTERFACE
+        dorado_aligner
+        dorado_alignment
+        dorado_api
+        dorado_basecall
+        dorado_correct
+        dorado_demux
+        dorado_hts_io
+        dorado_modbase
+        dorado_poly_tail
+        dorado_read_pipeline
+        dorado_resume_loader
+        dorado_secondary
+        dorado_splitter
+        dorado_version
+)
+
+# Packaging setup.
 include(cmake/InstallRedistLibs.cmake)
 if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)
-endif()
-
-# For capturing test coverage.
-if (GENERATE_TEST_COVERAGE)
-    if (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64" AND NOT DORADO_DISABLE_TESTS)
-        include(cmake/CodeCoverage.cmake)
-        foreach(COVERAGE_TARGET dorado_tests dorado_lib dorado_io_lib dorado_models_lib dorado_torch_utils dorado_utils dorado_secondary dorado_file_info)
-            append_coverage_compiler_flags_to_target(${COVERAGE_TARGET})
-        endforeach()
-        setup_target_for_coverage_gcovr_html(
-            NAME dorado_test_coverage
-            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
-            DEPENDENCIES dorado_tests
-            BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
-            EXCLUDE
-                "${DORADO_3RD_PARTY_SOURCE}/*"
-                "${DORADO_3RD_PARTY_DOWNLOAD}/*"
-                "${PROJECT_SOURCE_DIR}/tests/*"
-                "${CMAKE_BINARY_DIR}/3rdparty/*"
-            )
-    endif()
-endif()
-
-# GCC 8 ICEs trying to compile this file with ASAN+optimisations enabled, so knock down the optimisation to try and help it out.
-if (ECM_ENABLE_SANITIZERS AND (CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 9.0))
-    set_source_files_properties(dorado/read_pipeline/stereo_features.cpp PROPERTIES COMPILE_OPTIONS "-O0")
 endif()
 
 if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )

@@ -1,11 +1,11 @@
-#include "read_pipeline/ResumeLoader.h"
+#include "resume_loader/ResumeLoader.h"
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 
 #include <catch2/catch_test_macros.hpp>
 
-#define TEST_GROUP "[read_pipeline][ResumeLoader]"
+#define TEST_GROUP "[resume_loader][ResumeLoader]"
 
 namespace fs = std::filesystem;
 

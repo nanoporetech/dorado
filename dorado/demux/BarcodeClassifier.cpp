@@ -1,6 +1,6 @@
-#include "BarcodeClassifier.h"
+#include "demux/BarcodeClassifier.h"
 
-#include "barcoding_info.h"
+#include "demux/barcoding_info.h"
 #include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/log_utils.h"

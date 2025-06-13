@@ -1,6 +1,6 @@
-#include "minimap2_args.h"
+#include "alignment/minimap2_args.h"
 
-#include "minimap2_wrappers.h"
+#include "alignment/minimap2_wrappers.h"
 #include "utils/string_utils.h"
 
 #include <minimap.h>

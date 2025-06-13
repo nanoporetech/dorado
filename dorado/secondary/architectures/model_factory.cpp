@@ -1,6 +1,10 @@
 
-#include "model_factory.h"
+#include "secondary/architectures/model_factory.h"
 
+#include "model_gru.h"
+#include "model_latent_space_lstm.h"
+#include "model_slot_attention_consensus.h"
+#include "model_torch_script.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 

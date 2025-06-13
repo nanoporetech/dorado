@@ -30,6 +30,12 @@ add_subdirectory(argparse EXCLUDE_FROM_ALL)
 # catch2
 add_subdirectory(catch2 EXCLUDE_FROM_ALL)
 
+# cpp-httplib
+add_library(httplib INTERFACE)
+target_include_directories(httplib SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/cpp-httplib
+)
+
 # cxxpool
 apply_3rdparty_patch(cxxpool)
 add_library(cxxpool INTERFACE)
@@ -49,6 +55,18 @@ target_compile_definitions(spdlog PUBLIC
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(elzip EXCLUDE_FROM_ALL)
 
+# indicators
+add_library(indicators INTERFACE)
+target_include_directories(indicators SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/indicators/include
+)
+
+# intervaltree
+add_library(intervaltree INTERFACE)
+target_include_directories(intervaltree SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/intervaltree
+)
+
 # minimap
 option(ONT_MM2_EXE "Build minimap2 exe" OFF)
 add_subdirectory(ont-minimap2 EXCLUDE_FROM_ALL)
@@ -60,6 +78,12 @@ if (ONT_MM2_EXE)
 endif()
 # Disable warnings from minimap source
 disable_warnings(minimap2)
+
+# NVTX
+add_library(nvtx INTERFACE)
+target_include_directories(nvtx SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
+)
 
 # edlib
 apply_3rdparty_patch(edlib)

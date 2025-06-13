@@ -1,4 +1,4 @@
-#include "cigar.h"
+#include "utils/cigar.h"
 
 #include <ostream>
 #include <sstream>

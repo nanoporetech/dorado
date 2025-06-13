@@ -1,7 +1,7 @@
-#include "sequence_utils.h"
+#include "utils/sequence_utils.h"
 
-#include "log_utils.h"
-#include "simd.h"
+#include "utils/log_utils.h"
+#include "utils/simd.h"
 
 #include <edlib.h>
 #include <minimap.h>

@@ -1,4 +1,4 @@
-#include "ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"
 
 #include "config/common.h"
 #include "utils/bam_utils.h"

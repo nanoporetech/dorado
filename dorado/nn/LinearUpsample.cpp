@@ -1,4 +1,4 @@
-#include "LinearUpsample.h"
+#include "nn/LinearUpsample.h"
 
 #include "config/common.h"
 

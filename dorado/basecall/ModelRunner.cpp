@@ -1,6 +1,6 @@
-#include "ModelRunner.h"
+#include "basecall/ModelRunner.h"
 
-#include "crf_utils.h"
+#include "basecall/crf_utils.h"
 #include "decode/Decoder.h"
 #include "model/CRFModel.h"
 
@@ -26,6 +26,8 @@ ModelRunner::ModelRunner(const config::BasecallModelConfig &model_config, const 
     m_input_NCT =
             at::zeros({N, C, T}, at::TensorOptions().dtype(m_decoder->dtype()).device(at::kCPU));
 }
+
+ModelRunner::~ModelRunner() = default;
 
 std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {
     at::InferenceMode guard;

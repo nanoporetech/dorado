@@ -1,4 +1,4 @@
-#include "sample.h"
+#include "secondary/consensus/sample.h"
 
 #include "torch_utils/tensor_utils.h"
 #include "utils/ssize.h"

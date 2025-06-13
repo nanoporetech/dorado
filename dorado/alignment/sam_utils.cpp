@@ -1,4 +1,4 @@
-#include "sam_utils.h"
+#include "alignment/sam_utils.h"
 
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"

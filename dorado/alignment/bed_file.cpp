@@ -1,4 +1,4 @@
-#include "bed_file.h"
+#include "alignment/bed_file.h"
 
 #include "utils/PostCondition.h"
 #include "utils/string_utils.h"

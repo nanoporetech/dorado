@@ -1,6 +1,6 @@
-#include "infer.h"
+#include "correct/infer.h"
 
-#include "types.h"
+#include "correct/types.h"
 #include "utils/memory_utils.h"
 #if DORADO_METAL_BUILD
 #include "torch_utils/metal_utils.h"

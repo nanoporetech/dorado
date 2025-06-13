@@ -1,0 +1,28 @@
+dorado_add_library(
+    NAME
+        dorado_correct
+    PUBLIC_DIR
+        correct
+    SOURCES_PUBLIC
+        conversions.h
+        decode.h
+        features.h
+        infer.h
+        types.h
+        windows.h
+    SOURCES_PRIVATE
+        conversions.cpp
+        decode.cpp
+        features.cpp
+        infer.cpp
+        types.cpp
+        windows.cpp
+    DEPENDS_PUBLIC
+        dorado_secondary
+        dorado_torch_utils
+        dorado_utils
+        spdlog::spdlog
+    DEPENDS_PRIVATE
+        dorado_read_pipeline_base
+        toml11::toml11
+)

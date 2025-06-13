@@ -1,0 +1,34 @@
+dorado_add_library(
+    NAME
+        dorado_demux
+    PUBLIC_DIR
+        demux
+    SOURCES_PUBLIC
+        adapter_info.h
+        AdapterDetector.h
+        AdapterDetectorSelector.h
+        BarcodeClassifier.h
+        BarcodeClassifierSelector.h
+        barcoding_info.h
+        KitInfoProvider.h
+        parse_custom_kit.h
+        Trimmer.h
+    SOURCES_PRIVATE
+        adapter_primer_kits.cpp
+        adapter_primer_kits.h
+        AdapterDetector.cpp
+        AdapterDetectorSelector.cpp
+        BarcodeClassifier.cpp
+        BarcodeClassifierSelector.cpp
+        KitInfoProvider.cpp
+        parse_custom_kit.cpp
+        parse_custom_sequences.cpp
+        Trimmer.cpp
+    DEPENDS_PUBLIC
+        dorado_utils
+    DEPENDS_PRIVATE
+        dorado_read_pipeline
+        htslib
+        spdlog::spdlog
+        toml11::toml11
+)

@@ -1,0 +1,32 @@
+dorado_add_library(
+    NAME
+        dorado_secondary_common
+    PUBLIC_DIR
+        secondary/common
+    SOURCES_PUBLIC
+        bam_file.h
+        bam_info.h
+        batching.h
+        interval.h
+        region.h
+        stats.h
+        variant.h
+        vcf_writer.h
+    SOURCES_PRIVATE
+        bam_file.cpp
+        bam_info.cpp
+        batching.cpp
+        region.cpp
+        variant.cpp
+        vcf_writer.cpp
+    DEPENDS_PUBLIC
+        dorado_torch_utils
+        dorado_utils
+    DEPENDS_PRIVATE
+        cxxpool
+        dorado_version
+        htslib
+        intervaltree
+        kadayashi::haplotag_lib
+        spdlog::spdlog
+)

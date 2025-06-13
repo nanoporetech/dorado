@@ -1,7 +1,7 @@
-#include "AdapterDetectorSelector.h"
+#include "demux/AdapterDetectorSelector.h"
 
-#include "AdapterDetector.h"
-#include "adapter_info.h"
+#include "demux/AdapterDetector.h"
+#include "demux/adapter_info.h"
 
 #include <spdlog/spdlog.h>
 

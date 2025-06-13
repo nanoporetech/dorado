@@ -1,0 +1,19 @@
+dorado_add_library(
+    NAME
+        dorado_polish
+    PUBLIC_DIR
+        polish
+    SOURCES_PUBLIC
+        polish_impl.h
+    SOURCES_PRIVATE
+        polish_impl.cpp
+    DEPENDS_PUBLIC
+        dorado_secondary
+        dorado_utils
+    DEPENDS_PRIVATE
+        cxxpool
+        dorado_hts_io
+        dorado_torch_utils
+        htslib
+        spdlog::spdlog
+)

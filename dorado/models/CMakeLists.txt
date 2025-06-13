@@ -1,18 +1,22 @@
-add_library(dorado_models_lib STATIC
-    kits.cpp
-    kits.h
-    metadata.cpp
-    metadata.h
-    model_complex.h
-    model_complex.cpp
-    models.cpp
-    models.h
-)
-
-target_link_libraries(dorado_models_lib
-    PRIVATE
+dorado_add_library(
+    NAME
+        dorado_models_lib
+    PUBLIC_DIR
+        models
+    SOURCES_PUBLIC
+        kits.h
+        metadata.h
+        model_complex.h
+        models.h
+    SOURCES_PRIVATE
+        kits.cpp
+        metadata.cpp
+        model_complex.cpp
+        models.cpp
+    DEPENDS_PUBLIC
+        # nothing
+    DEPENDS_PRIVATE
         dorado_utils
         spdlog::spdlog
+    NO_TORCH
 )
-
-enable_warnings_as_errors(dorado_models_lib)

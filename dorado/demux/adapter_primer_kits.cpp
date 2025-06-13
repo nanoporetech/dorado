@@ -1,6 +1,7 @@
 #include "adapter_primer_kits.h"
 
-#include "parse_custom_sequences.h"
+#include "demux/parse_custom_sequences.h"
+#include "models/kits.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -9,7 +10,86 @@
 #include <set>
 #include <sstream>
 
+namespace dorado::adapter_primer_kits {
+
 namespace {
+
+enum class AdapterCode { LSK110, RNA004 };
+
+enum class PrimerCode { cDNA, PCS110, RAD };
+
+using AC = AdapterCode;
+using PC = PrimerCode;
+using KC = models::KitCode;
+
+const std::unordered_map<AdapterCode, Candidate> adapters = {
+        {AC::LSK110, {"LSK110", "CCTGTACTTCGTTCAGTTACGTATTGC", "AGCAATACGTAACTGAAC"}},
+        {AC::RNA004, {"RNA004", "", "GGTTGTTTCTGTTGGTGCTG"}}};
+
+// If we know the kit, and it is in this mapping, we will look for the adapters we expect
+// for that kit. We look for the specified front adapter sequence at the beginning of the
+// read, and the specified rear adapter sequence at the end of the read.
+const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter_kit_map = {
+        {AC::LSK110, {KC::SQK_LSK114,        KC::SQK_LSK114_260,    KC::SQK_LSK114_XL,
+                      KC::SQK_LSK114_XL_260, KC::SQK_PCS114,        KC::SQK_PCS114_260,
+                      KC::SQK_RAD114,        KC::SQK_RAD114_260,    KC::SQK_ULK114,
+                      KC::SQK_ULK114_260,    KC::SQK_16S114_24,     KC::SQK_16S114_24_260,
+                      KC::SQK_MAB114_24,     KC::SQK_MLK114_96_XL,  KC::SQK_MLK114_96_XL_260,
+                      KC::SQK_NBD114_24,     KC::SQK_NBD114_24_260, KC::SQK_NBD114_96,
+                      KC::SQK_NBD114_96_260, KC::SQK_PCB114_24,     KC::SQK_PCB114_24_260,
+                      KC::SQK_RBK114_24,     KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
+                      KC::SQK_RBK114_96_260, KC::SQK_RPB114_24,     KC::SQK_RPB114_24_260}},
+        {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL, KC::SQK_DRB004_24}}};
+
+// Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
+// will actually be found near the beginning of a forward read, and vice-versa for reverse
+// reads. So for example, we list the SSP cDNA primer as the frint primer, and the VNP one as
+// the rear primer, so that the code will work properly. The PCS and RAD primer sequences used
+// here are also truncated from the beginning. This does not affect trimming, because trimming
+// is done from the end of the detected primer. It does allow these sequences to be used with
+// barcoding, where a truncated version of the primer appears as the inside flanking region.
+const std::unordered_map<PrimerCode, Candidate> primers = {
+        {PC::cDNA,
+         {
+                 "cDNA",
+                 "TTTCTGTTGGTGCTGATATTGCTGGG",  // SSP
+                 "ACTTGCCTGTCGCTCTATCTTCTTT"    // VNP
+         }},
+        {PC::PCS110,
+         {
+                 // These are actually truncated version of the actual primer sequences.
+                 "PCS110",
+                 "TTTCTGTTGGTGCTGATATTGCTTT",                          // SSP
+                 "ACTTGCCTGTCGCTCTATCTTCAGAGGAGAGTCCGCCGCCCGCAAGTTTT"  // VNP
+         }},
+        {PC::RAD,
+         {
+                 // This is also a truncated version of the actual primer sequence.
+                 "RAD", "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
+                 ""  // No rear primer for RAD
+         }}};
+
+// Only Kit14 sequencing kits are listed here. If the kit is specified, and found in this map,
+// then we will search for the specified front primer sequence near the beginning of the read,
+// and the RC of the specified rear primer sequence near the end of the read. Likewise we will
+// search for the rear primer sequence at the beginning, and the RC of the front primer sequence
+// at the end of the read, which is what we should see if we've sequenced the reverse strand.
+const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_kit_map = {
+        {
+                PC::cDNA,
+                {KC::SQK_LSK114, KC::SQK_LSK114_260, KC::SQK_LSK114_XL, KC::SQK_LSK114_XL_260},
+        },
+        {
+                PC::PCS110,
+                {KC::SQK_PCS114, KC::SQK_PCS114_260, KC::SQK_PCB114_24, KC::SQK_PCB114_24_260},
+        },
+        {
+                PC::RAD,
+                {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260,
+                 KC::SQK_RBK114_24, KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
+                 KC::SQK_RBK114_96_260},
+        },
+};
 
 struct CustomItem {
     enum ItemType { UNKNOWN, ADAPTER, PRIMER };
@@ -118,8 +198,6 @@ std::set<std::string> kit_names(const std::unordered_map<std::string, std::strin
 }
 
 }  // anonymous namespace
-
-namespace dorado::adapter_primer_kits {
 
 AdapterPrimerManager::AdapterPrimerManager() {
     for (const auto& entry : adapter_kit_map) {

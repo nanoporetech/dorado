@@ -1,6 +1,6 @@
 #include "TestUtils.h"
-#include "read_pipeline/DefaultClientInfo.h"
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "splitter/RNAReadSplitter.h"
 
 #include <catch2/catch_test_macros.hpp>

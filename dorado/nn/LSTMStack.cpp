@@ -1,4 +1,4 @@
-#include "LSTMStack.h"
+#include "nn/LSTMStack.h"
 
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"

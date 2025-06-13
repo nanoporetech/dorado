@@ -1,7 +1,7 @@
-#include "paf_utils.h"
+#include "utils/paf_utils.h"
 
-#include "alignment_utils.h"
-#include "overlap.h"
+#include "utils/alignment_utils.h"
+#include "utils/overlap.h"
 
 #include <spdlog/spdlog.h>
 

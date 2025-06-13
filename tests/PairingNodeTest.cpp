@@ -1,8 +1,8 @@
-#include "read_pipeline/PairingNode.h"
+#include "read_pipeline/nodes/PairingNode.h"
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "read_pipeline/DefaultClientInfo.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
 #include "utils/fasta_reader.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"

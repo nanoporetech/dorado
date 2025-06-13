@@ -1,7 +1,6 @@
-#include "CudaModelRunner.h"
+#include "basecall/CudaModelRunner.h"
 
-#include "CudaCaller.h"
-#include "decode/Decoder.h"
+#include "basecall/CudaCaller.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
 

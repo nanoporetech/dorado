@@ -2,7 +2,7 @@
 #include "TestUtils.h"
 #include "data_loader/DataLoader.h"
 #include "models/models.h"
-#include "read_pipeline/ReadPipeline.h"
+#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/fs_utils.h"
 
 #include <catch2/catch_test_macros.hpp>

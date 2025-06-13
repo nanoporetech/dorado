@@ -1,0 +1,24 @@
+dorado_add_library(
+    NAME
+        dorado_api
+    PUBLIC_DIR
+        api
+    SOURCES_PUBLIC
+        caller_creation.h
+        pipeline_creation.h
+        runner_creation.h
+    SOURCES_PRIVATE
+        caller_creation.cpp
+        pipeline_creation.cpp
+        runner_creation.cpp
+    DEPENDS_PUBLIC
+        dorado_basecall
+        dorado_modbase
+        dorado_read_pipeline_base
+    DEPENDS_PRIVATE
+        cxxpool
+        dorado_read_pipeline_nodes
+        dorado_splitter
+        dorado_utils
+        spdlog::spdlog
+)

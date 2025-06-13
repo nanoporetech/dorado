@@ -1,7 +1,7 @@
-#include "models.h"
+#include "models/models.h"
 
-#include "kits.h"
-#include "metadata.h"
+#include "models/kits.h"
+#include "models/metadata.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>

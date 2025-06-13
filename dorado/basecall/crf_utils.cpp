@@ -1,4 +1,4 @@
-#include "crf_utils.h"
+#include "basecall/crf_utils.h"
 
 #include "config/BasecallModelConfig.h"
 #include "model/CRFModel.h"

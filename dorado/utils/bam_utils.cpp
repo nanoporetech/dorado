@@ -1,8 +1,8 @@
-#include "bam_utils.h"
+#include "utils/bam_utils.h"
 
-#include "SampleSheet.h"
-#include "barcode_kits.h"
-#include "sequence_utils.h"
+#include "utils/SampleSheet.h"
+#include "utils/barcode_kits.h"
+#include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
 

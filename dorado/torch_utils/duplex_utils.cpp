@@ -1,4 +1,4 @@
-#include "duplex_utils.h"
+#include "torch_utils/duplex_utils.h"
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>

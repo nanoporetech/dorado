@@ -2,6 +2,11 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+// Need to include implementation details to perform dynamic_cast<>s in tests.
+#include "../model_gru.h"
+#include "../model_latent_space_lstm.h"
+#include "../model_slot_attention_consensus.h"
+
 #include <cstdint>
 #include <memory>
 

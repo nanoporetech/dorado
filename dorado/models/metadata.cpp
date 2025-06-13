@@ -1,4 +1,4 @@
-#include "metadata.h"
+#include "models/metadata.h"
 
 #include "utils/string_utils.h"
 

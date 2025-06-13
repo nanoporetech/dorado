@@ -1,4 +1,4 @@
-#include "myers.h"
+#include "splitter/myers.h"
 
 #include "utils/PostCondition.h"
 #include "utils/alignment_utils.h"

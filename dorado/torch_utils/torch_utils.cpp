@@ -1,4 +1,4 @@
-#include "torch_utils.h"
+#include "torch_utils/torch_utils.h"
 
 #include "compat/compat_utils.h"
 
