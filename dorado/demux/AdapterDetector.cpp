@@ -19,6 +19,8 @@
 #include <tuple>
 #include <vector>
 
+namespace dorado::demux {
+
 namespace {
 
 // The PCS114 and PCB114_24 kits can include UMI tag sequences.
@@ -119,9 +121,6 @@ dorado::SingleEndResult get_best_result(const std::vector<dorado::SingleEndResul
 }
 
 }  // namespace
-
-namespace dorado {
-namespace demux {
 
 AdapterDetector::AdapterDetector(const std::optional<std::string>& custom_primer_file) {
     if (custom_primer_file.has_value()) {
@@ -314,5 +313,4 @@ void AdapterDetector::check_for_umi_tags(const AdapterScoreResult& primer_result
     }
 }
 
-}  // namespace demux
-}  // namespace dorado
+}  // namespace dorado::demux
