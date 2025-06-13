@@ -1,8 +1,20 @@
+Data construction.
+Create a very small synthetic input BAM file of only one record.
+Reason: reducing the inference time for successful tests.
+  $ rm -rf data; mkdir -p data
+  > in_dir="${TEST_DATA_DIR}/polish/test-01-supertiny"
+  > in_bam="${in_dir}/calls_to_draft.bam"
+  > ### Create a BAM file with zero read groups.
+  > samtools view -H ${in_bam} > data/in.micro.sam
+  > samtools view ${in_bam} | head -n 1 >> data/in.micro.sam
+  > samtools view -Sb data/in.micro.sam | samtools sort > data/in.micro.bam
+  > samtools index data/in.micro.bam
+
 Stereo models should fail.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > ### Create synthetic data with mocked model name.
-  > samtools view -h ${in_dir}/calls_to_draft.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' | samtools view -Sb > out/in.bam
+  > samtools view -h data/in.micro.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 -v > out/out.fasta 2> out/out.fasta.stderr
@@ -18,7 +30,7 @@ This still fails because the model cannot be resolved automatically.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > ### Create synthetic data with mocked model name.
-  > samtools view -h ${in_dir}/calls_to_draft.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' | samtools view -Sb > out/in.bam
+  > samtools view -h data/in.micro.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > ${DORADO_BIN} polish --skip-model-compatibility-check --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 -v > out/out.fasta 2> out/out.fasta.stderr
@@ -35,7 +47,7 @@ This succeeds because the model was explicitly specified.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > ### Create synthetic data with mocked model name.
-  > samtools view -h ${in_dir}/calls_to_draft.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' | samtools view -Sb > out/in.bam
+  > samtools view -h data/in.micro.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
@@ -54,10 +66,10 @@ Since `--skip-model-compatibility-check` is used and the model explicitly specif
   > in_dir="${TEST_DATA_DIR}/polish/test-01-supertiny"
   > in_bam="${in_dir}/calls_to_draft.bam"
   > ### Create a BAM file with two read groups and two basecallers.
-  > samtools view -h ${in_bam} | sed -E 's/bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E/f9f2e0901209274f132de3554913a1dc0a4439ae_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-2DEAC5EC/g' > out/tmp.sam
+  > samtools view -h data/in.micro.bam | sed -E 's/bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E/f9f2e0901209274f132de3554913a1dc0a4439ae_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-2DEAC5EC/g' > out/tmp.sam
   > cat out/tmp.sam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_5khz_stereo@v1.3/g' > out/tmp2.sam
   > samtools view -Sb out/tmp2.sam | samtools sort > out/tmp2.bam
-  > samtools merge out/in.two_read_groups.two_basecallers.bam ${in_bam} out/tmp2.bam
+  > samtools merge out/in.two_read_groups.two_basecallers.bam data/in.micro.bam out/tmp2.bam
   > samtools index out/in.two_read_groups.two_basecallers.bam
   > ### Run the test
   > in_bam="out/in.two_read_groups.two_basecallers.bam"
