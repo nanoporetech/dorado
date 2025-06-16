@@ -21,12 +21,10 @@ model_speed=${6:-"hac"}
 version=${7:-"v5.0.0"}
 model_complex="${model_speed}@${version}"
 
-data_dir=$test_dir/data
-output_dir_name=test_output_$(echo $RANDOM | head -c 10)
+data_dir=${test_dir}/data
+output_dir_name=test_simple_basecaller_output_${RANDOM}
 output_dir=${test_dir}/${output_dir_name}
-mkdir -p $output_dir
-
-test_output_file=$test_dir/${output_dir_name}_output.log
+mkdir -p ${output_dir}
 
 echo dorado download models
 $dorado_bin download --list

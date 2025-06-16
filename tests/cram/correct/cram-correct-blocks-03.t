@@ -10,7 +10,7 @@ Test:
   > i=0; ${DORADO_BIN} correct ${in_reads} --device cpu -t 4 ${model_var} -v --index-size 100000 --run-block-id ${i} > out/out.block_${i}.fasta 2> out/out.block_${i}.fasta.stderr
   > i=1; ${DORADO_BIN} correct ${in_reads} --device cpu -t 4 ${model_var} -v --index-size 100000 --run-block-id ${i} > out/out.block_${i}.fasta 2> out/out.block_${i}.fasta.stderr
   > i=2; ${DORADO_BIN} correct ${in_reads} --device cpu -t 4 ${model_var} -v --index-size 100000 --run-block-id ${i} > out/out.block_${i}.fasta 2> out/out.block_${i}.fasta.stderr
-  > i=3; ${DORADO_BIN} correct ${in_reads} --device cpu  -t 4 ${model_var} -v --index-size 100000 --run-block-id ${i} > out/out.block_${i}.fasta 2> out/out.block_${i}.fasta.stderr
+  > i=3; ${DORADO_BIN} correct ${in_reads} --device cpu -t 4 ${model_var} -v --index-size 100000 --run-block-id ${i} > out/out.block_${i}.fasta 2> out/out.block_${i}.fasta.stderr
   > ls -l out/*.fasta | wc -l | awk '{ print $1 }'
   > cat out/out.block_*.fasta > out/out.all.fasta
   > samtools faidx out/out.all.fasta

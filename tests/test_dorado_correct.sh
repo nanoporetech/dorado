@@ -28,7 +28,7 @@ data_dir=$test_dir/data
 if [[ ${cli_out_dir} != "" ]]; then
     output_dir=${cli_out_dir}
 else
-    output_dir_name=test_output_dc_$(echo $RANDOM | head -c 10)
+    output_dir_name=test_output_correct_${RANDOM}
     output_dir=${test_dir}/${output_dir_name}
 fi
 

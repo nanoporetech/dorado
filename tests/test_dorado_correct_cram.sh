@@ -31,7 +31,7 @@ DORADO_BIN=$(cd "$(dirname ${IN_DORADO_BIN})"; pwd -P)/$(basename ${IN_DORADO_BI
 # Output directory. Either user specified or generated.
 output_dir=$(cd "${OUT_DIR}"; pwd -P)
 if [[ "${OUT_DIR}" == "" ]]; then
-    output_dir_name=test_output_dc_$(echo $RANDOM | head -c 10)
+    output_dir_name=test_output_correct_cram_${RANDOM}
     output_dir=${TEST_DIR}/${output_dir_name}
 fi
 
@@ -57,4 +57,7 @@ fi
 export DORADO_BIN
 export TEST_DATA_DIR
 export MODEL_DIR
-python3 ${CRAM} --verbose ${TEST_DIR}/cram/correct/*.t
+export OUTPUT_DIR=${output_dir}
+python3 ${CRAM} --verbose --shell=${TEST_DIR}/cram/cram_shell_wrapper.sh ${TEST_DIR}/cram/correct/*.t
+
+rm -rf ${output_dir}

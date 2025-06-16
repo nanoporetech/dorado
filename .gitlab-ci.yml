@@ -448,6 +448,11 @@ build_archive:macos:arm:
     - bash ./tests/test_dorado_correct_cram.sh ./dist/bin/dorado
     - bash ./tests/test_dorado_polish.sh ./dist/bin/dorado
     - bash ./tests/test_dorado_variant.sh ./dist/bin/dorado
+  artifacts:
+    when: on_failure
+    paths:
+      - test_archive/tests
+    expire_in: 1 day
 
 .test_dorado_windows:
   stage: test
@@ -497,11 +502,6 @@ test:linux:x86:focal:
     - .test_dorado
   needs:
     - build:linux:x86:focal
-  artifacts:
-    when: on_failure
-    paths:
-      - tests
-    expire_in: 1 day
 
 test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0

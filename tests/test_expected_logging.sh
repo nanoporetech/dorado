@@ -9,10 +9,10 @@ test_dir=$(dirname $0)
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 model=${2:-dna_r10.4.1_e8.2_400bps_hac@v5.0.0}
 batch=${3:-384}
-data_dir=$test_dir/data
-output_dir_name=$(echo $RANDOM | head -c 10)
+data_dir=${test_dir}/data
+output_dir_name=test_logging_output_${RANDOM}
 output_dir=${test_dir}/${output_dir_name}
-mkdir -p $output_dir
+mkdir -p ${output_dir}
 
 test_output_file=$test_dir/output.log
 
