@@ -26,8 +26,6 @@ output_dir_name=test_simple_basecaller_output_${RANDOM}
 output_dir=${test_dir}/${output_dir_name}
 mkdir -p ${output_dir}
 
-test_output_file=$test_dir/${output_dir_name}_output.log
-
 echo dorado download models
 $dorado_bin download --list
 $dorado_bin download --list-structured
