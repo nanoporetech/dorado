@@ -102,7 +102,6 @@ dorado_add_library(
         htslib
         minimap2
     NO_TORCH
-    POSITION_INDEPENDENT_CODE
 )
 
 target_compile_definitions(dorado_utils

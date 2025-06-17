@@ -13,6 +13,10 @@ endif()
 #  eventually set elsewhere
 set(BUILD_SHARED_LIBS OFF)
 
+# All static libraries should be position-independent, as they are liable to be compiled into shared
+# libraries
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Allow targets with no side effects to be built in parallel when using Makefiles.
 # Koi uses OBJECT targets which are (currently) incompatible with this.
 # See https://gitlab.kitware.com/cmake/cmake/-/issues/24058.
