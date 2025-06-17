@@ -66,26 +66,28 @@ void HtsWriterNode::input_thread_fn() {
             dx_tag = bam_aux2i(tag_str);
         }
 
-        bool ignore_read_id = dx_tag == 1;
+        const uint16_t flags = aln->core.flag;
 
-        if (ignore_read_id) {
+        const bool is_unmapped = ((flags & BAM_FUNMAP) != 0);
+        const bool is_primary =
+                ((flags & BAM_FSECONDARY) == 0) && ((flags & BAM_FSUPPLEMENTARY) == 0);
+        const bool is_duplex = dx_tag == 1;
+
+        if (is_duplex) {
             // Read is a duplex read.
-            m_duplex_reads_written++;
+            m_duplex_reads_written.fetch_add(1, std::memory_order_relaxed);
         } else {
-            std::string read_id;
-
-            // If read is a split read, use the parent read id
-            // to track write count since we don't know a priori
-            // how many split reads will be generated.
+            // We can end up with multiple records for a single input read because
+            // of read splitting or alignment.
+            // If read is a split read, only count it if the subread id is 0
+            // If read is an aligned read, only count it if it's the primary alignment
             auto pid_tag = bam_aux_get(aln.get(), "pi");
             if (pid_tag) {
-                read_id = std::string(bam_aux2Z(pid_tag));
-                m_split_reads_written++;
-            } else {
-                read_id = bam_get_qname(aln.get());
+                m_split_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
-
-            m_processed_read_ids.add(std::move(read_id));
+            if (bam_message.subread_id == 0 && (is_unmapped || is_primary)) {
+                m_primary_simplex_reads_written.fetch_add(1, std::memory_order_relaxed);
+            }
         }
     }
 }
@@ -116,19 +118,13 @@ int HtsWriterNode::write(bam1_t* const record) {
 
 stats::NamedStats HtsWriterNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
-    stats["unique_simplex_reads_written"] = static_cast<double>(m_processed_read_ids.size());
+    stats["unique_simplex_reads_written"] =
+            static_cast<double>(m_primary_simplex_reads_written.load());
     stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
     stats["split_reads_written"] = static_cast<double>(m_split_reads_written.load());
     return stats;
 }
 
 void HtsWriterNode::terminate(const FlushOptions&) { stop_input_processing(); }
-
-std::size_t HtsWriterNode::ProcessedReadIds::size() const { return m_threadsafe_count_of_reads; }
-
-void HtsWriterNode::ProcessedReadIds::add(std::string read_id) {
-    read_ids.insert(std::move(read_id));
-    m_threadsafe_count_of_reads = read_ids.size();
-}
 
 }  // namespace dorado
