@@ -41,6 +41,7 @@ void ReadToBamTypeNode::input_thread_fn() {
         for (auto& aln : alns) {
             BamMessage bam_msg{std::move(aln), read_common_data.client_info};
             bam_msg.sequencing_kit = read_common_data.sequencing_kit;
+            bam_msg.subread_id = read_common_data.subread_id;
             send_message_to_sink(std::move(bam_msg));
         }
     }

@@ -21,6 +21,45 @@ using Catch::Matchers::Equals;
 using utils::HtsFile;
 
 namespace {
+
+// Node to mutate reads in the pipeline
+// Updates the subread id for reads with a parent id that aren't duplex
+class SubreadIdTaggerNode : public MessageSink {
+public:
+    SubreadIdTaggerNode() : MessageSink(100, 1) {}
+    ~SubreadIdTaggerNode() { stop_input_processing(); }
+
+    std::string get_name() const override { return "SubreadIdTagger"; }
+    void terminate(const FlushOptions &) override { stop_input_processing(); };
+    void restart() override {
+        start_input_processing([this] { input_thread_fn(); }, "subreadidtagger_node");
+    }
+
+private:
+    void input_thread_fn() {
+        Message message;
+        std::unordered_map<std::string, size_t> read_id_counts;
+        while (get_input_message(message)) {
+            auto bam_message = std::get<BamMessage>(std::move(message));
+
+            int64_t dx_tag = 0;
+            auto tag_str = bam_aux_get(bam_message.bam_ptr.get(), "dx");
+            if (tag_str) {
+                dx_tag = bam_aux2i(tag_str);
+            }
+
+            if (dx_tag != 1) {
+                auto pid_tag = bam_aux_get(bam_message.bam_ptr.get(), "pi");
+                if (pid_tag) {
+                    std::string read_id = bam_aux2Z(pid_tag);
+                    bam_message.subread_id = read_id_counts[read_id]++;
+                }
+            }
+            send_message_to_sink(std::move(bam_message));
+        }
+    }
+};
+
 class HtsWriterTestsFixture {
 public:
     HtsWriterTestsFixture()
@@ -39,12 +78,13 @@ protected:
 
         PipelineDescriptor pipeline_desc;
         auto writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
+        pipeline_desc.add_node<SubreadIdTaggerNode>({writer});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
         pipeline->terminate(DefaultFlushOptions());
 
-        auto& writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);
+        auto &writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);
         stats = writer_ref.sample_stats();
 
         hts_file.finalise([](size_t) { /* noop */ });
