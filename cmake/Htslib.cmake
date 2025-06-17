@@ -53,6 +53,14 @@ if(NOT TARGET htslib) # lazy include guard
             set(hts_configure_flags "CPPFLAGS=${hts_cflags}" "LDFLAGS=${hts_cflags}")
         endif()
 
+        # Parallelise the htslib build too, though not enough to compete with the main build.
+        include(ProcessorCount)
+        ProcessorCount(nproc)
+        math(EXPR htslib_build_jobs "${nproc} / 4")
+        if (htslib_build_jobs EQUAL 0)
+            set(htslib_build_jobs 1)
+        endif()
+
         # The Htslib build apparently requires BUILD_IN_SOURCE=1, which is a problem when
         # switching between build targets because htscodecs object files aren't regenerated.
         # To avoid this, copy the source tree to a build-specific directory and do the build there.
@@ -68,7 +76,7 @@ if(NOT TARGET htslib) # lazy include guard
             CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
             COMMAND ${AUTOCONF_COMMAND}
             COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${hts_configure_flags}
-            BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
+            BUILD_COMMAND ${MAKE_COMMAND} -j${htslib_build_jobs} install prefix=${htslib_PREFIX}
             COMMAND ${INSTALL_NAME}
             INSTALL_COMMAND ""
             BUILD_BYPRODUCTS ${htslib_PREFIX}/lib/libhts.a
