@@ -31,6 +31,28 @@ if(NOT TARGET htslib) # lazy include guard
             set(AUTOCONF_COMMAND autoreconf --install)
         endif()
 
+        # htslib will only try to build the .so as PIC, but ont_core needs it all as PIC.
+        unset(hts_cflags)
+        if (LINUX)
+            set(hts_cflags "-fPIC")
+        endif()
+
+        # If we're building with sanitizers then we need to build htslib the same way.
+        if (ECM_ENABLE_SANITIZERS MATCHES "address")
+            set(hts_cflags "${hts_cflags} -g -fsanitize=address")
+        endif()
+        if (ECM_ENABLE_SANITIZERS MATCHES "undefined")
+            set(hts_cflags "${hts_cflags} -g -fsanitize=undefined")
+        endif()
+        if (ECM_ENABLE_SANITIZERS MATCHES "thread")
+            set(hts_cflags "${hts_cflags} -g -fsanitize=thread")
+        endif()
+
+        unset(hts_configure_flags)
+        if (hts_cflags)
+            set(hts_configure_flags "CPPFLAGS=${hts_cflags}" "LDFLAGS=${hts_cflags}")
+        endif()
+
         # The Htslib build apparently requires BUILD_IN_SOURCE=1, which is a problem when
         # switching between build targets because htscodecs object files aren't regenerated.
         # To avoid this, copy the source tree to a build-specific directory and do the build there.
@@ -45,7 +67,7 @@ if(NOT TARGET htslib) # lazy include guard
             PATCH_COMMAND patch < ${DORADO_3RD_PARTY_SOURCE}/patches/htslib.patch
             CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
             COMMAND ${AUTOCONF_COMMAND}
-            COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${CONFIGURE_FLAGS}
+            COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${hts_configure_flags}
             BUILD_COMMAND ${MAKE_COMMAND} install prefix=${htslib_PREFIX}
             COMMAND ${INSTALL_NAME}
             INSTALL_COMMAND ""
