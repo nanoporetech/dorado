@@ -491,6 +491,9 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
     auto f16_opts = x_f16.options().dtype(torch::kF16);
     auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
+    bool use_hopper = koi_hopper_tc_is_available(KOI_E4M3) == KOI_SUCCESS;
+    bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
+    utils::get_dev_opt<bool>("koi_use_f8", true);
 
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
@@ -531,13 +534,19 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
         t_res_weights = norm1->weight.view({C});
         t_res2_weights = norm2->weight.view({C});
+        if (use_hopper) {
+            t_res_weights_h = norm1->weight.view({C}).view({-1, 8}).repeat({1, 8}).flatten().view({C*8});
+            t_res2_weights_h = norm2->weight.view({C}).view({-1, 16}).repeat({1, 4}).flatten().view({C*4});
+        }
 
+        if (use_hopper) {
+            // Assuming ff->fc1->weight is of shape (N, K), aka (E, C) in this case
+            auto fc1_weight_interleaved = ff->fc1->weight.permute({1,0}).contiguous().view({C, E/32, 4, 4, 2}).transpose(2, 3).contiguous().reshape({C, E});
+            t_fc1_wts_f8_h = fc1_weight_interleaved.to(torch::kFloat8_e4m3fn).view({C / 128, 128 / 32, 32 / 16, 16, E / 256, 1, 256 / 8, 8}).permute({4, 0, 5, 1, 6, 2, 7, 3}).contiguous();
+        }
         // Quantize SwiGLU weights, interleave, and rearrange as tiled
         auto fc1_weight_interleaved =
                 ff->fc1->weight.unflatten(0, {2, -1, 16}).transpose(0, 1).contiguous();
-
-        bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
-                      utils::get_dev_opt<bool>("koi_use_f8", true);
         if (use_f8) {
             const auto fc1_weight_shuffle_index =
                     torch::tensor({0, 1, 4, 5, 8, 9, 12, 13, 2, 3, 6, 7, 10, 11, 14, 15},
@@ -560,6 +569,11 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         t_fc1_wts_f16.t =
                 fc1_weight_interleaved.view({E / 16, 16, C / 8, 8}).transpose(1, 2).contiguous();
 
+        if (use_hopper) {
+            // fc2 interleave is every 16 values, this is different from swiglu interleave
+            auto fc2_weight_interleaved = ff->fc2->weight.permute({1,0}).contiguous().view({C, (E / 2) / 16, 4, 2, 2}).transpose(2,3).contiguous().reshape({C, E / 2});
+            t_fc2_wts_h = fc2_weight_interleaved.to(torch::kFloat8_e4m3fn).view({C / 128, 128 / 32, 32 / 16, 16, (E / 2) / 256, 1, 256 / 8, 8}).permute({4, 0, 5, 1, 6, 2, 7, 3}).contiguous();
+        } 
         if (use_f8) {
             t_fc2_wts = ff->fc2->weight.to(torch::kFloat8_e4m3fn)
                                 .view({C / 16, 16, E / 32, 16})
@@ -579,12 +593,17 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto t_rms_out = torch::empty({N, T / 16, C / 16, 16, 16}, f8_opts);
     auto t_fc1_out = torch::empty({N * T / 16, t_fc2_wts.size(1), 16, t_fc2_wts.size(3)},
                                   t_fc2_wts.options());
+    auto t_rms1_out_f16 = torch::empty({N * T / 256, C / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f16_opts);
+    auto t_rms1_out_f8 = torch::empty({N * T / 256, C / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f8_opts);
+    auto t_fc1_out_f8 = torch::empty({N * T / 256, (E / 2) / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f8_opts);
     auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
+    auto t_fc2_out_f8 = torch::empty({N * T / 256, C / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f8_opts);
+    // auto t_rms2_out_f16 = torch::empty({N * T / 16, C / 8, 16, 8}, f16_opts); // RMS2 output residual is x_f16
 
     //Define Koi Tensors for the above buffers.
     auto &x = scaled_tensor.t;
     const bool use_i8 = (x.dtype() == torch::kI8);
-    const bool use_f8 = t_fc1_wts_f8.t.numel();
+    // const bool use_f8 = t_fc1_wts_f8.t.numel();
     auto &wqkv_weights = use_i8 ? wqkv_weights_i8 : wqkv_weights_f16;
     auto &t_fc1_wts = use_f8 ? t_fc1_wts_f8 : (use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16);
     KoiTensorExt in_f16(x_f16, {'N', 'T', 'C', 't', 'c'});
@@ -636,27 +655,43 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     if (res == KOI_SUCCESS && ++calls) {
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1", 3);
-        res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
-                                   use_f8 ? &out_rms_f8 : nullptr, use_f8 ? nullptr : in_i8_ptr);
+        if (use_hopper) {
+            res = koi_rmsnorm_hopper(stream, t_out_proj.data_ptr(), x_f16.data_ptr(), t_res_weights_h.data_ptr(), t_rms1_out_f16.data_ptr(), t_rms1_out_f8.data_ptr(), nullptr, N * T, C, alpha, true);
+        } else {
+            res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
+                                       use_f8 ? &out_rms_f8 : nullptr, use_f8 ? nullptr : in_i8_ptr);
+        }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
-        int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
-        res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
-                            use_f32_accum);
+        if (use_hopper) {
+            res = koi_swiglu_hopper(stream, t_rms1_out_f8.data_ptr(), t_fc1_wts_f8_h.data_ptr(), t_fc1_out_f8.data_ptr(), N * T, E, C);
+        } else {
+            int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
+            res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
+                                use_f32_accum);
+        }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Fully connected
         utils::ScopedProfileRange spr("FC2", 3);
-        res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
-                         ctr[3].data_ptr<int>());
+        if (use_hopper) {
+            res = koi_matmul_hopper(stream, t_fc1_out_f8.data_ptr(), t_fc2_wts_h.data_ptr(), t_fc2_out_f8.data_ptr(), N * T, C, (E/2));
+        } else {
+            res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
+                ctr[3].data_ptr<int>());
+        }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2", 3);
-        res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in_f16, alpha, &res2_weights, &in_f16,
-                                   nullptr, in_i8_ptr);
+        if (use_hopper) {
+            res = koi_rmsnorm_hopper(stream, t_fc2_out_f8.data_ptr(), t_rms1_out_f16.data_ptr(), t_res2_weights_h.data_ptr(), x_f16.data_ptr(), x.data_ptr(), scaled_tensor.scale.data_ptr(), N * T, C, alpha, false);
+        } else {
+            res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in_f16, alpha, &res2_weights, &in_f16,
+                nullptr, in_i8_ptr);
+        }
     }
     // TODO: handle result
     if (res != KOI_SUCCESS) {

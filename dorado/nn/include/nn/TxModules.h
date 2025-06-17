@@ -115,7 +115,7 @@ struct TxEncoderImpl : torch::nn::Module {
     // Rearranged weights for Koi tiled codepath
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f8,
             t_fc1_wts_f16;
-    at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts;
+    at::Tensor sincos_bfr, proj_weight, proj_bias, t_res_weights, t_res2_weights, t_fc2_wts, t_fc1_wts_f8_h, t_fc2_wts_h, t_res_weights_h, t_res2_weights_h;
 
     void remove_bits();
 
