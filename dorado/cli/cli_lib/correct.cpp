@@ -1,7 +1,7 @@
 #include "CorrectionMapper.h"
 #include "CorrectionPafReader.h"
 #include "CorrectionProgressTracker.h"
-#include "cli.h"
+#include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"

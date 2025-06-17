@@ -1,5 +1,5 @@
 #include "ProgressTracker.h"
-#include "cli.h"
+#include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "demux/adapter_info.h"
 #include "dorado_version.h"

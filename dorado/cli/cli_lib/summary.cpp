@@ -1,6 +1,6 @@
 #include "summary/summary.h"
 
-#include "cli.h"
+#include "cli/cli.h"
 #include "dorado_version.h"
 #include "utils/bam_utils.h"
 #include "utils/log_utils.h"
