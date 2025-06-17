@@ -1,4 +1,4 @@
-add_library(dorado_pch
+add_library(dorado_pch STATIC
     precompiled.cpp
     precompiled.h
 )

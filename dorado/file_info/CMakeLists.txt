@@ -12,4 +12,5 @@ dorado_add_library(
         dorado_utils
     DEPENDS_PRIVATE
         pod5_libs
+    NO_TORCH
 )
