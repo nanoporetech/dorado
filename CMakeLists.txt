@@ -87,17 +87,6 @@ include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
 include(cmake/DoradoCheckDeps.cmake)
 
-# Third party libs that aren't submodules.
-include(cmake/Zlib.cmake)
-include(cmake/Koi.cmake)
-include(cmake/Pod5.cmake)
-include(cmake/Torch.cmake)
-include(cmake/OpenSSL.cmake)
-include(cmake/Htslib.cmake)
-if (APPLE)
-    include(cmake/Metal.cmake)
-endif()
-
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)
@@ -184,6 +173,15 @@ endif()
 option(DORADO_PER_READ_TRACE "Enable per-read trace logging" OFF)
 
 # Bring in 3rdparty libs
+include(cmake/Zlib.cmake)
+include(cmake/Koi.cmake)
+include(cmake/Pod5.cmake)
+include(cmake/Torch.cmake)
+include(cmake/OpenSSL.cmake)
+include(cmake/Htslib.cmake)
+if (APPLE)
+    include(cmake/Metal.cmake)
+endif()
 add_subdirectory(dorado/3rdparty)
 
 enable_testing()
