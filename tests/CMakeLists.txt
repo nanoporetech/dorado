@@ -124,7 +124,10 @@ target_compile_definitions(dorado_tests_common
 # Finish setting up each target and add them as tests.
 foreach(TEST_BIN dorado_tests dorado_smoke_tests)
     if (DORADO_ENABLE_PCH)
-        target_precompile_headers(${TEST_BIN} REUSE_FROM dorado_pch)
+        target_precompile_headers(${TEST_BIN}
+            PUBLIC
+                "<torch/torch.h>"
+        )
     endif()
 
     target_link_libraries(${TEST_BIN}
