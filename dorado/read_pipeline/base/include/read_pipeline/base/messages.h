@@ -230,7 +230,7 @@ public:
     PrimerClassification primer_classification{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
-    size_t subread_id{0};
+    std::size_t subread_id{0};
 };
 
 // Overlaps for error correction

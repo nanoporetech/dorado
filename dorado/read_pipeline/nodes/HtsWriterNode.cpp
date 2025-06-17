@@ -71,7 +71,7 @@ void HtsWriterNode::input_thread_fn() {
         const bool is_unmapped = ((flags & BAM_FUNMAP) != 0);
         const bool is_primary =
                 ((flags & BAM_FSECONDARY) == 0) && ((flags & BAM_FSUPPLEMENTARY) == 0);
-        const bool is_duplex = dx_tag == 1;
+        const bool is_duplex = (dx_tag == 1);
 
         if (is_duplex) {
             // Read is a duplex read.
@@ -81,11 +81,11 @@ void HtsWriterNode::input_thread_fn() {
             // of read splitting or alignment.
             // If read is a split read, only count it if the subread id is 0
             // If read is an aligned read, only count it if it's the primary alignment
-            auto pid_tag = bam_aux_get(aln.get(), "pi");
+            const auto pid_tag = bam_aux_get(aln.get(), "pi");
             if (pid_tag) {
                 m_split_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
-            if (bam_message.subread_id == 0 && (is_unmapped || is_primary)) {
+            if ((bam_message.subread_id == 0) && (is_unmapped || is_primary)) {
                 m_primary_simplex_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
         }
