@@ -92,12 +92,6 @@ include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)
     # Always emit debug info to provide better stack traces
     add_compile_options(-g)
-    # Add a way to detect if we're compiling with sanitizers enabled, since UBSan
-    # detection isn't available in GCC
-    foreach (SANITIZER ${ECM_ENABLE_SANITIZERS})
-        string(TOUPPER ${SANITIZER} SANITIZER)
-        add_compile_definitions(DORADO_SANITIZE_${SANITIZER})
-    endforeach()
 endif()
 
 if(DORADO_USING_OLD_CPP_ABI)
