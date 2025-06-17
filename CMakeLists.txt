@@ -96,6 +96,10 @@ include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)
     # Always emit debug info to provide better stack traces
     add_compile_options(-g)
+    # Silence overeager GCC warnings that only show up when sanitizers are enabled.
+    if ((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0))
+        add_compile_options(-Wno-error=array-bounds)
+    endif()
 endif()
 
 if(DORADO_USING_OLD_CPP_ABI)
