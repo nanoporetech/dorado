@@ -13,6 +13,10 @@ endif()
 #  eventually set elsewhere
 set(BUILD_SHARED_LIBS OFF)
 
+# All static libraries should be position-independent, as they are liable to be compiled into shared
+# libraries
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+
 # Allow targets with no side effects to be built in parallel when using Makefiles.
 # Koi uses OBJECT targets which are (currently) incompatible with this.
 # See https://gitlab.kitware.com/cmake/cmake/-/issues/24058.
@@ -87,28 +91,15 @@ include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
 include(cmake/DoradoCheckDeps.cmake)
 
-# Third party libs that aren't submodules.
-include(cmake/Zlib.cmake)
-include(cmake/Koi.cmake)
-include(cmake/Pod5.cmake)
-include(cmake/Torch.cmake)
-include(cmake/OpenSSL.cmake)
-include(cmake/Htslib.cmake)
-if (APPLE)
-    include(cmake/Metal.cmake)
-endif()
-
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)
     # Always emit debug info to provide better stack traces
     add_compile_options(-g)
-    # Add a way to detect if we're compiling with sanitizers enabled, since UBSan
-    # detection isn't available in GCC
-    foreach (SANITIZER ${ECM_ENABLE_SANITIZERS})
-        string(TOUPPER ${SANITIZER} SANITIZER)
-        add_compile_definitions(DORADO_SANITIZE_${SANITIZER})
-    endforeach()
+    # Silence overeager GCC warnings that only show up when sanitizers are enabled.
+    if ((CMAKE_CXX_COMPILER_ID MATCHES "GNU") AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 13.0))
+        add_compile_options(-Wno-error=array-bounds)
+    endif()
 endif()
 
 if(DORADO_USING_OLD_CPP_ABI)
@@ -184,6 +175,15 @@ endif()
 option(DORADO_PER_READ_TRACE "Enable per-read trace logging" OFF)
 
 # Bring in 3rdparty libs
+include(cmake/Zlib.cmake)
+include(cmake/Koi.cmake)
+include(cmake/Pod5.cmake)
+include(cmake/Torch.cmake)
+include(cmake/OpenSSL.cmake)
+include(cmake/Htslib.cmake)
+if (APPLE)
+    include(cmake/Metal.cmake)
+endif()
 add_subdirectory(dorado/3rdparty)
 
 enable_testing()

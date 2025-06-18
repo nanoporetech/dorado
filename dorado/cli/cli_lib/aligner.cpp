@@ -3,7 +3,7 @@
 #include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
-#include "cli.h"
+#include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
 #include "read_output_progress_stats.h"

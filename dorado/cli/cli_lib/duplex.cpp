@@ -3,7 +3,7 @@
 #include "api/pipeline_creation.h"
 #include "api/runner_creation.h"
 #include "basecall_output_args.h"
-#include "cli.h"
+#include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
