@@ -90,4 +90,24 @@ double time_difference_seconds(const std::string & timestamp1, const std::string
     }
 }
 
+std::string get_datetime_from_unix_epoch_ms(int64_t epoch_ms) {
+    using namespace std::chrono;
+
+    system_clock::time_point time_point_ms{milliseconds{epoch_ms}};
+    std::time_t time_s = system_clock::to_time_t(time_point_ms);
+
+    std::tm tm_utc;
+#if defined(_MSC_VER)
+    gmtime_s(&tm_utc, &time_s);
+#else
+    gmtime_r(&time_s, &tm_utc);
+#endif
+
+    // YYYYMMDD_hhmm e.g. 20250604_1354 - MinKnow output file datetime format
+    char buf[32];
+    std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M", &tm_utc);
+
+    return buf;
+}
+
 }  // namespace dorado::utils

@@ -1,5 +1,6 @@
 #include "utils/time_utils.h"
 
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
@@ -84,4 +85,10 @@ CATCH_TEST_CASE(CUT_TAG ": adjust_time", CUT_TAG) {
     CATCH_CAPTURE(timestamp);
     auto result_time_stamp = dorado::utils::adjust_time(timestamp, adjustment);
     CATCH_CHECK(result_time_stamp == adjusted_timestamp);
+}
+
+CATCH_TEST_CASE(CUT_TAG ": MinKnow datetime format from pod5 timestamp", CUT_TAG) {
+    CATCH_CHECK(dorado::utils::get_datetime_from_unix_epoch_ms(0) == "19700101_0000");
+    CATCH_CHECK(dorado::utils::get_datetime_from_unix_epoch_ms(1110371400000) == "20050309_1230");
+    CATCH_CHECK(dorado::utils::get_datetime_from_unix_epoch_ms(1750411401000) == "20250620_0923");
 }

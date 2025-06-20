@@ -18,4 +18,8 @@ std::string adjust_time(const std::string& time_stamp, uint32_t offset);
 
 double time_difference_seconds(const std::string& timestamp1, const std::string& timestamp2);
 
+// Get a formatted datetime from ms since unix epoch. This effectively converts pod5 start time
+// to MinKnow formatted datetimes as "YYYYMMDD_hhmm"
+std::string get_datetime_from_unix_epoch_ms(int64_t epoch_ms);
+
 }  // namespace dorado::utils
