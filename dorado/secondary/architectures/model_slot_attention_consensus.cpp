@@ -205,8 +205,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
     register_module("slot_classifier", m_slot_classifier);
 }
 
-at::Tensor ModelSlotAttentionConsensus::forward(torch::Tensor x  // NOLINT
-) {
+at::Tensor ModelSlotAttentionConsensus::forward(torch::Tensor x) {
     auto [out, attn] = forward_impl(x);
 
     for (int64_t i = 0; i < x.size(0); ++i) {
@@ -324,10 +323,9 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
 }
 
 std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::quick_phase(
-        torch::Tensor hap_probs_unphased,  // NOLINT
-        at::Tensor attn,                   // NOLINT
-        at::Tensor features                // NOLINT
-) const {
+        at::Tensor hap_probs_unphased,
+        const at::Tensor& attn,
+        const at::Tensor& features) const {
     if ((attn.size(0) != hap_probs_unphased.size(0)) ||
         (attn.size(1) != hap_probs_unphased.size(1))) {
         throw std::runtime_error{
@@ -378,7 +376,7 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::quick_phase(
                                              .reshape({-1, n_span_reads})
                                              .transpose(0, 1);  // Shape: (n_reads, ?)
     // const at::Tensor span_read_haps = kmeans_cluster(het_attn_span_reads, 2, 10).to(torch::TensorOptions().device(device).dtype(dtype));;
-    at::Tensor span_read_haps = kmeans_cluster(std::move(het_attn_span_reads), 2, 10);
+    at::Tensor span_read_haps = kmeans_cluster(het_attn_span_reads, 2, 10);
     at::Tensor read_haps =
             torch::zeros(n_reads).to(torch::TensorOptions().device(device).dtype(torch::kLong));
     read_haps.index_put_({span_reads_mask}, span_read_haps + 1);
@@ -468,7 +466,7 @@ at::Tensor distance_matrix(const at::Tensor& tensor_x, const at::Tensor& tensor_
 }
 }  // namespace
 
-at::Tensor ModelSlotAttentionConsensus::kmeans_cluster(at::Tensor x,  // NOLINT
+at::Tensor ModelSlotAttentionConsensus::kmeans_cluster(const at::Tensor& x,
                                                        const int32_t k,
                                                        const int32_t n_iters) const {
     const at::Tensor sorted_indices = torch::argsort(x.select(1, 0));
