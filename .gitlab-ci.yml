@@ -598,24 +598,3 @@ test:model_download:macos:arm:
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
   timeout: 3h
-
-# Deploy
-
-deploy:all:
-  stage: deploy
-  variables:
-    GIT_STRATEGY: none
-  script:
-    - ls -lh archive
-  extends:
-    - .on_nightly_or_manual
-  artifacts:
-    paths:
-      - archive
-    expire_in: 1 day
-  needs:
-    - build_archive:linux:x86:cuda11
-    - build_archive:linux:x86:cuda12
-    - build_archive:linux:arm64:jammy
-    - build_archive:macos:arm
-    - build_archive:windows
