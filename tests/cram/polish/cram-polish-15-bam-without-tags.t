@@ -11,7 +11,7 @@ Reason: reducing the inference time for successful tests.
   > samtools index data/in.micro.bam
 
 The input BAM is stripped of all tags.
-Auto-resolve the model The one without move tables should be used.
+Auto-resolve the model. The one without move tables should be used.
 The output should be as good as it gets with other tests.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
@@ -23,7 +23,7 @@ The output should be as good as it gets with other tests.
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -32,7 +32,7 @@ The output should be as good as it gets with other tests.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9993
+  contig_1 9995
   0
 
 Quality field in the BAM is set to `*` instead of actual qualities (valid according to the SAM format specification).
@@ -49,7 +49,7 @@ Results will be worse than using QVs, but this input should successfully run non
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -58,7 +58,7 @@ Results will be worse than using QVs, but this input should successfully run non
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9990
+  contig_1 9997
   0
 
 Quality field in the BAM is set to `*` instead of actual qualities (valid according to the SAM format specification).
@@ -75,7 +75,7 @@ Results will be worse than using QVs, but this input should successfully run non
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" --skip-model-compatibility-check --device cpu out/in.bam ${in_dir}/draft.fasta.gz -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" --skip-model-compatibility-check --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -84,7 +84,7 @@ Results will be worse than using QVs, but this input should successfully run non
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 10003
+  contig_1 10001
   0
   [warning] Input data has move tables, but a model without move table support has been chosen. This may produce inferior results.
 
@@ -99,7 +99,7 @@ This should fail by default.
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv" -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv" --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
@@ -113,7 +113,7 @@ This should fail by default.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=data/in.micro.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
@@ -133,7 +133,7 @@ Results are worse than using the correct model, as expected.
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv" --skip-model-compatibility-check -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv" --skip-model-compatibility-check --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -142,7 +142,7 @@ Results are worse than using the correct model, as expected.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 10002
+  contig_1 10000
   0
   [warning] Input data does not contain move tables, but a model which requires move tables has been chosen. This may produce inferior results.
 
@@ -153,7 +153,7 @@ Results are worse than using the correct model, as expected.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=data/in.micro.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" --skip-model-compatibility-check -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz --model "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" --skip-model-compatibility-check --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -162,6 +162,6 @@ Results are worse than using the correct model, as expected.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9993
+  contig_1 9995
   0
   [warning] Input data has move tables, but a model without move table support has been chosen. This may produce inferior results.

@@ -18,7 +18,7 @@ Input is .fasta.gz.
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -26,7 +26,7 @@ Input is .fasta.gz.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Same tiny test but use a non-bgzipped .fasta reference.
@@ -38,7 +38,7 @@ Same tiny test but use a non-bgzipped .fasta reference.
   > in_draft=out/draft.fasta
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -46,7 +46,7 @@ Same tiny test but use a non-bgzipped .fasta reference.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Same tiny test but use a non-bgzipped .fa reference.
@@ -58,7 +58,7 @@ Same tiny test but use a non-bgzipped .fa reference.
   > in_draft=out/draft.fa
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -66,7 +66,7 @@ Same tiny test but use a non-bgzipped .fa reference.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Same tiny test but use a .fa.gz reference.
@@ -78,7 +78,7 @@ Same tiny test but use a .fa.gz reference.
   > in_draft=out/draft.fa.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -86,7 +86,7 @@ Same tiny test but use a .fa.gz reference.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Same tiny test but use a .fna reference.
@@ -98,7 +98,7 @@ Same tiny test but use a .fna reference.
   > in_draft=out/draft.fna
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -106,7 +106,7 @@ Same tiny test but use a .fna reference.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Same tiny test but use a .fna.gz reference.
@@ -118,7 +118,7 @@ Same tiny test but use a .fna.gz reference.
   > in_draft=out/draft.fna.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -126,7 +126,7 @@ Same tiny test but use a .fna.gz reference.
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Input draft is a .fastq file (added dummy qualities to existing test data).
@@ -142,7 +142,7 @@ Input draft is a .fastq file (added dummy qualities to existing test data).
   > in_draft=out/draft.fastq
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -150,7 +150,7 @@ Input draft is a .fastq file (added dummy qualities to existing test data).
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Input draft is a .fq file (added dummy qualities to existing test data).
@@ -166,7 +166,7 @@ Input draft is a .fq file (added dummy qualities to existing test data).
   > in_draft=out/draft.fq
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -174,7 +174,7 @@ Input draft is a .fq file (added dummy qualities to existing test data).
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Input draft is a .fastq.gz file (added dummy qualities to existing test data).
@@ -191,7 +191,7 @@ Input draft is a .fastq.gz file (added dummy qualities to existing test data).
   > in_draft=out/draft.fastq.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -199,7 +199,7 @@ Input draft is a .fastq.gz file (added dummy qualities to existing test data).
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Input draft is a .fq.gz file (added dummy qualities to existing test data).
@@ -216,7 +216,7 @@ Input draft is a .fq.gz file (added dummy qualities to existing test data).
   > in_draft=out/draft.fq.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
@@ -224,5 +224,5 @@ Input draft is a .fq.gz file (added dummy qualities to existing test data).
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0

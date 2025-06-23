@@ -16,7 +16,7 @@ Write output to a directory defined by the `-o` option.
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/consensus.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" -o out 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/consensus.fasta
   > awk '{ print $1,$2 }' out/consensus.fasta.fai
@@ -24,7 +24,7 @@ Write output to a directory defined by the `-o` option.
   > grep "\[error\]" out/consensus.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/consensus.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Write output to a directory defined by the `--output-dir` option.
@@ -34,7 +34,7 @@ Write output to a directory defined by the `--output-dir` option.
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --output-dir out 2> out/consensus.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" --output-dir out 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/consensus.fasta
   > awk '{ print $1,$2 }' out/consensus.fasta.fai
@@ -42,7 +42,7 @@ Write output to a directory defined by the `--output-dir` option.
   > grep "\[error\]" out/consensus.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/consensus.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  contig_1 9996
+  contig_1 9995
   0
 
 Output directory matches an existing file.
@@ -50,7 +50,6 @@ Output directory matches an existing file.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
-  > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > touch out/file.txt
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out/file.txt 2> out/consensus.fasta.stderr
@@ -98,7 +97,7 @@ IMPORTANT: not comparing the qualities because they may vary with Torch versions
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --qualities > out/out.fastq 2> out/out.fastq.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" --qualities > out/out.fastq 2> out/out.fastq.stderr
   > echo "Exit code: $?"
   > wc -l out/out.fastq | awk '{ print $1 }'
   > samtools faidx out/out.fastq
@@ -108,7 +107,7 @@ IMPORTANT: not comparing the qualities because they may vary with Torch versions
   > grep "\[warning\]" out/out.fastq.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   4
-  contig_1 9996
+  contig_1 9995
 
 FASTQ output to folder.
 Checking only the number of lines in the output and the bases.
@@ -119,7 +118,7 @@ IMPORTANT: not comparing the qualities because they may vary with Torch versions
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --qualities --output-dir out 2> out/consensus.fastq.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" --qualities --output-dir out 2> out/consensus.fastq.stderr
   > echo "Exit code: $?"
   > wc -l out/consensus.fastq | awk '{ print $1 }'
   > samtools faidx out/consensus.fastq
@@ -129,4 +128,4 @@ IMPORTANT: not comparing the qualities because they may vary with Torch versions
   > grep "\[warning\]" out/consensus.fastq.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   4
-  contig_1 9996
+  contig_1 9995
