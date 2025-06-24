@@ -51,6 +51,16 @@ bool are_reads_adjacent(const dorado::SimplexRead& temp, const dorado::SimplexRe
     return false;
 }
 
+std::map<std::string, std::string> build_complement_template_map(
+        const std::map<std::string, std::string>& template_complement_map) {
+    std::map<std::string, std::string> complement_template_map;
+    // Set up the complement-template_map
+    for (auto& key : template_complement_map) {
+        complement_template_map[key.second] = key.first;
+    }
+    return complement_template_map;
+}
+
 }  // namespace
 
 namespace dorado {
@@ -182,17 +192,12 @@ void PairingNode::pair_list_worker_thread(int tid) {
         std::string partner_id;
 
         // Check if read is a template with corresponding complement
-        std::unique_lock<std::mutex> tc_lock(m_tc_map_mutex);
-
         auto it = m_template_complement_map.find(read->read_common.read_id);
         if (it != m_template_complement_map.end()) {
             partner_id = it->second;
-            tc_lock.unlock();
             read_is_template = true;
             partner_found = true;
         } else {
-            tc_lock.unlock();
-            std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
             it = m_complement_template_map.find(read->read_common.read_id);
             if (it != m_complement_template_map.end()) {
                 partner_id = it->second;
@@ -454,12 +459,8 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
                          size_t max_reads)
         : MessageSink(max_reads, 0),
           m_num_worker_threads(num_worker_threads),
-          m_template_complement_map(std::move(template_complement_map)) {
-    // Set up the complement-template_map
-    for (auto& key : m_template_complement_map) {
-        m_complement_template_map[key.second] = key.first;
-    }
-
+          m_template_complement_map(std::move(template_complement_map)),
+          m_complement_template_map(build_complement_template_map(m_template_complement_map)) {
     m_pairing_func = &PairingNode::pair_list_worker_thread;
 }
 

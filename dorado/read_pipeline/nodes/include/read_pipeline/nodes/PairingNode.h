@@ -74,12 +74,9 @@ private:
 
     // Members for pair_list method
 
-    std::mutex m_tc_map_mutex;
-    std::mutex m_ct_map_mutex;
+    const std::map<std::string, std::string> m_template_complement_map;
+    const std::map<std::string, std::string> m_complement_template_map;
     std::mutex m_read_cache_mutex;
-
-    std::map<std::string, std::string> m_template_complement_map;
-    std::map<std::string, std::string> m_complement_template_map;
     std::map<std::string, SimplexReadPtr> m_read_cache;
 
     // Members for pair_generating method
