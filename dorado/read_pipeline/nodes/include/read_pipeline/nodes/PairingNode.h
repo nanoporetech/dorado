@@ -45,7 +45,7 @@ public:
 
 private:
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.

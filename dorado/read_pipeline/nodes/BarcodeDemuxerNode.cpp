@@ -2,7 +2,6 @@
 
 #include "hts_utils/fastq_reader.h"
 #include "hts_utils/hts_file.h"
-#include "read_pipeline/base/ReadPipeline.h"
 #include "utils/SampleSheet.h"
 
 #include <htslib/bgzf.h>
@@ -79,7 +78,9 @@ BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
     std::filesystem::create_directories(m_output_dir);
 }
 
-BarcodeDemuxerNode::~BarcodeDemuxerNode() { stop_input_processing(); }
+BarcodeDemuxerNode::~BarcodeDemuxerNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+}
 
 void BarcodeDemuxerNode::input_thread_fn() {
     Message message;
@@ -165,7 +166,9 @@ stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
 
 std::string BarcodeDemuxerNode::get_name() const { return "BarcodeDemuxerNode"; }
 
-void BarcodeDemuxerNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+void BarcodeDemuxerNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+}
 
 void BarcodeDemuxerNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "brcd_demux");

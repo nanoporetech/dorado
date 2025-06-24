@@ -4,8 +4,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
-
 namespace dorado {
 
 void SubreadTaggerNode::input_thread_fn() {
@@ -116,11 +114,13 @@ void SubreadTaggerNode::check_duplex_thread() {
 SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
         : MessageSink(max_reads, num_worker_threads) {}
 
-SubreadTaggerNode::~SubreadTaggerNode() { terminate_impl(); }
+SubreadTaggerNode::~SubreadTaggerNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
 
 std::string SubreadTaggerNode::get_name() const { return "SubreadTaggerNode"; }
 
-void SubreadTaggerNode::terminate(const TerminateOptions&) { terminate_impl(); }
+void SubreadTaggerNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(utils::terminate_fast(terminate_options.fast));
+}
 
 void SubreadTaggerNode::restart() { start_threads(); }
 
@@ -130,8 +130,8 @@ void SubreadTaggerNode::start_threads() {
     start_input_processing([this] { input_thread_fn(); }, "subread_tagger");
 }
 
-void SubreadTaggerNode::terminate_impl() {
-    stop_input_processing();
+void SubreadTaggerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    stop_input_processing(fast);
 
     m_terminate.store(true);
     m_check_duplex_cv.notify_one();

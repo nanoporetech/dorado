@@ -97,11 +97,15 @@ void DuplexReadTaggingNode::input_thread_fn() {
 
 DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000, 1) {}
 
-DuplexReadTaggingNode::~DuplexReadTaggingNode() { stop_input_processing(); }
+DuplexReadTaggingNode::~DuplexReadTaggingNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+}
 
 std::string DuplexReadTaggingNode::get_name() const { return "DuplexReadTaggingNode"; }
 
-void DuplexReadTaggingNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+void DuplexReadTaggingNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+}
 
 void DuplexReadTaggingNode::restart() {
     m_duplex_parents.clear();

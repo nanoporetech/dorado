@@ -30,7 +30,7 @@ protected:
 
 private:
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
     void input_thread_fn();
     void check_duplex_thread();
 

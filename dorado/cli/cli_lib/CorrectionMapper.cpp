@@ -257,7 +257,7 @@ void CorrectionMapper::process(Pipeline& pipeline) {
         if (reader_thread.joinable()) {
             reader_thread.join();
         }
-        m_reads_queue.terminate();
+        m_reads_queue.terminate(utils::AsyncQueueTerminateFast::No);
         for (auto& t : aligner_threads) {
             if (t.joinable()) {
                 t.join();

@@ -11,11 +11,13 @@ void NullNode::input_thread_fn() {
 
 NullNode::NullNode() : MessageSink(1000, 4) {}
 
-NullNode::~NullNode() { stop_input_processing(); }
+NullNode::~NullNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
 std::string NullNode::get_name() const { return "NullNode"; }
 
-void NullNode::terminate(const TerminateOptions &) { stop_input_processing(); }
+void NullNode::terminate(const TerminateOptions &opts) {
+    stop_input_processing(utils::terminate_fast(opts.fast));
+}
 
 void NullNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "null_node");

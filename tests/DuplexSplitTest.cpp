@@ -126,7 +126,7 @@ CATCH_TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     pipeline->push_message(std::move(read));
-    pipeline.reset();
+    pipeline->terminate(dorado::DefaultTerminateOptions());
 
     CATCH_CHECK(messages.size() == 6);
     CATCH_REQUIRE(std::all_of(messages.begin(), messages.end(),
@@ -190,7 +190,7 @@ CATCH_TEST_CASE("No split output read properties", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     pipeline->push_message(std::move(read));
-    pipeline.reset();
+    pipeline->terminate(dorado::DefaultTerminateOptions());
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     CATCH_CHECK(reads.size() == 1);
@@ -241,7 +241,7 @@ CATCH_TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     pipeline->push_message(std::move(read));
-    pipeline.reset();
+    pipeline->terminate(dorado::DefaultTerminateOptions());
 
     CATCH_CHECK(messages.size() == 1);
 

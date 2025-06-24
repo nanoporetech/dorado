@@ -2,7 +2,6 @@
 
 #include "correct/types.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/AsyncQueue.h"
 
 #include <spdlog/spdlog.h>
 
@@ -41,6 +40,8 @@ private:
     void input_thread_fn();
     int m_window_size;
     std::string m_model_path;
+
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
 
     void infer_fn(const std::string& device, int mtx_idx, int batch_size);
     void decode_fn();

@@ -1,13 +1,11 @@
 #include "read_pipeline/nodes/StereoDuplexEncoderNode.h"
 
-#include "torch_utils/duplex_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <ATen/Functions.h>
 #include <edlib.h>
 
 #include <cassert>
-#include <cstdint>
 #include <cstring>
 
 namespace dorado {
@@ -112,7 +110,9 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
         : MessageSink(1000, std::thread::hardware_concurrency()),
           m_input_signal_stride(input_signal_stride) {}
 
-StereoDuplexEncoderNode::~StereoDuplexEncoderNode() { stop_input_processing(); };
+StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+};
 
 std::string StereoDuplexEncoderNode::get_name() const { return "StereoDuplexEncoderNode"; }
 
@@ -122,7 +122,9 @@ stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     return stats;
 }
 
-void StereoDuplexEncoderNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+void StereoDuplexEncoderNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+}
 
 void StereoDuplexEncoderNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "stereo_encode");

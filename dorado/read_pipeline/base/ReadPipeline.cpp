@@ -7,6 +7,7 @@
 #include <chrono>
 #include <iomanip>
 #include <iostream>
+#include <ranges>
 #include <sstream>
 #include <stack>
 #include <stdexcept>
@@ -117,16 +118,27 @@ void Pipeline::push_message(Message &&message) {
 
 stats::NamedStats Pipeline::terminate(const TerminateOptions &terminate_options) {
     stats::NamedStats final_stats;
-    // Nodes must be terminated in source to sink order to ensure all in flight
-    // processing is completed, and sources still have valid sinks as they finish
-    // work.
-    for (auto handle : m_source_to_sink_order) {
-        auto &node = m_nodes.at(handle);
-        node->terminate(terminate_options);
-        auto node_stats = node->sample_stats();
-        const auto node_name = node->get_name();
-        for (const auto &[name, value] : node_stats) {
-            final_stats[std::string(node_name).append(".").append(name)] = value;
+    if (terminate_options.fast) {
+        // Fast terminate means that we don't need to preserve the reads, so traverse
+        // sink to source order so that we unblock sources trying to push reads into
+        // sinks.
+        // We also don't need to care about the stats.
+        for (auto handle : m_source_to_sink_order | std::views::reverse) {
+            auto &node = m_nodes.at(handle);
+            node->terminate(terminate_options);
+        }
+    } else {
+        // Nodes must be terminated in source to sink order to ensure all in flight
+        // processing is completed, and sources still have valid sinks as they finish
+        // work.
+        for (auto handle : m_source_to_sink_order) {
+            auto &node = m_nodes.at(handle);
+            node->terminate(terminate_options);
+            auto node_stats = node->sample_stats();
+            const auto node_name = node->get_name();
+            for (const auto &[name, value] : node_stats) {
+                final_stats[std::string(node_name).append(".").append(name)] = value;
+            }
         }
     }
     return final_stats;
@@ -141,6 +153,12 @@ void Pipeline::restart() {
 }
 
 Pipeline::~Pipeline() {
+    // Shutdown fast during destruction.
+    TerminateOptions options;
+    options.fast = true;
+    terminate(options);
+
+    // Destroy from source to sink to avoid dangling references to sinks.
     for (auto handle : m_source_to_sink_order) {
         auto &node = m_nodes.at(handle);
         node.reset();

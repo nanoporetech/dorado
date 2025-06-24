@@ -48,8 +48,10 @@ public:
 protected:
     virtual bool forward_on_disconnected() const { return true; }
 
-    // Terminates waits on the input queue.
-    void terminate_input_queue() { m_work_queue.terminate(); }
+    // Mark the input queue as terminating.
+    void terminate_input_queue(utils::AsyncQueueTerminateFast fast) {
+        m_work_queue.terminate(fast);
+    }
 
     // Allows inputs again.
     void start_input_queue() { m_work_queue.restart(); }
@@ -90,7 +92,7 @@ protected:
                                 const std::string& worker_name);
 
     // Mark the input queue as terminating, and stop input processing threads.
-    void stop_input_processing();
+    void stop_input_processing(utils::AsyncQueueTerminateFast fast);
 
 private:
     // Queue of work items for this node.

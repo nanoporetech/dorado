@@ -15,7 +15,6 @@
 #include <spdlog/spdlog.h>
 
 #include <cassert>
-#include <filesystem>
 #include <string>
 #include <vector>
 
@@ -111,7 +110,7 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
           m_bed_file_access(std::move(bed_file_access)),
           m_task_executor(*m_thread_pool, m_pipeline_priority, MAX_PROCESSING_QUEUE_SIZE) {}
 
-AlignerNode::~AlignerNode() { stop_input_processing(); }
+AlignerNode::~AlignerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ClientInfo& client_info) {
@@ -218,10 +217,11 @@ void AlignerNode::input_thread_fn() {
     }
 }
 
-void AlignerNode::terminate(const TerminateOptions&) {
-    stop_input_processing();
+void AlignerNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
     m_task_executor.flush();
 }
+
 void AlignerNode::restart() {
     m_task_executor.restart();
     start_input_processing([this] { input_thread_fn(); }, "aligner_node");

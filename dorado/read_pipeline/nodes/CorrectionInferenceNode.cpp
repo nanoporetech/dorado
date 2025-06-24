@@ -1,29 +1,14 @@
 #include "read_pipeline/nodes/CorrectionInferenceNode.h"
 
-#include "correct/conversions.h"
 #include "correct/decode.h"
 #include "correct/features.h"
 #include "correct/infer.h"
 #include "correct/windows.h"
-#include "hts_utils/bam_utils.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "torch_utils/gpu_profiling.h"
-#include "utils/paf_utils.h"
-#include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
-#include "utils/types.h"
 
-#include <stdexcept>
-#include <unordered_set>
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "hts_utils/FastxRandomReader.h"
-
-#if DORADO_CUDA_BUILD
-#include <c10/cuda/CUDACachingAllocator.h>
-#include <c10/cuda/CUDAGuard.h>
-#endif
 #include <ATen/Tensor.h>
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
@@ -33,10 +18,18 @@
 
 #include <cassert>
 #include <filesystem>
-#include <iostream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#endif
 
 #if DORADO_CUDA_BUILD
 constexpr bool USING_DORADO_CUDA_BUILD = true;
@@ -347,7 +340,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 
     auto remaining_threads = --m_num_active_infer_threads;
     if (remaining_threads == 0) {
-        m_inferred_features_queue.terminate();
+        m_inferred_features_queue.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 
@@ -526,7 +519,7 @@ void CorrectionInferenceNode::input_thread_fn() {
 
     auto remaining_threads = --m_num_active_feature_threads;
     if (remaining_threads == 0) {
-        m_features_queue.terminate();
+        m_features_queue.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 
@@ -606,12 +599,18 @@ CorrectionInferenceNode::CorrectionInferenceNode(
     hts_free(idx_name);
 }
 
-CorrectionInferenceNode::~CorrectionInferenceNode() { stop_input_processing(); }
+CorrectionInferenceNode::~CorrectionInferenceNode() {
+    terminate_impl(utils::AsyncQueueTerminateFast::Yes);
+}
 
 std::string CorrectionInferenceNode::get_name() const { return "CorrectionInferenceNode"; }
 
-void CorrectionInferenceNode::terminate(const TerminateOptions&) {
-    stop_input_processing();
+void CorrectionInferenceNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(utils::terminate_fast(terminate_options.fast));
+}
+
+void CorrectionInferenceNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    stop_input_processing(fast);
     for (auto& infer_thread : m_infer_threads) {
         infer_thread.join();
     }

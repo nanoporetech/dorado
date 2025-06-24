@@ -1,7 +1,6 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/AsyncQueue.h"
 
 #include <atomic>
 #include <cstdint>
@@ -19,7 +18,7 @@ class ModelRunnerBase;
 using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 }  // namespace basecall
 
-class BasecallerNode : public MessageSink {
+class BasecallerNode final : public MessageSink {
     struct BasecallingRead;
     struct BasecallingChunk;
 
@@ -35,12 +34,12 @@ public:
 
     std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions &) override { terminate_impl(); }
+    void terminate(const TerminateOptions &) override;
     void restart() override;
 
 private:
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
     // Consume reads from input queue, chunks them up, and sticks them in the pending list.
     void input_thread_fn();
     // Basecall reads

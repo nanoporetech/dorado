@@ -72,7 +72,7 @@ ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
                              size_t max_reads)
         : MessageSink(max_reads, num_worker_threads), m_splitter(std::move(splitter)) {}
 
-ReadSplitNode::~ReadSplitNode() { stop_input_processing(); }
+ReadSplitNode::~ReadSplitNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
 std::string ReadSplitNode::get_name() const { return "ReadSplitNode"; }
 
@@ -84,7 +84,9 @@ stats::NamedStats ReadSplitNode::sample_stats() const {
     return stats;
 }
 
-void ReadSplitNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+void ReadSplitNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+}
 
 void ReadSplitNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "readsplit_node");

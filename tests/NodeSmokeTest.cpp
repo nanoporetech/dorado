@@ -121,7 +121,7 @@ protected:
             pipeline->push_message(std::move(read));
         }
         // Wait for them to complete.
-        pipeline.reset();
+        pipeline->terminate(dorado::DefaultTerminateOptions());
         // Check that we get the expected number of outputs
         CATCH_CHECK(messages.size() == m_num_messages);
         // Check the message types match

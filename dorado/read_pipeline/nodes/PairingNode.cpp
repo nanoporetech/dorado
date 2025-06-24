@@ -491,7 +491,7 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
 }
 
-PairingNode::~PairingNode() { terminate_impl(); }
+PairingNode::~PairingNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
 
 std::string PairingNode::get_name() const { return "PairingNode"; }
 
@@ -504,10 +504,12 @@ void PairingNode::start_threads() {
     }
 }
 
-void PairingNode::terminate(const TerminateOptions&) { terminate_impl(); }
+void PairingNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(utils::terminate_fast(terminate_options.fast));
+}
 
-void PairingNode::terminate_impl() {
-    terminate_input_queue();
+void PairingNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    terminate_input_queue(fast);
     for (auto& m : m_workers) {
         m.join();
     }

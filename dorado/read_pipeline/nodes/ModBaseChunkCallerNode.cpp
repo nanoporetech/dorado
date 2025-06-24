@@ -1,7 +1,6 @@
 #include "read_pipeline/nodes/ModBaseChunkCallerNode.h"
 
 #include "config/ModBaseModelConfig.h"
-#include "hts_utils/bam_utils.h"
 #include "modbase/ModBaseContext.h"
 #include "modbase/encode_kmer.h"
 #include "read_pipeline/base/messages.h"
@@ -149,7 +148,9 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
     }
 }
 
-ModBaseChunkCallerNode::~ModBaseChunkCallerNode() { terminate_impl(); }
+ModBaseChunkCallerNode::~ModBaseChunkCallerNode() {
+    terminate_impl(utils::AsyncQueueTerminateFast::Yes);
+}
 
 void ModBaseChunkCallerNode::start_threads() {
     m_output_workers.emplace_back([this] { output_thread_fn(); });
@@ -181,12 +182,12 @@ void ModBaseChunkCallerNode::input_thread_fn() {
     }
 }
 
-void ModBaseChunkCallerNode::terminate_impl() {
+void ModBaseChunkCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
     // Signal termination in the input queue, and wait for input threads to join.
-    stop_input_processing();
+    stop_input_processing(fast);
     // Signal termination in the chunk queues.
     for (auto& chunk_queue : m_chunk_queues) {
-        chunk_queue->terminate();
+        chunk_queue->terminate(fast);
     }
     // Wait for runner workers to join, now that they have been asked to via chunk queue
     // termination.
@@ -210,7 +211,9 @@ void ModBaseChunkCallerNode::terminate_impl() {
 
 std::string ModBaseChunkCallerNode::get_name() const { return "ModBaseChunkCallerNode"; }
 
-void ModBaseChunkCallerNode::terminate(const TerminateOptions&) { terminate_impl(); }
+void ModBaseChunkCallerNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(utils::terminate_fast(terminate_options.fast));
+}
 
 void ModBaseChunkCallerNode::restart() {
     m_processed_chunks.restart();
@@ -988,7 +991,7 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
     // model caller also send termination signal to sink
     int num_remaining_callers = --m_num_active_runner_workers;
     if (num_remaining_callers == 0) {
-        m_processed_chunks.terminate();
+        m_processed_chunks.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 

@@ -49,7 +49,7 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
           m_num_simplex_reads_filtered(0),
           m_num_duplex_reads_filtered(0) {}
 
-ReadFilterNode::~ReadFilterNode() { stop_input_processing(); }
+ReadFilterNode::~ReadFilterNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
 std::string ReadFilterNode::get_name() const { return "ReadFilterNode"; }
 
@@ -60,7 +60,9 @@ stats::NamedStats ReadFilterNode::sample_stats() const {
     return stats;
 }
 
-void ReadFilterNode::terminate(const TerminateOptions &) { stop_input_processing(); }
+void ReadFilterNode::terminate(const TerminateOptions &terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+}
 
 void ReadFilterNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "readfilter_node");

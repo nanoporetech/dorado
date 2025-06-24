@@ -20,7 +20,7 @@ public:
     void restart() override;
 
 private:
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
     void input_thread_fn();
 
     std::atomic<size_t> total_tail_lengths_called{0};

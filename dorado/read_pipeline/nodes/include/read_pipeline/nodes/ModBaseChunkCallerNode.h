@@ -2,7 +2,6 @@
 
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/AsyncQueue.h"
 
 #include <spdlog/spdlog.h>
 
@@ -74,7 +73,7 @@ private:
     using PerBaseIntVec = std::array<std::vector<int64_t>, 4>;
 
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
 
     // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();

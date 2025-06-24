@@ -4,12 +4,8 @@
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "utils/context_container.h"
-#include "utils/math_utils.h"
-#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
-
-#include <algorithm>
 
 namespace dorado {
 
@@ -87,13 +83,17 @@ void PolyACalculatorNode::input_thread_fn() {
 PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, size_t max_reads)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)) {}
 
-PolyACalculatorNode::~PolyACalculatorNode() { terminate_impl(); }
+PolyACalculatorNode::~PolyACalculatorNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
 
 std::string PolyACalculatorNode::get_name() const { return "PolyACalculator"; }
 
-void PolyACalculatorNode::terminate_impl() { stop_input_processing(); }
+void PolyACalculatorNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    stop_input_processing(fast);
+}
 
-void PolyACalculatorNode::terminate(const TerminateOptions &) { terminate_impl(); };
+void PolyACalculatorNode::terminate(const TerminateOptions &terminate_options) {
+    terminate_impl(utils::terminate_fast(terminate_options.fast));
+};
 
 void PolyACalculatorNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "polyacalc_node");

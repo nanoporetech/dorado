@@ -152,7 +152,7 @@ CATCH_TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         CATCH_REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-        pipeline.reset();
+        pipeline->terminate(dorado::DefaultTerminateOptions());
         CATCH_CHECK(messages.size() == 0);
     }
 
@@ -166,7 +166,7 @@ CATCH_TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         CATCH_REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-        pipeline.reset();
+        pipeline->terminate(dorado::DefaultTerminateOptions());
         CATCH_CHECK(messages.size() == 0);
     }
 }
@@ -185,6 +185,6 @@ CATCH_TEST_CASE("TerminateRestart", TEST_GROUP) {
     // If we restart we should be able to get another message through.
     pipeline->restart();
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-    pipeline.reset();
+    pipeline->terminate(dorado::DefaultTerminateOptions());
     CATCH_CHECK(messages.size() == 2);
 }

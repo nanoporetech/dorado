@@ -23,7 +23,7 @@ public:
 
 private:
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
     void worker_thread();
     void basespace(const std::string& template_read_id, const std::string& complement_read_id);
 

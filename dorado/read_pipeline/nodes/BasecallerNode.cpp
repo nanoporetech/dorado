@@ -2,7 +2,6 @@
 
 #include "basecall/ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
-#include "models/kits.h"
 #include "read_pipeline/base/read_utils.h"
 #include "read_pipeline/base/stitch.h"
 #include "utils/stats.h"
@@ -134,7 +133,7 @@ void BasecallerNode::input_thread_fn() {
 
     // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
     for (auto &chunk_queue : m_chunk_in_queues) {
-        chunk_queue->terminate();
+        chunk_queue->terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 
@@ -368,7 +367,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         for (auto &runner : m_model_runners) {
             runner->terminate();
         }
-        m_processed_chunks.terminate();
+        m_processed_chunks.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 
@@ -438,7 +437,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
     }
 }
 
-BasecallerNode::~BasecallerNode() { terminate_impl(); }
+BasecallerNode::~BasecallerNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
 
 void BasecallerNode::start_threads() {
     start_input_processing([this] { input_thread_fn(); }, "basecall_node");
@@ -455,8 +454,8 @@ void BasecallerNode::start_threads() {
     m_num_active_model_runners = int(num_workers);
 }
 
-void BasecallerNode::terminate_impl() {
-    stop_input_processing();
+void BasecallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    stop_input_processing(fast);
     for (auto &t : m_basecall_workers) {
         t.join();
     }
@@ -470,6 +469,10 @@ void BasecallerNode::terminate_impl() {
     if (!m_working_reads.empty()) {
         throw std::logic_error("Reads have been left in BasecallerNode");
     }
+}
+
+void BasecallerNode::terminate(const TerminateOptions &terminate_options) {
+    terminate_impl(utils::terminate_fast(terminate_options.fast));
 }
 
 void BasecallerNode::restart() {

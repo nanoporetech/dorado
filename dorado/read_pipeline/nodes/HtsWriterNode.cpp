@@ -1,15 +1,11 @@
 #include "read_pipeline/nodes/HtsWriterNode.h"
 
-#include "read_pipeline/base/ReadPipeline.h"
-#include "utils/sequence_utils.h"
-
 #include <htslib/bgzf.h>
 #include <htslib/kroundup.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <cassert>
-#include <filesystem>
 #include <stdexcept>
 
 namespace dorado {
@@ -23,7 +19,7 @@ HtsWriterNode::HtsWriterNode(utils::HtsFile& file, std::string gpu_names)
     }
 }
 
-HtsWriterNode::~HtsWriterNode() { stop_input_processing(); }
+HtsWriterNode::~HtsWriterNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
 OutputMode HtsWriterNode::get_output_mode(const std::string& mode) {
     if (mode == "sam") {
@@ -127,7 +123,9 @@ stats::NamedStats HtsWriterNode::sample_stats() const {
     return stats;
 }
 
-void HtsWriterNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+void HtsWriterNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+}
 
 void HtsWriterNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "hts_writer");
