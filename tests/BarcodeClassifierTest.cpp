@@ -314,7 +314,7 @@ CATCH_TEST_CASE(
     // Push a type not used by the ClassifierNode.
     pipeline->push_message(std::move(dummy_read_pair));
 
-    pipeline->terminate(DefaultFlushOptions());
+    pipeline->terminate(DefaultTerminateOptions());
 
     constexpr size_t num_expected_messages = 3;
     CATCH_CHECK(messages.size() == num_expected_messages);
@@ -424,7 +424,7 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     auto orig_seq2 = dorado::utils::extract_sequence(read2.get());
     pipeline->push_message(dorado::BamMessage{HtsData{std::move(read2)}, client_info});
 
-    pipeline->terminate(DefaultFlushOptions());
+    pipeline->terminate(DefaultTerminateOptions());
 
     CATCH_CHECK(messages.size() == 2);
 

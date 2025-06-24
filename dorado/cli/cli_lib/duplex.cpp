@@ -787,7 +787,7 @@ int duplex(int argc, char* argv[]) {
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.
-        final_stats = pipeline->terminate(DefaultFlushOptions());
+        final_stats = pipeline->terminate(DefaultTerminateOptions());
 
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();

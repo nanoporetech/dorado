@@ -115,14 +115,14 @@ void Pipeline::push_message(Message &&message) {
     m_nodes.at(source_node_index)->push_message(std::move(message));
 }
 
-stats::NamedStats Pipeline::terminate(const FlushOptions &flush_options) {
+stats::NamedStats Pipeline::terminate(const TerminateOptions &terminate_options) {
     stats::NamedStats final_stats;
     // Nodes must be terminated in source to sink order to ensure all in flight
     // processing is completed, and sources still have valid sinks as they finish
     // work.
     for (auto handle : m_source_to_sink_order) {
         auto &node = m_nodes.at(handle);
-        node->terminate(flush_options);
+        node->terminate(terminate_options);
         auto node_stats = node->sample_stats();
         const auto node_name = node->get_name();
         for (const auto &[name, value] : node_stats) {

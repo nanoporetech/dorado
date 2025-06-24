@@ -68,7 +68,7 @@ public:
     ~ModBaseChunkCallerNode();
     std::string get_name() const override { return "ModBaseChunkCallerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
+    void terminate(const TerminateOptions&) override { terminate_impl(); }
     void restart() override;
 
     static std::optional<int64_t> next_hit(const std::vector<int64_t>& ctx_hit_signal_idxs,

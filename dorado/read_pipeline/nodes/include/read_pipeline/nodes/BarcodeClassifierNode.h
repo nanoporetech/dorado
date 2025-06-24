@@ -24,7 +24,7 @@ public:
     ~BarcodeClassifierNode() { stop_input_processing(); }
     std::string get_name() const override { return "BarcodeClassifierNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { stop_input_processing(); }
+    void terminate(const TerminateOptions&) override { stop_input_processing(); }
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
     }

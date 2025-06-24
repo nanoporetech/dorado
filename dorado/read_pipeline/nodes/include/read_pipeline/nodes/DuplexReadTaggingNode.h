@@ -19,7 +19,7 @@ public:
     DuplexReadTaggingNode();
     ~DuplexReadTaggingNode() { stop_input_processing(); }
     std::string get_name() const override { return "DuplexReadTaggingNode"; }
-    void terminate(const FlushOptions &) override { stop_input_processing(); }
+    void terminate(const TerminateOptions &) override { stop_input_processing(); }
     void restart() override;
 
 private:

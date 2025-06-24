@@ -109,7 +109,7 @@ protected:
         pipeline_desc.add_node<NodeType>({sink}, std::forward<Args>(args)...);
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         if (m_pipeline_restart) {
-            pipeline->terminate(dorado::DefaultFlushOptions());
+            pipeline->terminate(dorado::DefaultTerminateOptions());
             pipeline->restart();
         }
         // Throw some reads at it.

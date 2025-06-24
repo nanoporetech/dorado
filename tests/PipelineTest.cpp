@@ -98,7 +98,7 @@ CATCH_TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
                 : MessageSink(1, 0), m_destruction_order(destruction_order), m_index(index) {}
         ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
-        void terminate(const dorado::FlushOptions&) override {}
+        void terminate(const dorado::TerminateOptions&) override {}
         void restart() override {}
 
     private:
@@ -179,7 +179,7 @@ CATCH_TEST_CASE("TerminateRestart", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     CATCH_REQUIRE(pipeline != nullptr);
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-    pipeline->terminate(dorado::DefaultFlushOptions());
+    pipeline->terminate(dorado::DefaultTerminateOptions());
     // Messages should get through as soon as we have terminated.
     CATCH_CHECK(messages.size() == 1);
     // If we restart we should be able to get another message through.

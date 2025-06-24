@@ -606,7 +606,7 @@ CorrectionInferenceNode::CorrectionInferenceNode(
     hts_free(idx_name);
 }
 
-void CorrectionInferenceNode::terminate(const FlushOptions&) {
+void CorrectionInferenceNode::terminate(const TerminateOptions&) {
     stop_input_processing();
     for (auto& infer_thread : m_infer_threads) {
         infer_thread.join();

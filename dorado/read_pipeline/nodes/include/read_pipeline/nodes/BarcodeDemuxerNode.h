@@ -30,7 +30,7 @@ public:
     ~BarcodeDemuxerNode();
     std::string get_name() const override { return "BarcodeDemuxerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "brcd_demux");
     }

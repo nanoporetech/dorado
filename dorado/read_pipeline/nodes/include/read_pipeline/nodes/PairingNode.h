@@ -41,7 +41,7 @@ public:
     ~PairingNode() { terminate_impl(); }
     std::string get_name() const override { return "PairingNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override;
+    void terminate(const TerminateOptions& terminate_options) override;
     void restart() override;
 
 private:

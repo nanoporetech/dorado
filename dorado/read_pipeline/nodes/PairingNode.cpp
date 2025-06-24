@@ -502,7 +502,7 @@ void PairingNode::start_threads() {
     }
 }
 
-void PairingNode::terminate(const FlushOptions&) { terminate_impl(); }
+void PairingNode::terminate(const TerminateOptions&) { terminate_impl(); }
 
 void PairingNode::terminate_impl() {
     terminate_input_queue();

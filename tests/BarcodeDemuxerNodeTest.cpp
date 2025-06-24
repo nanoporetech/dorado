@@ -69,7 +69,7 @@ CATCH_TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TE
             }
         }
 
-        pipeline->terminate(DefaultFlushOptions());
+        pipeline->terminate(DefaultTerminateOptions());
 
         demux_writer_ref.finalise_hts_files([](size_t) { /* noop */ });
 

@@ -20,7 +20,7 @@ CATCH_TEST_CASE(TEST_GROUP) {
 
     dorado::ResumeLoader loader(sink, sam.string());
     loader.copy_completed_reads();
-    sink.terminate(dorado::DefaultFlushOptions());
+    sink.terminate(dorado::DefaultTerminateOptions());
     CATCH_CHECK(messages.size() == 2);
     auto read_ids = loader.get_processed_read_ids();
     CATCH_CHECK(read_ids.count("002bd127-db82-436f-b828-28567c3d505d") == 1);

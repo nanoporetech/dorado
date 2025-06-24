@@ -33,7 +33,7 @@ public:
     ~ModBaseCallerNode();
     std::string get_name() const override { return "ModBaseCallerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
+    void terminate(const TerminateOptions&) override { terminate_impl(); }
     void restart() override;
     void simplex_mod_call(Message&& message);
     void duplex_mod_call(Message&& message);

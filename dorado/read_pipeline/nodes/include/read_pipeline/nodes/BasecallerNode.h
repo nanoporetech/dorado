@@ -36,7 +36,7 @@ public:
     ~BasecallerNode();
     std::string get_name() const override { return m_node_name; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions &) override { terminate_impl(); }
+    void terminate(const TerminateOptions &) override { terminate_impl(); }
     void restart() override;
 
 private:

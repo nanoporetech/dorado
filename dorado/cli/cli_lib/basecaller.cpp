@@ -634,7 +634,7 @@ void setup(const std::vector<std::string>& args,
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
-    auto final_stats = pipeline->terminate(DefaultFlushOptions());
+    auto final_stats = pipeline->terminate(DefaultTerminateOptions());
 
     // Stop the stats sampler thread before tearing down any pipeline objects.
     // Then update progress tracking one more time from this thread, to

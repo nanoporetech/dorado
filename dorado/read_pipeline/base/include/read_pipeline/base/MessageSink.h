@@ -1,8 +1,8 @@
 #pragma once
 
 #include "ClientInfo.h"
-#include "flush_options.h"
 #include "messages.h"
+#include "terminate_options.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
@@ -44,7 +44,7 @@ public:
     // Waits until work is finished and shuts down worker threads.
     // No work can be done by the node after this returns until
     // restart is subsequently called.
-    virtual void terminate(const FlushOptions& flush_options) = 0;
+    virtual void terminate(const TerminateOptions& terminate_options) = 0;
 
     // Starts or restarts the node following initial setup or a terminate call.
     virtual void restart() = 0;

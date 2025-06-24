@@ -87,7 +87,7 @@ public:
     // Returns stats from nodes' final states.
     // After this is called the pipeline will do no further work processing subsequent inputs,
     // unless restart is called first.
-    stats::NamedStats terminate(const FlushOptions& flush_options);
+    stats::NamedStats terminate(const TerminateOptions& terminate_options);
 
     // Restarts pipeline after a call to terminate.
     void restart();

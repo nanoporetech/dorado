@@ -216,7 +216,7 @@ void AlignerNode::input_thread_fn() {
     }
 }
 
-void AlignerNode::terminate(const FlushOptions&) {
+void AlignerNode::terminate(const TerminateOptions&) {
     stop_input_processing();
     m_task_executor.flush();
 }

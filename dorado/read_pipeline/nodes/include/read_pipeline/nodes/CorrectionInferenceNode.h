@@ -35,7 +35,7 @@ public:
     ~CorrectionInferenceNode() { stop_input_processing(); }
     std::string get_name() const override { return "CorrectionInferenceNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "corr_node");
     }

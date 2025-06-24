@@ -452,7 +452,7 @@ CATCH_TEST_CASE(
     dorado::ReadPair dummy_read_pair;
     pipeline->push_message(std::move(dummy_read_pair));
 
-    pipeline->terminate(DefaultFlushOptions());
+    pipeline->terminate(DefaultTerminateOptions());
 
     const size_t num_expected_messages = 3;
     CATCH_CHECK(messages.size() == num_expected_messages);

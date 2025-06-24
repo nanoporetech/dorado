@@ -19,7 +19,7 @@ public:
                               size_t threads);
     ~BaseSpaceDuplexCallerNode() { terminate_impl(); }
     std::string get_name() const override { return "BaseSpaceDuplexCallerNode"; }
-    void terminate(const FlushOptions&) override { terminate_impl(); }
+    void terminate(const TerminateOptions&) override { terminate_impl(); }
     void restart() override;
 
 private:

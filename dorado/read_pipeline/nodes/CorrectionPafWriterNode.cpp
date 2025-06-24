@@ -27,6 +27,6 @@ void CorrectionPafWriterNode::input_thread_fn() {
     }
 }
 
-void CorrectionPafWriterNode::terminate(const FlushOptions &) { stop_input_processing(); }
+void CorrectionPafWriterNode::terminate(const TerminateOptions &) { stop_input_processing(); }
 
 }  // namespace dorado

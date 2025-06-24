@@ -41,7 +41,7 @@ public:
     ~AlignerNode() { stop_input_processing(); }
     std::string get_name() const override { return "AlignerNode"; }
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
 
     alignment::HeaderSequenceRecords get_sequence_records_for_header() const;

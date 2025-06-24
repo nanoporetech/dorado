@@ -30,7 +30,7 @@ public:
     ~SubreadIdTaggerNode() { stop_input_processing(); }
 
     std::string get_name() const override { return "SubreadIdTagger"; }
-    void terminate(const FlushOptions &) override { stop_input_processing(); };
+    void terminate(const TerminateOptions &) override { stop_input_processing(); };
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "subreadidtagger_node");
     }
@@ -82,7 +82,7 @@ protected:
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
-        pipeline->terminate(DefaultFlushOptions());
+        pipeline->terminate(DefaultTerminateOptions());
 
         auto &writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);
         stats = writer_ref.sample_stats();
