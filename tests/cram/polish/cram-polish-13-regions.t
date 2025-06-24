@@ -6,9 +6,10 @@ Region string is empty. This should fail.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "Option --regions is specified, but an empty set of regions is given" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  1
+  [error] Option --regions is specified, but an empty set of regions is given!
 
 Region: full length of the input chromosome.
   $ rm -rf out; mkdir -p out
@@ -23,6 +24,8 @@ Region: full length of the input chromosome.
   > samtools faidx out/out.fastq
   > cut -f 2,2 out/out.fastq.fai
   > grep "Copying contig verbatim from input" out/out.fastq.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fastq.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fastq.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   NM:i:2
   9998
@@ -40,6 +43,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 0-10000
   contig_1_0 9998
@@ -52,9 +57,10 @@ Unknown contig name is specified.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "nonexistent_contig" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: sequence name for region 'nonexistent_contig:0--1' does not exist in the input sequence file.
+  [error] Region validation failed: sequence name for region 'nonexistent_contig:0--1' does not exist in the input sequence file.
 
 Failing region: input region ends after contig length.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -65,9 +71,10 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:1-999999" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: coordinates for region 'contig_1:1-999999' are not valid. Sequence length: 10000
+  [error] Region validation failed: coordinates for region 'contig_1:1-999999' are not valid. Sequence length: 10000
 
 Region: only the start coordinate is specified. Clamp to [start, contig_len] interval.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -81,7 +88,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 499-10000
   contig_1_0 9499
@@ -98,6 +106,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 0-500
   contig_1_0 500
@@ -110,9 +120,10 @@ Region completely out of coordinate range of the target.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:50000-55000" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: coordinates for region 'contig_1:50000-55000' are not valid. Sequence length: 10000
+  [error] Region validation failed: coordinates for region 'contig_1:50000-55000' are not valid. Sequence length: 10000
 
 Single valid region is specified.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -126,6 +137,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 6999-7200
   contig_1_0 201
@@ -142,6 +155,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 0-500
   contig_1_1 6999-7200
@@ -167,7 +182,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 6999-7200
   contig_1_0 201
@@ -184,6 +200,8 @@ If there was an off-by-one edge case (e.g. non-inclusive end coordinate), this w
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 0-7200
   contig_1_0 7198
@@ -197,9 +215,10 @@ Fails because region overlap is not allowed.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:1-500,contig_1:501-7200,contig_1:7001-7100,contig_1:8123-8124" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
+  [error] Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
 
 Zero length region.
   $ rm -rf out; mkdir -p out
@@ -209,9 +228,10 @@ Zero length region.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:1-500,contig_1:502-501,contig_1:7001-7100,contig_1:8123-8124" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: coordinates for region 'contig_1:502-501' are not valid. Sequence length: 10000
+  [error] Region validation failed: coordinates for region 'contig_1:502-501' are not valid. Sequence length: 10000
 
 Wrong region coordinates.
   $ rm -rf out; mkdir -p out
@@ -221,9 +241,10 @@ Wrong region coordinates.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions "contig_1:700-500" -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: coordinates for region 'contig_1:700-500' are not valid. Sequence length: 10000
+  [error] Region validation failed: coordinates for region 'contig_1:700-500' are not valid. Sequence length: 10000
 
 Loading from a BED file with multiple regions.
 Evaluate using the "--no-gap-fill" to get only the polished region.
@@ -240,6 +261,8 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 0-500
   contig_1_1 6999-7200
@@ -258,9 +281,10 @@ Evaluate using the "--no-gap-fill" to get only the polished region.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions out/in.bed -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "Option --regions is specified, but an empty set of regions is given" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  1
+  [error] Option --regions is specified, but an empty set of regions is given!
 
 Loading from a BED file with adjacent regions but with no overlap.
 Checks that the interval coordinates internally are represented well.
@@ -276,6 +300,8 @@ Checks that the interval coordinates internally are represented well.
   > grep ">" out/out.fasta | tr -d ">"
   > samtools faidx out/out.fasta
   > awk '{ print $1,$2 }' out/out.fasta.fai
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1_0 0-7200
   contig_1_0 7198
@@ -293,6 +319,7 @@ Fails because region overlap is not allowed.
   > ${DORADO_BIN} polish --device cpu ${in_dir}/calls_to_draft.bam ${in_dir}/draft.fasta.gz ${model_var} --no-fill-gaps --regions out/in.bed -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.
+  [error] Region validation failed: region 'contig_1:501-7200' overlaps other regions. Regions have to be unique.

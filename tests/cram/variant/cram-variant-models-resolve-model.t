@@ -1,3 +1,14 @@
+Data construction.
+Create a very small synthetic input BAM file of only one record.
+Reason: reducing the inference time for successful tests.
+  $ rm -rf data; mkdir -p data
+  > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam=${in_dir}/in.aln.bam
+  > samtools view -H ${in_bam} > data/in.micro.sam
+  > samtools view ${in_bam} | head -n 1 >> data/in.micro.sam
+  > samtools view -Sb data/in.micro.sam | samtools sort > data/in.micro.bam
+  > samtools index data/in.micro.bam
+
 ###################################################
 ### Test auto-resolve for all available models  ###
 ### from the input BAM file.                    ###
@@ -5,22 +16,24 @@
 HAC. Auto-resolve the `dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0` model from the BAM file and download it.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
-  > in_bam=${in_dir}/in.aln.bam
+  > in_bam="data/in.micro.bam"
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > ${DORADO_BIN} variant --device cpu ${in_bam} ${in_ref} -t 4 -v > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
   > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
   1
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Attempt to download a model which is not available.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > ### Create the synthetic data with no dwells.
-  > samtools view -h ${in_dir}/in.aln.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_sup@v5.0.0/g' | samtools view -Sb > out/in.modified.bam
+  > samtools view -h data/in.micro.bam | sed 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_sup@v5.0.0/g' | samtools view -Sb > out/in.modified.bam
   > samtools index out/in.modified.bam
   > ### Run the unit under test.
   > in_bam=out/in.modified.bam
@@ -29,11 +42,13 @@ Attempt to download a model which is not available.
   > echo "Exit code: $?"
   > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   0
   0
-  Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0'.
+  [error] Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0'.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 ##############################################
 ### Test auto-resolve from the Basecaller  ###
@@ -43,47 +58,53 @@ Attempt to download a model which is not available.
 Resolve the model from a Basecaller model name `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
-  > in_bam=${in_dir}/in.aln.bam
+  > in_bam="data/in.micro.bam"
   > in_ref=${in_dir}/in.ref.fasta.gz
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
-  > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 -v > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4  --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
   > grep "Resolved model from user-specified basecaller model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
   1
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Resolve the model from an exact Variant Calling model name.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
-  > in_bam=${in_dir}/in.aln.bam
+  > in_bam="data/in.micro.bam"
   > in_ref=${in_dir}/in.ref.fasta.gz
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0"
-  > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 -v > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
   > grep "Resolved model from user-specified variant calling model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
   1
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Resolve the model from a local path.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
-  > in_bam=${in_dir}/in.aln.bam
+  > in_bam="data/in.micro.bam"
   > in_ref=${in_dir}/in.ref.fasta.gz
   > model=${MODEL_DIR}
-  > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 -v > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
   > grep "Resolved model from user-specified path: " out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
   0
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 ##############################################
 ### Compatibility checks.                  ###
@@ -91,10 +112,11 @@ Resolve the model from a local path.
 Negative test: no dwells in data, but the model uses them for polishing.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0"
   > ### Create the synthetic data with no dwells.
-  > samtools view -H ${in_dir}/in.aln.bam > out/in.no_dwells.sam
-  > samtools view ${in_dir}/in.aln.bam | cut -f1-11 >> out/in.no_dwells.sam
+  > samtools view -H ${in_bam} > out/in.no_dwells.sam
+  > samtools view ${in_bam} | cut -f1-11 >> out/in.no_dwells.sam
   > samtools view -Sb out/in.no_dwells.sam > out/in.no_dwells.bam
   > samtools index out/in.no_dwells.bam
   > ### Run the unit under test.
@@ -114,9 +136,10 @@ Negative test: no dwells in data, but the model uses them for polishing.
 Negative test: Basecaller model specified in the BAM does not match the Basecaller model specified in the Variant Calling model.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model=${MODEL_DIR}
   > ### Create the mocked data for a non-supported basecaller version (1.0.0).
-  > samtools view -h ${in_dir}/in.aln.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
+  > samtools view -h ${in_bam} | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > in_bam=out/in.bam
@@ -134,16 +157,17 @@ Passing test with warnings: no dwells in data, but the model uses them for polis
 Using `--skip-model-compatibility-check`.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0"
   > ### Create the synthetic data with no dwells.
-  > samtools view -H ${in_dir}/in.aln.bam > out/in.no_dwells.sam
-  > samtools view ${in_dir}/in.aln.bam | cut -f1-11 >> out/in.no_dwells.sam
+  > samtools view -H ${in_bam} > out/in.no_dwells.sam
+  > samtools view ${in_bam} | cut -f1-11 >> out/in.no_dwells.sam
   > samtools view -Sb out/in.no_dwells.sam > out/in.no_dwells.bam
   > samtools index out/in.no_dwells.bam
   > ### Run the unit under test.
   > in_bam=out/in.no_dwells.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > ${DORADO_BIN} variant --model "${model}" --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model "${model}" --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model from user-specified variant calling model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
@@ -158,14 +182,15 @@ Passing test with warnings: Basecaller model specified in the BAM does not match
 Using `--skip-model-compatibility-check`.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model=${MODEL_DIR}
   > ### Create the mocked data for a non-supported basecaller version (1.0.0).
-  > samtools view -h ${in_dir}/in.aln.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
+  > samtools view -h ${in_bam} | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > in_bam=out/in.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > ${DORADO_BIN} variant --model ${model} --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model ${model} --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
@@ -180,7 +205,7 @@ Negative test: A Polishing model is provided instead of a Variant Calling model.
   > model=out/dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > ### Run the unit under test.
-  > in_bam=${in_dir}/in.aln.bam
+  > in_bam="data/in.micro.bam"
   > in_ref=${in_dir}/in.ref.fasta.gz
   > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
@@ -198,9 +223,9 @@ Using `--skip-model-compatibility-check`.
   > model=out/dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > ### Run the unit under test.
-  > in_bam=${in_dir}/in.aln.bam
+  > in_bam="data/in.micro.bam"
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > ${DORADO_BIN} variant --model ${model} --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model ${model} --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
@@ -215,67 +240,82 @@ Using `--skip-model-compatibility-check`.
 Negative test: Cannot resolve the model, it does not match a Basecaller model, a Variant Calling model, a path nor is it 'auto'.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model="unknown"
   > ### Run the unit under test.
-  > ${DORADO_BIN} variant --model "${model}" --device cpu ${in_dir}/in.aln.bam ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model "${model}" --device cpu ${in_bam} ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Could not resolve model from string: 'unknown'.
+  [error] Could not resolve model from string: 'unknown'.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: Empty model string provided.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > ### Run the unit under test.
-  > ${DORADO_BIN} variant --model "" --device cpu ${in_dir}/in.aln.bam ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
+  > ${DORADO_BIN} variant --model "" --device cpu ${in_bam} ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Could not resolve model from string: ''.
+  [error] Could not resolve model from string: ''.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: BAM has a model which is not available for download in auto mode.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model="auto"
   > ### Create the mocked data for a non-supported basecaller version (1.0.0).
-  > samtools view -h ${in_dir}/in.aln.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
+  > samtools view -h ${in_bam} | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > ${DORADO_BIN} variant --model "${model}" --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
+  [error] Could not find any variant calling model compatible with the basecaller model 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: using 'auto' but the BAM has no models listed (no RG tags).
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model="auto"
   > ### Create the mocked data, remove the @RG lines.
-  > samtools view -h ${in_dir}/in.aln.bam | grep -v "@RG" | samtools view -Sb > out/in.bam
+  > samtools view -h ${in_bam} | grep -v "@RG" | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > ${DORADO_BIN} variant --model "${model}" --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Input BAM file has no basecaller models listed in the header.
+  [error] Input BAM file has no basecaller models listed in the header.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
 
 Negative test: Using `auto` and `--skip-model-compatibility-check`, but BAM has no models listed (no RG tags), so this should fail even without compatibility check.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam="data/in.micro.bam"
   > model="auto"
   > ### Create the mocked data, remove the @RG lines.
-  > samtools view -h ${in_dir}/in.aln.bam | grep -v "@RG" | samtools view -Sb > out/in.bam
+  > samtools view -h ${in_bam} | grep -v "@RG" | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
   > ${DORADO_BIN} variant --model "${model}" --skip-model-compatibility-check --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[error\] //g'
+  > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.
+  [error] Input BAM file has no basecaller models listed in the header. Cannot use 'auto' to resolve the model.
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
