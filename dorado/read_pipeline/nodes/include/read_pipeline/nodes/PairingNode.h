@@ -84,9 +84,8 @@ private:
 
     // Members for pair_generating method
 
-    std::mutex m_pairing_mtx;
-
     // individual read caches per client, keyed by client_id
+    std::mutex m_read_caches_mutex;
     std::unordered_map<int32_t, ReadCache> m_read_caches;
 
     /**

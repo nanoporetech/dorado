@@ -261,7 +261,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<CacheFlushMessage>(message)) {
-            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            std::unique_lock<std::mutex> lock(m_read_caches_mutex);
             auto flush_message = std::get<CacheFlushMessage>(message);
             auto& read_cache = m_read_caches[flush_message.client_id];
             for (auto& [key, reads_list] : read_cache.channel_read_map) {
@@ -292,7 +292,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         std::string flowcell_id = read->read_common.flowcell_id;
         int32_t client_id = read->read_common.client_info->client_id();
 
-        std::unique_lock<std::mutex> lock(m_pairing_mtx);
+        std::unique_lock<std::mutex> lock(m_read_caches_mutex);
 
         auto& read_cache = m_read_caches[client_id];
         UniquePoreIdentifierKey key = std::make_tuple(channel, run_id, flowcell_id);
@@ -428,7 +428,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
 
     if (--m_num_active_worker_threads == 0) {
         {
-            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            std::unique_lock<std::mutex> lock(m_read_caches_mutex);
             // There are still reads in channel_read_map. Push them to the sink.
             // Last thread alive is responsible for cleaning up the cache.
             for (auto& [client_id, read_cache] : m_read_caches) {
