@@ -19,7 +19,7 @@ dorado_add_library(
         variant_calling.cpp
         window.cpp
     DEPENDS_PUBLIC
-        dorado_hts_io
+        dorado_hts_utils
         dorado_secondary_common
         dorado_secondary_features
         dorado_torch_utils

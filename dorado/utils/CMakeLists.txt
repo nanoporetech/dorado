@@ -7,7 +7,6 @@ dorado_add_library(
         alignment_utils.h
         arg_parse_ext.h
         AsyncQueue.h
-        bam_utils.h
         barcode_kits.h
         basecaller_utils.h
         cigar.h
@@ -21,16 +20,13 @@ dorado_add_library(
         dev_utils.h
         fasta_fastq_utils.h
         fasta_reader.h
-        fastq_reader.h
         fs_utils.h
         gzip_reader.h
-        hts_file.h
         jthread.h
         locale_utils.h
         log_utils.h
         math_utils.h
         memory_utils.h
-        MergeHeaders.h
         overlap.h
         parameters.h
         PostCondition.h
@@ -48,7 +44,6 @@ dorado_add_library(
         types.h
         uuid_utils.h
         paf_utils.h
-        fai_utils.h
         container_utils.h
         io_utils.h
         rle.h
@@ -56,7 +51,6 @@ dorado_add_library(
         span.h
     SOURCES_PRIVATE
         alignment_utils.cpp
-        bam_utils.cpp
         barcode_kits.cpp
         basecaller_utils.cpp
         cigar.cpp
@@ -67,14 +61,11 @@ dorado_add_library(
         dev_utils.cpp
         fasta_fastq_utils.cpp
         fasta_reader.cpp
-        fastq_reader.cpp
         fs_utils.cpp
         gzip_reader.cpp
-        hts_file.cpp
         locale_utils.cpp
         log_utils.cpp
         memory_utils.cpp
-        MergeHeaders.cpp
         parameters.cpp
         SampleSheet.cpp
         scoped_trace_log.cpp
@@ -84,10 +75,8 @@ dorado_add_library(
         sys_utils.cpp
         thread_utils.cpp
         time_utils.cpp
-        types.cpp
         uuid_utils.cpp
         paf_utils.cpp
-        fai_utils.cpp
         container_utils.cpp
         io_utils.cpp
     DEPENDS_PUBLIC
@@ -99,7 +88,6 @@ dorado_add_library(
         spdlog::spdlog
     DEPENDS_PRIVATE
         dorado_compat
-        htslib
         minimap2
     NO_TORCH
 )

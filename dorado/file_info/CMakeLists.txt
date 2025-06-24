@@ -9,6 +9,7 @@ dorado_add_library(
         file_info.cpp
     DEPENDS_PUBLIC
         dorado_models_lib
+        dorado_hts_utils
         dorado_utils
     DEPENDS_PRIVATE
         pod5_libs

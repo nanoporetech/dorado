@@ -1,15 +1,20 @@
-#include "utils/bam_utils.h"
+#include "hts_utils/bam_utils.h"
 
+#include "hts_utils/KString.h"
 #include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
 
+#include <edlib.h>
 #include <htslib/sam.h>
+#include <minimap.h>
 
 #include <algorithm>
+#include <cassert>
 #include <cctype>
 #include <iostream>
 #include <map>
+#include <numeric>
 #include <sstream>
 #include <string>
 #include <string_view>
@@ -513,6 +518,181 @@ void remove_alignment_tags_from_record(bam1_t* record) {
             aux_ptr = bam_aux_next(record, aux_ptr);
         }
     }
+}
+
+// Query is the read that the moves table is associated with. A new moves table will be generated
+// Which is aligned to the target sequence.
+std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
+                                                         const std::string& target_sequence,
+                                                         const std::vector<uint8_t>& moves) {
+    assert(static_cast<int>(query_sequence.length()) ==
+           std::accumulate(moves.begin(), moves.end(), 0));
+
+    // We are going to compute the overlap between the two reads
+    MmTbufPtr working_buffer;
+    const auto overlap_result =
+            compute_overlap(query_sequence, "query", target_sequence, "target", working_buffer);
+
+    // clang-tidy warns about performance-no-automatic-move if |failed_realignment| is const. It should be treated as such though.
+    /*const*/ auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
+    // No overlap was computed, so return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
+    if (!overlap_result) {
+        return failed_realignment;
+    }
+    auto query_start = overlap_result->query_start;
+    auto target_start = overlap_result->target_start;
+    const auto query_end = overlap_result->query_end;
+    const auto target_end = overlap_result->target_end;
+
+    // Advance the query and target position so that their first nucleotide is identical
+    while (query_sequence[target_start] != target_sequence[query_start]) {
+        ++query_start;
+        ++target_start;
+        if (static_cast<size_t>(target_start) >= query_sequence.length() ||
+            static_cast<size_t>(query_start) >= target_sequence.length()) {
+            return failed_realignment;
+        }
+    }
+
+    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
+    align_config.task = EDLIB_TASK_PATH;
+
+    auto target_sequence_component =
+            target_sequence.substr(query_start, query_end - query_start + 1);
+    auto query_sequence_component =
+            query_sequence.substr(target_start, target_end - target_start + 1);
+
+    EdlibAlignResult edlib_result = edlibAlign(
+            target_sequence_component.data(), static_cast<int>(target_sequence_component.length()),
+            query_sequence_component.data(), static_cast<int>(query_sequence_component.length()),
+            align_config);
+
+    // Check if alignment failed (edlib_result.startLocations is null)
+    if (edlib_result.startLocations == nullptr) {
+        // Free the memory allocated by edlibAlign
+        edlibFreeAlignResult(edlib_result);
+
+        // Return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
+        return failed_realignment;
+    }
+
+    // Let's keep two cursor positions - one for the new move table which we are building, and one for the old where we track where we got to
+    int new_move_cursor = 0;
+    int old_move_cursor = 0;
+
+    // First step is to advance the moves table to the start of the aligment in the query.
+    int moves_found = 0;
+
+    for (int i = 0; i < int(moves.size()); i++) {
+        moves_found += moves[i];
+        if (moves_found == target_start + 1) {
+            break;
+        }
+        old_move_cursor++;
+    }
+
+    int old_moves_offset =
+            old_move_cursor;  // Cursor indicating where the move table should now start
+
+    const auto alignment_size =
+            static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]) + 1;
+    // Now that we have the alignment, we need to compute the new move table, by walking along the alignment
+    std::vector<uint8_t> new_moves;
+    for (size_t i = 0; i < alignment_size; i++) {
+        auto alignment_entry = edlib_result.alignment[i];
+        if ((alignment_entry == 0) || (alignment_entry == 3)) {  // Match or mismatch
+            // Need to update the new move table and move the cursor of the old move table.
+            new_moves.push_back(1);  // We have a match so we need a 1 (move)
+            new_move_cursor++;
+            old_move_cursor++;
+
+            while ((old_move_cursor < int(moves.size())) && moves[old_move_cursor] == 0) {
+                if (old_move_cursor < (new_move_cursor + old_moves_offset)) {
+                    old_move_cursor++;
+                } else {
+                    // If we have a zero in the old move table, we need to add zeros to the new move table to make it up
+                    new_moves.push_back(0);
+                    new_move_cursor++;
+                    old_move_cursor++;
+                }
+            }
+            // Update the Query and target seq cursors
+        } else if (alignment_entry == 1) {  // Insertion to target
+            // If we have an insertion in the target, we need to add a 1 to the new move table, and increment the new move table cursor. the old move table cursor and new are now out of sync and need fixing.
+            new_moves.push_back(1);
+            new_move_cursor++;
+        } else if (alignment_entry == 2) {  // Insertion to Query
+            // We have a query insertion, all we need to do is add zeros to the new move table to make it up, the signal can be assigned to the leftmost nucleotide in the sequence.
+            new_moves.push_back(0);
+            new_move_cursor++;
+            old_move_cursor++;
+            while ((old_move_cursor < int(moves.size())) && moves[old_move_cursor] == 0) {
+                new_moves.push_back(0);
+                old_move_cursor++;
+                new_move_cursor++;
+            }
+        }
+    }
+
+    edlibFreeAlignResult(edlib_result);
+
+    return std::make_tuple(old_moves_offset, query_start, std::move(new_moves));
+}
+
+std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
+                                             const std::string& query_name,
+                                             const std::string& target_seq,
+                                             const std::string& target_name,
+                                             MmTbufPtr& working_buffer) {
+    std::optional<OverlapResult> overlap_result;
+
+    // Add mm2 based overlap check.
+    mm_idxopt_t idx_opt;
+    mm_mapopt_t map_opt;
+    mm_set_opt(0, &idx_opt, &map_opt);
+    mm_set_opt("map-hifi", &idx_opt, &map_opt);
+
+    // Equivalent to "--cap-kalloc 100m --cap-sw-mem 50m"
+    map_opt.cap_kalloc = 100'000'000;
+    map_opt.max_sw_mat = 50'000'000;
+
+    const char* seqs[] = {query_seq.c_str()};
+    const char* names[] = {query_name.c_str()};
+    mm_idx_t* index = mm_idx_str(idx_opt.w, idx_opt.k, 0, idx_opt.bucket_bits, 1, seqs, names);
+    mm_mapopt_update(&map_opt, index);
+
+    if (!working_buffer) {
+        working_buffer = MmTbufPtr(mm_tbuf_init());
+    }
+
+    int hits = 0;
+    mm_reg1_t* reg = mm_map(index, int(target_seq.length()), target_seq.c_str(), &hits,
+                            working_buffer.get(), &map_opt, target_name.c_str());
+
+    mm_idx_destroy(index);
+
+    if (hits > 0) {
+        OverlapResult result;
+
+        auto best_map = std::max_element(
+                reg, reg + hits,
+                [](const mm_reg1_t& l, const mm_reg1_t& r) { return l.mapq < r.mapq; });
+        result.target_start = best_map->rs;
+        result.target_end = best_map->re;
+        result.query_start = best_map->qs;
+        result.query_end = best_map->qe;
+        result.mapq = best_map->mapq;
+        result.rev = best_map->rev;
+
+        overlap_result = result;
+    }
+
+    for (int i = 0; i < hits; ++i) {
+        free(reg[i].p);
+    }
+    free(reg);
+
+    return overlap_result;
 }
 
 }  // namespace dorado::utils

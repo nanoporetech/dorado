@@ -1,12 +1,11 @@
 #pragma once
 
 #include "correct/types.h"
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "read_pipeline/base/MessageSink.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
-#include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 

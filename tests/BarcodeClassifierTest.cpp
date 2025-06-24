@@ -5,12 +5,12 @@
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -308,7 +308,7 @@ CATCH_TEST_CASE(
     pipeline->push_message(std::move(read));
     // Push BamPtr type.
     for (auto& rec : records) {
-        pipeline->push_message(BamMessage{BamPtr(std::move(rec)), client_info});
+        pipeline->push_message(BamMessage{HtsData(BamPtr(std::move(rec))), client_info});
     }
     dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.
@@ -331,7 +331,7 @@ CATCH_TEST_CASE(
     for (auto& message : messages) {
         if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
-            bam1_t* rec = bam_message.bam_ptr.get();
+            bam1_t* rec = bam_message.data.bam_ptr.get();
 
             // Check trimming on the bam1_t struct.
             CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(rec, "BC")), Equals(expected_bc));
@@ -415,23 +415,23 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     BamPtr read1(bam_dup1(reader.record.get()));
     std::string id_in1 = bam_get_qname(read1.get());
     auto orig_seq1 = dorado::utils::extract_sequence(read1.get());
-    pipeline->push_message(dorado::BamMessage{std::move(read1), client_info});
+    pipeline->push_message(dorado::BamMessage{HtsData(std::move(read1)), client_info});
 
     // Second read should be classified.
     reader.read();
     BamPtr read2(bam_dup1(reader.record.get()));
     std::string id_in2 = bam_get_qname(read2.get());
     auto orig_seq2 = dorado::utils::extract_sequence(read2.get());
-    pipeline->push_message(dorado::BamMessage{std::move(read2), client_info});
+    pipeline->push_message(dorado::BamMessage{HtsData(std::move(read2)), client_info});
 
     pipeline->terminate(DefaultFlushOptions());
 
     CATCH_CHECK(messages.size() == 2);
 
     auto bam_message = std::get<BamMessage>(std::move(messages[0]));
-    read1 = std::move(bam_message.bam_ptr);
+    read1 = std::move(bam_message.data.bam_ptr);
     bam_message = std::get<BamMessage>(std::move(messages[1]));
-    read2 = std::move(bam_message.bam_ptr);
+    read2 = std::move(bam_message.data.bam_ptr);
 
     // Reads may not come back in the same order.
     std::string id_out1 = bam_get_qname(read1.get());

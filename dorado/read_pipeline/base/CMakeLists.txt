@@ -23,6 +23,7 @@ dorado_add_library(
         stereo_features.h
         stitch.cpp
     DEPENDS_PUBLIC
+        dorado_hts_utils
         dorado_models_lib
         dorado_torch_utils
         dorado_utils

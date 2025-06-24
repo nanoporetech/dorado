@@ -2,18 +2,11 @@
 
 #include <array>
 #include <functional>
-#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
 #include <vector>
-
-struct bam1_t;
-struct htsFile;
-struct mm_tbuf_s;
-struct sam_hdr_t;
-struct kstring_t;
 
 namespace dorado {
 
@@ -73,26 +66,6 @@ struct AlignmentResult {
               mapping_quality(255) {}
 };
 
-struct BarcodeScoreResult {
-    int penalty = -1;
-    int top_penalty = -1;
-    int bottom_penalty = -1;
-    float top_barcode_score = -1.f;
-    float bottom_barcode_score = -1.f;
-    float barcode_score = -1.f;
-    float flank_score = -1.f;
-    float top_flank_score = -1.f;
-    float bottom_flank_score = -1.f;
-    bool use_top = false;
-    std::string barcode_name = UNCLASSIFIED;
-    std::string kit = UNCLASSIFIED;
-    std::string barcode_kit = UNCLASSIFIED;
-    std::string variant = "n/a";
-    std::pair<int, int> top_barcode_pos = {-1, -1};
-    std::pair<int, int> bottom_barcode_pos = {-1, -1};
-    bool found_midstrand = false;
-};
-
 struct SingleEndResult {
     float score = -1.f;
     std::string name = UNCLASSIFIED;
@@ -104,115 +77,7 @@ struct AdapterScoreResult {
     SingleEndResult rear;
 };
 
-struct ReadGroup {
-    std::string run_id;
-    std::string basecalling_model;
-    std::string modbase_models;
-    std::string flowcell_id;
-    std::string device_id;
-    std::string exp_start_time;
-    std::string sample_id;
-    std::string position_id;
-    std::string experiment_id;
-};
-
-enum class StrandOrientation : int {
-    REVERSE = -1,  ///< "-" orientation
-    UNKNOWN = 0,   ///< "?" orientation
-    FORWARD = 1,   ///< "+" orientation
-};
-
-inline char to_char(const StrandOrientation orientation) {
-    switch (orientation) {
-    case StrandOrientation::REVERSE:
-        return '-';
-    case StrandOrientation::FORWARD:
-        return '+';
-    case StrandOrientation::UNKNOWN:
-        return '?';
-    default:
-        throw std::runtime_error("Invalid orientation value " + std::to_string(int(orientation)));
-    }
-}
-
-struct PrimerClassification {
-    std::string primer_name = UNCLASSIFIED;
-    std::string umi_tag_sequence{};
-    StrandOrientation orientation = StrandOrientation::UNKNOWN;
-};
-
 using BarcodeFilterSet = std::optional<std::unordered_set<std::string>>;
-
-struct BamDestructor {
-    void operator()(bam1_t *);
-};
-using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
-
-struct MmTbufDestructor {
-    void operator()(mm_tbuf_s *);
-};
-using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
-
-struct SamHdrDestructor {
-    void operator()(sam_hdr_t *);
-};
-using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
-
-struct HtsFileDestructor {
-    void operator()(htsFile *);
-};
-using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
-
-/// Wrapper for htslib kstring_t struct.
-class KString {
-public:
-    /** Contains an uninitialized kstring_t.
-     *  Useful for later assigning to a kstring_t returned by an htslib
-     *  API function. If you need to pass object to an API function which
-     *  will put data in it, then use the pre-allocate constructor instead,
-     *  to avoid library conflicts on windows.
-     */
-    KString();
-
-    /** Pre-allocate the string with n bytes of storage. If you pass the kstring
-     *  into an htslib API function that would resize the kstring_t object as
-     *  needed, when the API function does the resize this can result in
-     *  strange errors like stack corruption due to differences between the
-     *  implementation in the compiled library, and the implementation compiled
-     *  into your C++ code using htslib macros. So make sure you pre-allocate
-     *  with enough memory to insure that no resizing will be needed.
-     */
-    KString(size_t n);
-
-    /** This object owns the storage in the internal kstring_t object.
-     *  To avoid reference counting, we don't allow this object to be copied.
-     */
-    KString(const KString &) = delete;
-
-    /** Take ownership of the data in the kstring_t object.
-     *  Note that it is an error to create more than one KString object
-     *  that owns the same kstring_t data.
-     */
-    KString(kstring_t &&data) noexcept;
-
-    /// Move Constructor
-    KString(KString &&other) noexcept;
-
-    /// No copying allowed.
-    KString &operator=(const KString &) = delete;
-
-    /// Move assignment.
-    KString &operator=(KString &&rhs) noexcept;
-
-    /// Destroys the kstring_t data.
-    ~KString();
-
-    /// Returns the kstring_t object that points to the internal data.
-    kstring_t &get() const;
-
-private:
-    std::unique_ptr<kstring_t> m_data;
-};
 
 enum class ReadOrder { UNRESTRICTED, BY_CHANNEL, BY_TIME };
 

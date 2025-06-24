@@ -18,6 +18,7 @@ dorado_add_library(
     DEPENDS_PUBLIC
         dorado_models_lib
     DEPENDS_PRIVATE
+        dorado_hts_utils
         dorado_utils
         spdlog::spdlog
         toml11::toml11

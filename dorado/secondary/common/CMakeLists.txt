@@ -20,6 +20,7 @@ dorado_add_library(
         variant.cpp
         vcf_writer.cpp
     DEPENDS_PUBLIC
+        dorado_hts_utils
         dorado_torch_utils
         dorado_utils
     DEPENDS_PRIVATE

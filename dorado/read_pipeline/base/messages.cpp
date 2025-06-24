@@ -1,8 +1,8 @@
 #include "read_pipeline/base/messages.h"
 
+#include "hts_utils/bam_utils.h"
 #include "modbase/ModBaseContext.h"
 #include "stereo_features.h"
-#include "utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"

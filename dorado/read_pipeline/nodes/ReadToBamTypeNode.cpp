@@ -39,9 +39,9 @@ void ReadToBamTypeNode::input_thread_fn() {
         auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold,
                                                        is_duplex_parent);
         for (auto& aln : alns) {
-            BamMessage bam_msg{std::move(aln), read_common_data.client_info};
-            bam_msg.sequencing_kit = read_common_data.sequencing_kit;
-            bam_msg.subread_id = read_common_data.subread_id;
+            BamMessage bam_msg{HtsData(std::move(aln)), read_common_data.client_info};
+            bam_msg.data.sequencing_kit = read_common_data.sequencing_kit;
+            bam_msg.data.subread_id = read_common_data.subread_id;
             send_message_to_sink(std::move(bam_msg));
         }
     }

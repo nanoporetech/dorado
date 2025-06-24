@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "hts_types.h"
 
 #include <algorithm>
 #include <filesystem>

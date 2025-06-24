@@ -2,8 +2,8 @@
 #pragma once
 
 #include "dorado_version.h"
+#include "hts_utils/bam_utils.h"
 #include "utils/arg_parse_ext.h"
-#include "utils/bam_utils.h"
 
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"

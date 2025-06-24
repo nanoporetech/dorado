@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hts_utils/hts_types.h"
 #include "models/kits.h"
 #include "utils/cigar.h"
 #include "utils/overlap.h"
@@ -221,18 +222,6 @@ public:
     int32_t client_id;
 };
 
-class BamMessage {
-public:
-    BamPtr bam_ptr;
-    std::shared_ptr<ClientInfo> client_info;
-    std::string sequencing_kit{};
-    std::shared_ptr<BarcodeScoreResult> barcoding_result{};
-    PrimerClassification primer_classification{};
-    std::pair<int, int> adapter_trim_interval{};
-    std::pair<int, int> barcode_trim_interval{};
-    std::size_t subread_id{0};
-};
-
 // Overlaps for error correction
 struct CorrectionAlignments {
     // Populated in CorrectionMapperNode::extract_alignments
@@ -284,6 +273,11 @@ struct CorrectionAlignments {
 
         return si;
     }
+};
+
+struct BamMessage {
+    HtsData data;
+    std::shared_ptr<ClientInfo> client_info;
 };
 
 // The Message type is a std::variant that can hold different types of message objects.

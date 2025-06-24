@@ -13,7 +13,7 @@
 #include "demux/parse_custom_sequences.h"
 #include "modbase/ModBaseRunner.h"
 #include "models/models.h"
-#include "read_pipeline/base/ClientInfo.h"
+#include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/base/read_utils.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
@@ -95,8 +95,6 @@ DORADO_EXPORT void reference_all_public_functions() {
     force_reference(&dorado::AlignerNode::get_name);
     // read_pipeline/BarcodeClassifierNode.h
     force_reference(&dorado::BarcodeClassifierNode::get_name);
-    // read_pipeline/ClientInfo.h
-    force_reference(&dorado::ClientInfo::is_disconnected);
     // read_pipeline/ReadForwarderNode.h
     force_reference(&dorado::ReadForwarderNode::get_name);
     // read_pipeline/ReadPipeline.h
@@ -107,6 +105,8 @@ DORADO_EXPORT void reference_all_public_functions() {
     force_reference(&dorado::utils::shallow_copy_read);
     // utils/barcode_kits.h
     force_reference(&dorado::barcode_kits::get_kit_infos);
+    // utils/client_info.h
+    force_reference(&dorado::ClientInfo::is_disconnected);
     // demux/parse_custom_kit.h
     force_reference(&dorado::demux::parse_custom_arrangement);
 

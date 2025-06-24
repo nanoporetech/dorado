@@ -1,12 +1,11 @@
 #include "alignment/alignment_processing_items.h"
 
+#include "hts_utils/fastq_reader.h"
 #include "utils/PostCondition.h"
-#include "utils/fastq_reader.h"
 #include "utils/fs_utils.h"
 #include "utils/scoped_trace_log.h"
 #include "utils/stream_utils.h"
 #include "utils/tty_utils.h"
-#include "utils/types.h"
 
 #include <htslib/hts.h>
 #include <htslib/sam.h>

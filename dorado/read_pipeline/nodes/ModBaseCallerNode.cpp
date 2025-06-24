@@ -1,6 +1,7 @@
 #include "read_pipeline/nodes/ModBaseCallerNode.h"
 
 #include "config/ModBaseModelConfig.h"
+#include "hts_utils/bam_utils.h"
 #include "modbase/ModBaseContext.h"
 #include "modbase/ModBaseEncoder.h"
 #include "modbase/ModBaseRunner.h"

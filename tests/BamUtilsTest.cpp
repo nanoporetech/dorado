@@ -1,7 +1,8 @@
 #include "TestUtils.h"
+#include "hts_utils/KString.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 
 #include <catch2/catch_test_macros.hpp>

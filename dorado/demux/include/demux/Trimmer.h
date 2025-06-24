@@ -1,5 +1,5 @@
 #pragma once
-#include "utils/types.h"
+#include "hts_utils/hts_types.h"
 
 #include <utility>
 

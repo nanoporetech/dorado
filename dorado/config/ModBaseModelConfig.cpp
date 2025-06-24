@@ -1,7 +1,7 @@
 #include "config/ModBaseModelConfig.h"
 
 #include "config/common.h"
-#include "utils/bam_utils.h"
+#include "hts_utils/bam_utils.h"
 #include "utils/dev_utils.h"
 #include "utils/sequence_utils.h"
 

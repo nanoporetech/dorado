@@ -1,4 +1,4 @@
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 
 #include "utils/string_utils.h"
 

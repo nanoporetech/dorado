@@ -1,6 +1,7 @@
 #include "read_pipeline/nodes/ModBaseChunkCallerNode.h"
 
 #include "config/ModBaseModelConfig.h"
+#include "hts_utils/bam_utils.h"
 #include "modbase/ModBaseContext.h"
 #include "modbase/encode_kmer.h"
 #include "read_pipeline/base/messages.h"

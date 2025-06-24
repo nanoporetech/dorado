@@ -1,9 +1,9 @@
 #include "read_pipeline/base/HtsReader.h"
 
+#include "hts_utils/bam_utils.h"
+#include "hts_utils/fastq_reader.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
-#include "utils/bam_utils.h"
-#include "utils/fastq_reader.h"
 #include "utils/types.h"
 
 #include <htslib/sam.h>
@@ -213,7 +213,7 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
             m_record_mutator(record);
         }
 
-        BamMessage bam_message{BamPtr(bam_dup1(record.get())), m_client_info};
+        BamMessage bam_message{HtsData(BamPtr(bam_dup1(record.get()))), m_client_info};
         pipeline.push_message(std::move(bam_message));
         ++num_reads;
         if (max_reads > 0 && num_reads >= max_reads) {

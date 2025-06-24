@@ -3,11 +3,12 @@
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 
@@ -79,7 +80,7 @@ void TrimmerNode::input_thread_fn() {
         if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it.
-            if (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
+            if (bam_message.data.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
                 continue;
             }
             process_read(bam_message);
@@ -95,30 +96,31 @@ void TrimmerNode::input_thread_fn() {
 }
 
 void TrimmerNode::process_read(BamMessage& bam_message) {
-    bam1_t* irecord = bam_message.bam_ptr.get();
+    HtsData& read = bam_message.data;
+    bam1_t* irecord = read.bam_ptr.get();
     int seqlen = irecord->core.l_qseq;
 
     auto increment_read_count = utils::PostCondition([this] { m_num_records++; });
 
     auto [trim_adapter, trim_barcodes, trim_interval] =
-            get_trim_interval(*bam_message.client_info, seqlen, bam_message.adapter_trim_interval,
-                              bam_message.barcode_trim_interval, bam_get_qname(irecord));
+            get_trim_interval(*bam_message.client_info, seqlen, read.adapter_trim_interval,
+                              read.barcode_trim_interval, bam_get_qname(irecord));
 
     if (trim_adapter || trim_barcodes) {
-        bam_message.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
-        if (bam_message.primer_classification.orientation != StrandOrientation::UNKNOWN) {
-            auto sense_data = uint8_t(to_char(bam_message.primer_classification.orientation));
-            bam_aux_append(bam_message.bam_ptr.get(), "TS", 'A', 1, &sense_data);
+        read.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
+        if (read.primer_classification.orientation != StrandOrientation::UNKNOWN) {
+            auto sense_data = uint8_t(to_char(read.primer_classification.orientation));
+            bam_aux_append(read.bam_ptr.get(), "TS", 'A', 1, &sense_data);
         }
-        if (!bam_message.primer_classification.umi_tag_sequence.empty()) {
-            auto len = int(bam_message.primer_classification.umi_tag_sequence.size()) + 1;
-            auto data = (const uint8_t*)bam_message.primer_classification.umi_tag_sequence.c_str();
-            bam_aux_append(bam_message.bam_ptr.get(), "RX", 'Z', len, data);
+        if (!read.primer_classification.umi_tag_sequence.empty()) {
+            auto len = int(read.primer_classification.umi_tag_sequence.size()) + 1;
+            auto data = (const uint8_t*)read.primer_classification.umi_tag_sequence.c_str();
+            bam_aux_append(read.bam_ptr.get(), "RX", 'Z', len, data);
         }
     } else {
         // Even if we don't trim this read, we need to strip any alignment details, since the BAM header
         // will not contain any alignment information anymore.
-        bam_message.bam_ptr = utils::new_unmapped_record(irecord, {}, {});
+        read.bam_ptr = utils::new_unmapped_record(irecord, {}, {});
         return;
     }
 }

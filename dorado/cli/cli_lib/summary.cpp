@@ -2,7 +2,7 @@
 
 #include "cli/cli.h"
 #include "dorado_version.h"
-#include "utils/bam_utils.h"
+#include "hts_utils/bam_utils.h"
 #include "utils/log_utils.h"
 #include "utils/time_utils.h"
 

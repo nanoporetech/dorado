@@ -11,6 +11,7 @@ dorado_add_library(
         # nothing
     DEPENDS_PRIVATE
         dorado_lib
+        dorado_hts_utils
         dorado_utils
         spdlog::spdlog
 )

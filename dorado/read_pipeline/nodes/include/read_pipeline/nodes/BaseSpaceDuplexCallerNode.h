@@ -1,8 +1,8 @@
 #pragma once
 
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/HtsReader.h"  // for ReadMap
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/bam_utils.h"
 
 #include <map>
 #include <memory>

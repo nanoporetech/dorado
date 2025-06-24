@@ -8,7 +8,6 @@
 #include "utils/concurrency/async_task_executor.h"
 #include "utils/concurrency/task_priority.h"
 #include "utils/stats.h"
-#include "utils/types.h"
 
 #include <memory>
 #include <string>

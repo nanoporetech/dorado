@@ -1,7 +1,7 @@
 #pragma once
 
+#include "hts_utils/hts_file.h"
 #include "utils/arg_parse_ext.h"
-#include "utils/hts_file.h"
 
 #include <memory>
 

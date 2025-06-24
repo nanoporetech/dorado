@@ -4,11 +4,11 @@
 #include "TestUtils.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
-#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <ATen/Functions.h>
@@ -439,8 +439,8 @@ CATCH_TEST_CASE(
                     dorado::demux::AdapterInfo{true, true, false, std::nullopt}));
     read->read_common.client_info = std::move(client_info);
 
-    BamMessage bam_read{std::move(record_copy), read->read_common.client_info};
-    bam_read.sequencing_kit = TEST_KIT2;
+    BamMessage bam_read{HtsData(std::move(record_copy)), read->read_common.client_info};
+    bam_read.data.sequencing_kit = TEST_KIT2;
 
     // Push a Symplex read type.
     pipeline->push_message(std::move(read));
@@ -468,7 +468,7 @@ CATCH_TEST_CASE(
     for (auto& message : messages) {
         if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
-            bam1_t* rec = bam_message.bam_ptr.get();
+            bam1_t* rec = bam_message.data.bam_ptr.get();
 
             // Check trimming on the bam1_t struct.
             auto seq = dorado::utils::extract_sequence(rec);
@@ -477,8 +477,8 @@ CATCH_TEST_CASE(
             auto qual = dorado::utils::extract_quality(rec);
             CATCH_CHECK(qual.size() == seq.length());
 
-            CATCH_CHECK(bam_message.primer_classification.primer_name == "PCS110_FWD");
-            CATCH_CHECK(bam_message.primer_classification.orientation ==
+            CATCH_CHECK(bam_message.data.primer_classification.primer_name == "PCS110_FWD");
+            CATCH_CHECK(bam_message.data.primer_classification.orientation ==
                         StrandOrientation::FORWARD);
             CATCH_CHECK(bam_aux2A(bam_aux_get(rec, "TS")) == '+');
             std::string expected_umi_tag = "RX:Z:" + umi_full;

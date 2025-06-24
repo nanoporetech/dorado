@@ -1,9 +1,9 @@
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 
 #include "TestUtils.h"
+#include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_file.h"
 #include "read_pipeline/nodes/HtsWriterNode.h"
-#include "utils/bam_utils.h"
-#include "utils/hts_file.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <htslib/sam.h>

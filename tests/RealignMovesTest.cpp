@@ -1,4 +1,4 @@
-#include "utils/sequence_utils.h"
+#include "hts_utils/bam_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <catch2/catch_test_macros.hpp>

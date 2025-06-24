@@ -1,5 +1,5 @@
 #pragma once
-#include "types.h"
+#include "hts_types.h"
 
 #include <map>
 #include <set>

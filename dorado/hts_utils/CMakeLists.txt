@@ -1,0 +1,32 @@
+dorado_add_library(
+    NAME
+        dorado_hts_utils
+    PUBLIC_DIR
+        hts_utils
+    SOURCES_PUBLIC
+        bam_utils.h
+        fai_utils.h
+        fastq_reader.h
+        FastxRandomReader.h
+        hts_file.h
+        hts_types.h
+        KString.h
+        MergeHeaders.h
+    SOURCES_PRIVATE
+        bam_utils.cpp
+        fai_utils.cpp
+        fastq_reader.cpp
+        FastxRandomReader.cpp
+        hts_file.cpp
+        hts_types.cpp
+        KString.cpp
+        MergeHeaders.cpp
+    DEPENDS_PUBLIC
+        # nothing
+    DEPENDS_PRIVATE
+        dorado_utils
+        htslib
+        minimap2
+        spdlog::spdlog
+    NO_TORCH
+)

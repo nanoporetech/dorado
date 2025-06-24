@@ -1,5 +1,6 @@
 #include "file_info/file_info.h"
 
+#include "hts_utils/hts_types.h"
 #include "utils/PostCondition.h"
 #include "utils/fs_utils.h"
 #include "utils/time_utils.h"

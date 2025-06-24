@@ -1,6 +1,6 @@
 #pragma once
 
-#include "utils/hts_file.h"
+#include "hts_utils/hts_file.h"
 
 #include <string>
 #include <vector>

@@ -1,24 +1,10 @@
-#include "utils/types.h"
+#include "hts_utils/KString.h"
 
 #include <htslib/sam.h>
-#include <minimap.h>
-#include <spdlog/spdlog.h>
+
+#include <memory>
 
 namespace dorado {
-
-void BamDestructor::operator()(bam1_t* bam) { bam_destroy1(bam); }
-
-// Here mm_tbuf_t is used instead of mm_tbuf_s since minimap.h
-// provides a typedef for mm_tbuf_s to mm_tbuf_t.
-void MmTbufDestructor::operator()(mm_tbuf_t* tbuf) { mm_tbuf_destroy(tbuf); }
-
-void SamHdrDestructor::operator()(sam_hdr_t* bam) { sam_hdr_destroy(bam); }
-
-void HtsFileDestructor::operator()(htsFile* hts_file) {
-    if (hts_file) {
-        hts_close(hts_file);
-    }
-}
 
 KString::KString() : m_data(std::make_unique<kstring_t>()) { *m_data = {0, 0, nullptr}; }
 

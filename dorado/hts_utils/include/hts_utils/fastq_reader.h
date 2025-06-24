@@ -1,6 +1,6 @@
 #pragma once
 
-#include "fasta_fastq_utils.h"
+#include "utils/fasta_fastq_utils.h"
 
 #include <istream>
 #include <memory>

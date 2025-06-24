@@ -7,6 +7,7 @@
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/concurrency/multi_queue_thread_pool.h"
+#include "utils/context_container.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>
@@ -187,13 +188,13 @@ void AlignerNode::align_bam_message(BamMessage&& bam_message) {
     m_task_executor.send([this, bam_message_ = std::move(bam_message)] {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
         auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
-                               .align(bam_message_.bam_ptr.get(), tbuf.get());
+                               .align(bam_message_.data.bam_ptr.get(), tbuf.get());
         for (auto& record : records) {
             if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
                 auto ref_id = record->core.tid;
                 add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
             }
-            send_message_to_sink(BamMessage{std::move(record), bam_message_.client_info});
+            send_message_to_sink(BamMessage{HtsData(std::move(record)), bam_message_.client_info});
         }
     });
 }

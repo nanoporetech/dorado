@@ -1,8 +1,8 @@
 #include "aligner/Minimap2Aligner.h"
 
 #include "alignment/sam_utils.h"
+#include "hts_utils/bam_utils.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
