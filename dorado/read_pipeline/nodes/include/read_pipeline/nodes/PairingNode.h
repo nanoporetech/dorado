@@ -68,7 +68,6 @@ private:
     std::vector<std::thread> m_workers;
     const int m_num_worker_threads;
     std::atomic<int> m_num_active_worker_threads = 0;
-    std::atomic<bool> m_preserve_cache_during_flush = false;
 
     using FPairingFunc = void (PairingNode::*)(int);
     FPairingFunc m_pairing_func = nullptr;

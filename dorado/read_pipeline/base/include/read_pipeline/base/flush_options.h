@@ -2,9 +2,7 @@
 
 namespace dorado {
 
-struct FlushOptions {
-    bool preserve_pairing_caches = false;
-};
-inline FlushOptions DefaultFlushOptions() { return {false}; }
+struct FlushOptions {};
+inline FlushOptions DefaultFlushOptions() { return {}; }
 
 }  // namespace dorado

@@ -427,7 +427,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
     }
 
     if (--m_num_active_worker_threads == 0) {
-        if (!m_preserve_cache_during_flush) {
+        {
             std::unique_lock<std::mutex> lock(m_pairing_mtx);
             // There are still reads in channel_read_map. Push them to the sink.
             // Last thread alive is responsible for cleaning up the cache.
@@ -501,11 +501,7 @@ void PairingNode::start_threads() {
     }
 }
 
-void PairingNode::terminate(const FlushOptions& flush_options) {
-    m_preserve_cache_during_flush = flush_options.preserve_pairing_caches;
-    terminate_impl();
-    m_preserve_cache_during_flush = false;
-}
+void PairingNode::terminate(const FlushOptions&) { terminate_impl(); }
 
 void PairingNode::terminate_impl() {
     terminate_input_queue();
