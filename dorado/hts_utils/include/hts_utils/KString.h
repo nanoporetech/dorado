@@ -1,7 +1,5 @@
 #pragma once
 
-#include <htslib/sam.h>
-
 #include <cstddef>
 #include <memory>
 
