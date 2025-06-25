@@ -6,7 +6,6 @@
 struct bam1_t;
 struct sam_hdr_t;
 struct htsFile;
-struct mm_tbuf_s;
 
 namespace dorado {
 
@@ -26,11 +25,6 @@ struct HtsFileDestructor {
     void operator()(htsFile *);
 };
 using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
-
-struct MmTbufDestructor {
-    void operator()(mm_tbuf_s *);
-};
-using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
 
 enum class StrandOrientation : int {
     REVERSE = -1,  ///< "-" orientation

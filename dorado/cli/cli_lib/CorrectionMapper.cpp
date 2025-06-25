@@ -10,6 +10,7 @@
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/alignment_utils.h"
+#include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>

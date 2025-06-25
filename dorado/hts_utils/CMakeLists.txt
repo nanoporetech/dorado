@@ -26,7 +26,6 @@ dorado_add_library(
     DEPENDS_PRIVATE
         dorado_utils
         htslib
-        minimap2
         spdlog::spdlog
     NO_TORCH
 )

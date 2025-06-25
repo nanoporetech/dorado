@@ -1,7 +1,5 @@
 #include "hts_utils/KString.h"
 
-#include <htslib/sam.h>
-
 #include <memory>
 
 namespace dorado {
