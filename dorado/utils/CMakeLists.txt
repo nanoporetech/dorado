@@ -18,8 +18,6 @@ dorado_add_library(
         context_container.h
         crypto_utils.h
         dev_utils.h
-        fasta_fastq_utils.h
-        fasta_reader.h
         fs_utils.h
         gzip_reader.h
         jthread.h
@@ -59,8 +57,6 @@ dorado_add_library(
         concurrency/multi_queue_thread_pool.cpp
         crypto_utils.cpp
         dev_utils.cpp
-        fasta_fastq_utils.cpp
-        fasta_reader.cpp
         fs_utils.cpp
         gzip_reader.cpp
         locale_utils.cpp

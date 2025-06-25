@@ -1,6 +1,6 @@
 #include "demux/parse_custom_sequences.h"
 
-#include "utils/fasta_reader.h"
+#include "hts_utils/fasta_reader.h"
 
 #include <stdexcept>
 #include <tuple>
