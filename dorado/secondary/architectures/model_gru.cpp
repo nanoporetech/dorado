@@ -27,4 +27,20 @@ torch::Tensor ModelGRU::forward(torch::Tensor x) {
     return x;
 }
 
+double ModelGRU::estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const {
+    if (std::size(batch_tensor_shape) != 3) {
+        throw std::runtime_error{
+                "Input tensor shape is of wrong dimension! Expected 3 sizes, got " +
+                std::to_string(std::size(batch_tensor_shape))};
+    }
+
+    // Input tensor shape: [batch_size x num_positions x num_features];
+    const int64_t batch_size = batch_tensor_shape[0];
+    const int64_t num_positions = batch_tensor_shape[1];
+
+    // IMPORTANT: The following equation was determined as part of the DOR-1293 effort.
+    return 1.0424 + (0.0003441 * batch_size) + (0.0000019 * num_positions) +
+           (-0.0000026 * std::pow(batch_size, 2)) + (0.0000120 * batch_size * num_positions);
+}
+
 }  // namespace dorado::secondary

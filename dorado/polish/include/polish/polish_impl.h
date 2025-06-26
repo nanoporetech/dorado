@@ -38,6 +38,7 @@ struct DeviceInfo {
     std::string name;
     DeviceType type;
     torch::Device device;
+    double available_memory_GB = 0.0;
 };
 
 struct PolisherResources {
@@ -165,6 +166,7 @@ void sample_producer(PolisherResources& resources,
                      int32_t window_len,
                      int32_t window_overlap,
                      int32_t bam_subchunk_len,
+                     double max_available_mem,
                      bool continue_on_exception,
                      utils::AsyncQueue<InferenceData>& infer_data,
                      std::atomic<bool>& worker_terminate,

@@ -68,6 +68,8 @@ public:
 
     at::Tensor forward(at::Tensor x) override;
 
+    double estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const override;
+
 private:
     static constexpr int32_t MAX_HAPLOTAGS{16};
 

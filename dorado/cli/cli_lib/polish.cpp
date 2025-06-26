@@ -184,7 +184,7 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_group("Advanced options");
         parser->visible.add_argument("-b", "--batchsize")
                 .help("Batch size for inference.")
-                .default_value(16)
+                .default_value(0)
                 .scan<'i', int>();
         parser->visible.add_argument("--draft-batchsize")
                 .help("Approximate batch size for processing input draft sequences.")
@@ -393,8 +393,8 @@ void validate_options(const Options& opt) {
         spdlog::error("Input reads file {} does not exist!", opt.in_draft_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
-    if (opt.batch_size <= 0) {
-        spdlog::error("Batch size should be > 0. Given: {}.", opt.batch_size);
+    if (opt.batch_size < 0) {
+        spdlog::error("Batch size should be >= 0. Given: {}.", opt.batch_size);
         std::exit(EXIT_FAILURE);
     }
     if (opt.draft_batch_size <= 0) {
@@ -918,8 +918,30 @@ void run_polishing(const Options& opt,
         stats.set("processed", 0.0);
     }
 
-    int64_t total_batch_bases = 0;
+    // Compute the minimum usable memory across all devices and use that as the batch size.
+    // Reason: batches are constructed and pushed to a queue, workers only pop the batches from
+    // the queue, and minimum possible batch size needs to be satisfied.
+    const double min_avail_mem = [&resources]() {
+        if (std::empty(resources.devices)) {
+            return 0.0;
+        }
+        double ret = resources.devices.front().available_memory_GB;
+        for (const polisher::DeviceInfo& device_info : resources.devices) {
+            ret = std::min(ret, device_info.available_memory_GB);
+        }
+        return ret;
+    }();
+    constexpr double AVAILABLE_MEMORY_FACTOR = 0.95;
+    const double usable_mem = (min_avail_mem * AVAILABLE_MEMORY_FACTOR) / opt.infer_threads;
 
+    if (opt.batch_size > 0) {
+        spdlog::info("Using fixed batch size: {}", opt.batch_size);
+    } else {
+        spdlog::info("Using auto computed batch size. Usable per-worker memory: {:.2f} GB",
+                     usable_mem);
+    }
+
+    int64_t total_batch_bases = 0;
     std::atomic<bool> worker_terminate{false};
 
     // Process the draft sequences in batches of user-specified size.
@@ -983,14 +1005,14 @@ void run_polishing(const Options& opt,
                 // Create a thread for the sample producer.
                 polisher::WorkerReturnStatus wrs_sample_producer;
                 std::shared_ptr<std::thread> thread_sample_producer = utils::make_jthread(
-                        std::thread([&resources, &bam_regions, &draft_lens, &opt, &batch_queue,
-                                     &worker_terminate, &wrs_sample_producer] {
+                        std::thread([&resources, &bam_regions, &draft_lens, &opt, &usable_mem,
+                                     &batch_queue, &worker_terminate, &wrs_sample_producer] {
                             utils::set_thread_name("polish_produce");
-                            polisher::sample_producer(resources, bam_regions, draft_lens,
-                                                      opt.threads, opt.batch_size, opt.window_len,
-                                                      opt.window_overlap, opt.bam_subchunk,
-                                                      opt.continue_on_error, batch_queue,
-                                                      worker_terminate, wrs_sample_producer);
+                            polisher::sample_producer(
+                                    resources, bam_regions, draft_lens, opt.threads, opt.batch_size,
+                                    opt.window_len, opt.window_overlap, opt.bam_subchunk,
+                                    usable_mem, opt.continue_on_error, batch_queue,
+                                    worker_terminate, wrs_sample_producer);
                         }));
 
                 if (!thread_sample_producer) {
