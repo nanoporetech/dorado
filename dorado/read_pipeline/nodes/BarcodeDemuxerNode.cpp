@@ -1,9 +1,9 @@
 #include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 
+#include "hts_utils/fastq_reader.h"
+#include "hts_utils/hts_file.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/SampleSheet.h"
-#include "utils/fastq_reader.h"
-#include "utils/hts_file.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/sam.h>
@@ -85,7 +85,7 @@ void BarcodeDemuxerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         auto bam_message = std::move(std::get<BamMessage>(message));
-        write(*bam_message.bam_ptr);
+        write(*bam_message.data.bam_ptr);
     }
 }
 

@@ -6,10 +6,11 @@
 #include "alignment/Minimap2Options.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/alignment_utils.h"
-#include "utils/bam_utils.h"
+#include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>

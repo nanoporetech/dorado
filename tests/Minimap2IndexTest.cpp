@@ -3,8 +3,8 @@
 #include "TestUtils.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
+#include "hts_utils/hts_file.h"
 #include "read_pipeline/nodes/HtsWriterNode.h"
-#include "utils/hts_file.h"
 #include "utils/stream_utils.h"
 #include "utils/types.h"
 

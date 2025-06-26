@@ -38,6 +38,7 @@ dorado_add_library(
     DEPENDS_PUBLIC
         dorado_torch_utils
         dorado_utils
+        dorado_hts_utils
         dorado_version
         htslib
         spdlog::spdlog

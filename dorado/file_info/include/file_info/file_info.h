@@ -1,7 +1,7 @@
 #pragma once
 
+#include "hts_utils/hts_types.h"
 #include "models/kits.h"
-#include "utils/types.h"
 
 #include <filesystem>
 #include <optional>

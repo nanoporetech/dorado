@@ -1,4 +1,4 @@
-#include "utils/fai_utils.h"
+#include "hts_utils/fai_utils.h"
 
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>

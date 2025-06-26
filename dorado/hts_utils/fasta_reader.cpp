@@ -1,4 +1,4 @@
-#include "utils/fasta_reader.h"
+#include "hts_utils/fasta_reader.h"
 
 #include <spdlog/spdlog.h>
 

@@ -3,7 +3,6 @@
 #include "demux/BarcodeClassifierSelector.h"
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/stats.h"
-#include "utils/types.h"
 
 #include <atomic>
 #include <map>

@@ -1,4 +1,4 @@
-#include "utils/fasta_fastq_utils.h"
+#include "hts_utils/fasta_fastq_utils.h"
 
 namespace dorado::utils {
 

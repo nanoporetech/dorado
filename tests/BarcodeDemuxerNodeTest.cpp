@@ -2,9 +2,10 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "utils/SampleSheet.h"
-#include "utils/bam_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
@@ -64,7 +65,7 @@ CATCH_TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TE
         for (auto bc : {"bc01", "bc02", "bc03"}) {
             auto records = create_bam_reader(bc);
             for (auto& rec : records) {
-                pipeline->push_message(BamMessage{std::move(rec), client_info});
+                pipeline->push_message(BamMessage{HtsData{std::move(rec)}, client_info});
             }
         }
 

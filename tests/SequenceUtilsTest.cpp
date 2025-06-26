@@ -1,3 +1,5 @@
+#include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/benchmark/catch_benchmark.hpp>

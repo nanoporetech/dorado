@@ -4,14 +4,14 @@
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/SampleSheet.h"
-#include "utils/bam_utils.h"
+#include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/types.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -60,7 +60,7 @@ void BarcodeClassifierNode::input_thread_fn() {
             // client requires read trimming.
             const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
             if (barcoding_info && barcoding_info->trim &&
-                (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                (bam_message.data.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
                 continue;
             }
 
@@ -76,12 +76,14 @@ void BarcodeClassifierNode::input_thread_fn() {
     }
 }
 
-void BarcodeClassifierNode::barcode(BamMessage& read, const demux::BarcodingInfo* barcoding_info) {
+void BarcodeClassifierNode::barcode(BamMessage& message,
+                                    const demux::BarcodingInfo* barcoding_info) {
     if (!barcoding_info) {
         return;
     }
     auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
 
+    HtsData& read = message.data;
     bam1_t* irecord = read.bam_ptr.get();
     bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
     std::string seq = utils::extract_sequence(irecord);
@@ -92,6 +94,7 @@ void BarcodeClassifierNode::barcode(BamMessage& read, const demux::BarcodingInfo
     auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
+
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
     bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());

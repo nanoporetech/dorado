@@ -1,7 +1,7 @@
 #include "summary/summary.h"
 
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/HtsReader.h"
-#include "utils/bam_utils.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/time_utils.h"

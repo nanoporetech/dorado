@@ -12,7 +12,7 @@ dorado_add_library(
         dorado_utils
     DEPENDS_PRIVATE
         cxxpool
-        dorado_hts_io
+        dorado_hts_utils
         dorado_torch_utils
         htslib
         spdlog::spdlog

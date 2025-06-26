@@ -203,7 +203,7 @@ add_subdirectory(dorado/data_loader)
 add_subdirectory(dorado/demux)
 add_subdirectory(dorado/devtools)
 add_subdirectory(dorado/file_info)
-add_subdirectory(dorado/hts_io)
+add_subdirectory(dorado/hts_utils)
 add_subdirectory(dorado/modbase)
 add_subdirectory(dorado/model_downloader)
 add_subdirectory(dorado/models)
@@ -234,7 +234,7 @@ target_link_libraries(dorado_lib
         dorado_basecall
         dorado_correct
         dorado_demux
-        dorado_hts_io
+        dorado_hts_utils
         dorado_modbase
         dorado_poly_tail
         dorado_read_pipeline

@@ -4,15 +4,15 @@
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "alignment/minimap2_wrappers.h"
+#include "hts_utils/KString.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 #include "utils/concurrency/multi_queue_thread_pool.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
-#include "utils/types.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -93,7 +93,7 @@ protected:
         std::vector<dorado::BamPtr> result{};
         result.reserve(bam_messages.size());
         for (auto& bam_message : bam_messages) {
-            result.push_back(std::move(bam_message.bam_ptr));
+            result.push_back(std::move(bam_message.data.bam_ptr));
         }
         return result;
     }

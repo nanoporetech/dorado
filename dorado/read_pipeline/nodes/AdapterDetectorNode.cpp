@@ -3,12 +3,13 @@
 #include "demux/AdapterDetector.h"
 #include "demux/Trimmer.h"
 #include "demux/adapter_info.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages.h"
 #include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 #include "utils/barcode_kits.h"
+#include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
@@ -33,7 +34,7 @@ void AdapterDetectorNode::input_thread_fn() {
         if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it.
-            if (bam_message.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
+            if (bam_message.data.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
                 continue;
             }
             process_read(bam_message);
@@ -57,7 +58,7 @@ std::shared_ptr<demux::AdapterDetector> AdapterDetectorNode::get_detector(
 }
 
 void AdapterDetectorNode::process_read(BamMessage& bam_message) {
-    bam1_t* irecord = bam_message.bam_ptr.get();
+    bam1_t* irecord = bam_message.data.bam_ptr.get();
     bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
     std::string qname = bam_get_qname(irecord);
     std::string seq = utils::extract_sequence(irecord);
@@ -72,7 +73,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         return;
     }
 
-    auto kit_name = bam_message.sequencing_kit;
+    auto kit_name = bam_message.data.sequencing_kit;
     if (kit_name.empty()) {
         if (adapter_info->kit_name) {
             // For the standalone trim application, the kit name is provided on
@@ -103,7 +104,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
     if (adapter_info->trim_primers) {
         primer_res = detector->find_primers(seq, kit_name);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
-        bam_message.primer_classification =
+        bam_message.data.primer_classification =
                 detector->classify_primers(primer_res, primer_trim_interval, seq);
     }
     if (adapter_info->trim_adapters || adapter_info->trim_primers) {
@@ -118,7 +119,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
             ++m_num_untrimmed_short_reads;
             return;
         }
-        bam_message.adapter_trim_interval = trim_interval;
+        bam_message.data.adapter_trim_interval = trim_interval;
     }
 }
 

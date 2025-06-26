@@ -130,6 +130,12 @@ __attribute__((target("avx2"))) std::string reverse_complement_impl(const std::s
 
 }  // namespace
 
+namespace dorado {
+// Here mm_tbuf_t is used instead of mm_tbuf_s since minimap.h
+// provides a typedef for mm_tbuf_s to mm_tbuf_t.
+void MmTbufDestructor::operator()(mm_tbuf_t* tbuf) { mm_tbuf_destroy(tbuf); }
+}  // namespace dorado
+
 namespace dorado::utils {
 
 size_t find_rna_polya(const std::string& seq) {

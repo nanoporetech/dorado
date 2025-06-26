@@ -1,6 +1,7 @@
-#include "utils/MergeHeaders.h"
+#include "hts_utils/MergeHeaders.h"
 
-#include "utils/bam_utils.h"
+#include "hts_utils/KString.h"
+#include "hts_utils/bam_utils.h"
 
 #include <htslib/sam.h>
 

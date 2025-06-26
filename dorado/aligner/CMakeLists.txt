@@ -14,5 +14,6 @@ dorado_add_library(
         dorado_alignment
         dorado_read_pipeline_base
     DEPENDS_PRIVATE
+        dorado_hts_utils
         spdlog::spdlog
 )

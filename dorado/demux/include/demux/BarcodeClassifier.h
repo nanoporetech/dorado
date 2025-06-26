@@ -1,9 +1,9 @@
 #pragma once
 #include "KitInfoProvider.h"
 #include "barcoding_info.h"
+#include "hts_utils/hts_types.h"
 #include "utils/barcode_kits.h"
 #include "utils/stats.h"
-#include "utils/types.h"
 
 #include <atomic>
 #include <optional>

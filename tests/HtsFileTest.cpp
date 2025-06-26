@@ -1,6 +1,6 @@
 #include "TestUtils.h"
+#include "hts_utils/hts_file.h"
 #include "utils/PostCondition.h"
-#include "utils/hts_file.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <htslib/sam.h>

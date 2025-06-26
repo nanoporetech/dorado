@@ -5,6 +5,7 @@
 #include "models/kits.h"
 #include "torch_utils/tensor_utils.h"
 #include "torch_utils/trim.h"
+#include "utils/context_container.h"
 #include "utils/log_utils.h"
 
 #include <ATen/Functions.h>

@@ -25,6 +25,7 @@ dorado_add_library(
         parse_custom_sequences.cpp
         Trimmer.cpp
     DEPENDS_PUBLIC
+        dorado_hts_utils
         dorado_utils
     DEPENDS_PRIVATE
         dorado_read_pipeline

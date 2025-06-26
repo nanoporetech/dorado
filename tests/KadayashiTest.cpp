@@ -1,5 +1,5 @@
 #include "TestUtils.h"
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "local_haplotagging.h"
 #include "secondary/common/bam_file.h"
 #include "types.h"

@@ -27,6 +27,7 @@ dorado_add_library(
     DEPENDS_PUBLIC
         htslib
         minimap2
+        dorado_hts_utils
         dorado_utils
     DEPENDS_PRIVATE
         spdlog::spdlog

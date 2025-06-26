@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "sample.h"
 #include "secondary/common/interval.h"
 #include "secondary/common/variant.h"

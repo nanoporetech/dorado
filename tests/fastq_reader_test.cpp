@@ -1,4 +1,4 @@
-#include "utils/fastq_reader.h"
+#include "hts_utils/fastq_reader.h"
 
 #include "TestUtils.h"
 

@@ -1,6 +1,6 @@
 #include "polish/polish_impl.h"
 
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "secondary/architectures/model_factory.h"
 #include "secondary/common/batching.h"
 #include "secondary/common/region.h"

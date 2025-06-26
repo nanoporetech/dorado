@@ -5,8 +5,8 @@
 #include "correct/features.h"
 #include "correct/infer.h"
 #include "correct/windows.h"
+#include "hts_utils/bam_utils.h"
 #include "torch_utils/gpu_profiling.h"
-#include "utils/bam_utils.h"
 #include "utils/paf_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
@@ -18,7 +18,7 @@
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 #endif
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDACachingAllocator.h>
@@ -124,12 +124,12 @@ void CorrectionInferenceNode::concat_features_and_send(const std::vector<std::st
     LOG_TRACE("decoding window for {}", read_name);
     auto corrected_seqs = concatenate_corrected_windows(to_decode);
     if (corrected_seqs.size() == 1) {
-        BamMessage rec{create_bam_record(read_name, corrected_seqs[0]), nullptr};
+        BamMessage rec{HtsData{create_bam_record(read_name, corrected_seqs[0])}, nullptr};
         send_message_to_sink(std::move(rec));
     } else {
         for (size_t s = 0; s < corrected_seqs.size(); s++) {
             const std::string new_name = read_name + ":" + std::to_string(s);
-            BamMessage rec{create_bam_record(new_name, corrected_seqs[s]), nullptr};
+            BamMessage rec{HtsData{create_bam_record(new_name, corrected_seqs[s])}, nullptr};
             send_message_to_sink(std::move(rec));
         }
     }

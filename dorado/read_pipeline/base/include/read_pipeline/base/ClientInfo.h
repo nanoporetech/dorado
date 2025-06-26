@@ -1,12 +1,10 @@
 #pragma once
 
-#include "utils/context_container.h"
-
 #include <cstdint>
-#include <memory>
-#include <string>
 
 namespace dorado {
+
+class ContextContainer;
 
 class ClientInfo {
 public:

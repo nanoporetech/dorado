@@ -1,6 +1,6 @@
 #pragma once
+#include "hts_utils/hts_file.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/hts_file.h"
 #include "utils/stats.h"
 
 #include <atomic>

@@ -1,7 +1,7 @@
-#include "utils/hts_file.h"
+#include "hts_utils/hts_file.h"
 
+#include "hts_utils/bam_utils.h"
 #include "utils/PostCondition.h"
-#include "utils/bam_utils.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/hts.h>

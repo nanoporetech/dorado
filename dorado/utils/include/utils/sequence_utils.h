@@ -1,14 +1,24 @@
 #pragma once
 
-#include "types.h"
-
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <optional>
 #include <string>
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+struct mm_tbuf_s;
+
+namespace dorado {
+
+struct MmTbufDestructor {
+    void operator()(mm_tbuf_s*);
+};
+using MmTbufPtr = std::unique_ptr<mm_tbuf_s, MmTbufDestructor>;
+
+}  // namespace dorado
 
 namespace dorado::utils {
 

@@ -1,6 +1,6 @@
 #pragma once
-#include "barcode_kits.h"
-#include "types.h"
+
+#include "hts_utils/hts_types.h"
 
 #include <map>
 #include <string>

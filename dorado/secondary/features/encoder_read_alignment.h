@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hts_io/FastxRandomReader.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/consensus/sample.h"
 #include "secondary/features/encoder_base.h"

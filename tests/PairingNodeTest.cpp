@@ -2,8 +2,8 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
+#include "hts_utils/fasta_reader.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
-#include "utils/fasta_reader.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
