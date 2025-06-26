@@ -308,7 +308,7 @@ CATCH_TEST_CASE(
     pipeline->push_message(std::move(read));
     // Push BamPtr type.
     for (auto& rec : records) {
-        pipeline->push_message(BamMessage{HtsData(BamPtr(std::move(rec))), client_info});
+        pipeline->push_message(BamMessage{HtsData{BamPtr(std::move(rec))}, client_info});
     }
     dorado::ReadPair dummy_read_pair;
     // Push a type not used by the ClassifierNode.
@@ -415,14 +415,14 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     BamPtr read1(bam_dup1(reader.record.get()));
     std::string id_in1 = bam_get_qname(read1.get());
     auto orig_seq1 = dorado::utils::extract_sequence(read1.get());
-    pipeline->push_message(dorado::BamMessage{HtsData(std::move(read1)), client_info});
+    pipeline->push_message(dorado::BamMessage{HtsData{std::move(read1)}, client_info});
 
     // Second read should be classified.
     reader.read();
     BamPtr read2(bam_dup1(reader.record.get()));
     std::string id_in2 = bam_get_qname(read2.get());
     auto orig_seq2 = dorado::utils::extract_sequence(read2.get());
-    pipeline->push_message(dorado::BamMessage{HtsData(std::move(read2)), client_info});
+    pipeline->push_message(dorado::BamMessage{HtsData{std::move(read2)}, client_info});
 
     pipeline->terminate(DefaultFlushOptions());
 

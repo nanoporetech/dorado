@@ -439,7 +439,7 @@ CATCH_TEST_CASE(
                     dorado::demux::AdapterInfo{true, true, false, std::nullopt}));
     read->read_common.client_info = std::move(client_info);
 
-    BamMessage bam_read{HtsData(std::move(record_copy)), read->read_common.client_info};
+    BamMessage bam_read{HtsData{std::move(record_copy)}, read->read_common.client_info};
     bam_read.data.sequencing_kit = TEST_KIT2;
 
     // Push a Symplex read type.

@@ -57,7 +57,7 @@ void ResumeLoader::copy_completed_reads() {
             }
             m_processed_read_ids.insert(read_id);
             m_sink.push_message(
-                    BamMessage{HtsData(BamPtr(bam_dup1(reader.record.get()))), client_info});
+                    BamMessage{HtsData{BamPtr(bam_dup1(reader.record.get()))}, client_info});
             if (is_safe_to_log && m_processed_read_ids.size() % 100 == 0) {
                 bar.tick();
             }
