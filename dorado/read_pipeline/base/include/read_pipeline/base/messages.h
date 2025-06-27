@@ -60,6 +60,8 @@ public:
     std::string position_id;     // Position ID - used for sample sheet aliasing
     std::string experiment_id;   // Experiment ID - used for sample sheet aliasing
     std::string model_name;      // Read group
+    std::string sample_id;       // User-supplied name for the sample being analysed.
+    int64_t protocol_start_time_ms;  // Start time of the protocol
 
     dorado::details::Attributes attributes;
 

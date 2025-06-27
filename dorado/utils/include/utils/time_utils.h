@@ -6,6 +6,11 @@
 
 namespace dorado::utils {
 
+// Get a formatted datetime from ms since unix epoch. This effectively converts pod5 start time
+// to MinKnow formatted datetimes as "YYYYMMDD_hhmm"
+std::string get_minknow_timestamp_from_unix_time(int64_t time_stamp_ms);
+
+// Get a formatted datetime from ms since unix epoch as YYYY-MM-DDThh:mm:ss.uuu+00:00
 std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms);
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".

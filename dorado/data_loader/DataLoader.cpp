@@ -146,6 +146,8 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.flow_cell_product_code = run_info_data->flow_cell_product_code;
     new_read->read_common.position_id = run_info_data->sequencer_position;
     new_read->read_common.experiment_id = run_info_data->experiment_name;
+    new_read->read_common.sample_id = run_info_data->sample_id;
+    new_read->read_common.protocol_start_time_ms = run_info_data->protocol_start_time_ms;
     new_read->read_common.is_duplex = false;
 
     // Get the condition_info from the run_info_data to determine if the sequencing kit
