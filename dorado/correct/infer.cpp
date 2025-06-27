@@ -34,7 +34,7 @@ int calculate_batch_size(const std::string& device, float memory_fraction) {
                 utils::get_apple_physical_memory_bytes() / dorado::utils::BYTES_PER_GB;
         usable_memory = physical_memory * memory_fraction;
 #else
-        size_t free_ram_GB = utils::available_host_memory_GB();
+        const size_t free_ram_GB = static_cast<size_t>(utils::available_host_memory_GB());
         usable_memory = free_ram_GB * memory_fraction;
 #endif
     }

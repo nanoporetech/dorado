@@ -218,8 +218,9 @@ size_t auto_calculate_num_runners(const BasecallModelConfig &model_config, float
     // numbers were determined with a batch_size of 128, assume this just scales
     required_ram_per_runner_GB *= model_config.basecaller.batch_size() / 128.f;
 
-    auto free_ram_GB = utils::available_host_memory_GB() * memory_fraction;
-    auto num_runners = static_cast<size_t>(free_ram_GB / required_ram_per_runner_GB);
+    const auto free_ram_GB =
+            static_cast<size_t>(utils::available_host_memory_GB()) * memory_fraction;
+    const auto num_runners = static_cast<size_t>(free_ram_GB / required_ram_per_runner_GB);
     return std::clamp(num_runners, size_t(1), std::size_t(std::thread::hardware_concurrency()));
 }
 
