@@ -88,7 +88,9 @@ CATCH_TEST_CASE(CUT_TAG ": adjust_time", CUT_TAG) {
 }
 
 CATCH_TEST_CASE(CUT_TAG ": MinKnow datetime format from pod5 timestamp", CUT_TAG) {
-    CATCH_CHECK(dorado::utils::get_datetime_from_unix_epoch_ms(0) == "19700101_0000");
-    CATCH_CHECK(dorado::utils::get_datetime_from_unix_epoch_ms(1110371400000) == "20050309_1230");
-    CATCH_CHECK(dorado::utils::get_datetime_from_unix_epoch_ms(1750411401000) == "20250620_0923");
+    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time(0) == "19700101_0000");
+    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time(1110371400000) ==
+                "20050309_1230");
+    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time(1750411401000) ==
+                "20250620_0923");
 }

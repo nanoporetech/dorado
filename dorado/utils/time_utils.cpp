@@ -1,5 +1,7 @@
 #include "utils/time_utils.h"
 
+#include <iomanip>
+
 #if __cplusplus >= 202002L && 0  // Most stdlibs don't support parse()/from_stream() yet
 namespace date = std::chrono;
 #else
@@ -10,23 +12,38 @@ namespace date = std::chrono;
 #include <chrono>
 #include <sstream>
 
+namespace {
+
+auto get_timepoint_from_ms(time_t ms) {
+    using namespace std::chrono;
+    auto tp = system_clock::from_time_t(ms / 1000);
+    tp += milliseconds(ms % 1000);
+    date::sys_time<std::chrono::milliseconds> time_ms(
+            duration_cast<milliseconds>(tp.time_since_epoch()));
+    return time_ms;
+}
+
+std::string format_timestamp(const std::string& format, int64_t ms) {
+    std::ostringstream date_time;
+    auto tp = get_timepoint_from_ms(ms);
+    date_time << date::format(format, tp);
+    return date_time.str();
+}
+}  // namespace
+
 namespace dorado::utils {
 
-std::string get_string_timestamp_from_unix_time(time_t time_stamp_ms) {
-    auto tp = std::chrono::system_clock::from_time_t(time_stamp_ms / 1000);
-    tp += std::chrono::milliseconds(time_stamp_ms % 1000);
-    auto dp = date::floor<date::days>(tp);
-    auto time = date::hh_mm_ss(std::chrono::duration_cast<std::chrono::milliseconds>(tp - dp));
-    auto ymd = date::year_month_day{dp};
+std::string get_minknow_timestamp_from_unix_time(int64_t ms) {
+    return format_timestamp("%Y%m%d_%H%M", ms);
+}
 
-    std::ostringstream date_time_ss;
-    date_time_ss << ymd << "T" << time << "+00:00";
-    return date_time_ss.str();
+std::string get_string_timestamp_from_unix_time(time_t ms) {
+    return format_timestamp("%FT%T%Ez", ms);
 }
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".
 // Time stamp can be specified up to microseconds
-time_t get_unix_time_from_string_timestamp(const std::string & time_stamp) {
+time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
     std::istringstream ss(time_stamp);
     date::sys_time<std::chrono::microseconds> time_us;
     ss >> date::parse("%FT%T%Ez", time_us);
@@ -42,12 +59,12 @@ time_t get_unix_time_from_string_timestamp(const std::string & time_stamp) {
     return value.count();
 }
 
-std::string adjust_time_ms(const std::string & time_stamp, uint64_t offset_ms) {
+std::string adjust_time_ms(const std::string& time_stamp, uint64_t offset_ms) {
     return get_string_timestamp_from_unix_time(get_unix_time_from_string_timestamp(time_stamp) +
                                                offset_ms);
 }
 
-std::string adjust_time(const std::string & time_stamp, uint32_t offset) {
+std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
     // Expects the time to be encoded like "2017-09-12T9:50:12Z".
     // Adds the offset (in seconds) to the timeStamp.
 
@@ -65,7 +82,7 @@ std::string adjust_time(const std::string & time_stamp, uint32_t offset) {
     return date_time_ss.str();
 }
 
-double time_difference_seconds(const std::string & timestamp1, const std::string & timestamp2) {
+double time_difference_seconds(const std::string& timestamp1, const std::string& timestamp2) {
     try {
         std::istringstream ss1(timestamp1);
         std::istringstream ss2(timestamp2);
@@ -85,29 +102,9 @@ double time_difference_seconds(const std::string & timestamp1, const std::string
         }
         std::chrono::duration<double> diff = time1 - time2;
         return diff.count();
-    } catch (const std::exception & e) {
+    } catch (const std::exception& e) {
         throw std::runtime_error(std::string("Failed to parse timestamps: ") + e.what());
     }
-}
-
-std::string get_datetime_from_unix_epoch_ms(int64_t epoch_ms) {
-    using namespace std::chrono;
-
-    system_clock::time_point time_point_ms{milliseconds{epoch_ms}};
-    std::time_t time_s = system_clock::to_time_t(time_point_ms);
-
-    std::tm tm_utc;
-#if defined(_MSC_VER)
-    gmtime_s(&tm_utc, &time_s);
-#else
-    gmtime_r(&time_s, &tm_utc);
-#endif
-
-    // YYYYMMDD_hhmm e.g. 20250604_1354 - MinKnow output file datetime format
-    char buf[32];
-    std::strftime(buf, sizeof(buf), "%Y%m%d_%H%M", &tm_utc);
-
-    return buf;
 }
 
 }  // namespace dorado::utils
