@@ -16,6 +16,9 @@
 #include "demux/parse_custom_sequences.h"
 #include "file_info/file_info.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_file.h"
+#include "hts_writer/hts_file_writer.h"
+#include "hts_writer/interface.h"
 #include "model_downloader/model_downloader.h"
 #include "model_resolution.h"
 #include "models/kits.h"
@@ -31,6 +34,7 @@
 #include "read_pipeline/nodes/ReadFilterNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
+#include "read_pipeline/nodes/WriterNode.h"
 #include "resume_loader/ResumeLoader.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
@@ -312,7 +316,8 @@ void setup(const std::vector<std::string>& args,
            const std::string& bed,
            size_t num_runners,
            const ModBaseBatchParams& modbase_params,
-           std::unique_ptr<utils::HtsFile> hts_file,
+           bool emit_fastq,
+           bool emit_sam,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
@@ -347,6 +352,9 @@ void setup(const std::vector<std::string>& args,
         std::exit(EXIT_FAILURE);
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
+
+    ProgressTracker tracker(ProgressTracker::SIMPLEX);
+    tracker.set_total_reads(num_reads);
 
     // Sampling rate is checked by ModelComplexSearch when a complex is given, only test for a path
     if (model_complex.is_path() && !skip_model_compatibility_check) {
@@ -462,14 +470,27 @@ void setup(const std::vector<std::string>& args,
         utils::add_rg_headers(hdr.get(), read_groups);
     }
 
-    hts_file->set_num_threads(thread_allocations.writer_threads);
+    auto foo = utils::ProgressCallback([&tracker](size_t progress) {
+        tracker.set_description("Sorting output files");
+        tracker.update_post_processing_progress(static_cast<float>(progress));
+    });
+    auto hts_writer_builder =
+            hts_writer::HtsFileWriterBuilder(emit_fastq, emit_sam, !ref.empty(), std::nullopt,
+                                             thread_allocations.writer_threads, foo);
+
+    std::unique_ptr<hts_writer::HtsFileWriter> writer = hts_writer_builder.build();
+    if (writer == nullptr) {
+        spdlog::error("Failed to create hts file writer");
+        std::exit(EXIT_FAILURE);
+    }
+    writer->take_header(std::move(hdr));
 
     PipelineDescriptor pipeline_desc;
     std::string gpu_names{};
 #if DORADO_CUDA_BUILD
     gpu_names = utils::get_cuda_gpu_names(device);
 #endif
-    auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
+    auto hts_writer = pipeline_desc.add_node<WriterNode>({}, writer);
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -547,9 +568,8 @@ void setup(const std::vector<std::string>& args,
     auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
-        utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
+        utils::add_sq_hdr(writer->header().get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_file->set_header(hdr.get());
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
@@ -641,12 +661,6 @@ void setup(const std::vector<std::string>& args,
     // allow accurate summarisation.
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
-
-    // Report progress during output file finalisation.
-    tracker.set_description("Sorting output files");
-    hts_file->finalise([&](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
 
     // Give the user a nice summary.
     tracker.summarize();
@@ -933,7 +947,8 @@ int basecaller(int argc, char* argv[]) {
         setup(args, model_config, pod5_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
-              modbase_params, std::move(hts_file), parser.visible.get<bool>("--emit-moves"),
+              modbase_params, parser.visible.get<bool>("--emit-sam"),
+              parser.visible.get<bool>("--emit-fastq"), parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
