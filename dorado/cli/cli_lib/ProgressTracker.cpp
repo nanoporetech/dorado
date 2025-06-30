@@ -27,6 +27,11 @@ void erase_progress_bar_line() {
 
 namespace dorado {
 
+ProgressTracker::ProgressTracker(Mode mode)
+        : m_num_reads_expected(1), m_mode(mode), m_post_processing_percentage(1.0) {
+    m_initialization_time = std::chrono::system_clock::now();
+}
+
 ProgressTracker::ProgressTracker(Mode mode, int total_reads, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
           m_mode(mode),
