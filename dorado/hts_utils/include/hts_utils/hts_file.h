@@ -10,6 +10,8 @@
 
 namespace dorado::utils {
 
+using ProgressCallback = std::function<void(size_t percentage)>;
+
 class HtsFile {
 public:
     enum class OutputMode {
@@ -19,8 +21,6 @@ public:
         FASTQ,
         FASTA,
     };
-
-    using ProgressCallback = std::function<void(size_t percentage)>;
 
     HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam);
     ~HtsFile();
