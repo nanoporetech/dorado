@@ -24,12 +24,12 @@ class HtsFileWriter : public IWriter {
 public:
     explicit HtsFileWriter(OutputMode mode,
                            int threads,
-                           const utils::ProgressCallback& progress_callback,
-                           const utils::DescriptionCallback& description_callback)
+                           utils::ProgressCallback progress_callback,
+                           utils::DescriptionCallback description_callback)
             : m_mode(mode),
               m_threads(threads),
-              m_progress_callback(progress_callback),
-              m_description_callback(description_callback) {}
+              m_progress_callback(std::move(progress_callback)),
+              m_description_callback(std::move(description_callback)) {}
     void take_header(SamHdrPtr header) { m_header = std::move(header); };
     SamHdrPtr& header() { return m_header; }
     void process(const Processable item);
@@ -47,8 +47,8 @@ public:
 protected:
     const OutputMode m_mode;
     const int m_threads;
-    const utils::ProgressCallback& m_progress_callback;
-    const utils::DescriptionCallback& m_description_callback;
+    utils::ProgressCallback m_progress_callback;
+    utils::DescriptionCallback m_description_callback;
     SamHdrPtr m_header{nullptr};
 
     virtual void handle(const HtsData& _) = 0;
@@ -58,8 +58,8 @@ class SingleHtsFileWriter : public HtsFileWriter {
 public:
     SingleHtsFileWriter(OutputMode mode,
                         int threads,
-                        const utils::ProgressCallback& progress_callback,
-                        const utils::DescriptionCallback& description_callback);
+                        utils::ProgressCallback progress_callback,
+                        utils::DescriptionCallback description_callback);
     void init() override;
     void shutdown() override;
 
@@ -77,8 +77,8 @@ public:
                             OutputMode mode,
                             int threads,
                             bool sort,
-                            const utils::ProgressCallback& progress_callback,
-                            const utils::DescriptionCallback& description_callback);
+                            utils::ProgressCallback progress_callback,
+                            utils::DescriptionCallback description_callback);
     void init() override;
     void shutdown() override;
 

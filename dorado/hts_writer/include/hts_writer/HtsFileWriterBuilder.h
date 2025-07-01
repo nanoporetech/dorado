@@ -13,9 +13,9 @@ public:
                          bool emit_sam,
                          bool reference_requested,
                          const std::optional<std::string>& output_dir,
-                         const int writer_threads,
-                         const utils::ProgressCallback& progress_callback,
-                         const utils::DescriptionCallback& description_callback);
+                         int writer_threads,
+                         utils::ProgressCallback progress_callback,
+                         utils::DescriptionCallback description_callback);
 
     void set_output_mode(OutputMode output_mode);
     OutputMode get_output_mode() const { return m_output_mode; }

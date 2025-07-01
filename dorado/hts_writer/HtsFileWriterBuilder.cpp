@@ -25,16 +25,16 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            bool emit_sam,
                                            bool reference_requested,
                                            const std::optional<std::string> &output_dir,
-                                           const int threads,
-                                           const utils::ProgressCallback &progress_callback,
-                                           const utils::DescriptionCallback &description_callback)
+                                           int threads,
+                                           utils::ProgressCallback progress_callback,
+                                           utils::DescriptionCallback description_callback)
         : m_emit_fastq(emit_fastq),
           m_emit_sam(emit_sam),
           m_reference_requested(reference_requested),
           m_output_dir(output_dir),
           m_writer_threads(threads),
-          m_progress_callback(progress_callback),
-          m_description_callback(description_callback),
+          m_progress_callback(std::move(progress_callback)),
+          m_description_callback(std::move(description_callback)),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {};
 
@@ -64,6 +64,7 @@ void HtsFileWriterBuilder::update() {
         m_output_mode = OutputMode::SAM;
         m_sort = to_file && m_reference_requested;
     } else if (!to_file && m_is_fd_pipe) {
+        // Write uncompressed zlib-wrapped BAM files when piping and emit-sam is not set
         m_output_mode = OutputMode::UBAM;
         m_sort = false;
     } else {

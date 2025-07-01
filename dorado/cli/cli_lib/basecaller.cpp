@@ -744,19 +744,6 @@ int basecaller(int argc, char* argv[]) {
         device = utils::get_auto_detected_device();
     }
 
-    auto hts_file = cli::extract_hts_file(parser);
-    if (!hts_file) {
-        return EXIT_FAILURE;
-    }
-    if (hts_file->get_output_mode() == OutputMode::FASTQ) {
-        if (model_complex.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
-            spdlog::error(
-                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
-                    "results.");
-            return EXIT_FAILURE;
-        }
-    }
-
     bool trim_barcodes = true, trim_primers = true, trim_adapters = true;
     auto trim_options = parser.visible.get<std::string>("--trim");
     if (parser.visible.get<bool>("--no-trim")) {

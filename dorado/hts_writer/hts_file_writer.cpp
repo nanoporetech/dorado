@@ -26,34 +26,32 @@ void HtsFileWriter::process(const Processable item) {
 
 SingleHtsFileWriter::SingleHtsFileWriter(OutputMode mode,
                                          int threads,
-                                         const utils::ProgressCallback &progress_callback,
-                                         const utils::DescriptionCallback &description_callback)
-        : HtsFileWriter(mode, threads, progress_callback, description_callback) {};
+                                         utils::ProgressCallback progress_callback,
+                                         utils::DescriptionCallback description_callback)
+        : HtsFileWriter(mode,
+                        threads,
+                        std::move(progress_callback),
+                        std::move(description_callback)) {};
 
-void SingleHtsFileWriter::init() {
-    // TODO: Use local m_mode;
-};
+void SingleHtsFileWriter::init() {};
 
 void SingleHtsFileWriter::shutdown() {
-    set_description("Finalising HTS output file");
+    // set_description("Finalising HTS output file");
     m_hts_file->finalise([this](size_t progress) { set_progress(progress); });
 };
 
 void SingleHtsFileWriter::handle(const HtsData &data) {
     if (m_hts_file == nullptr) {
         const bool sort_bam = false;
-        m_hts_file = std::make_unique<utils::HtsFile>("-", utils::HtsFile::OutputMode::BAM,
-                                                      m_threads, sort_bam);
+        m_hts_file = std::make_unique<utils::HtsFile>("-", m_mode, m_threads, sort_bam);
         if (m_hts_file == nullptr) {
             std::runtime_error("Failed to create HTS output file");
         }
-
         if (m_header == nullptr) {
             std::logic_error("HtsFileWriter header not set before writing records.");
         }
         m_hts_file->set_header(m_header.get());
     }
-
     m_hts_file->write(data.bam_ptr.get());
 };
 
@@ -61,14 +59,16 @@ void SingleHtsFileWriter::handle(const HtsData &data) {
 
 */
 
-StructuredHtsFileWriter::StructuredHtsFileWriter(
-        const std::string &output_dir,
-        OutputMode mode,
-        int threads,
-        bool sort,
-        const utils::ProgressCallback &progress_callback,
-        const utils::DescriptionCallback &description_callback)
-        : HtsFileWriter(mode, threads, progress_callback, description_callback),
+StructuredHtsFileWriter::StructuredHtsFileWriter(const std::string &output_dir,
+                                                 OutputMode mode,
+                                                 int threads,
+                                                 bool sort,
+                                                 utils::ProgressCallback progress_callback,
+                                                 utils::DescriptionCallback description_callback)
+        : HtsFileWriter(mode,
+                        threads,
+                        std::move(progress_callback),
+                        std::move(description_callback)),
           m_output_dir(output_dir),
           m_sort(sort) {};
 
@@ -77,6 +77,7 @@ void StructuredHtsFileWriter::init() { try_create_output_folder(); };
 void StructuredHtsFileWriter::shutdown() {
     set_description("Finalising HTS output files");
 
+    spdlog::warn("StructuredHtsFileWriter::Shutdown called");
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
     for (auto &[_, hts_file] : m_hts_files) {

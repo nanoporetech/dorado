@@ -2,6 +2,7 @@
 
 #include "hts_writer/interface.h"
 #include "read_pipeline/base/messages.h"
+#include "spdlog/spdlog.h"
 
 #include <utility>
 #include <variant>
@@ -30,7 +31,7 @@ void WriterNode::input_thread_fn() {
                 writer->process(item);
             }
         }
-        send_message_to_sink(std::move(message));
+        // send_message_to_sink(std::move(message));
     }
 }
 
@@ -43,10 +44,11 @@ stats::NamedStats WriterNode::sample_stats() const {
 }
 
 void WriterNode::terminate(const FlushOptions &) {
+    // Finish processing all messages before shutdown
+    stop_input_processing();
     for (const auto &writer : m_writers) {
         writer->shutdown();
     }
-    stop_input_processing();
 }
 
 }  // namespace dorado

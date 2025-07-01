@@ -22,7 +22,7 @@ private:
     void input_thread_fn();
 
     std::atomic<int> m_num_received{0}, m_num_dispatched{0};
-    std::vector<std::unique_ptr<hts_writer::IWriter>> m_writers;
+    const std::vector<std::unique_ptr<hts_writer::IWriter>> m_writers;
 };
 
 }  // namespace dorado
