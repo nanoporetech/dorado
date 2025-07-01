@@ -18,11 +18,7 @@ constexpr std::string_view SAM{".sam"};
 constexpr std::string_view FASTQ{".fastq"};
 }  // namespace ext
 
-enum class OutputMode {
-    BAM,
-    SAM,
-    FASTQ,
-};
+using OutputMode = utils::HtsFile::OutputMode;
 
 class HtsFileWriter : public IWriter {
 public:
@@ -99,7 +95,5 @@ private:
 };
 
 }  // namespace hts_writer
-
-std::string to_string(hts_writer::OutputMode mode);
 
 }  // namespace dorado

@@ -114,18 +114,4 @@ bool StructuredHtsFileWriter::try_create_output_folder() const {
 }
 
 }  // namespace hts_writer
-
-std::string to_string(hts_writer::OutputMode mode) {
-    {
-        switch (mode) {
-        case hts_writer::OutputMode::BAM:
-            return "BAM";
-        case hts_writer::OutputMode::SAM:
-            return "SAM";
-        case hts_writer::OutputMode::FASTQ:
-            return "FASTQ";
-        }
-    }
-}
-
 }  // namespace dorado

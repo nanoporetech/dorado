@@ -30,7 +30,8 @@ constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs"};
 
 }  // namespace
 
-namespace dorado::utils {
+namespace dorado {
+namespace utils {
 
 struct HtsFile::ProgressUpdater {
     const ProgressCallback* m_progress_callback{nullptr};
@@ -567,4 +568,23 @@ std::vector<FileMergeBatcher::MergeJob> FileMergeBatcher::recursive_batching(
     return jobs;
 }
 
-}  // namespace dorado::utils
+}  // namespace utils
+
+std::string to_string(utils::HtsFile::OutputMode mode) {
+    {
+        switch (mode) {
+        case utils::HtsFile::OutputMode::BAM:
+            return "BAM";
+        case utils::HtsFile::OutputMode::UBAM:
+            return "UBAM";
+        case utils::HtsFile::OutputMode::SAM:
+            return "SAM";
+        case utils::HtsFile::OutputMode::FASTA:
+            return "FASTA";
+        case utils::HtsFile::OutputMode::FASTQ:
+            return "FASTQ";
+        }
+    }
+}
+
+}  // namespace dorado

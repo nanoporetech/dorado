@@ -354,8 +354,8 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
                         // Output depends on --emit-sam regardless of reference when piping
                         {OutputMode::SAM, false, std::nullopt, true, false, true},
                         {OutputMode::SAM, true, std::nullopt, true, false, true},
-                        {OutputMode::BAM, false, std::nullopt, false, false, true},
-                        {OutputMode::BAM, true, std::nullopt, false, false, true},
+                        {OutputMode::UBAM, false, std::nullopt, false, false, true},
+                        {OutputMode::UBAM, true, std::nullopt, false, false, true},
 
                 }));
 

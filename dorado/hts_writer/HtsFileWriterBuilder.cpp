@@ -1,6 +1,7 @@
 #include "hts_writer/HtsFileWriterBuilder.h"
 
 #include "hts_utils/hts_file.h"
+#include "hts_writer/hts_file_writer.h"
 #include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -62,10 +63,13 @@ void HtsFileWriterBuilder::update() {
         // Write SAM if chosen by user - sort only if we have a reference and are writing to a file
         m_output_mode = OutputMode::SAM;
         m_sort = to_file && m_reference_requested;
+    } else if (!to_file && m_is_fd_pipe) {
+        m_output_mode = OutputMode::UBAM;
+        m_sort = false;
     } else {
         // Default case is to write BAMs - we can sort this if we have a reference and are using files.
         m_output_mode = OutputMode::BAM;
-        m_sort = to_file && m_reference_requested && !m_is_fd_pipe;
+        m_sort = to_file && m_reference_requested;
     }
 }
 

@@ -7,7 +7,8 @@
 #include <map>
 #include <string>
 
-namespace dorado::utils {
+namespace dorado {
+namespace utils {
 
 using ProgressCallback = std::function<void(size_t percentage)>;
 using DescriptionCallback = std::function<void(const std::string&)>;
@@ -94,4 +95,8 @@ private:
     std::vector<MergeJob> recursive_batching(const std::vector<std::string>& files);
 };
 
-}  // namespace dorado::utils
+}  // namespace utils
+
+std::string to_string(utils::HtsFile::OutputMode mode);
+
+}  // namespace dorado
