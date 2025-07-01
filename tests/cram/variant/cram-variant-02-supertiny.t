@@ -7,8 +7,11 @@ Run a supertiny test case.
   > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
   > ${DORADO_BIN} variant --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --ignore-read-groups > out/out.vcf 2> out/stderr
   > echo "Exit code: $?"
+  > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
   > cat out/out.vcf | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   Exit code: 0
+  [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
