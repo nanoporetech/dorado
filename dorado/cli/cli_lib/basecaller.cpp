@@ -470,27 +470,32 @@ void setup(const std::vector<std::string>& args,
         utils::add_rg_headers(hdr.get(), read_groups);
     }
 
-    auto foo = utils::ProgressCallback([&tracker](size_t progress) {
-        tracker.set_description("Sorting output files");
+    auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
         tracker.update_post_processing_progress(static_cast<float>(progress));
     });
-    auto hts_writer_builder =
-            hts_writer::HtsFileWriterBuilder(emit_fastq, emit_sam, !ref.empty(), std::nullopt,
-                                             thread_allocations.writer_threads, foo);
+    auto description_callback = utils::DescriptionCallback(
+            [&tracker](const std::string& description) { tracker.set_description(description); });
+    auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+            emit_fastq, emit_sam, !ref.empty(), std::nullopt, thread_allocations.writer_threads,
+            progress_callback, description_callback);
 
-    std::unique_ptr<hts_writer::HtsFileWriter> writer = hts_writer_builder.build();
-    if (writer == nullptr) {
+    std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
+    if (hts_file_writer == nullptr) {
         spdlog::error("Failed to create hts file writer");
         std::exit(EXIT_FAILURE);
     }
-    writer->take_header(std::move(hdr));
+    hts_file_writer->take_header(std::move(hdr));
+    tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);
 
     PipelineDescriptor pipeline_desc;
     std::string gpu_names{};
 #if DORADO_CUDA_BUILD
     gpu_names = utils::get_cuda_gpu_names(device);
 #endif
-    auto hts_writer = pipeline_desc.add_node<WriterNode>({}, writer);
+    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+    writers.push_back(std::move(hts_file_writer));
+    auto hts_writer = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
+
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -564,11 +569,12 @@ void setup(const std::vector<std::string>& args,
     }
 
     // At present, header output file header writing relies on direct node method calls
-    // rather than the pipeline framework.
-    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
+    // rather than the pipeline framework - because we must guarantee that the header is set
+    // BEFORE we write any reads.
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
-        utils::add_sq_hdr(writer->header().get(), aligner_ref.get_sequence_records_for_header());
+        utils::add_sq_hdr(hts_file_writer->header().get(),
+                          aligner_ref.get_sequence_records_for_header());
     }
 
     std::unordered_set<std::string> reads_already_processed;
@@ -625,16 +631,13 @@ void setup(const std::vector<std::string>& args,
         }
 
         // Resume functionality injects reads directly into the writer node.
+        auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
         ResumeLoader resume_loader(hts_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
         reads_already_processed = resume_loader.get_processed_read_ids();
     }
 
-    // If we're doing alignment, post-processing takes longer due to bam file sorting.
-    float post_processing_percentage = (hts_file->finalise_is_noop() || ref.empty()) ? 0.0f : 0.5f;
-
-    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, int(num_reads),
-                            post_processing_percentage);
+    // If we're doing alignment, post-processing takes longer due to bam file sorting / merging.
     tracker.set_description("Basecalling");
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
@@ -650,6 +653,8 @@ void setup(const std::vector<std::string>& args,
 
     auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
+
+    // This is blocking on all reads
     loader.load_reads(pod5_folder_info.files(), ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect

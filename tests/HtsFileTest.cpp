@@ -1,5 +1,6 @@
 #include "TestUtils.h"
 #include "hts_utils/hts_file.h"
+#include "hts_writer/hts_file_writer.h"
 #include "utils/PostCondition.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -8,6 +9,7 @@
 #include <filesystem>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
 #include <vector>
 
@@ -285,4 +287,139 @@ CATCH_TEST_CASE("FileMergeBatcher: Eight batches, 3 recursions", TEST_GROUP) {
     const auto& batch7 = batcher.get_batch(7);
     CATCH_REQUIRE(batch7.size() == 2);
     CATCH_CHECK(batch7 == expected_files7);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
+    using namespace hts_writer;
+    using MaybeString = std::optional<std::string>;
+
+    auto p_cb = utils::ProgressCallback([](float _) {});
+    auto d_cb = utils::DescriptionCallback([](const std::string& _) {});
+    int threads = 0;
+
+    CATCH_SECTION("OutputMode::FASTQ happy paths") {
+        auto [output_mode, finalise_noop, out_dir] = GENERATE(table<OutputMode, bool, MaybeString>({
+                {OutputMode::FASTQ, true, std::nullopt},
+                {OutputMode::FASTQ, true, "out"},
+        }));
+
+        bool emit_fastq = true;
+        bool emit_sam = false;
+        bool ref_req = false;
+        CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
+                      out_dir.has_value());
+
+        auto writer_builder =
+                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        auto writer = writer_builder.build();
+
+        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+    };
+
+    CATCH_SECTION("OutputMode::SAM happy paths") {
+        auto [output_mode, finalise_noop, ref_req, out_dir] =
+                GENERATE(table<OutputMode, bool, bool, MaybeString>({
+                        // SAM / BAM will sort if writing to file AND reference is set
+                        {OutputMode::SAM, true, false, std::nullopt},
+                        {OutputMode::SAM, true, false, "out"},
+                        {OutputMode::SAM, true, true, std::nullopt},
+                        {OutputMode::SAM, false, true, "out"},
+                }));
+
+        bool emit_sam = true;
+        bool emit_fastq = false;
+        CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
+                      out_dir.has_value());
+
+        auto writer_builder =
+                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        auto writer = writer_builder.build();
+
+        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+    };
+
+    CATCH_SECTION("test tty and pipe outputs") {
+        auto [output_mode, ref_req, out_dir, emit_sam, is_fd_tty, is_fd_pipe] =
+                GENERATE(table<OutputMode, bool, MaybeString, bool, bool, bool>({
+                        // Always write SAM if writing to stdout tty
+                        {OutputMode::SAM, false, std::nullopt, true, true, false},
+                        {OutputMode::SAM, true, std::nullopt, true, true, false},
+                        {OutputMode::SAM, false, std::nullopt, false, true, false},
+                        {OutputMode::SAM, true, std::nullopt, false, true, false},
+
+                        // Output depends on --emit-sam regardless of reference when piping
+                        {OutputMode::SAM, false, std::nullopt, true, false, true},
+                        {OutputMode::SAM, true, std::nullopt, true, false, true},
+                        {OutputMode::BAM, false, std::nullopt, false, false, true},
+                        {OutputMode::BAM, true, std::nullopt, false, false, true},
+
+                }));
+
+        bool emit_fastq = false;
+        CATCH_CAPTURE(to_string(output_mode), emit_fastq, emit_sam, ref_req, out_dir.has_value(),
+                      is_fd_tty, is_fd_pipe);
+
+        auto writer_builder =
+                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        writer_builder.set_is_fd_tty(is_fd_tty);
+        writer_builder.set_is_fd_pipe(is_fd_pipe);
+        auto writer = writer_builder.build();
+
+        CATCH_CHECK(is_fd_tty != is_fd_pipe);
+        CATCH_CHECK(writer->mode() == output_mode);
+    };
+
+    CATCH_SECTION("OutputMode::BAM happy paths") {
+        auto [output_mode, finalise_noop, ref_req, out_dir] =
+                GENERATE(table<OutputMode, bool, bool, MaybeString>({
+                        {OutputMode::BAM, true, false, std::nullopt},
+                        {OutputMode::BAM, true, false, "out"},
+                        {OutputMode::BAM, true, true, std::nullopt},
+                        // BAM will sort if writing to file AND reference is set
+                        {OutputMode::BAM, false, true, "out"},
+                }));
+
+        bool is_fd_tty = false;
+        bool is_fd_pipe = false;
+        bool emit_sam = false;
+        bool emit_fastq = false;
+        CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
+                      out_dir.has_value(), is_fd_tty, is_fd_pipe);
+
+        auto writer_builder =
+                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        writer_builder.set_is_fd_tty(is_fd_tty);
+        writer_builder.set_is_fd_pipe(is_fd_pipe);
+
+        auto writer = writer_builder.build();
+
+        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+    };
+
+    CATCH_SECTION("HtsFileWriter other methods") {
+        int writer_threads = 10;
+        size_t progress_res = 0;
+        auto progress_cb =
+                utils::ProgressCallback([&progress_res](float value) { progress_res = value; });
+
+        std::string description_res{};
+        auto description_cb = utils::DescriptionCallback(
+                [&description_res](const std::string& value) { description_res = value; });
+        auto writer_builder = HtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
+                                                   progress_cb, description_cb);
+        auto writer = writer_builder.build();
+
+        CATCH_CHECK(writer->get_threads() == writer_threads);
+
+        const int test_progress = 100;
+        writer->set_progress(test_progress);
+        CATCH_CHECK(progress_res == test_progress);
+
+        const auto test_description = "running a test";
+        writer->set_description(test_description);
+        CATCH_CHECK(description_res == test_description);
+    }
 }

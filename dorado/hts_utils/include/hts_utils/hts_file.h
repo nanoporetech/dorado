@@ -2,7 +2,6 @@
 
 #include "hts_types.h"
 
-#include <algorithm>
 #include <filesystem>
 #include <functional>
 #include <map>
@@ -11,6 +10,7 @@
 namespace dorado::utils {
 
 using ProgressCallback = std::function<void(size_t percentage)>;
+using DescriptionCallback = std::function<void(const std::string&)>;
 
 class HtsFile {
 public:
