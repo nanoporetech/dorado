@@ -1,9 +1,11 @@
 #include "TestUtils.h"
 #include "hts_utils/hts_file.h"
+#include "hts_writer/HtsFileWriterBuilder.h"
 #include "hts_writer/hts_file_writer.h"
 #include "utils/PostCondition.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>
