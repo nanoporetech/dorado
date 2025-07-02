@@ -54,10 +54,9 @@ protected:
     virtual void handle(const HtsData& _) = 0;
 };
 
-class SingleHtsFileWriter : public HtsFileWriter {
+class StreamHtsFileWriter : public HtsFileWriter {
 public:
-    SingleHtsFileWriter(OutputMode mode,
-                        int threads,
+    StreamHtsFileWriter(OutputMode mode,
                         utils::ProgressCallback progress_callback,
                         utils::DescriptionCallback description_callback);
     void init() override;

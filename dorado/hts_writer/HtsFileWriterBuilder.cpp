@@ -78,7 +78,7 @@ std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     update();
     if (!m_output_dir.has_value()) {
         spdlog::info("Creating StreamHtsFileWriter {}", to_string(m_output_mode));
-        return std::make_unique<SingleHtsFileWriter>(m_output_mode, m_writer_threads,
+        return std::make_unique<StreamHtsFileWriter>(m_output_mode, m_writer_threads,
                                                      m_progress_callback, m_description_callback);
     }
     spdlog::error("Creating StructuredHtsFileWriter");

@@ -24,26 +24,21 @@ void HtsFileWriter::process(const Processable item) {
     dispatch_processable(item, [this](const auto &t) { this->handle(t); });
 };
 
-SingleHtsFileWriter::SingleHtsFileWriter(OutputMode mode,
-                                         int threads,
+StreamHtsFileWriter::StreamHtsFileWriter(OutputMode mode,
                                          utils::ProgressCallback progress_callback,
                                          utils::DescriptionCallback description_callback)
-        : HtsFileWriter(mode,
-                        threads,
-                        std::move(progress_callback),
-                        std::move(description_callback)) {};
+        : HtsFileWriter(mode, 0, std::move(progress_callback), std::move(description_callback)) {};
 
-void SingleHtsFileWriter::init() {};
+void StreamHtsFileWriter::init() {};
 
-void SingleHtsFileWriter::shutdown() {
-    // set_description("Finalising HTS output file");
+void StreamHtsFileWriter::shutdown() {
+    set_description("Finalising output");
     m_hts_file->finalise([this](size_t progress) { set_progress(progress); });
 };
 
-void SingleHtsFileWriter::handle(const HtsData &data) {
+void StreamHtsFileWriter::handle(const HtsData &data) {
     if (m_hts_file == nullptr) {
-        const bool sort_bam = false;
-        m_hts_file = std::make_unique<utils::HtsFile>("-", m_mode, m_threads, sort_bam);
+        m_hts_file = std::make_unique<utils::HtsFile>("-", m_mode, m_threads, false);
         if (m_hts_file == nullptr) {
             std::runtime_error("Failed to create HTS output file");
         }
@@ -75,16 +70,10 @@ StructuredHtsFileWriter::StructuredHtsFileWriter(const std::string &output_dir,
 void StructuredHtsFileWriter::init() { try_create_output_folder(); };
 
 void StructuredHtsFileWriter::shutdown() {
-    set_description("Finalising HTS output files");
-
-    spdlog::warn("StructuredHtsFileWriter::Shutdown called");
+    set_description("Finalising outputs");
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
     for (auto &[_, hts_file] : m_hts_files) {
-        if (m_sort) {
-            set_description("Sorting BAM");
-        }
-
         const size_t index = i++;
         hts_file.finalise([this, index, n_files](size_t progress) {
             const size_t past_progress = index * size_t(100);
