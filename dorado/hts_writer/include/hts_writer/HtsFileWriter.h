@@ -4,9 +4,7 @@
 #include "hts_utils/hts_types.h"
 #include "interface.h"
 
-#include <memory>
 #include <string>
-#include <unordered_map>
 
 namespace dorado {
 
@@ -30,6 +28,7 @@ public:
               m_threads(threads),
               m_progress_callback(std::move(progress_callback)),
               m_description_callback(std::move(description_callback)) {}
+
     void take_header(SamHdrPtr header) { m_header = std::move(header); };
     SamHdrPtr& header() { return m_header; }
     void process(const Processable item);
@@ -47,50 +46,11 @@ public:
 protected:
     const OutputMode m_mode;
     const int m_threads;
-    utils::ProgressCallback m_progress_callback;
-    utils::DescriptionCallback m_description_callback;
+    const utils::ProgressCallback m_progress_callback;
+    const utils::DescriptionCallback m_description_callback;
     SamHdrPtr m_header{nullptr};
 
     virtual void handle(const HtsData& _) = 0;
-};
-
-class StreamHtsFileWriter : public HtsFileWriter {
-public:
-    StreamHtsFileWriter(OutputMode mode,
-                        utils::ProgressCallback progress_callback,
-                        utils::DescriptionCallback description_callback);
-    void init() override;
-    void shutdown() override;
-
-    bool finalise_is_noop() const override { return true; };
-
-private:
-    std::unique_ptr<utils::HtsFile> m_hts_file;
-
-    void handle(const HtsData& data) override;
-};
-
-class StructuredHtsFileWriter : public HtsFileWriter {
-public:
-    StructuredHtsFileWriter(const std::string& output_dir,
-                            OutputMode mode,
-                            int threads,
-                            bool sort,
-                            utils::ProgressCallback progress_callback,
-                            utils::DescriptionCallback description_callback);
-    void init() override;
-    void shutdown() override;
-
-    bool finalise_is_noop() const override { return m_mode == OutputMode::FASTQ || !m_sort; };
-
-private:
-    const std::string m_output_dir;
-    const bool m_sort;
-    std::unordered_map<std::string, utils::HtsFile> m_hts_files;
-
-    bool try_create_output_folder() const;
-
-    void handle(const HtsData& data) override;
 };
 
 }  // namespace hts_writer

@@ -1,7 +1,9 @@
 #include "hts_writer/HtsFileWriterBuilder.h"
 
 #include "hts_utils/hts_file.h"
-#include "hts_writer/hts_file_writer.h"
+#include "hts_writer/StreamHtsFileWriter.h"
+#include "hts_writer/StructureStrategy.h"
+#include "hts_writer/StructuredHtsFileWriter.h"
 #include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -13,7 +15,6 @@
 #include <string>
 
 namespace dorado {
-
 namespace hts_writer {
 
 namespace fs = std::filesystem;
@@ -77,12 +78,13 @@ void HtsFileWriterBuilder::update() {
 std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     update();
     if (!m_output_dir.has_value()) {
-        spdlog::info("Creating StreamHtsFileWriter {}", to_string(m_output_mode));
-        return std::make_unique<StreamHtsFileWriter>(m_output_mode, m_writer_threads,
-                                                     m_progress_callback, m_description_callback);
+        spdlog::debug("Creating StreamHtsFileWriter {}", to_string(m_output_mode));
+        return std::make_unique<StreamHtsFileWriter>(m_output_mode, m_progress_callback,
+                                                     m_description_callback);
     }
-    spdlog::error("Creating StructuredHtsFileWriter");
-    return std::make_unique<StructuredHtsFileWriter>(m_output_dir.value(), m_output_mode,
+    spdlog::debug("Creating StructuredHtsFileWriter");
+    auto structure = std::make_unique<SingleFileStructure>(m_output_dir.value());
+    return std::make_unique<StructuredHtsFileWriter>(m_output_mode, std::move(structure),
                                                      m_writer_threads, m_sort, m_progress_callback,
                                                      m_description_callback);
 }

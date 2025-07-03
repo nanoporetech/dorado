@@ -1,7 +1,8 @@
 #include "TestUtils.h"
 #include "hts_utils/hts_file.h"
+#include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
-#include "hts_writer/hts_file_writer.h"
+#include "hts_writer/StreamHtsFileWriter.h"
 #include "utils/PostCondition.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -414,7 +415,11 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
                                                    progress_cb, description_cb);
         auto writer = writer_builder.build();
 
-        CATCH_CHECK(writer->get_threads() == writer_threads);
+        auto& writer_ref = *writer;
+        CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
+
+        // StreamHtsFileWriter sets threads to 0 as it has no use for them.
+        CATCH_CHECK(writer->get_threads() == 0);
 
         const int test_progress = 100;
         writer->set_progress(test_progress);

@@ -1,5 +1,6 @@
 #pragma once
-#include "hts_file_writer.h"
+
+#include "HtsFileWriter.h"
 
 namespace dorado {
 namespace hts_writer {

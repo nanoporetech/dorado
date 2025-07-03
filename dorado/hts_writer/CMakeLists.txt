@@ -4,12 +4,18 @@ dorado_add_library(
     PUBLIC_DIR
         hts_writer
     SOURCES_PUBLIC
+        HtsFileWriter.h
         HtsFileWriterBuilder.h
-        hts_file_writer.h
+        StreamHtsFileWriter.h
+        StructuredHtsFileWriter.h
+        StructureStrategy.h
         interface.h
     SOURCES_PRIVATE
+        HtsFileWriter.cpp
         HtsFileWriterBuilder.cpp
-        hts_file_writer.cpp
+        StreamHtsFileWriter.cpp
+        StructuredHtsFileWriter.cpp
+        StructureStrategy.cpp
     DEPENDS_PUBLIC
         # nothing
     DEPENDS_PRIVATE
