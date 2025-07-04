@@ -61,8 +61,7 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
            << (read_group.modbase_models.empty() ? ""
                                                  : (" modbase_models=" + read_group.modbase_models))
            << " runid=" << value_or_unknown(read_group.run_id) << "\t";
-        rg << "LB:" << value_or_unknown(read_group.sample_id) << "\t";
-        rg << "SM:" << value_or_unknown(read_group.sample_id);
+        rg << "LB:" << value_or_unknown(read_group.sample_id);
     }
     return rg.str();
 }
@@ -86,8 +85,9 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
         throw std::runtime_error("Unrecognised kit name: " + kit_name);
     }
     for (const auto& barcode_name : kit_info->second.barcodes) {
-        const auto additional_tags = "\tBC:" + get_barcode_sequence(barcode_name);
+        auto additional_tags = "\tBC:" + get_barcode_sequence(barcode_name);
         const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+        additional_tags += "\tSM:" + normalized_barcode_name;
         for (const auto& read_group : read_groups) {
             std::string alias;
             auto id = read_group.first + '_';
@@ -100,13 +100,16 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
                         read_group.second.flowcell_id, read_group.second.position_id,
                         read_group.second.experiment_id, normalized_barcode_name);
             }
+            auto extra_tags = additional_tags;
             if (!alias.empty()) {
                 id += alias;
+                extra_tags += "\tal:" + alias;
             } else {
                 id += barcode_kits::generate_standard_barcode_name(kit_name, barcode_name);
+                extra_tags += "\tal:" + normalized_barcode_name;
             }
             const std::string read_group_tags = read_group_to_string(read_group.second);
-            emit_read_group(hdr, read_group_tags, id, additional_tags);
+            emit_read_group(hdr, read_group_tags, id, extra_tags);
         }
     }
 }

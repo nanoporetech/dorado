@@ -18,7 +18,8 @@
 |    | PL | `ONT`                                                                                      |
 |    | DS | `basecall_model=<basecall_model_name> modbase_models=<modbase_model_names> runid=<run_id>` |
 |    | LB | `<sample_id>`                                                                              |
-|    | SM | `<sample_id>`                                                                              |
+|    | SM | `<barcode_name>` (only if barcoding, and barcode is not "unclassified")                    |
+|    | al | `<barcode_alias>` (only if barcoding, same as `SM` tag if no alias)                        |
 
 #### Read Tags
 
