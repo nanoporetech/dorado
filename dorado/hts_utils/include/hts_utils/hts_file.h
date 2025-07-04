@@ -98,5 +98,6 @@ private:
 }  // namespace utils
 
 std::string to_string(utils::HtsFile::OutputMode mode);
+std::string get_suffix(utils::HtsFile::OutputMode mode);
 
 }  // namespace dorado

@@ -571,19 +571,31 @@ std::vector<FileMergeBatcher::MergeJob> FileMergeBatcher::recursive_batching(
 }  // namespace utils
 
 std::string to_string(utils::HtsFile::OutputMode mode) {
-    {
-        switch (mode) {
-        case utils::HtsFile::OutputMode::BAM:
-            return "BAM";
-        case utils::HtsFile::OutputMode::UBAM:
-            return "UBAM";
-        case utils::HtsFile::OutputMode::SAM:
-            return "SAM";
-        case utils::HtsFile::OutputMode::FASTA:
-            return "FASTA";
-        case utils::HtsFile::OutputMode::FASTQ:
-            return "FASTQ";
-        }
+    switch (mode) {
+    case utils::HtsFile::OutputMode::BAM:
+        return "BAM";
+    case utils::HtsFile::OutputMode::UBAM:
+        return "UBAM";
+    case utils::HtsFile::OutputMode::SAM:
+        return "SAM";
+    case utils::HtsFile::OutputMode::FASTA:
+        return "FASTA";
+    case utils::HtsFile::OutputMode::FASTQ:
+        return "FASTQ";
+    }
+}
+
+std::string get_suffix(utils::HtsFile::OutputMode mode) {
+    switch (mode) {
+    case utils::HtsFile::OutputMode::BAM:
+    case utils::HtsFile::OutputMode::UBAM:
+        return ".bam";
+    case utils::HtsFile::OutputMode::SAM:
+        return ".sam";
+    case utils::HtsFile::OutputMode::FASTA:
+        return "fasta";
+    case utils::HtsFile::OutputMode::FASTQ:
+        return ".fastq";
     }
 }
 

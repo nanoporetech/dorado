@@ -16,12 +16,9 @@ using OutputMode = utils::HtsFile::OutputMode;
 
 class StreamHtsFileWriter : public HtsFileWriter {
 public:
-    StreamHtsFileWriter(OutputMode mode,
-                        utils::ProgressCallback progress_callback,
-                        utils::DescriptionCallback description_callback);
+    StreamHtsFileWriter(const HtsFileWriterConfig& cfg);
     void init() override;
     void shutdown() override;
-
     bool finalise_is_noop() const override { return true; };
 
 private:

@@ -1,6 +1,7 @@
 #include "hts_writer/StructuredHtsFileWriter.h"
 
 #include "hts_utils/hts_file.h"
+#include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/StructureStrategy.h"
 
 #include <spdlog/spdlog.h>
@@ -18,18 +19,10 @@ namespace hts_writer {
 
 namespace fs = std::filesystem;
 
-StructuredHtsFileWriter::StructuredHtsFileWriter(OutputMode mode,
+StructuredHtsFileWriter::StructuredHtsFileWriter(const HtsFileWriterConfig &cfg,
                                                  std::unique_ptr<IStructure> structure,
-                                                 int threads,
-                                                 bool sort,
-                                                 utils::ProgressCallback progress_callback,
-                                                 utils::DescriptionCallback description_callback)
-        : HtsFileWriter(mode,
-                        threads,
-                        std::move(progress_callback),
-                        std::move(description_callback)),
-          m_structure(std::move(structure)),
-          m_sort(sort) {};
+                                                 bool sort)
+        : HtsFileWriter(cfg), m_structure(std::move(structure)), m_sort(sort) {};
 
 void StructuredHtsFileWriter::init() { m_structure->init(); }
 

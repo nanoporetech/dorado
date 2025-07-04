@@ -16,7 +16,8 @@ public:
                          const std::optional<std::string>& output_dir,
                          int writer_threads,
                          utils::ProgressCallback progress_callback,
-                         utils::DescriptionCallback description_callback);
+                         utils::DescriptionCallback description_callback,
+                         std::string gpu_names);
 
     void set_output_mode(OutputMode output_mode);
     OutputMode get_output_mode() const { return m_output_mode; }
@@ -48,6 +49,8 @@ private:
     int m_writer_threads{0};
     utils::ProgressCallback m_progress_callback;
     utils::DescriptionCallback m_description_callback;
+
+    std::string m_gpu_names;
 
     bool m_sort{false};
 

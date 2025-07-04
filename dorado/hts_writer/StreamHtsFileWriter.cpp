@@ -10,10 +10,9 @@
 namespace dorado {
 namespace hts_writer {
 
-StreamHtsFileWriter::StreamHtsFileWriter(OutputMode mode,
-                                         utils::ProgressCallback progress_callback,
-                                         utils::DescriptionCallback description_callback)
-        : HtsFileWriter(mode, 0, std::move(progress_callback), std::move(description_callback)) {}
+StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig & cfg)
+        : HtsFileWriter(
+                  {cfg.mode, 0, cfg.progress_callback, cfg.description_callback, cfg.gpu_names}) {}
 
 void StreamHtsFileWriter::init() {}
 
@@ -22,7 +21,7 @@ void StreamHtsFileWriter::shutdown() {
     m_hts_file->finalise([this](size_t progress) { set_progress(progress); });
 }
 
-void StreamHtsFileWriter::handle(const HtsData &data) {
+void StreamHtsFileWriter::handle(const HtsData & data) {
     if (m_hts_file == nullptr) {
         m_hts_file = std::make_unique<utils::HtsFile>("-", m_mode, 0, false);
         if (m_hts_file == nullptr) {

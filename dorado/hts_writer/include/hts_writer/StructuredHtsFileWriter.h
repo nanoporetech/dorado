@@ -12,12 +12,9 @@ namespace hts_writer {
 
 class StructuredHtsFileWriter : public HtsFileWriter {
 public:
-    StructuredHtsFileWriter(OutputMode mode,
+    StructuredHtsFileWriter(const HtsFileWriterConfig& cfg,
                             std::unique_ptr<IStructure> structure,
-                            int threads,
-                            bool sort,
-                            utils::ProgressCallback progress_callback,
-                            utils::DescriptionCallback description_callback);
+                            bool sort);
     void init() override;
     void shutdown() override;
 

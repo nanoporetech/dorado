@@ -18,16 +18,22 @@ constexpr std::string_view FASTQ{".fastq"};
 
 using OutputMode = utils::HtsFile::OutputMode;
 
+struct HtsFileWriterConfig {
+    OutputMode mode;
+    int threads;
+    utils::ProgressCallback progress_callback;
+    utils::DescriptionCallback description_callback;
+    std::string gpu_names;
+};
+
 class HtsFileWriter : public IWriter {
 public:
-    explicit HtsFileWriter(OutputMode mode,
-                           int threads,
-                           utils::ProgressCallback progress_callback,
-                           utils::DescriptionCallback description_callback)
-            : m_mode(mode),
-              m_threads(threads),
-              m_progress_callback(std::move(progress_callback)),
-              m_description_callback(std::move(description_callback)) {}
+    explicit HtsFileWriter(const HtsFileWriterConfig& cfg)
+            : m_mode(cfg.mode),
+              m_threads(cfg.threads),
+              m_progress_callback(cfg.progress_callback),
+              m_description_callback(cfg.description_callback),
+              m_gpu_names(cfg.gpu_names) {}
 
     void take_header(SamHdrPtr header) { m_header = std::move(header); };
     SamHdrPtr& header() { return m_header; }

@@ -299,6 +299,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
     auto p_cb = utils::ProgressCallback([](float _) {});
     auto d_cb = utils::DescriptionCallback([](const std::string& _) {});
     int threads = 0;
+    const std::string gpu_names = "gpu_names:1";
 
     CATCH_SECTION("OutputMode::FASTQ happy paths") {
         auto [output_mode, finalise_noop, out_dir] = GENERATE(table<OutputMode, bool, MaybeString>({
@@ -312,11 +313,11 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
         CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
                       out_dir.has_value());
 
-        auto writer_builder =
-                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, gpu_names);
         auto writer = writer_builder.build();
 
-        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->get_mode() == output_mode);
         CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
     };
 
@@ -335,11 +336,11 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
         CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
                       out_dir.has_value());
 
-        auto writer_builder =
-                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, gpu_names);
         auto writer = writer_builder.build();
 
-        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->get_mode() == output_mode);
         CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
     };
 
@@ -364,14 +365,14 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
         CATCH_CAPTURE(to_string(output_mode), emit_fastq, emit_sam, ref_req, out_dir.has_value(),
                       is_fd_tty, is_fd_pipe);
 
-        auto writer_builder =
-                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, gpu_names);
         writer_builder.set_is_fd_tty(is_fd_tty);
         writer_builder.set_is_fd_pipe(is_fd_pipe);
         auto writer = writer_builder.build();
 
         CATCH_CHECK(is_fd_tty != is_fd_pipe);
-        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->get_mode() == output_mode);
     };
 
     CATCH_SECTION("OutputMode::BAM happy paths") {
@@ -391,14 +392,14 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
         CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
                       out_dir.has_value(), is_fd_tty, is_fd_pipe);
 
-        auto writer_builder =
-                HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads, p_cb, d_cb);
+        auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, gpu_names);
         writer_builder.set_is_fd_tty(is_fd_tty);
         writer_builder.set_is_fd_pipe(is_fd_pipe);
 
         auto writer = writer_builder.build();
 
-        CATCH_CHECK(writer->mode() == output_mode);
+        CATCH_CHECK(writer->get_mode() == output_mode);
         CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
     };
 
@@ -412,14 +413,15 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
         auto description_cb = utils::DescriptionCallback(
                 [&description_res](const std::string& value) { description_res = value; });
         auto writer_builder = HtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
-                                                   progress_cb, description_cb);
+                                                   progress_cb, description_cb, gpu_names);
         auto writer = writer_builder.build();
 
         auto& writer_ref = *writer;
-        CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
-
         // StreamHtsFileWriter sets threads to 0 as it has no use for them.
+        CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
         CATCH_CHECK(writer->get_threads() == 0);
+
+        CATCH_CHECK(writer->get_gpu_names() == gpu_names);
 
         const int test_progress = 100;
         writer->set_progress(test_progress);

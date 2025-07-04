@@ -1,6 +1,7 @@
 #include "hts_writer/HtsFileWriterBuilder.h"
 
 #include "hts_utils/hts_file.h"
+#include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/StructureStrategy.h"
 #include "hts_writer/StructuredHtsFileWriter.h"
@@ -28,7 +29,8 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            const std::optional<std::string> &output_dir,
                                            int threads,
                                            utils::ProgressCallback progress_callback,
-                                           utils::DescriptionCallback description_callback)
+                                           utils::DescriptionCallback description_callback,
+                                           std::string gpu_names)
         : m_emit_fastq(emit_fastq),
           m_emit_sam(emit_sam),
           m_reference_requested(reference_requested),
@@ -36,6 +38,7 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_writer_threads(threads),
           m_progress_callback(std::move(progress_callback)),
           m_description_callback(std::move(description_callback)),
+          m_gpu_names(std::move(gpu_names)),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {};
 
@@ -45,13 +48,13 @@ void HtsFileWriterBuilder::update() {
     if (m_emit_fastq) {
         if (m_emit_sam) {
             spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
-            std::runtime_error("Invalid writer configuration");
+            throw std::runtime_error("Invalid writer configuration");
         }
         if (m_reference_requested) {
             spdlog::error(
                     "--emit-fastq cannot be used with --reference as FASTQ cannot store "
                     "alignment results.");
-            std::runtime_error("Invalid writer configuration");
+            throw std::runtime_error("Invalid writer configuration");
         }
         spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
         m_output_mode = OutputMode::FASTQ;
@@ -77,16 +80,14 @@ void HtsFileWriterBuilder::update() {
 
 std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     update();
+    const auto cfg = HtsFileWriterConfig{m_output_mode, m_writer_threads, m_progress_callback,
+                                         m_description_callback, m_gpu_names};
+
     if (!m_output_dir.has_value()) {
-        spdlog::debug("Creating StreamHtsFileWriter {}", to_string(m_output_mode));
-        return std::make_unique<StreamHtsFileWriter>(m_output_mode, m_progress_callback,
-                                                     m_description_callback);
+        return std::make_unique<StreamHtsFileWriter>(cfg);
     }
-    spdlog::debug("Creating StructuredHtsFileWriter");
-    auto structure = std::make_unique<SingleFileStructure>(m_output_dir.value());
-    return std::make_unique<StructuredHtsFileWriter>(m_output_mode, std::move(structure),
-                                                     m_writer_threads, m_sort, m_progress_callback,
-                                                     m_description_callback);
+    auto structure = std::make_unique<SingleFileStructure>(m_output_dir.value(), m_output_mode);
+    return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(structure), m_sort);
 }
 }  // namespace hts_writer
 }  // namespace dorado
