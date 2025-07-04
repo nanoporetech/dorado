@@ -2,7 +2,7 @@
 
 #include "hts_utils/hts_file.h"
 #include "hts_writer/HtsFileWriter.h"
-#include "hts_writer/StructureStrategy.h"
+#include "hts_writer/Structure.h"
 
 #include <spdlog/spdlog.h>
 
@@ -31,6 +31,12 @@ void StructuredHtsFileWriter::shutdown() {
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
     for (auto &[_, hts_file] : m_hts_files) {
+        if (hts_file == nullptr) {
+            spdlog::debug(
+                    "StructuredHtsFileWriter::shutdown called on uninitialised hts_file - nothing "
+                    "to do");
+            continue;
+        }
         const size_t index = i++;
         hts_file->finalise([this, index, n_files](size_t progress) {
             const size_t past_progress = index * size_t(100);

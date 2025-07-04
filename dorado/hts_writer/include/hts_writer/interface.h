@@ -1,6 +1,10 @@
 #pragma once
 
 #include "hts_utils/hts_types.h"
+#include "utils/stats.h"
+
+#include <functional>
+#include <variant>
 
 namespace dorado {
 namespace hts_writer {
@@ -25,13 +29,19 @@ public:
     virtual void init() = 0;
     virtual void process(const Processable item) = 0;
     virtual void shutdown() = 0;
+
+    virtual std::string get_name() const = 0;
+    virtual stats::NamedStats sample_stats() const = 0;
 };
 
 class NullWriter : public IWriter {
 public:
-    void init() {};
-    void process(const Processable _) {};
-    void shutdown() {};
+    void init() override {};
+    void process([[maybe_unused]] const Processable _) override {};
+    void shutdown() override {};
+
+    std::string get_name() const override { return "NullWriter"; }
+    stats::NamedStats sample_stats() const override { return stats::NamedStats(); };
 };
 
 }  // namespace hts_writer

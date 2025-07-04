@@ -3,8 +3,10 @@
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
 #include "interface.h"
+#include "utils/stats.h"
 
 #include <string>
+#include <utility>
 
 namespace dorado {
 
@@ -35,28 +37,43 @@ public:
               m_description_callback(cfg.description_callback),
               m_gpu_names(cfg.gpu_names) {}
 
-    void take_header(SamHdrPtr header) { m_header = std::move(header); };
-    SamHdrPtr& header() { return m_header; }
-    void process(const Processable item);
+    void set_header(SamHdrSharedPtr header) { m_header = std::move(header); };
+    SamHdrSharedPtr& get_header() { return m_header; }
 
-    OutputMode mode() const { return m_mode; }
+    void process(const Processable item) override;
+
+    OutputMode get_mode() const { return m_mode; }
     virtual bool finalise_is_noop() const = 0;
 
     int get_threads() const { return m_threads; }
+    const std::string& get_gpu_names() const { return m_gpu_names; }
 
     void set_progress(size_t progress) const { m_progress_callback(progress); }
     void set_description(const std::string& description) const {
         m_description_callback(description);
     }
 
+    std::string get_name() const override { return "HtsFileWriter"; }
+    stats::NamedStats sample_stats() const override;
+
 protected:
     const OutputMode m_mode;
     const int m_threads;
     const utils::ProgressCallback m_progress_callback;
     const utils::DescriptionCallback m_description_callback;
-    SamHdrPtr m_header{nullptr};
 
+    SamHdrSharedPtr m_header{nullptr};
+
+    std::string m_gpu_names{};
+
+    void prepare_item(const HtsData& _) const;
     virtual void handle(const HtsData& _) = 0;
+    void tally(const HtsData& data);
+
+    // Stats counters
+    std::atomic<std::size_t> m_primary_simplex_reads_written{0};
+    std::atomic<std::size_t> m_duplex_reads_written{0};
+    std::atomic<std::size_t> m_split_reads_written{0};
 };
 
 }  // namespace hts_writer

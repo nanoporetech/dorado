@@ -3,7 +3,7 @@
 #include "hts_utils/hts_file.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/StreamHtsFileWriter.h"
-#include "hts_writer/StructureStrategy.h"
+#include "hts_writer/Structure.h"
 #include "hts_writer/StructuredHtsFileWriter.h"
 #include "utils/tty_utils.h"
 

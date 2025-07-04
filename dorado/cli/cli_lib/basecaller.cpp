@@ -315,6 +315,7 @@ void setup(const std::vector<std::string>& args,
            const std::string& bed,
            size_t num_runners,
            const ModBaseBatchParams& modbase_params,
+           const std::optional<std::string>& output_dir,
            bool emit_fastq,
            bool emit_sam,
            bool emit_moves,
@@ -459,6 +460,11 @@ void setup(const std::vector<std::string>& args,
             int(num_devices), !modbase_runners.empty() ? int(modbase_params.threads) : 0,
             enable_aligner, barcoding_info != nullptr, adapter_trimming_enabled);
 
+    std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+    gpu_names = utils::get_cuda_gpu_names(device);
+#endif
+
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
@@ -468,33 +474,38 @@ void setup(const std::vector<std::string>& args,
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
+    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+    {
+        auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
+        auto description_callback =
+                utils::DescriptionCallback([&tracker](const std::string& description) {
+                    tracker.set_description(description);
+                });
+        auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+                emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
+                progress_callback, description_callback, gpu_names);
 
-    auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
-    auto description_callback = utils::DescriptionCallback(
-            [&tracker](const std::string& description) { tracker.set_description(description); });
-    auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-            emit_fastq, emit_sam, !ref.empty(), std::nullopt, thread_allocations.writer_threads,
-            progress_callback, description_callback);
+        std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
+        if (hts_file_writer == nullptr) {
+            spdlog::error("Failed to create hts file writer");
+            std::exit(EXIT_FAILURE);
+        }
 
-    std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
-    if (hts_file_writer == nullptr) {
-        spdlog::error("Failed to create hts file writer");
-        std::exit(EXIT_FAILURE);
+        if (hts_file_writer->get_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
+
+        tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);
+        writers.push_back(std::move(hts_file_writer));
     }
-    hts_file_writer->take_header(std::move(hdr));
-    tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);
 
     PipelineDescriptor pipeline_desc;
-    std::string gpu_names{};
-#if DORADO_CUDA_BUILD
-    gpu_names = utils::get_cuda_gpu_names(device);
-#endif
-    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
-    writers.push_back(std::move(hts_file_writer));
     auto hts_writer = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
-
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -572,8 +583,13 @@ void setup(const std::vector<std::string>& args,
     // BEFORE we write any reads.
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
-        utils::add_sq_hdr(hts_file_writer->header().get(),
-                          aligner_ref.get_sequence_records_for_header());
+        utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
+    }
+
+    {
+        // Set the sam header for all writers
+        const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
+        hts_writer_ref.take_hts_header(std::move(hdr));
     }
 
     std::unordered_set<std::string> reads_already_processed;
@@ -938,8 +954,8 @@ int basecaller(int argc, char* argv[]) {
         setup(args, model_config, pod5_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
-              modbase_params, parser.visible.get<bool>("--emit-sam"),
-              parser.visible.get<bool>("--emit-fastq"), parser.visible.get<bool>("--emit-moves"),
+              modbase_params, cli::get_output_dir(parser), cli::get_emit_fastq(parser),
+              cli::get_emit_sam(parser), parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),

@@ -8,19 +8,20 @@ dorado_add_library(
         HtsFileWriterBuilder.h
         StreamHtsFileWriter.h
         StructuredHtsFileWriter.h
-        StructureStrategy.h
+        Structure.h
         interface.h
     SOURCES_PRIVATE
         HtsFileWriter.cpp
         HtsFileWriterBuilder.cpp
         StreamHtsFileWriter.cpp
         StructuredHtsFileWriter.cpp
-        StructureStrategy.cpp
+        Structure.cpp
     DEPENDS_PUBLIC
         # nothing
     DEPENDS_PRIVATE
         dorado_hts_utils
         dorado_utils
+        htslib
         spdlog::spdlog
     NO_TORCH
 )

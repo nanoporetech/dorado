@@ -296,8 +296,8 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder", TEST_GROUP) {
     using namespace hts_writer;
     using MaybeString = std::optional<std::string>;
 
-    auto p_cb = utils::ProgressCallback([](float _) {});
-    auto d_cb = utils::DescriptionCallback([](const std::string& _) {});
+    auto p_cb = utils::ProgressCallback([](float f) { (void)f; });
+    auto d_cb = utils::DescriptionCallback([](const std::string& s) { (void)s; });
     int threads = 0;
     const std::string gpu_names = "gpu_names:1";
 

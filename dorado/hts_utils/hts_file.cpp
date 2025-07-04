@@ -583,6 +583,7 @@ std::string to_string(utils::HtsFile::OutputMode mode) {
     case utils::HtsFile::OutputMode::FASTQ:
         return "FASTQ";
     }
+    throw std::logic_error("Unknown OutputMode");
 }
 
 std::string get_suffix(utils::HtsFile::OutputMode mode) {
@@ -597,6 +598,7 @@ std::string get_suffix(utils::HtsFile::OutputMode mode) {
     case utils::HtsFile::OutputMode::FASTQ:
         return ".fastq";
     }
+    throw std::logic_error("Unknown OutputMode");
 }
 
 }  // namespace dorado

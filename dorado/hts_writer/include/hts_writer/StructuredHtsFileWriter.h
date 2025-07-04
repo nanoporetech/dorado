@@ -1,7 +1,7 @@
 #pragma once
 
 #include "hts_writer/HtsFileWriter.h"
-#include "hts_writer/StructureStrategy.h"
+#include "hts_writer/Structure.h"
 
 #include <memory>
 #include <unordered_map>

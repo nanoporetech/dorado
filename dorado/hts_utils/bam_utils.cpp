@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cstdint>
 #include <iostream>
 #include <map>
 #include <numeric>
@@ -521,5 +522,18 @@ void remove_alignment_tags_from_record(bam1_t* record) {
         }
     }
 }
+
+int64_t get_dx_tag(const bam1_t* record) {
+    int64_t dx_tag = 0;
+    auto tag_str = bam_aux_get(record, "dx");
+    if (tag_str) {
+        dx_tag = bam_aux2i(tag_str);
+    }
+    return dx_tag;
+}
+
+bool is_duplex_record(const bam1_t* record) { return get_dx_tag(record) == 1; }
+
+bool is_duplex_offspring_record(const bam1_t* record) { return get_dx_tag(record) == -1; }
 
 }  // namespace dorado::utils

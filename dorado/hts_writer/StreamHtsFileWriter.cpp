@@ -17,6 +17,11 @@ StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig & cfg)
 void StreamHtsFileWriter::init() {}
 
 void StreamHtsFileWriter::shutdown() {
+    if (m_hts_file == nullptr) {
+        spdlog::debug(
+                "StreamHtsFileWriter::shutdown called on uninitialised hts_file - nothing to do");
+        return;
+    }
     set_description("Finalising output");
     m_hts_file->finalise([this](size_t progress) { set_progress(progress); });
 }

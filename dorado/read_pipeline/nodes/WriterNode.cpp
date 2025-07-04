@@ -1,8 +1,9 @@
 #include "read_pipeline/nodes/WriterNode.h"
 
+#include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/interface.h"
 #include "read_pipeline/base/messages.h"
-#include "spdlog/spdlog.h"
+#include "utils/stats.h"
 
 #include <utility>
 #include <variant>
@@ -40,6 +41,13 @@ stats::NamedStats WriterNode::sample_stats() const {
     stats["num_writers"] = m_writers.size();
     stats["num_received"] = m_num_received.load();
     stats["num_dispatched"] = m_num_dispatched.load();
+
+    for (const auto &writer : m_writers) {
+        for (const auto &[key, value] : stats::from_obj(*writer.get())) {
+            stats[key] = value;
+        }
+    }
+
     return stats;
 }
 
@@ -48,6 +56,15 @@ void WriterNode::terminate(const FlushOptions &) {
     stop_input_processing();
     for (const auto &writer : m_writers) {
         writer->shutdown();
+    }
+}
+
+void WriterNode::take_hts_header(SamHdrPtr hdr) const {
+    SamHdrSharedPtr shared_header(std::move(hdr));
+    for (const auto &writer : m_writers) {
+        if (auto w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
+            w->set_header(shared_header);
+        }
     }
 }
 
