@@ -612,25 +612,21 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto t_rms_out = torch::empty({N, T / 16, C / 16, 16, 16}, f8_opts);
     auto t_fc1_out = use_f8 ? torch::empty({N * T / 16, E / 32, 16, 16}, f8_opts)
                             : torch::empty({N * T / 16, E / 16, 16, 8}, f16_opts);
-    // auto t_fc1_out = torch::empty({N * T / 16, t_fc2_wts.size(1), 16, t_fc2_wts.size(3)},
-    //                               t_fc2_wts.options());
-    auto t_rms1_out_f16 = torch::empty(
-            {N * T / 256, C / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f16_opts);
-    auto t_rms1_out_f8 = torch::empty(
-            {N * T / 256, C / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f8_opts);
-    auto t_fc1_out_f8 = torch::empty(
-            {N * T / 256, (E / 2) / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f8_opts);
+    auto hopper_layout = [](int64_t dim0, int64_t dim1) -> std::array<int64_t, 8> {
+        // {dim0 / 256, dim1 / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16 }
+        return {dim0 / 256, dim1 / 128, 4, 4, 8, 2, 8, 16};
+    };
+    auto t_rms1_out_f16 = torch::empty(hopper_layout(N * T, C), f16_opts);
+    auto t_rms1_out_f8 = torch::empty(hopper_layout(N * T, C), f8_opts);
+    auto t_fc1_out_f8 = torch::empty(hopper_layout(N * T, E / 2), f8_opts);
+    auto t_fc2_out_f8 = torch::empty(hopper_layout(N * T, C), f8_opts);
     auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
-    auto t_fc2_out_f8 = torch::empty(
-            {N * T / 256, C / 128, 256 / 64, 128 / 32, 64 / 8, 32 / 16, 8, 16}, f8_opts);
-    // auto t_rms2_out_f16 = torch::empty({N * T / 16, C / 8, 16, 8}, f16_opts); // RMS2 output residual is x_f16
 
     //Define Koi Tensors for the above buffers.
     auto &x = scaled_tensor.t;
     const bool use_i8 = (x.dtype() == torch::kI8);
     auto &wqkv_weights = use_i8 ? wqkv_weights_i8 : wqkv_weights_f16;
     auto &t_fc1_wts = use_f8 ? t_fc1_wts_f8 : (use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16);
-    // auto &t_fc1_wts = (use_hopper || use_f8) ? t_fc1_wts_f8 : (use_i8 ? t_fc1_wts_i8 : t_fc1_wts_f16);
     KoiTensorExt in_f16(x_f16, {'N', 'T', 'C', 't', 'c'});
     KoiTensorExt in(x, {'N', 'T', 'C', 't', 'c'}, scaled_tensor.scale, 'C');
     KoiTensorExt *in_i8_ptr = use_i8 ? &in : nullptr;
@@ -649,7 +645,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     if (!use_hopper) {
         fc1_wts = KoiTensorExt(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
     }
-    // KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
     KoiTensorExt fc1_out(t_fc1_out, {'M', 'N', 'm', 'n'});
     KoiTensorExt fc1_out_mk(t_fc1_out, {'M', 'K', 'm', 'k'});
     KoiTensorExt fc2_out_mn(t_fc2_out.flatten(0, 1), {'M', 'N', 'm', 'n'});
@@ -662,17 +657,14 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     if (!use_hopper) {
         res_weights = KoiTensorExt(t_res_weights, {'C'});
     }
-    // KoiTensorExt res_weights(t_res_weights, {'C'});
     KoiTensorExt fc2_wts;
     if (!use_hopper) {
         fc2_wts = KoiTensorExt(t_fc2_wts, {'N', 'K', 'n', 'k'});
     }
-    // KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
     KoiTensorExt res2_weights;
     if (!use_hopper) {
         res2_weights = KoiTensorExt(t_res2_weights, {'C'});
     }
-    // KoiTensorExt res2_weights(t_res2_weights, {'C'});
 
     int res = KOI_SUCCESS;
     int calls = 0;
@@ -701,7 +693,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         utils::ScopedProfileRange spr("LNORM1", 3);
         std::cout << "Made it to LNORM1\n";
         if (use_hopper) {
-            // res = koi_rmsnorm_hopper(stream, t_out_proj.data_ptr(), x_f16.data_ptr(), t_res_weights_h.data_ptr(), t_rms1_out_f16.data_ptr(), t_rms1_out_f8.data_ptr(), nullptr, N * T, C, alpha, true);
             res = koi_rmsnorm_hopper(stream, t_out_proj.data_ptr(), x_f16.data_ptr(),
                                      t_res_weights.data_ptr(), t_rms1_out_f16.data_ptr(),
                                      t_rms1_out_f8.data_ptr(), nullptr, N * T, C, alpha, true);
@@ -716,7 +707,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         utils::ScopedProfileRange spr("FC1+SILU", 3);
         std::cout << "Made it to FC1+SILU\n";
         if (use_hopper) {
-            // res = koi_swiglu_hopper(stream, t_rms1_out_f8.data_ptr(), t_fc1_wts_f8_h.data_ptr(), t_fc1_out_f8.data_ptr(), N * T, E, C);
             res = koi_swiglu_hopper(stream, t_rms1_out_f8.data_ptr(), t_fc1_wts_f8.t.data_ptr(),
                                     t_fc1_out_f8.data_ptr(), N * T, E, C);
         } else {
@@ -742,7 +732,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         utils::ScopedProfileRange spr("LNORM2", 3);
         std::cout << "Made it to LNORM2\n";
         if (use_hopper) {
-            // res = koi_rmsnorm_hopper(stream, t_fc2_out_f8.data_ptr(), t_rms1_out_f16.data_ptr(), t_res2_weights_h.data_ptr(), x_f16.data_ptr(), x.data_ptr(), scaled_tensor.scale.data_ptr(), N * T, C, alpha, false);
             res = koi_rmsnorm_hopper(stream, t_fc2_out_f8.data_ptr(), t_rms1_out_f16.data_ptr(),
                                      t_res2_weights.data_ptr(), x_f16.data_ptr(), x.data_ptr(),
                                      scaled_tensor.scale.data_ptr(), N * T, C, alpha, false);
