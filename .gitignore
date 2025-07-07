@@ -23,3 +23,6 @@ log*
 out*
 Makefile
 /models
+
+# Ignore test output directories
+/tests/test_simple_basecaller_output_[0-9]*/
