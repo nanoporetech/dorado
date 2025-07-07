@@ -81,6 +81,7 @@ add_executable(dorado_tests
     SecondaryMergeVCSamplesTest.cpp
     SecondaryModelFactory.cpp
     SecondarySampleTest.cpp
+    SecondarySampleCollateUtilsTest.cpp
     SecondaryTrimTest.cpp
     SecondaryWindowTest.cpp
     RleTest.cpp
