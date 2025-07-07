@@ -589,7 +589,7 @@ void setup(const std::vector<std::string>& args,
     {
         // Set the sam header for all writers
         const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
-        hts_writer_ref.take_hts_header(std::move(hdr));
+        hts_writer_ref.set_hts_file_header(std::move(hdr));
     }
 
     std::unordered_set<std::string> reads_already_processed;
@@ -652,7 +652,7 @@ void setup(const std::vector<std::string>& args,
         reads_already_processed = resume_loader.get_processed_read_ids();
     }
 
-    // If we're doing alignment, post-processing takes longer due to bam file sorting / merging.
+    tracker.reset_initialization_time();
     tracker.set_description("Basecalling");
 
     std::vector<dorado::stats::StatsCallable> stats_callables;

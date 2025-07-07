@@ -57,17 +57,17 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
         std::logic_error("StructuredHtsFileWriter is only implemented for SingleFileStructure");
     }
 
-    const std::shared_ptr<const fs::path> path = m_structure->get_path(item);
-    if (!m_hts_files.contains(*path)) {
-        auto hts_file = std::make_unique<utils::HtsFile>(path->string(), m_mode, m_threads, m_sort);
+    const std::string &path = *m_structure->get_path(item);
+    if (!m_hts_files.contains(path)) {
+        auto hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
         if (hts_file == nullptr) {
-            std::runtime_error("Failed to create HTS output file at: '" + path->string() + "'.");
+            std::runtime_error("Failed to create HTS output file at: '" + path + "'.");
         }
         hts_file->set_header(m_header.get());
-        m_hts_files.emplace(*path, std::move(hts_file));
+        m_hts_files.emplace(path, std::move(hts_file));
     }
 
-    std::unique_ptr<utils::HtsFile> &hts_file = m_hts_files.at(*path);
+    std::unique_ptr<utils::HtsFile> &hts_file = m_hts_files.at(path);
     hts_file->write(item.bam_ptr.get());
 }
 

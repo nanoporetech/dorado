@@ -4,6 +4,7 @@
 #include "hts_writer/interface.h"
 #include "read_pipeline/base/MessageSink.h"
 
+#include <cstddef>
 #include <string>
 
 namespace dorado {
@@ -19,14 +20,14 @@ public:
         start_input_processing([this] { input_thread_fn(); }, "writer_node");
     }
 
-    // Set the header for all owned HtsFileWriters
-    void take_hts_header(SamHdrPtr hdr) const;
+    // Set the header for all hts file writers
+    void set_hts_file_header(SamHdrPtr hdr) const;
 
 private:
     void input_thread_fn();
 
-    std::atomic<int> m_num_received{0}, m_num_dispatched{0};
     const std::vector<std::unique_ptr<hts_writer::IWriter>> m_writers;
+    const size_t m_num_writers{0};
 };
 
 }  // namespace dorado

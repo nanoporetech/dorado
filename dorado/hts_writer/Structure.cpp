@@ -8,6 +8,8 @@ namespace dorado {
 
 namespace hts_writer {
 
+namespace fs = std::filesystem;
+
 namespace {
 std::tm get_gmtime(const std::time_t* time) {
     // gmtime is not threadsafe, so lock.
@@ -18,22 +20,22 @@ std::tm get_gmtime(const std::time_t* time) {
 }
 }  // namespace
 
-bool SingleFileStructure::try_create_output_folder() const {
+void SingleFileStructure::create_output_folder() const {
     std::error_code creation_error;
     // N.B. No error code if folder already exists.
-    fs::create_directories(m_path->parent_path(), creation_error);
+    const auto parent = fs::path(*m_path).parent_path();
+    fs::create_directories(parent, creation_error);
     if (creation_error) {
-        spdlog::error("Unable to create output folder '{}'.  ErrorCode({}) {}",
-                      m_path->parent_path().string(), creation_error.value(),
-                      creation_error.message());
-        return false;
+        spdlog::error("Unable to create output folder '{}'.  ErrorCode({}) {}", parent.string(),
+                      creation_error.value(), creation_error.message());
+        throw std::runtime_error("Failed to create output directory");
     }
-    return true;
 }
 
-std::shared_ptr<const fs::path> SingleFileStructure::make_shared_path(
-        const fs::path& output_dir) const {
-    return std::make_shared<const fs::path>(output_dir / get_filename());
+std::shared_ptr<const std::string> SingleFileStructure::make_shared_path(
+        const std::string& output_dir) const {
+    const auto path = fs::path(output_dir) / get_filename();
+    return std::make_shared<const std::string>(path.string());
 }
 
 constexpr std::string_view OUTPUT_FILE_PREFIX{"calls_"};

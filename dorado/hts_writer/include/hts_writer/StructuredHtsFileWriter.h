@@ -23,7 +23,7 @@ public:
 private:
     const std::unique_ptr<IStructure> m_structure;
     const bool m_sort;
-    std::unordered_map<fs::path, std::unique_ptr<utils::HtsFile>> m_hts_files;
+    std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>> m_hts_files;
 
     void handle(const HtsData& data) override;
 };

@@ -30,14 +30,14 @@ namespace dorado {
 
 ProgressTracker::ProgressTracker(Mode mode)
         : m_num_reads_expected(1), m_mode(mode), m_post_processing_percentage(1.0) {
-    m_initialization_time = std::chrono::system_clock::now();
+    reset_initialization_time();
 }
 
 ProgressTracker::ProgressTracker(Mode mode, int total_reads, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
           m_mode(mode),
           m_post_processing_percentage(post_processing_percentage) {
-    m_initialization_time = std::chrono::system_clock::now();
+    reset_initialization_time();
 }
 
 ProgressTracker::~ProgressTracker() = default;
@@ -48,6 +48,10 @@ void ProgressTracker::set_description(const std::string& desc) {
         m_progress_bar.set_option(indicators::option::PostfixText{desc});
     }
 }
+
+void ProgressTracker::reset_initialization_time() {
+    m_initialization_time = std::chrono::system_clock::now();
+};
 
 void ProgressTracker::summarize() const {
     if (!m_is_progress_reporting_disabled) {
