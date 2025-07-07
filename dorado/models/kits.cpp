@@ -333,7 +333,7 @@ const KitSets sets = {{flowcells, kits}};
 namespace rna004 {
 // RNA004 Flowcells and Kits
 const std::vector<FC> flowcells = {FC::FLO_PRO004RA, FC::FLO_MIN004RA};
-const std::vector<KC> kits = {KC::SQK_RNA004, KC::SQK_RNA004_XL};
+const std::vector<KC> kits = {KC::SQK_RNA004, KC::SQK_RNA004_XL, KC::SQK_DRB004_24};
 const KitSets sets = {{rna004::flowcells, rna004::kits}};
 }  // namespace rna004
 
