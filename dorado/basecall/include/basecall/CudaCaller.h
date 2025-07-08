@@ -47,8 +47,6 @@ public:
     std::pair<int, int> batch_timeouts_ms() const;
 
 private:
-    struct NNTask;
-
     static int get_batch_size_granularity(const config::BasecallModelConfig &model_config) {
         // TODO: we may want to use different numbers based on model type and GPU arch
         return model_config.is_tx_model() ? 32 : 64;
@@ -67,9 +65,6 @@ private:
     const at::TensorOptions m_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::atomic<bool> m_terminate{false};
-    std::deque<std::shared_ptr<NNTask>> m_input_queue;
-    std::mutex m_input_lock;
-    std::condition_variable m_input_cv;
     std::thread m_cuda_thread;
     int m_num_input_features;
     const bool m_low_latency;
