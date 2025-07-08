@@ -36,6 +36,8 @@ public:
               m_progress_callback(cfg.progress_callback),
               m_description_callback(cfg.description_callback),
               m_gpu_names(cfg.gpu_names) {}
+    std::string get_name() const override { return "HtsFileWriter"; }
+    stats::NamedStats sample_stats() const override;
 
     void set_header(SamHdrSharedPtr header) { m_header = std::move(header); };
     SamHdrSharedPtr& get_header() { return m_header; }
@@ -53,9 +55,6 @@ public:
         m_description_callback(description);
     }
 
-    std::string get_name() const override { return "HtsFileWriter"; }
-    stats::NamedStats sample_stats() const override;
-
 protected:
     const OutputMode m_mode;
     const int m_threads;
@@ -66,9 +65,9 @@ protected:
 
     std::string m_gpu_names{};
 
-    void prepare_item(const HtsData& _) const;
-    virtual void handle(const HtsData& _) = 0;
-    void tally(const HtsData& data);
+    void prepare_item(const HtsData& item) const;
+    virtual void handle(const HtsData& item) = 0;
+    void update_stats(const HtsData& item);
 
     // Stats counters
     std::atomic<std::size_t> m_primary_simplex_reads_written{0};

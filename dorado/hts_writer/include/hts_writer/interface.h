@@ -37,7 +37,7 @@ public:
 class NullWriter : public IWriter {
 public:
     void init() override {};
-    void process([[maybe_unused]] const Processable _) override {};
+    void process([[maybe_unused]] const Processable item) override {};
     void shutdown() override {};
 
     std::string get_name() const override { return "NullWriter"; }

@@ -38,9 +38,6 @@ public:
     bool operator==(std::nullptr_t) const noexcept { return m_header == nullptr; }
     bool operator!=(std::nullptr_t) const noexcept { return m_header != nullptr; }
 
-    static std::shared_ptr<const sam_hdr_t> make(sam_hdr_t* hdr);
-    static std::shared_ptr<const sam_hdr_t> take(SamHdrPtr hdr);
-
 private:
     std::shared_ptr<const sam_hdr_t> m_header;
 };

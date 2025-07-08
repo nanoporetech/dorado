@@ -510,8 +510,7 @@ int duplex(int argc, char* argv[]) {
         gpu_names = utils::get_cuda_gpu_names(device);
 #endif
 
-        ProgressTracker tracker(ProgressTracker::Mode::DUPLEX);
-        tracker.set_total_reads(num_reads);
+        ProgressTracker tracker(ProgressTracker::Mode::DUPLEX, num_reads);
 
         std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
         OutputMode writer_output_mode;

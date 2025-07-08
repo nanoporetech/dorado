@@ -353,8 +353,7 @@ void setup(const std::vector<std::string>& args,
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
 
-    ProgressTracker tracker(ProgressTracker::SIMPLEX);
-    tracker.set_total_reads(num_reads);
+    ProgressTracker tracker(ProgressTracker::SIMPLEX, num_reads);
 
     // Sampling rate is checked by ModelComplexSearch when a complex is given, only test for a path
     if (model_complex.is_path() && !skip_model_compatibility_check) {

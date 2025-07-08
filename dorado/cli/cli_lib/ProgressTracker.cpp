@@ -28,10 +28,8 @@ void erase_progress_bar_line() {
 
 namespace dorado {
 
-ProgressTracker::ProgressTracker(Mode mode)
-        : m_num_reads_expected(1), m_mode(mode), m_post_processing_percentage(1.0) {
-    reset_initialization_time();
-}
+ProgressTracker::ProgressTracker(Mode mode, int total_reads)
+        : ProgressTracker(mode, total_reads, 0.) {}
 
 ProgressTracker::ProgressTracker(Mode mode, int total_reads, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
@@ -162,18 +160,18 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
 
     // TODO: Transfer over entirely to WriterNode in DOR-1176 and DOR-1204
     auto fetch_reads_written = [&fetch_stat]() {
-        double sx_w, dx_w = 0.0;
-        sx_w = fetch_stat("WriterNode.HtsFileWriter.unique_simplex_reads_written");
-        if (sx_w == 0.) {
-            sx_w = fetch_stat("HtsWriterNode.unique_simplex_reads_written");
+        double simplex_reads_written, duplex_reads_written = 0.0;
+        simplex_reads_written = fetch_stat("WriterNode.HtsFileWriter.unique_simplex_reads_written");
+        if (simplex_reads_written == 0.) {
+            simplex_reads_written = fetch_stat("HtsWriterNode.unique_simplex_reads_written");
         }
 
-        dx_w = fetch_stat("WriterNode.HtsFileWriter.duplex_reads_written");
-        if (dx_w == 0.) {
-            dx_w = fetch_stat("HtsWriterNode.duplex_reads_written");
+        duplex_reads_written = fetch_stat("WriterNode.HtsFileWriter.duplex_reads_written");
+        if (duplex_reads_written == 0.) {
+            duplex_reads_written = fetch_stat("HtsWriterNode.duplex_reads_written");
         }
 
-        return std::make_pair(sx_w, dx_w);
+        return std::make_pair(simplex_reads_written, duplex_reads_written);
     };
 
     auto [simplex_reads_written, duplex_reads_written] = fetch_reads_written();

@@ -7,7 +7,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cstdio>
 #include <filesystem>
 #include <memory>
 #include <stdexcept>
@@ -30,11 +29,12 @@ void StructuredHtsFileWriter::shutdown() {
     set_description("Finalising outputs");
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
-    for (auto &[_, hts_file] : m_hts_files) {
+    for (auto &[path, hts_file] : m_hts_files) {
         if (hts_file == nullptr) {
             spdlog::debug(
                     "StructuredHtsFileWriter::shutdown called on uninitialised hts_file - nothing "
-                    "to do");
+                    "to do for '{}'",
+                    path);
             continue;
         }
         const size_t index = i++;
@@ -48,26 +48,29 @@ void StructuredHtsFileWriter::shutdown() {
 
 void StructuredHtsFileWriter::handle(const HtsData &item) {
     if (m_header == nullptr) {
-        std::logic_error("HtsFileWriter header not set before writing records.");
+        throw std::logic_error("HtsFileWriter header not set before writing records.");
     }
 
     // Implemented only for SingleFileStructure while structured outputs are under development
     auto &structure_ref = *m_structure;
     if (typeid(structure_ref) != typeid(SingleFileStructure)) {
-        std::logic_error("StructuredHtsFileWriter is only implemented for SingleFileStructure");
+        throw std::logic_error(
+                "StructuredHtsFileWriter is only implemented for SingleFileStructure");
     }
 
     const std::string &path = *m_structure->get_path(item);
-    if (!m_hts_files.contains(path)) {
-        auto hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
+
+    auto [it, inserted] = m_hts_files.try_emplace(path, nullptr);
+    auto &hts_file = it->second;
+
+    if (inserted) {
+        hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
         if (hts_file == nullptr) {
-            std::runtime_error("Failed to create HTS output file at: '" + path + "'.");
+            throw std::runtime_error("Failed to create HTS output file at: '" + path + "'.");
         }
         hts_file->set_header(m_header.get());
-        m_hts_files.emplace(path, std::move(hts_file));
     }
 
-    std::unique_ptr<utils::HtsFile> &hts_file = m_hts_files.at(path);
     hts_file->write(item.bam_ptr.get());
 }
 

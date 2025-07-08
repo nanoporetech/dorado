@@ -22,7 +22,7 @@ class ProgressTracker {
 public:
     enum Mode : uint8_t { SIMPLEX, DUPLEX, TRIM, ALIGN };
 
-    ProgressTracker(Mode mode);
+    ProgressTracker(Mode mode, int total_reads);
     ProgressTracker(Mode mode, int total_reads, float post_processing_percentage);
     ~ProgressTracker();
 

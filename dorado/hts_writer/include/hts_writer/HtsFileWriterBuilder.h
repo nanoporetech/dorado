@@ -9,7 +9,6 @@ class HtsFileWriter;
 
 class HtsFileWriterBuilder {
 public:
-    HtsFileWriterBuilder();
     HtsFileWriterBuilder(bool emit_fastq,
                          bool emit_sam,
                          bool reference_requested,

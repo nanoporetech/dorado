@@ -20,9 +20,6 @@ namespace hts_writer {
 
 namespace fs = std::filesystem;
 
-HtsFileWriterBuilder::HtsFileWriterBuilder()
-        : m_is_fd_tty(utils::is_fd_tty(stdout)), m_is_fd_pipe(utils::is_fd_pipe(stdout)) {}
-
 HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            bool emit_sam,
                                            bool reference_requested,
@@ -80,8 +77,8 @@ void HtsFileWriterBuilder::update() {
 
 std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     update();
-    const auto cfg = HtsFileWriterConfig{m_output_mode, m_writer_threads, m_progress_callback,
-                                         m_description_callback, m_gpu_names};
+    const HtsFileWriterConfig cfg{m_output_mode, m_writer_threads, m_progress_callback,
+                                  m_description_callback, m_gpu_names};
 
     if (!m_output_dir.has_value()) {
         return std::make_unique<StreamHtsFileWriter>(cfg);

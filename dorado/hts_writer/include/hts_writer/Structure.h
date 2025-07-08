@@ -3,10 +3,7 @@
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
 
-#include <spdlog/spdlog.h>
-
 #include <memory>
-#include <stdexcept>
 
 namespace dorado {
 
@@ -24,7 +21,7 @@ public:
     SingleFileStructure(const std::string &output_dir, OutputMode mode)
             : m_mode(mode), m_path(make_shared_path(output_dir)) {};
     void init() override { create_output_folder(); }
-    std::shared_ptr<const std::string> get_path([[maybe_unused]] const HtsData &_) override {
+    std::shared_ptr<const std::string> get_path([[maybe_unused]] const HtsData &hts_data) override {
         return m_path;
     };
 

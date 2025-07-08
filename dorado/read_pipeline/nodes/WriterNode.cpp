@@ -39,9 +39,7 @@ stats::NamedStats WriterNode::sample_stats() const {
     stats["num_writers"] = m_num_writers;
 
     for (const auto &writer : m_writers) {
-        for (const auto &[key, value] : stats::from_obj(*writer.get())) {
-            stats[key] = value;
-        }
+        stats.merge(stats::from_obj(*writer.get()));
     }
 
     return stats;
