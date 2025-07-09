@@ -58,10 +58,6 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
         hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
-        // Asserts HtsFile was created
-        if (hts_file.get() == nullptr) {
-            throw std::runtime_error("Failed to create HTS output file at: '" + path + "'.");
-        }
         hts_file->set_header(m_header.get());
     }
 
