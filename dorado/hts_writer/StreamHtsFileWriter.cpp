@@ -13,8 +13,6 @@ StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig & cfg)
         : HtsFileWriter(
                   {cfg.mode, 0, cfg.progress_callback, cfg.description_callback, cfg.gpu_names}) {}
 
-void StreamHtsFileWriter::init() {}
-
 void StreamHtsFileWriter::shutdown() {
     if (m_hts_file == nullptr || m_hts_file.get() == nullptr) {
         spdlog::debug(

@@ -23,8 +23,6 @@ StructuredHtsFileWriter::StructuredHtsFileWriter(const HtsFileWriterConfig &cfg,
                                                  bool sort)
         : HtsFileWriter(cfg), m_structure(std::move(structure)), m_sort(sort) {};
 
-void StructuredHtsFileWriter::init() { m_structure->init(); }
-
 void StructuredHtsFileWriter::shutdown() {
     set_description("Finalising outputs");
     size_t i = 0;

@@ -11,11 +11,7 @@
 namespace dorado {
 
 WriterNode::WriterNode(std::vector<std::unique_ptr<hts_writer::IWriter>> writers)
-        : MessageSink(10000, 1), m_writers(std::move(writers)), m_num_writers(m_writers.size()) {
-    for (const auto &writer : m_writers) {
-        writer->init();
-    }
-}
+        : MessageSink(10000, 1), m_writers(std::move(writers)), m_num_writers(m_writers.size()) {}
 
 WriterNode::~WriterNode() { stop_input_processing(); }
 
@@ -29,8 +25,6 @@ void WriterNode::input_thread_fn() {
                 writer->process(item);
             }
         }
-        // As this is the terminal writer node we must not send message onwards
-        // send_message_to_sink(std::move(message));
     }
 }
 

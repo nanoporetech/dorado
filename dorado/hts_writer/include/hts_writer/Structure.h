@@ -12,15 +12,15 @@ namespace hts_writer {
 class IStructure {
 public:
     virtual ~IStructure() = default;
-    virtual void init() = 0;
     virtual std::shared_ptr<const std::string> get_path(const HtsData &item) = 0;
 };
 
 class SingleFileStructure : public IStructure {
 public:
     SingleFileStructure(const std::string &output_dir, OutputMode mode)
-            : m_mode(mode), m_path(make_shared_path(output_dir)) {};
-    void init() override { create_output_folder(); }
+            : m_mode(mode), m_path(make_shared_path(output_dir)) {
+        create_output_folder();
+    };
     std::shared_ptr<const std::string> get_path([[maybe_unused]] const HtsData &hts_data) override {
         return m_path;
     };

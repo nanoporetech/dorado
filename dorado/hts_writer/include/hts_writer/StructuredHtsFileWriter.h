@@ -15,7 +15,6 @@ public:
     StructuredHtsFileWriter(const HtsFileWriterConfig& cfg,
                             std::unique_ptr<IStructure> structure,
                             bool sort);
-    void init() override;
     void shutdown() override;
 
     bool finalise_is_noop() const override { return m_mode == OutputMode::FASTQ || !m_sort; };

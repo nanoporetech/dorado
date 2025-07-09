@@ -26,7 +26,6 @@ void dispatch_processable(const Processable& item, Visitor&& visitor) {
 class IWriter {
 public:
     virtual ~IWriter() = default;
-    virtual void init() = 0;
     virtual void process(const Processable item) = 0;
     virtual void shutdown() = 0;
 
@@ -36,7 +35,6 @@ public:
 
 class NullWriter : public IWriter {
 public:
-    void init() override {};
     void process([[maybe_unused]] const Processable item) override {};
     void shutdown() override {};
 
