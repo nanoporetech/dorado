@@ -533,7 +533,9 @@ int64_t get_dx_tag(const bam1_t* record) {
 }
 
 bool is_duplex_record(const bam1_t* record) { return get_dx_tag(record) == 1; }
-
-bool is_duplex_offspring_record(const bam1_t* record) { return get_dx_tag(record) == -1; }
+bool is_simplex_record_no_duplex_offspring(const bam1_t* record) { return get_dx_tag(record) == 0; }
+bool is_simplex_record_with_duplex_offspring(const bam1_t* record) {
+    return get_dx_tag(record) == -1;
+}
 
 }  // namespace dorado::utils

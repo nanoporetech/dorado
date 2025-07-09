@@ -227,7 +227,7 @@ void remove_alignment_tags_from_record(bam1_t* record);
 int64_t get_dx_tag(const bam1_t* record);
 
 /*
- * Check if this record is a duplex record where "dx" tag == 1
+ * Check if this record is a duplex record i.e. "dx" tag == 1
  *
  * @param record BAM record.
  * @return True if the reads is a duplex read
@@ -235,11 +235,19 @@ int64_t get_dx_tag(const bam1_t* record);
 bool is_duplex_record(const bam1_t* record);
 
 /*
- * Check if this record is a simplex record which has duplex offspring where "dx" tag == -1
+ * Check if this record is a simplex record which has no duplex offspring i.e. "dx" tag == 0
  *
  * @param record BAM record.
  * @return True if the reads is a simplex read which has duplex offspring
  */
-bool is_duplex_offspring_record(const bam1_t* record);
+bool is_simplex_record_no_duplex_offspring(const bam1_t* record);
+
+/*
+ * Check if this record is a simplex record which has duplex offspring i.e. "dx" tag == -1
+ *
+ * @param record BAM record.
+ * @return True if the reads is a simplex read which has duplex offspring
+ */
+bool is_simplex_record_with_duplex_offspring(const bam1_t* record);
 
 }  // namespace dorado::utils
