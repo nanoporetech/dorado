@@ -1,9 +1,9 @@
-#include "catch2/catch_message.hpp"
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
