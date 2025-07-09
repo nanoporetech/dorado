@@ -16,7 +16,7 @@ StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig & cfg)
 void StreamHtsFileWriter::init() {}
 
 void StreamHtsFileWriter::shutdown() {
-    if (m_hts_file == nullptr) {
+    if (m_hts_file == nullptr || m_hts_file.get() == nullptr) {
         spdlog::debug(
                 "StreamHtsFileWriter::shutdown called on uninitialised hts_file - nothing to do");
         return;
@@ -28,7 +28,7 @@ void StreamHtsFileWriter::shutdown() {
 void StreamHtsFileWriter::handle(const HtsData & data) {
     if (m_hts_file == nullptr) {
         m_hts_file = std::make_unique<utils::HtsFile>("-", m_mode, 0, false);
-        if (m_hts_file == nullptr) {
+        if (m_hts_file.get() == nullptr) {
             throw std::runtime_error("Failed to create HTS output file");
         }
         if (m_header == nullptr) {

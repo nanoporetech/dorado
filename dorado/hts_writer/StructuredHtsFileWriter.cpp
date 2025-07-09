@@ -30,7 +30,7 @@ void StructuredHtsFileWriter::shutdown() {
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
     for (auto &[path, hts_file] : m_hts_files) {
-        if (hts_file == nullptr) {
+        if (hts_file.get() == nullptr) {
             spdlog::debug(
                     "StructuredHtsFileWriter::shutdown called on uninitialised hts_file - nothing "
                     "to do for '{}'",
@@ -60,12 +60,11 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
 
     const std::string &path = *m_structure->get_path(item);
 
-    auto [it, inserted] = m_hts_files.try_emplace(path, nullptr);
-    auto &hts_file = it->second;
-
-    if (inserted) {
+    auto &hts_file = m_hts_files[path];
+    if (!hts_file) {
         hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
-        if (hts_file == nullptr) {
+        // Asserts HtsFile was created
+        if (hts_file.get() == nullptr) {
             throw std::runtime_error("Failed to create HTS output file at: '" + path + "'.");
         }
         hts_file->set_header(m_header.get());
