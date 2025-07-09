@@ -2,10 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <memory>
-
 namespace dorado {
-
 namespace hts_writer {
 
 namespace fs = std::filesystem;
@@ -20,22 +17,25 @@ std::tm get_gmtime(const std::time_t* time) {
 }
 }  // namespace
 
+SingleFileStructure::SingleFileStructure(const std::string& output_dir, OutputMode mode)
+        : m_mode(mode), m_path(std::filesystem::path(output_dir) / get_filename()) {
+    create_output_folder();
+};
+
+const std::string& SingleFileStructure::get_path([[maybe_unused]] const HtsData& hts_data) {
+    return m_path;
+};
+
 void SingleFileStructure::create_output_folder() const {
     std::error_code creation_error;
     // N.B. No error code if folder already exists.
-    const auto parent = fs::path(*m_path).parent_path();
+    const auto parent = fs::path(m_path).parent_path();
     fs::create_directories(parent, creation_error);
     if (creation_error) {
         spdlog::error("Unable to create output folder '{}'.  ErrorCode({}) {}", parent.string(),
                       creation_error.value(), creation_error.message());
         throw std::runtime_error("Failed to create output directory");
     }
-}
-
-std::shared_ptr<const std::string> SingleFileStructure::make_shared_path(
-        const std::string& output_dir) const {
-    const auto path = fs::path(output_dir) / get_filename();
-    return std::make_shared<const std::string>(path.string());
 }
 
 constexpr std::string_view OUTPUT_FILE_PREFIX{"calls_"};

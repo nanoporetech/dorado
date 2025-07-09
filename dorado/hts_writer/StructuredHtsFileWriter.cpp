@@ -7,7 +7,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <filesystem>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -15,8 +14,6 @@
 namespace dorado {
 
 namespace hts_writer {
-
-namespace fs = std::filesystem;
 
 StructuredHtsFileWriter::StructuredHtsFileWriter(const HtsFileWriterConfig &cfg,
                                                  std::unique_ptr<IStructure> structure,
@@ -56,7 +53,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
                 "StructuredHtsFileWriter is only implemented for SingleFileStructure");
     }
 
-    const std::string &path = *m_structure->get_path(item);
+    const std::string &path = m_structure->get_path(item);
 
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {

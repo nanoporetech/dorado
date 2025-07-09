@@ -487,7 +487,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     }));
 
     hts_writer::SingleFileStructure structure(root, output_mode);
-    const auto single_path = *structure.get_path(HtsData{});
+    const auto& single_path = structure.get_path(HtsData{});
 
     CATCH_CAPTURE(root, single_path, output_mode);
 
@@ -507,6 +507,6 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     CATCH_CHECK(extension == get_suffix(output_mode));
 
     // Regardless of the input data the output path should be the same for SingleFileStructure
-    const auto single_path2 = *structure.get_path(HtsData{});
+    const auto& single_path2 = structure.get_path(HtsData{nullptr, "kit", nullptr});
     CATCH_CHECK(single_path == single_path2);
 }
