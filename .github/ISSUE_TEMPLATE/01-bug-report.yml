@@ -1,0 +1,73 @@
+name: 🐞 Bug Report
+description: Create a new bug report
+labels: ["needs-triage", "bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        - Thank you for taking the time to report a bug in Dorado. 
+        - Please note that you can open the issue report in fullscreen by clicking the ⛶ icon above.
+        - When adding commands, logs or other formatted output please [use a code-block](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-and-highlighting-code-blocks).
+  - type: checkboxes
+    attributes:
+      label: New issue checks
+      description: |
+        The [Dorado Documentation](https://dorado-docs.readthedocs.io/en/latest/) contains Troubleshooting and FAQ sections
+        for each of the Dorado subcommands. Please review the documentation thoroughly before submitting a new Bug report.
+        Your issue may have been resolved in an [existing issue](https://github.com/nanoporetech/dorado/issues?q=is%3Aissue). 
+        Please search for an existing issue before creating a new one.
+      options:
+        - label: I have read the [Dorado Documentation](https://dorado-docs.readthedocs.io/en/latest/).
+          required: true
+        - label: I did not find an [existing issue](https://github.com/nanoporetech/dorado/issues?q=is%3Aissue).
+          required: true
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Dorado version
+      render: true
+      placeholder: 1.0.2
+      description: |
+        Please state the affected Dorado version(s). Use `dorado --version`.
+  - type: dropdown
+    id: subcommand
+    validations:
+      required: true
+    attributes:
+      label: Dorado subcommand
+      description: |
+        Please select all Dorado subcommands that are affected by your issue.
+      multiple: true
+      options:
+        - Aligner
+        - Basecaller
+        - Demux
+        - Correct
+        - Download
+        - Duplex
+        - Polish
+        - Summary
+        - Trim
+        - Variant
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: The issue
+      description: |
+        Please include: 
+          - The complete Dorado command used.
+          - Any logging / error messages from Dorado with `--verbose` set.
+          - Any information on how to reproduce the error.
+          - What steps you have already taken to resolve the issue.
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: System specifications
+      description: |
+        Please be as specific as possible when you include: 
+          - Operating system information (e.g. Linux / Windows / MacOS).
+          - Hardware specifications (e.g. CPU, GPU, Memory, SSD or HDD).
+          - Cluster environment details (e.g. Slurm, SGE).

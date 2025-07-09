@@ -1,0 +1,28 @@
+name: 📖 Documentation Improvement
+description: Suggest an improvement to the documentation
+labels: ["needs-triage", "documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        - Thank you for taking the time to propose improvements to Dorado.
+        - Please note that you can open the issue report in fullscreen by clicking the ⛶ icon above.
+        - When adding commands, logs or other formatted output please [use a code-block](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-and-highlighting-code-blocks).
+  - type: checkboxes
+    attributes:
+      label: New issue checks
+      description: |
+        Your change request may have already been suggested and discussed on an existing issue. 
+        Please search for an 
+        [existing documentation enhancement](https://github.com/nanoporetech/dorado/issues?q=is%3Aissue%20label%3Adocumentation) 
+        before creating a new one.
+      options:
+        - label: I did not find an [existing documentation enhancement](https://github.com/nanoporetech/dorado/issues?q=is%3Aissue%20label%3Adocumentation).
+          required: true
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Documentation change request
+      description: |
+        Please describe your proposed changes to the Dorado documentation here.

@@ -1,0 +1,47 @@
+name: 💡 Feature Request
+description: Create feature request
+labels: ["needs-triage", "enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        - Thank you for taking the time to propose improvements to Dorado.
+        - Please note that you can open the issue report in fullscreen by clicking the ⛶ icon above.
+        - When adding commands, logs or other formatted output please [use a code-block](https://docs.github.com/en/get-started/writing-on-github/working-with-advanced-formatting/creating-and-highlighting-code-blocks).
+  - type: checkboxes
+    attributes:
+      label: New issue checks
+      description: |
+        Your feature request may have already been suggested and discussed. Please search for 
+        [existing feature requests](https://github.com/nanoporetech/dorado/issues?q=is%3Aissue%20type%3AFeature) 
+        before creating a new one.
+      options:
+        - label: I did not find an [existing feature request](https://github.com/nanoporetech/dorado/issues?q=is%3Aissue%20type%3AFeature).
+          required: true
+  - type: dropdown
+    id: subcommand
+    validations:
+      required: true
+    attributes:
+      label: Dorado subcommand
+      description: |
+        Please select the Dorado subcommands that would benefit from your feature request.
+      multiple: true
+      options:
+        - Aligner
+        - Basecaller
+        - Demux
+        - Correct
+        - Download
+        - Duplex
+        - Polish
+        - Summary
+        - Trim
+        - Variant
+  - type: textarea
+    validations:
+      required: true
+    attributes:
+      label: Feature request
+      description: |
+        Please describe your feature request in detail here.
