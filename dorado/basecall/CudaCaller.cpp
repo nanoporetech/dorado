@@ -29,6 +29,7 @@ using namespace std::chrono_literals;
 namespace dorado::basecall {
 
 namespace {
+
 struct NNTask {
     NNTask(at::Tensor input_, int num_chunks_, void *caller_)
             : input(std::move(input_)), num_chunks(num_chunks_), caller(caller_) {}
@@ -40,19 +41,6 @@ struct NNTask {
     std::condition_variable cv;
     bool done{false};
 };
-
-// Global task queues, one per GPU. This ensures that tasks from different clients are
-// processed in the order they became ready, rather than individual callers contending
-// for a global mutex that can wake up threads in an arbitrary order
-struct GPUTaskQueue {
-public:
-    std::queue<std::shared_ptr<NNTask>> m_input_queue;
-    std::mutex m_input_lock;
-    std::condition_variable m_input_cv;
-};
-
-static std::vector<GPUTaskQueue> gpu_task_queues(torch::cuda::device_count());
-static std::vector<GPUTaskQueue> low_latency_gpu_task_queues(torch::cuda::device_count());
 
 constexpr float GB = 1.0e9f;
 
@@ -125,6 +113,13 @@ static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
 // chunk was added to the batch.
 static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
 
+struct CudaCaller::GPUTaskQueue {
+public:
+    std::queue<std::shared_ptr<NNTask>> m_input_queue;
+    std::mutex m_input_lock;
+    std::condition_variable m_input_cv;
+};
+
 CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         : m_config(params.model_config),
           m_device(params.device),
@@ -170,6 +165,18 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
 
 CudaCaller::~CudaCaller() { terminate(); }
 
+CudaCaller::GPUTaskQueue &CudaCaller::get_task_queue() {
+    // Global task queues, one per GPU. This ensures that tasks from different clients are
+    // processed in the order they became ready, rather than individual callers contending
+    // for a global mutex that can wake up threads in an arbitrary order
+
+    static std::vector<GPUTaskQueue> gpu_task_queues(torch::cuda::device_count());
+    static std::vector<GPUTaskQueue> low_latency_gpu_task_queues(torch::cuda::device_count());
+
+    auto &task_queues = m_low_latency ? low_latency_gpu_task_queues : gpu_task_queues;
+    return task_queues.at(m_options.device().index());
+}
+
 std::pair<int, int> CudaCaller::batch_timeouts_ms() const {
     // For low-latency pipelines we set both timeouts to the same value. This means that we
     // will always timeout based on the time from the first chunk being added to the batch.
@@ -186,8 +193,7 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
         return std::vector<decode::DecodedChunk>();
     }
 
-    auto &task_queue = m_low_latency ? low_latency_gpu_task_queues.at(m_options.device().index())
-                                     : gpu_task_queues.at(m_options.device().index());
+    auto &task_queue = get_task_queue();
     auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks, this);
     {
         std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
@@ -206,8 +212,7 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
 
 void CudaCaller::terminate() {
     m_terminate.store(true);
-    auto &task_queue = m_low_latency ? low_latency_gpu_task_queues.at(m_options.device().index())
-                                     : gpu_task_queues.at(m_options.device().index());
+    auto &task_queue = get_task_queue();
     task_queue.m_input_cv.notify_all();
     if (m_cuda_thread.joinable()) {
         m_cuda_thread.join();
@@ -551,8 +556,7 @@ void CudaCaller::cuda_thread_fn() {
     const std::string gpu_lock_scope_str = "gpu_lock_" + std::to_string(m_options.device().index());
 
     c10::cuda::CUDAStreamGuard stream_guard(m_stream);
-    auto &task_queue = m_low_latency ? low_latency_gpu_task_queues.at(m_options.device().index())
-                                     : gpu_task_queues.at(m_options.device().index());
+    auto &task_queue = get_task_queue();
     while (true) {
         nvtx3::scoped_range loop{loop_scope_str};
         std::unique_lock<std::mutex> input_lock(task_queue.m_input_lock);
