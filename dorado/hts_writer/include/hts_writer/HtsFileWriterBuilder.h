@@ -18,7 +18,6 @@ public:
                          utils::DescriptionCallback description_callback,
                          std::string gpu_names);
 
-    void set_output_mode(OutputMode output_mode);
     OutputMode get_output_mode() const { return m_output_mode; }
 
     void set_output_dir(const std::optional<std::string>& output_dir) { m_output_dir = output_dir; }

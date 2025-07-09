@@ -25,7 +25,7 @@ void StructuredHtsFileWriter::shutdown() {
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
     for (auto &[path, hts_file] : m_hts_files) {
-        if (hts_file.get() == nullptr) {
+        if (hts_file == nullptr) {
             spdlog::debug(
                     "StructuredHtsFileWriter::shutdown called on uninitialised hts_file - nothing "
                     "to do for '{}'",

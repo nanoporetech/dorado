@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/Structure.h"
 
@@ -18,6 +19,10 @@ public:
     void shutdown() override;
 
     bool finalise_is_noop() const override { return m_mode == OutputMode::FASTQ || !m_sort; };
+
+    const std::string& get_path(const HtsData& item) const override {
+        return m_structure->get_path(item);
+    }
 
 private:
     const std::unique_ptr<IStructure> m_structure;

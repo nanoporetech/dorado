@@ -18,7 +18,7 @@ std::tm get_gmtime(const std::time_t* time) {
 }  // namespace
 
 SingleFileStructure::SingleFileStructure(const std::string& output_dir, OutputMode mode)
-        : m_mode(mode), m_path(std::filesystem::path(output_dir) / get_filename()) {
+        : m_mode(mode), m_path((std::filesystem::path(output_dir) / get_filename()).string()) {
     create_output_folder();
 };
 

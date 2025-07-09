@@ -73,6 +73,7 @@ add_executable(dorado_tests
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimTest.cpp
+    WriterNodeTest.cpp
     PafUtilsTest.cpp
     SecondaryDecodeVariantsTest.cpp
     SecondaryKadayashiUtils.cpp
