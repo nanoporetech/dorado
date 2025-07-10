@@ -249,6 +249,10 @@ std::vector<std::string> parse_cuda_device_string(const std::string &device_stri
 
 std::vector<CUDADeviceInfo> get_cuda_device_info(const std::string &device_string,
                                                  bool include_unused) {
+    if (!include_unused && (device_string == "cpu")) {
+        return {};
+    }
+
     const auto num_devices = utils::gpu_monitor::get_device_count();
     std::string error_message{};
     std::vector<int> requested_device_ids{};

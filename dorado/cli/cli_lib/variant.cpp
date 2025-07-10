@@ -942,6 +942,10 @@ int variant_caller(int argc, char* argv[]) {
         // Check if input options are good.
         validate_options(opt);
 
+#if DORADO_CUDA_BUILD
+        cli::log_requested_cuda_devices(opt.device_str);
+#endif
+
         // Get info from BAM needed for the run.
         const secondary::BamInfo bam_info =
                 secondary::analyze_bam(opt.in_aln_bam_fn, opt.read_group);
