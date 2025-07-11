@@ -4,34 +4,23 @@
 #include "read_pipeline/base/ReadPipeline.h"
 
 #include <memory>
-#include <stdexcept>
 #include <vector>
 
 class MessageSinkToVector : public dorado::MessageSink {
 public:
     MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
-            : MessageSink(max_messages, 0), m_messages(messages) {}
+            : MessageSink(max_messages, 1), m_messages(messages) {}
     ~MessageSinkToVector() { terminate_impl(); }
+
     std::string get_name() const override { return "sink"; }
     void terminate(const dorado::TerminateOptions&) override { terminate_impl(); }
     void restart() override {
-        start_input_queue();
-        start_threads();
+        start_input_processing([this] { worker_thread(); }, "MessageSinkToVector");
     }
 
 private:
-    void start_threads() {
-        m_worker_thread = std::thread([this] { worker_thread(); });
-    }
+    void terminate_impl() { stop_input_processing(); }
 
-    void terminate_impl() {
-        terminate_input_queue();
-        if (m_worker_thread.joinable()) {
-            m_worker_thread.join();
-        }
-    }
-
-    std::thread m_worker_thread;
     std::vector<dorado::Message>& m_messages;
 
     void worker_thread() {
