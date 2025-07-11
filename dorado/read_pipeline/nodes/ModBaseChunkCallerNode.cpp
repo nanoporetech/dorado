@@ -159,7 +159,6 @@ void ModBaseChunkCallerNode::start_threads() {
         for (size_t model_id = 0; model_id < m_runners[worker_id]->num_models(); ++model_id) {
             m_runner_workers.emplace_back(
                     [this, worker_id, model_id] { chunk_caller_thread_fn(worker_id, model_id); });
-            ++m_num_active_runner_workers;
         }
     }
     // This creates num_threads threads defined in the MessageSink(limit, num_threads)
@@ -185,6 +184,7 @@ void ModBaseChunkCallerNode::input_thread_fn() {
 void ModBaseChunkCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
     // Signal termination in the input queue, and wait for input threads to join.
     stop_input_processing(fast);
+
     // Signal termination in the chunk queues.
     for (auto& chunk_queue : m_chunk_queues) {
         chunk_queue->terminate(fast);
@@ -196,15 +196,18 @@ void ModBaseChunkCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast)
     }
     m_runner_workers.clear();
 
+    // Signal the output threads to terminate.
+    m_processed_chunks.terminate(fast);
     for (auto& t : m_output_workers) {
-        if (t.joinable()) {
-            t.join();
-        }
+        t.join();
     }
     m_output_workers.clear();
 
     // There should be no reads left in the node after it's terminated.
-    if (!m_working_reads.empty()) {
+    // Unless we're terminating fast, in which case we can safely drop them.
+    if (fast == utils::AsyncQueueTerminateFast::Yes) {
+        m_working_reads.clear();
+    } else if (!m_working_reads.empty()) {
         throw std::logic_error("Reads have been left in ModBaseChunkCallerNode");
     }
 }
@@ -985,13 +988,6 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
         call_batch(worker_id, model_id, batched_chunks);
         m_model_ms += timer.GetElapsedMS();
         m_num_chunks += batched_chunks.size();
-    }
-
-    // Reduce the count of active model callers.  If this was the last active
-    // model caller also send termination signal to sink
-    int num_remaining_callers = --m_num_active_runner_workers;
-    if (num_remaining_callers == 0) {
-        m_processed_chunks.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 

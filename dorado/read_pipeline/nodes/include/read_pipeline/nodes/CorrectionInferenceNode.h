@@ -62,7 +62,6 @@ private:
     std::mutex m_features_mutex;
 
     std::atomic<int> m_num_active_feature_threads{0};
-    std::atomic<int> m_num_active_infer_threads{0};
 
     std::array<std::mutex, 32> m_gpu_mutexes;
 

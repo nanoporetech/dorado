@@ -107,8 +107,6 @@ private:
     std::mutex m_working_reads_mutex;
 
     std::vector<std::thread> m_runner_workers;
-    std::atomic<int> m_num_active_runner_workers{0};
-
     std::vector<std::thread> m_output_workers;
 
     // Reads removed from input queue and being modbasecalled.

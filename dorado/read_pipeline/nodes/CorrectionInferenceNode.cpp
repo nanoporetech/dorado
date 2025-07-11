@@ -167,7 +167,6 @@ void CorrectionInferenceNode::decode_fn() {
 void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_idx, int batch_size) {
     utils::set_thread_name("corr_infer");
     spdlog::debug("Starting process thread for {}!", device_str);
-    m_num_active_infer_threads++;
 
     torch::Device device = torch::Device(device_str);
 
@@ -336,11 +335,6 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 
     if (bases_batch.size() > 0) {
         batch_infer();
-    }
-
-    auto remaining_threads = --m_num_active_infer_threads;
-    if (remaining_threads == 0) {
-        m_inferred_features_queue.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 
@@ -518,10 +512,7 @@ void CorrectionInferenceNode::input_thread_fn() {
         }
     }
 
-    auto remaining_threads = --m_num_active_feature_threads;
-    if (remaining_threads == 0) {
-        m_features_queue.terminate(utils::AsyncQueueTerminateFast::No);
-    }
+    --m_num_active_feature_threads;
 }
 
 CorrectionInferenceNode::CorrectionInferenceNode(
@@ -610,10 +601,14 @@ void CorrectionInferenceNode::terminate(const TerminateOptions& terminate_option
 
 void CorrectionInferenceNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
     stop_input_processing(fast);
+
+    m_features_queue.terminate(fast);
     for (auto& infer_thread : m_infer_threads) {
         infer_thread.join();
     }
     m_infer_threads.clear();
+
+    m_inferred_features_queue.terminate(fast);
     for (auto& decode_thread : m_decode_threads) {
         decode_thread.join();
     }

@@ -72,8 +72,6 @@ private:
     // Reads removed from input queue and being modbasecalled.
     std::unordered_set<std::shared_ptr<WorkingRead>> m_working_reads;
 
-    std::atomic<int> m_num_active_runner_workers{0};
-
     std::shared_ptr<const ModBaseInfo> m_mod_base_info;
     // The offsets to the canonical bases in the modbase alphabet
     std::array<size_t, 4> m_base_prob_offsets;

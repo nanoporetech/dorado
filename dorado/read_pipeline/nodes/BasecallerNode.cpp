@@ -130,11 +130,6 @@ void BasecallerNode::input_thread_fn() {
             m_chunk_in_queues[chunk_queue_idx]->try_push(std::move(chunk));
         }
     }
-
-    // Notify the basecaller threads that it is safe to gracefully terminate the basecaller
-    for (auto &chunk_queue : m_chunk_in_queues) {
-        chunk_queue->terminate(utils::AsyncQueueTerminateFast::No);
-    }
 }
 
 void BasecallerNode::basecall_current_batch(int worker_id) {
@@ -357,18 +352,6 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                       worker_id, worker_chunks.size());
         basecall_current_batch(worker_id);
     }
-
-    // Reduce the count of active runner threads.  If this was the last active
-    // thread also send termination signal to sink
-    int num_remaining_runners = --m_num_active_model_runners;
-    if (num_remaining_runners == 0) {
-        // runners can share a caller, so shutdown when all runners are done
-        // rather than terminating each runner as it finishes
-        for (auto &runner : m_model_runners) {
-            runner->terminate();
-        }
-        m_processed_chunks.terminate(utils::AsyncQueueTerminateFast::No);
-    }
 }
 
 namespace {
@@ -451,22 +434,43 @@ void BasecallerNode::start_threads() {
     for (int i = 0; i < static_cast<int>(num_workers); i++) {
         m_basecall_workers[i] = std::thread([this, i] { basecall_worker_thread(i); });
     }
-    m_num_active_model_runners = int(num_workers);
 }
 
 void BasecallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    // Signal termination in the input queue, and wait for input threads to join.
     stop_input_processing(fast);
-    for (auto &t : m_basecall_workers) {
-        t.join();
+
+    // Signal the basecaller threads to shutdown.
+    {
+        for (auto &chunk_queue : m_chunk_in_queues) {
+            chunk_queue->terminate(fast);
+        }
+        for (auto &t : m_basecall_workers) {
+            t.join();
+        }
+        m_basecall_workers.clear();
     }
-    m_basecall_workers.clear();
-    for (auto &t : m_working_reads_managers) {
-        t.join();
+
+    // runners can share a caller, so shutdown when all runners are done
+    // rather than terminating each runner as it finishes
+    for (auto &runner : m_model_runners) {
+        runner->terminate();
     }
-    m_working_reads_managers.clear();
+
+    // Signal the working read threads to shutdown.
+    {
+        m_processed_chunks.terminate(fast);
+        for (auto &t : m_working_reads_managers) {
+            t.join();
+        }
+        m_working_reads_managers.clear();
+    }
 
     // There should be no reads left in the node after it's terminated.
-    if (!m_working_reads.empty()) {
+    // Unless we're terminating fast, in which case we can safely drop them.
+    if (fast == utils::AsyncQueueTerminateFast::Yes) {
+        m_working_reads.clear();
+    } else if (!m_working_reads.empty()) {
         throw std::logic_error("Reads have been left in BasecallerNode");
     }
 }

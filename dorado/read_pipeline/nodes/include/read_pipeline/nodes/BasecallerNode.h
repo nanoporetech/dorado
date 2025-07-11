@@ -66,9 +66,6 @@ private:
     // Mean Q-score start position from model properties.
     uint32_t m_mean_qscore_start_pos;
 
-    // Model runners which have not terminated.
-    std::atomic<int> m_num_active_model_runners{0};
-
     // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
     // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`
     std::vector<size_t> m_chunk_sizes;

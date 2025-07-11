@@ -81,7 +81,6 @@ void ModBaseCallerNode::start_threads() {
             m_runner_workers.emplace_back([this, worker_id, model_id] {
                 modbasecall_worker_thread(worker_id, model_id);
             });
-            ++m_num_active_runner_workers;
         }
     }
     start_input_processing([this] { input_thread_fn(); }, "modbase_node");
@@ -90,6 +89,7 @@ void ModBaseCallerNode::start_threads() {
 void ModBaseCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
     // Signal termination in the input queue, and wait for input threads to join.
     stop_input_processing(fast);
+
     // Signal termination in the chunk queues.
     for (auto& chunk_queue : m_chunk_queues) {
         chunk_queue->terminate(fast);
@@ -100,12 +100,18 @@ void ModBaseCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
         t.join();
     }
     m_runner_workers.clear();
+
+    // Signal the output thread to terminate.
+    m_processed_chunks.terminate(fast);
     if (m_output_worker.joinable()) {
         m_output_worker.join();
     }
 
     // There should be no reads left in the node after it's terminated.
-    if (!m_working_reads.empty()) {
+    // Unless we're terminating fast, in which case we can safely drop them.
+    if (fast == utils::AsyncQueueTerminateFast::Yes) {
+        m_working_reads.clear();
+    } else if (!m_working_reads.empty()) {
         throw std::logic_error("Reads have been left in ModBaseCallerNode");
     }
 }
@@ -478,13 +484,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     // Basecall any remaining chunks.
     if (!batched_chunks.empty()) {
         call_current_batch(worker_id, caller_id, batched_chunks);
-    }
-
-    // Reduce the count of active model callers.  If this was the last active
-    // model caller also send termination signal to sink
-    int num_remaining_callers = --m_num_active_runner_workers;
-    if (num_remaining_callers == 0) {
-        m_processed_chunks.terminate(utils::AsyncQueueTerminateFast::No);
     }
 }
 
