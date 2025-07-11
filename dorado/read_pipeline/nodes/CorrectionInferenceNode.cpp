@@ -255,7 +255,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
             inputs.push_back(indices_batch);
         }
 
-        std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
+        std::unique_lock<std::mutex> lock(m_gpu_mutexes.at(mtx_idx));
 
         c10::IValue output;
         try {
@@ -529,8 +529,6 @@ CorrectionInferenceNode::CorrectionInferenceNode(
           m_model_config(parse_model_config(model_dir / "config.toml")),
           m_features_queue(1000),
           m_inferred_features_queue(500),
-          m_bases_manager(batch_size),
-          m_quals_manager(batch_size),
           m_legacy_windowing(legacy_windowing),
           m_debug_tnames(debug_tnames) {
     if (m_model_config.window_size <= 0) {
@@ -621,8 +619,8 @@ void CorrectionInferenceNode::restart() {
 
 stats::NamedStats CorrectionInferenceNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
-    stats["num_reads_corrected"] = double(num_reads.load());
-    stats["total_reads_in_input"] = total_reads_in_input;
+    stats["num_reads_corrected"] = num_reads.load(std::memory_order_relaxed);
+    stats["total_reads_in_input"] = total_reads_in_input.load(std::memory_order_relaxed);
     return stats;
 }
 
