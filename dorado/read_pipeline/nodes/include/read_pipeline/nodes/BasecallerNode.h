@@ -2,10 +2,8 @@
 
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/AsyncQueue.h"
-#include "utils/stats.h"
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -34,7 +32,8 @@ public:
                    std::string node_name,
                    uint32_t read_mean_qscore_start_pos);
     ~BasecallerNode();
-    std::string get_name() const override { return m_node_name; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions &) override { terminate_impl(); }
     void restart() override;

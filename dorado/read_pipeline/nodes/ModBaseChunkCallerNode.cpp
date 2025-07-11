@@ -177,6 +177,10 @@ void ModBaseChunkCallerNode::terminate_impl() {
     }
 }
 
+std::string ModBaseChunkCallerNode::get_name() const { return "ModBaseChunkCallerNode"; }
+
+void ModBaseChunkCallerNode::terminate(const TerminateOptions&) { terminate_impl(); }
+
 void ModBaseChunkCallerNode::restart() {
     m_processed_chunks.restart();
     for (auto& runner : m_runners) {

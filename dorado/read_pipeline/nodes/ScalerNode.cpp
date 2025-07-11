@@ -243,4 +243,14 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
           m_scaling_params(config),
           m_model_type(model_type) {}
 
+ScalerNode::~ScalerNode() { stop_input_processing(); }
+
+std::string ScalerNode::get_name() const { return "ScalerNode"; }
+
+void ScalerNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+
+void ScalerNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "scaler_node");
+}
+
 }  // namespace dorado

@@ -2,7 +2,6 @@
 
 #include "hts_utils/hts_file.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
 #include <filesystem>
@@ -28,12 +27,11 @@ public:
                        std::unique_ptr<const utils::SampleSheet> sample_sheet,
                        bool sort_bam);
     ~BarcodeDemuxerNode();
-    std::string get_name() const override { return "BarcodeDemuxerNode"; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions&) override;
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "brcd_demux");
-    }
+    void restart() override;
 
     void set_header(const sam_hdr_t* header);
 

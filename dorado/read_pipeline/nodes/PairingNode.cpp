@@ -1,7 +1,5 @@
 #include "read_pipeline/nodes/PairingNode.h"
 
-#include "hts_utils/bam_utils.h"
-#include "read_pipeline/base/ClientInfo.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
@@ -492,6 +490,10 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
     }
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
 }
+
+PairingNode::~PairingNode() { terminate_impl(); }
+
+std::string PairingNode::get_name() const { return "PairingNode"; }
 
 void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);

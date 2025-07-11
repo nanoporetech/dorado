@@ -1,7 +1,6 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
 #include <cstdint>
@@ -11,16 +10,14 @@ namespace dorado {
 class StereoDuplexEncoderNode : public MessageSink {
 public:
     StereoDuplexEncoderNode(int input_signal_stride);
+    ~StereoDuplexEncoderNode();
+
+    std::string get_name() const override;
+    stats::NamedStats sample_stats() const override;
+    void terminate(const TerminateOptions &) override;
+    void restart() override;
 
     DuplexReadPtr stereo_encode(ReadPair pair);
-
-    ~StereoDuplexEncoderNode() { stop_input_processing(); };
-    std::string get_name() const override { return "StereoDuplexEncoderNode"; }
-    stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions &) override { stop_input_processing(); }
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "stereo_encode");
-    }
 
 private:
     void input_thread_fn();

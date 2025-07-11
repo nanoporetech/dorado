@@ -112,10 +112,20 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
         : MessageSink(1000, std::thread::hardware_concurrency()),
           m_input_signal_stride(input_signal_stride) {}
 
+StereoDuplexEncoderNode::~StereoDuplexEncoderNode() { stop_input_processing(); };
+
+std::string StereoDuplexEncoderNode::get_name() const { return "StereoDuplexEncoderNode"; }
+
 stats::NamedStats StereoDuplexEncoderNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
     stats["encoded_pairs"] = static_cast<double>(m_num_encoded_pairs);
     return stats;
+}
+
+void StereoDuplexEncoderNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+
+void StereoDuplexEncoderNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "stereo_encode");
 }
 
 }  // namespace dorado

@@ -113,6 +113,10 @@ void ModBaseCallerNode::terminate_impl() {
     }
 }
 
+std::string ModBaseCallerNode::get_name() const { return "ModBaseCallerNode"; }
+
+void ModBaseCallerNode::terminate(const TerminateOptions&) { terminate_impl(); }
+
 void ModBaseCallerNode::restart() {
     m_processed_chunks.restart();
     for (auto& runner : m_runners) {

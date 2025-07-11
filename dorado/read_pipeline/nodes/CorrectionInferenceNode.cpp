@@ -606,6 +606,10 @@ CorrectionInferenceNode::CorrectionInferenceNode(
     hts_free(idx_name);
 }
 
+CorrectionInferenceNode::~CorrectionInferenceNode() { stop_input_processing(); }
+
+std::string CorrectionInferenceNode::get_name() const { return "CorrectionInferenceNode"; }
+
 void CorrectionInferenceNode::terminate(const TerminateOptions&) {
     stop_input_processing();
     for (auto& infer_thread : m_infer_threads) {
@@ -616,6 +620,10 @@ void CorrectionInferenceNode::terminate(const TerminateOptions&) {
         decode_thread.join();
     }
     m_decode_threads.clear();
+}
+
+void CorrectionInferenceNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "corr_node");
 }
 
 stats::NamedStats CorrectionInferenceNode::sample_stats() const {

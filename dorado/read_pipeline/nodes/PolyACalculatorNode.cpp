@@ -87,7 +87,17 @@ void PolyACalculatorNode::input_thread_fn() {
 PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, size_t max_reads)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)) {}
 
+PolyACalculatorNode::~PolyACalculatorNode() { terminate_impl(); }
+
+std::string PolyACalculatorNode::get_name() const { return "PolyACalculator"; }
+
 void PolyACalculatorNode::terminate_impl() { stop_input_processing(); }
+
+void PolyACalculatorNode::terminate(const TerminateOptions &) { terminate_impl(); };
+
+void PolyACalculatorNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "polyacalc_node");
+}
 
 stats::NamedStats PolyACalculatorNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
@@ -97,7 +107,7 @@ stats::NamedStats PolyACalculatorNode::sample_stats() const {
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
 
     if (spdlog::get_level() <= spdlog::level::debug) {
-        for (const auto& [len, count] : tail_length_counts) {
+        for (const auto &[len, count] : tail_length_counts) {
             std::string key = "pt." + std::to_string(len);
             stats[key] = static_cast<float>(count);
         }

@@ -483,6 +483,8 @@ void BasecallerNode::restart() {
     start_threads();
 }
 
+std::string BasecallerNode::get_name() const { return m_node_name; }
+
 stats::NamedStats BasecallerNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
     for (const auto &runner : m_model_runners) {

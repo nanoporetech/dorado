@@ -62,6 +62,14 @@ ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
 
 ReadToBamTypeNode::~ReadToBamTypeNode() { stop_input_processing(); }
 
+std::string ReadToBamTypeNode::get_name() const { return "ReadToBamType"; }
+
+void ReadToBamTypeNode::terminate(const TerminateOptions&) { stop_input_processing(); };
+
+void ReadToBamTypeNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "readtobam_node");
+}
+
 void ReadToBamTypeNode::set_modbase_threshold(float threshold) {
     if (threshold < 0.f || threshold > 1.f) {
         throw std::runtime_error("modbase threshold must be between 0 and 1.");

@@ -1,16 +1,12 @@
 #pragma once
 
 #include "correct/types.h"
-#include "hts_utils/FastxRandomReader.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "read_pipeline/base/messages.h"
 #include "utils/AsyncQueue.h"
-#include "utils/stats.h"
 
 #include <spdlog/spdlog.h>
 
 #include <atomic>
-#include <chrono>
 #include <filesystem>
 #include <memory>
 #include <mutex>
@@ -32,13 +28,12 @@ public:
                             const std::filesystem::path& model_dir,
                             const bool legacy_windowing,
                             const std::unordered_set<std::string>& debug_tnames);
-    ~CorrectionInferenceNode() { stop_input_processing(); }
-    std::string get_name() const override { return "CorrectionInferenceNode"; }
+    ~CorrectionInferenceNode();
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions&) override;
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "corr_node");
-    }
+    void restart() override;
 
 private:
     const std::string m_fastq;

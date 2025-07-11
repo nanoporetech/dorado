@@ -51,6 +51,16 @@ namespace dorado {
 
 BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {}
 
+BarcodeClassifierNode::~BarcodeClassifierNode() { stop_input_processing(); }
+
+std::string BarcodeClassifierNode::get_name() const { return "BarcodeClassifierNode"; }
+
+void BarcodeClassifierNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+
+void BarcodeClassifierNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
+}
+
 void BarcodeClassifierNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {

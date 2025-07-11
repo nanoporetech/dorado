@@ -1,8 +1,7 @@
 #pragma once
 
-#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/base/MessageSink.h"
 #include "utils/sequence_utils.h"
-#include "utils/stats.h"
 #include "utils/types.h"
 
 #include <atomic>
@@ -10,7 +9,6 @@
 #include <deque>
 #include <list>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -38,8 +36,9 @@ public:
 
     // No template-complement map: uses the pair_generation pairing method
     PairingNode(DuplexPairingParameters pairing_params, int num_worker_threads, size_t max_reads);
-    ~PairingNode() { terminate_impl(); }
-    std::string get_name() const override { return "PairingNode"; }
+    ~PairingNode();
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions& terminate_options) override;
     void restart() override;

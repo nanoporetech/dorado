@@ -1,9 +1,7 @@
 #pragma once
 
-#include "read_pipeline/base/ReadPipeline.h"
-#include "utils/stats.h"
+#include "read_pipeline/base/MessageSink.h"
 
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <unordered_set>
@@ -17,9 +15,10 @@ namespace dorado {
 class DuplexReadTaggingNode : public MessageSink {
 public:
     DuplexReadTaggingNode();
-    ~DuplexReadTaggingNode() { stop_input_processing(); }
-    std::string get_name() const override { return "DuplexReadTaggingNode"; }
-    void terminate(const TerminateOptions &) override { stop_input_processing(); }
+    ~DuplexReadTaggingNode();
+
+    std::string get_name() const override;
+    void terminate(const TerminateOptions &) override;
     void restart() override;
 
 private:

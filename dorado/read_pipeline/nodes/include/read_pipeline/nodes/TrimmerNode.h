@@ -1,25 +1,21 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
-#include <memory>
 #include <string>
-#include <vector>
 
 namespace dorado {
 
 class TrimmerNode : public MessageSink {
 public:
     TrimmerNode(int threads);
-    ~TrimmerNode() override { stop_input_processing(); }
-    std::string get_name() const override { return "TrimmerNode"; }
+    ~TrimmerNode() override;
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions&) override { stop_input_processing(); }
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "trimmer");
-    }
+    void terminate(const TerminateOptions&) override;
+    void restart() override;
 
 private:
     std::atomic<int> m_num_records{0};

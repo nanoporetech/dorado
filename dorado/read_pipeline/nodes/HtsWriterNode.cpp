@@ -116,6 +116,8 @@ int HtsWriterNode::write(bam1_t* const record) {
     return m_file.write(record);
 }
 
+std::string HtsWriterNode::get_name() const { return "HtsWriterNode"; }
+
 stats::NamedStats HtsWriterNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
     stats["unique_simplex_reads_written"] =
@@ -126,5 +128,9 @@ stats::NamedStats HtsWriterNode::sample_stats() const {
 }
 
 void HtsWriterNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+
+void HtsWriterNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "hts_writer");
+}
 
 }  // namespace dorado

@@ -1,11 +1,9 @@
 #pragma once
 
-#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/HtsReader.h"  // for ReadMap
 #include "read_pipeline/base/MessageSink.h"
 
 #include <map>
-#include <memory>
 #include <string>
 
 namespace dorado {
@@ -17,9 +15,10 @@ public:
     BaseSpaceDuplexCallerNode(std::map<std::string, std::string> template_complement_map,
                               ReadMap reads,
                               size_t threads);
-    ~BaseSpaceDuplexCallerNode() { terminate_impl(); }
-    std::string get_name() const override { return "BaseSpaceDuplexCallerNode"; }
-    void terminate(const TerminateOptions&) override { terminate_impl(); }
+    ~BaseSpaceDuplexCallerNode();
+
+    std::string get_name() const override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
 
 private:
@@ -30,7 +29,7 @@ private:
 
     const size_t m_num_worker_threads;
     std::thread m_worker_thread;
-    std::map<std::string, std::string> m_template_complement_map;
+    const std::map<std::string, std::string> m_template_complement_map;
     const ReadMap m_reads;
 };
 }  // namespace dorado

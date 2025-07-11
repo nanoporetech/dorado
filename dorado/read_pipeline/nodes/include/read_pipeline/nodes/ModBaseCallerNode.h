@@ -2,12 +2,10 @@
 
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/AsyncQueue.h"
-#include "utils/stats.h"
 
 #include <array>
 #include <atomic>
 #include <cstdint>
-#include <functional>
 #include <memory>
 #include <mutex>
 #include <string>
@@ -31,10 +29,12 @@ public:
                       size_t block_stride,
                       size_t max_reads);
     ~ModBaseCallerNode();
-    std::string get_name() const override { return "ModBaseCallerNode"; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions&) override { terminate_impl(); }
+    void terminate(const TerminateOptions&) override;
     void restart() override;
+
     void simplex_mod_call(Message&& message);
     void duplex_mod_call(Message&& message);
 

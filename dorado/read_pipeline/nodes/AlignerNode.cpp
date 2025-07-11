@@ -111,6 +111,8 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
           m_bed_file_access(std::move(bed_file_access)),
           m_task_executor(*m_thread_pool, m_pipeline_priority, MAX_PROCESSING_QUEUE_SIZE) {}
 
+AlignerNode::~AlignerNode() { stop_input_processing(); }
+
 std::shared_ptr<const alignment::Minimap2Index> AlignerNode::get_index(
         const ClientInfo& client_info) {
     auto align_info = client_info.contexts().get_ptr<const alignment::AlignmentInfo>();
@@ -224,6 +226,8 @@ void AlignerNode::restart() {
     m_task_executor.restart();
     start_input_processing([this] { input_thread_fn(); }, "aligner_node");
 }
+
+std::string AlignerNode::get_name() const { return "AlignerNode"; }
 
 stats::NamedStats AlignerNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();

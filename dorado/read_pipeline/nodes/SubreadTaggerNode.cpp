@@ -116,6 +116,14 @@ void SubreadTaggerNode::check_duplex_thread() {
 SubreadTaggerNode::SubreadTaggerNode(int num_worker_threads, size_t max_reads)
         : MessageSink(max_reads, num_worker_threads) {}
 
+SubreadTaggerNode::~SubreadTaggerNode() { terminate_impl(); }
+
+std::string SubreadTaggerNode::get_name() const { return "SubreadTaggerNode"; }
+
+void SubreadTaggerNode::terminate(const TerminateOptions&) { terminate_impl(); }
+
+void SubreadTaggerNode::restart() { start_threads(); }
+
 void SubreadTaggerNode::start_threads() {
     m_terminate.store(false);
     m_duplex_thread = std::thread([this] { check_duplex_thread(); });

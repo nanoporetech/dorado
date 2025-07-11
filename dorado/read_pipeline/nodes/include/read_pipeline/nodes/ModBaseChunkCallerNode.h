@@ -3,7 +3,6 @@
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/AsyncQueue.h"
-#include "utils/stats.h"
 
 #include <spdlog/spdlog.h>
 
@@ -66,9 +65,10 @@ public:
                            size_t canonical_stride,
                            size_t max_reads);
     ~ModBaseChunkCallerNode();
-    std::string get_name() const override { return "ModBaseChunkCallerNode"; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions&) override { terminate_impl(); }
+    void terminate(const TerminateOptions&) override;
     void restart() override;
 
     static std::optional<int64_t> next_hit(const std::vector<int64_t>& ctx_hit_signal_idxs,

@@ -74,6 +74,16 @@ namespace dorado {
 // This Node is responsible for trimming adapters, primers, and barcodes.
 TrimmerNode::TrimmerNode(int threads) : MessageSink(10000, threads) {}
 
+TrimmerNode::~TrimmerNode() { stop_input_processing(); }
+
+std::string TrimmerNode::get_name() const { return "TrimmerNode"; }
+
+void TrimmerNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+
+void TrimmerNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "trimmer");
+}
+
 void TrimmerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {

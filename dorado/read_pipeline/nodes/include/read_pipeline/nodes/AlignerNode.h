@@ -7,7 +7,6 @@
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/concurrency/async_task_executor.h"
 #include "utils/concurrency/task_priority.h"
-#include "utils/stats.h"
 
 #include <memory>
 #include <string>
@@ -38,8 +37,9 @@ public:
                 std::shared_ptr<alignment::BedFileAccess> bed_file_access,
                 std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
                 utils::concurrency::TaskPriority pipeline_priority);
-    ~AlignerNode() { stop_input_processing(); }
-    std::string get_name() const override { return "AlignerNode"; }
+    ~AlignerNode();
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions&) override;
     void restart() override;

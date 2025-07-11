@@ -5,7 +5,6 @@
 #include <atomic>
 #include <condition_variable>
 #include <cstdint>
-#include <memory>
 #include <mutex>
 #include <thread>
 #include <unordered_map>
@@ -18,10 +17,11 @@ namespace dorado {
 class SubreadTaggerNode : public MessageSink {
 public:
     SubreadTaggerNode(int num_worker_threads, size_t max_reads);
-    ~SubreadTaggerNode() { terminate_impl(); }
-    std::string get_name() const override { return "SubreadTaggerNode"; }
-    void terminate(const TerminateOptions &) override { terminate_impl(); }
-    void restart() override { start_threads(); }
+    ~SubreadTaggerNode();
+
+    std::string get_name() const override;
+    void terminate(const TerminateOptions &) override;
+    void restart() override;
 
 protected:
     // Ensure this node processes reads from disconnected clients, otherwise we may not properly

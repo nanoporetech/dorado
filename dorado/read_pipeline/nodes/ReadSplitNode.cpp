@@ -72,12 +72,22 @@ ReadSplitNode::ReadSplitNode(std::unique_ptr<const ReadSplitter> splitter,
                              size_t max_reads)
         : MessageSink(max_reads, num_worker_threads), m_splitter(std::move(splitter)) {}
 
+ReadSplitNode::~ReadSplitNode() { stop_input_processing(); }
+
+std::string ReadSplitNode::get_name() const { return "ReadSplitNode"; }
+
 stats::NamedStats ReadSplitNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
     stats["num_input_reads_pushed"] = static_cast<double>(m_num_input_reads_pushed.load());
     stats["num_reads_split"] = static_cast<double>(m_num_reads_split.load());
     stats["total_num_reads_pushed"] = static_cast<double>(m_total_num_reads_pushed.load());
     return stats;
+}
+
+void ReadSplitNode::terminate(const TerminateOptions&) { stop_input_processing(); }
+
+void ReadSplitNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "readsplit_node");
 }
 
 }  // namespace dorado

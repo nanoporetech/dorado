@@ -193,6 +193,8 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)) {}
 
+BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() { terminate_impl(); }
+
 void BaseSpaceDuplexCallerNode::start_threads() {
     m_worker_thread = std::thread([this] { worker_thread(); });
 }
@@ -203,6 +205,10 @@ void BaseSpaceDuplexCallerNode::terminate_impl() {
         m_worker_thread.join();
     }
 }
+
+std::string BaseSpaceDuplexCallerNode::get_name() const { return "BaseSpaceDuplexCallerNode"; }
+
+void BaseSpaceDuplexCallerNode::terminate(const TerminateOptions&) { terminate_impl(); }
 
 void BaseSpaceDuplexCallerNode::restart() {
     start_input_queue();

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <cstdint>
 #include <memory>
@@ -22,11 +21,10 @@ public:
                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
                       size_t max_reads);
     ~ReadToBamTypeNode();
-    std::string get_name() const override { return "ReadToBamType"; }
-    void terminate(const TerminateOptions &) override { stop_input_processing(); };
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "readtobam_node");
-    }
+
+    std::string get_name() const override;
+    void terminate(const TerminateOptions &) override;
+    void restart() override;
 
     // TODO: refactor duplex.cpp pipeline setup so that this isn't required.
     void set_modbase_threshold(float threshold);

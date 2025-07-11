@@ -6,15 +6,11 @@
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
-#include <atomic>
-#include <iostream>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
