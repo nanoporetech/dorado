@@ -36,10 +36,8 @@ public:
 
 private:
     const std::string m_fastq;
-    correction::ModelConfig m_model_config;
+    const correction::ModelConfig m_model_config;
     void input_thread_fn();
-    int m_window_size;
-    std::string m_model_path;
 
     void terminate_impl(utils::AsyncQueueTerminateFast fast);
 

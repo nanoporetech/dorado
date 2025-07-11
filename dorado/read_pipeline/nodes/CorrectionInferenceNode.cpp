@@ -361,6 +361,8 @@ void CorrectionInferenceNode::input_thread_fn() {
     std::ofstream ofs_windows("wfs_windows." + std::to_string(thread_id) + ".txt");
 #endif
 
+    const int window_size = m_model_config.window_size;
+
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<CorrectionAlignments>(message)) {
@@ -380,7 +382,7 @@ void CorrectionInferenceNode::input_thread_fn() {
 
             // Get the windows
             const int32_t tlen = alignments.overlaps[0].tlen;
-            const size_t n_windows = (tlen + m_window_size - 1) / m_window_size;
+            const size_t n_windows = (tlen + window_size - 1) / window_size;
             LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
@@ -389,10 +391,10 @@ void CorrectionInferenceNode::input_thread_fn() {
             std::unordered_set<int> overlap_idxs;
             bool rv = false;
             if (m_legacy_windowing) {
-                rv = extract_windows(windows, alignments, m_window_size);
-                for (int32_t ii = 0; ii < tlen; ii += m_window_size) {
+                rv = extract_windows(windows, alignments, window_size);
+                for (int32_t ii = 0; ii < tlen; ii += window_size) {
                     win_intervals.emplace_back(
-                            secondary::Interval{ii, std::min(ii + m_window_size, tlen)});
+                            secondary::Interval{ii, std::min(ii + window_size, tlen)});
                 }
 
                 // Filter the window features and get the set of unique overlaps.
@@ -402,9 +404,8 @@ void CorrectionInferenceNode::input_thread_fn() {
                 }
 
             } else {
-                win_intervals =
-                        extract_limited_windows(windows, alignments, m_window_size,
-                                                static_cast<int32_t>(m_window_size * 1.10f));
+                win_intervals = extract_limited_windows(windows, alignments, window_size,
+                                                        static_cast<int32_t>(window_size * 1.10f));
                 rv = !std::empty(windows);
 
                 // Get the set of unique useful overlaps.
@@ -541,12 +542,10 @@ CorrectionInferenceNode::CorrectionInferenceNode(
           m_quals_manager(batch_size),
           m_legacy_windowing(legacy_windowing),
           m_debug_tnames(debug_tnames) {
-    m_window_size = m_model_config.window_size;
-
-    if (m_window_size <= 0) {
+    if (m_model_config.window_size <= 0) {
         throw std::runtime_error{
                 "Window size specified in the model config needs to be >= 0! Given: " +
-                std::to_string(m_window_size)};
+                std::to_string(m_model_config.window_size)};
     }
 
     std::vector<std::string> devices;
