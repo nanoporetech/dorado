@@ -1,7 +1,6 @@
 #pragma once
 
 #include <algorithm>
-#include <atomic>
 #include <cassert>
 #include <condition_variable>
 #include <mutex>
@@ -13,6 +12,12 @@ namespace dorado::utils {
 
 // Status return by push/pop methods.
 enum class AsyncQueueStatus { Success, Timeout, Terminate };
+
+// Whether to terminate the queue fast or wait until it's empty.
+enum class AsyncQueueTerminateFast : bool { No = false, Yes = true };
+inline AsyncQueueTerminateFast terminate_fast(bool fast) {
+    return static_cast<AsyncQueueTerminateFast>(fast);
+}
 
 // Asynchronous queue for producer/consumer use.
 // Items must be movable.
@@ -31,10 +36,11 @@ class AsyncQueue {
     std::queue<Item> m_items;
     // Number of items that can be added before further additions block, pending
     // consumption of items.
-    size_t m_capacity = 0;
-    // If true, CV waits should terminate regardless of other state.
-    // Pending attempts to push or pop items will fail.
-    bool m_terminate = false;
+    const size_t m_capacity;
+    // If not No, CV waits should terminate regardless of other state.
+    // Pending attempts to push items will fail, pop will fail only if Fast.
+    enum class Terminate { No, WhenEmpty, Fast };
+    Terminate m_terminate = Terminate::No;
     // Stats for monitoring queue usage.
     int64_t m_num_pushes = 0;
     int64_t m_num_pops = 0;
@@ -81,7 +87,8 @@ class AsyncQueue {
     // Returns a unique_lock holding m_mutex.
     std::unique_lock<std::mutex> wait_for_item() {
         std::unique_lock lock(m_mutex);
-        m_not_empty_cv.wait(lock, [this] { return !m_items.empty() || m_terminate; });
+        m_not_empty_cv.wait(lock,
+                            [this] { return !m_items.empty() || m_terminate != Terminate::No; });
         // Note: don't use std::move, so we have the opportunity of NRVO on lock.
         return lock;
     }
@@ -91,8 +98,9 @@ class AsyncQueue {
     std::tuple<std::unique_lock<std::mutex>, bool> wait_for_item_or_timeout(
             const std::chrono::time_point<Clock, Duration>& timeout_time) {
         std::unique_lock lock(m_mutex);
-        bool wait_status = m_not_empty_cv.wait_until(
-                lock, timeout_time, [this] { return !m_items.empty() || m_terminate; });
+        bool wait_status = m_not_empty_cv.wait_until(lock, timeout_time, [this] {
+            return !m_items.empty() || m_terminate != Terminate::No;
+        });
         return {std::move(lock), wait_status};
     }
 
@@ -102,7 +110,7 @@ public:
 
     ~AsyncQueue() {
         // Ensure CV waits terminate before destruction.
-        terminate();
+        terminate(AsyncQueueTerminateFast::Yes);
     }
 
     // Contains std::mutex and std::condition_variable, so is not copyable or movable.
@@ -122,11 +130,13 @@ public:
         std::unique_lock lock(m_mutex);
 
         // Ensure there is space for the new item, given our limit on capacity.
-        m_not_full_cv.wait(lock, [this] { return m_items.size() < m_capacity || m_terminate; });
+        m_not_full_cv.wait(lock, [this] {
+            return m_items.size() < m_capacity || m_terminate != Terminate::No;
+        });
 
         // We hold the mutex, and either there is space in the queue, or we have been
         // asked to terminate.
-        if (m_terminate) {
+        if (m_terminate != Terminate::No) {
             return AsyncQueueStatus::Terminate;
         }
 
@@ -156,9 +166,17 @@ public:
             return AsyncQueueStatus::Timeout;
         }
 
-        // Termination takes effect once all items have been popped from the queue.
-        if (m_terminate && m_items.empty()) {
+        switch (m_terminate) {
+        case Terminate::Fast:
             return AsyncQueueStatus::Terminate;
+        case Terminate::WhenEmpty:
+            // Termination takes effect once all items have been popped from the queue.
+            if (m_items.empty()) {
+                return AsyncQueueStatus::Terminate;
+            }
+            break;
+        case Terminate::No:
+            break;
         }
 
         pop_item(lock, item);
@@ -173,9 +191,17 @@ public:
     AsyncQueueStatus try_pop(Item& item) {
         auto lock = wait_for_item();
 
-        // Termination takes effect once all items have been popped from the queue.
-        if (m_terminate && m_items.empty()) {
+        switch (m_terminate) {
+        case Terminate::Fast:
             return AsyncQueueStatus::Terminate;
+        case Terminate::WhenEmpty:
+            // Termination takes effect once all items have been popped from the queue.
+            if (m_items.empty()) {
+                return AsyncQueueStatus::Terminate;
+            }
+            break;
+        case Terminate::No:
+            break;
         }
 
         pop_item(lock, item);
@@ -194,9 +220,17 @@ public:
     AsyncQueueStatus process_and_pop_n(ProcessFn process_fn, size_t max_count) {
         auto lock = wait_for_item();
 
-        // Termination takes effect once all items have been popped from the queue.
-        if (m_terminate && m_items.empty()) {
+        switch (m_terminate) {
+        case Terminate::Fast:
             return AsyncQueueStatus::Terminate;
+        case Terminate::WhenEmpty:
+            // Termination takes effect once all items have been popped from the queue.
+            if (m_items.empty()) {
+                return AsyncQueueStatus::Terminate;
+            }
+            break;
+        case Terminate::No:
+            break;
         }
 
         process_items(lock, process_fn, max_count);
@@ -218,9 +252,17 @@ public:
             return AsyncQueueStatus::Timeout;
         }
 
-        // Termination takes effect once all items have been popped from the queue.
-        if (m_terminate && m_items.empty()) {
+        switch (m_terminate) {
+        case Terminate::Fast:
             return AsyncQueueStatus::Terminate;
+        case Terminate::WhenEmpty:
+            // Termination takes effect once all items have been popped from the queue.
+            if (m_items.empty()) {
+                return AsyncQueueStatus::Terminate;
+            }
+            break;
+        case Terminate::No:
+            break;
         }
 
         process_items(lock, process_fn, max_count);
@@ -229,11 +271,12 @@ public:
 
     // Tells the queue to terminate any CV waits.
     // Pushes will fail and return return AsyncQueueStatus::Terminate until restart is called.
-    // Pops will return AsyncQueueStatus::Terminate once the queue is empty.
-    void terminate() {
+    // Pops will return AsyncQueueStatus::Terminate once the queue is empty, or immediately if fast.
+    void terminate(AsyncQueueTerminateFast fast) {
         {
             std::lock_guard lock(m_mutex);
-            m_terminate = true;
+            m_terminate =
+                    fast == AsyncQueueTerminateFast::Yes ? Terminate::Fast : Terminate::WhenEmpty;
         }
 
         // Signal all CV waits so they examine the termination flag and finish if
@@ -247,7 +290,7 @@ public:
     // Resets state to active following a terminate call.
     void restart() {
         std::lock_guard lock(m_mutex);
-        m_terminate = false;
+        m_terminate = Terminate::No;
     }
 
     // Maximum number of items the queue can contain.
