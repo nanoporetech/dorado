@@ -22,37 +22,7 @@ namespace dorado {
 class ModBaseChunkCallerNode : public MessageSink {
     struct ModBaseData;
     struct WorkingRead;
-
-    struct ModBaseChunk {
-        ModBaseChunk(std::shared_ptr<WorkingRead> working_read_,
-                     int model_id_,
-                     int base_id_,
-                     int64_t signal_start_,
-                     int64_t hit_start_,
-                     int64_t num_states_,
-                     bool is_template_)
-                : working_read(std::move(working_read_)),
-                  model_id(model_id_),
-                  base_id(base_id_),
-                  signal_start(signal_start_),
-                  hit_start(hit_start_),
-                  num_states(num_states_),
-                  is_template(is_template_) {}
-
-        std::shared_ptr<WorkingRead> working_read;
-        const int model_id;
-        const int base_id;
-        // The start index into the working read in the PADDED signal
-        const int64_t signal_start;
-        // The start index into the context hits
-        const int64_t hit_start;
-        // The number of states predicted by the modbase model `num_mods + 1`
-        const int64_t num_states;
-        // False if the chunk uses the complement modbase data on the working read
-        const bool is_template;
-        // The model predictions for this chunk arranged in `[canonical, mod1, .., modN, canonical, mod1, ..]`
-        std::vector<float> scores;
-    };
+    struct ModBaseChunk;
 
 public:
     struct EncodingData {
