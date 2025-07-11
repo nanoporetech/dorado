@@ -79,6 +79,19 @@ CATCH_TEST_CASE(TEST_GROUP ": PushPopSucceedAfterRestarting") {
     CATCH_CHECK(val == 42);
 }
 
+CATCH_TEST_CASE(TEST_GROUP ": QueueEmptyAfterRestarting") {
+    const auto terminate_mode = GENERATE(dorado::utils::AsyncQueueTerminateFast::No,
+                                         dorado::utils::AsyncQueueTerminateFast::Yes);
+
+    AsyncQueue<int> queue(5);
+    CATCH_CHECK(queue.try_push(1) == AsyncQueueStatus::Success);
+    CATCH_CHECK(queue.try_push(2) == AsyncQueueStatus::Success);
+    CATCH_CHECK(queue.try_push(3) == AsyncQueueStatus::Success);
+    queue.terminate(terminate_mode);
+    queue.restart();
+    CATCH_CHECK(queue.size() == 0);
+}
+
 // Spawned thread sits waiting for an item.
 // Main thread supplies that item.
 CATCH_TEST_CASE(TEST_GROUP ": PopFromOtherThread") {

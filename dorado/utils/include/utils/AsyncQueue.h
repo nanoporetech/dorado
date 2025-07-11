@@ -290,6 +290,11 @@ public:
     // Resets state to active following a terminate call.
     void restart() {
         std::lock_guard lock(m_mutex);
+        while (!m_items.empty()) {
+            m_items.pop();
+        }
+        m_num_pushes = 0;
+        m_num_pops = 0;
         m_terminate = Terminate::No;
     }
 
