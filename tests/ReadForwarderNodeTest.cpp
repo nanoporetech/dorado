@@ -22,7 +22,7 @@ CATCH_TEST_CASE("OnlyReadsExtracted", TEST_GROUP) {
     pipeline->push_message(dorado::ReadPair());
     pipeline->push_message(dorado::CacheFlushMessage());
     pipeline->push_message(std::make_unique<dorado::DuplexRead>());
-    pipeline->terminate(dorado::DefaultTerminateOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
     CATCH_CHECK(messages.size() == 2);
 }

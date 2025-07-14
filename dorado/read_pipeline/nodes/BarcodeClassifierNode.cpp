@@ -53,7 +53,7 @@ BarcodeClassifierNode::~BarcodeClassifierNode() {
 std::string BarcodeClassifierNode::get_name() const { return "BarcodeClassifierNode"; }
 
 void BarcodeClassifierNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void BarcodeClassifierNode::restart() {

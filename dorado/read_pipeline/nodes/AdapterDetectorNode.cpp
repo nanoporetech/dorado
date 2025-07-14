@@ -32,7 +32,7 @@ AdapterDetectorNode::~AdapterDetectorNode() {
 std::string AdapterDetectorNode::get_name() const { return "AdapterDetectorNode"; }
 
 void AdapterDetectorNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void AdapterDetectorNode::restart() {

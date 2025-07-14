@@ -87,7 +87,7 @@ CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     for (auto& read : reads) {
         pipeline->push_message(std::move(read));
     }
-    pipeline->terminate(dorado::DefaultTerminateOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
     // the 4 split reads generate one additional readpair
     CATCH_CHECK(messages.size() == 9);

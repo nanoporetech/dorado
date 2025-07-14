@@ -215,7 +215,7 @@ void ModBaseChunkCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast)
 std::string ModBaseChunkCallerNode::get_name() const { return "ModBaseChunkCallerNode"; }
 
 void ModBaseChunkCallerNode::terminate(const TerminateOptions& terminate_options) {
-    terminate_impl(utils::terminate_fast(terminate_options.fast));
+    terminate_impl(terminate_options.fast);
 }
 
 void ModBaseChunkCallerNode::restart() {

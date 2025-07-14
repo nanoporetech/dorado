@@ -245,7 +245,7 @@ ScalerNode::~ScalerNode() { stop_input_processing(utils::AsyncQueueTerminateFast
 std::string ScalerNode::get_name() const { return "ScalerNode"; }
 
 void ScalerNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void ScalerNode::restart() {

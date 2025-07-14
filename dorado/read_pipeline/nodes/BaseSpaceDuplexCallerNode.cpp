@@ -209,7 +209,7 @@ void BaseSpaceDuplexCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fa
 std::string BaseSpaceDuplexCallerNode::get_name() const { return "BaseSpaceDuplexCallerNode"; }
 
 void BaseSpaceDuplexCallerNode::terminate(const TerminateOptions& terminate_options) {
-    terminate_impl(utils::terminate_fast(terminate_options.fast));
+    terminate_impl(terminate_options.fast);
 }
 
 void BaseSpaceDuplexCallerNode::restart() {

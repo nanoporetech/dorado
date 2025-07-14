@@ -88,7 +88,7 @@ protected:
         reader.set_client_info(client_info);
 
         reader.read(*pipeline, 100);
-        pipeline->terminate({});
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
         auto bam_messages = ConvertMessages<dorado::BamMessage>(std::move(m_output_messages));
         std::vector<dorado::BamPtr> result{};
         result.reserve(bam_messages.size());
@@ -123,7 +123,7 @@ protected:
         read->read_common.seq = sequence;
 
         pipeline->push_message(std::move(read));
-        pipeline->terminate({});
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
         CATCH_CHECK((m_output_messages.size() == 1 &&
                      std::holds_alternative<MessageTypePtr>(m_output_messages[0])));

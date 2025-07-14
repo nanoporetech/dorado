@@ -85,7 +85,7 @@ stats::NamedStats ReadSplitNode::sample_stats() const {
 }
 
 void ReadSplitNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void ReadSplitNode::restart() {

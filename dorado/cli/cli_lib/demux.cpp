@@ -380,7 +380,7 @@ int demuxer(int argc, char* argv[]) {
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.
-    auto final_stats = pipeline->terminate(DefaultTerminateOptions());
+    auto final_stats = pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
     progress_stats.notify_stats_collector_completed(final_stats);

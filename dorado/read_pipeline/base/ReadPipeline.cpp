@@ -4,15 +4,7 @@
 
 #include <algorithm>
 #include <cctype>
-#include <chrono>
-#include <iomanip>
-#include <iostream>
 #include <ranges>
-#include <sstream>
-#include <stack>
-#include <stdexcept>
-#include <string_view>
-#include <unordered_map>
 
 using namespace std::chrono_literals;
 
@@ -118,7 +110,7 @@ void Pipeline::push_message(Message &&message) {
 
 stats::NamedStats Pipeline::terminate(const TerminateOptions &terminate_options) {
     stats::NamedStats final_stats;
-    if (terminate_options.fast) {
+    if (terminate_options.fast == utils::AsyncQueueTerminateFast::Yes) {
         // Fast terminate means that we don't need to preserve the reads, so traverse
         // sink to source order so that we unblock sources trying to push reads into
         // sinks.
@@ -154,9 +146,7 @@ void Pipeline::restart() {
 
 Pipeline::~Pipeline() {
     // Shutdown fast during destruction.
-    TerminateOptions options;
-    options.fast = true;
-    terminate(options);
+    terminate({.fast = utils::AsyncQueueTerminateFast::Yes});
 
     // Destroy from source to sink to avoid dangling references to sinks.
     for (auto handle : m_source_to_sink_order) {

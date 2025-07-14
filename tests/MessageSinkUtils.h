@@ -14,7 +14,7 @@ public:
 
     std::string get_name() const override { return "sink"; }
     void terminate(const dorado::TerminateOptions& terminate_options) override {
-        terminate_impl(dorado::utils::terminate_fast(terminate_options.fast));
+        terminate_impl(terminate_options.fast);
     }
     void restart() override {
         start_input_processing([this] { worker_thread(); }, "MessageSinkToVector");
@@ -61,6 +61,6 @@ inline size_t CountSinkReads(const std::filesystem::path& data_path,
 
     auto input_pod5_files = dorado::DataLoader::InputFiles::search_pod5s(data_path, false);
     loader.load_reads(input_pod5_files, dorado::ReadOrder::UNRESTRICTED);
-    pipeline->terminate(dorado::DefaultTerminateOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     return messages.size();
 }

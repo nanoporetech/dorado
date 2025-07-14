@@ -23,7 +23,7 @@ ReadForwarderNode::~ReadForwarderNode() {
 std::string ReadForwarderNode::get_name() const { return "ReadForwarderNode"; }
 
 void ReadForwarderNode::terminate(const TerminateOptions &terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void ReadForwarderNode::restart() {

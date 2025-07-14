@@ -119,7 +119,7 @@ void ModBaseCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
 std::string ModBaseCallerNode::get_name() const { return "ModBaseCallerNode"; }
 
 void ModBaseCallerNode::terminate(const TerminateOptions& terminate_options) {
-    terminate_impl(utils::terminate_fast(terminate_options.fast));
+    terminate_impl(terminate_options.fast);
 }
 
 void ModBaseCallerNode::restart() {

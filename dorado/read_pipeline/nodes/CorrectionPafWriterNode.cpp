@@ -32,7 +32,7 @@ void CorrectionPafWriterNode::input_thread_fn() {
 }
 
 void CorrectionPafWriterNode::terminate(const TerminateOptions &terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void CorrectionPafWriterNode::restart() {

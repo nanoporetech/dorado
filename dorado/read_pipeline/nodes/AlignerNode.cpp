@@ -218,7 +218,7 @@ void AlignerNode::input_thread_fn() {
 }
 
 void AlignerNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
     m_task_executor.flush();
 }
 

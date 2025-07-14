@@ -594,7 +594,7 @@ CorrectionInferenceNode::~CorrectionInferenceNode() {
 std::string CorrectionInferenceNode::get_name() const { return "CorrectionInferenceNode"; }
 
 void CorrectionInferenceNode::terminate(const TerminateOptions& terminate_options) {
-    terminate_impl(utils::terminate_fast(terminate_options.fast));
+    terminate_impl(terminate_options.fast);
 }
 
 void CorrectionInferenceNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {

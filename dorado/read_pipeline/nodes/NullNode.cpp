@@ -15,9 +15,7 @@ NullNode::~NullNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Ye
 
 std::string NullNode::get_name() const { return "NullNode"; }
 
-void NullNode::terminate(const TerminateOptions &opts) {
-    stop_input_processing(utils::terminate_fast(opts.fast));
-}
+void NullNode::terminate(const TerminateOptions &opts) { stop_input_processing(opts.fast); }
 
 void NullNode::restart() {
     start_input_processing([this] { input_thread_fn(); }, "null_node");

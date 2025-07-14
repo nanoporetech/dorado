@@ -167,7 +167,7 @@ stats::NamedStats BarcodeDemuxerNode::sample_stats() const {
 std::string BarcodeDemuxerNode::get_name() const { return "BarcodeDemuxerNode"; }
 
 void BarcodeDemuxerNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void BarcodeDemuxerNode::restart() {

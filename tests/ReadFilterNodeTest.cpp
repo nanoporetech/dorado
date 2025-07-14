@@ -58,7 +58,7 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
 
-        pipeline->terminate(dorado::DefaultTerminateOptions());
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     }
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
@@ -104,7 +104,7 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
 
-        pipeline->terminate(dorado::DefaultTerminateOptions());
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     }
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
@@ -150,7 +150,7 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
 
-        pipeline->terminate(dorado::DefaultTerminateOptions());
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     }
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));

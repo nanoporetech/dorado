@@ -76,7 +76,7 @@ TrimmerNode::~TrimmerNode() { stop_input_processing(utils::AsyncQueueTerminateFa
 std::string TrimmerNode::get_name() const { return "TrimmerNode"; }
 
 void TrimmerNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void TrimmerNode::restart() {

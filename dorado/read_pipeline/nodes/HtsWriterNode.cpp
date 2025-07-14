@@ -124,7 +124,7 @@ stats::NamedStats HtsWriterNode::sample_stats() const {
 }
 
 void HtsWriterNode::terminate(const TerminateOptions& terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void HtsWriterNode::restart() {

@@ -15,9 +15,6 @@ enum class AsyncQueueStatus { Success, Timeout, Terminate };
 
 // Whether to terminate the queue fast or wait until it's empty.
 enum class AsyncQueueTerminateFast : bool { No = false, Yes = true };
-inline AsyncQueueTerminateFast terminate_fast(bool fast) {
-    return static_cast<AsyncQueueTerminateFast>(fast);
-}
 
 // Asynchronous queue for producer/consumer use.
 // Items must be movable.

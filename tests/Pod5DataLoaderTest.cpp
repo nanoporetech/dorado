@@ -72,7 +72,7 @@ CATCH_TEST_CASE(TEST_GROUP " Load data sorted by channel id.", TEST_GROUP) {
         throw std::runtime_error("No pod5 files in " + data_path.string());
     }
     loader.load_reads(input_pod5_files, dorado::ReadOrder::BY_CHANNEL);
-    pipeline->terminate(dorado::DefaultTerminateOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
 
     int start_channel_id = -1;
@@ -115,7 +115,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test correct previous and next read ids when loaded
         throw std::runtime_error("No pod5 files in " + data_path.string());
     }
     loader.load_reads(input_pod5_files, dorado::ReadOrder::BY_CHANNEL);
-    pipeline->terminate(dorado::DefaultTerminateOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     std::sort(reads.begin(), reads.end(), [](auto& a, auto& b) {
         return a->read_common.start_time_ms < b->read_common.start_time_ms;

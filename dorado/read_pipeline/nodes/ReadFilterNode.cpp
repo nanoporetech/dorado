@@ -61,7 +61,7 @@ stats::NamedStats ReadFilterNode::sample_stats() const {
 }
 
 void ReadFilterNode::terminate(const TerminateOptions &terminate_options) {
-    stop_input_processing(utils::terminate_fast(terminate_options.fast));
+    stop_input_processing(terminate_options.fast);
 }
 
 void ReadFilterNode::restart() {
