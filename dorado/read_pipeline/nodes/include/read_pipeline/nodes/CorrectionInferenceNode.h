@@ -61,8 +61,6 @@ private:
     std::unordered_map<std::string, int> m_pending_features_by_id;
     std::mutex m_features_mutex;
 
-    std::atomic<int> m_num_active_feature_threads{0};
-
     std::array<std::mutex, 32> m_gpu_mutexes;
 
     bool m_legacy_windowing = false;

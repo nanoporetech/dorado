@@ -39,9 +39,6 @@ constexpr bool USING_DORADO_CUDA_BUILD = false;
 
 using namespace dorado::correction;
 
-// #define DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
-// #define DEBUG_CORRECT_PRINT_WINDOW_INFO_TO_FILE
-
 namespace {
 
 dorado::BamPtr create_bam_record(const std::string& read_id, const std::string& seq) {
@@ -339,21 +336,9 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 }
 
 void CorrectionInferenceNode::input_thread_fn() {
-    auto thread_id = m_num_active_feature_threads++;
-
     auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_fastq);
 
-    if (thread_id == 0) {
-        total_reads_in_input = fastx_reader->num_entries();
-    }
-
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
-    std::ofstream ofs_lens("wfs_lengths." + std::to_string(thread_id) + ".txt");
-    std::ofstream ofs_bed("wfs_windows." + std::to_string(thread_id) + ".bed");
-#endif
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_INFO_TO_FILE
-    std::ofstream ofs_windows("wfs_windows." + std::to_string(thread_id) + ".txt");
-#endif
+    total_reads_in_input.store(fastx_reader->num_entries(), std::memory_order_relaxed);
 
     const int window_size = m_model_config.window_size;
 
@@ -425,49 +410,6 @@ void CorrectionInferenceNode::input_thread_fn() {
             // Get the filtered features
             auto wfs = extract_features(windows, alignments);
 
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
-            for (const auto& wf : wfs) {
-                ofs_lens << wf.read_name << '\t';
-                polisher::print_tensor_shape(ofs_lens, wf.bases, "\t");
-                ofs_lens << '\t' << alignments.overlaps[0].tlen << '\n';
-            }
-            for (size_t ii = 0; ii < std::size(win_intervals); ++ii) {
-                const auto& interval = win_intervals[ii];
-                ofs_bed << alignments.read_name << '\t' << interval.start << '\t' << interval.end
-                        << '\t' << "win-" << ii << '\n';
-            }
-#endif
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_INFO_TO_FILE
-            for (size_t ovl_idx = 0; ovl_idx < std::size(alignments.overlaps); ++ovl_idx) {
-                const auto& ovl = alignments.overlaps[ovl_idx];
-                ofs_windows << "[ovl_idx = " << ovl_idx << "] ";  // << ovl << '\n';
-                utils::serialize_to_paf(ofs_windows, alignments.qnames[ovl_idx],
-                                        alignments.read_name, ovl, 0, 0, 0, {});
-                ofs_windows << '\n';
-            }
-            for (const auto& wf : wfs) {
-                ofs_windows << "[window] tname = " << wf.read_name << '\t' << wf.window_idx << '\t';
-                polisher::print_tensor_shape(ofs_windows, wf.bases, "\t");
-                ofs_windows << "\t" << alignments.overlaps[0].tlen << "\twf = {" << wf << "}\n";
-                for (size_t ii = 0; ii < std::size(windows[wf.window_idx]); ++ii) {
-                    const auto& w = windows[wf.window_idx][ii];
-                    ofs_windows << "    [final win i = " << ii
-                                << "] qname = " << alignments.qnames[w.overlap_idx] << ", win = {"
-                                << w << "}, overlap = {" << alignments.overlaps[w.overlap_idx]
-                                << "}\n";
-                }
-                {
-                    int32_t ii = 0;
-                    for (const int32_t idx : overlap_idxs) {
-                        ofs_windows << "    [useful ovl ii = " << ii << "] idx = " << idx
-                                    << ", qname = " << alignments.qnames[idx] << '\n';
-                        ++ii;
-                    }
-                }
-            }
-            ofs_windows << "-------------------\n";
-#endif
-
             std::vector<std::string> corrected_seqs;
             corrected_seqs.resize(wfs.size());
 
@@ -511,8 +453,6 @@ void CorrectionInferenceNode::input_thread_fn() {
             continue;
         }
     }
-
-    --m_num_active_feature_threads;
 }
 
 CorrectionInferenceNode::CorrectionInferenceNode(
