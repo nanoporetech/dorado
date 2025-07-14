@@ -103,9 +103,8 @@ CATCH_TEST_CASE("kadayashi_dvr_1 empty region", TEST_GROUP) {
     const std::unordered_map<std::string, int32_t> result =
             kadayashi::kadayashi_dvr_single_region_wrapper(
                     bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                    fastx_reader.get_raw_faidx_ptr(),
-
-                    "chr20", 200000, 200001, 0, 5, 5, 0.2f, 10, 100000, 1 << 27);
+                    fastx_reader.get_raw_faidx_ptr(), "chr20", 200000, 200001, 0, 5, 5, 0.2f, 10,
+                    100000, 1 << 27);
 
     CATCH_CHECK(result == expected);
 }

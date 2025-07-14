@@ -1462,7 +1462,7 @@ chunk_t *unphased_varcall_a_chunk(bamfile_t *hf,
         snprintf(itvl, itvl_len, "%s:%d-%d", refname, itvl_start, itvl_start + 1);
         hts_itr_destroy(bamitr);
         bamitr = sam_itr_querys(hf->bai, hf->header, itvl);
-        while (sam_itr_next(hf->fp, bamitr, aln) >= 0) {
+        while (bamitr && (sam_itr_next(hf->fp, bamitr, aln) >= 0)) {
             if (itvl_start - aln->core.pos < offset_default) {
                 offset_left = static_cast<int>(itvl_start - aln->core.pos);
                 break;
@@ -1473,7 +1473,7 @@ chunk_t *unphased_varcall_a_chunk(bamfile_t *hf,
         snprintf(itvl, itvl_len, "%s:%d-%d", refname, itvl_end, itvl_end + 1);
         hts_itr_destroy(bamitr);
         bamitr = sam_itr_querys(hf->bai, hf->header, itvl);
-        while (sam_itr_next(hf->fp, bamitr, aln) >= 0) {
+        while (bamitr && (sam_itr_next(hf->fp, bamitr, aln) >= 0)) {
             int end_pos = (int)bam_endpos(aln);
             if (end_pos - itvl_end < offset_default) {
                 offset_right =
@@ -1497,7 +1497,7 @@ chunk_t *unphased_varcall_a_chunk(bamfile_t *hf,
     }
 
     uint64_t n_reads = 0;
-    while (sam_itr_next(hf->fp, bamitr, aln) >= 0) {
+    while (bamitr && (sam_itr_next(hf->fp, bamitr, aln) >= 0)) {
         n_reads++;
         if (n_reads > MAX_READS) {
             if (DEBUG_LOCAL_HAPLOTAGGING) {
