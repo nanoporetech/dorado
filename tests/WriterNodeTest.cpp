@@ -1,7 +1,6 @@
 #include "read_pipeline/nodes/WriterNode.h"
 
 #include "TestUtils.h"
-#include "catch2/catch_message.hpp"
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
@@ -12,6 +11,7 @@
 #include "read_pipeline/base/messages.h"
 #include "utils/stats.h"
 
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
@@ -34,7 +34,7 @@ using utils::HtsFile;
 
 namespace {
 
-constexpr std::string_view GPU_NAMES = "gpu_names:all";
+const std::string GPU_NAMES = "gpu_names:all";
 
 // Node to mutate reads in the pipeline
 // Updates the subread id for reads with a parent id that aren't duplex

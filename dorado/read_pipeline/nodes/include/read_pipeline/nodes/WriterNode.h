@@ -1,13 +1,15 @@
 #pragma once
 
-#include "hts_utils/hts_types.h"
-#include "hts_writer/interface.h"
 #include "read_pipeline/base/MessageSink.h"
 
 #include <cstddef>
 #include <string>
 
 namespace dorado {
+
+namespace hts_writer {
+class IWriter;
+}
 
 class WriterNode : public MessageSink {
 public:

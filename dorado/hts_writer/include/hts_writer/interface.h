@@ -1,12 +1,14 @@
 #pragma once
 
-#include "hts_utils/hts_types.h"
 #include "utils/stats.h"
 
 #include <functional>
 #include <variant>
 
 namespace dorado {
+
+class HtsData;
+
 namespace hts_writer {
 
 using Processable = std::variant<std::reference_wrapper<const HtsData>>;

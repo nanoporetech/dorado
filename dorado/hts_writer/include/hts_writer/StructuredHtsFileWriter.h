@@ -1,6 +1,5 @@
 #pragma once
 
-#include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/Structure.h"
 

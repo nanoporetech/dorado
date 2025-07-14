@@ -1,7 +1,6 @@
 #pragma once
 
 #include "hts_utils/hts_file.h"
-#include "hts_utils/hts_types.h"
 #include "interface.h"
 #include "utils/stats.h"
 
@@ -9,6 +8,8 @@
 #include <utility>
 
 namespace dorado {
+
+class HtsData;
 
 namespace hts_writer {
 
