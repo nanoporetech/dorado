@@ -163,17 +163,9 @@ public:
             return AsyncQueueStatus::Timeout;
         }
 
-        switch (m_terminate) {
-        case Terminate::Fast:
+        if (m_terminate == Terminate::Fast ||
+            (m_terminate == Terminate::WhenEmpty && m_items.empty())) {
             return AsyncQueueStatus::Terminate;
-        case Terminate::WhenEmpty:
-            // Termination takes effect once all items have been popped from the queue.
-            if (m_items.empty()) {
-                return AsyncQueueStatus::Terminate;
-            }
-            break;
-        case Terminate::No:
-            break;
         }
 
         pop_item(lock, item);
@@ -188,17 +180,9 @@ public:
     AsyncQueueStatus try_pop(Item& item) {
         auto lock = wait_for_item();
 
-        switch (m_terminate) {
-        case Terminate::Fast:
+        if (m_terminate == Terminate::Fast ||
+            (m_terminate == Terminate::WhenEmpty && m_items.empty())) {
             return AsyncQueueStatus::Terminate;
-        case Terminate::WhenEmpty:
-            // Termination takes effect once all items have been popped from the queue.
-            if (m_items.empty()) {
-                return AsyncQueueStatus::Terminate;
-            }
-            break;
-        case Terminate::No:
-            break;
         }
 
         pop_item(lock, item);
@@ -217,17 +201,9 @@ public:
     AsyncQueueStatus process_and_pop_n(ProcessFn process_fn, size_t max_count) {
         auto lock = wait_for_item();
 
-        switch (m_terminate) {
-        case Terminate::Fast:
+        if (m_terminate == Terminate::Fast ||
+            (m_terminate == Terminate::WhenEmpty && m_items.empty())) {
             return AsyncQueueStatus::Terminate;
-        case Terminate::WhenEmpty:
-            // Termination takes effect once all items have been popped from the queue.
-            if (m_items.empty()) {
-                return AsyncQueueStatus::Terminate;
-            }
-            break;
-        case Terminate::No:
-            break;
         }
 
         process_items(lock, process_fn, max_count);
@@ -249,17 +225,9 @@ public:
             return AsyncQueueStatus::Timeout;
         }
 
-        switch (m_terminate) {
-        case Terminate::Fast:
+        if (m_terminate == Terminate::Fast ||
+            (m_terminate == Terminate::WhenEmpty && m_items.empty())) {
             return AsyncQueueStatus::Terminate;
-        case Terminate::WhenEmpty:
-            // Termination takes effect once all items have been popped from the queue.
-            if (m_items.empty()) {
-                return AsyncQueueStatus::Terminate;
-            }
-            break;
-        case Terminate::No:
-            break;
         }
 
         process_items(lock, process_fn, max_count);
