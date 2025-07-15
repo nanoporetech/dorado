@@ -2,7 +2,6 @@
 
 #include "config/BasecallModelConfig.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
 #include <string>
@@ -15,12 +14,11 @@ public:
                models::SampleType model_type,
                int num_worker_threads,
                size_t max_reads);
-    ~ScalerNode() { stop_input_processing(); }
-    std::string get_name() const override { return "ScalerNode"; }
-    void terminate(const FlushOptions&) override { stop_input_processing(); }
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "scaler_node");
-    }
+    ~ScalerNode();
+
+    std::string get_name() const override;
+    void terminate(const TerminateOptions&) override;
+    void restart() override;
 
 private:
     void input_thread_fn();

@@ -1,11 +1,8 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/AsyncQueue.h"
-#include "utils/stats.h"
 
 #include <atomic>
-#include <chrono>
 #include <cstdint>
 #include <memory>
 #include <mutex>
@@ -21,7 +18,7 @@ class ModelRunnerBase;
 using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 }  // namespace basecall
 
-class BasecallerNode : public MessageSink {
+class BasecallerNode final : public MessageSink {
     struct BasecallingRead;
     struct BasecallingChunk;
 
@@ -34,14 +31,15 @@ public:
                    std::string node_name,
                    uint32_t read_mean_qscore_start_pos);
     ~BasecallerNode();
-    std::string get_name() const override { return m_node_name; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions &) override { terminate_impl(); }
+    void terminate(const TerminateOptions &) override;
     void restart() override;
 
 private:
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
     // Consume reads from input queue, chunks them up, and sticks them in the pending list.
     void input_thread_fn();
     // Basecall reads
@@ -67,9 +65,6 @@ private:
     std::string m_model_name;
     // Mean Q-score start position from model properties.
     uint32_t m_mean_qscore_start_pos;
-
-    // Model runners which have not terminated.
-    std::atomic<int> m_num_active_model_runners{0};
 
     // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
     // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`

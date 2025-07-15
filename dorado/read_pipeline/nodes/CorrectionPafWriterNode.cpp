@@ -8,7 +8,11 @@ namespace dorado {
 
 CorrectionPafWriterNode::CorrectionPafWriterNode() : MessageSink(10000, 1) {}
 
-CorrectionPafWriterNode::~CorrectionPafWriterNode() { stop_input_processing(); }
+CorrectionPafWriterNode::~CorrectionPafWriterNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+}
+
+std::string CorrectionPafWriterNode::get_name() const { return "CorrectionPafWriterNode"; }
 
 void CorrectionPafWriterNode::input_thread_fn() {
     Message message;
@@ -27,6 +31,12 @@ void CorrectionPafWriterNode::input_thread_fn() {
     }
 }
 
-void CorrectionPafWriterNode::terminate(const FlushOptions &) { stop_input_processing(); }
+void CorrectionPafWriterNode::terminate(const TerminateOptions &terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
+void CorrectionPafWriterNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "paf_writer");
+}
 
 }  // namespace dorado

@@ -1,7 +1,5 @@
 #include "read_pipeline/nodes/PairingNode.h"
 
-#include "hts_utils/bam_utils.h"
-#include "read_pipeline/base/ClientInfo.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
@@ -13,6 +11,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 
 namespace {
 const int kMaxTimeDeltaMs = 10000;
@@ -49,6 +48,16 @@ bool are_reads_adjacent(const dorado::SimplexRead& temp, const dorado::SimplexRe
         return true;
     }
     return false;
+}
+
+std::map<std::string, std::string> build_complement_template_map(
+        const std::map<std::string, std::string>& template_complement_map) {
+    std::map<std::string, std::string> complement_template_map;
+    // Set up the complement-template_map
+    for (auto& key : template_complement_map) {
+        complement_template_map[key.second] = key.first;
+    }
+    return complement_template_map;
 }
 
 }  // namespace
@@ -182,17 +191,12 @@ void PairingNode::pair_list_worker_thread(int tid) {
         std::string partner_id;
 
         // Check if read is a template with corresponding complement
-        std::unique_lock<std::mutex> tc_lock(m_tc_map_mutex);
-
         auto it = m_template_complement_map.find(read->read_common.read_id);
         if (it != m_template_complement_map.end()) {
             partner_id = it->second;
-            tc_lock.unlock();
             read_is_template = true;
             partner_found = true;
         } else {
-            tc_lock.unlock();
-            std::lock_guard<std::mutex> ct_lock(m_ct_map_mutex);
             it = m_complement_template_map.find(read->read_common.read_id);
             if (it != m_complement_template_map.end()) {
                 partner_id = it->second;
@@ -247,7 +251,6 @@ void PairingNode::pair_list_worker_thread(int tid) {
             }
         }
     }
-    --m_num_active_worker_threads;
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
@@ -261,7 +264,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
     Message message;
     while (get_input_message(message)) {
         if (std::holds_alternative<CacheFlushMessage>(message)) {
-            std::unique_lock<std::mutex> lock(m_pairing_mtx);
+            std::unique_lock<std::mutex> lock(m_read_caches_mutex);
             auto flush_message = std::get<CacheFlushMessage>(message);
             auto& read_cache = m_read_caches[flush_message.client_id];
             for (auto& [key, reads_list] : read_cache.channel_read_map) {
@@ -292,7 +295,7 @@ void PairingNode::pair_generating_worker_thread(int tid) {
         std::string flowcell_id = read->read_common.flowcell_id;
         int32_t client_id = read->read_common.client_info->client_id();
 
-        std::unique_lock<std::mutex> lock(m_pairing_mtx);
+        std::unique_lock<std::mutex> lock(m_read_caches_mutex);
 
         auto& read_cache = m_read_caches[client_id];
         UniquePoreIdentifierKey key = std::make_tuple(channel, run_id, flowcell_id);
@@ -425,28 +428,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             }
         }
     }
-
-    if (--m_num_active_worker_threads == 0) {
-        if (!m_preserve_cache_during_flush) {
-            std::unique_lock<std::mutex> lock(m_pairing_mtx);
-            // There are still reads in channel_read_map. Push them to the sink.
-            // Last thread alive is responsible for cleaning up the cache.
-            for (auto& [client_id, read_cache] : m_read_caches) {
-                for (auto& kv : read_cache.channel_read_map) {
-                    // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-                    auto& reads_list = kv.second;
-
-                    for (auto& read_ptr : reads_list) {
-                        m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
-                        // Push each read message
-                        send_message_to_sink(std::move(read_ptr));
-                    }
-                }
-            }
-            m_read_caches.clear();
-        }
-        m_reads_in_flight_ctr.clear();
-    }
 }
 
 PairingNode::PairingNode(std::map<std::string, std::string> template_complement_map,
@@ -454,12 +435,8 @@ PairingNode::PairingNode(std::map<std::string, std::string> template_complement_
                          size_t max_reads)
         : MessageSink(max_reads, 0),
           m_num_worker_threads(num_worker_threads),
-          m_template_complement_map(std::move(template_complement_map)) {
-    // Set up the complement-template_map
-    for (auto& key : m_template_complement_map) {
-        m_complement_template_map[key.second] = key.first;
-    }
-
+          m_template_complement_map(std::move(template_complement_map)),
+          m_complement_template_map(build_complement_template_map(m_template_complement_map)) {
     m_pairing_func = &PairingNode::pair_list_worker_thread;
 }
 
@@ -492,27 +469,45 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
 }
 
+PairingNode::~PairingNode() {
+    // Calling virtuals from a dtor is a Bad Thing, unless this is the most derived class.
+    static_assert(std::is_final_v<PairingNode>);
+    terminate({.fast = utils::AsyncQueueTerminateFast::Yes});
+}
+
+std::string PairingNode::get_name() const { return "PairingNode"; }
+
 void PairingNode::start_threads() {
     m_tbufs.reserve(m_num_worker_threads);
     for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
         m_workers.emplace_back([this, i] { (this->*m_pairing_func)(i); });
-        ++m_num_active_worker_threads;
     }
 }
 
-void PairingNode::terminate(const FlushOptions& flush_options) {
-    m_preserve_cache_during_flush = flush_options.preserve_pairing_caches;
-    terminate_impl();
-    m_preserve_cache_during_flush = false;
-}
-
-void PairingNode::terminate_impl() {
-    terminate_input_queue();
+void PairingNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_input_queue(terminate_options.fast);
     for (auto& m : m_workers) {
         m.join();
     }
     m_workers.clear();
+
+    if (!terminate_options.preserve_pairing_caches) {
+        // There are still reads in channel_read_map. Push them to the sink.
+        for (auto& [client_id, read_cache] : m_read_caches) {
+            for (auto& kv : read_cache.channel_read_map) {
+                // kv is a std::pair<UniquePoreIdentifierKey, std::list<SimplexReadPtr>>
+                auto& reads_list = kv.second;
+                for (auto& read_ptr : reads_list) {
+                    m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
+                    // Push each read message
+                    send_message_to_sink(std::move(read_ptr));
+                }
+            }
+        }
+        m_read_caches.clear();
+    }
+    m_reads_in_flight_ctr.clear();
 
     m_tbufs.clear();
 }

@@ -15,13 +15,9 @@ MessageSink::~MessageSink() = default;
 stats::NamedStats MessageSink::sample_stats() const { return stats::from_obj(m_work_queue); }
 
 void MessageSink::push_message_internal(Message &&message) {
-#ifndef NDEBUG
-    const auto status =
-#endif
-            m_work_queue.try_push(std::move(message));
-    // try_push will fail if the sink has been told to terminate.
-    // We do not expect to be pushing reads from this source if that is the case.
-    assert(status == utils::AsyncQueueStatus::Success);
+    // We don't check the error return value since during fast terminate this will
+    // intentionally return Terminate instead of Success.
+    m_work_queue.try_push(std::move(message));
 }
 
 void MessageSink::add_sink(MessageSink &sink) { m_sinks.push_back(std::ref(sink)); }
@@ -49,8 +45,8 @@ void MessageSink::start_input_processing(const std::function<void()> &input_thre
 }
 
 // Mark the input queue as terminating, and stop input processing threads.
-void MessageSink::stop_input_processing() {
-    terminate_input_queue();
+void MessageSink::stop_input_processing(utils::AsyncQueueTerminateFast fast) {
+    terminate_input_queue(fast);
     for (auto &t : m_input_threads) {
         t.join();
     }

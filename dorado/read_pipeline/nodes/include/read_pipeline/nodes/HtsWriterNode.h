@@ -1,15 +1,9 @@
 #pragma once
 #include "hts_utils/hts_file.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
-#include <cstdint>
-#include <memory>
-#include <mutex>
 #include <string>
-#include <thread>
-#include <unordered_set>
 
 struct bam1_t;
 
@@ -19,12 +13,11 @@ class HtsWriterNode : public MessageSink {
 public:
     HtsWriterNode(utils::HtsFile& file, std::string gpu_names);
     ~HtsWriterNode();
-    std::string get_name() const override { return "HtsWriterNode"; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override;
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "hts_writer");
-    }
+    void terminate(const TerminateOptions&) override;
+    void restart() override;
 
     int write(bam1_t* record);
     size_t get_total() const { return m_total; }

@@ -1,29 +1,14 @@
 #include "read_pipeline/nodes/CorrectionInferenceNode.h"
 
-#include "correct/conversions.h"
 #include "correct/decode.h"
 #include "correct/features.h"
 #include "correct/infer.h"
 #include "correct/windows.h"
-#include "hts_utils/bam_utils.h"
+#include "hts_utils/FastxRandomReader.h"
 #include "torch_utils/gpu_profiling.h"
-#include "utils/paf_utils.h"
-#include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
-#include "utils/types.h"
 
-#include <stdexcept>
-#include <unordered_set>
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-#include "hts_utils/FastxRandomReader.h"
-
-#if DORADO_CUDA_BUILD
-#include <c10/cuda/CUDACachingAllocator.h>
-#include <c10/cuda/CUDAGuard.h>
-#endif
 #include <ATen/Tensor.h>
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
@@ -33,10 +18,18 @@
 
 #include <cassert>
 #include <filesystem>
-#include <iostream>
+#include <stdexcept>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+
+#include <c10/cuda/CUDACachingAllocator.h>
+#include <c10/cuda/CUDAGuard.h>
+#endif
 
 #if DORADO_CUDA_BUILD
 constexpr bool USING_DORADO_CUDA_BUILD = true;
@@ -45,9 +38,6 @@ constexpr bool USING_DORADO_CUDA_BUILD = false;
 #endif
 
 using namespace dorado::correction;
-
-// #define DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
-// #define DEBUG_CORRECT_PRINT_WINDOW_INFO_TO_FILE
 
 namespace {
 
@@ -174,7 +164,6 @@ void CorrectionInferenceNode::decode_fn() {
 void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_idx, int batch_size) {
     utils::set_thread_name("corr_infer");
     spdlog::debug("Starting process thread for {}!", device_str);
-    m_num_active_infer_threads++;
 
     torch::Device device = torch::Device(device_str);
 
@@ -263,7 +252,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
             inputs.push_back(indices_batch);
         }
 
-        std::unique_lock<std::mutex> lock(m_gpu_mutexes[mtx_idx]);
+        std::unique_lock<std::mutex> lock(m_gpu_mutexes.at(mtx_idx));
 
         c10::IValue output;
         try {
@@ -344,29 +333,14 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
     if (bases_batch.size() > 0) {
         batch_infer();
     }
-
-    auto remaining_threads = --m_num_active_infer_threads;
-    if (remaining_threads == 0) {
-        m_inferred_features_queue.terminate();
-    }
 }
 
 void CorrectionInferenceNode::input_thread_fn() {
-    auto thread_id = m_num_active_feature_threads++;
-
     auto fastx_reader = std::make_unique<hts_io::FastxRandomReader>(m_fastq);
 
-    if (thread_id == 0) {
-        total_reads_in_input = fastx_reader->num_entries();
-    }
+    total_reads_in_input.store(fastx_reader->num_entries(), std::memory_order_relaxed);
 
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
-    std::ofstream ofs_lens("wfs_lengths." + std::to_string(thread_id) + ".txt");
-    std::ofstream ofs_bed("wfs_windows." + std::to_string(thread_id) + ".bed");
-#endif
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_INFO_TO_FILE
-    std::ofstream ofs_windows("wfs_windows." + std::to_string(thread_id) + ".txt");
-#endif
+    const int window_size = m_model_config.window_size;
 
     Message message;
     while (get_input_message(message)) {
@@ -387,7 +361,7 @@ void CorrectionInferenceNode::input_thread_fn() {
 
             // Get the windows
             const int32_t tlen = alignments.overlaps[0].tlen;
-            const size_t n_windows = (tlen + m_window_size - 1) / m_window_size;
+            const size_t n_windows = (tlen + window_size - 1) / window_size;
             LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
@@ -396,10 +370,10 @@ void CorrectionInferenceNode::input_thread_fn() {
             std::unordered_set<int> overlap_idxs;
             bool rv = false;
             if (m_legacy_windowing) {
-                rv = extract_windows(windows, alignments, m_window_size);
-                for (int32_t ii = 0; ii < tlen; ii += m_window_size) {
+                rv = extract_windows(windows, alignments, window_size);
+                for (int32_t ii = 0; ii < tlen; ii += window_size) {
                     win_intervals.emplace_back(
-                            secondary::Interval{ii, std::min(ii + m_window_size, tlen)});
+                            secondary::Interval{ii, std::min(ii + window_size, tlen)});
                 }
 
                 // Filter the window features and get the set of unique overlaps.
@@ -409,9 +383,8 @@ void CorrectionInferenceNode::input_thread_fn() {
                 }
 
             } else {
-                win_intervals =
-                        extract_limited_windows(windows, alignments, m_window_size,
-                                                static_cast<int32_t>(m_window_size * 1.10f));
+                win_intervals = extract_limited_windows(windows, alignments, window_size,
+                                                        static_cast<int32_t>(window_size * 1.10f));
                 rv = !std::empty(windows);
 
                 // Get the set of unique useful overlaps.
@@ -436,49 +409,6 @@ void CorrectionInferenceNode::input_thread_fn() {
 
             // Get the filtered features
             auto wfs = extract_features(windows, alignments);
-
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_SIZES_TO_FILE
-            for (const auto& wf : wfs) {
-                ofs_lens << wf.read_name << '\t';
-                polisher::print_tensor_shape(ofs_lens, wf.bases, "\t");
-                ofs_lens << '\t' << alignments.overlaps[0].tlen << '\n';
-            }
-            for (size_t ii = 0; ii < std::size(win_intervals); ++ii) {
-                const auto& interval = win_intervals[ii];
-                ofs_bed << alignments.read_name << '\t' << interval.start << '\t' << interval.end
-                        << '\t' << "win-" << ii << '\n';
-            }
-#endif
-#ifdef DEBUG_CORRECT_PRINT_WINDOW_INFO_TO_FILE
-            for (size_t ovl_idx = 0; ovl_idx < std::size(alignments.overlaps); ++ovl_idx) {
-                const auto& ovl = alignments.overlaps[ovl_idx];
-                ofs_windows << "[ovl_idx = " << ovl_idx << "] ";  // << ovl << '\n';
-                utils::serialize_to_paf(ofs_windows, alignments.qnames[ovl_idx],
-                                        alignments.read_name, ovl, 0, 0, 0, {});
-                ofs_windows << '\n';
-            }
-            for (const auto& wf : wfs) {
-                ofs_windows << "[window] tname = " << wf.read_name << '\t' << wf.window_idx << '\t';
-                polisher::print_tensor_shape(ofs_windows, wf.bases, "\t");
-                ofs_windows << "\t" << alignments.overlaps[0].tlen << "\twf = {" << wf << "}\n";
-                for (size_t ii = 0; ii < std::size(windows[wf.window_idx]); ++ii) {
-                    const auto& w = windows[wf.window_idx][ii];
-                    ofs_windows << "    [final win i = " << ii
-                                << "] qname = " << alignments.qnames[w.overlap_idx] << ", win = {"
-                                << w << "}, overlap = {" << alignments.overlaps[w.overlap_idx]
-                                << "}\n";
-                }
-                {
-                    int32_t ii = 0;
-                    for (const int32_t idx : overlap_idxs) {
-                        ofs_windows << "    [useful ovl ii = " << ii << "] idx = " << idx
-                                    << ", qname = " << alignments.qnames[idx] << '\n';
-                        ++ii;
-                    }
-                }
-            }
-            ofs_windows << "-------------------\n";
-#endif
 
             std::vector<std::string> corrected_seqs;
             corrected_seqs.resize(wfs.size());
@@ -523,11 +453,6 @@ void CorrectionInferenceNode::input_thread_fn() {
             continue;
         }
     }
-
-    auto remaining_threads = --m_num_active_feature_threads;
-    if (remaining_threads == 0) {
-        m_features_queue.terminate();
-    }
 }
 
 CorrectionInferenceNode::CorrectionInferenceNode(
@@ -544,16 +469,12 @@ CorrectionInferenceNode::CorrectionInferenceNode(
           m_model_config(parse_model_config(model_dir / "config.toml")),
           m_features_queue(1000),
           m_inferred_features_queue(500),
-          m_bases_manager(batch_size),
-          m_quals_manager(batch_size),
           m_legacy_windowing(legacy_windowing),
           m_debug_tnames(debug_tnames) {
-    m_window_size = m_model_config.window_size;
-
-    if (m_window_size <= 0) {
+    if (m_model_config.window_size <= 0) {
         throw std::runtime_error{
                 "Window size specified in the model config needs to be >= 0! Given: " +
-                std::to_string(m_window_size)};
+                std::to_string(m_model_config.window_size)};
     }
 
     std::vector<std::string> devices;
@@ -606,22 +527,40 @@ CorrectionInferenceNode::CorrectionInferenceNode(
     hts_free(idx_name);
 }
 
-void CorrectionInferenceNode::terminate(const FlushOptions&) {
-    stop_input_processing();
+CorrectionInferenceNode::~CorrectionInferenceNode() {
+    terminate_impl(utils::AsyncQueueTerminateFast::Yes);
+}
+
+std::string CorrectionInferenceNode::get_name() const { return "CorrectionInferenceNode"; }
+
+void CorrectionInferenceNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(terminate_options.fast);
+}
+
+void CorrectionInferenceNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    stop_input_processing(fast);
+
+    m_features_queue.terminate(fast);
     for (auto& infer_thread : m_infer_threads) {
         infer_thread.join();
     }
     m_infer_threads.clear();
+
+    m_inferred_features_queue.terminate(fast);
     for (auto& decode_thread : m_decode_threads) {
         decode_thread.join();
     }
     m_decode_threads.clear();
 }
 
+void CorrectionInferenceNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "corr_node");
+}
+
 stats::NamedStats CorrectionInferenceNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
-    stats["num_reads_corrected"] = double(num_reads.load());
-    stats["total_reads_in_input"] = total_reads_in_input;
+    stats["num_reads_corrected"] = num_reads.load(std::memory_order_relaxed);
+    stats["total_reads_in_input"] = total_reads_in_input.load(std::memory_order_relaxed);
     return stats;
 }
 

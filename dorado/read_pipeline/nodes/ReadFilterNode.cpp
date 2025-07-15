@@ -15,7 +15,7 @@ void ReadFilterNode::input_thread_fn() {
             continue;
         }
 
-        const auto& read_common = get_read_common_data(message);
+        const auto &read_common = get_read_common_data(message);
 
         auto log_filtering = [&]() {
             if (read_common.is_duplex) {
@@ -49,11 +49,23 @@ ReadFilterNode::ReadFilterNode(size_t min_qscore,
           m_num_simplex_reads_filtered(0),
           m_num_duplex_reads_filtered(0) {}
 
+ReadFilterNode::~ReadFilterNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
+
+std::string ReadFilterNode::get_name() const { return "ReadFilterNode"; }
+
 stats::NamedStats ReadFilterNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
     stats["simplex_reads_filtered"] = static_cast<double>(m_num_simplex_reads_filtered);
     stats["duplex_reads_filtered"] = static_cast<double>(m_num_duplex_reads_filtered);
     return stats;
+}
+
+void ReadFilterNode::terminate(const TerminateOptions &terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
+void ReadFilterNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "readfilter_node");
 }
 
 }  // namespace dorado

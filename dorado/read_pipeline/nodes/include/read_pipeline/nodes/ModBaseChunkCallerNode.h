@@ -2,8 +2,6 @@
 
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/AsyncQueue.h"
-#include "utils/stats.h"
 
 #include <spdlog/spdlog.h>
 
@@ -23,37 +21,7 @@ namespace dorado {
 class ModBaseChunkCallerNode : public MessageSink {
     struct ModBaseData;
     struct WorkingRead;
-
-    struct ModBaseChunk {
-        ModBaseChunk(std::shared_ptr<WorkingRead> working_read_,
-                     int model_id_,
-                     int base_id_,
-                     int64_t signal_start_,
-                     int64_t hit_start_,
-                     int64_t num_states_,
-                     bool is_template_)
-                : working_read(std::move(working_read_)),
-                  model_id(model_id_),
-                  base_id(base_id_),
-                  signal_start(signal_start_),
-                  hit_start(hit_start_),
-                  num_states(num_states_),
-                  is_template(is_template_) {}
-
-        std::shared_ptr<WorkingRead> working_read;
-        const int model_id;
-        const int base_id;
-        // The start index into the working read in the PADDED signal
-        const int64_t signal_start;
-        // The start index into the context hits
-        const int64_t hit_start;
-        // The number of states predicted by the modbase model `num_mods + 1`
-        const int64_t num_states;
-        // False if the chunk uses the complement modbase data on the working read
-        const bool is_template;
-        // The model predictions for this chunk arranged in `[canonical, mod1, .., modN, canonical, mod1, ..]`
-        std::vector<float> scores;
-    };
+    struct ModBaseChunk;
 
 public:
     struct EncodingData {
@@ -66,9 +34,10 @@ public:
                            size_t canonical_stride,
                            size_t max_reads);
     ~ModBaseChunkCallerNode();
-    std::string get_name() const override { return "ModBaseChunkCallerNode"; }
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions&) override { terminate_impl(); }
+    void terminate(const TerminateOptions&) override;
     void restart() override;
 
     static std::optional<int64_t> next_hit(const std::vector<int64_t>& ctx_hit_signal_idxs,
@@ -104,7 +73,7 @@ private:
     using PerBaseIntVec = std::array<std::vector<int64_t>, 4>;
 
     void start_threads();
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
 
     // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();
@@ -138,8 +107,6 @@ private:
     std::mutex m_working_reads_mutex;
 
     std::vector<std::thread> m_runner_workers;
-    std::atomic<int> m_num_active_runner_workers{0};
-
     std::vector<std::thread> m_output_workers;
 
     // Reads removed from input queue and being modbasecalled.

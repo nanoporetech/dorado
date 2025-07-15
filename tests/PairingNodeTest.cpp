@@ -9,10 +9,12 @@
 
 #include <ATen/Functions.h>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #include <filesystem>
 
 #define TEST_GROUP "[PairingNodeTest]"
+#define DEFINE_TEST(name) CATCH_TEST_CASE(TEST_GROUP " " name, TEST_GROUP)
 
 namespace {
 
@@ -48,7 +50,7 @@ auto make_read(int delay_ms, size_t seq_len) {
 
 }  // namespace
 
-CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
+DEFINE_TEST("Split read pairing") {
     // the second read must start within 1000ms of the end of the first read
     // and min/max length ratio must be greater than 0.2
     // expected pairs: {2, 3} and {5, 6}
@@ -87,7 +89,7 @@ CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
     for (auto& read : reads) {
         pipeline->push_message(std::move(read));
     }
-    pipeline.reset();
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
     // the 4 split reads generate one additional readpair
     CATCH_CHECK(messages.size() == 9);
@@ -101,4 +103,42 @@ CATCH_TEST_CASE("Split read pairing", TEST_GROUP) {
                 return std::holds_alternative<dorado::ReadPair>(message);
             });
     CATCH_CHECK(num_pairs == 2);
+}
+
+DEFINE_TEST("Terminate behaviour") {
+    // Arbitrary reads separated out enough that they won't pair.
+    std::array reads{
+            make_read(0, 100),
+            make_read(20000, 100),
+            make_read(40000, 100),
+    };
+
+    dorado::PipelineDescriptor pipeline_desc;
+    std::vector<dorado::Message> messages;
+    auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 5, messages);
+    // one thread, one read - force reads through in order
+    pipeline_desc.add_node<dorado::PairingNode>(
+            {sink},
+            dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
+                                            dorado::DEFAULT_DUPLEX_CACHE_DEPTH},
+            1, 1);
+    auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
+
+    for (auto& read : reads) {
+        pipeline->push_message(std::move(read));
+    }
+
+    const auto preserve_pairing_caches = GENERATE(false, true);
+    CATCH_CAPTURE(preserve_pairing_caches);
+    pipeline->terminate({
+            .preserve_pairing_caches = preserve_pairing_caches,
+            .fast = dorado::utils::AsyncQueueTerminateFast::No,
+    });
+
+    // If the cache is preserved then nothing should be flushed, otherwise we should get them all back.
+    if (preserve_pairing_caches) {
+        CATCH_CHECK(messages.size() == 0);
+    } else {
+        CATCH_CHECK(messages.size() == reads.size());
+    }
 }

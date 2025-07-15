@@ -109,7 +109,7 @@ protected:
         pipeline_desc.add_node<NodeType>({sink}, std::forward<Args>(args)...);
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         if (m_pipeline_restart) {
-            pipeline->terminate(dorado::DefaultFlushOptions());
+            pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
             pipeline->restart();
         }
         // Throw some reads at it.
@@ -121,7 +121,7 @@ protected:
             pipeline->push_message(std::move(read));
         }
         // Wait for them to complete.
-        pipeline.reset();
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
         // Check that we get the expected number of outputs
         CATCH_CHECK(messages.size() == m_num_messages);
         // Check the message types match

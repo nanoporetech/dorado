@@ -1,8 +1,10 @@
 #include "MessageSinkUtils.h"
 #include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/base/terminate_options.h"
 #include "read_pipeline/nodes/NullNode.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #define TEST_GROUP "[Pipeline]"
 
@@ -98,7 +100,7 @@ CATCH_TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
                 : MessageSink(1, 0), m_destruction_order(destruction_order), m_index(index) {}
         ~OrderTestNode() { m_destruction_order.push_back(m_index); }
         std::string get_name() const override { return "OrderTestNode"; }
-        void terminate(const dorado::FlushOptions&) override {}
+        void terminate(const dorado::TerminateOptions&) override {}
         void restart() override {}
 
     private:
@@ -152,7 +154,7 @@ CATCH_TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         CATCH_REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-        pipeline.reset();
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
         CATCH_CHECK(messages.size() == 0);
     }
 
@@ -166,7 +168,7 @@ CATCH_TEST_CASE("PipelineFlow", TEST_GROUP) {
         auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
         CATCH_REQUIRE(pipeline != nullptr);
         pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-        pipeline.reset();
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
         CATCH_CHECK(messages.size() == 0);
     }
 }
@@ -179,12 +181,47 @@ CATCH_TEST_CASE("TerminateRestart", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
     CATCH_REQUIRE(pipeline != nullptr);
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-    pipeline->terminate(dorado::DefaultFlushOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     // Messages should get through as soon as we have terminated.
     CATCH_CHECK(messages.size() == 1);
     // If we restart we should be able to get another message through.
     pipeline->restart();
     pipeline->push_message(std::make_unique<dorado::SimplexRead>());
-    pipeline.reset();
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     CATCH_CHECK(messages.size() == 2);
+}
+
+// Check that fast terminate works.
+CATCH_TEST_CASE("TerminateFast", TEST_GROUP) {
+    class TerminateTestNode : public MessageSink {
+    public:
+        TerminateTestNode(std::optional<dorado::utils::AsyncQueueTerminateFast>& was_fast_terminate)
+                : MessageSink(1, 0), m_was_fast_terminate(was_fast_terminate) {}
+
+        std::string get_name() const override { return "TerminateTestNode"; }
+        void terminate(const dorado::TerminateOptions& terminate_options) override {
+            m_was_fast_terminate = terminate_options.fast;
+        }
+        void restart() override {}
+
+    private:
+        std::optional<dorado::utils::AsyncQueueTerminateFast>& m_was_fast_terminate;
+    };
+
+    // Make a pipeline.
+    PipelineDescriptor pipeline_desc;
+    std::optional<dorado::utils::AsyncQueueTerminateFast> was_fast_terminate;
+    pipeline_desc.add_node<TerminateTestNode>({}, was_fast_terminate);
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
+
+    // Terminate it.
+    const auto terminate_fast = GENERATE(dorado::utils::AsyncQueueTerminateFast::No,
+                                         dorado::utils::AsyncQueueTerminateFast::Yes);
+    dorado::TerminateOptions terminate_options;
+    terminate_options.fast = terminate_fast;
+    pipeline->terminate(terminate_options);
+
+    // Check that terminate() was called and with the right arg.
+    CATCH_REQUIRE(was_fast_terminate.has_value());
+    CATCH_CHECK(*was_fast_terminate == terminate_fast);
 }

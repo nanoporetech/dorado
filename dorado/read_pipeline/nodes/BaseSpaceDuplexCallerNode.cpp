@@ -9,13 +9,11 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <chrono>
 #include <cstdint>
 #include <string_view>
 #include <utility>
 #include <vector>
 
-using namespace std::chrono_literals;
 namespace {
 // Given two sequences, their quality scores, and alignments, computes a consensus sequence
 std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
@@ -193,15 +191,25 @@ BaseSpaceDuplexCallerNode::BaseSpaceDuplexCallerNode(
           m_template_complement_map(std::move(template_complement_map)),
           m_reads(std::move(reads)) {}
 
+BaseSpaceDuplexCallerNode::~BaseSpaceDuplexCallerNode() {
+    terminate_impl(utils::AsyncQueueTerminateFast::Yes);
+}
+
 void BaseSpaceDuplexCallerNode::start_threads() {
     m_worker_thread = std::thread([this] { worker_thread(); });
 }
 
-void BaseSpaceDuplexCallerNode::terminate_impl() {
-    terminate_input_queue();
+void BaseSpaceDuplexCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    terminate_input_queue(fast);
     if (m_worker_thread.joinable()) {
         m_worker_thread.join();
     }
+}
+
+std::string BaseSpaceDuplexCallerNode::get_name() const { return "BaseSpaceDuplexCallerNode"; }
+
+void BaseSpaceDuplexCallerNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(terminate_options.fast);
 }
 
 void BaseSpaceDuplexCallerNode::restart() {

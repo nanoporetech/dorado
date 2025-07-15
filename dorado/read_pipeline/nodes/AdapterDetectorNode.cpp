@@ -6,9 +6,7 @@
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages.h"
-#include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
-#include "utils/barcode_kits.h"
 #include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
@@ -21,12 +19,25 @@
 #include <memory>
 #include <string>
 #include <utility>
-#include <vector>
 
 namespace dorado {
 
 // A Node which encapsulates running adapter and primer detection on each read.
 AdapterDetectorNode::AdapterDetectorNode(int threads) : MessageSink(10000, threads) {}
+
+AdapterDetectorNode::~AdapterDetectorNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+}
+
+std::string AdapterDetectorNode::get_name() const { return "AdapterDetectorNode"; }
+
+void AdapterDetectorNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
+void AdapterDetectorNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "adapter_detect");
+}
 
 void AdapterDetectorNode::input_thread_fn() {
     Message message;

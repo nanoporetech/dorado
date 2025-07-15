@@ -1,7 +1,6 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
 #include <cstdint>
@@ -19,20 +18,19 @@ public:
                    size_t min_read_length,
                    std::unordered_set<std::string> read_ids_to_filter,
                    size_t num_worker_threads);
-    ~ReadFilterNode() { stop_input_processing(); }
-    std::string get_name() const override { return "ReadFilterNode"; }
+    ~ReadFilterNode();
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions &) override { stop_input_processing(); }
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "readfilter_node");
-    }
+    void terminate(const TerminateOptions &) override;
+    void restart() override;
 
 private:
     void input_thread_fn();
 
-    size_t m_min_qscore;
-    size_t m_min_read_length;
-    std::unordered_set<std::string> m_read_ids_to_filter;
+    const size_t m_min_qscore;
+    const size_t m_min_read_length;
+    const std::unordered_set<std::string> m_read_ids_to_filter;
     std::atomic<int64_t> m_num_simplex_reads_filtered;
     std::atomic<int64_t> m_num_simplex_bases_filtered;
     std::atomic<int64_t> m_num_duplex_reads_filtered;

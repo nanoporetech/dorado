@@ -4,7 +4,6 @@
 #include "secondary/architectures/model_factory.h"
 #include "secondary/common/batching.h"
 #include "secondary/common/region.h"
-#include "secondary/consensus/consensus_utils.h"
 #include "secondary/consensus/variant_calling.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -934,7 +933,7 @@ void sample_producer(PolisherResources& resources,
                 // Instead, communicate the error and return.
                 ret_status = {.exception_thrown = true, .message = e.what()};
                 worker_terminate = true;
-                infer_data.terminate();
+                infer_data.terminate(utils::AsyncQueueTerminateFast::No);
                 return;
             }
 
@@ -957,7 +956,7 @@ void sample_producer(PolisherResources& resources,
         spdlog::debug("[producer] Pushed final batch for inference to infer_data queue.");
     }
 
-    infer_data.terminate();
+    infer_data.terminate(utils::AsyncQueueTerminateFast::No);
 }
 
 void infer_samples_in_parallel(
@@ -1184,7 +1183,7 @@ void infer_samples_in_parallel(
         f.get();
     }
 
-    decode_queue.terminate();
+    decode_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     for (size_t tid = 0; tid < std::size(worker_return_vals); ++tid) {
         const WorkerReturnStatus& rv = worker_return_vals[tid];

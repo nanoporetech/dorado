@@ -1,5 +1,4 @@
 #include "TestUtils.h"
-#include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_file.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
@@ -27,10 +26,12 @@ namespace {
 class SubreadIdTaggerNode : public MessageSink {
 public:
     SubreadIdTaggerNode() : MessageSink(100, 1) {}
-    ~SubreadIdTaggerNode() { stop_input_processing(); }
+    ~SubreadIdTaggerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
     std::string get_name() const override { return "SubreadIdTagger"; }
-    void terminate(const FlushOptions &) override { stop_input_processing(); };
+    void terminate(const TerminateOptions &terminate_options) override {
+        stop_input_processing(terminate_options.fast);
+    }
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "subreadidtagger_node");
     }
@@ -82,7 +83,7 @@ protected:
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
         reader.read(*pipeline, 1000);
-        pipeline->terminate(DefaultFlushOptions());
+        pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
         auto &writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);
         stats = writer_ref.sample_stats();

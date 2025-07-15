@@ -97,6 +97,16 @@ void DuplexReadTaggingNode::input_thread_fn() {
 
 DuplexReadTaggingNode::DuplexReadTaggingNode() : MessageSink(1000, 1) {}
 
+DuplexReadTaggingNode::~DuplexReadTaggingNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+}
+
+std::string DuplexReadTaggingNode::get_name() const { return "DuplexReadTaggingNode"; }
+
+void DuplexReadTaggingNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
 void DuplexReadTaggingNode::restart() {
     m_duplex_parents.clear();
     m_parents_processed.clear();

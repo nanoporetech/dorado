@@ -1,11 +1,9 @@
 #include "read_pipeline/nodes/ModBaseCallerNode.h"
 
 #include "config/ModBaseModelConfig.h"
-#include "hts_utils/bam_utils.h"
 #include "modbase/ModBaseContext.h"
 #include "modbase/ModBaseEncoder.h"
 #include "modbase/ModBaseRunner.h"
-#include "torch_utils/tensor_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -18,7 +16,6 @@
 
 #include <chrono>
 #include <cstring>
-#include <iostream>
 
 using namespace std::chrono_literals;
 
@@ -74,7 +71,7 @@ ModBaseCallerNode::ModBaseCallerNode(std::vector<modbase::RunnerPtr> model_runne
     }
 }
 
-ModBaseCallerNode::~ModBaseCallerNode() { terminate_impl(); }
+ModBaseCallerNode::~ModBaseCallerNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
 
 void ModBaseCallerNode::start_threads() {
     m_output_worker = std::thread([this] { output_worker_thread(); });
@@ -84,18 +81,18 @@ void ModBaseCallerNode::start_threads() {
             m_runner_workers.emplace_back([this, worker_id, model_id] {
                 modbasecall_worker_thread(worker_id, model_id);
             });
-            ++m_num_active_runner_workers;
         }
     }
     start_input_processing([this] { input_thread_fn(); }, "modbase_node");
 }
 
-void ModBaseCallerNode::terminate_impl() {
+void ModBaseCallerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
     // Signal termination in the input queue, and wait for input threads to join.
-    stop_input_processing();
+    stop_input_processing(fast);
+
     // Signal termination in the chunk queues.
     for (auto& chunk_queue : m_chunk_queues) {
-        chunk_queue->terminate();
+        chunk_queue->terminate(fast);
     }
     // Wait for runner workers to join, now that they have been asked to via chunk queue
     // termination.
@@ -103,14 +100,26 @@ void ModBaseCallerNode::terminate_impl() {
         t.join();
     }
     m_runner_workers.clear();
+
+    // Signal the output thread to terminate.
+    m_processed_chunks.terminate(fast);
     if (m_output_worker.joinable()) {
         m_output_worker.join();
     }
 
     // There should be no reads left in the node after it's terminated.
-    if (!m_working_reads.empty()) {
+    // Unless we're terminating fast, in which case we can safely drop them.
+    if (fast == utils::AsyncQueueTerminateFast::Yes) {
+        m_working_reads.clear();
+    } else if (!m_working_reads.empty()) {
         throw std::logic_error("Reads have been left in ModBaseCallerNode");
     }
+}
+
+std::string ModBaseCallerNode::get_name() const { return "ModBaseCallerNode"; }
+
+void ModBaseCallerNode::terminate(const TerminateOptions& terminate_options) {
+    terminate_impl(terminate_options.fast);
 }
 
 void ModBaseCallerNode::restart() {
@@ -475,13 +484,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     // Basecall any remaining chunks.
     if (!batched_chunks.empty()) {
         call_current_batch(worker_id, caller_id, batched_chunks);
-    }
-
-    // Reduce the count of active model callers.  If this was the last active
-    // model caller also send termination signal to sink
-    int num_remaining_callers = --m_num_active_runner_workers;
-    if (num_remaining_callers == 0) {
-        m_processed_chunks.terminate();
     }
 }
 

@@ -15,12 +15,9 @@
 
 #include <algorithm>
 #include <array>
-#include <atomic>
 #include <cassert>
-#include <chrono>
 #include <cstdint>
 #include <iterator>
-#include <unordered_map>
 #include <utility>
 
 static constexpr float EPS = 1e-9f;
@@ -242,5 +239,17 @@ ScalerNode::ScalerNode(const SignalNormalisationParams& config,
         : MessageSink(max_reads, num_worker_threads),
           m_scaling_params(config),
           m_model_type(model_type) {}
+
+ScalerNode::~ScalerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
+
+std::string ScalerNode::get_name() const { return "ScalerNode"; }
+
+void ScalerNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
+void ScalerNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "scaler_node");
+}
 
 }  // namespace dorado

@@ -1,12 +1,11 @@
 #include "utils/AsyncQueue.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 
 #define TEST_GROUP "AsyncQueue "
 
-#include <algorithm>
 #include <atomic>
-#include <iostream>
 #include <numeric>
 #include <thread>
 
@@ -33,29 +32,64 @@ CATCH_TEST_CASE(TEST_GROUP ": InputsMatchOutputs") {
 }
 
 CATCH_TEST_CASE(TEST_GROUP ": PushFailsIfTerminating") {
+    const auto terminate_mode = GENERATE(dorado::utils::AsyncQueueTerminateFast::No,
+                                         dorado::utils::AsyncQueueTerminateFast::Yes);
+
     AsyncQueue<int> queue(1);
-    queue.terminate();
+    queue.terminate(terminate_mode);
     const auto status = queue.try_push(42);
     CATCH_CHECK(status == AsyncQueueStatus::Terminate);
 }
 
-CATCH_TEST_CASE(TEST_GROUP ": PopFailsIfTerminating") {
+CATCH_TEST_CASE(TEST_GROUP ": PopFailsIfTerminatingFast") {
     AsyncQueue<int> queue(1);
-    queue.terminate();
-    int val;
-    const auto status = queue.try_pop(val);
+    auto status = queue.try_push(42);
+    CATCH_CHECK(status == AsyncQueueStatus::Success);
+    queue.terminate(dorado::utils::AsyncQueueTerminateFast::Yes);
+    int val = 0;
+    status = queue.try_pop(val);
+    CATCH_CHECK(status == AsyncQueueStatus::Terminate);
+}
+
+CATCH_TEST_CASE(TEST_GROUP ": PopSucceedsIfTerminatingSlow") {
+    AsyncQueue<int> queue(1);
+    auto status = queue.try_push(42);
+    CATCH_CHECK(status == AsyncQueueStatus::Success);
+    queue.terminate(dorado::utils::AsyncQueueTerminateFast::No);
+    int val = 0;
+    status = queue.try_pop(val);
+    CATCH_CHECK(status == AsyncQueueStatus::Success);
+    CATCH_CHECK(val == 42);
+    status = queue.try_pop(val);
     CATCH_CHECK(status == AsyncQueueStatus::Terminate);
 }
 
 CATCH_TEST_CASE(TEST_GROUP ": PushPopSucceedAfterRestarting") {
+    const auto terminate_mode = GENERATE(dorado::utils::AsyncQueueTerminateFast::No,
+                                         dorado::utils::AsyncQueueTerminateFast::Yes);
+
     AsyncQueue<int> queue(1);
-    queue.terminate();
+    queue.terminate(terminate_mode);
     queue.restart();
     const auto push_status = queue.try_push(42);
     CATCH_CHECK(push_status == AsyncQueueStatus::Success);
-    int val;
+    int val = 0;
     const auto pop_status = queue.try_pop(val);
     CATCH_CHECK(pop_status == AsyncQueueStatus::Success);
+    CATCH_CHECK(val == 42);
+}
+
+CATCH_TEST_CASE(TEST_GROUP ": QueueEmptyAfterRestarting") {
+    const auto terminate_mode = GENERATE(dorado::utils::AsyncQueueTerminateFast::No,
+                                         dorado::utils::AsyncQueueTerminateFast::Yes);
+
+    AsyncQueue<int> queue(5);
+    CATCH_CHECK(queue.try_push(1) == AsyncQueueStatus::Success);
+    CATCH_CHECK(queue.try_push(2) == AsyncQueueStatus::Success);
+    CATCH_CHECK(queue.try_push(3) == AsyncQueueStatus::Success);
+    queue.terminate(terminate_mode);
+    queue.restart();
+    CATCH_CHECK(queue.size() == 0);
 }
 
 // Spawned thread sits waiting for an item.
@@ -105,7 +139,7 @@ CATCH_TEST_CASE(TEST_GROUP ": TerminateFromOtherThread") {
     }
 
     // Stop it
-    queue.terminate();
+    queue.terminate(dorado::utils::AsyncQueueTerminateFast::No);
     popping_thread.join();
 
     // This will fail, since the wait is terminated.

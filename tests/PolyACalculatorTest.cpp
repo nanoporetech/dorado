@@ -64,7 +64,7 @@ CATCH_TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     // Push a Read type.
     pipeline->push_message(std::move(read));
 
-    pipeline->terminate(DefaultFlushOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
     CATCH_CHECK(messages.size() == 1);
 
@@ -102,7 +102,7 @@ CATCH_TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config"
     // Push a Read type.
     pipeline->push_message(std::move(read));
 
-    pipeline->terminate(DefaultFlushOptions());
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
     CATCH_CHECK(messages.size() == 1);
 

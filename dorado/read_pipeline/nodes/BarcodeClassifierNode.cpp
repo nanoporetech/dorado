@@ -2,13 +2,11 @@
 
 #include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
-#include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages.h"
-#include "torch_utils/trim.h"
-#include "utils/SampleSheet.h"
+#include "utils/barcode_kits.h"
 #include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
@@ -16,11 +14,8 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <memory>
-#include <optional>
 #include <string>
-#include <vector>
 
 namespace {
 
@@ -50,6 +45,20 @@ const dorado::demux::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo&
 namespace dorado {
 
 BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {}
+
+BarcodeClassifierNode::~BarcodeClassifierNode() {
+    stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
+}
+
+std::string BarcodeClassifierNode::get_name() const { return "BarcodeClassifierNode"; }
+
+void BarcodeClassifierNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
+void BarcodeClassifierNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
+}
 
 void BarcodeClassifierNode::input_thread_fn() {
     Message message;

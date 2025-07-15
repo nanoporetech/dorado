@@ -4,12 +4,8 @@
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "utils/context_container.h"
-#include "utils/math_utils.h"
-#include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
-
-#include <algorithm>
 
 namespace dorado {
 
@@ -87,7 +83,21 @@ void PolyACalculatorNode::input_thread_fn() {
 PolyACalculatorNode::PolyACalculatorNode(size_t num_worker_threads, size_t max_reads)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)) {}
 
-void PolyACalculatorNode::terminate_impl() { stop_input_processing(); }
+PolyACalculatorNode::~PolyACalculatorNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
+
+std::string PolyACalculatorNode::get_name() const { return "PolyACalculator"; }
+
+void PolyACalculatorNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
+    stop_input_processing(fast);
+}
+
+void PolyACalculatorNode::terminate(const TerminateOptions &terminate_options) {
+    terminate_impl(terminate_options.fast);
+};
+
+void PolyACalculatorNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "polyacalc_node");
+}
 
 stats::NamedStats PolyACalculatorNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
@@ -97,7 +107,7 @@ stats::NamedStats PolyACalculatorNode::sample_stats() const {
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
 
     if (spdlog::get_level() <= spdlog::level::debug) {
-        for (const auto& [len, count] : tail_length_counts) {
+        for (const auto &[len, count] : tail_length_counts) {
             std::string key = "pt." + std::to_string(len);
             stats[key] = static_cast<float>(count);
         }

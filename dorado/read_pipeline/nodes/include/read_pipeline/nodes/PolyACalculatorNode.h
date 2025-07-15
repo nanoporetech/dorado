@@ -1,11 +1,9 @@
 #pragma once
 
 #include "read_pipeline/base/MessageSink.h"
-#include "utils/stats.h"
 
 #include <atomic>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
 
@@ -14,16 +12,15 @@ namespace dorado {
 class PolyACalculatorNode : public MessageSink {
 public:
     PolyACalculatorNode(size_t num_worker_threads, size_t max_reads);
-    ~PolyACalculatorNode() { terminate_impl(); }
-    std::string get_name() const override { return "PolyACalculator"; }
+    ~PolyACalculatorNode();
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions &) override { terminate_impl(); };
-    void restart() override {
-        start_input_processing([this] { input_thread_fn(); }, "polyacalc_node");
-    }
+    void terminate(const TerminateOptions &) override;
+    void restart() override;
 
 private:
-    void terminate_impl();
+    void terminate_impl(utils::AsyncQueueTerminateFast fast);
     void input_thread_fn();
 
     std::atomic<size_t> total_tail_lengths_called{0};

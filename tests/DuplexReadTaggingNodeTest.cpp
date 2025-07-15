@@ -54,7 +54,7 @@ CATCH_TEST_CASE("DuplexReadTaggingNode", TEST_GROUP) {
         pipeline->push_message(std::move(read_6));
         pipeline->push_message(std::move(read_56));
     }
-    pipeline.reset();
+    pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
     auto reads = ConvertMessages<dorado::SimplexReadPtr>(std::move(messages));
     for (auto& read : reads) {

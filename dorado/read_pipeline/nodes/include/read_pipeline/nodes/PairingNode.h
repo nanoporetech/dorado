@@ -1,8 +1,7 @@
 #pragma once
 
-#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/base/MessageSink.h"
 #include "utils/sequence_utils.h"
-#include "utils/stats.h"
 #include "utils/types.h"
 
 #include <atomic>
@@ -10,7 +9,6 @@
 #include <deque>
 #include <list>
 #include <map>
-#include <memory>
 #include <mutex>
 #include <string>
 #include <thread>
@@ -20,7 +18,7 @@
 
 namespace dorado {
 
-class PairingNode : public MessageSink {
+class PairingNode final : public MessageSink {
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
     // The values are channel, run_id, flowcell_id
     using UniquePoreIdentifierKey = std::tuple<int, std::string, std::string>;
@@ -38,15 +36,15 @@ public:
 
     // No template-complement map: uses the pair_generation pairing method
     PairingNode(DuplexPairingParameters pairing_params, int num_worker_threads, size_t max_reads);
-    ~PairingNode() { terminate_impl(); }
-    std::string get_name() const override { return "PairingNode"; }
+    ~PairingNode();
+
+    std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const FlushOptions& flush_options) override;
+    void terminate(const TerminateOptions& terminate_options) override;
     void restart() override;
 
 private:
     void start_threads();
-    void terminate_impl();
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.
@@ -67,27 +65,21 @@ private:
 
     std::vector<std::thread> m_workers;
     const int m_num_worker_threads;
-    std::atomic<int> m_num_active_worker_threads = 0;
-    std::atomic<bool> m_preserve_cache_during_flush = false;
 
     using FPairingFunc = void (PairingNode::*)(int);
     FPairingFunc m_pairing_func = nullptr;
 
     // Members for pair_list method
 
-    std::mutex m_tc_map_mutex;
-    std::mutex m_ct_map_mutex;
+    const std::map<std::string, std::string> m_template_complement_map;
+    const std::map<std::string, std::string> m_complement_template_map;
     std::mutex m_read_cache_mutex;
-
-    std::map<std::string, std::string> m_template_complement_map;
-    std::map<std::string, std::string> m_complement_template_map;
     std::map<std::string, SimplexReadPtr> m_read_cache;
 
     // Members for pair_generating method
 
-    std::mutex m_pairing_mtx;
-
     // individual read caches per client, keyed by client_id
+    std::mutex m_read_caches_mutex;
     std::unordered_map<int32_t, ReadCache> m_read_caches;
 
     /**

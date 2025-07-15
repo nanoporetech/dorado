@@ -1,20 +1,16 @@
 #pragma once
 
 #include "ClientInfo.h"
-#include "flush_options.h"
 #include "messages.h"
+#include "terminate_options.h"
 #include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
-#include <atomic>
-#include <iostream>
 #include <memory>
-#include <mutex>
 #include <stdexcept>
 #include <string>
 #include <thread>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -44,7 +40,7 @@ public:
     // Waits until work is finished and shuts down worker threads.
     // No work can be done by the node after this returns until
     // restart is subsequently called.
-    virtual void terminate(const FlushOptions& flush_options) = 0;
+    virtual void terminate(const TerminateOptions& terminate_options) = 0;
 
     // Starts or restarts the node following initial setup or a terminate call.
     virtual void restart() = 0;
@@ -52,8 +48,10 @@ public:
 protected:
     virtual bool forward_on_disconnected() const { return true; }
 
-    // Terminates waits on the input queue.
-    void terminate_input_queue() { m_work_queue.terminate(); }
+    // Mark the input queue as terminating.
+    void terminate_input_queue(utils::AsyncQueueTerminateFast fast) {
+        m_work_queue.terminate(fast);
+    }
 
     // Allows inputs again.
     void start_input_queue() { m_work_queue.restart(); }
@@ -94,7 +92,7 @@ protected:
                                 const std::string& worker_name);
 
     // Mark the input queue as terminating, and stop input processing threads.
-    void stop_input_processing();
+    void stop_input_processing(utils::AsyncQueueTerminateFast fast);
 
 private:
     // Queue of work items for this node.

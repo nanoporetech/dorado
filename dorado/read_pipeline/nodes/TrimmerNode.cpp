@@ -5,12 +5,9 @@
 #include "demux/barcoding_info.h"
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
-#include "torch_utils/trim.h"
 #include "utils/PostCondition.h"
-#include "utils/barcode_kits.h"
 #include "utils/context_container.h"
 #include "utils/log_utils.h"
-#include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -73,6 +70,18 @@ namespace dorado {
 
 // This Node is responsible for trimming adapters, primers, and barcodes.
 TrimmerNode::TrimmerNode(int threads) : MessageSink(10000, threads) {}
+
+TrimmerNode::~TrimmerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
+
+std::string TrimmerNode::get_name() const { return "TrimmerNode"; }
+
+void TrimmerNode::terminate(const TerminateOptions& terminate_options) {
+    stop_input_processing(terminate_options.fast);
+}
+
+void TrimmerNode::restart() {
+    start_input_processing([this] { input_thread_fn(); }, "trimmer");
+}
 
 void TrimmerNode::input_thread_fn() {
     Message message;

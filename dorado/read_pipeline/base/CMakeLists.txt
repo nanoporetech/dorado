@@ -6,7 +6,7 @@ dorado_add_library(
     SOURCES_PUBLIC
         ClientInfo.h
         DefaultClientInfo.h
-        flush_options.h
+        terminate_options.h
         HtsReader.h
         messages.h
         MessageSink.h
