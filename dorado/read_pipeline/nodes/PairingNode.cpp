@@ -250,7 +250,6 @@ void PairingNode::pair_list_worker_thread(int tid) {
             }
         }
     }
-    --m_num_active_worker_threads;
 }
 
 void PairingNode::pair_generating_worker_thread(int tid) {
@@ -428,28 +427,6 @@ void PairingNode::pair_generating_worker_thread(int tid) {
             }
         }
     }
-
-    if (--m_num_active_worker_threads == 0) {
-        {
-            std::unique_lock<std::mutex> lock(m_read_caches_mutex);
-            // There are still reads in channel_read_map. Push them to the sink.
-            // Last thread alive is responsible for cleaning up the cache.
-            for (auto& [client_id, read_cache] : m_read_caches) {
-                for (auto& kv : read_cache.channel_read_map) {
-                    // kv is a std::pair<UniquePoreIdentifierKey, std::list<std::shared_ptr<Read>>>
-                    auto& reads_list = kv.second;
-
-                    for (auto& read_ptr : reads_list) {
-                        m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
-                        // Push each read message
-                        send_message_to_sink(std::move(read_ptr));
-                    }
-                }
-            }
-            m_read_caches.clear();
-        }
-        m_reads_in_flight_ctr.clear();
-    }
 }
 
 PairingNode::PairingNode(std::map<std::string, std::string> template_complement_map,
@@ -500,7 +477,6 @@ void PairingNode::start_threads() {
     for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
         m_workers.emplace_back([this, i] { (this->*m_pairing_func)(i); });
-        ++m_num_active_worker_threads;
     }
 }
 
@@ -514,6 +490,21 @@ void PairingNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
         m.join();
     }
     m_workers.clear();
+
+    // There are still reads in channel_read_map. Push them to the sink.
+    for (auto& [client_id, read_cache] : m_read_caches) {
+        for (auto& kv : read_cache.channel_read_map) {
+            // kv is a std::pair<UniquePoreIdentifierKey, std::list<SimplexReadPtr>>
+            auto& reads_list = kv.second;
+            for (auto& read_ptr : reads_list) {
+                m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
+                // Push each read message
+                send_message_to_sink(std::move(read_ptr));
+            }
+        }
+    }
+    m_read_caches.clear();
+    m_reads_in_flight_ctr.clear();
 
     m_tbufs.clear();
 }
