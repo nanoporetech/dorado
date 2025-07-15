@@ -1006,7 +1006,7 @@ int variant_caller(int argc, char* argv[]) {
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
-#ifdef DORADO_CUDA_BUILD
+#if DORADO_CUDA_BUILD
         // Turn on mixed precision if required. No RAII in Libtorch.
         if (!opt.full_precision) {
             at::autocast::set_autocast_enabled(at::kCUDA, true);
@@ -1023,7 +1023,7 @@ int variant_caller(int argc, char* argv[]) {
         std::cerr << std::string(200, ' ') << '\r';
         spdlog::info("Done!");
 
-#ifdef DORADO_CUDA_BUILD
+#if DORADO_CUDA_BUILD
         // Turn off mixed precision.
         if (!opt.full_precision) {
             at::autocast::set_autocast_enabled(at::kCUDA, false);
