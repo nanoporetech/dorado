@@ -18,7 +18,7 @@
 
 namespace dorado {
 
-class PairingNode : public MessageSink {
+class PairingNode final : public MessageSink {
     // A key for a unique Pore, Duplex reads must have the same UniquePoreIdentifierKey
     // The values are channel, run_id, flowcell_id
     using UniquePoreIdentifierKey = std::tuple<int, std::string, std::string>;
@@ -45,7 +45,6 @@ public:
 
 private:
     void start_threads();
-    void terminate_impl(utils::AsyncQueueTerminateFast fast);
 
     /**
      * This is a worker thread function for pairing reads based on a specified list of template-complement pairs.

@@ -11,6 +11,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <limits>
+#include <type_traits>
 
 namespace {
 const int kMaxTimeDeltaMs = 10000;
@@ -468,7 +469,11 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
     m_pairing_func = &PairingNode::pair_generating_worker_thread;
 }
 
-PairingNode::~PairingNode() { terminate_impl(utils::AsyncQueueTerminateFast::Yes); }
+PairingNode::~PairingNode() {
+    // Calling virtuals from a dtor is a Bad Thing, unless this is the most derived class.
+    static_assert(std::is_final_v<PairingNode>);
+    terminate({.fast = utils::AsyncQueueTerminateFast::Yes});
+}
 
 std::string PairingNode::get_name() const { return "PairingNode"; }
 
@@ -481,29 +486,27 @@ void PairingNode::start_threads() {
 }
 
 void PairingNode::terminate(const TerminateOptions& terminate_options) {
-    terminate_impl(terminate_options.fast);
-}
-
-void PairingNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
-    terminate_input_queue(fast);
+    terminate_input_queue(terminate_options.fast);
     for (auto& m : m_workers) {
         m.join();
     }
     m_workers.clear();
 
-    // There are still reads in channel_read_map. Push them to the sink.
-    for (auto& [client_id, read_cache] : m_read_caches) {
-        for (auto& kv : read_cache.channel_read_map) {
-            // kv is a std::pair<UniquePoreIdentifierKey, std::list<SimplexReadPtr>>
-            auto& reads_list = kv.second;
-            for (auto& read_ptr : reads_list) {
-                m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
-                // Push each read message
-                send_message_to_sink(std::move(read_ptr));
+    if (!terminate_options.preserve_pairing_caches) {
+        // There are still reads in channel_read_map. Push them to the sink.
+        for (auto& [client_id, read_cache] : m_read_caches) {
+            for (auto& kv : read_cache.channel_read_map) {
+                // kv is a std::pair<UniquePoreIdentifierKey, std::list<SimplexReadPtr>>
+                auto& reads_list = kv.second;
+                for (auto& read_ptr : reads_list) {
+                    m_cache_signal_bytes -= read_signal_bytes(*read_ptr);
+                    // Push each read message
+                    send_message_to_sink(std::move(read_ptr));
+                }
             }
         }
+        m_read_caches.clear();
     }
-    m_read_caches.clear();
     m_reads_in_flight_ctr.clear();
 
     m_tbufs.clear();
