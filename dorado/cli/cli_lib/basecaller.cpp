@@ -485,17 +485,18 @@ void setup(const std::vector<std::string>& args,
         auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
                 progress_callback, description_callback, gpu_names);
+        hts_writer_builder.update();
+
+        if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            std::exit(EXIT_FAILURE);
+        }
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {
             spdlog::error("Failed to create hts file writer");
-            std::exit(EXIT_FAILURE);
-        }
-
-        if (hts_file_writer->get_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
-            spdlog::error(
-                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
-                    "results.");
             std::exit(EXIT_FAILURE);
         }
 

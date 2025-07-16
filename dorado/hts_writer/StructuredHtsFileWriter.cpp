@@ -42,6 +42,10 @@ void StructuredHtsFileWriter::shutdown() {
     }
 }
 
+bool StructuredHtsFileWriter::finalise_is_noop() const {
+    return m_mode == OutputMode::FASTQ || !m_sort;
+};
+
 void StructuredHtsFileWriter::handle(const HtsData &item) {
     if (m_header == nullptr) {
         throw std::logic_error("HtsFileWriter header not set before writing records.");

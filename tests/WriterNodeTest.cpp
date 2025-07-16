@@ -7,8 +7,9 @@
 #include "hts_writer/HtsFileWriterBuilder.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
-#include "read_pipeline/base/flush_options.h"
 #include "read_pipeline/base/messages.h"
+#include "read_pipeline/base/terminate_options.h"
+#include "utils/AsyncQueue.h"
 #include "utils/stats.h"
 
 #include <catch2/catch_message.hpp>
@@ -22,7 +23,6 @@
 #include <memory>
 #include <optional>
 #include <stdexcept>
-#include <string_view>
 #include <utility>
 
 #define TEST_GROUP "[bam_utils][hts_writer][writer_node]"
@@ -41,10 +41,12 @@ const std::string GPU_NAMES = "gpu_names:all";
 class SubreadIdTaggerNode : public MessageSink {
 public:
     SubreadIdTaggerNode() : MessageSink(100, 1) {}
-    ~SubreadIdTaggerNode() { stop_input_processing(); }
+    ~SubreadIdTaggerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
     std::string get_name() const override { return "SubreadIdTagger"; }
-    void terminate(const FlushOptions &) override { stop_input_processing(); };
+    void terminate(const TerminateOptions &terminate_options) override {
+        stop_input_processing(terminate_options.fast);
+    };
     void restart() override {
         start_input_processing([this] { input_thread_fn(); }, "subreadidtagger_node");
     }
@@ -94,10 +96,11 @@ protected:
 
             bool emit_fastq = mode == hts_writer::OutputMode::FASTQ;
             bool emit_sam = mode == hts_writer::OutputMode::SAM;
+            std::optional<std::string> out_dir = m_out_path.m_path.string();
 
             auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-                    emit_fastq, emit_sam, false, m_out_path.m_path, num_threads, progress_cb,
-                    description_cb, GPU_NAMES);
+                    emit_fastq, emit_sam, false, out_dir, num_threads, progress_cb, description_cb,
+                    GPU_NAMES);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -117,7 +120,7 @@ protected:
         writer_ref.set_hts_file_header(std::move(hdr));
 
         reader.read(*pipeline, 1000);
-        pipeline->terminate(DefaultFlushOptions());
+        pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
         stats = writer_ref.sample_stats();
     }
@@ -194,9 +197,10 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
     {
         auto progress_cb = utils::ProgressCallback([](size_t) {});
         auto description_cb = utils::DescriptionCallback([](const std::string &) {});
+        std::optional<std::string> out_dir = tmp_dir.m_path.string();
 
         auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-                true, false, false, tmp_dir.m_path, 1, progress_cb, description_cb, GPU_NAMES);
+                true, false, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -225,7 +229,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
 
     writer.restart();
     writer.push_message(std::move(bam_message));
-    writer.terminate(DefaultFlushOptions());
+    writer.terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
     const auto fastq_path = get_output_file(tmp_dir.m_path, OutputMode::FASTQ);
     CATCH_CAPTURE(fastq_path);
@@ -266,8 +270,10 @@ CATCH_TEST_CASE(
         {
             auto progress_cb = utils::ProgressCallback([](size_t) {});
             auto description_cb = utils::DescriptionCallback([](const std::string &) {});
+            std::optional<std::string> out_dir = tmp_dir.m_path.string();
+
             auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-                    false, true, false, tmp_dir.m_path, 1, progress_cb, description_cb, GPU_NAMES);
+                    false, true, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -286,7 +292,7 @@ CATCH_TEST_CASE(
 
         writer.restart();
         writer.push_message(std::move(bam_message));
-        writer.terminate(DefaultFlushOptions());
+        writer.terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
     }
 
     const auto out_sam = get_output_file(tmp_dir.m_path, OutputMode::SAM);

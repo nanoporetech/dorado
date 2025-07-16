@@ -41,7 +41,7 @@ public:
     void shutdown() override {};
 
     std::string get_name() const override { return "NullWriter"; }
-    stats::NamedStats sample_stats() const override { return stats::NamedStats(); };
+    stats::NamedStats sample_stats() const override;
 };
 
 }  // namespace hts_writer

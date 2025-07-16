@@ -18,8 +18,7 @@ class StreamHtsFileWriter : public HtsFileWriter {
 public:
     StreamHtsFileWriter(const HtsFileWriterConfig& cfg);
     void shutdown() override;
-    bool finalise_is_noop() const override { return true; };
-    const std::string& get_path([[maybe_unused]] const HtsData& item) const override;
+    bool finalise_is_noop() const override;
 
 private:
     std::unique_ptr<utils::HtsFile> m_hts_file;

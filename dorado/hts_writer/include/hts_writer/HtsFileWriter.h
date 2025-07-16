@@ -56,8 +56,6 @@ public:
         m_description_callback(description);
     }
 
-    virtual const std::string& get_path(const HtsData& item) const = 0;
-
 protected:
     const OutputMode m_mode;
     const int m_threads;

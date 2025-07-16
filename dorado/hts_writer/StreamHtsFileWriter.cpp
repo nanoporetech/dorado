@@ -23,20 +23,18 @@ void StreamHtsFileWriter::shutdown() {
     m_hts_file->finalise([this](size_t progress) { set_progress(progress); });
 }
 
+bool StreamHtsFileWriter::finalise_is_noop() const { return true; };
+
 void StreamHtsFileWriter::handle(const HtsData& data) {
     if (m_hts_file == nullptr) {
         if (m_header == nullptr) {
             throw std::logic_error("HtsFileWriter header not set before writing records.");
         }
-        m_hts_file = std::make_unique<utils::HtsFile>(get_path(data), m_mode, 0, false);
+        m_hts_file = std::make_unique<utils::HtsFile>(m_path, m_mode, 0, false);
         m_hts_file->set_header(m_header.get());
     }
     m_hts_file->write(data.bam_ptr.get());
 }
-
-const std::string& StreamHtsFileWriter::get_path([[maybe_unused]] const HtsData& item) const {
-    return m_path;
-};
 
 }  // namespace hts_writer
 }  // namespace dorado

@@ -16,12 +16,7 @@ public:
                             std::unique_ptr<IStructure> structure,
                             bool sort);
     void shutdown() override;
-
-    bool finalise_is_noop() const override { return m_mode == OutputMode::FASTQ || !m_sort; };
-
-    const std::string& get_path(const HtsData& item) const override {
-        return m_structure->get_path(item);
-    }
+    bool finalise_is_noop() const override;
 
 private:
     const std::unique_ptr<IStructure> m_structure;
