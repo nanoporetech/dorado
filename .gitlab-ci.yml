@@ -213,7 +213,7 @@ build:linux:x86:focal:
     - .build_and_test_dorado
 
 build:linux:x86:focal_koi_from_source:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
@@ -247,7 +247,7 @@ build:linux:x86:focal:debug:
 
 build:linux:x86:coverage:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
@@ -495,7 +495,7 @@ test:windows:
     - build:windows
 
 test:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_test_dependencies
     - .linux_runner
@@ -577,7 +577,7 @@ test_archive:windows:cpu:
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_test_dependencies
     - .linux_runner
