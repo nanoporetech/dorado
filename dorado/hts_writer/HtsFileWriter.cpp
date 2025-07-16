@@ -5,6 +5,8 @@
 
 #include <htslib/sam.h>
 
+#include <atomic>
+
 namespace dorado {
 namespace hts_writer {
 
@@ -57,9 +59,11 @@ void HtsFileWriter::update_stats(const HtsData &hts_data) {
 stats::NamedStats HtsFileWriter::sample_stats() const {
     stats::NamedStats stats;
     stats["unique_simplex_reads_written"] =
-            static_cast<double>(m_primary_simplex_reads_written.load());
-    stats["duplex_reads_written"] = static_cast<double>(m_duplex_reads_written.load());
-    stats["split_reads_written"] = static_cast<double>(m_split_reads_written.load());
+            static_cast<double>(m_primary_simplex_reads_written.load(std::memory_order_relaxed));
+    stats["duplex_reads_written"] =
+            static_cast<double>(m_duplex_reads_written.load(std::memory_order_relaxed));
+    stats["split_reads_written"] =
+            static_cast<double>(m_split_reads_written.load(std::memory_order_relaxed));
     return stats;
 }
 

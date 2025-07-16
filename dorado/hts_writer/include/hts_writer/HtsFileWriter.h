@@ -13,12 +13,6 @@ class HtsData;
 
 namespace hts_writer {
 
-namespace ext {
-constexpr std::string_view BAM{".bam"};
-constexpr std::string_view SAM{".sam"};
-constexpr std::string_view FASTQ{".fastq"};
-}  // namespace ext
-
 using OutputMode = utils::HtsFile::OutputMode;
 
 struct HtsFileWriterConfig {
