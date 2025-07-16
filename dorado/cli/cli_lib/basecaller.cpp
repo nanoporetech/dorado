@@ -485,7 +485,6 @@ void setup(const std::vector<std::string>& args,
         auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
                 progress_callback, description_callback, gpu_names);
-        hts_writer_builder.update();
 
         if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
             spdlog::error(
