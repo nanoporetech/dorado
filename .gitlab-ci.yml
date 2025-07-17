@@ -57,6 +57,7 @@ variables:
   tags:
     - linux_aarch64
     - docker-arm
+    - aws
 
 .linux_orin_cuda_12_runner:
   tags:
