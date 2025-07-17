@@ -156,6 +156,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("Resume basecalling from the given HTS file. Fully written read records are "
                       "not processed again.")
                 .default_value(std::string{});
+        parser.visible.add_argument("--disable-read-splitting")
+                .default_value(false)
+                .implicit_value(true)
+                .help("Disable read splitting");
     }
     {
         parser.visible.add_group("Output arguments");
@@ -339,6 +343,7 @@ void setup(const std::vector<std::string>& args,
            bool run_batchsize_benchmarks,
            bool emit_batchsize_benchmarks,
            const std::string& resume_from_file,
+           bool enable_read_splitting,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelComplex& model_complex,
@@ -575,11 +580,11 @@ void setup(const std::vector<std::string>& args,
 
     auto mean_qscore_start_pos = model_config.mean_qscore_start_pos;
 
-    api::create_simplex_pipeline(
-            pipeline_desc, std::move(runners), std::move(modbase_runners), mean_qscore_start_pos,
-            thread_allocations.scaler_node_threads, true /* Enable read splitting */,
-            thread_allocations.splitter_node_threads, thread_allocations.modbase_threads,
-            current_sink_node, PipelineDescriptor::InvalidNodeHandle);
+    api::create_simplex_pipeline(pipeline_desc, std::move(runners), std::move(modbase_runners),
+                                 mean_qscore_start_pos, thread_allocations.scaler_node_threads,
+                                 enable_read_splitting, thread_allocations.splitter_node_threads,
+                                 thread_allocations.modbase_threads, current_sink_node,
+                                 PipelineDescriptor::InvalidNodeHandle);
 
     // Create the Pipeline from our description.
     std::vector<dorado::stats::StatsReporter> stats_reporters{dorado::stats::sys_stats_report};
@@ -974,6 +979,7 @@ int basecaller(int argc, char* argv[]) {
               parser.hidden.get<std::string>("--dump_stats_filter"), run_batchsize_benchmarks,
               parser.hidden.get<bool>("--emit-batchsize-benchmarks"),
               parser.visible.get<std::string>("--resume-from"),
+              !parser.visible.get<bool>("--disable-read-splitting"),
               parser.visible.get<bool>("--estimate-poly-a"), polya_config, model_complex,
               std::move(barcoding_info), std::move(adapter_info), std::move(sample_sheet));
     } catch (const std::exception& e) {
