@@ -306,6 +306,16 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
     return params;
 }
 
+void terminate_runners(std::vector<dorado::basecall::RunnerPtr>& runners,
+                       std::vector<dorado::modbase::RunnerPtr>& modbase_runners) {
+    for (auto& runner : runners) {
+        runner->terminate();
+    }
+    for (auto& runner : modbase_runners) {
+        runner->terminate();
+    }
+}
+
 void setup(const std::vector<std::string>& args,
            const BasecallModelConfig& model_config,
            const InputPod5FolderInfo& pod5_folder_info,
@@ -490,12 +500,14 @@ void setup(const std::vector<std::string>& args,
             spdlog::error(
                     "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
                     "results.");
+            terminate_runners(runners, modbase_runners);
             std::exit(EXIT_FAILURE);
         }
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {
             spdlog::error("Failed to create hts file writer");
+            terminate_runners(runners, modbase_runners);
             std::exit(EXIT_FAILURE);
         }
 

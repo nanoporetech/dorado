@@ -5,6 +5,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace dorado {
 namespace hts_writer {
@@ -14,6 +15,10 @@ StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig& cfg)
                   {cfg.mode, 0, cfg.progress_callback, cfg.description_callback, cfg.gpu_names}) {}
 
 void StreamHtsFileWriter::shutdown() {
+    if (std::exchange(m_has_shutdown, true)) {
+        return;
+    }
+
     if (m_hts_file == nullptr || m_hts_file.get() == nullptr) {
         spdlog::debug(
                 "StreamHtsFileWriter::shutdown called on uninitialised hts_file - nothing to do");
@@ -26,6 +31,11 @@ void StreamHtsFileWriter::shutdown() {
 bool StreamHtsFileWriter::finalise_is_noop() const { return true; };
 
 void StreamHtsFileWriter::handle(const HtsData& data) {
+    if (m_has_shutdown) {
+        spdlog::debug("HtsFileWriter has shutdown and cannot process more work.");
+        return;
+    }
+
     if (m_hts_file == nullptr) {
         if (m_header == nullptr) {
             throw std::logic_error("HtsFileWriter header not set before writing records.");

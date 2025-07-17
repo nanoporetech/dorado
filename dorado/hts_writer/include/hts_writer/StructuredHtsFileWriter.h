@@ -23,6 +23,8 @@ private:
     const bool m_sort;
     std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>> m_hts_files;
 
+    bool m_has_shutdown{false};
+
     void handle(const HtsData& data) override;
 };
 

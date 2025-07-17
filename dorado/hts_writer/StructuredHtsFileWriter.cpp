@@ -22,6 +22,10 @@ StructuredHtsFileWriter::StructuredHtsFileWriter(const HtsFileWriterConfig &cfg,
         : HtsFileWriter(cfg), m_structure(std::move(structure)), m_sort(sort) {};
 
 void StructuredHtsFileWriter::shutdown() {
+    if (std::exchange(m_has_shutdown, true)) {
+        return;
+    }
+
     set_description("Finalising outputs");
     size_t i = 0;
     const size_t n_files = m_hts_files.size();
@@ -47,6 +51,11 @@ bool StructuredHtsFileWriter::finalise_is_noop() const {
 };
 
 void StructuredHtsFileWriter::handle(const HtsData &item) {
+    if (m_has_shutdown) {
+        spdlog::debug("HtsFileWriter has shutdown and cannot process more work.");
+        return;
+    }
+
     if (m_header == nullptr) {
         throw std::logic_error("HtsFileWriter header not set before writing records.");
     }

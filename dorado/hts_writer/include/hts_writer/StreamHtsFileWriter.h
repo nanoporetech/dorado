@@ -24,6 +24,8 @@ private:
     std::unique_ptr<utils::HtsFile> m_hts_file;
     const std::string m_path{"-"};
 
+    bool m_has_shutdown{false};
+
     void handle(const HtsData& data) override;
 };
 
