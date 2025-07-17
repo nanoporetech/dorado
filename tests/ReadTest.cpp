@@ -1,10 +1,16 @@
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "utils/types.h"
 
 #include <ATen/Functions.h>
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <htslib/sam.h>
+
+#include <cstdint>
+#include <limits>
 
 #define TEST_GROUP "[ReadTest]"
 
@@ -392,5 +398,54 @@ CATCH_TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     CATCH_SECTION("Check start pos = qstring length") {
         read_common.mean_qscore_start_pos = int(read_common.qstring.length());
         CATCH_CHECK(read_common.calculate_mean_qscore() == Catch::Approx(8.79143f));
+    }
+}
+
+CATCH_TEST_CASE(TEST_GROUP ": Test duplex read tag", TEST_GROUP) {
+    CATCH_SECTION("is_duplex_record") {
+        bam1_t* record = bam_init1();
+        CATCH_CHECK_FALSE(record == NULL);
+
+        int32_t dx = 1;
+        bam_aux_append(record, "dx", 'i', sizeof(dx), (uint8_t*)&dx);
+        CATCH_CHECK(dorado::utils::is_duplex_record(record));
+
+        bam_destroy1(record);
+    }
+
+    CATCH_SECTION("is_simplex_record_no_duplex_offspring") {
+        bam1_t* record = bam_init1();
+        CATCH_CHECK_FALSE(record == NULL);
+
+        int32_t dx = 0;
+        bam_aux_append(record, "dx", 'i', sizeof(dx), (uint8_t*)&dx);
+        CATCH_CHECK(dorado::utils::is_simplex_record_no_duplex_offspring(record));
+
+        bam_destroy1(record);
+    }
+
+    CATCH_SECTION("is_simplex_record_with_duplex_offspring") {
+        bam1_t* record = bam_init1();
+        CATCH_CHECK_FALSE(record == NULL);
+
+        int32_t dx = -1;
+        bam_aux_append(record, "dx", 'i', sizeof(dx), (uint8_t*)&dx);
+        CATCH_CHECK(dorado::utils::is_simplex_record_with_duplex_offspring(record));
+
+        bam_destroy1(record);
+    }
+
+    CATCH_SECTION("get_dx_tag") {
+        bam1_t* record = bam_init1();
+        CATCH_CHECK_FALSE(record == NULL);
+
+        using i32 = std::numeric_limits<int32_t>;
+        const auto dx = GENERATE(i32::min(), -1, 0, 1, i32::max());
+        CATCH_CAPTURE(dx);
+
+        bam_aux_append(record, "dx", 'i', sizeof(dx), (uint8_t*)&dx);
+        CATCH_CAPTURE(dorado::utils::get_dx_tag(record) == dx);
+
+        bam_destroy1(record);
     }
 }

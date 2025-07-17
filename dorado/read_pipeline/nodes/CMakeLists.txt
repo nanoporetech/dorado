@@ -27,6 +27,7 @@ dorado_add_library(
         StereoDuplexEncoderNode.h
         SubreadTaggerNode.h
         TrimmerNode.h
+        WriterNode.h
     SOURCES_PRIVATE
         AdapterDetectorNode.cpp
         AlignerNode.cpp
@@ -52,6 +53,7 @@ dorado_add_library(
         StereoDuplexEncoderNode.cpp
         SubreadTaggerNode.cpp
         TrimmerNode.cpp
+        WriterNode.cpp
     DEPENDS_PUBLIC
         dorado_alignment
         dorado_read_pipeline_base
@@ -65,5 +67,6 @@ dorado_add_library(
         dorado_modbase
         dorado_poly_tail
         dorado_splitter
+        dorado_hts_writer
         spdlog::spdlog
 )

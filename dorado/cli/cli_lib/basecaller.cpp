@@ -16,6 +16,9 @@
 #include "demux/parse_custom_sequences.h"
 #include "file_info/file_info.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_file.h"
+#include "hts_writer/HtsFileWriter.h"
+#include "hts_writer/HtsFileWriterBuilder.h"
 #include "model_downloader/model_downloader.h"
 #include "model_resolution.h"
 #include "models/kits.h"
@@ -26,11 +29,11 @@
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
-#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/nodes/PolyACalculatorNode.h"
 #include "read_pipeline/nodes/ReadFilterNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
+#include "read_pipeline/nodes/WriterNode.h"
 #include "resume_loader/ResumeLoader.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
@@ -303,6 +306,16 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
     return params;
 }
 
+void terminate_runners(std::vector<dorado::basecall::RunnerPtr>& runners,
+                       std::vector<dorado::modbase::RunnerPtr>& modbase_runners) {
+    for (auto& runner : runners) {
+        runner->terminate();
+    }
+    for (auto& runner : modbase_runners) {
+        runner->terminate();
+    }
+}
+
 void setup(const std::vector<std::string>& args,
            const BasecallModelConfig& model_config,
            const InputPod5FolderInfo& pod5_folder_info,
@@ -312,7 +325,9 @@ void setup(const std::vector<std::string>& args,
            const std::string& bed,
            size_t num_runners,
            const ModBaseBatchParams& modbase_params,
-           std::unique_ptr<utils::HtsFile> hts_file,
+           const std::optional<std::string>& output_dir,
+           bool emit_fastq,
+           bool emit_sam,
            bool emit_moves,
            size_t max_reads,
            size_t min_qscore,
@@ -347,6 +362,8 @@ void setup(const std::vector<std::string>& args,
         std::exit(EXIT_FAILURE);
     }
     num_reads = max_reads == 0 ? num_reads : std::min(num_reads, max_reads);
+
+    ProgressTracker tracker(ProgressTracker::SIMPLEX, num_reads);
 
     // Sampling rate is checked by ModelComplexSearch when a complex is given, only test for a path
     if (model_complex.is_path() && !skip_model_compatibility_check) {
@@ -452,6 +469,11 @@ void setup(const std::vector<std::string>& args,
             int(num_devices), !modbase_runners.empty() ? int(modbase_params.threads) : 0,
             enable_aligner, barcoding_info != nullptr, adapter_trimming_enabled);
 
+    std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+    gpu_names = utils::get_cuda_gpu_names(device);
+#endif
+
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
@@ -461,15 +483,40 @@ void setup(const std::vector<std::string>& args,
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
+    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+    {
+        auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
+            tracker.update_post_processing_progress(static_cast<float>(progress));
+        });
+        auto description_callback =
+                utils::DescriptionCallback([&tracker](const std::string& description) {
+                    tracker.set_description(description);
+                });
+        auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+                emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
+                progress_callback, description_callback, gpu_names);
 
-    hts_file->set_num_threads(thread_allocations.writer_threads);
+        if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
+            spdlog::error(
+                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
+                    "results.");
+            terminate_runners(runners, modbase_runners);
+            std::exit(EXIT_FAILURE);
+        }
+
+        std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
+        if (hts_file_writer == nullptr) {
+            spdlog::error("Failed to create hts file writer");
+            terminate_runners(runners, modbase_runners);
+            std::exit(EXIT_FAILURE);
+        }
+
+        tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);
+        writers.push_back(std::move(hts_file_writer));
+    }
 
     PipelineDescriptor pipeline_desc;
-    std::string gpu_names{};
-#if DORADO_CUDA_BUILD
-    gpu_names = utils::get_cuda_gpu_names(device);
-#endif
-    auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
+    auto hts_writer = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
     auto aligner = PipelineDescriptor::InvalidNodeHandle;
     auto current_sink_node = hts_writer;
     if (enable_aligner) {
@@ -543,13 +590,18 @@ void setup(const std::vector<std::string>& args,
     }
 
     // At present, header output file header writing relies on direct node method calls
-    // rather than the pipeline framework.
-    auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
+    // rather than the pipeline framework - because we must guarantee that the header is set
+    // BEFORE we write any reads.
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
         utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
     }
-    hts_file->set_header(hdr.get());
+
+    {
+        // Set the sam header for all writers
+        const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
+        hts_writer_ref.set_hts_file_header(std::move(hdr));
+    }
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
@@ -605,16 +657,13 @@ void setup(const std::vector<std::string>& args,
         }
 
         // Resume functionality injects reads directly into the writer node.
+        auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
         ResumeLoader resume_loader(hts_writer_ref, resume_from_file);
         resume_loader.copy_completed_reads();
         reads_already_processed = resume_loader.get_processed_read_ids();
     }
 
-    // If we're doing alignment, post-processing takes longer due to bam file sorting.
-    float post_processing_percentage = (hts_file->finalise_is_noop() || ref.empty()) ? 0.0f : 0.5f;
-
-    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, int(num_reads),
-                            post_processing_percentage);
+    tracker.reset_initialization_time();
     tracker.set_description("Basecalling");
 
     std::vector<dorado::stats::StatsCallable> stats_callables;
@@ -630,6 +679,8 @@ void setup(const std::vector<std::string>& args,
 
     auto func = [client_info](ReadCommon& read) { read.client_info = client_info; };
     loader.add_read_initialiser(func);
+
+    // This is blocking on all reads
     loader.load_reads(pod5_folder_info.files(), ReadOrder::UNRESTRICTED);
 
     // Wait for the pipeline to complete.  When it does, we collect
@@ -641,12 +692,6 @@ void setup(const std::vector<std::string>& args,
     // allow accurate summarisation.
     stats_sampler->terminate();
     tracker.update_progress_bar(final_stats);
-
-    // Report progress during output file finalisation.
-    tracker.set_description("Sorting output files");
-    hts_file->finalise([&](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
 
     // Give the user a nice summary.
     tracker.summarize();
@@ -723,19 +768,6 @@ int basecaller(int argc, char* argv[]) {
     }
     if (device == cli::AUTO_DETECT_DEVICE) {
         device = utils::get_auto_detected_device();
-    }
-
-    auto hts_file = cli::extract_hts_file(parser);
-    if (!hts_file) {
-        return EXIT_FAILURE;
-    }
-    if (hts_file->get_output_mode() == OutputMode::FASTQ) {
-        if (model_complex.has_mods_variant() || !mod_bases.empty() || !mod_bases_models.empty()) {
-            spdlog::error(
-                    "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
-                    "results.");
-            return EXIT_FAILURE;
-        }
     }
 
     bool trim_barcodes = true, trim_primers = true, trim_adapters = true;
@@ -933,7 +965,8 @@ int basecaller(int argc, char* argv[]) {
         setup(args, model_config, pod5_folder_info, mods_model_paths, device,
               parser.visible.get<std::string>("--reference"),
               parser.visible.get<std::string>("--bed-file"), default_parameters.num_runners,
-              modbase_params, std::move(hts_file), parser.visible.get<bool>("--emit-moves"),
+              modbase_params, cli::get_output_dir(parser), cli::get_emit_fastq(parser),
+              cli::get_emit_sam(parser), parser.visible.get<bool>("--emit-moves"),
               parser.visible.get<int>("--max-reads"), parser.visible.get<int>("--min-qscore"),
               parser.visible.get<std::string>("--read-ids"), *minimap_options,
               parser.hidden.get<bool>("--skip-model-compatibility-check"),
