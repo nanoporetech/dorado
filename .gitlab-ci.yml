@@ -43,6 +43,7 @@ variables:
   tags:
     - osx_arm64
     - xcode-15.3
+    - on-prem
   variables:
     MACOSX_DEPLOYMENT_TARGET: "13.0"
 
@@ -50,22 +51,26 @@ variables:
   tags:
     - ubuntu-20.04
     - nvidia-docker
+    - on-prem
 
 .linux_arm64_runner:
   tags:
     - linux_aarch64
     - docker-arm
+    - aws
 
 .linux_orin_cuda_12_runner:
   tags:
     - linux-arm64-gpu-12.6
     - nvidia-docker
+    - on-prem
 
 .windows_runner:
   tags:
     - windows-10
     - VS2019
     - cuda-${WIN_CUDA}
+    - on-prem
 
 .linux_build_dependencies:
   before_script:
