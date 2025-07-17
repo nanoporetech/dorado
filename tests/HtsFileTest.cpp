@@ -304,7 +304,7 @@ namespace {
 auto p_cb = utils::ProgressCallback([](float f) { (void)f; });
 auto d_cb = utils::DescriptionCallback([](const std::string& s) { (void)s; });
 int threads = 0;
-const std::string gpu_names = "gpu_names:1";
+const std::string GPU_NAMES = "gpu_names:1";
 }  // namespace
 
 CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP) {
@@ -320,7 +320,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP)
                   out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, gpu_names);
+                                               p_cb, d_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -339,7 +339,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ throws given reference", 
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, gpu_names);
+                                               p_cb, d_cb, GPU_NAMES);
 
     CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
 }
@@ -356,7 +356,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusiv
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, gpu_names);
+                                               p_cb, d_cb, GPU_NAMES);
 
     CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
 }
@@ -377,12 +377,37 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
                   out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, gpu_names);
+                                               p_cb, d_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
     CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
 }
+
+class HtsFileWriterBuilderTest : public HtsFileWriterBuilder {
+public:
+    HtsFileWriterBuilderTest(bool emit_fastq,
+                             bool emit_sam,
+                             bool reference_requested,
+                             const std::optional<std::string>& output_dir,
+                             int writer_threads,
+                             utils::ProgressCallback progress_callback,
+                             utils::DescriptionCallback description_callback,
+                             std::string gpu_names,
+                             bool is_fd_tty,
+                             bool is_fd_pipe)
+            : HtsFileWriterBuilder(emit_fastq,
+                                   emit_sam,
+                                   reference_requested,
+                                   output_dir,
+                                   writer_threads,
+                                   std::move(progress_callback),
+                                   std::move(description_callback),
+                                   std::move(gpu_names)) {
+        m_is_fd_tty = is_fd_tty;
+        m_is_fd_pipe = is_fd_pipe;
+    };
+};
 
 CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder tty and pipe settings", TEST_GROUP) {
     auto [output_mode, ref_req, out_dir, emit_sam, is_fd_tty, is_fd_pipe] =
@@ -405,10 +430,8 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder tty and pipe settings", TEST_G
     CATCH_CAPTURE(to_string(output_mode), emit_fastq, emit_sam, ref_req, out_dir.has_value(),
                   is_fd_tty, is_fd_pipe);
 
-    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, gpu_names);
-    writer_builder.set_is_fd_tty(is_fd_tty);
-    writer_builder.set_is_fd_pipe(is_fd_pipe);
+    auto writer_builder = HtsFileWriterBuilderTest(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(is_fd_tty != is_fd_pipe);
@@ -432,10 +455,8 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM happy paths", TEST_GROUP) 
     CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
                   out_dir.has_value(), is_fd_tty, is_fd_pipe);
 
-    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, gpu_names);
-    writer_builder.set_is_fd_tty(is_fd_tty);
-    writer_builder.set_is_fd_pipe(is_fd_pipe);
+    auto writer_builder = HtsFileWriterBuilderTest(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
 
     auto writer = writer_builder.build();
 
@@ -453,7 +474,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     auto description_cb = utils::DescriptionCallback(
             [&description_res](const std::string& value) { description_res = value; });
     auto writer_builder = HtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
-                                               progress_cb, description_cb, gpu_names);
+                                               progress_cb, description_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
     auto& writer_ref = *writer;
@@ -461,7 +482,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
     CATCH_CHECK(writer->get_threads() == 0);
 
-    CATCH_CHECK(writer->get_gpu_names() == gpu_names);
+    CATCH_CHECK(writer->get_gpu_names() == GPU_NAMES);
 
     const int test_progress = 100;
     writer->set_progress(test_progress);

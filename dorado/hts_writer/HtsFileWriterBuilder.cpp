@@ -87,46 +87,9 @@ std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(structure), m_sort);
 }
 
-bool HtsFileWriterBuilder::get_sort() {
-    update();
-    return m_sort;
-}
-
 OutputMode HtsFileWriterBuilder::get_output_mode() {
     update();
     return m_output_mode;
-}
-
-void HtsFileWriterBuilder::set_emit_fastq(bool emit_fastq) { m_emit_fastq = emit_fastq; }
-bool HtsFileWriterBuilder::get_emit_fastq() const { return m_emit_fastq; }
-
-void HtsFileWriterBuilder::set_emit_sam(bool emit_sam) { m_emit_sam = emit_sam; }
-bool HtsFileWriterBuilder::get_emit_sam() const { return m_emit_sam; }
-
-void HtsFileWriterBuilder::set_gpu_names(bool gpu_names) { m_gpu_names = gpu_names; }
-const std::string &HtsFileWriterBuilder::get_gpu_names() const { return m_gpu_names; }
-
-void HtsFileWriterBuilder::set_is_fd_tty(bool is_fd_tty) { m_is_fd_tty = is_fd_tty; }
-void HtsFileWriterBuilder::set_is_fd_pipe(bool is_fd_pipe) { m_is_fd_pipe = is_fd_pipe; }
-
-void HtsFileWriterBuilder::set_reference_requested(bool requested) {
-    m_reference_requested = requested;
-}
-bool HtsFileWriterBuilder::get_reference_requested() const { return m_reference_requested; }
-
-void HtsFileWriterBuilder::set_output_dir(const std::optional<std::string> &output_dir) {
-    m_output_dir = output_dir;
-}
-std::optional<std::string> HtsFileWriterBuilder::get_output_dir() const { return m_output_dir; }
-
-void HtsFileWriterBuilder::set_writer_threads(int threads) { m_writer_threads = threads; }
-int HtsFileWriterBuilder::get_writer_threads() const { return m_writer_threads; }
-
-void HtsFileWriterBuilder::set_progress_callback(const utils::ProgressCallback &callback) {
-    m_progress_callback = callback;
-}
-void HtsFileWriterBuilder::set_description_callback(const utils::DescriptionCallback &callback) {
-    m_description_callback = callback;
 }
 
 }  // namespace hts_writer
