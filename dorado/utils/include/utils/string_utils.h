@@ -58,6 +58,10 @@ inline bool ends_with(std::string_view str, std::string_view suffix) {
     return str.substr(str.length() - suffix.length()) == suffix;
 }
 
+inline bool contains(std::string_view str, std::string_view substr) {
+    return str.find(substr) != str.npos;
+}
+
 inline void rtrim(std::string& s) {
     s.erase(std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base(),
             s.end());

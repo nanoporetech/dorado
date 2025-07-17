@@ -4,13 +4,14 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #define CUT_TAG "[dorado::utils::string_utils]"
+#define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
 #include <string>
 #include <string_view>
 
 namespace dorado::utils::string_view {
 
-CATCH_TEST_CASE(CUT_TAG " split", CUT_TAG) {
+DEFINE_TEST("split") {
     // clang-format off
     auto [input, delimiter, expected_results] = GENERATE(
         table<std::string, char, std::vector<std::string>>({
@@ -30,7 +31,7 @@ CATCH_TEST_CASE(CUT_TAG " split", CUT_TAG) {
     CATCH_CHECK(tokens == expected_results);
 }
 
-CATCH_TEST_CASE(CUT_TAG " split_view", CUT_TAG) {
+DEFINE_TEST("split_view") {
     // clang-format off
     auto [input, delimiter, expected_results] = GENERATE(
         table<std::string_view, char, std::vector<std::string_view>>({
@@ -50,7 +51,7 @@ CATCH_TEST_CASE(CUT_TAG " split_view", CUT_TAG) {
     CATCH_CHECK(tokens == expected_results);
 }
 
-CATCH_TEST_CASE(CUT_TAG " join", CUT_TAG) {
+DEFINE_TEST("join") {
     // clang-format off
     auto [inputs, separator, expected_result] = GENERATE(
             table<std::vector<std::string>, std::string, std::string >({
@@ -69,7 +70,7 @@ CATCH_TEST_CASE(CUT_TAG " join", CUT_TAG) {
     CATCH_CHECK(joined == expected_result);
 }
 
-CATCH_TEST_CASE(CUT_TAG " starts_with") {
+DEFINE_TEST("starts_with") {
     // clang-format off
     auto [input, prefix, expected_results] = GENERATE(
         table<std::string, std::string, bool>({
@@ -90,7 +91,7 @@ CATCH_TEST_CASE(CUT_TAG " starts_with") {
     CATCH_CHECK(starts_with == expected_results);
 }
 
-CATCH_TEST_CASE(CUT_TAG " ends_with") {
+DEFINE_TEST("ends_with") {
     // clang-format off
     auto [input, suffix, expected_results] = GENERATE(
         table<std::string, std::string, bool>({
@@ -111,7 +112,24 @@ CATCH_TEST_CASE(CUT_TAG " ends_with") {
     CATCH_CHECK(starts_with == expected_results);
 }
 
-CATCH_TEST_CASE(CUT_TAG " rtrim_view", CUT_TAG) {
+DEFINE_TEST("contains") {
+    auto [input, substr, expected_result] = GENERATE(table<std::string, std::string, bool>({
+            std::make_tuple("", "", true),
+            std::make_tuple("aaa", "bbb", false),
+            std::make_tuple("word", "word", true),
+            std::make_tuple("word", "", true),
+            std::make_tuple("word", "or", true),
+            std::make_tuple("word", "or ", false),
+            std::make_tuple("or", "word", false),
+    }));
+
+    CATCH_CAPTURE(input);
+    CATCH_CAPTURE(substr);
+    auto starts_with = dorado::utils::contains(input, substr);
+    CATCH_CHECK(starts_with == expected_result);
+}
+
+DEFINE_TEST("rtrim_view") {
     // clang-format off
     auto [input, expected] = GENERATE(
             table<std::string, std::string_view>({
