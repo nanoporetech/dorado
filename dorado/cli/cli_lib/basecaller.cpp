@@ -610,6 +610,11 @@ void setup(const std::vector<std::string>& args,
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
+        if (output_dir.has_value()) {
+            spdlog::error("--resume-from cannot be used with --output-dir.");
+            std::exit(EXIT_FAILURE);
+        }
+
         spdlog::info("> Inspecting resume file...");
         // Turn off warning logging as header info is fetched.
         auto initial_hts_log_level = hts_get_log_level();
