@@ -53,7 +53,7 @@ private:
                 auto pid_tag = bam_aux_get(bam_message.data.bam_ptr.get(), "pi");
                 if (pid_tag) {
                     std::string read_id = bam_aux2Z(pid_tag);
-                    bam_message.data.subread_id = read_id_counts[read_id]++;
+                    bam_message.data.read_attrs.subread_id = read_id_counts[read_id]++;
                 }
             }
             send_message_to_sink(std::move(bam_message));

@@ -68,7 +68,7 @@ private:
                 auto pid_tag = bam_aux_get(bam_message.data.bam_ptr.get(), "pi");
                 if (pid_tag) {
                     std::string read_id = bam_aux2Z(pid_tag);
-                    bam_message.data.subread_id = read_id_counts[read_id]++;
+                    bam_message.data.read_attrs.subread_id = read_id_counts[read_id]++;
                 }
             }
             send_message_to_sink(std::move(bam_message));
@@ -225,7 +225,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
     CATCH_CHECK_THAT(bam_aux2Z(st_tag), Equals("2023-06-22T07:17:48.308+00:00"));
 
     BamPtr bam_ptr{bam_dup1(reader.record.get())};
-    BamMessage bam_message{HtsData{std::move(bam_ptr), "kit2"}, nullptr};
+    BamMessage bam_message{HtsData{std::move(bam_ptr), {"kit2"}}, nullptr};
 
     writer.restart();
     writer.push_message(std::move(bam_message));
@@ -288,7 +288,7 @@ CATCH_TEST_CASE(
         // Write into temporary folder.
 
         BamPtr bam_ptr{bam_dup1(fastq_reader.record.get())};
-        BamMessage bam_message{HtsData{std::move(bam_ptr), "kit2"}, nullptr};
+        BamMessage bam_message{HtsData{std::move(bam_ptr), {"kit2"}}, nullptr};
 
         writer.restart();
         writer.push_message(std::move(bam_message));

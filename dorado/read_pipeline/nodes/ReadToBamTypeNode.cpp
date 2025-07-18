@@ -38,10 +38,18 @@ void ReadToBamTypeNode::input_thread_fn() {
 
         auto alns = read_common_data.extract_sam_lines(m_emit_moves, m_modbase_threshold,
                                                        is_duplex_parent);
+
+        const HtsData::ReadAttributes read_attrs{read_common_data.sequencing_kit,
+                                                 read_common_data.experiment_id,
+                                                 read_common_data.sample_id,
+                                                 read_common_data.position_id,
+                                                 read_common_data.flowcell_id,
+                                                 read_common_data.run_id,
+                                                 read_common_data.protocol_start_time_ms,
+                                                 read_common_data.subread_id};
+
         for (auto& aln : alns) {
-            BamMessage bam_msg{HtsData{std::move(aln)}, read_common_data.client_info};
-            bam_msg.data.sequencing_kit = read_common_data.sequencing_kit;
-            bam_msg.data.subread_id = read_common_data.subread_id;
+            BamMessage bam_msg{HtsData{std::move(aln), read_attrs}, read_common_data.client_info};
             send_message_to_sink(std::move(bam_msg));
         }
     }
