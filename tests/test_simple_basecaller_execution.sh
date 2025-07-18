@@ -26,15 +26,21 @@ output_dir_name=test_simple_basecaller_output_${RANDOM}
 output_dir=${test_dir}/${output_dir_name}
 mkdir -p ${output_dir}
 
+models_directory=${output_dir}/models
+mkdir -p ${models_directory}
+
+models_directory_arg="--models-directory ${models_directory}"
+
+
 echo dorado download models
 $dorado_bin download --list
 $dorado_bin download --list-structured
-$dorado_bin download --model ${model_name_5k} --directory ${output_dir}
-model_5k=${output_dir}/${model_name_5k}
-$dorado_bin download --model ${model_name_5k_v43} --directory ${output_dir}
-model_5k_v43=${output_dir}/${model_name_5k_v43}
-$dorado_bin download --model ${model_name_rna004} --directory ${output_dir}
-model_rna004=${output_dir}/${model_name_rna004}
+$dorado_bin download --model ${model_name_5k} ${models_directory_arg}
+model_5k=${models_directory}/${model_name_5k}
+$dorado_bin download --model ${model_name_5k_v43} ${models_directory_arg}
+model_5k_v43=${models_directory}/${model_name_5k_v43}
+$dorado_bin download --model ${model_name_rna004} ${models_directory_arg}
+model_rna004=${models_directory}/${model_name_rna004}
 
 dorado_check_bam_not_empty() {
     samtools quickcheck -u $output_dir/calls.bam
@@ -50,13 +56,14 @@ pod5_data=$data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz
 echo using pod5_data: $pod5_data
 
 echo dorado basecaller test stage
+# Not included models_directory_arg here to test temporary model download and delete.
 $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq > $output_dir/ref.fq
-$dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
-$dorado_bin basecaller ${model_5k} $pod5_data/ -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
 dorado_check_bam_not_empty
 
-$dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ -b ${batch} --emit-moves > $output_dir/calls.bam
+$dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ ${models_directory_arg} -b ${batch} --emit-moves > $output_dir/calls.bam
 
 # Check that the read group has the required model info in its header
 if ! grep -q "basecall_model=${model_name_5k}" $output_dir/calls.sam; then
@@ -69,32 +76,32 @@ if ! grep -q "modbase_models=${model_name_5k}_5mCG_5hmCG" $output_dir/calls.sam;
 fi
 
 echo dorado basecaller mixed model complex and --modified-bases
-$dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
+$dorado_bin basecaller $model_complex $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
 samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
 samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
 samtools view -h $output_dir/calls.bam | grep "MN:i:"
 
 set +e
-if $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
+if $dorado_bin basecaller ${model_5k} $pod5_data ${models_directory_arg} -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
     echo "Error: dorado basecaller should fail with combination of emit-fastq and reference!"
     exit 1
 fi
-if $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
+if $dorado_bin basecaller ${model_5k} $pod5_data ${models_directory_arg} -b ${batch} --emit-fastq --modified-bases 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo "Error: dorado basecaller should fail with combination of emit-fastq and modbase!"
     exit 1
 fi
-if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then
+if $dorado_bin basecaller $model_5k_v43 $data_dir/duplex/pod5 ${models_directory_arg} --modified-bases 5mC_5hmC 5mCG_5hmCG > $output_dir/error_condition.fq; then
     echo "Error: dorado basecaller should fail with multiple modbase configs having overlapping mods!"
     exit 1
 fi
 set -e
 
 # Check INSTX-5275 problematic read does not crash
-$dorado_bin basecaller $model_5k_v43 $data_dir/split/INSTX-5275 -b ${batch} --emit-fastq --dump_stats_file $output_dir/INSTX-5275_stats.txt > $output_dir/INSTX-5275.fq
+$dorado_bin basecaller $model_5k_v43 $data_dir/split/INSTX-5275 ${models_directory_arg} -b ${batch} --emit-fastq --dump_stats_file $output_dir/INSTX-5275_stats.txt > $output_dir/INSTX-5275.fq
 
 # Check that dorado handles degenerate reads without crashing
-$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/trimming_bomb.pod5 -b ${batch} --skip-model-compatibility-check > $output_dir/error_condition.fq
-$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 -b ${batch} --skip-model-compatibility-check --kit-name EXP-NBD196 > $output_dir/error_condition.fq
+$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/trimming_bomb.pod5 ${models_directory_arg} -b ${batch} --skip-model-compatibility-check > $output_dir/error_condition.fq
+$dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${models_directory_arg} -b ${batch} --skip-model-compatibility-check --kit-name EXP-NBD196 > $output_dir/error_condition.fq
 
 {
     set +e
@@ -143,9 +150,9 @@ cp $output_dir/calls.sam $output_dir/folder/calls.sam
 cp $output_dir/calls.sam $output_dir/folder/subfolder/calls.sam
 $dorado_bin aligner $output_dir/ref.fq $output_dir/folder -o $output_dir/aligner_out
 dorado_check_bam_not_empty
-$dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG | $dorado_bin aligner $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
-$dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
+$dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
 # Check that the aligner strips old alignment tags
 $dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam
@@ -230,10 +237,10 @@ dorado_aligner_options_test
 # Skip duplex tests if NO_TEST_DUPLEX is set.
 if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     echo dorado duplex basespace test stage
-    $dorado_bin duplex basespace $data_dir/basespace/pairs.bam --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
+    $dorado_bin duplex basespace $data_dir/basespace/pairs.bam ${models_directory_arg} --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
     echo dorado in-line duplex test stage - model name
-    $dorado_bin duplex $model_5k $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
+    $dorado_bin duplex $model_5k $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -242,7 +249,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     fi
 
     echo dorado in-line duplex test stage - complex
-    $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 > $output_dir/duplex_calls.bam
+    $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -251,7 +258,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     fi
 
     echo dorado pairs file based duplex test stage - model name
-    $dorado_bin duplex $model_5k $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
+    $dorado_bin duplex $model_5k $data_dir/duplex/pod5 ${models_directory_arg} --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -260,7 +267,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     fi
 
     echo dorado pairs file based duplex test stage - complex
-    $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
+    $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 ${models_directory_arg} --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     samtools quickcheck -u $output_dir/duplex_calls.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -269,7 +276,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
     fi
 
     echo dorado in-line modbase duplex from model complex
-    $dorado_bin duplex ${model_complex},5mCG_5hmCG $data_dir/duplex/pod5 > $output_dir/duplex_calls_mods.bam
+    $dorado_bin duplex ${model_complex},5mCG_5hmCG $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls_mods.bam
     samtools quickcheck -u $output_dir/duplex_calls_mods.bam
     num_duplex_reads=$(samtools view $output_dir/duplex_calls_mods.bam | grep dx:i:1 | wc -l | awk '{print $1}')
     if [[ $num_duplex_reads -ne "2" ]]; then
@@ -281,9 +288,9 @@ fi
 if command -v truncate > /dev/null; then
     echo dorado basecaller resume feature
     # n.b. some of these options (--skip, --mm2-opts) won't affect the basecall but are included to test that we can resume with them present
-    $dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check > $output_dir/tmp.bam
+    $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
-    $dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
+    $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
     samtools quickcheck -u $output_dir/calls.bam
     num_reads=$(samtools view -c $output_dir/calls.bam)
     if [[ $num_reads -ne "4" ]]; then
@@ -344,20 +351,20 @@ if cmp --silent -- "$file1" "$file2"; then
 fi
 
 echo "dorado test poly(A) tail estimation"
-$dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
+$dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
 samtools quickcheck -u $output_dir/cdna_polya.bam
 num_estimated_reads=$(samtools view $output_dir/cdna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
 if [[ $num_estimated_reads -ne "2" ]]; then
     echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
     exit 1
 fi
-$dorado_bin basecaller -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
+$dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
 samtools quickcheck -u $output_dir/no_detect_cdna_polya.bam
 if [[ $? -ne "0" ]]; then
     echo "PolyA tail estimation with custom config file failed."
     exit 1
 fi
-$dorado_bin basecaller -b ${batch} ${model_rna004} $data_dir/poly_a/rna004_pod5/ --estimate-poly-a > $output_dir/rna_polya.bam
+$dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_rna004} $data_dir/poly_a/rna004_pod5/ --estimate-poly-a > $output_dir/rna_polya.bam
 samtools quickcheck -u $output_dir/rna_polya.bam
 num_estimated_reads=$(samtools view $output_dir/rna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
 if [[ $num_estimated_reads -ne "1" ]]; then
@@ -375,7 +382,7 @@ test_barcoding_read_groups() (
     sample_sheet=$1
     output_name=read_group_test${sample_sheet:+_sample_sheet}
     demux_data=$data_dir/barcode_demux/read_group_test
-    $dorado_bin basecaller -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} ${demux_data} --no-trim > $output_dir/${output_name}.bam
+    $dorado_bin basecaller ${models_directory_arg} -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} ${demux_data} --no-trim > $output_dir/${output_name}.bam
 
     samtools quickcheck -u $output_dir/${output_name}.bam
     split_dir=$output_dir/${output_name}
@@ -421,7 +428,7 @@ test_barcoding_read_groups() (
         check_barcodes $bam
     done
 
-    $dorado_bin basecaller -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
+    $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
     $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
 
     for bam in $output_dir/${output_name}-demux/*.bam; do
