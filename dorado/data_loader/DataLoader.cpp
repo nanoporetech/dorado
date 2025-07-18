@@ -499,6 +499,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
         for (auto& v : futures) {
             auto read = v.get();
             if (!read) {
+                // POD5 read errors are issued in the loader processes
                 continue;
             }
             initialise_read(read->read_common);
@@ -568,6 +569,10 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         for (auto& v : futures) {
             auto read = v.get();
+            if (!read) {
+                // POD5 read errors are issued in the loader processes
+                continue;
+            }
             initialise_read(read->read_common);
             check_read(read);
             m_pipeline.push_message(std::move(read));
