@@ -873,6 +873,43 @@ void sample_producer(PolisherResources& resources,
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
+    const auto move_buffer_data_to_queue = [](InferenceData& buffer,
+                                              utils::AsyncQueue<InferenceData>& queue,
+                                              const bool any_batch_size) {
+        if (std::empty(buffer.samples)) {
+            return;
+        }
+
+        // Any batch size is fine (no need to find a multiple of 8).
+        if (any_batch_size) {
+            queue.try_push(std::move(buffer));
+            buffer = {};
+            return;
+        }
+
+        // Round to the nearest smaller multiple of 8. If number of samples < 8 just use what
+        // there is, there is no real benefit of rounding to anything below it really.
+        const int64_t num_samples = dorado::ssize(buffer.samples);
+        const int64_t new_batch_size = (num_samples < 8) ? num_samples : (8 * (num_samples / 8));
+
+        // Get the first batch_size elements and push them to the queue.
+        InferenceData new_buffer;
+        for (int64_t i = 0; i < new_batch_size; ++i) {
+            new_buffer.samples.emplace_back(std::move(buffer.samples[i]));
+            new_buffer.trims.emplace_back(std::move(buffer.trims[i]));
+        }
+        queue.try_push(std::move(new_buffer));
+
+        // Get the remaining items and update the buffer.
+        InferenceData remainder;
+        for (int64_t i = new_batch_size; i < dorado::ssize(buffer.samples); ++i) {
+            remainder.samples.emplace_back(std::move(buffer.samples[i]));
+            remainder.trims.emplace_back(std::move(buffer.trims[i]));
+        }
+        buffer.samples = std::move(remainder.samples);
+        buffer.trims = std::move(remainder.trims);
+    };
+
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
             bam_region_intervals, num_threads,
@@ -962,11 +999,11 @@ void sample_producer(PolisherResources& resources,
                                 utils::print_container_as_string(next_batch_shape, ",", true));
 
                         spdlog::trace(
-                                "[producer] Pushing a batch of data to infer_data queue. "
+                                "[producer] Pushing a batch of data to infer_data queue (1a). "
                                 "buffer.samples.size() = {}",
                                 std::size(buffer.samples));
-                        infer_data.try_push(std::move(buffer));
-                        buffer = {};
+
+                        move_buffer_data_to_queue(buffer, infer_data, false);
                     }
 
                 } else {
@@ -974,11 +1011,10 @@ void sample_producer(PolisherResources& resources,
                     if (dorado::ssize(buffer.samples) >= batch_size) {
                         // Fixed batch size.
                         spdlog::trace(
-                                "[producer] Pushing a batch of data to infer_data queue. "
+                                "[producer] Pushing a batch of data to infer_data queue (1b). "
                                 "buffer.samples.size() = {}",
                                 std::size(buffer.samples));
-                        infer_data.try_push(std::move(buffer));
-                        buffer = {};
+                        move_buffer_data_to_queue(buffer, infer_data, true);
                     }
                 }
 
@@ -1007,11 +1043,16 @@ void sample_producer(PolisherResources& resources,
 
     if (!std::empty(buffer.samples)) {
         spdlog::trace(
-                "[producer] Pushing a batch of data to infer_data queue. "
+                "[producer] Pushing a batch of data to infer_data queue (2). "
                 "buffer.samples.size() = {} (final)",
                 std::size(buffer.samples));
-        infer_data.try_push(std::move(buffer));
-        buffer = {};
+
+        // First, push the N*8 elements to the queue for efficiency.
+        move_buffer_data_to_queue(buffer, infer_data, false);
+
+        // Next, push the remainder if the buffer is not empty.
+        move_buffer_data_to_queue(buffer, infer_data, true);
+
         spdlog::debug("[producer] Pushed final batch for inference to infer_data queue.");
     }
 
@@ -1070,13 +1111,16 @@ void infer_samples_in_parallel(
             time_collate = timer_collate.GetElapsedMilliseconds();
         }
 
+        const std::string input_batch_tensor_shape =
+                utils::tensor_shape_as_string(batch_features_tensor);
+
         // Debug output.
         {
             spdlog::trace(
                     "[consumer {}] About to call forward(): batch_features_tensor.size() = [{}], "
                     "approx "
                     "size: {} MB.",
-                    tid, utils::tensor_shape_as_string(batch_features_tensor),
+                    tid, input_batch_tensor_shape,
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }
@@ -1146,8 +1190,8 @@ void infer_samples_in_parallel(
             spdlog::trace(
                     "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} "
                     "ms, "
-                    "total = {}",
-                    tid, time_collate, time_forward, time_total);
+                    "total = {}, batch_features_tensor.shape = [{}]",
+                    tid, time_collate, time_forward, time_total, input_batch_tensor_shape);
         }
 
         return output;
