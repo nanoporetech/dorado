@@ -10,13 +10,13 @@ namespace hts_writer {
 class IStructure {
 public:
     virtual ~IStructure() = default;
-    virtual const std::string &get_path(const HtsData &item) = 0;
+    virtual std::string get_path(const HtsData &item) = 0;
 };
 
 class SingleFileStructure : public IStructure {
 public:
     SingleFileStructure(const std::string &output_dir, OutputMode mode);
-    const std::string &get_path([[maybe_unused]] const HtsData &hts_data) override;
+    std::string get_path([[maybe_unused]] const HtsData &hts_data) override;
 
 private:
     const OutputMode m_mode;

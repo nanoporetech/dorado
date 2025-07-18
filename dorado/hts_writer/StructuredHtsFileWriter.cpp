@@ -67,7 +67,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
                 "StructuredHtsFileWriter is only implemented for SingleFileStructure");
     }
 
-    const std::string &path = m_structure->get_path(item);
+    const std::string path = m_structure->get_path(item);
 
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {

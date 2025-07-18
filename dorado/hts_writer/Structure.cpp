@@ -2,6 +2,8 @@
 
 #include <spdlog/spdlog.h>
 
+#include <string>
+
 namespace dorado {
 namespace hts_writer {
 
@@ -35,7 +37,7 @@ SingleFileStructure::SingleFileStructure(const std::string& output_dir, OutputMo
     create_output_folder(m_path);
 };
 
-const std::string& SingleFileStructure::get_path([[maybe_unused]] const HtsData& hts_data) {
+std::string SingleFileStructure::get_path([[maybe_unused]] const HtsData& hts_data) {
     return m_path;
 };
 
