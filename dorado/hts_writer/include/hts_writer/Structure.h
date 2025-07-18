@@ -23,8 +23,6 @@ private:
     const std::string m_path;
 
     std::string get_filename() const;
-
-    void create_output_folder() const;
 };
 
 }  // namespace hts_writer

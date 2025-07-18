@@ -15,21 +15,11 @@ std::tm get_gmtime(const std::time_t* time) {
     std::tm* time_buffer = gmtime(time);
     return *time_buffer;
 }
-}  // namespace
 
-SingleFileStructure::SingleFileStructure(const std::string& output_dir, OutputMode mode)
-        : m_mode(mode), m_path((std::filesystem::path(output_dir) / get_filename()).string()) {
-    create_output_folder();
-};
-
-const std::string& SingleFileStructure::get_path([[maybe_unused]] const HtsData& hts_data) {
-    return m_path;
-};
-
-void SingleFileStructure::create_output_folder() const {
+void create_output_folder(const std::string& path) {
     std::error_code creation_error;
     // N.B. No error code if folder already exists.
-    const auto parent = fs::path(m_path).parent_path();
+    const auto parent = fs::path(path).parent_path();
     fs::create_directories(parent, creation_error);
     if (creation_error) {
         spdlog::error("Unable to create output folder '{}'.  ErrorCode({}) {}", parent.string(),
@@ -37,6 +27,17 @@ void SingleFileStructure::create_output_folder() const {
         throw std::runtime_error("Failed to create output directory");
     }
 }
+
+}  // namespace
+
+SingleFileStructure::SingleFileStructure(const std::string& output_dir, OutputMode mode)
+        : m_mode(mode), m_path((std::filesystem::path(output_dir) / get_filename()).string()) {
+    create_output_folder(m_path);
+};
+
+const std::string& SingleFileStructure::get_path([[maybe_unused]] const HtsData& hts_data) {
+    return m_path;
+};
 
 constexpr std::string_view OUTPUT_FILE_PREFIX{"calls_"};
 
