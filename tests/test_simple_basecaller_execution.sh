@@ -43,6 +43,10 @@ $dorado_bin download --model ${model_name_rna004} ${models_directory_arg}
 model_rna004=${models_directory}/${model_name_rna004}
 
 dorado_check_bam_not_empty() {
+    if [[ -n "$SAMTOOLS_UNAVAILABLE" ]]; then
+        echo "Skipping dorado_check_bam_not_empty as SAMTOOLS_UNAVAILABLE is set"
+        return 0
+    fi
     samtools quickcheck -u $output_dir/calls.bam
     samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
     num_lines=$(wc -l $output_dir/calls.sam | awk '{print $1}')
@@ -66,21 +70,24 @@ dorado_check_bam_not_empty
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ ${models_directory_arg} -b ${batch} --emit-moves > $output_dir/calls.bam
 
 # Check that the read group has the required model info in its header
-if ! grep -q "basecall_model=${model_name_5k}" $output_dir/calls.sam; then
-    echo "Output SAM file does not contain basecall model name in header!"
-    exit 1
-fi
-if ! grep -q "modbase_models=${model_name_5k}_5mCG_5hmCG" $output_dir/calls.sam; then
-    echo "Output SAM file does not contain modbase model name in header!"
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    if ! grep -q "basecall_model=${model_name_5k}" $output_dir/calls.sam; then
+        echo "Output SAM file does not contain basecall model name in header!"
+        exit 1
+    fi
+    if ! grep -q "modbase_models=${model_name_5k}_5mCG_5hmCG" $output_dir/calls.sam; then
+        echo "Output SAM file does not contain modbase model name in header!"
+        exit 1
+    fi
 fi
 
 echo dorado basecaller mixed model complex and --modified-bases
 $dorado_bin basecaller $model_complex $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
-samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
-samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
-samtools view -h $output_dir/calls.bam | grep "MN:i:"
-
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
+    samtools view -h $output_dir/calls.bam | grep "MM:Z:C+h"
+    samtools view -h $output_dir/calls.bam | grep "MN:i:"
+fi
 set +e
 if $dorado_bin basecaller ${model_5k} $pod5_data ${models_directory_arg} -b ${batch} --emit-fastq --reference $output_dir/ref.fq > $output_dir/error_condition.fq; then
     echo "Error: dorado basecaller should fail with combination of emit-fastq and reference!"
@@ -107,28 +114,32 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
     set +e
     echo "Testing split read without '--disable-read-splitting'"
     $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read > $output_dir/calls.bam
-    num_sam_records=$(samtools view $output_dir/calls.bam | wc -l | awk '{print $1}')
-    if [[ $num_sam_records -ne "2" ]]; then
-        echo "Expected 2 sam records from 1 split read but found: ${num_sam_records}"
-        exit 1
-    fi
-    num_unique_parents=$(samtools view $output_dir/calls.bam | grep "pi:Z:[^\s]*" -oh | uniq | wc -l | awk '{print $1}')
-    if [[ $num_unique_parents -ne "1" ]]; then
-        echo "Expected 1 unique parent read id in 'pi:Z' tag but found: ${num_unique_parents}"
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        num_sam_records=$(samtools view $output_dir/calls.bam | wc -l | awk '{print $1}')
+        if [[ $num_sam_records -ne "2" ]]; then
+            echo "Expected 2 sam records from 1 split read but found: ${num_sam_records}"
+            exit 1
+        fi
+        num_unique_parents=$(samtools view $output_dir/calls.bam | grep "pi:Z:[^\s]*" -oh | uniq | wc -l | awk '{print $1}')
+        if [[ $num_unique_parents -ne "1" ]]; then
+            echo "Expected 1 unique parent read id in 'pi:Z' tag but found: ${num_unique_parents}"
+            exit 1
+        fi
     fi
 
     echo "Testing split read with '--disable-read-splitting'"
     $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read --disable-read-splitting > $output_dir/calls.bam
-    num_sam_records=$(samtools view $output_dir/calls.bam | wc -l | awk '{print $1}')
-    if [[ $num_sam_records -ne "1" ]]; then
-        echo "Expected 1 sam records from 1 unsplit read with '--disable-read-splitting' but found: ${num_sam_records}"
-        exit 1
-    fi
-    num_parent_tags=$(samtools view $output_dir/calls.bam | grep "pi:Z:[^\s]*" -oh | wc -l | awk '{print $1}')
-    if [[ $num_parent_tags -ne "0" ]]; then
-        echo "Expected 0 instances of 'pi:Z' tag with '--disable-read-splitting' but found: ${num_parent_tags}"
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        num_sam_records=$(samtools view $output_dir/calls.bam | wc -l | awk '{print $1}')
+        if [[ $num_sam_records -ne "1" ]]; then
+            echo "Expected 1 sam records from 1 unsplit read with '--disable-read-splitting' but found: ${num_sam_records}"
+            exit 1
+        fi
+        num_parent_tags=$(samtools view $output_dir/calls.bam | grep "pi:Z:[^\s]*" -oh | wc -l | awk '{print $1}')
+        if [[ $num_parent_tags -ne "0" ]]; then
+            echo "Expected 0 instances of 'pi:Z' tag with '--disable-read-splitting' but found: ${num_parent_tags}"
+            exit 1
+        fi
     fi
     set -e
 }
@@ -142,6 +153,10 @@ env -u MTL_DEBUG_LAYER $dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch
 dorado_check_bam_not_empty
 
 echo dorado aligner test stage
+
+# Make a sam file to use as input
+$dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves --emit-sam > $output_dir/calls.sam
+
 $dorado_bin aligner $output_dir/ref.fq $output_dir/calls.sam > $output_dir/calls.bam
 dorado_check_bam_not_empty
 mkdir $output_dir/folder
@@ -156,11 +171,13 @@ $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batc
 dorado_check_bam_not_empty
 # Check that the aligner strips old alignment tags
 $dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam
-num_nm_tags=$(samtools view $output_dir/realigned.bam | grep -o NM:i | wc -l)
-# This alignment creates a secondary output, so there should be exactly 2 NM:i tags
-if [[ $num_nm_tags -ne "2" ]]; then
-    echo "dorado aligner has emitted incorrect number of NM tags."
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    num_nm_tags=$(samtools view $output_dir/realigned.bam | grep -o NM:i | wc -l)
+    # This alignment creates a secondary output, so there should be exactly 2 NM:i tags
+    if [[ $num_nm_tags -ne "2" ]]; then
+        echo "dorado aligner has emitted incorrect number of NM tags."
+        exit 1
+    fi
 fi
 
 echo dorado aligner options test stage
@@ -241,47 +258,57 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
 
     echo dorado in-line duplex test stage - model name
     $dorado_bin duplex $model_5k $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls.bam
-    samtools quickcheck -u $output_dir/duplex_calls.bam
-    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
-    if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads - in-line"
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        samtools quickcheck -u $output_dir/duplex_calls.bam
+        num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+        if [[ $num_duplex_reads -ne "2" ]]; then
+            echo "Duplex basecalling missing reads - in-line"
+            exit 1
+        fi
     fi
 
     echo dorado in-line duplex test stage - complex
     $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls.bam
-    samtools quickcheck -u $output_dir/duplex_calls.bam
-    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
-    if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads."
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        samtools quickcheck -u $output_dir/duplex_calls.bam
+        num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+        if [[ $num_duplex_reads -ne "2" ]]; then
+            echo "Duplex basecalling missing reads."
+            exit 1
+        fi
     fi
 
     echo dorado pairs file based duplex test stage - model name
     $dorado_bin duplex $model_5k $data_dir/duplex/pod5 ${models_directory_arg} --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
-    samtools quickcheck -u $output_dir/duplex_calls.bam
-    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
-    if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads - pairs file"
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        samtools quickcheck -u $output_dir/duplex_calls.bam
+        num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+        if [[ $num_duplex_reads -ne "2" ]]; then
+            echo "Duplex basecalling missing reads - pairs file"
+            exit 1
+        fi
     fi
 
     echo dorado pairs file based duplex test stage - complex
     $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 ${models_directory_arg} --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
-    samtools quickcheck -u $output_dir/duplex_calls.bam
-    num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
-    if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads."
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        samtools quickcheck -u $output_dir/duplex_calls.bam
+        num_duplex_reads=$(samtools view $output_dir/duplex_calls.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+        if [[ $num_duplex_reads -ne "2" ]]; then
+            echo "Duplex basecalling missing reads."
+            exit 1
+        fi
     fi
 
     echo dorado in-line modbase duplex from model complex
     $dorado_bin duplex ${model_complex},5mCG_5hmCG $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls_mods.bam
-    samtools quickcheck -u $output_dir/duplex_calls_mods.bam
-    num_duplex_reads=$(samtools view $output_dir/duplex_calls_mods.bam | grep dx:i:1 | wc -l | awk '{print $1}')
-    if [[ $num_duplex_reads -ne "2" ]]; then
-        echo "Duplex basecalling missing reads - mods"
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        samtools quickcheck -u $output_dir/duplex_calls_mods.bam
+        num_duplex_reads=$(samtools view $output_dir/duplex_calls_mods.bam | grep dx:i:1 | wc -l | awk '{print $1}')
+        if [[ $num_duplex_reads -ne "2" ]]; then
+            echo "Duplex basecalling missing reads - mods"
+            exit 1
+        fi
     fi
 fi
 
@@ -291,11 +318,13 @@ if command -v truncate > /dev/null; then
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check --resume-from $output_dir/tmp.bam > $output_dir/calls.bam
-    samtools quickcheck -u $output_dir/calls.bam
-    num_reads=$(samtools view -c $output_dir/calls.bam)
-    if [[ $num_reads -ne "4" ]]; then
-        echo "Resumed basecalling has incorrect number of reads."
-        exit 1
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        samtools quickcheck -u $output_dir/calls.bam
+        num_reads=$(samtools view -c $output_dir/calls.bam)
+        if [[ $num_reads -ne "4" ]]; then
+            echo "Resumed basecalling has incorrect number of reads."
+            exit 1
+        fi
     fi
 fi
 
@@ -309,14 +338,19 @@ fi
 
 echo dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux --emit-summary
-samtools quickcheck -u $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam
-num_demuxed_reads=$(samtools view -c $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam)
-if [[ $num_demuxed_reads -ne "3" ]]; then
-    echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam
+    num_demuxed_reads=$(samtools view -c $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam)
+    if [[ $num_demuxed_reads -ne "3" ]]; then
+        echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
+        exit 1
+    fi
 fi
+
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/ --kit-name EXP-PBC096 --output-dir $output_dir/demux_from_folder
-samtools quickcheck -u $output_dir/demux_from_folder/unknown_run_id_EXP-PBC096_barcode04.bam
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/demux_from_folder/unknown_run_id_EXP-PBC096_barcode04.bam
+fi
 num_summary_lines=$(wc -l < $output_dir/demux/barcoding_summary.txt)
 if [[ $num_summary_lines -ne "4" ]]; then
     echo "4 lines in summary expected. Found ${num_summary_lines}"
@@ -325,11 +359,13 @@ fi
 
 echo dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --kit-name CUSTOM-SQK-RPB004 --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
-samtools quickcheck -u $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam
-num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam)
-if [[ $num_demuxed_reads -ne "2" ]]; then
-    echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam
+    num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam)
+    if [[ $num_demuxed_reads -ne "2" ]]; then
+        echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
+        exit 1
+    fi
 fi
 
 echo dorado demux doesnt crash on an empty input directory
@@ -352,24 +388,32 @@ fi
 
 echo "dorado test poly(A) tail estimation"
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
-samtools quickcheck -u $output_dir/cdna_polya.bam
-num_estimated_reads=$(samtools view $output_dir/cdna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
-if [[ $num_estimated_reads -ne "2" ]]; then
-    echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/cdna_polya.bam
+    num_estimated_reads=$(samtools view $output_dir/cdna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
+    if [[ $num_estimated_reads -ne "2" ]]; then
+        echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
+        exit 1
+    fi
 fi
+
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
-samtools quickcheck -u $output_dir/no_detect_cdna_polya.bam
-if [[ $? -ne "0" ]]; then
-    echo "PolyA tail estimation with custom config file failed."
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/no_detect_cdna_polya.bam
+    if [[ $? -ne "0" ]]; then
+        echo "PolyA tail estimation with custom config file failed."
+        exit 1
+    fi
 fi
+
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_rna004} $data_dir/poly_a/rna004_pod5/ --estimate-poly-a > $output_dir/rna_polya.bam
-samtools quickcheck -u $output_dir/rna_polya.bam
-num_estimated_reads=$(samtools view $output_dir/rna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
-if [[ $num_estimated_reads -ne "1" ]]; then
-    echo "1 poly(A) estimated reads expected. Found ${num_estimated_reads}"
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/rna_polya.bam
+    num_estimated_reads=$(samtools view $output_dir/rna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
+    if [[ $num_estimated_reads -ne "1" ]]; then
+        echo "1 poly(A) estimated reads expected. Found ${num_estimated_reads}"
+        exit 1
+    fi
 fi
 
 echo dorado basecaller barcoding read groups
@@ -385,6 +429,7 @@ test_barcoding_read_groups() (
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} ${demux_data} --no-trim > $output_dir/${output_name}.bam
 
     samtools quickcheck -u $output_dir/${output_name}.bam
+
     split_dir=$output_dir/${output_name}
     mkdir $split_dir
     samtools split -u $split_dir/unknown.bam -f "$split_dir/rg_%!.bam" $output_dir/${output_name}.bam
@@ -436,12 +481,18 @@ test_barcoding_read_groups() (
     done
 )
 
-# There should be 4 reads with BC01, 2 with BC04, 1 with barcode 68, and 1 unclassified groups.
-test_barcoding_read_groups barcode01 4 barcode04 2 barcode68 1 unclassified 1
-# There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
-test_barcoding_read_groups patient_id_1 4 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    # There should be 4 reads with BC01, 2 with BC04, 1 with barcode 68, and 1 unclassified groups.
+    test_barcoding_read_groups barcode01 4 barcode04 2 barcode68 1 unclassified 1
+    # There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
+    test_barcoding_read_groups patient_id_1 4 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
+fi
 
 # Test demux only on a pre-classified BAM file
+# Start by making an input file for demux:
+demux_data=$data_dir/barcode_demux/read_group_test
+$dorado_bin basecaller ${models_directory_arg} -b ${batch} --kit-name SQK-RBK114-96 ${model_5k} ${demux_data} --no-trim > $output_dir/read_group_test.bam
+
 $dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
 for bam in $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_unclassified.bam; do
     if [ ! -f $bam ]; then

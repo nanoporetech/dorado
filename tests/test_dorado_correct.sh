@@ -70,16 +70,18 @@ if [[ $result -ne "0" ]]; then
     exit 1
 fi
 #
-# Test that the sequences have the same length.
-samtools faidx $output_dir_correct/corrected_reads.fasta
-cut -f 1,2 $output_dir_correct/corrected_reads.fasta.fai | sort > $output_dir_correct/corrected_reads.fasta.seq_lengths.csv
-set +e
-result=$(diff $data_dir/read_correction/expected.seq_lengths.csv $output_dir_correct/corrected_reads.fasta.seq_lengths.csv | wc -l | awk '{ print $1 }')
-set -e
-if [[ $result -ne "0" ]]; then
-    echo "Dorado correct sequence length do not match expected sequence lengths."
-    diff $data_dir/read_correction/expected.seq_lengths.csv $output_dir_correct/corrected_reads.fasta.seq_lengths.csv
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    # Test that the sequences have the same length.
+    samtools faidx $output_dir_correct/corrected_reads.fasta
+    cut -f 1,2 $output_dir_correct/corrected_reads.fasta.fai | sort > $output_dir_correct/corrected_reads.fasta.seq_lengths.csv
+    set +e
+    result=$(diff $data_dir/read_correction/expected.seq_lengths.csv $output_dir_correct/corrected_reads.fasta.seq_lengths.csv | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $result -ne "0" ]]; then
+        echo "Dorado correct sequence length do not match expected sequence lengths."
+        diff $data_dir/read_correction/expected.seq_lengths.csv $output_dir_correct/corrected_reads.fasta.seq_lengths.csv
+        exit 1
+    fi
 fi
 
 # Test if nonexistent input reads file will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
@@ -117,23 +119,27 @@ mkdir -p ${output_dir_correct}
 #
 # Run the joined Dorado Correct pipeline (both mapping and inference stages) as a control.
 $dorado_bin correct $data_dir/read_correction/reads.fq -v > $output_dir_correct/joined.fasta
-samtools faidx $output_dir_correct/joined.fasta
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools faidx $output_dir_correct/joined.fasta
+fi
 #
 # Run separate stages.
 $dorado_bin correct $data_dir/read_correction/reads.fq -v --to-paf > $output_dir_correct/separate.paf
 $dorado_bin correct $data_dir/read_correction/reads.fq -v --from-paf $output_dir_correct/separate.paf > $output_dir_correct/separate.fasta
-samtools faidx $output_dir_correct/separate.fasta
-#
-# Evaluate. Check that the number of generated sequences and their length is the same.
-cut -f 1-2 $output_dir_correct/joined.fasta.fai | sort > $output_dir_correct/joined.fasta.seqs
-cut -f 1-2 $output_dir_correct/separate.fasta.fai | sort > $output_dir_correct/separate.fasta.seqs
-set +e
-result=$(diff $output_dir_correct/joined.fasta.seqs $output_dir_correct/separate.fasta.seqs | wc -l | awk '{ print $1 }')
-set -e
-if [[ $result -ne "0" ]]; then
-    echo "Dorado Correct decoupled map/inference run does not generate the same output as the complete pipeline."
-    diff $output_dir_correct/joined.fasta.seqs $output_dir_correct/separate.fasta.seqs
-    exit 1
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools faidx $output_dir_correct/separate.fasta
+    #
+    # Evaluate. Check that the number of generated sequences and their length is the same.
+    cut -f 1-2 $output_dir_correct/joined.fasta.fai | sort > $output_dir_correct/joined.fasta.seqs
+    cut -f 1-2 $output_dir_correct/separate.fasta.fai | sort > $output_dir_correct/separate.fasta.seqs
+    set +e
+    result=$(diff $output_dir_correct/joined.fasta.seqs $output_dir_correct/separate.fasta.seqs | wc -l | awk '{ print $1 }')
+    set -e
+    if [[ $result -ne "0" ]]; then
+        echo "Dorado Correct decoupled map/inference run does not generate the same output as the complete pipeline."
+        diff $output_dir_correct/joined.fasta.seqs $output_dir_correct/separate.fasta.seqs
+        exit 1
+    fi
 fi
 
 # Test if nonexistent user-specified input PAF file will fail gracefully. This test _should_ fail, that's why we deactivate the -e.
