@@ -20,6 +20,22 @@ inline std::vector<std::string> split(std::string_view input, char delimiter) {
     return result;
 }
 
+inline std::vector<std::string_view> split_view(const std::string_view input,
+                                                const char delimiter) {
+    if (std::empty(input)) {
+        return {};
+    }
+    size_t start = 0;
+    size_t pos = 0;
+    std::vector<std::string_view> result;
+    while ((pos = input.find(delimiter, start)) != std::string_view::npos) {
+        result.emplace_back(std::string_view(std::data(input) + start, pos - start));
+        start = pos + 1;
+    }
+    result.emplace_back(std::string_view(std::data(input) + start, std::size(input) - start));
+    return result;
+}
+
 inline std::string join(const std::vector<std::string>& inputs, const std::string& separator) {
     std::string result;
     for (const auto& item : inputs) {
