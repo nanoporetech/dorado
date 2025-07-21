@@ -72,12 +72,12 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-BatchParams get_batch_params(argparse::ArgumentParser& arg) {
+BatchParams get_batch_params(const utils::arg_parse::ArgParser& arg) {
     BatchParams basecaller{};
     basecaller.update(BatchParams::Priority::CLI_ARG,
-                      cli::get_optional_argument<int>("--chunksize", arg),
-                      cli::get_optional_argument<int>("--overlap", arg),
-                      cli::get_optional_argument<int>("--batchsize", arg));
+                      cli::get_optional_argument<int>("--chunksize", arg.hidden),
+                      cli::get_optional_argument<int>("--overlap", arg.hidden),
+                      cli::get_optional_argument<int>("--batchsize", arg.visible));
     return basecaller;
 }
 
@@ -405,11 +405,11 @@ int duplex(int argc, char* argv[]) {
                       "selected.")
                 .default_value(default_parameters.batchsize)
                 .scan<'i', int>();
-        parser.visible.add_argument("-c", "--chunksize")
+        parser.hidden.add_argument("-c", "--chunksize")
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
-        parser.visible.add_argument("--overlap")
+        parser.hidden.add_argument("--overlap")
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
@@ -636,7 +636,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
             const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
-            const auto batch_params = get_batch_params(parser.visible);
+            const auto batch_params = get_batch_params(parser);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 

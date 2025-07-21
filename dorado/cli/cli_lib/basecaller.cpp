@@ -97,13 +97,13 @@ public:
     const DataLoader::InputFiles& files() const { return m_pod5_files; }
 };
 
-void set_basecaller_params(const argparse::ArgumentParser& arg,
+void set_basecaller_params(const utils::arg_parse::ArgParser& arg,
                            BasecallModelConfig& model_config,
                            const std::string& device) {
     model_config.basecaller.update(BatchParams::Priority::CLI_ARG,
-                                   cli::get_optional_argument<int>("--chunksize", arg),
-                                   cli::get_optional_argument<int>("--overlap", arg),
-                                   cli::get_optional_argument<int>("--batchsize", arg));
+                                   cli::get_optional_argument<int>("--chunksize", arg.hidden),
+                                   cli::get_optional_argument<int>("--overlap", arg.hidden),
+                                   cli::get_optional_argument<int>("--batchsize", arg.visible));
 
     if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
         // Force the batch size to 128
@@ -265,11 +265,11 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                       "selected.")
                 .default_value(default_parameters.batchsize)
                 .scan<'i', int>();
-        parser.visible.add_argument("-c", "--chunksize")
+        parser.hidden.add_argument("-c", "--chunksize")
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
-        parser.visible.add_argument("--overlap")
+        parser.hidden.add_argument("--overlap")
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
@@ -940,7 +940,7 @@ int basecaller(int argc, char* argv[]) {
     BasecallModelConfig model_config;
     try {
         model_config = load_model_config(model_path);
-        set_basecaller_params(parser.visible, model_config, device);
+        set_basecaller_params(parser, model_config, device);
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return EXIT_FAILURE;
