@@ -1,5 +1,6 @@
 #include "hts_utils/FastxRandomReader.h"
 
+#include "hts_utils/sequence_file_format.h"
 #include "utils/string_utils.h"
 
 #include <htslib/faidx.h>
@@ -37,19 +38,13 @@ FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
     std::transform(std::begin(path_str), std::end(path_str), std::begin(path_str),
                    [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
 
-    fai_format_options fmt = FAI_NONE;
+    const hts_io::SequenceFormatType fmt = hts_io::parse_sequence_format(fastx_path);
 
-    if (utils::ends_with(path_str, ".fasta") || utils::ends_with(path_str, ".fa") ||
-        utils::ends_with(path_str, ".fna") || utils::ends_with(path_str, ".fasta.gz") ||
-        utils::ends_with(path_str, ".fa.gz") || utils::ends_with(path_str, ".fna.gz")) {
-        fmt = FAI_FASTA;
+    const fai_format_options fai_fmt = (fmt == hts_io::SequenceFormatType::FASTA)   ? FAI_FASTA
+                                       : (fmt == hts_io::SequenceFormatType::FASTQ) ? FAI_FASTQ
+                                                                                    : FAI_NONE;
 
-    } else if (utils::ends_with(path_str, ".fastq") || utils::ends_with(path_str, ".fq") ||
-               utils::ends_with(path_str, ".fastq.gz") || utils::ends_with(path_str, ".fq.gz")) {
-        fmt = FAI_FASTQ;
-    }
-
-    m_faidx = open_fai(fastx_path, fmt);
+    m_faidx = open_fai(fastx_path, fai_fmt);
 
     // Both attempts failed.
     if (!m_faidx) {
