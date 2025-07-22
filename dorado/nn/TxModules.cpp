@@ -546,20 +546,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
             t_res_weights = norm1->weight.view({C}).view({-1, 8}).repeat({1, 8}).flatten();
             t_res2_weights = norm2->weight.view({C}).view({-1, 16}).repeat({1, 4}).flatten();
 
-            // Assuming ff->fc1->weight is of shape (N, K), aka (E, C) in this case
-            // ! Make sure this is right
-            // std::cerr << "E = " << E << '\n' << "C = " << C << '\n';
-            // if (ff->fc1->weight.size(0) != E || ff->fc1->weight.size(1) != C) {
-            //     spdlog::error("Koi tiled path failed {}");   // log your own context
-            //     throw std::runtime_error("ff->fc1 weight has shape (C, E)");
-            //     // or return / std::abort(), depending on how you want to fail
-            // }
-            // if (ff->fc1->weight.size(0) == E || ff->fc1->weight.size(1) == C) {
-            //     spdlog::error("Koi tiled path failed {}");   // log your own context
-            //     throw std::runtime_error("ff->fc1 weight has wrong shape (E, C)");
-            //     // or return / std::abort(), depending on how you want to fail
-            // }
-            // save_tensor(ff->fc1->weight, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/ff_fc1_weight.pt");
             auto fc1_weight_interleaved = ff->fc1->weight.t()
                                                   .reshape({C, E})
                                                   .view({C, 2, E / 2, 1})
@@ -573,15 +559,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
                                      .view({C / 128, 128 / 32, 32 / 16, 16, E / 256, 1, 256 / 8, 8})
                                      .permute({4, 0, 5, 1, 6, 2, 7, 3})
                                      .contiguous();
-            // save_tensor(t_fc1_wts_f8.t, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/ff_fc1_weight_permuted.pt");
-            // fc2 interleave is every 16 values, this is different from swiglu interleave
-            // ! Make sure the first permute is necessary
-            // ! This is wrong, assuming shape of weight is (N, K), it is then (C, E/2) for fc2
-            // if (ff->fc2->weight.size(0) != C || ff->fc2->weight.size(1) != E/2) {
-            //     spdlog::error("Koi tiled path failed {}");   // log your own context
-            //     throw std::runtime_error("ff->fc2 weight has wrong shape");
-            //     // or return / std::abort(), depending on how you want to fail
-            // }
             auto fc2_weight_interleaved = ff->fc2->weight.t()
                                                   .view({E / 2, C})
                                                   .contiguous()
@@ -680,39 +657,22 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
     int res = KOI_SUCCESS;
     int calls = 0;
-    // std::cerr << "use_f8 = " << use_f8 << '\n'
-    //           << "use_hopper = " << use_hopper << '\n';
     if (res == KOI_SUCCESS && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE", 3);
         res = koi_qkv_rotary(stream, self_attn->rotary_emb->theta, &in, &weights_qkv, &sincos,
                              &out_qkv, ctr[0].data_ptr<int>());
-        if (use_hopper) {
-            // save_tensor(qkv, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_out_qkv.pt");
-        } else {
-            // save_tensor(qkv, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_out_qkv.pt");
-        }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Apply masket attention
         utils::ScopedProfileRange spr("MEA", 3);
         res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
-        if (use_hopper) {
-            // save_tensor(t_out_attn, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_out_attn.pt");
-        } else {
-            // save_tensor(t_out_attn, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_out_attn.pt");
-        }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Koi linear matmul
         utils::ScopedProfileRange spr("OUTP", 3);
         res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
                          ctr[1].data_ptr<int>());
-        if (use_hopper) {
-            // save_tensor(t_out_proj, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_out_proj.pt");
-        } else {
-            // save_tensor(t_out_proj, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_out_proj.pt");
-        }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // RMS residual
@@ -721,33 +681,24 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
             res = koi_rmsnorm_hopper(stream, t_out_proj.data_ptr(), x_f16.data_ptr(),
                                      t_res_weights.data_ptr(), t_rms1_out_f16.data_ptr(),
                                      t_rms1_out_f8.data_ptr(), nullptr, N * T, C, alpha, true);
-            // save_tensor(t_rms1_out_f16, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_rms1_out_f16.pt");
-            // save_tensor(t_rms1_out_f8, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_rms1_out_f8.pt");
         } else {
             KoiTensorExt res_weights(t_res_weights, {'C'});
             res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
                                        use_f8 ? &out_rms_f8 : nullptr,
                                        use_f8 ? nullptr : in_i8_ptr);
-            // save_tensor(x_f16, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_rms1_out_f16.pt");
-            // save_tensor(t_rms_out, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_rms1_out_f8.pt");
         }
     }
     if (res == KOI_SUCCESS && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
         if (use_hopper) {
-            // save_tensor(t_fc1_wts_f8.t, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/ff_fc1_weight_permuted_before_kernel.pt");
-            // save_tensor(t_rms1_out_f8, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_rms1_out_f8_before_kernel.pt");
-            // save_tensor(t_fc1_out_f8, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_fc1_out_f8_before_kernel.pt");
             res = koi_swiglu_hopper(stream, t_rms1_out_f8.data_ptr(), t_fc1_wts_f8.t.data_ptr(),
                                     t_fc1_out_f8.data_ptr(), N * T, E, C);
-            // save_tensor(t_fc1_out_f8, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_fc1_out_f8.pt");
         } else {
             KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
             int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
             res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
                                 use_f32_accum);
-            // save_tensor(t_fc1_out, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_fc1_out_f8.pt");
         }
     }
     if (res == KOI_SUCCESS && ++calls) {
@@ -756,12 +707,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         if (use_hopper) {
             res = koi_matmul_hopper(stream, t_fc1_out_f8.data_ptr(), t_fc2_wts.data_ptr(),
                                     t_fc2_out_f8.data_ptr(), N * T, C, (E / 2));
-            // save_tensor(t_fc2_out_f8, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_fc2_out_f8.pt");
         } else {
             KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
             res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
                              ctr[3].data_ptr<int>());
-            // save_tensor(t_fc2_out, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_fc2_out_f16.pt");
         }
     }
     if (res == KOI_SUCCESS && ++calls) {
@@ -771,16 +720,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
             res = koi_rmsnorm_hopper(stream, t_fc2_out_f8.data_ptr(), t_rms1_out_f16.data_ptr(),
                                      t_res2_weights.data_ptr(), x_f16.data_ptr(), x.data_ptr(),
                                      scaled_tensor.scale.data_ptr(), N * T, C, alpha, false);
-            // save_tensor(x_f16, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_rms2_out_f16.pt");
-            // save_tensor(x, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_rms2_out_int8.pt");
-            // save_tensor(scaled_tensor.scale, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/hopper_path/t_rms2_out_scalefactor.pt");
         } else {
             KoiTensorExt res2_weights(t_res2_weights, {'C'});
             res = koi_rmsnorm_residual(stream, &fc2_out_ntc, &in_f16, alpha, &res2_weights, &in_f16,
                                        nullptr, in_i8_ptr);
-            // save_tensor(x_f16, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_rms2_out_f16.pt");
-            // save_tensor(x, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_rms2_out_int8.pt");
-            // save_tensor(scaled_tensor.scale, "/home/OXFORDNANOLABS/ebalaguerrodon/hopper_dev/latest_dorado/dorado/debug/ada_path/t_rms2_out_scalefactor.pt");
         }
     }
     // TODO: handle result
@@ -1034,7 +977,6 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
 
         for (auto &layer : layer_vec) {
             layer->koi_forward(scaled_tensor, tiled_f16);
-            // break;  // ! DEBUGGING PURPOSES ONLY
         }
 
         at::Tensor untiled_f16;
