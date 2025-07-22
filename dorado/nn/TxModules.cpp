@@ -623,7 +623,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     };
     auto t_rms1_out_f16 = torch::empty(hopper_layout(N * T, C), f16_opts);
     auto t_rms1_out_f8 = torch::empty(hopper_layout(N * T, C), f8_opts);
-    auto t_fc1_out_f8 = torch::zeros(hopper_layout(N * T, E / 2), f8_opts);
+    auto t_fc1_out_f8 = torch::empty(hopper_layout(N * T, E / 2), f8_opts);
     auto t_fc2_out_f8 = torch::empty(hopper_layout(N * T, C), f8_opts);
     auto t_fc2_out = torch::empty({N, T / 16, C / 8, 16, 8}, f16_opts);
 
