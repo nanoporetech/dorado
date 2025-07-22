@@ -164,7 +164,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.attributes.channel_number = read_data.channel;
     new_read->read_common.attributes.start_time = start_time;
     new_read->read_common.run_id = run_info_data->protocol_run_id;
-    new_read->read_common.acquisition_run_id = run_info_data->acquisition_id;
+    new_read->read_common.acquisition_id = run_info_data->acquisition_id;
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;

@@ -112,7 +112,8 @@ public:
         std::string sample_id{};
         std::string position_id{};
         std::string flowcell_id{};
-        std::string run_id{};
+        std::string protocol_run_id{};
+        std::string acquisition_id{};
         int64_t protocol_start_time_ms{0};
         std::size_t subread_id{0};
     };
@@ -125,4 +126,43 @@ public:
     std::pair<int, int> barcode_trim_interval{};
 };
 
+inline bool operator==(const dorado::HtsData::ReadAttributes& lhs,
+                       const dorado::HtsData::ReadAttributes& rhs) {
+    // clang-format off
+    return lhs.sequencing_kit == rhs.sequencing_kit &&
+           lhs.experiment_id == rhs.experiment_id &&
+           lhs.sample_id == rhs.sample_id &&
+           lhs.position_id == rhs.position_id &&
+           lhs.flowcell_id == rhs.flowcell_id &&
+           lhs.acquisition_id == rhs.acquisition_id &&
+           lhs.protocol_start_time_ms == rhs.protocol_start_time_ms &&
+           lhs.subread_id == rhs.subread_id;
+    // clang-format on
+}
+
 }  // namespace dorado
+
+namespace std {
+template <>
+struct hash<dorado::HtsData::ReadAttributes> {
+    std::size_t operator()(const dorado::HtsData::ReadAttributes& attr) const {
+        std::size_t seed = 0;
+        hash_combine(seed, attr.sequencing_kit);
+        hash_combine(seed, attr.experiment_id);
+        hash_combine(seed, attr.sample_id);
+        hash_combine(seed, attr.position_id);
+        hash_combine(seed, attr.flowcell_id);
+        hash_combine(seed, attr.acquisition_id);
+        hash_combine(seed, attr.protocol_start_time_ms);
+        hash_combine(seed, attr.subread_id);
+        return seed;
+    }
+
+private:
+    template <typename T>
+    static void hash_combine(std::size_t& seed, const T& value) {
+        seed ^= std::hash<T>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+    }
+};
+
+}  // namespace std
