@@ -56,7 +56,7 @@ void ReadToBamTypeNode::input_thread_fn() {
 ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
                                      size_t num_worker_threads,
                                      std::optional<float> modbase_threshold_frac,
-                                     std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                                     std::shared_ptr<const utils::SampleSheet> sample_sheet,
                                      size_t max_reads)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
           m_emit_moves(emit_moves),

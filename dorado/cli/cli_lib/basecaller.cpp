@@ -349,7 +349,7 @@ void setup(const std::vector<std::string>& args,
            const ModelComplex& model_complex,
            const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
            const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
-           std::unique_ptr<const utils::SampleSheet> sample_sheet) {
+           std::shared_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
@@ -499,7 +499,7 @@ void setup(const std::vector<std::string>& args,
                 });
         auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
-                progress_callback, description_callback, gpu_names);
+                progress_callback, description_callback, gpu_names, sample_sheet);
 
         if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
             spdlog::error(
@@ -819,7 +819,7 @@ int basecaller(int argc, char* argv[]) {
     }
 
     std::shared_ptr<demux::BarcodingInfo> barcoding_info{};
-    std::unique_ptr<const utils::SampleSheet> sample_sheet{};
+    std::shared_ptr<const utils::SampleSheet> sample_sheet{};
     if (parser.visible.is_used("--kit-name")) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
@@ -863,7 +863,7 @@ int basecaller(int argc, char* argv[]) {
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
-            sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+            sample_sheet = std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, false);
             barcoding_info->allowed_barcodes = sample_sheet->get_barcode_values();
         }
 

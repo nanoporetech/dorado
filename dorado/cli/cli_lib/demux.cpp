@@ -246,9 +246,9 @@ int demuxer(int argc, char* argv[]) {
     cli::add_pg_hdr(header.get(), "demux", args, "cpu");
 
     auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
-    std::unique_ptr<const utils::SampleSheet> sample_sheet;
+    std::shared_ptr<const utils::SampleSheet> sample_sheet;
     if (!barcode_sample_sheet.empty()) {
-        sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, true);
+        sample_sheet = std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, true);
     }
 
     auto client_info = std::make_shared<DefaultClientInfo>();

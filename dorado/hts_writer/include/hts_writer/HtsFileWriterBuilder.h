@@ -2,7 +2,14 @@
 
 #include "HtsFileWriter.h"
 
+#include <memory>
+
 namespace dorado {
+
+namespace utils {
+class SampleSheet;
+}
+
 namespace hts_writer {
 
 class HtsFileWriter;
@@ -16,7 +23,8 @@ public:
                          int writer_threads,
                          utils::ProgressCallback progress_callback,
                          utils::DescriptionCallback description_callback,
-                         std::string gpu_names);
+                         std::string gpu_names,
+                         std::shared_ptr<const utils::SampleSheet> sample_sheet);
 
     OutputMode get_output_mode();
 
@@ -30,6 +38,7 @@ private:
     const utils::ProgressCallback m_progress_callback;
     const utils::DescriptionCallback m_description_callback;
     const std::string m_gpu_names;
+    const std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
 
     bool m_sort{false};
     OutputMode m_output_mode{OutputMode::BAM};

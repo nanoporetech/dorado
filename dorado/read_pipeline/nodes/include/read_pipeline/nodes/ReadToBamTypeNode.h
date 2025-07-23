@@ -18,7 +18,7 @@ public:
     ReadToBamTypeNode(bool emit_moves,
                       size_t num_worker_threads,
                       std::optional<float> modbase_threshold_frac,
-                      std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                      std::shared_ptr<const utils::SampleSheet> sample_sheet,
                       size_t max_reads);
     ~ReadToBamTypeNode();
 
@@ -34,7 +34,7 @@ private:
 
     bool m_emit_moves;
     std::optional<uint8_t> m_modbase_threshold;
-    std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
+    std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 
 }  // namespace dorado
