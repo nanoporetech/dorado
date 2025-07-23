@@ -40,6 +40,8 @@ VALIDATOR_BRANCH="INSTX-10694_hts_style_fastq"
 if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
     echo "Enabling validation of fastq files against spec from ${SPECIFICATION_URL}"
     $PYTHON --version
+    $PYTHON -m venv venv
+    source ./venv/*/activate
     # Install output-file specification validator.
     rm -rf ont-output-specification-validator
     git clone --single-branch --branch ${VALIDATOR_BRANCH} https://gitlab-ci-token:${CI_JOB_TOKEN}@${VALIDATOR_REPO}
