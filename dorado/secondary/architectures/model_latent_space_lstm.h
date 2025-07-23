@@ -67,7 +67,9 @@ public:
                          const int32_t bases_embedding_size,
                          const bool bidirectional);
 
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(at::Tensor x) override;
+
+    double estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const override;
 
 private:
     // Model parameters.

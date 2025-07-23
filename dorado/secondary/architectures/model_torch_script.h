@@ -24,6 +24,8 @@ public:
 
     void to_device(torch::Device device) override;
 
+    double estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const override;
+
 private:
     torch::jit::script::Module m_module;
 };

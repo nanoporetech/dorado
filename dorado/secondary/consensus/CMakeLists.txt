@@ -6,15 +6,17 @@ dorado_add_library(
     SOURCES_PUBLIC
         consensus_result.h
         consensus_utils.h
-        sample_trimming.h
         sample.h
+        sample_collate_utils.h
+        sample_trimming.h
         variant_calling_sample.h
         variant_calling.h
         window.h
     SOURCES_PRIVATE
         consensus_utils.cpp
-        sample_trimming.cpp
         sample.cpp
+        sample_collate_utils.cpp
+        sample_trimming.cpp
         variant_calling_sample.cpp
         variant_calling.cpp
         window.cpp

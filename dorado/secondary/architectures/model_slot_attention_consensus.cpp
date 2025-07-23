@@ -216,6 +216,31 @@ at::Tensor ModelSlotAttentionConsensus::forward(torch::Tensor x  // NOLINT
     return out;
 }
 
+double ModelSlotAttentionConsensus::estimate_batch_memory(
+        const std::vector<int64_t>& batch_tensor_shape) const {
+    if (std::size(batch_tensor_shape) != 4) {
+        throw std::runtime_error{
+                "Input tensor shape is of wrong dimension! Expected 4 sizes, got " +
+                std::to_string(std::size(batch_tensor_shape))};
+    }
+
+    // Input tensor shape: [batch_size x num_positions x coverage x num_features];
+    const int64_t batch_size = batch_tensor_shape[0];
+    const int64_t num_positions = batch_tensor_shape[1];
+    const int64_t coverage = batch_tensor_shape[2];
+
+    // IMPORTANT: The following equation was determined as part of the DOR-1237 effort.
+    return 4.9272 + (0.0518966 * batch_size) + (-0.0422506 * coverage) +
+           (-0.0005646 * std::pow(batch_size, 2)) + (0.0000146 * batch_size * num_positions) +
+           (-0.0019084 * batch_size * coverage) + (-0.0000030 * num_positions * coverage) +
+           (0.0016286 * std::pow(coverage, 2)) + (0.0000051 * std::pow(batch_size, 3)) +
+           (-0.0000049 * std::pow(batch_size, 2) * coverage) +
+           (0.0000027 * batch_size * num_positions * coverage) +
+           (0.0000435 * batch_size * std::pow(coverage, 2)) +
+           (0.0000001 * num_positions * std::pow(coverage, 2)) +
+           (-0.0000175 * std::pow(coverage, 3));
+}
+
 std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
         const torch::Tensor& in_x) {
     if (in_x.size(-1) != 6) {

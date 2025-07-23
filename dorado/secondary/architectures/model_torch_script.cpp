@@ -70,4 +70,11 @@ void ModelTorchScript::to_device(torch::Device device) {
     m_module.to(device);
 }
 
+double ModelTorchScript::estimate_batch_memory(
+        const std::vector<int64_t>& /*batch_tensor_shape*/) const {
+    throw std::runtime_error{
+            "Estimation of model memory consumption is not possible for the ModelTorchScript model "
+            "because this is architecture specific."};
+}
+
 }  // namespace dorado::secondary
