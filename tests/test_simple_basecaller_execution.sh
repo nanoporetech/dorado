@@ -31,6 +31,21 @@ mkdir -p ${models_directory}
 
 models_directory_arg="--models-directory ${models_directory}"
 
+ONT_OUTPUT_SPEC_REF="INSTX-10694_hts_style_fastq"
+SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
+SPECIFICATION_FILE="ont_output_spec.zip"
+VALIDATOR_BRANCH="INSTX-10694_hts_style_fastq"
+
+# Set up the output specification validator so we can check output file formats
+if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
+    echo "Enabling validation of fastq files against spec from ${SPECIFICATION_URL}"
+    $PYTHON --version
+    # Install output-file specification validator.
+    rm -rf ont-output-specification-validator
+    git clone --single-branch --branch ${VALIDATOR_BRANCH} https://gitlab-ci-token:${CI_JOB_TOKEN}@${VALIDATOR_REPO}
+    pip install -e ont-output-specification-validator
+    curl -LfsS ${SPECIFICATION_URL} > ${SPECIFICATION_FILE}
+fi
 
 echo dorado download models
 $dorado_bin download --list
@@ -62,6 +77,9 @@ echo using pod5_data: $pod5_data
 echo dorado basecaller test stage
 # Not included models_directory_arg here to test temporary model download and delete.
 $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq > $output_dir/ref.fq
+if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
+    $PYTHON ./${test_dir}/validate_fastq.py $output_dir/ref.fq $SPECIFICATION_FILE
+fi
 $dorado_bin basecaller ${model_5k} $pod5_data ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
 $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
