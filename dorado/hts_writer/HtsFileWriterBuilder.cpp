@@ -86,12 +86,11 @@ std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     if (!m_output_dir.has_value()) {
         return std::make_unique<StreamHtsFileWriter>(cfg);
     }
-    auto structure = std::make_unique<SingleFileStructure>(m_output_dir.value(), m_output_mode);
 
-    // auto nested_structure = std::make_unique<NestedFileStructure>(m_output_dir.value(),
-    //                                                               m_output_mode, m_sample_sheet);
+    auto nested_structure = std::make_unique<NestedFileStructure>(m_output_dir.value(),
+                                                                  m_output_mode, m_sample_sheet);
 
-    return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(structure), m_sort);
+    return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(nested_structure), m_sort);
 }
 
 OutputMode HtsFileWriterBuilder::get_output_mode() {

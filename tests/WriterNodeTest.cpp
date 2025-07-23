@@ -137,7 +137,7 @@ std::string get_output_file(const std::filesystem::path &output_dir,
                             hts_writer::OutputMode output_mode) {
     const auto suffix = get_suffix(output_mode);
     std::optional<std::string> found;
-    for (const auto &entry : std::filesystem::directory_iterator(
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(
                  output_dir, std::filesystem::directory_options::skip_permission_denied)) {
         if (entry.path().extension().string() != suffix) {
             continue;
@@ -153,8 +153,7 @@ std::string get_output_file(const std::filesystem::path &output_dir,
     if (found.has_value()) {
         return found.value();
     }
-    throw std::runtime_error("Expected temp_directory to contain output file with suffix: '" +
-                             suffix + "'");
+    throw std::runtime_error("Expected tmpdir to have '" + suffix + "' file");
 };
 
 }  // namespace
@@ -286,10 +285,12 @@ CATCH_TEST_CASE(
             writers.push_back(std::move(hts_file_writer));
         }
         WriterNode writer(std::move(writers));
-        // Write into temporary folder.
 
         BamPtr bam_ptr{bam_dup1(fastq_reader.record.get())};
-        BamMessage bam_message{HtsData{std::move(bam_ptr), {"kit2"}}, nullptr};
+        BamMessage bam_message{
+                HtsData{std::move(bam_ptr),
+                        {"kit", "exp", "sample", "pos", "fc", "proto", "acq", 94678224500, 1}},
+                nullptr};
 
         writer.restart();
         writer.push_message(std::move(bam_message));

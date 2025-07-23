@@ -60,13 +60,6 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
         throw std::logic_error("HtsFileWriter header not set before writing records.");
     }
 
-    // Implemented only for SingleFileStructure while structured outputs are under development
-    auto &structure_ref = *m_structure;
-    if (typeid(structure_ref) != typeid(SingleFileStructure)) {
-        throw std::logic_error(
-                "StructuredHtsFileWriter is only implemented for SingleFileStructure");
-    }
-
     const std::string path = m_structure->get_path(item);
 
     auto &hts_file = m_hts_files[path];

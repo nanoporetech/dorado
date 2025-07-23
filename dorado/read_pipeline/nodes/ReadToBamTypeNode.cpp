@@ -47,7 +47,9 @@ void ReadToBamTypeNode::input_thread_fn() {
                 read_common_data.subread_id};
 
         for (auto& aln : alns) {
-            BamMessage bam_msg{HtsData{std::move(aln), read_attrs}, read_common_data.client_info};
+            BamMessage bam_msg{
+                    HtsData{std::move(aln), read_attrs, read_common_data.barcoding_result},
+                    read_common_data.client_info};
             send_message_to_sink(std::move(bam_msg));
         }
     }
