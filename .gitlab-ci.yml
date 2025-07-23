@@ -122,8 +122,8 @@ variables:
   # Uploading these allows us to avoid checking out the repo in tests.
   - echo Zipping test files
   - |
-    zip -r  tests.archive tests/*.sh tests/data tests/cram ||
-    tar -cf tests.archive tests/*.sh tests/data tests/cram
+    zip -r  tests.archive tests/*.sh tests/*.py tests/data tests/cram ||
+    tar -cf tests.archive tests/*.sh tests/*.py tests/data tests/cram
 
 .unzip_test_files:
   - echo Unzipping test files
