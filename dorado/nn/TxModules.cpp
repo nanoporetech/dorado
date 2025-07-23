@@ -29,13 +29,6 @@ extern "C" {
 }
 
 namespace {
-void save_tensor(const torch::Tensor &t, const std::string &file_path) {
-    auto cpu_copy = t.to(torch::kCPU);
-    torch::save(cpu_copy, file_path);
-    // torch::jit::save(cpu_copy, file_path);
-    std::cout << "Wrote tensor to " << '\n';
-}
-
 bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     return ((prop->major == 8 || prop->major == 9) && prop->minor == 0);
@@ -501,9 +494,11 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
     bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
                   utils::get_dev_opt<bool>("koi_use_f8", true);
-    bool use_hopper = (koi_hopper_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
-                      utils::get_dev_opt<bool>("koi_use_f8", true) &&
+    bool use_hopper = utils::get_dev_opt<bool>("koi_use_f8", true) &&
                       utils::get_dev_opt<bool>("koi_use_hopper", true);
+#if !DORADO_ORIN
+    use_hopper = use_hopper && (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS);
+#endif
 
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
@@ -678,9 +673,11 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1", 3);
         if (use_hopper) {
+#if !DORADO_ORIN
             res = koi_rmsnorm_hopper(stream, t_out_proj.data_ptr(), x_f16.data_ptr(),
                                      t_res_weights.data_ptr(), t_rms1_out_f16.data_ptr(),
                                      t_rms1_out_f8.data_ptr(), nullptr, N * T, C, alpha, true);
+#endif
         } else {
             KoiTensorExt res_weights(t_res_weights, {'C'});
             res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
@@ -692,8 +689,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
         if (use_hopper) {
+#if !DORADO_ORIN
             res = koi_swiglu_hopper(stream, t_rms1_out_f8.data_ptr(), t_fc1_wts_f8.t.data_ptr(),
                                     t_fc1_out_f8.data_ptr(), N * T, E, C);
+#endif
         } else {
             KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
             int use_f32_accum = int(utils::get_dev_opt<bool>("koi_swiglu_f32_accum", false));
@@ -705,8 +704,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
         // Fully connected
         utils::ScopedProfileRange spr("FC2", 3);
         if (use_hopper) {
+#if !DORADO_ORIN
             res = koi_matmul_hopper(stream, t_fc1_out_f8.data_ptr(), t_fc2_wts.data_ptr(),
                                     t_fc2_out_f8.data_ptr(), N * T, C, (E / 2));
+#endif
         } else {
             KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
             res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
