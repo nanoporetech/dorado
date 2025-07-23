@@ -2,7 +2,7 @@ OPTION(BUILD_KOI_FROM_SOURCE OFF)
 
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
-        #Koi provides binaries for these cuda versions when targeting aarch64
+        # Koi provides binaries for these cuda versions when targeting aarch64
         set(SUPPORTED_VERSIONS 12.6 11.4 10.2)
     else()
         set(SUPPORTED_VERSIONS 12.8 12.4 12.0 11.8)
@@ -19,20 +19,20 @@ function(get_best_compatible_koi_version KOI_CUDA)
 endfunction()
 
 function(get_koi_download_hash KOI_DIR KOI_HASH)
-    #List of valid hashes.
+    # List of valid hashes.
     set(hash__libkoi__0_6_1__Linux__aarch64__cuda__12_6 "f352b7910ee33761f5714b648df358026f002fc67f9edfe2611fa7bfdd5835d7")
     set(hash__libkoi__0_6_1__Linux__x86_64__cuda__11_8 "61eedb09b3b8abe8b27b5161d89f68755b9484ad1c03b08ec6cb8fbd17274e32")
     set(hash__libkoi__0_6_1__Linux__x86_64__cuda__12_8 "a8988b21c735d0375a129ae3dfd08b111befdb677a817b3f7b8e01a3f30d7542")
     set(hash__libkoi__0_6_1__Windows__AMD64__cuda__12_8 "4b9d5c35fc7d88c26d1346fba1cf75792d51ca086739ed48dc67e792d12fafd2")
 
-    #Do the lookup.
+    # Do the lookup.
     string(REPLACE "." "_" hash_key ${KOI_DIR})
     string(REPLACE "-" "__" hash_key ${hash_key})
     set(hash_key "hash__${hash_key}")
     if (NOT DEFINED ${hash_key})
         message(FATAL_ERROR "Missing hash for ${KOI_DIR}")
     endif()
-    set(${KOI_HASH} ${$ { hash_key }} PARENT_SCOPE)
+    set(${KOI_HASH} ${${hash_key}} PARENT_SCOPE)
 endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
@@ -57,10 +57,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
                 COMMAND
                     git clone
                         -b v${KOI_VERSION}
-                        #TODO : once we drop centos support we can use these instead of a separate submodule update
-                        #-- depth 1
-                        #-- recurse - submodules
-                        #-- shallow - submodules
+                        # TODO: once we drop centos support we can use these instead of a separate submodule update
+                        #--depth 1
+                        #--recurse-submodules
+                        #--shallow-submodules
                         ${KOI_REPO}
                         ${KOI_DIR}
                 COMMAND_ERROR_IS_FATAL ANY
