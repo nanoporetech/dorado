@@ -1,4 +1,5 @@
 #pragma once
+#include "adapter_info.h"
 #include "hts_utils/hts_types.h"
 #include "utils/stats.h"
 #include "utils/types.h"
@@ -29,12 +30,14 @@ public:
     ~AdapterDetector();
 
     AdapterScoreResult find_adapters(const std::string& seq, const std::string& kit_name);
-    AdapterScoreResult find_primers(const std::string& seq, const std::string& kit_name);
+    AdapterScoreResult find_primers(const std::string& seq,
+                                    const std::string& kit_name,
+                                    PrimerAux primer_aux);
 
     using Query = dorado::adapter_primer_kits::Candidate;
 
     std::vector<Query>& get_adapter_sequences(const std::string& kit_name);
-    std::vector<Query>& get_primer_sequences(const std::string& kit_name);
+    std::vector<Query>& get_primer_sequences(const std::string& kit_name, PrimerAux primer_aux);
 
     PrimerClassification classify_primers(const AdapterScoreResult& result,
                                           std::pair<int, int>& trim_interval,
@@ -55,6 +58,9 @@ private:
                             PrimerClassification& classification,
                             const std::string& sequence,
                             std::pair<int, int>& trim_interval);
+    void check_10x_primers(PrimerClassification& classification,
+                           const std::string& sequence,
+                           std::pair<int, int>& trim_interval);
 };
 
 }  // namespace demux

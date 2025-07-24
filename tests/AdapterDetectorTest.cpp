@@ -123,7 +123,8 @@ CATCH_TEST_CASE("AdapterDetector: test UMI detection", TEST_GROUP) {
     // Create new read that is [PCS110_SSP_FWD] - [UMI_TAG] - 200 As - [PCS110_VNP_REV].
     demux::AdapterDetector detector(std::nullopt);
     const std::string nonbc_seq = std::string(200, 'A');
-    const auto& primers = detector.get_primer_sequences(TEST_KIT2);
+    const auto& primers =
+            detector.get_primer_sequences(TEST_KIT2, dorado::demux::PrimerAux::DEFAULT);
     const auto& front_primer = primers[0].front_sequence;
     const auto& rear_primer = primers[0].rear_sequence;
     const std::string umi_partial = "AAAATTCCCCTTGGGGTTACGATTT";
@@ -159,6 +160,144 @@ CATCH_TEST_CASE("AdapterDetector: test UMI detection", TEST_GROUP) {
     CATCH_CHECK(trim_interval.first == trim_start);
     CATCH_CHECK(trim_interval.second == trim_end - int(umi_partial.size()));
     CATCH_CHECK(classification.umi_tag_sequence == umi_full);
+}
+
+CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.", TEST_GROUP) {
+    demux::AdapterDetector detector(std::nullopt);
+    const std::string nonbc_seq = std::string(200, 'A');
+    const std::string cell_barcode = "CTGATTGCAATCGTCC";  // 16 bp cell-barcode
+    const std::string cell_barcode_x = "GATCTTTCGACTG";   // 13 bp x-cell-barcode
+    const std::string cell_barcode_y = "CCTATCGTAAATCG";  // 14 bp y-cell-barcode
+    const std::string umi_tag10 = "GTGTAACTAC";           // 10 bp UMI tag
+    const std::string umi_tag12 = "CACATGCCGCCA";         // 12 bp UMI tag
+    const std::string poly_t = "TTTTTTTTTTTTTTTTTTTT";    // 20 Ts
+    const std::string tso = "TTTCTTATATGGG";              // TSO sequence
+    const std::string vnp_prefix_rc = "ATGGG";
+
+    const auto& primers = detector.get_primer_sequences(TEST_KIT1, demux::PrimerAux::GEN10X);
+    const auto& front_primer = primers[0].front_sequence;
+    const auto& rear_primer = primers[0].rear_sequence;
+
+    CATCH_SECTION("10X Genomics 3prime kit.") {
+        // Create a read with structure [SSP] - [16bp cell_barcode] - [10 bp UMI-tag] - [20 bp polyT] - 200 As - [VNP]
+        // Note that for this kit, the VNP primer has an additional CCCAT at the beginning, which means we add it here
+        // to the end (since we will be looking for the RC of the VNP).
+        const std::string sequence = front_primer + cell_barcode + umi_tag10 + poly_t + nonbc_seq +
+                                     rear_primer + vnp_prefix_rc;
+        auto res1 = detector.find_primers(sequence, TEST_KIT1, demux::PrimerAux::GEN10X);
+        CATCH_CHECK(res1.front.name == "10X_FWD_FRONT");
+        CATCH_CHECK(res1.rear.name == "10X_FWD_REAR");
+        CATCH_CHECK(res1.front.position == std::make_pair(0, int(front_primer.length()) - 1));
+        CATCH_CHECK(res1.rear.position ==
+                    std::make_pair(int(front_primer.length()) + 246, int(sequence.length()) - 6));
+        // Get the trim-interval and apply the classification method.
+        auto trim_interval = Trimmer::determine_trim_interval(res1, int(sequence.length()));
+        auto old_trim_interval = trim_interval;
+        auto classification = detector.classify_primers(res1, trim_interval, sequence);
+        CATCH_CHECK(trim_interval.first == old_trim_interval.first + 26);
+        CATCH_CHECK(trim_interval.second == old_trim_interval.second);
+        CATCH_CHECK(classification.orientation == StrandOrientation::FORWARD);
+        CATCH_CHECK(classification.umi_tag_sequence == cell_barcode + umi_tag10);
+
+        // Now check a reverse-read.
+        auto rev_seq = utils::reverse_complement(sequence);
+        auto res2 = detector.find_primers(rev_seq, TEST_KIT1, demux::PrimerAux::GEN10X);
+        CATCH_CHECK(res2.front.name == "10X_REV_FRONT");
+        CATCH_CHECK(res2.rear.name == "10X_REV_REAR");
+        CATCH_CHECK(res2.front.position ==
+                    std::make_pair(int(vnp_prefix_rc.length()),
+                                   int(rear_primer.length() + vnp_prefix_rc.length()) - 1));
+        CATCH_CHECK(res2.rear.position ==
+                    std::make_pair(int(rear_primer.length() + vnp_prefix_rc.length()) + 246,
+                                   int(sequence.length()) - 1));
+        // Get the trim-interval and apply the classification method.
+        trim_interval = Trimmer::determine_trim_interval(res2, int(rev_seq.length()));
+        old_trim_interval = trim_interval;
+        classification = detector.classify_primers(res2, trim_interval, rev_seq);
+        CATCH_CHECK(trim_interval.first == old_trim_interval.first);
+        CATCH_CHECK(trim_interval.second == old_trim_interval.second - 26);
+        CATCH_CHECK(classification.orientation == StrandOrientation::REVERSE);
+        CATCH_CHECK(classification.umi_tag_sequence == cell_barcode + umi_tag10);
+    }
+
+    CATCH_SECTION("10X Genomics 5prime kit.") {
+        // Create a read with structure [SSP] - [16bp cell_barcode] - [12 bp UMI-tag] - [13 bp TSO] - 200 As - [VNP]
+        const std::string sequence =
+                front_primer + cell_barcode + umi_tag12 + tso + nonbc_seq + rear_primer;
+        auto res1 = detector.find_primers(sequence, TEST_KIT1, demux::PrimerAux::GEN10X);
+        CATCH_CHECK(res1.front.name == "10X_FWD_FRONT");
+        CATCH_CHECK(res1.rear.name == "10X_FWD_REAR");
+        CATCH_CHECK(res1.front.position == std::make_pair(0, int(front_primer.length()) - 1));
+        CATCH_CHECK(res1.rear.position ==
+                    std::make_pair(int(front_primer.length()) + 241, int(sequence.length()) - 1));
+        // Get the trim-interval and apply the classification method.
+        auto trim_interval = Trimmer::determine_trim_interval(res1, int(sequence.length()));
+        auto old_trim_interval = trim_interval;
+        auto classification = detector.classify_primers(res1, trim_interval, sequence);
+        CATCH_CHECK(trim_interval.first == old_trim_interval.first + 41);
+        CATCH_CHECK(trim_interval.second == old_trim_interval.second);
+        CATCH_CHECK(classification.orientation == StrandOrientation::FORWARD);
+        CATCH_CHECK(classification.umi_tag_sequence == cell_barcode + umi_tag12);
+
+        // Now check a reverse-read.
+        auto rev_seq = utils::reverse_complement(sequence);
+        auto res2 = detector.find_primers(rev_seq, TEST_KIT1, demux::PrimerAux::GEN10X);
+        CATCH_CHECK(res2.front.name == "10X_REV_FRONT");
+        CATCH_CHECK(res2.rear.name == "10X_REV_REAR");
+        CATCH_CHECK(res2.front.position == std::make_pair(0, int(rear_primer.length()) - 1));
+        CATCH_CHECK(res2.rear.position ==
+                    std::make_pair(int(rear_primer.length()) + 241, int(sequence.length()) - 1));
+        // Get the trim-interval and apply the classification method.
+        trim_interval = Trimmer::determine_trim_interval(res2, int(rev_seq.length()));
+        old_trim_interval = trim_interval;
+        classification = detector.classify_primers(res2, trim_interval, rev_seq);
+        CATCH_CHECK(trim_interval.first == old_trim_interval.first);
+        CATCH_CHECK(trim_interval.second == old_trim_interval.second - 41);
+        CATCH_CHECK(classification.orientation == StrandOrientation::REVERSE);
+        CATCH_CHECK(classification.umi_tag_sequence == cell_barcode + umi_tag12);
+    }
+
+    CATCH_SECTION("10X Genomics Visium HD 3prime kit.") {
+        // Create a read with structure [SSP] - [10 bp UMI-tag] - [13bp cell_barcode_x] - [14 bp cell_barcode_y] - [20 bp polyT] - 200 As - [VNP]
+        // Note that for this kit, the VNP primer has an additional CCCAT at the beginning, which means we add it here
+        // to the end (since we will be looking for the RC of the VNP).
+        const std::string sequence = front_primer + umi_tag10 + cell_barcode_x + cell_barcode_y +
+                                     poly_t + nonbc_seq + rear_primer + vnp_prefix_rc;
+        auto res1 = detector.find_primers(sequence, TEST_KIT1, demux::PrimerAux::GEN10X);
+        CATCH_CHECK(res1.front.name == "10X_FWD_FRONT");
+        CATCH_CHECK(res1.rear.name == "10X_FWD_REAR");
+        CATCH_CHECK(res1.front.position == std::make_pair(0, int(front_primer.length()) - 1));
+        CATCH_CHECK(res1.rear.position ==
+                    std::make_pair(int(front_primer.length()) + 257, int(sequence.length()) - 6));
+        // Get the trim-interval and apply the classification method.
+        auto trim_interval = Trimmer::determine_trim_interval(res1, int(sequence.length()));
+        auto old_trim_interval = trim_interval;
+        auto classification = detector.classify_primers(res1, trim_interval, sequence);
+        CATCH_CHECK(trim_interval.first == old_trim_interval.first + 37);
+        CATCH_CHECK(trim_interval.second == old_trim_interval.second);
+        CATCH_CHECK(classification.orientation == StrandOrientation::FORWARD);
+        CATCH_CHECK(classification.umi_tag_sequence == umi_tag10 + cell_barcode_x + cell_barcode_y);
+
+        // Now check a reverse-read.
+        auto rev_seq = utils::reverse_complement(sequence);
+        auto res2 = detector.find_primers(rev_seq, TEST_KIT1, demux::PrimerAux::GEN10X);
+        CATCH_CHECK(res2.front.name == "10X_REV_FRONT");
+        CATCH_CHECK(res2.rear.name == "10X_REV_REAR");
+        CATCH_CHECK(res2.front.position ==
+                    std::make_pair(int(vnp_prefix_rc.length()),
+                                   int(rear_primer.length() + vnp_prefix_rc.length()) - 1));
+        CATCH_CHECK(res2.rear.position ==
+                    std::make_pair(int(rear_primer.length() + vnp_prefix_rc.length()) + 257,
+                                   int(sequence.length()) - 1));
+        // Get the trim-interval and apply the classification method.
+        trim_interval = Trimmer::determine_trim_interval(res2, int(rev_seq.length()));
+        old_trim_interval = trim_interval;
+        classification = detector.classify_primers(res2, trim_interval, rev_seq);
+        CATCH_CHECK(trim_interval.first == old_trim_interval.first);
+        CATCH_CHECK(trim_interval.second == old_trim_interval.second - 37);
+        CATCH_CHECK(classification.orientation == StrandOrientation::REVERSE);
+        CATCH_CHECK(classification.umi_tag_sequence == umi_tag10 + cell_barcode_x + cell_barcode_y);
+    }
 }
 
 CATCH_TEST_CASE("AdapterDetector: test adapter detection", TEST_GROUP) {
@@ -213,7 +352,7 @@ CATCH_TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     fs::path data_dir = fs::path(get_data_dir("barcode_demux/single_end"));
 
     demux::AdapterDetector detector(std::nullopt);
-    auto primers = detector.get_primer_sequences(TEST_KIT1);
+    auto primers = detector.get_primer_sequences(TEST_KIT1, dorado::demux::PrimerAux::DEFAULT);
     sort_queries(primers);
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
@@ -224,7 +363,8 @@ CATCH_TEST_CASE("AdapterDetector: test primer detection", TEST_GROUP) {
     for (size_t i = 0; i < primers.size(); ++i) {
         const auto& primer = primers[i];
         auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
-        auto res = detector.find_primers(new_sequence1, TEST_KIT1);
+        auto res =
+                detector.find_primers(new_sequence1, TEST_KIT1, dorado::demux::PrimerAux::DEFAULT);
         CATCH_CHECK(res.front.name == primer.name + "_FRONT");
         CATCH_CHECK(res.front.position ==
                     std::make_pair(6, int(primer.front_sequence.length()) + 5));
@@ -252,7 +392,7 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_G
 
     demux::AdapterDetector detector(custom_primer_file);
     const auto& adapters = detector.get_adapter_sequences("TEST_KIT1");
-    auto primers = detector.get_primer_sequences("TEST_KIT2");
+    auto primers = detector.get_primer_sequences("TEST_KIT2", dorado::demux::PrimerAux::DEFAULT);
     sort_queries(primers);
     // Make sure the adapters and primers have been properly loaded.
     std::string expected_adapter_name = "adapter1";
@@ -282,7 +422,8 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_G
         // Put the front primer at the beginning, and the rear primer at the end.
         const auto& primer = primers[i];
         auto new_sequence1 = "ACGTAC" + primer.front_sequence + seq + primer.rear_sequence + "TTT";
-        auto res = detector.find_primers(new_sequence1, "TEST_KIT2");
+        auto res = detector.find_primers(new_sequence1, "TEST_KIT2",
+                                         dorado::demux::PrimerAux::DEFAULT);
         CATCH_CHECK(res.front.name == primer.name + "_FRONT");
         CATCH_CHECK(res.front.position ==
                     std::make_pair(6, int(primer.front_sequence.length()) + 5));
@@ -313,7 +454,7 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection without kit", TES
 
     demux::AdapterDetector detector(custom_primer_file);
     const auto& adapters = detector.get_adapter_sequences("TEST_KIT1");
-    auto primers = detector.get_primer_sequences("TEST_KIT2");
+    auto primers = detector.get_primer_sequences("TEST_KIT2", dorado::demux::PrimerAux::DEFAULT);
     sort_queries(primers);
     // Make sure the adapters and primers have been properly loaded.
     std::string expected_adapter_name = "adapter1";
@@ -338,7 +479,8 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection without kit", TES
         // Put the front primer at the beginning, and the rear primer at the end.
         auto new_sequence1 =
                 "ACGTAC" + primers[i].front_sequence + seq + primers[i].rear_sequence + "TTT";
-        auto res = detector.find_primers(new_sequence1, "TEST_KIT2");
+        auto res = detector.find_primers(new_sequence1, "TEST_KIT2",
+                                         dorado::demux::PrimerAux::DEFAULT);
         CATCH_CHECK(res.front.name == primers[i].name + "_FRONT");
         CATCH_CHECK(res.front.position ==
                     std::make_pair(6, int(primers[i].front_sequence.length()) + 5));
@@ -380,7 +522,8 @@ CATCH_TEST_CASE(
     const std::string nonbc_seq = std::string(200, 'A');
     demux::AdapterDetector detector(std::nullopt);
     const auto& adapters = detector.get_adapter_sequences(TEST_KIT2);
-    const auto& primers = detector.get_primer_sequences(TEST_KIT2);
+    const auto& primers =
+            detector.get_primer_sequences(TEST_KIT2, dorado::demux::PrimerAux::DEFAULT);
     const auto& front_adapter = adapters[0].front_sequence;
     const auto& front_primer = primers[0].front_sequence;
     const auto& rear_adapter = adapters[0].rear_sequence;
@@ -435,8 +578,8 @@ CATCH_TEST_CASE(
 
     auto client_info = std::make_shared<dorado::DefaultClientInfo>();
     client_info->contexts().register_context<const dorado::demux::AdapterInfo>(
-            std::make_shared<const dorado::demux::AdapterInfo>(
-                    dorado::demux::AdapterInfo{true, true, false, std::nullopt}));
+            std::make_shared<const dorado::demux::AdapterInfo>(dorado::demux::AdapterInfo{
+                    true, true, false, dorado::demux::PrimerAux::DEFAULT, std::nullopt}));
     read->read_common.client_info = std::move(client_info);
 
     BamMessage bam_read{HtsData{std::move(record_copy)}, read->read_common.client_info};

@@ -220,6 +220,9 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                       "--barcode-arrangement.");
         parser.visible.add_argument("--primer-sequences")
                 .help("Path to file with custom primer sequences.");
+        parser.visible.add_argument("--special-primers")
+                .help("If special primers supported by dorado have been used, specify here.")
+                .default_value(std::string(""));
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -843,6 +846,12 @@ int basecaller(int argc, char* argv[]) {
         demux::KitInfoProvider provider(barcoding_info->kit_name);
         const barcode_kits::KitInfo& kit_info = provider.get_kit_info(barcoding_info->kit_name);
         adapter_info->rna_adapters = kit_info.rna_barcodes;
+    }
+    const auto& special_primers = parser.visible.get<std::string>("--special-primers");
+    adapter_info->primer_aux = demux::special_primer_by_name(special_primers);
+    if (adapter_info->primer_aux == demux::PrimerAux::UNKNOWN) {
+        spdlog::error("Unknown value of --special-primers option: '{}'.", special_primers);
+        std::exit(EXIT_FAILURE);
     }
 
     fs::path model_path;
