@@ -121,6 +121,7 @@ public:
 
     BamPtr bam_ptr;
     ReadAttributes read_attrs{};
+    std::string flowcell_id{};
     std::shared_ptr<BarcodeScoreResult> barcoding_result{};
     PrimerClassification primer_classification{};
     std::pair<int, int> adapter_trim_interval{};

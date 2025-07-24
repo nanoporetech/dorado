@@ -60,8 +60,6 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
                    (uint8_t *)attributes.start_time.c_str());
 
-    bam_aux_append(aln, "PU", 'Z', int(flowcell_id.length() + 1), (uint8_t *)flowcell_id.c_str());
-
     if (primer_classification.orientation != StrandOrientation::UNKNOWN) {
         auto sense_data = uint8_t(to_char(primer_classification.orientation));
         bam_aux_append(aln, "TS", 'A', 1, &sense_data);

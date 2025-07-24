@@ -18,9 +18,16 @@ void HtsFileWriter::process(const Processable item) {
 }
 
 void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
-    if (m_mode == OutputMode::FASTQ && !m_gpu_names.empty()) {
-        bam_aux_append(hts_data.bam_ptr.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
-                       (uint8_t *)m_gpu_names.c_str());
+    if (m_mode == OutputMode::FASTQ) {
+        if (!m_gpu_names.empty()) {
+            bam_aux_append(hts_data.bam_ptr.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
+                           (uint8_t *)m_gpu_names.c_str());
+        }
+        if (!hts_data.flowcell_id.empty()) {
+            bam_aux_append(hts_data.bam_ptr.get(), "PU", 'Z',
+                           int(hts_data.flowcell_id.length() + 1),
+                           (uint8_t *)hts_data.flowcell_id.c_str());
+        }
     }
 
     // Verify that the MN tag, if it exists, and the sequence length are in sync.
