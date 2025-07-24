@@ -144,6 +144,8 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
     set -e
 }
 
+${test_dir}/test_nested_output_structure.sh ${dorado_bin} ${model_speed} ${batch}
+
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
