@@ -93,7 +93,7 @@ private:
     // Get the filetype prefix used in the status
     std::string status_filetype() const;
     // Get the pass/fail status of this read
-    std::string pass_fail([[maybe_unused]] const HtsData::ReadAttributes &attrs) const;
+    std::string pass_fail(const HtsData::ReadAttributes &attrs) const;
     // Resolve the optional sample sheet alias
     std::string alias(const HtsData &hts_data) const;
     // Get the batch numer

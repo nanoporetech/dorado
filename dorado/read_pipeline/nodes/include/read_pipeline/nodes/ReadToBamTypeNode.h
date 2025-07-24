@@ -2,6 +2,7 @@
 
 #include "read_pipeline/base/MessageSink.h"
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <optional>
@@ -19,7 +20,8 @@ public:
                       size_t num_worker_threads,
                       std::optional<float> modbase_threshold_frac,
                       std::shared_ptr<const utils::SampleSheet> sample_sheet,
-                      size_t max_reads);
+                      size_t max_reads,
+                      size_t min_qscore);
     ~ReadToBamTypeNode();
 
     std::string get_name() const override;
@@ -35,6 +37,7 @@ private:
     bool m_emit_moves;
     std::optional<uint8_t> m_modbase_threshold;
     std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
+    size_t m_min_qscore;
 };
 
 }  // namespace dorado

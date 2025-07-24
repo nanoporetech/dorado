@@ -116,6 +116,7 @@ public:
         std::string acquisition_id{};
         int64_t protocol_start_time_ms{0};
         std::size_t subread_id{0};
+        bool is_status_pass{true};
     };
 
     BamPtr bam_ptr;

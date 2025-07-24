@@ -149,16 +149,8 @@ oss << hts_data.read_attrs.flowcell_id << "_"
     return std::move(oss).str();
 };
 
-// std::string NestedFileStructure::status(const HtsData::ReadAttributes& attrs) const {
-//     std::ostringstream oss;
-//     oss << status_filetype() << "_" << pass_fail(attrs);
-//     return oss.str();
-// };
-
-std::string NestedFileStructure::pass_fail(
-        [[maybe_unused]] const HtsData::ReadAttributes& attrs) const {
-    // FIXME: Implement qscore thresholds
-    return "pass";
+std::string NestedFileStructure::pass_fail(const HtsData::ReadAttributes& attrs) const {
+    return attrs.is_status_pass ? "pass" : "fail";
 };
 
 std::string NestedFileStructure::status_filetype() const {

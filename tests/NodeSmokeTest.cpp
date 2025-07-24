@@ -322,7 +322,7 @@ DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {
     set_pipeline_restart(pipeline_restart);
 
     const auto modbase_threshold = get_modbase_params({}, 1).threshold;
-    run_smoke_test<dorado::ReadToBamTypeNode>(emit_moves, 2, modbase_threshold, nullptr, 1000);
+    run_smoke_test<dorado::ReadToBamTypeNode>(emit_moves, 2, modbase_threshold, nullptr, 1000, 0);
 }
 
 struct BarcodeKitInputs {

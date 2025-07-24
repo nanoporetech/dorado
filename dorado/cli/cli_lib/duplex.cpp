@@ -571,13 +571,17 @@ int duplex(int argc, char* argv[]) {
         }
 
         const auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, std::nullopt, nullptr, 1000);
+                {converted_reads_sink}, emit_moves, 2, std::nullopt, nullptr, 1000, min_qscore);
         const auto duplex_read_tagger =
                 pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.
         std::unordered_set<std::string> read_ids_to_filter;
+
+        // When writing to output, write reads below min_qscore to "fail"
+        const size_t maybe_min_qscore = cli::get_output_dir(parser).has_value() ? 0 : min_qscore;
+
         auto read_filter_node = pipeline_desc.add_node<ReadFilterNode>(
-                {duplex_read_tagger}, min_qscore, default_parameters.min_sequence_length,
+                {duplex_read_tagger}, maybe_min_qscore, default_parameters.min_sequence_length,
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
