@@ -7,24 +7,8 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <iomanip>
 #include <sstream>
 #include <utility>
-
-namespace {
-
-void erase_progress_bar_line() {
-    // Don't write escape codes unless it's a TTY.
-    if (dorado::utils::is_fd_tty(stderr)) {
-        // Erase the current line so that we remove the previous description.
-#ifndef _WIN32
-        // I would use indicators::erase_progress_bar_line() here, but it hardcodes stdout.
-        std::cerr << "\r\033[K";
-#endif
-    }
-}
-
-}  // namespace
 
 namespace dorado {
 
@@ -42,7 +26,7 @@ ProgressTracker::~ProgressTracker() = default;
 
 void ProgressTracker::set_description(const std::string& desc) {
     if (!m_is_progress_reporting_disabled) {
-        erase_progress_bar_line();
+        m_progress_bar.erase_progress_bar_line();
         m_progress_bar.set_option(indicators::option::PostfixText{desc});
     }
 }
@@ -53,7 +37,7 @@ void ProgressTracker::reset_initialization_time() {
 
 void ProgressTracker::summarize() const {
     if (!m_is_progress_reporting_disabled) {
-        erase_progress_bar_line();
+        m_progress_bar.erase_progress_bar_line();
     }
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(m_end_time -
@@ -276,11 +260,7 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
     }
 
     // Draw it.
-#ifdef _WIN32
-    m_progress_bar.set_progress(static_cast<size_t>(total_progress));
-#else
     m_progress_bar.set_progress(total_progress);
-#endif
     std::cerr << "\r";
 }
 
