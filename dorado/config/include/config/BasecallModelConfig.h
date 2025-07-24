@@ -118,6 +118,7 @@ struct BasecallModelConfig {
     int sample_rate = -1;
     SignalNormalisationParams signal_norm_params;
     std::filesystem::path model_path;
+    std::string model_name() const;
 
     // polya translocation speed calibration coefficients
     std::optional<float> polya_speed_correction;

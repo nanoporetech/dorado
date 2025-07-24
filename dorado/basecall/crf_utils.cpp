@@ -198,7 +198,7 @@ ModuleHolder<AnyModule> load_crf_model(const BasecallModelConfig &model_config,
 }
 
 size_t auto_calculate_num_runners(const BasecallModelConfig &model_config, float memory_fraction) {
-    auto model_name = std::filesystem::canonical(model_config.model_path).filename().string();
+    auto model_name = model_config.model_name();
 
     // very hand-wavy determination
     // these numbers were determined empirically by running 1, 2, 4 and 8 runners for each model
