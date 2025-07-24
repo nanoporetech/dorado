@@ -531,7 +531,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     CATCH_CHECK(extension == get_suffix(output_mode));
 
     // Regardless of the input data the output path should be the same for SingleFileStructure
-    const auto& single_path2 = structure.get_path(HtsData{nullptr, {"kit"}, nullptr});
+    const auto& single_path2 = structure.get_path(HtsData{nullptr, {"kit"}, "FLOWCELL", nullptr});
     CATCH_CHECK(single_path == single_path2);
 }
 
