@@ -185,8 +185,8 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
         const std::string sequence = front_primer + cell_barcode + umi_tag10 + poly_t + nonbc_seq +
                                      rear_primer + vnp_prefix_rc;
         auto res1 = detector.find_primers(sequence, TEST_KIT1, demux::PrimerAux::GEN10X);
-        CATCH_CHECK(res1.front.name == "10X_FWD_FRONT");
-        CATCH_CHECK(res1.rear.name == "10X_FWD_REAR");
+        CATCH_CHECK(res1.front.name == "10X_Genomics_FWD_FRONT");
+        CATCH_CHECK(res1.rear.name == "10X_Genomics_FWD_REAR");
         CATCH_CHECK(res1.front.position == std::make_pair(0, int(front_primer.length()) - 1));
         CATCH_CHECK(res1.rear.position ==
                     std::make_pair(int(front_primer.length()) + 246, int(sequence.length()) - 6));
@@ -202,8 +202,8 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
         // Now check a reverse-read.
         auto rev_seq = utils::reverse_complement(sequence);
         auto res2 = detector.find_primers(rev_seq, TEST_KIT1, demux::PrimerAux::GEN10X);
-        CATCH_CHECK(res2.front.name == "10X_REV_FRONT");
-        CATCH_CHECK(res2.rear.name == "10X_REV_REAR");
+        CATCH_CHECK(res2.front.name == "10X_Genomics_REV_FRONT");
+        CATCH_CHECK(res2.rear.name == "10X_Genomics_REV_REAR");
         CATCH_CHECK(res2.front.position ==
                     std::make_pair(int(vnp_prefix_rc.length()),
                                    int(rear_primer.length() + vnp_prefix_rc.length()) - 1));
@@ -225,8 +225,8 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
         const std::string sequence =
                 front_primer + cell_barcode + umi_tag12 + tso + nonbc_seq + rear_primer;
         auto res1 = detector.find_primers(sequence, TEST_KIT1, demux::PrimerAux::GEN10X);
-        CATCH_CHECK(res1.front.name == "10X_FWD_FRONT");
-        CATCH_CHECK(res1.rear.name == "10X_FWD_REAR");
+        CATCH_CHECK(res1.front.name == "10X_Genomics_FWD_FRONT");
+        CATCH_CHECK(res1.rear.name == "10X_Genomics_FWD_REAR");
         CATCH_CHECK(res1.front.position == std::make_pair(0, int(front_primer.length()) - 1));
         CATCH_CHECK(res1.rear.position ==
                     std::make_pair(int(front_primer.length()) + 241, int(sequence.length()) - 1));
@@ -242,8 +242,8 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
         // Now check a reverse-read.
         auto rev_seq = utils::reverse_complement(sequence);
         auto res2 = detector.find_primers(rev_seq, TEST_KIT1, demux::PrimerAux::GEN10X);
-        CATCH_CHECK(res2.front.name == "10X_REV_FRONT");
-        CATCH_CHECK(res2.rear.name == "10X_REV_REAR");
+        CATCH_CHECK(res2.front.name == "10X_Genomics_REV_FRONT");
+        CATCH_CHECK(res2.rear.name == "10X_Genomics_REV_REAR");
         CATCH_CHECK(res2.front.position == std::make_pair(0, int(rear_primer.length()) - 1));
         CATCH_CHECK(res2.rear.position ==
                     std::make_pair(int(rear_primer.length()) + 241, int(sequence.length()) - 1));
@@ -264,8 +264,8 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
         const std::string sequence = front_primer + umi_tag10 + cell_barcode_x + cell_barcode_y +
                                      poly_t + nonbc_seq + rear_primer + vnp_prefix_rc;
         auto res1 = detector.find_primers(sequence, TEST_KIT1, demux::PrimerAux::GEN10X);
-        CATCH_CHECK(res1.front.name == "10X_FWD_FRONT");
-        CATCH_CHECK(res1.rear.name == "10X_FWD_REAR");
+        CATCH_CHECK(res1.front.name == "10X_Genomics_FWD_FRONT");
+        CATCH_CHECK(res1.rear.name == "10X_Genomics_FWD_REAR");
         CATCH_CHECK(res1.front.position == std::make_pair(0, int(front_primer.length()) - 1));
         CATCH_CHECK(res1.rear.position ==
                     std::make_pair(int(front_primer.length()) + 257, int(sequence.length()) - 6));
@@ -281,8 +281,8 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
         // Now check a reverse-read.
         auto rev_seq = utils::reverse_complement(sequence);
         auto res2 = detector.find_primers(rev_seq, TEST_KIT1, demux::PrimerAux::GEN10X);
-        CATCH_CHECK(res2.front.name == "10X_REV_FRONT");
-        CATCH_CHECK(res2.rear.name == "10X_REV_REAR");
+        CATCH_CHECK(res2.front.name == "10X_Genomics_REV_FRONT");
+        CATCH_CHECK(res2.rear.name == "10X_Genomics_REV_REAR");
         CATCH_CHECK(res2.front.position ==
                     std::make_pair(int(vnp_prefix_rc.length()),
                                    int(rear_primer.length() + vnp_prefix_rc.length()) - 1));

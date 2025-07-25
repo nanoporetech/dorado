@@ -14,9 +14,15 @@ enum class PrimerAux {
 };
 
 inline PrimerAux special_primer_by_name(const std::string& name) {
-    static std::map<std::string, PrimerAux> name_map{{"", PrimerAux::DEFAULT},
-                                                     {"10X", PrimerAux::GEN10X}};
+    // This map should contain any special primers defined in adapter_primer_kits.cpp
+    // that must be specified in the AdapterInfo object in order to be searched for.
+    // If one of these entries is specified, then those primers will be searched for
+    // instead of the standard primers associated with the sequencing kit.
+    static std::map<std::string, PrimerAux> name_map{{"10X_Genomics", PrimerAux::GEN10X}};
 
+    if (name.empty()) {
+        return PrimerAux::DEFAULT;
+    }
     auto ptr = name_map.find(name);
     if (ptr == name_map.end()) {
         return PrimerAux::UNKNOWN;

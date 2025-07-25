@@ -51,8 +51,9 @@ int trim(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-k", "--sequencing-kit")
             .help("Sequencing kit name to use for selecting adapters and primers to trim.");
-    parser.add_argument("--special-primers")
-            .help("If special primers supported by dorado have been used, specify here.")
+    parser.add_argument("--extended-primers")
+            .help("If any non-standard primers supported by dorado have been used, you can specify "
+                  "them here.")
             .default_value(std::string(""));
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to trim.")
@@ -163,10 +164,10 @@ int trim(int argc, char* argv[]) {
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
     adapter_info->kit_name = kit_name;
     adapter_info->custom_seqs = custom_primer_file;
-    const auto& special_primers = parser.get<std::string>("--special-primers");
+    const auto& special_primers = parser.get<std::string>("--extended-primers");
     adapter_info->primer_aux = demux::special_primer_by_name(special_primers);
     if (adapter_info->primer_aux == demux::PrimerAux::UNKNOWN) {
-        spdlog::error("Unknown value of --special-primers option: '{}'.", special_primers);
+        spdlog::error("Unknown value of --extended-primers option: '{}'.", special_primers);
         return EXIT_FAILURE;
     }
 

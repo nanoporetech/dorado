@@ -72,21 +72,10 @@ const std::unordered_map<PrimerCode, Candidate> primers = {
         {PC::GEN10X,
          {
                  // Special primers for 10X sequencing,
-                 "10X",
+                 "10X_Genomics",
                  "CTACACGACGCTCTTCCGATCT",    // SSP
                  "GTACTCTGCGTTGATACCACTGCTT"  // VNP
          }},
-};
-
-// Any special primers that should only be searched for when specified (for example, with the
-// `--special-primers` command-line option) must be listed here. The key is the string name of
-// the primer, as specified above. The value is the `demux::PrimerAux` value that should be
-// specified when calling `AdapterPrimerManager::get_primers`.
-const std::unordered_map<std::string, demux::PrimerAux> primer_aux_map = {
-        {
-                "10X",
-                demux::PrimerAux::GEN10X,
-        },
 };
 
 // This maps primer codes to the set of kit codes that those primers can be used with. Only Kit14
@@ -338,8 +327,8 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
     }
     std::vector<Candidate> filtered_results;
     for (auto& item : results) {
-        auto aux = primer_aux_map.find(item.name);
-        if (aux == primer_aux_map.end()) {
+        auto aux = demux::special_primer_by_name(item.name);
+        if (aux == dorado::demux::PrimerAux::UNKNOWN) {
             // No primer_aux value associated with candidate, so only include if no
             // special primer_aux was requested.
             if (primer_aux == demux::PrimerAux::DEFAULT) {
@@ -348,7 +337,7 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
         } else {
             // This candidate should only be included if the associated primer_aux value
             // matches what was requested.
-            if (primer_aux == aux->second) {
+            if (primer_aux == aux) {
                 filtered_results.emplace_back(std::move(item));
             }
         }

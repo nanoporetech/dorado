@@ -281,7 +281,7 @@ PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult&
         check_for_umi_tags(result, classification, sequence, trim_interval);
     }
     // For the GEN10X primers, we need to apply some additional analysis checks.
-    if (classification.primer_name.substr(0, 3) == "10X") {
+    if (classification.primer_name.substr(0, 12) == "10X_Genomics") {
         check_10x_primers(classification, sequence, trim_interval);
     }
     return classification;

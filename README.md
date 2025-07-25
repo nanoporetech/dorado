@@ -145,6 +145,18 @@ The output of `dorado trim` will always be unaligned records, regardless of whet
 
 The software automatically searches for primer sequences used in Oxford Nanopore kits. However, you can specify an alternative set of primer sequences to search for when trimming either in-line with basecalling, or in combination with the `--trim` option. In both cases this is accomplished using the `--primer-sequences` command line option, followed by the full path and filename of a FASTA file containing the primer sequences you want to search for. Note that if you use this option the normal primer sequences built-in to the dorado software will not be searched for. More details on custom adapter/primer sequence files can be found in `CustomPrimers.md`.
 
+#### Trimming 3rd-party or non-standard primers
+
+The software now supports handling of some non-standard primers without having to provide a custom primer file, as described above. This can be enabled by using the `--extended-primers` command-line option, followed by a string indicating a supported primer set. This can be used with either `dorado basecaller` or `dorado trim`.
+
+Currently the only extended primer set supported is the primers used for 10X Genomics sequencing. Support for detecting and trimming these primers can be enabled by using:
+
+`--extended-primers 10X_Genomics`
+
+In addition to detecting and trimming primers, dorado will also extract the cell-barcodes and UMI tags, which it puts into the `RX:Z` BAM tag. Because the dorado software does not know anything about the specific cell-barcode or UMI sequences, it will simply extract the entire portion of the read corresponding the cell-barcodes and UMI tags, and place it in the `RX:Z` BAM tag. It is up to the user to apply whatever post-processing is needed to make use of that information.
+
+Other extended primer options may be included in the future.
+
 ### RNA adapter trimming
 
 Adapters for RNA004 kits are automatically trimmed during basecalling. However, unlike in DNA, the RNA adapter cannot be trimmed post-basecalling.
