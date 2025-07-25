@@ -11,6 +11,7 @@
 #include "data_loader/DataLoader.h"
 #include "file_info/file_info.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_writer/HtsFileWriterBuilder.h"
 #include "model_downloader/model_downloader.h"
 #include "model_resolution.h"
 #include "models/metadata.h"
@@ -23,6 +24,7 @@
 #include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/nodes/ReadFilterNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
+#include "read_pipeline/nodes/WriterNode.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/duplex_utils.h"
 #include "torch_utils/torch_utils.h"
@@ -50,6 +52,7 @@
 #include <optional>
 #include <thread>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #if DORADO_CUDA_BUILD
@@ -69,12 +72,12 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-BatchParams get_batch_params(argparse::ArgumentParser& arg) {
+BatchParams get_batch_params(const utils::arg_parse::ArgParser& arg) {
     BatchParams basecaller{};
     basecaller.update(BatchParams::Priority::CLI_ARG,
-                      cli::get_optional_argument<int>("--chunksize", arg),
-                      cli::get_optional_argument<int>("--overlap", arg),
-                      cli::get_optional_argument<int>("--batchsize", arg));
+                      cli::get_optional_argument<int>("--chunksize", arg.hidden),
+                      cli::get_optional_argument<int>("--overlap", arg.hidden),
+                      cli::get_optional_argument<int>("--batchsize", arg.visible));
     return basecaller;
 }
 
@@ -402,11 +405,11 @@ int duplex(int argc, char* argv[]) {
                       "selected.")
                 .default_value(default_parameters.batchsize)
                 .scan<'i', int>();
-        parser.visible.add_argument("-c", "--chunksize")
+        parser.hidden.add_argument("-c", "--chunksize")
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
-        parser.visible.add_argument("--overlap")
+        parser.hidden.add_argument("--overlap")
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
@@ -467,8 +470,6 @@ int duplex(int argc, char* argv[]) {
 
         bool emit_moves = false;
 
-        auto output_mode = OutputMode::BAM;
-
         if (parser.visible.get<std::string>("--reference").empty() &&
             !parser.visible.get<std::string>("--bed-file").empty()) {
             spdlog::error("--bed-file cannot be used without --reference.");
@@ -504,25 +505,50 @@ int duplex(int argc, char* argv[]) {
         SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), "duplex", args, device);
 
-        auto hts_file = cli::extract_hts_file(parser);
-        if (!hts_file) {
-            return EXIT_FAILURE;
+        std::string gpu_names{};
+#if DORADO_CUDA_BUILD
+        gpu_names = utils::get_cuda_gpu_names(device);
+#endif
+
+        ProgressTracker tracker(ProgressTracker::Mode::DUPLEX, num_reads);
+
+        std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+        OutputMode writer_output_mode;
+        {
+            auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
+                tracker.update_post_processing_progress(static_cast<float>(progress));
+            });
+            auto description_callback =
+                    utils::DescriptionCallback([&tracker](const std::string& description) {
+                        tracker.set_description(description);
+                    });
+
+            constexpr int WRITER_THREADS = 4;
+            auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+                    cli::get_emit_fastq(parser), cli::get_emit_sam(parser), !ref.empty(),
+                    cli::get_output_dir(parser), WRITER_THREADS, progress_callback,
+                    description_callback, gpu_names);
+
+            std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
+            if (hts_file_writer == nullptr) {
+                spdlog::error("Failed to create hts file writer");
+                std::exit(EXIT_FAILURE);
+            }
+            writer_output_mode = hts_file_writer->get_mode();
+            tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f
+                                                                                       : 0.5f);
+            writers.push_back(std::move(hts_file_writer));
         }
-        constexpr int WRITER_THREADS = 4;
-        hts_file->set_num_threads(WRITER_THREADS);
 
         PipelineDescriptor pipeline_desc;
         auto hts_writer = PipelineDescriptor::InvalidNodeHandle;
         auto aligner = PipelineDescriptor::InvalidNodeHandle;
         auto converted_reads_sink = PipelineDescriptor::InvalidNodeHandle;
-        std::string gpu_names{};
-#if DORADO_CUDA_BUILD
-        gpu_names = utils::get_cuda_gpu_names(device);
-#endif
-        if (ref.empty()) {
-            hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
-            converted_reads_sink = hts_writer;
-        } else {
+
+        hts_writer = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
+        converted_reads_sink = hts_writer;
+
+        if (!ref.empty()) {
             std::string err_msg{};
             auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
             if (!minimap_options) {
@@ -540,8 +566,7 @@ int duplex(int argc, char* argv[]) {
             aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
                                                           ref, bed, *minimap_options,
                                                           std::thread::hardware_concurrency());
-            hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, *hts_file, gpu_names);
-            pipeline_desc.add_node_sink(aligner, hts_writer);
+            pipeline_desc.add_node_sink(aligner, converted_reads_sink);
             converted_reads_sink = aligner;
         }
 
@@ -556,8 +581,7 @@ int duplex(int argc, char* argv[]) {
                 read_ids_to_filter, 5);
 
         std::unique_ptr<dorado::Pipeline> pipeline;
-        ProgressTracker tracker(ProgressTracker::Mode::DUPLEX, int(num_reads),
-                                hts_file->finalise_is_noop() ? 0.f : 0.5f);
+
         tracker.set_description("Running duplex");
         std::vector<dorado::stats::StatsCallable> stats_callables;
         stats_callables.push_back(
@@ -605,13 +629,14 @@ int duplex(int argc, char* argv[]) {
             }
 
             // Write header as no read group info is needed.
-            hts_file->set_header(hdr.get());
+            const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
+            hts_writer_ref.set_hts_file_header(std::move(hdr));
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
             const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
-            const auto batch_params = get_batch_params(parser.visible);
+            const auto batch_params = get_batch_params(parser);
             const bool skip_model_compatibility_check =
                     parser.hidden.get<bool>("--skip-model-compatibility-check");
 
@@ -636,7 +661,7 @@ int duplex(int argc, char* argv[]) {
                                                                 modbase_params.runners_per_caller,
                                                                 modbase_params.batchsize);
 
-            if (!mod_base_runners.empty() && output_mode == OutputMode::FASTQ) {
+            if (!mod_base_runners.empty() && writer_output_mode == OutputMode::FASTQ) {
                 throw std::runtime_error("Modified base models cannot be used with FASTQ output");
             }
 
@@ -647,6 +672,7 @@ int duplex(int argc, char* argv[]) {
                     file_info::load_read_groups(input_pod5_files.get(), models.model_name, "");
             read_groups.merge(
                     file_info::load_read_groups(input_pod5_files.get(), duplex_rg_name, ""));
+
             utils::add_rg_headers(hdr.get(), read_groups);
 
             const size_t num_runners = default_parameters.num_runners;
@@ -771,7 +797,10 @@ int duplex(int argc, char* argv[]) {
                 const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
             }
-            hts_file->set_header(hdr.get());
+
+            // Write header as no read group info is needed.
+            const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
+            hts_writer_ref.set_hts_file_header(std::move(hdr));
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
             loader.add_read_initialiser(client_info_init_func);
@@ -780,6 +809,7 @@ int duplex(int argc, char* argv[]) {
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
             // Run pipeline.
+            tracker.reset_initialization_time();
             loader.load_reads(input_pod5_files, ReadOrder::BY_CHANNEL);
 
             utils::clean_temporary_models(temp_model_paths);
@@ -792,12 +822,6 @@ int duplex(int argc, char* argv[]) {
         // Stop the stats sampler thread before tearing down any pipeline objects.
         stats_sampler->terminate();
         tracker.update_progress_bar(final_stats);
-
-        // Report progress during output file finalisation.
-        tracker.set_description("Sorting output files");
-        hts_file->finalise([&](size_t progress) {
-            tracker.update_post_processing_progress(static_cast<float>(progress));
-        });
 
         tracker.summarize();
         if (!dump_stats_file.empty()) {

@@ -13,17 +13,37 @@ namespace dorado {
 inline const std::string UNCLASSIFIED_STR = "unclassified";
 
 struct BamDestructor {
-    void operator()(bam1_t *);
+    void operator()(bam1_t*);
 };
 using BamPtr = std::unique_ptr<bam1_t, BamDestructor>;
 
 struct SamHdrDestructor {
-    void operator()(sam_hdr_t *);
+    void operator()(sam_hdr_t*);
 };
 using SamHdrPtr = std::unique_ptr<sam_hdr_t, SamHdrDestructor>;
 
+class SamHdrSharedPtr {
+public:
+    explicit SamHdrSharedPtr(sam_hdr_t* hdr_ptr);
+    explicit SamHdrSharedPtr(SamHdrPtr hdr);
+
+    SamHdrSharedPtr(const std::shared_ptr<const sam_hdr_t>&) = delete;
+
+    const sam_hdr_t* get() const { return m_header.get(); }
+    const sam_hdr_t& operator*() const { return *m_header; }
+    const sam_hdr_t* operator->() const { return m_header.get(); }
+
+    std::shared_ptr<const sam_hdr_t> ptr() const { return m_header; }
+
+    bool operator==(std::nullptr_t) const noexcept { return m_header == nullptr; }
+    bool operator!=(std::nullptr_t) const noexcept { return m_header != nullptr; }
+
+private:
+    std::shared_ptr<const sam_hdr_t> m_header;
+};
+
 struct HtsFileDestructor {
-    void operator()(htsFile *);
+    void operator()(htsFile*);
 };
 using HtsFilePtr = std::unique_ptr<htsFile, HtsFileDestructor>;
 

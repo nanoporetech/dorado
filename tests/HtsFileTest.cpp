@@ -1,14 +1,24 @@
 #include "TestUtils.h"
 #include "hts_utils/hts_file.h"
+#include "hts_utils/hts_types.h"
+#include "hts_writer/HtsFileWriter.h"
+#include "hts_writer/HtsFileWriterBuilder.h"
+#include "hts_writer/StreamHtsFileWriter.h"
+#include "hts_writer/Structure.h"
 #include "utils/PostCondition.h"
 
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <htslib/sam.h>
 
 #include <filesystem>
 #include <memory>
 #include <numeric>
+#include <optional>
 #include <random>
+#include <stdexcept>
+#include <string>
 #include <vector>
 
 #define TEST_GROUP "[hts_file]"
@@ -285,4 +295,239 @@ CATCH_TEST_CASE("FileMergeBatcher: Eight batches, 3 recursions", TEST_GROUP) {
     const auto& batch7 = batcher.get_batch(7);
     CATCH_REQUIRE(batch7.size() == 2);
     CATCH_CHECK(batch7 == expected_files7);
+}
+
+using namespace hts_writer;
+using MaybeString = std::optional<std::string>;
+
+namespace {
+auto p_cb = utils::ProgressCallback([](float f) { (void)f; });
+auto d_cb = utils::DescriptionCallback([](const std::string& s) { (void)s; });
+int threads = 0;
+const std::string GPU_NAMES = "gpu_names:1";
+}  // namespace
+
+CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP) {
+    auto [output_mode, finalise_noop, out_dir] = GENERATE(table<OutputMode, bool, MaybeString>({
+            {OutputMode::FASTQ, true, std::nullopt},
+            {OutputMode::FASTQ, true, "out"},
+    }));
+
+    bool emit_fastq = true;
+    bool emit_sam = false;
+    bool ref_req = false;
+    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
+                  out_dir.has_value());
+
+    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                               p_cb, d_cb, GPU_NAMES);
+    auto writer = writer_builder.build();
+
+    CATCH_CHECK(writer->get_mode() == output_mode);
+    CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+}
+
+CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ throws given reference", TEST_GROUP) {
+    auto [out_dir] = GENERATE(table<MaybeString>({
+            {std::nullopt},
+            {"out"},
+    }));
+
+    bool emit_fastq = true;
+    bool ref_req = true;  // << FASTQ cannot store alignment results
+    bool emit_sam = false;
+    CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
+
+    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                               p_cb, d_cb, GPU_NAMES);
+
+    CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
+}
+
+CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusive", TEST_GROUP) {
+    auto [out_dir] = GENERATE(table<MaybeString>({
+            {std::nullopt},
+            {"out"},
+    }));
+
+    bool emit_fastq = true;  // << Both true
+    bool emit_sam = true;    // << Both true
+    bool ref_req = false;
+    CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
+
+    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                               p_cb, d_cb, GPU_NAMES);
+
+    CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) {
+    auto [output_mode, finalise_noop, ref_req, out_dir] =
+            GENERATE(table<OutputMode, bool, bool, MaybeString>({
+                    // SAM / BAM will sort if writing to file AND reference is set
+                    {OutputMode::SAM, true, false, std::nullopt},
+                    {OutputMode::SAM, true, false, "out"},
+                    {OutputMode::SAM, true, true, std::nullopt},
+                    {OutputMode::SAM, false, true, "out"},
+            }));
+
+    bool emit_sam = true;
+    bool emit_fastq = false;
+    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
+                  out_dir.has_value());
+
+    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                               p_cb, d_cb, GPU_NAMES);
+    auto writer = writer_builder.build();
+
+    CATCH_CHECK(writer->get_mode() == output_mode);
+    CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+}
+
+class HtsFileWriterBuilderTest : public HtsFileWriterBuilder {
+public:
+    HtsFileWriterBuilderTest(bool emit_fastq,
+                             bool emit_sam,
+                             bool reference_requested,
+                             const std::optional<std::string>& output_dir,
+                             int writer_threads,
+                             utils::ProgressCallback progress_callback,
+                             utils::DescriptionCallback description_callback,
+                             std::string gpu_names,
+                             bool is_fd_tty,
+                             bool is_fd_pipe)
+            : HtsFileWriterBuilder(emit_fastq,
+                                   emit_sam,
+                                   reference_requested,
+                                   output_dir,
+                                   writer_threads,
+                                   std::move(progress_callback),
+                                   std::move(description_callback),
+                                   std::move(gpu_names)) {
+        m_is_fd_tty = is_fd_tty;
+        m_is_fd_pipe = is_fd_pipe;
+    };
+};
+
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder tty and pipe settings", TEST_GROUP) {
+    auto [output_mode, ref_req, out_dir, emit_sam, is_fd_tty, is_fd_pipe] =
+            GENERATE(table<OutputMode, bool, MaybeString, bool, bool, bool>({
+                    // Always write SAM if writing to stdout tty
+                    {OutputMode::SAM, false, std::nullopt, true, true, false},
+                    {OutputMode::SAM, true, std::nullopt, true, true, false},
+                    {OutputMode::SAM, false, std::nullopt, false, true, false},
+                    {OutputMode::SAM, true, std::nullopt, false, true, false},
+
+                    // Output depends on --emit-sam regardless of reference when piping
+                    {OutputMode::SAM, false, std::nullopt, true, false, true},
+                    {OutputMode::SAM, true, std::nullopt, true, false, true},
+                    {OutputMode::UBAM, false, std::nullopt, false, false, true},
+                    {OutputMode::UBAM, true, std::nullopt, false, false, true},
+
+            }));
+
+    bool emit_fastq = false;
+    CATCH_CAPTURE(to_string(output_mode), emit_fastq, emit_sam, ref_req, out_dir.has_value(),
+                  is_fd_tty, is_fd_pipe);
+
+    auto writer_builder = HtsFileWriterBuilderTest(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
+    auto writer = writer_builder.build();
+
+    CATCH_CHECK(is_fd_tty != is_fd_pipe);
+    CATCH_CHECK(writer->get_mode() == output_mode);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM happy paths", TEST_GROUP) {
+    auto [output_mode, finalise_noop, ref_req, out_dir] =
+            GENERATE(table<OutputMode, bool, bool, MaybeString>({
+                    {OutputMode::BAM, true, false, std::nullopt},
+                    {OutputMode::BAM, true, false, "out"},
+                    {OutputMode::BAM, true, true, std::nullopt},
+                    // BAM will sort if writing to file AND reference is set
+                    {OutputMode::BAM, false, true, "out"},
+            }));
+
+    bool is_fd_tty = false;
+    bool is_fd_pipe = false;
+    bool emit_sam = false;
+    bool emit_fastq = false;
+    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
+                  out_dir.has_value(), is_fd_tty, is_fd_pipe);
+
+    auto writer_builder = HtsFileWriterBuilderTest(emit_fastq, emit_sam, ref_req, out_dir, threads,
+                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
+
+    auto writer = writer_builder.build();
+
+    CATCH_CHECK(writer->get_mode() == output_mode);
+    CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
+    int writer_threads = 10;
+    size_t progress_res = 0;
+    auto progress_cb =
+            utils::ProgressCallback([&progress_res](float value) { progress_res = value; });
+
+    std::string description_res{};
+    auto description_cb = utils::DescriptionCallback(
+            [&description_res](const std::string& value) { description_res = value; });
+    auto writer_builder = HtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
+                                               progress_cb, description_cb, GPU_NAMES);
+    auto writer = writer_builder.build();
+
+    auto& writer_ref = *writer;
+    // StreamHtsFileWriter sets threads to 0 as it has no use for them.
+    CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
+    CATCH_CHECK(writer->get_threads() == 0);
+
+    CATCH_CHECK(writer->get_gpu_names() == GPU_NAMES);
+
+    const int test_progress = 100;
+    writer->set_progress(test_progress);
+    CATCH_CHECK(progress_res == test_progress);
+
+    const auto test_description = "running a test";
+    writer->set_description(test_description);
+    CATCH_CHECK(description_res == test_description);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
+    using namespace hts_writer;
+    namespace fs = std::filesystem;
+
+    const auto tmp_dir = make_temp_dir("test_writer_structure");
+    const auto root = tmp_dir.m_path.string();
+
+    auto [output_mode] = GENERATE(table<OutputMode>({
+            {OutputMode::FASTQ},
+            {OutputMode::SAM},
+            {OutputMode::BAM},
+            {OutputMode::UBAM},
+    }));
+
+    hts_writer::SingleFileStructure structure(root, output_mode);
+    const auto& single_path = structure.get_path(HtsData{});
+
+    CATCH_CAPTURE(root, single_path, output_mode);
+
+    // Root is the parent of the output
+    const bool is_parent = fs::path(single_path).parent_path() == fs::path(root);
+    CATCH_CHECK(is_parent);
+
+    // Output starts with 'calls_'
+    const auto fname = fs::path(single_path).filename().string();
+    const bool fname_has_calls_prefix = fname.find("calls_") != std::string::npos;
+    CATCH_CAPTURE(fname);
+    CATCH_CHECK(fname_has_calls_prefix);
+
+    // Output file extension matches the output mode
+    const auto extension = fs::path(single_path).filename().extension().string();
+    CATCH_CAPTURE(extension, get_suffix(output_mode));
+    CATCH_CHECK(extension == get_suffix(output_mode));
+
+    // Regardless of the input data the output path should be the same for SingleFileStructure
+    const auto& single_path2 = structure.get_path(HtsData{nullptr, "kit", nullptr});
+    CATCH_CHECK(single_path == single_path2);
 }

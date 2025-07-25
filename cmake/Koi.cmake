@@ -20,15 +20,10 @@ endfunction()
 
 function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
-    set(hash__libkoi__0_6_0__Linux__aarch64__cuda__10_2 "e7e9410dda40d84b332de06f306d0b28cdceddf5f3db72434c8bafb7eb299d69")
-    set(hash__libkoi__0_6_0__Linux__aarch64__cuda__12_6 "abcf2f32baa7fac1333851a82087989d6c67f84b46bfbb497d23d1b7cc968fbd")
-    set(hash__libkoi__0_6_0__Linux__x86_64__cuda__11_8 "017664b061ad9f919ac93444b3f939abedf1cdd557f08605b67fe0a624793a40")
-    set(hash__libkoi__0_6_0__Linux__x86_64__cuda__12_0 "476b58ea0ba73bac0c3ecbb0e853d9b173ba022b2efeca87800c084638d043ab")
-    set(hash__libkoi__0_6_0__Linux__x86_64__cuda__12_4 "f0c6cfcbe29f9001ef27da12ec3621b89911033aaf899efb8c94353375f2145f")
-    set(hash__libkoi__0_6_0__Linux__x86_64__cuda__12_8 "b1a32428dcc663902f17ca8a7ae437536966d4d674ca45e34d727428fb82022e")
-    set(hash__libkoi__0_6_0__Windows__AMD64__cuda__11_8 "fd0da158e6630861c3410e61d3f7925cf8fc84c8f75162350dc604a391d217bf")
-    set(hash__libkoi__0_6_0__Windows__AMD64__cuda__12_4 "c745f33fddfd20884804a91b13a6fe63e26485db0acb924e579a5a4a371f1f17")
-    set(hash__libkoi__0_6_0__Windows__AMD64__cuda__12_8 "8037916ae99968321e32ad9b5cc5ea4390c3bc4abf2520971572c0d0776091af")
+    set(hash__libkoi__0_6_1__Linux__aarch64__cuda__12_6 "f352b7910ee33761f5714b648df358026f002fc67f9edfe2611fa7bfdd5835d7")
+    set(hash__libkoi__0_6_1__Linux__x86_64__cuda__11_8 "61eedb09b3b8abe8b27b5161d89f68755b9484ad1c03b08ec6cb8fbd17274e32")
+    set(hash__libkoi__0_6_1__Linux__x86_64__cuda__12_8 "a8988b21c735d0375a129ae3dfd08b111befdb677a817b3f7b8e01a3f30d7542")
+    set(hash__libkoi__0_6_1__Windows__AMD64__cuda__12_8 "4b9d5c35fc7d88c26d1346fba1cf75792d51ca086739ed48dc67e792d12fafd2")
 
     # Do the lookup.
     string(REPLACE "." "_" hash_key ${KOI_DIR})
@@ -42,7 +37,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.6.0)
+    set(KOI_VERSION 0.6.1)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})

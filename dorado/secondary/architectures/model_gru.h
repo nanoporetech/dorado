@@ -20,6 +20,8 @@ public:
 
     at::Tensor forward(at::Tensor x) override;
 
+    double estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const override;
+
 private:
     int32_t m_num_features = 10;
     int32_t m_num_classes = 5;

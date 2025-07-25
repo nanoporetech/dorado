@@ -43,6 +43,7 @@ variables:
   tags:
     - osx_arm64
     - xcode-15.3
+    - on-prem
   variables:
     MACOSX_DEPLOYMENT_TARGET: "13.0"
 
@@ -50,22 +51,26 @@ variables:
   tags:
     - ubuntu-20.04
     - nvidia-docker
+    - on-prem
 
 .linux_arm64_runner:
   tags:
     - linux_aarch64
     - docker-arm
+    - aws
 
 .linux_orin_cuda_12_runner:
   tags:
     - linux-arm64-gpu-12.6
     - nvidia-docker
+    - on-prem
 
 .windows_runner:
   tags:
     - windows-10
     - VS2019
     - cuda-${WIN_CUDA}
+    - on-prem
 
 .linux_build_dependencies:
   before_script:
@@ -117,8 +122,8 @@ variables:
   # Uploading these allows us to avoid checking out the repo in tests.
   - echo Zipping test files
   - |
-    zip -r  tests.archive tests/*.sh tests/*.bat tests/data tests/cram ||
-    tar -cf tests.archive tests/*.sh tests/*.bat tests/data tests/cram
+    zip -r  tests.archive tests/*.sh tests/data tests/cram ||
+    tar -cf tests.archive tests/*.sh tests/data tests/cram
 
 .unzip_test_files:
   - echo Unzipping test files
@@ -458,6 +463,7 @@ build_archive:macos:arm:
   stage: test
   variables:
     GIT_STRATEGY: none
+    SAMTOOLS_UNAVAILABLE: sadly_yes
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
@@ -466,7 +472,9 @@ build_archive:macos:arm:
     - cd test_archive
     - mv ../dist ../tests.archive .
     - !reference [.unzip_test_files]
-    - .\\tests\\test_simple_basecaller_execution.bat .\\dist\\bin\\dorado.exe
+    - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
+    - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
+    - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
 
 .test_archive:
   stage: test

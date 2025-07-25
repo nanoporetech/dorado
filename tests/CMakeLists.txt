@@ -73,6 +73,7 @@ add_executable(dorado_tests
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimTest.cpp
+    WriterNodeTest.cpp
     PafUtilsTest.cpp
     SecondaryDecodeVariantsTest.cpp
     SecondaryKadayashiUtils.cpp
@@ -80,6 +81,7 @@ add_executable(dorado_tests
     SecondaryMergeVCSamplesTest.cpp
     SecondaryModelFactory.cpp
     SecondarySampleTest.cpp
+    SecondarySampleCollateUtilsTest.cpp
     SecondaryTrimTest.cpp
     SecondaryWindowTest.cpp
     RleTest.cpp

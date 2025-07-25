@@ -4,9 +4,12 @@
 #include "secondary/architectures/model_factory.h"
 #include "secondary/common/batching.h"
 #include "secondary/common/region.h"
+#include "secondary/consensus/sample_collate_utils.h"
 #include "secondary/consensus/variant_calling.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/container_utils.h"
+#include "utils/memory_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
 
@@ -33,6 +36,10 @@
 // #define DEBUG_VC_DATA
 // #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
 
+#ifdef DEBUG_VC_DATA
+#include "secondary/consensus/consensus_utils.h"
+#endif
+
 namespace dorado::polisher {
 
 namespace {
@@ -42,7 +49,10 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
 
     if (devices_str == "cpu") {
         torch::Device torch_device = torch::Device(devices_str);
-        devices.emplace_back(DeviceInfo{devices_str, DeviceType::CPU, std::move(torch_device)});
+        devices.emplace_back(DeviceInfo{.name = devices_str,
+                                        .type = DeviceType::CPU,
+                                        .device = std::move(torch_device),
+                                        .available_memory_GB = utils::available_host_memory_GB()});
     }
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(devices_str, "cuda")) {
@@ -54,7 +64,12 @@ std::vector<DeviceInfo> init_devices(const std::string& devices_str) {
         }
         for (const auto& val : parsed_devices) {
             torch::Device torch_device = torch::Device(val);
-            devices.emplace_back(DeviceInfo{val, DeviceType::CUDA, std::move(torch_device)});
+            const double available_memory_GB =
+                    utils::available_memory(torch_device) / dorado::utils::BYTES_PER_GB;
+            devices.emplace_back(DeviceInfo{.name = val,
+                                            .type = DeviceType::CUDA,
+                                            .device = std::move(torch_device),
+                                            .available_memory_GB = available_memory_GB});
         }
     }
 #endif
@@ -87,6 +102,13 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
     resources.devices = init_devices(device_str);
     if (std::empty(resources.devices)) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
+    }
+
+    spdlog::debug("Initialized devices:");
+    for (int32_t device_id = 0; device_id < dorado::ssize(resources.devices); ++device_id) {
+        const DeviceInfo& dev_info = resources.devices[device_id];
+        spdlog::debug("    - [device_id = {}] name = {}, available_memory = {:.2f} GB", device_id,
+                      dev_info.name, dev_info.available_memory_GB);
     }
 
     // Construct the model.
@@ -822,6 +844,7 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_len,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
+                     const double max_available_mem,
                      const bool continue_on_exception,
                      utils::AsyncQueue<InferenceData>& infer_data,
                      std::atomic<bool>& worker_terminate,
@@ -850,12 +873,54 @@ void sample_producer(PolisherResources& resources,
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }
 
+    const auto move_buffer_data_to_queue = [](InferenceData& buffer,
+                                              utils::AsyncQueue<InferenceData>& queue,
+                                              const bool any_batch_size) {
+        if (std::empty(buffer.samples)) {
+            return;
+        }
+
+        // Any batch size is fine (no need to find a multiple of 8).
+        if (any_batch_size) {
+            queue.try_push(std::move(buffer));
+            buffer = {};
+            return;
+        }
+
+        // Round to the nearest smaller multiple of 8. If number of samples < 8 just use what
+        // there is, there is no real benefit of rounding to anything below it really.
+        const int64_t num_samples = dorado::ssize(buffer.samples);
+        const int64_t new_batch_size = (num_samples < 8) ? num_samples : (8 * (num_samples / 8));
+
+        // Get the first batch_size elements and push them to the queue.
+        InferenceData new_buffer;
+        for (int64_t i = 0; i < new_batch_size; ++i) {
+            new_buffer.samples.emplace_back(std::move(buffer.samples[i]));
+            new_buffer.trims.emplace_back(std::move(buffer.trims[i]));
+        }
+        queue.try_push(std::move(new_buffer));
+
+        // Get the remaining items and update the buffer.
+        InferenceData remainder;
+        for (int64_t i = new_batch_size; i < dorado::ssize(buffer.samples); ++i) {
+            remainder.samples.emplace_back(std::move(buffer.samples[i]));
+            remainder.trims.emplace_back(std::move(buffer.trims[i]));
+        }
+        buffer.samples = std::move(remainder.samples);
+        buffer.trims = std::move(remainder.trims);
+    };
+
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
             bam_region_intervals, num_threads,
             [](const secondary::Interval& val) { return val.end - val.start; });
 
     InferenceData buffer;
+
+    // All models should have the same architecture (they are just copies on different devices),
+    // so get the first one to be able to reach the `estimate_batch_memory()` function.
+    assert(!std::empty(resources.models));
+    const auto& model = resources.models.front();
 
     // Each iteration of the for loop produces full BAM regions of samples to fit at least num_threads windows.
     // It is important to process full BAM regions because of splitting/merging/splitting and trimming.
@@ -907,25 +972,55 @@ void sample_producer(PolisherResources& resources,
                     remainder_buffer.samples.emplace_back(std::move(samples[i]));
                     remainder_buffer.trims.emplace_back(std::move(trims[i]));
                     spdlog::trace(
-                            "[producer] Pushing a batch of data to infer_data queue. "
-                            "remainder_buffer.samples.size() = {}",
-                            std::size(remainder_buffer.samples));
+                            "[producer] Pushing a remainder batch of data to infer_data queue. "
+                            "remainder_buffer.samples.size() = {}. i = {}, size(positions_major) = "
+                            "{}, window_len = {}, size(samples) = {}",
+                            std::size(remainder_buffer.samples), i,
+                            std::size(samples[i].positions_major), window_len, std::size(samples));
                     infer_data.try_push(std::move(remainder_buffer));
                     continue;
+                }
+
+                // Cut batches either on memory consumption or on the absolute count.
+                if (batch_size <= 0) {
+                    // Auto batch size computation.
+                    const std::vector<int64_t> next_batch_shape =
+                            secondary::compute_collated_padded_shape(buffer.samples, samples[i]);
+
+                    const double estimated_memory = model->estimate_batch_memory(next_batch_shape);
+
+                    spdlog::trace("Using auto-estimated batch-size.");
+                    if (!std::empty(buffer.samples) && (estimated_memory >= max_available_mem)) {
+                        spdlog::trace("Estimating next batch memory:");
+                        spdlog::trace("    - estimated_memory = {} GB", estimated_memory);
+                        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
+                        spdlog::trace(
+                                "    - next_batch_shape = {}",
+                                utils::print_container_as_string(next_batch_shape, ",", true));
+
+                        spdlog::trace(
+                                "[producer] Pushing a batch of data to infer_data queue (1a). "
+                                "buffer.samples.size() = {}",
+                                std::size(buffer.samples));
+
+                        move_buffer_data_to_queue(buffer, infer_data, false);
+                    }
+
+                } else {
+                    spdlog::trace("Using fixed batch-size of {}.", batch_size);
+                    if (dorado::ssize(buffer.samples) >= batch_size) {
+                        // Fixed batch size.
+                        spdlog::trace(
+                                "[producer] Pushing a batch of data to infer_data queue (1b). "
+                                "buffer.samples.size() = {}",
+                                std::size(buffer.samples));
+                        move_buffer_data_to_queue(buffer, infer_data, true);
+                    }
                 }
 
                 // Expand the current buffer.
                 buffer.samples.emplace_back(std::move(samples[i]));
                 buffer.trims.emplace_back(std::move(trims[i]));
-
-                if (dorado::ssize(buffer.samples) == batch_size) {
-                    spdlog::trace(
-                            "[producer] Pushing a batch of data to infer_data queue. "
-                            "buffer.samples.size() = {}",
-                            std::size(buffer.samples));
-                    infer_data.try_push(std::move(buffer));
-                    buffer = {};
-                }
             }
         } catch (const std::exception& e) {
             if (!continue_on_exception) {
@@ -948,11 +1043,16 @@ void sample_producer(PolisherResources& resources,
 
     if (!std::empty(buffer.samples)) {
         spdlog::trace(
-                "[producer] Pushing a batch of data to infer_data queue. "
+                "[producer] Pushing a batch of data to infer_data queue (2). "
                 "buffer.samples.size() = {} (final)",
                 std::size(buffer.samples));
-        infer_data.try_push(std::move(buffer));
-        buffer = {};
+
+        // First, push the N*8 elements to the queue for efficiency.
+        move_buffer_data_to_queue(buffer, infer_data, false);
+
+        // Next, push the remainder if the buffer is not empty.
+        move_buffer_data_to_queue(buffer, infer_data, true);
+
         spdlog::debug("[producer] Pushed final batch for inference to infer_data queue.");
     }
 
@@ -1011,13 +1111,16 @@ void infer_samples_in_parallel(
             time_collate = timer_collate.GetElapsedMilliseconds();
         }
 
+        const std::string input_batch_tensor_shape =
+                utils::tensor_shape_as_string(batch_features_tensor);
+
         // Debug output.
         {
             spdlog::trace(
                     "[consumer {}] About to call forward(): batch_features_tensor.size() = [{}], "
                     "approx "
                     "size: {} MB.",
-                    tid, utils::tensor_shape_as_string(batch_features_tensor),
+                    tid, input_batch_tensor_shape,
                     batch_features_tensor.numel() * batch_features_tensor.element_size() /
                             (1024.0 * 1024.0));
         }
@@ -1087,8 +1190,8 @@ void infer_samples_in_parallel(
             spdlog::trace(
                     "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} "
                     "ms, "
-                    "total = {}",
-                    tid, time_collate, time_forward, time_total);
+                    "total = {}, batch_features_tensor.shape = [{}]",
+                    tid, time_collate, time_forward, time_total, input_batch_tensor_shape);
         }
 
         return output;

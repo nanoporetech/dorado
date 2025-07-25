@@ -2,13 +2,16 @@
 
 #include "hts_types.h"
 
-#include <algorithm>
 #include <filesystem>
 #include <functional>
 #include <map>
 #include <string>
 
-namespace dorado::utils {
+namespace dorado {
+namespace utils {
+
+using ProgressCallback = std::function<void(size_t percentage)>;
+using DescriptionCallback = std::function<void(const std::string&)>;
 
 class HtsFile {
 public:
@@ -19,8 +22,6 @@ public:
         FASTQ,
         FASTA,
     };
-
-    using ProgressCallback = std::function<void(size_t percentage)>;
 
     HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam);
     ~HtsFile();
@@ -94,4 +95,9 @@ private:
     std::vector<MergeJob> recursive_batching(const std::vector<std::string>& files);
 };
 
-}  // namespace dorado::utils
+}  // namespace utils
+
+std::string to_string(utils::HtsFile::OutputMode mode);
+std::string get_suffix(utils::HtsFile::OutputMode mode);
+
+}  // namespace dorado

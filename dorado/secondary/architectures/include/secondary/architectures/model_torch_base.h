@@ -4,6 +4,7 @@
 #include <torch/nn/module.h>
 
 #include <memory>
+#include <vector>
 
 namespace dorado::secondary {
 
@@ -47,6 +48,12 @@ public:
      * \brief Predict on a batch with device and precision handling.
      */
     virtual at::Tensor predict_on_batch(at::Tensor x);
+
+    /**
+     * \brief Approximate memory consumption estimate given an input batch tensor shape.
+     *          This is model specific, and facilitates auto batch size computation
+     */
+    virtual double estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const = 0;
 
 protected:
     bool m_normalise = true;

@@ -218,4 +218,36 @@ BamPtr new_unmapped_record(bam1_t* record, std::string seq, std::vector<uint8_t>
  */
 void remove_alignment_tags_from_record(bam1_t* record);
 
+/*
+ * Get the "dx" tag from the bam record
+ *
+ * @param record BAM record.
+ * @return The "dx" tag value - 0 if not found
+ */
+int64_t get_dx_tag(const bam1_t* record);
+
+/*
+ * Check if this record is a duplex record i.e. "dx" tag == 1
+ *
+ * @param record BAM record.
+ * @return True if the reads is a duplex read
+ */
+bool is_duplex_record(const bam1_t* record);
+
+/*
+ * Check if this record is a simplex record which has no duplex offspring i.e. "dx" tag == 0
+ *
+ * @param record BAM record.
+ * @return True if the reads is a simplex read which has duplex offspring
+ */
+bool is_simplex_record_no_duplex_offspring(const bam1_t* record);
+
+/*
+ * Check if this record is a simplex record which has duplex offspring i.e. "dx" tag == -1
+ *
+ * @param record BAM record.
+ * @return True if the reads is a simplex read which has duplex offspring
+ */
+bool is_simplex_record_with_duplex_offspring(const bam1_t* record);
+
 }  // namespace dorado::utils

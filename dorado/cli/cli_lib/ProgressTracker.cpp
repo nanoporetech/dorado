@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <iomanip>
 #include <sstream>
+#include <utility>
 
 namespace {
 
@@ -27,11 +28,14 @@ void erase_progress_bar_line() {
 
 namespace dorado {
 
+ProgressTracker::ProgressTracker(Mode mode, int total_reads)
+        : ProgressTracker(mode, total_reads, 0.) {}
+
 ProgressTracker::ProgressTracker(Mode mode, int total_reads, float post_processing_percentage)
         : m_num_reads_expected(total_reads),
           m_mode(mode),
           m_post_processing_percentage(post_processing_percentage) {
-    m_initialization_time = std::chrono::system_clock::now();
+    reset_initialization_time();
 }
 
 ProgressTracker::~ProgressTracker() = default;
@@ -42,6 +46,10 @@ void ProgressTracker::set_description(const std::string& desc) {
         m_progress_bar.set_option(indicators::option::PostfixText{desc});
     }
 }
+
+void ProgressTracker::reset_initialization_time() {
+    m_initialization_time = std::chrono::system_clock::now();
+};
 
 void ProgressTracker::summarize() const {
     if (!m_is_progress_reporting_disabled) {
@@ -150,8 +158,26 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         return 0.;
     };
 
-    m_num_simplex_reads_written = int(fetch_stat("HtsWriterNode.unique_simplex_reads_written") +
-                                      fetch_stat("BarcodeDemuxerNode.demuxed_reads_written"));
+    // TODO: Transfer over entirely to WriterNode in DOR-1176 and DOR-1204
+    auto fetch_reads_written = [&fetch_stat]() {
+        double simplex_reads_written, duplex_reads_written = 0.0;
+        simplex_reads_written = fetch_stat("WriterNode.HtsFileWriter.unique_simplex_reads_written");
+        if (simplex_reads_written == 0.) {
+            simplex_reads_written = fetch_stat("HtsWriterNode.unique_simplex_reads_written");
+        }
+
+        duplex_reads_written = fetch_stat("WriterNode.HtsFileWriter.duplex_reads_written");
+        if (duplex_reads_written == 0.) {
+            duplex_reads_written = fetch_stat("HtsWriterNode.duplex_reads_written");
+        }
+
+        return std::make_pair(simplex_reads_written, duplex_reads_written);
+    };
+
+    auto [simplex_reads_written, duplex_reads_written] = fetch_reads_written();
+
+    m_num_simplex_reads_written =
+            int(simplex_reads_written + fetch_stat("BarcodeDemuxerNode.demuxed_reads_written"));
 
     m_num_simplex_reads_filtered = int(fetch_stat("ReadFilterNode.simplex_reads_filtered"));
     m_num_simplex_bases_filtered = int(fetch_stat("ReadFilterNode.simplex_bases_filtered"));
@@ -163,7 +189,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         m_num_duplex_bases_processed = int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
         m_num_bases_processed += m_num_duplex_bases_processed;
     }
-    m_num_duplex_reads_written = int(fetch_stat("HtsWriterNode.duplex_reads_written"));
+    m_num_duplex_reads_written = int(duplex_reads_written);
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
 

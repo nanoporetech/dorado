@@ -923,7 +923,7 @@ The command above will create the output directory `split_by_channel` and write 
 
 If running duplex basecalling in a distributed fashion (e.g. on a SLURM or Kubernetes cluster) it is important to split POD5 files as described above. The reason is that duplex basecalling requires aggregation of reads from across a whole sequencing run, which will be distributed over multiple POD5 files.
 The splitting strategy described above ensures that all reads which need to be aggregated are in the same POD5 file. Once the split is performed one can execute multiple jobs against smaller subsets of POD5 (e.g one job per 100 channels). This will allow basecalling to be distributed across nodes on a cluster. 
-This will generate multiple BAMs which can be merged. This apporach also offers some resilience as if any job fails it can be restarted without having to re-run basecalling against the entire dataset.
+This will generate multiple BAMs which can be merged. This approach also offers some resilience as if any job fails it can be restarted without having to re-run basecalling against the entire dataset.
 
 ### GPU Out of Memory Errors
 
