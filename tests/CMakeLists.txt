@@ -32,6 +32,7 @@ add_executable(dorado_tests
     fasta_reader_test.cpp
     fastq_reader_test.cpp
     FastxRandomReaderTest.cpp
+    FastxSequentialReaderTest.cpp
     FileInfoTest.cpp
     gpu_monitor_test.cpp
     gzip_reader_test.cpp
