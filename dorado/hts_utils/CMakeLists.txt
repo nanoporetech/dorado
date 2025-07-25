@@ -9,6 +9,7 @@ dorado_add_library(
         fasta_fastq_utils.h
         fasta_reader.h
         fastq_reader.h
+        fastq_tags.h
         FastxRandomReader.h
         FastxSequentialReader.h
         hts_file.h
@@ -22,6 +23,7 @@ dorado_add_library(
         fasta_fastq_utils.cpp
         fasta_reader.cpp
         fastq_reader.cpp
+        fastq_tags.cpp
         FastxRandomReader.cpp
         FastxSequentialReader.cpp
         hts_file.cpp
