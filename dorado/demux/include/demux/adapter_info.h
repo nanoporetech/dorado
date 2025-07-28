@@ -3,32 +3,22 @@
 #include <map>
 #include <optional>
 #include <string>
+#include <vector>
 
 namespace dorado::demux {
 
-/// This enum allows for specification of special primer detection and handling.
+/// This enum allows for specification of extended primer detection and handling.
 enum class PrimerAux {
     DEFAULT,  ///< Indicates that standard primers for the kit should be used.
     GEN10X,   ///< Applies to SQK-LSK114* kits. Look for 10X primers, and apply special analysis.
-    UNKNOWN,  ///< Indicates an unknown (and unsupported) special primer.
+    UNKNOWN,  ///< Indicates an unknown (and unsupported) extended primer.
 };
 
-inline PrimerAux special_primer_by_name(const std::string& name) {
-    // This map should contain any special primers defined in adapter_primer_kits.cpp
-    // that must be specified in the AdapterInfo object in order to be searched for.
-    // If one of these entries is specified, then those primers will be searched for
-    // instead of the standard primers associated with the sequencing kit.
-    static std::map<std::string, PrimerAux> name_map{{"10X_Genomics", PrimerAux::GEN10X}};
+/// Get the primer sequences for the specified primer set.
+PrimerAux extended_primers_by_name(const std::string& name);
 
-    if (name.empty()) {
-        return PrimerAux::DEFAULT;
-    }
-    auto ptr = name_map.find(name);
-    if (ptr == name_map.end()) {
-        return PrimerAux::UNKNOWN;
-    }
-    return ptr->second;
-}
+/// Get the names of all supported extended primer sets.
+std::vector<std::string> extended_primer_names();
 
 struct AdapterInfo {
     bool trim_adapters{true};

@@ -44,7 +44,7 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
 // This maps primer codes to the details of the primers. Note that for cDNA and PCS110 primers,
 // what would normally be considered the "rear" primer will actually be found near the beginning
 // of a forward read, and vice-versa for reverse reads. So for example, we list the SSP cDNA primer
-// as the frint primer, and the VNP one as the rear primer, so that the code will work properly.
+// as the front primer, and the VNP one as the rear primer, so that the code will work properly.
 // The PCS and RAD primer sequences used here are also truncated from the beginning. This does not
 // affect trimming, because trimming is done from the end of the detected primer. It does allow these
 // sequences to be used with barcoding, where a truncated version of the primer appears as the inside
@@ -71,7 +71,6 @@ const std::unordered_map<PrimerCode, Candidate> primers = {
          }},
         {PC::GEN10X,
          {
-                 // Special primers for 10X sequencing,
                  "10X_Genomics",
                  "CTACACGACGCTCTTCCGATCT",    // SSP
                  "GTACTCTGCGTTGATACCACTGCTT"  // VNP
@@ -327,7 +326,7 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
     }
     std::vector<Candidate> filtered_results;
     for (auto& item : results) {
-        auto aux = demux::special_primer_by_name(item.name);
+        auto aux = demux::extended_primers_by_name(item.name);
         if (aux == dorado::demux::PrimerAux::UNKNOWN) {
             // No primer_aux value associated with candidate, so only include if no
             // special primer_aux was requested.

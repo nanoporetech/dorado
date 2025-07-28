@@ -147,15 +147,13 @@ The software automatically searches for primer sequences used in Oxford Nanopore
 
 #### Trimming 3rd-party or non-standard primers
 
-The software now supports handling of some non-standard primers without having to provide a custom primer file, as described above. This can be enabled by using the `--extended-primers` command-line option, followed by a string indicating a supported primer set. This can be used with either `dorado basecaller` or `dorado trim`.
+Dorado handles a selection of 3rd-party primers without the need to provide a custom primer file. This can be enabled by using the `--extended-primers` command-line option, followed by a string indicating a supported primer set. This can be used with either `dorado basecaller` or `dorado trim`.
 
 Currently the only extended primer set supported is the primers used for 10X Genomics sequencing. Support for detecting and trimming these primers can be enabled by using:
 
 `--extended-primers 10X_Genomics`
 
-In addition to detecting and trimming primers, dorado will also extract the cell-barcodes and UMI tags, which it puts into the `RX:Z` BAM tag. Because the dorado software does not know anything about the specific cell-barcode or UMI sequences, it will simply extract the entire portion of the read corresponding the cell-barcodes and UMI tags, and place it in the `RX:Z` BAM tag. It is up to the user to apply whatever post-processing is needed to make use of that information.
-
-Other extended primer options may be included in the future.
+In addition to detecting and trimming primers, Dorado will extract the section of the read corresponding to the cell-barcodes and UMI tags and place it in the RX:Z BAM tag.
 
 ### RNA adapter trimming
 

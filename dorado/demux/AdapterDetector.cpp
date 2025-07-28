@@ -5,6 +5,7 @@
 #include "demux/parse_custom_sequences.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 #include "utils/types.h"
 
 #include <edlib.h>
@@ -27,15 +28,15 @@ namespace {
 // When present, the tag will either immediately follow the PCS110 SSP sequence near the beginning
 // of the read, or its RC will immediately precede the RC of the PCS110 SSP sequence near the end
 // of the read. Note that the Vs are wildcards, which could be any of "A", "C", or "G".
-const std::string umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
+const std::string_view umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
 
-// For the GEN10X special primers, depending on the specific configuration, there may be a TSO
-// sequence following the UMI tag (if not, there will be a run of polyT). And for the VNP sequence,
-// there may be an additional bit of sequence just before the VNP sequence. This is because there
-// are actually two different VNP primers, but they are nearly identical, except for this extra
-// bit of sequence, so treating them as different primers would greatly complicate things.
-const std::string gen10x_tso_sequence = "TTTCTTATATGGG";
-const std::string gen10x_polyt_sequence = "TTTTTTTTTTTTT";
+// For the GEN10X primers, depending on the specific configuration, there may be a TSO sequence
+// following the UMI tag (if not, there will be a run of polyT). And for the VNP sequence, there
+// may be an additional bit of sequence just before the VNP sequence. This is because there are
+// actually two different VNP primers, but they are nearly identical, except for this extra bit
+// of sequence, so treating them as different primers would greatly complicate things.
+const std::string_view gen10x_tso_sequence = "TTTCTTATATGGG";
+const std::string_view gen10x_polyt_sequence = "TTTTTTTTTTTTT";
 
 // This indicates how many bases before the end of the detected SSP primer the UMI search window
 // should begin. Note that the first 3 bases of the UMI tag are also the last 3 bases of the primer.
@@ -277,11 +278,11 @@ PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult&
         classification.orientation = get_dir(rear_name);
     }
     // For the PCS110 primers, we need to check for a UMI tag after the SSP primer.
-    if (classification.primer_name.substr(0, 6) == "PCS110") {
+    if (utils::starts_with(classification.primer_name, "PCS110")) {
         check_for_umi_tags(result, classification, sequence, trim_interval);
     }
     // For the GEN10X primers, we need to apply some additional analysis checks.
-    if (classification.primer_name.substr(0, 12) == "10X_Genomics") {
+    if (utils::starts_with(classification.primer_name, "10X_Genomics")) {
         check_10x_primers(classification, sequence, trim_interval);
     }
     return classification;

@@ -227,10 +227,23 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                       "--barcode-arrangement.");
         parser.visible.add_argument("--primer-sequences")
                 .help("Path to file with custom primer sequences.");
+        const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
         parser.visible.add_argument("--extended-primers")
-                .help("If any non-standard primers supported by dorado have been used, you can "
-                      "specify them here.")
-                .default_value(std::string(""));
+                .help("Specify a supported 3rd-party primer set to search for, instead of the "
+                      "standard ONT primers. "
+                      "Choose from: " +
+                      extended_primer_codes + ".")
+                .default_value(std::string(""))
+                .action([extended_primer_codes](const std::string& value) {
+                    const auto& codes = demux::extended_primer_names();
+                    if (std::find(codes.begin(), codes.end(), value) == codes.end()) {
+                        spdlog::error(
+                                "'{}' is not a supported extended primer. please select from {}",
+                                value, extended_primer_codes);
+                        std::exit(EXIT_FAILURE);
+                    }
+                    return value;
+                });
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -885,10 +898,10 @@ int basecaller(int argc, char* argv[]) {
         const barcode_kits::KitInfo& kit_info = provider.get_kit_info(barcoding_info->kit_name);
         adapter_info->rna_adapters = kit_info.rna_barcodes;
     }
-    const auto& special_primers = parser.visible.get<std::string>("--extended-primers");
-    adapter_info->primer_aux = demux::special_primer_by_name(special_primers);
+    const auto& extended_primers = parser.visible.get<std::string>("--extended-primers");
+    adapter_info->primer_aux = demux::extended_primers_by_name(extended_primers);
     if (adapter_info->primer_aux == demux::PrimerAux::UNKNOWN) {
-        spdlog::error("Unknown value of --extended-primers option: '{}'.", special_primers);
+        spdlog::error("Unknown value of --extended-primers option: '{}'.", extended_primers);
         std::exit(EXIT_FAILURE);
     }
 

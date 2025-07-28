@@ -14,6 +14,7 @@ dorado_add_library(
         parse_custom_kit.h
         Trimmer.h
     SOURCES_PRIVATE
+        adapter_info.cpp
         adapter_primer_kits.cpp
         adapter_primer_kits.h
         AdapterDetector.cpp

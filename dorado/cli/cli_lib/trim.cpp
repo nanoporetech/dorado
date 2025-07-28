@@ -13,6 +13,7 @@
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -51,10 +52,22 @@ int trim(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-k", "--sequencing-kit")
             .help("Sequencing kit name to use for selecting adapters and primers to trim.");
+    const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
     parser.add_argument("--extended-primers")
-            .help("If any non-standard primers supported by dorado have been used, you can specify "
-                  "them here.")
-            .default_value(std::string(""));
+            .help("Specify a supported 3rd-party primer set to search for, instead of the standard "
+                  "ONT primers. "
+                  "Choose from: " +
+                  extended_primer_codes + ".")
+            .default_value(std::string(""))
+            .action([extended_primer_codes](const std::string& value) {
+                const auto& codes = demux::extended_primer_names();
+                if (std::find(codes.begin(), codes.end(), value) == codes.end()) {
+                    spdlog::error("'{}' is not a supported extended primer. please select from {}",
+                                  value, extended_primer_codes);
+                    std::exit(EXIT_FAILURE);
+                }
+                return value;
+            });
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to trim.")
             .default_value(std::string(""));
@@ -164,10 +177,10 @@ int trim(int argc, char* argv[]) {
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
     adapter_info->kit_name = kit_name;
     adapter_info->custom_seqs = custom_primer_file;
-    const auto& special_primers = parser.get<std::string>("--extended-primers");
-    adapter_info->primer_aux = demux::special_primer_by_name(special_primers);
+    const auto& extended_primers = parser.get<std::string>("--extended-primers");
+    adapter_info->primer_aux = demux::extended_primers_by_name(extended_primers);
     if (adapter_info->primer_aux == demux::PrimerAux::UNKNOWN) {
-        spdlog::error("Unknown value of --extended-primers option: '{}'.", special_primers);
+        spdlog::error("Unknown value of --extended-primers option: '{}'.", extended_primers);
         return EXIT_FAILURE;
     }
 

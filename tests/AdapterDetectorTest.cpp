@@ -175,6 +175,7 @@ CATCH_TEST_CASE("AdapterDetector: test 10X primers, cell-barcodes, and UMI tags.
     const std::string vnp_prefix_rc = "ATGGG";
 
     const auto& primers = detector.get_primer_sequences(TEST_KIT1, demux::PrimerAux::GEN10X);
+    CATCH_REQUIRE_FALSE(primers.empty());
     const auto& front_primer = primers[0].front_sequence;
     const auto& rear_primer = primers[0].rear_sequence;
 
