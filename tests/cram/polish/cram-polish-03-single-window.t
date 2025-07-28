@@ -5,7 +5,7 @@ FASTA output.
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu --window-len 10000 --window-overlap 1000 --bam-chunk 1000000 ${in_bam} ${in_draft} -t 4 ${model_var} > out/out.fasta 2> out/stderr
   > echo "Exit code: $?"
   > gunzip -d --stdout ${expected} | head -n 2 | sed 's/@/>/g' > out/expected.fasta

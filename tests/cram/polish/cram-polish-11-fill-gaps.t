@@ -21,7 +21,7 @@ Create a synthetic test case used by tests below. This block does not run any te
 Fill gaps with draft sequence (default behaviour).
 Expected: no diffs, exit code 0 and one sequence copied verbatim (contig_2 with no coverage).
   $ rm -rf out; mkdir -p out
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > in_draft="data/draft.fasta"
   > in_bam="data/calls_to_draft.bam"
   > expected="${in_dir}/expected.synth.medaka.w_fill_gaps.no_fill_char.fasta.gz"
@@ -36,7 +36,7 @@ Expected: no diffs, exit code 0 and one sequence copied verbatim (contig_2 with 
 No filling of gaps with draft sequence.
 Expected: only parts of contig_1 with coverage should be output. contig_2 will not be output because it has zero coverage.
   $ rm -rf out; mkdir -p out
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > in_draft="data/draft.fasta"
   > in_bam="data/calls_to_draft.bam"
   > expected="${in_dir}/expected.synth.medaka.no_fill_gaps.no_fill_char.fasta.gz"
@@ -52,7 +52,7 @@ Fill gaps with custom user-defined character.
 The zero coverage gap in contig_1 should be filled with 'Z' characters instead of bases from the draft.
 Also, the `contig_2` sequence should be taken verbatim from input draft, and not be filled with 'Z' characters.
   $ rm -rf out; mkdir -p out
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > in_draft="data/draft.fasta"
   > in_bam="data/calls_to_draft.bam"
   > expected="${in_dir}/expected.synth.medaka.w_fill_gaps.fill_char_Z.fasta"
@@ -71,7 +71,7 @@ No filling of gaps with draft sequence, while `--fill-char` is used.
 The `--fill-char` should have no effect.
 Expected: only parts of contig_1 with coverage should be output. contig_2 will not be output because it has zero coverage.
   $ rm -rf out; mkdir -p out
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > in_draft="data/draft.fasta"
   > in_bam="data/calls_to_draft.bam"
   > expected="${in_dir}/expected.synth.medaka.no_fill_gaps.no_fill_char.fasta.gz"

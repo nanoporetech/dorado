@@ -18,7 +18,7 @@ Given the right BAM region size and overap, this triggers the edge case.
 Such samples should be filtered out from the output.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > # Create the edge-case input BAM.
   > samtools merge -c out/in.bam ${in_dir}/calls_to_draft.bam ${in_dir}/calls_to_draft.single_read.long_insertion.bam
   > samtools index out/in.bam

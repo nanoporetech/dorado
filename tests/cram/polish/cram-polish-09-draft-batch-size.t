@@ -5,7 +5,7 @@ Preparing test data here. This block does not actually run tests. The data produ
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > # Produce a draft consisting of 3 sequences.
   > gunzip -c ${in_draft} > data/original.draft.fasta
   > cat data/original.draft.fasta > data/in.draft.fasta

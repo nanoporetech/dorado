@@ -4,7 +4,7 @@ Test input BAM which was not aligned using Dorado (no "dorado aligner" in the @P
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > # Create an input BAM with no @PG lines in the header (so no way to identify Dorado).
   > samtools view -H ${in_bam} | grep -v "@PG" > out/in.sam
   > samtools view ${in_bam} >> out/in.sam
@@ -23,7 +23,7 @@ Allow any BAM as input.
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/ref.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > # Create an input BAM with no @PG lines in the header (so no way to identify Dorado).
   > samtools view -H ${in_bam} | grep -v "@PG" > out/in.sam
   > samtools view ${in_bam} >> out/in.sam
