@@ -1,6 +1,5 @@
 #pragma once
 
-#include <map>
 #include <optional>
 #include <string>
 #include <vector>
@@ -18,7 +17,7 @@ enum class PrimerAux {
 PrimerAux extended_primers_by_name(const std::string& name);
 
 /// Get the names of all supported extended primer sets.
-std::vector<std::string> extended_primer_names();
+const std::vector<std::string>& extended_primer_names();
 
 struct AdapterInfo {
     bool trim_adapters{true};
