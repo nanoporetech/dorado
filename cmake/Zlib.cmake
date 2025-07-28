@@ -1,16 +1,17 @@
 if(WIN32)
     set(ZLIB_VER 1.3.1)
+    set(ZLIB_HASH "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c")
 
     # On windows, we need to build Zlib
     set(ZLIB_INSTALL_DIR ${CMAKE_BINARY_DIR}/zlib-${ZLIB_VER}/install)
     if(EXISTS ${ZLIB_INSTALL_DIR})
         message(STATUS "Found ZLIB=${ZLIB_VER}")
     else()
-        # Need a zlib build 
+        # Need a zlib build
         download_and_extract(
             https://github.com/madler/zlib/archive/refs/tags/v${ZLIB_VER}.tar.gz
             zlib-${ZLIB_VER}
-            "17e88863f3600672ab49182f217281b6fc4d3c762bde361935e436a95214d05c"
+            "${ZLIB_HASH}"
         )
         set(ZLIB_BUILD_DIR ${CMAKE_BINARY_DIR}/zlib-${ZLIB_VER}/build)
         execute_process(
@@ -35,6 +36,6 @@ if(WIN32)
 
     install(FILES ${ZLIB_INSTALL_DIR}/bin/zlib.dll DESTINATION bin)
 
-    find_package(ZLIB REQUIRED)
-
 endif()
+
+find_package(ZLIB REQUIRED)
