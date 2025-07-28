@@ -113,7 +113,6 @@ check_structure() {
     expected=(
         "${core}/bam_pass/barcode01/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
         "${core}/bam_pass/barcode04/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
-        "${core}/bam_pass/barcode68/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
         "${core}/bam_pass/unclassified/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
     )
 

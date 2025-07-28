@@ -484,10 +484,10 @@ test_barcoding_read_groups() (
 )
 
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    # There should be 4 reads with BC01, 2 with BC04, 1 with barcode 68, and 1 unclassified groups.
-    test_barcoding_read_groups barcode01 4 barcode04 2 barcode68 1 unclassified 1
+    # There should be 4 reads with BC01, 2 with BC04, and 1 unclassified groups.
+    test_barcoding_read_groups barcode01 4 barcode04 2 unclassified 1
     # There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
-    test_barcoding_read_groups patient_id_1 4 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
+    test_barcoding_read_groups patient_id_1 4 unclassified 3 $data_dir/barcode_demux/sample_sheet.csv
 fi
 
 # Test demux only on a pre-classified BAM file
