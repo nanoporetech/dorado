@@ -35,7 +35,6 @@ bool koi_can_use_cutlass() {
 }
 
 struct KoiTensorExt : public KoiTensor {
-    KoiTensorExt() = default;
     KoiTensorExt(const at::Tensor &t, const std::vector<int> &dim_tags) { init(t, dim_tags); }
     KoiTensorExt(const at::Tensor &t,
                  const std::vector<int> &dim_tags,
@@ -494,10 +493,11 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
     bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
                   utils::get_dev_opt<bool>("koi_use_f8", true);
-    bool use_hopper = utils::get_dev_opt<bool>("koi_use_f8", true) &&
-                      utils::get_dev_opt<bool>("koi_use_hopper", true);
 #if !DORADO_ORIN
-    use_hopper = use_hopper && (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS);
+    bool use_hopper = use_f8 && utils::get_dev_opt<bool>("koi_use_hopper", true) &&
+                      (koi_hopper_tc_is_available(KOI_E4M3) == KOI_SUCCESS);
+#else
+    constexpr bool use_hopper = false;
 #endif
 
     if (!t_res_weights.numel()) {
