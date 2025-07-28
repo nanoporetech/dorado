@@ -4,6 +4,7 @@
 #include "hts_utils/FastxRandomReader.h"
 #include "hts_utils/fai_utils.h"
 #include "model_downloader/model_downloader.h"
+#include "model_resolution.h"
 #include "models/models.h"
 #include "polish/polish_impl.h"
 #include "polish_progress_tracker.h"
@@ -80,6 +81,7 @@ struct Options {
     // Optional parameters.
     std::filesystem::path output_dir;
     std::string model_str;
+    std::optional<std::filesystem::path> models_directory;
     OutputFormat out_format = OutputFormat::FASTA;
     int32_t verbosity = 0;
     int32_t threads = 0;
@@ -160,9 +162,9 @@ ParserPtr create_cli(int& verbosity) {
                 .help("If specified, output files will be written to the given folder. Otherwise, "
                       "output is to stdout.")
                 .default_value("");
-        parser->visible.add_argument("-m", "--model")
-                .help("Path to the model folder.")
-                .default_value("auto");
+        parser->visible.add_argument("--models-directory")
+                .help("Optional directory to search for existing models or download new models "
+                      "into.");
         parser->visible.add_argument("--bacteria")
                 .help("Optimise polishing for plasmids and bacterial genomes.")
                 .flag();
@@ -264,6 +266,9 @@ ParserPtr create_cli(int& verbosity) {
                 .help("Continue the process even if an exception is thrown. This "
                       "may leave some regions unprocessed.")
                 .flag();
+        parser->hidden.add_argument("--model-override")
+                .help("Path to a model folder or an exact name of a model to use.")
+                .default_value("");
     }
 
     return parser;
@@ -291,8 +296,9 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.in_draft_fastx_fn = parser.visible.get<std::string>("in_draft_fastx");
 
     opt.output_dir = parser.visible.get<std::string>("output-dir");
-    opt.model_str = parser.visible.get<std::string>("model");
     opt.bacteria = parser.visible.get<bool>("bacteria");
+
+    opt.models_directory = model_resolution::get_models_directory(parser.visible);
 
     opt.out_format =
             parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
@@ -332,6 +338,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.any_bam = parser.hidden.get<bool>("any-bam");
     opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
     opt.continue_on_error = parser.hidden.get<bool>("continue-on-error");
+    opt.model_str = parser.hidden.get<std::string>("model-override");
 
     opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
     opt.fill_char = (parser.visible.is_used("--fill-char"))
@@ -491,158 +498,194 @@ void write_consensus_results(std::ostream& os,
     }
 }
 
-std::filesystem::path download_model(const std::string& model_name) {
-    const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
-    const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
-    if (!success) {
-        spdlog::error("Could not download model: {}", model_name);
-        std::exit(EXIT_FAILURE);
+// clang-format off
+// Look-up table from a basecaller model to a legacy polish model (base)name.
+const std::unordered_map<std::string, std::string> lut_basecaller_to_legacy_polish_model{
+    {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},
+    {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},
+};
+// Look-up table from a basecaller model to a polish model (base)name.
+const std::unordered_map<std::string, std::string> lut_basecaller_to_polish_model{
+    {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl"},
+    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl"},
+};
+// Look-up table from a basecaller model to a bacterial model name.
+const std::unordered_map<std::string, std::string> lut_basecaller_to_bacterial_model{
+    {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+    {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
+};
+const std::unordered_set<std::string> legacy_basecaller_models{
+    "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
+    "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+    "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
+    "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
+};
+// Set of all basecaller models supported by polish.
+const std::unordered_set<std::string> all_basecaller_models{
+    "dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
+    "dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
+    "dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
+    "dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_sup@v5.2.0",
+};
+// Look-up table of basecaller model compatibilities for the bacterial models.
+// E.g. bacterial model for `dna_r10.4.1_e8.2_400bps_hac@v5.2.0` is fully compatible (and at the moment
+// identical) to `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`, `dna_r10.4.1_e8.2_400bps_sup@v4.3.0`, etc.
+// This is important for forward compatibility of existing models to avoid having to create a new copy of an
+// existing model every time a new basecaller model is released and the polishing model stays the same.
+const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_bacterial{
+    {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", all_basecaller_models},
+    {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", all_basecaller_models},
+};
+// clang-format on
+
+std::unordered_set<std::string> get_compatible_model_set(const std::string& basecaller_model,
+                                                         const bool bacteria) {
+    // Bacterial models can be compatible with multiple basecaller models.
+    if (bacteria) {
+        const auto it = lut_compatible_basecallers_for_bacterial.find(basecaller_model);
+        if (it == std::cend(lut_compatible_basecallers_for_bacterial)) {
+            return {};
+        }
+        return it->second;
     }
-    return (tmp_dir / model_name);
+    // Non-bacterial models are compatible with only one basecaller model.
+    return {basecaller_model};
 }
 
-const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
-                                           const std::string& model_str,
-                                           const bool load_scripted_model,
-                                           const bool bacteria,
-                                           const bool any_model) {
-    const auto count_model_hits = [](const dorado::models::ModelList& model_list,
-                                     const std::string& model_name) {
-        int32_t num_found = 0;
-        for (const auto& info : model_list) {
-            if (info.name == model_name) {
-                ++num_found;
-            }
+bool sets_intersect(const std::unordered_set<std::string>& set1,
+                    const std::unordered_set<std::string>& set2) {
+    for (const std::string& val : set1) {
+        if (set2.count(val) > 0) {
+            return true;
         }
-        return num_found;
-    };
+    }
+    return false;
+}
 
-    // clang-format off
-    // Set of all basecaller models supported by polish.
-    const std::unordered_set<std::string> all_basecaller_models{
-        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v5.2.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v5.2.0",
-    };
-    // Look-up table from a basecaller model to a polish model (base)name.
-    const std::unordered_map<std::string, std::string> lut_basecaller_to_polish_model {
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish"},    // Legacy.
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish"},    // Legacy.
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"},    // Legacy.
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish"},    // Legacy.
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl"},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl"},
-    };
-    // Look-up table from a basecaller model to a bacterial model name.
-    const std::unordered_map<std::string, std::string> lut_basecaller_to_bacterial_model {
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0"},
-    };
-    // Look-up table of basecaller model compatibilities. I.e. if the polishing model for one basecaller model is
-    // compatible with the polishing model for another basecaller model, this table gives this relation.
-    // At the moment, this is a 1-to-1 relation, unlike the bacterial models.
-    const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_polish {
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0"}},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0"}},
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0"}},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0"}},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"}},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0"}},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0"}},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0"}},
-    };
-    // Look-up table of basecaller model compatibilities for the bacterial models.
-    // E.g. bacterial model for `dna_r10.4.1_e8.2_400bps_hac@v5.2.0` is fully compatible (and at the moment
-    // identical) to `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`, `dna_r10.4.1_e8.2_400bps_sup@v4.3.0`, etc.
-    // This is important for forward compatibility of existing models to avoid having to create a new copy of an
-    // existing model every time a new basecaller model is released and the polishing model stays the same.
-    const std::unordered_map<std::string, std::unordered_set<std::string>> lut_compatible_basecallers_for_bacterial {
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.2.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.2.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_hac@v4.3.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_sup@v4.3.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.0.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0", all_basecaller_models},
-        {"dna_r10.4.1_e8.2_400bps_sup@v5.2.0", all_basecaller_models},
-    };
-    // Set of legacy polishing models.
-    const std::unordered_set<std::string> legacy_bc_models {
-        "dna_r10.4.1_e8.2_400bps_hac@v4.2.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
-        "dna_r10.4.1_e8.2_400bps_hac@v4.3.0",
-        "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
-    };
-    // clang-format on
-
-    const auto determine_model_name = [&bacteria, &lut_basecaller_to_polish_model,
-                                       &lut_basecaller_to_bacterial_model, &legacy_bc_models,
-                                       &bam_info](const std::string& basecaller_model) {
-        if (bacteria) {
-            // Resolve a bacterial model.
-            const auto it = lut_basecaller_to_bacterial_model.find(basecaller_model);
-            if (it == std::cend(lut_basecaller_to_bacterial_model)) {
-                throw std::runtime_error(
-                        "There are no bacterial models for the basecaller model: '" +
-                        basecaller_model + "'.");
-            }
-            return it->second;
-        } else {
-            const auto it = lut_basecaller_to_polish_model.find(basecaller_model);
-            if (it == std::cend(lut_basecaller_to_polish_model)) {
-                throw std::runtime_error(
-                        "There are no polishing models for the basecaller model: '" +
-                        basecaller_model + "'.");
-            }
-            const bool is_legacy_model = legacy_bc_models.count(basecaller_model) > 0;
-            const std::string polish_model_suffix =
-                    ((!is_legacy_model && bam_info.has_dwells) ? "_mv" : "");
-            return it->second + polish_model_suffix;
+std::string determine_model_name(const std::string& basecaller_model,
+                                 const bool bacteria,
+                                 const bool has_dwells) {
+    // Return a bacterial model if requested.
+    if (bacteria) {
+        // Resolve a bacterial model.
+        const auto it = lut_basecaller_to_bacterial_model.find(basecaller_model);
+        if (it == std::cend(lut_basecaller_to_bacterial_model)) {
+            throw std::runtime_error("There are no bacterial models for the basecaller model: '" +
+                                     basecaller_model + "'.");
         }
-    };
-    const auto get_compatible_model_set =
-            [&bacteria, &lut_compatible_basecallers_for_polish,
-             &lut_compatible_basecallers_for_bacterial](
-                    const std::string& basecaller_model) -> std::unordered_set<std::string> {
-        if (bacteria) {
-            const auto it = lut_compatible_basecallers_for_bacterial.find(basecaller_model);
-            if (it == std::cend(lut_compatible_basecallers_for_bacterial)) {
-                return {};
-            }
-            return it->second;
-        } else {
-            const auto it = lut_compatible_basecallers_for_polish.find(basecaller_model);
-            if (it == std::cend(lut_compatible_basecallers_for_polish)) {
-                return {};
-            }
-            return it->second;
-        }
-    };
-    const auto sets_intersect = [](const std::unordered_set<std::string>& set1,
-                                   const std::unordered_set<std::string>& set2) {
-        for (const auto& val : set1) {
-            if (set2.count(val) > 0) {
-                return true;
-            }
-        }
-        return false;
-    };
+        // Found a bacterial polishing model.
+        return it->second;
+    }
 
-    std::filesystem::path model_dir;
+    // Check if this is a legacy polishing model. These don't have move table support.
+    const auto it_legacy = lut_basecaller_to_legacy_polish_model.find(basecaller_model);
+    if (it_legacy != std::cend(lut_basecaller_to_legacy_polish_model)) {
+        // Found a legacy polishing model.
+        return it_legacy->second;
+    }
 
+    const auto it = lut_basecaller_to_polish_model.find(basecaller_model);
+    if (it == std::cend(lut_basecaller_to_polish_model)) {
+        throw std::runtime_error("There are no polishing models for the basecaller model: '" +
+                                 basecaller_model + "'.");
+    }
+
+    // Found a polishing model.
+    const std::string polish_model_suffix(has_dwells ? "_mv" : "");
+    return it->second + polish_model_suffix;
+}
+
+int32_t count_model_hits(const dorado::models::ModelList& model_list,
+                         const std::string& model_name) {
+    int32_t num_found = 0;
+    for (const auto& info : model_list) {
+        if (info.name == model_name) {
+            ++num_found;
+        }
+    }
+    return num_found;
+}
+
+void print_basecaller_models(std::ostream& os,
+                             const std::unordered_set<std::string>& basecaller_models,
+                             const std::string& delimiter) {
+    std::vector<std::string> lines(std::begin(basecaller_models), std::end(basecaller_models));
+    std::sort(std::begin(lines), std::end(lines));
+    os << utils::join(lines, delimiter);
+}
+
+const std::filesystem::path resolve_model(
+        const secondary::BamInfo& bam_info,
+        const std::optional<std::filesystem::path>& models_directory,
+        const bool bacteria) {
+    spdlog::info("Auto resolving the model.");
+
+    // Check that there is at least one basecaller listed in the BAM. Otherwise, no auto resolving.
+    if (std::size(bam_info.basecaller_models) != 1) {
+        if (std::empty(bam_info.basecaller_models)) {
+            throw std::runtime_error{
+                    "Input BAM file has no basecaller models listed in the header."};
+        }
+        if (std::size(bam_info.basecaller_models) > 1) {
+            std::ostringstream oss;
+            oss << "Input BAM file has a mix of different basecaller models. Only one basecaller "
+                   "model can be processed. List of all basecaller models found in the BAM file: ";
+            print_basecaller_models(oss, bam_info.basecaller_models, ", ");
+            throw std::runtime_error{oss.str()};
+        }
+    }
+
+    // Check if any of the input models is a stereo, to report a clear error that this is not supported.
+    for (const std::string& model : bam_info.basecaller_models) {
+        if (model.find("stereo") != std::string::npos) {
+            std::ostringstream oss;
+            oss << "Inputs from duplex basecalling are not supported. Detected model: '" << model
+                << "' in the input BAM.";
+            throw std::runtime_error{oss.str()};
+        }
+    }
+
+    // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
+    const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
+
+    // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
+    const std::string model_name =
+            determine_model_name(basecaller_model, bacteria, bam_info.has_dwells);
+
+    // Sanity check that the model name exists in the polishing models.
+    if (count_model_hits(models::polish_models(), model_name) == 0) {
+        throw std::runtime_error{"Resolved model '" + model_name + "' not found!"};
+    }
+
+    spdlog::debug("Resolved model from input data: {}", model_name);
+
+    model_downloader::ModelDownloader downloader(models_directory);
+    const std::filesystem::path model_dir = downloader.get(model_name, "polish");
+
+    return model_dir;
+}
+
+std::filesystem::path resolve_model_advanced(
+        const secondary::BamInfo& bam_info,
+        const std::optional<std::filesystem::path>& models_directory,
+        const std::string& model_str,
+        const bool any_model) {
     if (bam_info.has_dwells) {
         spdlog::info("Input data contains move tables.");
     } else {
@@ -653,7 +696,8 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     for (const std::string& model : bam_info.basecaller_models) {
         if (model.find("stereo") != std::string::npos) {
             std::ostringstream oss;
-            oss << "Duplex basecalling models are not supported. Model: '" << model << "'.";
+            oss << "Inputs from duplex basecalling are not supported. Detected model: '" << model
+                << "' in the input BAM.";
             if (!any_model) {
                 throw std::runtime_error{oss.str()};
             } else {
@@ -664,43 +708,23 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
 
     // Fail only if not explicitly permitting any model, or if any model is allowed but user specified
     // auto model resolution (in which case, the model name needs to be available in the input BAM file).
-    if (!any_model ||
-        (any_model && (model_str == "auto") && (std::size(bam_info.basecaller_models) != 1))) {
-        const std::string suffix{(any_model) ? " Cannot use 'auto' to resolve the model." : ""};
+    if (!any_model && (std::size(bam_info.basecaller_models) != 1)) {
         if (std::empty(bam_info.basecaller_models)) {
             throw std::runtime_error{
-                    "Input BAM file has no basecaller models listed in the header." + suffix};
+                    "Input BAM file has no basecaller models listed in the header."};
         }
         if (std::size(bam_info.basecaller_models) > 1) {
-            throw std::runtime_error{
-                    "Input BAM file has a mix of different basecaller models. Only one basecaller "
-                    "model can be processed." +
-                    suffix};
+            std::ostringstream oss;
+            oss << "Input BAM file has a mix of different basecaller models. Only one basecaller "
+                   "model can be processed. List of all basecaller models found in the BAM file:\n";
+            print_basecaller_models(oss, bam_info.basecaller_models, ", ");
+            throw std::runtime_error{oss.str()};
         }
     }
 
-    if (model_str == "auto") {
-        spdlog::info("Auto resolving the model.");
+    std::filesystem::path model_dir;
 
-        // Check that there is at least one basecaller listed in the BAM. Otherwise, no auto resolving.
-        if (std::empty(bam_info.basecaller_models)) {
-            throw std::runtime_error{
-                    "Cannot auto resolve the model because no model information is available "
-                    "in the BAM file."};
-        }
-
-        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
-        const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
-
-        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        const std::string model_name = determine_model_name(basecaller_model);
-
-        spdlog::debug("Resolved model from input data: {}", model_name);
-
-        spdlog::info("Downloading model: '{}'", model_name);
-        model_dir = download_model(model_name);
-
-    } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
+    if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
         spdlog::debug("Resolved model from user-specified path: {}", model_str);
         spdlog::info("Model specified by path: '{}'", model_str);
         model_dir = model_str;
@@ -709,29 +733,21 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         const std::string& model_name = model_str;
         spdlog::debug("Resolved model from user-specified polishing model name: {}", model_name);
         spdlog::info("Downloading model: '{}'", model_name);
-        model_dir = download_model(model_name);
-
-    } else if (count_model_hits(models::simplex_models(), model_str) == 1) {
-        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
-        const std::string& basecaller_model = model_str;
-
-        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
-        const std::string model_name = determine_model_name(basecaller_model);
-
-        spdlog::debug("Resolved model from user-specified basecaller model name: {}", model_name);
-        spdlog::info("Downloading model: '{}'", model_name);
-        model_dir = download_model(model_name);
+        model_downloader::ModelDownloader downloader(models_directory);
+        model_dir = downloader.get(model_name, "polish");
 
     } else {
         throw std::runtime_error{"Could not resolve model from string: '" + model_str + "'."};
     }
 
-    // Load the model.
-    spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
-    const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
-    secondary::ModelConfig model_config =
-            secondary::parse_model_config(model_dir / "config.toml", model_file);
+    return model_dir;
+}
 
+void validate_bam_model(const secondary::BamInfo& bam_info,
+                        const secondary::ModelConfig& model_config,
+                        const bool bacteria,
+                        const bool any_model,
+                        const secondary::LabelSchemeType expected_label_scheme) {
     // Check that both the model and data have dwells, or that they both do not have dwells.
     const auto it_dwells = model_config.model_kwargs.find("use_dwells");
     const bool model_uses_dwells = (it_dwells != std::end(model_config.model_kwargs))
@@ -739,19 +755,18 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
                                            : false;
 
     const bool run_dwell_check =
-            !bacteria && (legacy_bc_models.count(model_config.basecaller_model) == 0);
+            !bacteria && (legacy_basecaller_models.count(model_config.basecaller_model) == 0);
 
     const bool label_scheme_is_compatible =
             secondary::parse_label_scheme_type(model_config.label_scheme_type) ==
-            secondary::LabelSchemeType::HAPLOID;
+            expected_label_scheme;
 
     const auto check_models_supported =
-            [&sets_intersect, &get_compatible_model_set,
-             &model_config](const std::unordered_set<std::string>& basecaller_models) {
+            [bacteria, &model_config](const std::unordered_set<std::string>& basecaller_models) {
                 // Every model from the input BAM needs to be supported by the selected polishing model.
                 for (const std::string& model : basecaller_models) {
                     const std::unordered_set<std::string> compatible_models =
-                            get_compatible_model_set(model);
+                            get_compatible_model_set(model, bacteria);
                     const bool valid =
                             sets_intersect(compatible_models, model_config.supported_basecallers);
                     if (!valid) {
@@ -808,8 +823,6 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
                          model_config.label_scheme_type + ". This may produce unexpected results.");
         }
     }
-
-    return model_config;
 }
 
 void run_polishing(const Options& opt,
@@ -1228,9 +1241,23 @@ int polish(int argc, char* argv[]) {
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
         utils::initialise_torch();
 
-        // Resolve the model for polishing.
-        const secondary::ModelConfig model_config = resolve_model(
-                bam_info, opt.model_str, opt.load_scripted_model, opt.bacteria, opt.any_model);
+        // Resolve the model.
+        secondary::ModelConfig model_config;
+        if (std::empty(opt.model_str)) {
+            // Basic mainstream model resolving.
+            const std::filesystem::path model_dir =
+                    resolve_model(bam_info, opt.models_directory, opt.bacteria);
+            model_config = polisher::load_model(model_dir, opt.load_scripted_model);
+            validate_bam_model(bam_info, model_config, opt.bacteria, false,
+                               secondary::LabelSchemeType::HAPLOID);
+        } else {
+            // Advanced model resolve from a specific path or model name.
+            const std::filesystem::path model_dir = resolve_model_advanced(
+                    bam_info, opt.models_directory, opt.model_str, opt.any_model);
+            model_config = polisher::load_model(model_dir, opt.load_scripted_model);
+            validate_bam_model(bam_info, model_config, opt.bacteria, opt.any_model,
+                               secondary::LabelSchemeType::HAPLOID);
+        }
 
         // Create the models, encoders and BAM handles.
         polisher::PolisherResources resources = polisher::create_resources(
