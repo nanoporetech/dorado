@@ -549,37 +549,40 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
             {OutputMode::UBAM, "bam"},
     }));
 
-    auto [attrs, expected_dir, expected_stem] =
-            GENERATE_COPY(table<HtsData::ReadAttributes, std::string, std::string>(
-                    // clang-format off
+    auto [attrs, expected_dir, expected_stem] = GENERATE_COPY(table<HtsData::ReadAttributes,
+                                                                    std::string, std::string>(
+
             {{
-                HtsData::ReadAttributes{
-                    "sequencing_kit", 
-                    "experiment-id", 
-                    "sample-id", 
-                    "position-id",                  
-                    "flowcell-id", 
-                    "protocol-id", 
-                    "acquisition-id", 
-                    0, 
-                    0},
-                "experiment-id/sample-id/19700101_0000_position-id_flowcell-id_protocol/" + ftype + "_pass",
-                "flowcell-id_" + ftype + "_pass_protocol_acquisit_0"},
+                     HtsData::ReadAttributes{
+                             "sequencing_kit",
+                             "experiment-id",
+                             "sample-id",
+                             "position-id",
+                             "flowcell-id",
+                             "protocol-id",
+                             "acquisition-id",
+                             0,
+                             0,
+                     },
+                     "experiment-id/sample-id/19700101_0000_position-id_flowcell-id_protocol/" +
+                             ftype + "_pass",
+                     "flowcell-id_" + ftype + "_pass_protocol_acquisit_0",
+             },
              {
-                HtsData::ReadAttributes{
-                "kit", 
-                "exp", 
-                "sample", 
-                "pos", 
-                "fc", 
-                "proto", 
-                "acq",
-                946782245000 /* 2000/01/02 03:04:05 */,
-                1},
-              "exp/sample/20000102_0304_pos_fc_proto/" + ftype + "_pass",
-              "fc_" + ftype + "_pass_proto_acq_0"}
-            }));
-    // clang-format on
+                     HtsData::ReadAttributes{
+                             "kit",
+                             "exp",
+                             "sample",
+                             "pos",
+                             "fc",
+                             "proto",
+                             "acq",
+                             946782245000 /* 2000/01/02 03:04:05 */,
+                             1,
+                     },
+                     "exp/sample/20000102_0304_pos_fc_proto/" + ftype + "_pass",
+                     "fc_" + ftype + "_pass_proto_acq_0",
+             }}));
 
     hts_writer::NestedFileStructure structure(root, output_mode, nullptr);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs}));
@@ -621,15 +624,17 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     // FIXME: Sample sheet isn't working - maybe because the barcode data is incomplete?
     const auto sample_sheet = std::make_shared<utils::SampleSheet>(loaded_sample_sheet);
 
-    const HtsData::ReadAttributes attrs{"SQK-RBK114-96",
-                                        "",
-                                        "barcoding_run",
-                                        "fc-pos",
-                                        "PAO25751",
-                                        "proto-id",
-                                        "acq-id",
-                                        946782245000 /* 2000/01/02 03:04:05 */,
-                                        0};
+    const HtsData::ReadAttributes attrs{
+            "SQK-RBK114-96",
+            "",
+            "barcoding_run",
+            "fc-pos",
+            "PAO25751",
+            "proto-id",
+            "acq-id",
+            946782245000 /* 2000/01/02 03:04:05 */,
+            0,
+    };
 
     const std::string expected_base =
             "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
