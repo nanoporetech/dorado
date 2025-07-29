@@ -38,8 +38,6 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
 
     auto chunk_results = at::empty({N, 8}, tensor_options_int32);
 
-    chunk_results = chunk_results.contiguous();
-
     auto aux = at::empty(N * (T + 1) * (C + 4 * options.beam_width), tensor_options_int8);
     auto path = at::zeros(N * (T + 1), tensor_options_int32);
 
