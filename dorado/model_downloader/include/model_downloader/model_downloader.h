@@ -45,6 +45,8 @@ public:
 
     // Download a model
     std::filesystem::path get(const ModelInfo& model, const std::string& description);
+    // Download a model
+    std::filesystem::path get(const std::string& model_name, const std::string& description);
     // Download multiple models
     std::vector<std::filesystem::path> get(const std::vector<ModelInfo>& models,
                                            const std::string& description);

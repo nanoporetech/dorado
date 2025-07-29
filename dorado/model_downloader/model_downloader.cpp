@@ -41,12 +41,13 @@ bool download_models(const std::string& target_directory, const std::string& sel
     return success;
 }
 
-std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::string& description) {
+std::filesystem::path ModelDownloader::get(const std::string& model_name,
+                                           const std::string& description) {
     const fs::path parent_dir =
             m_models_dir.has_value() ? m_models_dir.value() : utils::create_temporary_directory();
 
     // clang-tidy warns about performance-no-automatic-move if |temp_model_dir| is const. It should be treated as such though.
-    /*const*/ fs::path model_dir = parent_dir / model.name;
+    /*const*/ fs::path model_dir = parent_dir / model_name;
 
     if (fs::exists(model_dir)) {
         spdlog::trace("Found existing model at '{}'.", model_dir.string());
@@ -61,8 +62,8 @@ std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::st
         throw std::runtime_error("Failed to prepare model download directory");
     }
 
-    if (!download_models(parent_dir.string(), model.name)) {
-        throw std::runtime_error("Failed to download + " + description + " model: '" + model.name +
+    if (!download_models(parent_dir.string(), model_name)) {
+        throw std::runtime_error("Failed to download + " + description + " model: '" + model_name +
                                  "'.");
     }
 
@@ -79,6 +80,10 @@ std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::st
 
     spdlog::trace("Downloaded {} model into: '{}'.", description, model_dir.string());
     return model_dir;
+}
+
+std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::string& description) {
+    return get(model.name, description);
 }
 
 std::vector<std::filesystem::path> ModelDownloader::get(const std::vector<ModelInfo>& models,
