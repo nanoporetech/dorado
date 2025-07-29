@@ -228,16 +228,17 @@ double ModelSlotAttentionConsensus::estimate_batch_memory(
     const int64_t num_positions = batch_tensor_shape[1];
     const int64_t coverage = batch_tensor_shape[2];
 
-    // IMPORTANT: The following equation was determined as part of the DOR-1237 effort.
-    return 4.9272 + (0.0518966 * batch_size) + (-0.0422506 * coverage) +
-           (-0.0005646 * std::pow(batch_size, 2)) + (0.0000146 * batch_size * num_positions) +
-           (-0.0019084 * batch_size * coverage) + (-0.0000030 * num_positions * coverage) +
-           (0.0016286 * std::pow(coverage, 2)) + (0.0000051 * std::pow(batch_size, 3)) +
-           (-0.0000049 * std::pow(batch_size, 2) * coverage) +
-           (0.0000027 * batch_size * num_positions * coverage) +
-           (0.0000435 * batch_size * std::pow(coverage, 2)) +
-           (0.0000001 * num_positions * std::pow(coverage, 2)) +
-           (-0.0000175 * std::pow(coverage, 3));
+    // Limit the maximum batch size and maximum coverage to the bounds used for model estimation.
+    constexpr int64_t MAX_BATCH_SIZE = 100;
+    constexpr int64_t MAX_COVERAGE = 100;
+    if ((batch_size > MAX_BATCH_SIZE) || (coverage > MAX_COVERAGE)) {
+        return MEMORY_ESTIMATE_UPPER_CAP;
+    }
+
+    // IMPORTANT: The following equation was determined as part of the DOR-1350 effort.
+    return (6.028445 * 1) + (0.000013 * num_positions) + (0.000020 * batch_size * num_positions) +
+           (0.000003 * batch_size * num_positions * coverage) +
+           (0.000027 * batch_size * std::pow(coverage, 2));
 }
 
 std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(

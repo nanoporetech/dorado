@@ -8,6 +8,8 @@
 
 namespace dorado::secondary {
 
+constexpr double MEMORY_ESTIMATE_UPPER_CAP = std::numeric_limits<double>::infinity();
+
 class ModelTorchBase : public torch::nn::Module {
 public:
     virtual ~ModelTorchBase() = default;
