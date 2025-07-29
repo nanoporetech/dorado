@@ -13,10 +13,10 @@ public:
     // We split beam_search into two parts, the first one running on the GPU and the second
     // one on the CPU. While the second part is running we can submit more commands to the GPU
     // on another thread.
-    DecodeData beam_search_part_1(DecodeData data) const;
-    std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const;
+    DecodeData beam_search_part_1(DecodeData data) const override;
+    std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const override;
 
-    at::ScalarType dtype() const { return at::ScalarType::Half; };
+    at::ScalarType dtype() const override { return at::ScalarType::Half; }
 
 private:
     float m_score_clamp_val;
