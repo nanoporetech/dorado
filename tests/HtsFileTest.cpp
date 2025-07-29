@@ -639,7 +639,6 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
         << "proto-id_acq-id_0";
     const std::string expected_fname = oss.str();
 
-    // clang-format on
     hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
