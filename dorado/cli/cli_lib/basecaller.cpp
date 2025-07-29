@@ -164,7 +164,8 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     {
         parser.visible.add_group("Output arguments");
         parser.visible.add_argument("--min-qscore")
-                .help("Discard reads with mean Q-score below this threshold.")
+                .help("Discard reads with mean Q-score below this threshold or write them to "
+                      "output files marked `fail` if `--output-dir` is set.")
                 .default_value(0)
                 .scan<'i', int>();
         parser.visible.add_argument("--emit-moves")
