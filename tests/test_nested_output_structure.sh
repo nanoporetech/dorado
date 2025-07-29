@@ -17,9 +17,12 @@ dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 model=${2:-"hac"}
 batch=${3:-384}
 
-# Test output
+# Test ion a tempdir to shorted filepaths which can cause issues on windows
+TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t tmp)"
+trap 'rm -rf "$TMPDIR"' EXIT
+
 output_dir_name=test_output_nested_structure_${RANDOM}
-output_dir=${test_dir}/${output_dir_name}
+output_dir=${TMPDIR}/${output_dir_name}
 mkdir -p ${output_dir}
 
 # Model storage
@@ -177,4 +180,4 @@ check_structure() {
     check_structure ${dest} "${expected[@]}"
 }
 
-rm -rf ${output_dir}
+rm -rf ${TMPDIR}

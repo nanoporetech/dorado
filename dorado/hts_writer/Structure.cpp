@@ -9,6 +9,7 @@
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
+#include <mutex>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -28,6 +29,17 @@ std::tm get_gmtime(const std::time_t* time) {
 }
 
 void create_output_folder(const std::filesystem::path& path) {
+#ifdef _WIN32
+    static std::once_flag long_path_warning_flag;
+    if (path.string().size() >= 260) {
+        std::call_once(long_path_warning_flag, [&path] {
+            spdlog::warn("Filepaths longer than 260 characters may cause issues on Windows.");
+            spdlog::warn("Attempting to create path of length '{}' at '{}'.", path.string().size(),
+                         path.string());
+        });
+    }
+#endif
+
     std::error_code creation_error;
     // N.B. No error code if folder already exists.
     fs::create_directories(path.parent_path(), creation_error);
