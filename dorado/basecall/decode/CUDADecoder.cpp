@@ -97,7 +97,7 @@ std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(DecodeData data) const
     int T = int(moves_cpu.size(1));
 
     std::vector<DecodedChunk> called_chunks;
-
+    called_chunks.reserve(N);
     for (int idx = 0; idx < N; idx++) {
         std::vector<uint8_t> mov((uint8_t *)moves_cpu[idx].data_ptr(),
                                  (uint8_t *)moves_cpu[idx].data_ptr() + T);
