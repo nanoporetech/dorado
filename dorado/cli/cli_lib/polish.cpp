@@ -940,7 +940,7 @@ void run_polishing(const Options& opt,
         }
         return ret;
     }();
-    constexpr double AVAILABLE_MEMORY_FACTOR = 0.95;
+    constexpr double AVAILABLE_MEMORY_FACTOR = 0.85;
     const double usable_mem = (min_avail_mem * AVAILABLE_MEMORY_FACTOR) / opt.infer_threads;
 
     if (opt.batch_size > 0) {
