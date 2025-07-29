@@ -196,14 +196,14 @@ Dorado supports aligning existing basecalls or producing aligned output directly
 
 To align existing basecalls, run:
 
-```
+```bash
 $ dorado aligner <index> <reads>  > aligned.bam
 ```
 where `index` is a reference to align to in (FASTQ/FASTA/.mmi) format and `reads` is a folder or file in any HTS format.
 
 When reading from an input folder, `dorado aligner` also supports emitting aligned files to an output folder, which will preserve the file structure of the inputs:
 
-```
+```bash
 $ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder>
 ```
 
@@ -211,12 +211,12 @@ An alignment summary containing alignment statistics for each read can be genera
 
 To basecall with alignment with duplex or simplex, run with the `--reference` option:
 
-```
+```bash
 $ dorado basecaller <model> <reads> --reference <index> > calls.bam
 ```
 
 Alignment uses [minimap2](https://github.com/lh3/minimap2) and by default uses the `lr:hq` preset. This can be overridden by passing a minimap option string, `--mm2-opts`, using the '-x <preset>' option and/or individual options such as `-k` and `-w` to set kmer and window size respectively. For a complete list of supported minimap2 options use '--mm2-opts --help'. For example:
-```
+```bash
 $ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder> --mm2-opt "-x splice --junc-bed <annotations_file>"
 $ dorado aligner <index> <input_read_folder> --output-dir <output_read_folder> --mm2-opt --help
 $ dorado basecaller <model> <reads> --reference <index> --mm2-opt "-k 15 -w 10" > calls.bam
@@ -400,7 +400,7 @@ Note that Dorado `polish` is a **haploid** polishing tool and does _not_ impleme
 #### Quick Start
 
 ##### Consensus
-```
+```bash
 # Align unmapped reads to a reference using dorado aligner, sort and index
 dorado aligner <draft.fasta> <unmapped_reads.bam> | samtools sort --threads <num_threads> > aligned_reads.bam
 samtools index aligned_reads.bam
@@ -411,15 +411,33 @@ dorado polish <aligned_reads.bam> <draft.fasta> > polished_assembly.fasta
 
 In the above example, `<aligned_reads>` is a BAM of reads aligned to a draft by Dorado `aligner` and `<draft>` is a FASTA or FASTQ file containing the draft assembly. The draft can be uncompressed or compressed with `bgzip`.
 
-##### Consensus on bacterial genomes
+##### Consensus from a FASTQ input instead of BAM
+
+In case a FASTQ file was produced during basecalling instead of a BAM file, you will need to provide a flag `--add-fastq-rg` to Dorado `aligner` to have it generate the proper BAM header required for Dorado `polish`.
+
+Note that this may take some time to run because it requires an extra pass over the input data prior to alignment.
+
+This feature supports only FASTQ files with HTS-style tags in the header and will not work for the old MinKnow style FASTQ files.
+
+Here is a full example:
+```bash
+# Align reads to a reference using dorado aligner, sort and index
+dorado aligner --add-fastq-rg <draft.fasta> <reads.fastq> | samtools sort --threads <num_threads> > aligned_reads.bam
+samtools index aligned_reads.bam
+
+# Call consensus
+dorado polish <aligned_reads.bam> <draft.fasta> > polished_assembly.fasta
 ```
+
+##### Consensus on bacterial genomes
+```bash
 dorado polish <aligned_reads> <draft> --bacteria > polished_assembly.fasta
 ```
 
 This will automatically resolve a suitable bacterial polishing model, if one exits for the input data type.
 
 ##### Variant calling
-```
+```bash
 dorado polish <aligned_reads> <draft> --vcf > polished_assembly.vcf
 dorado polish <aligned_reads> <draft> --gvcf > polished_assembly.all.vcf
 ```
@@ -427,7 +445,7 @@ dorado polish <aligned_reads> <draft> --gvcf > polished_assembly.all.vcf
 Specifying `--vcf` or `--gvcf` flags will output a VCF file to stdout instead of the consensus sequences.
 
 ##### Output to a folder
-```
+```bash
 dorado polish <aligned_reads> <draft> -o <output_dir>
 ```
 
@@ -447,7 +465,7 @@ To specify resources manually use:
 
 Example:
 
-```
+```bash
 dorado polish reads_to_draft.bam draft.fasta --device cuda:0 --threads 24 > consensus.fasta
 ```
 
@@ -456,7 +474,7 @@ dorado polish reads_to_draft.bam draft.fasta --device cuda:0 --threads 24 > cons
 By default, `polish` queries the BAM and selects the best model for the basecalled reads, if supported.
 
 Alternatively, a model can be selected through the command line in the following way:
-```
+```bash
 --model <value>
 ```
 | Value    | Description |
@@ -498,7 +516,7 @@ contiguity of an assembly by improving the fidelity of reads used to create it.
 
 ##### "How do I go from raw POD5 data to a polished T2T assembly?"
 Here is a high-level example workflow:
-```
+```bash
 # Generate basecalled data with dorado basecaller
 dorado basecaller <model> pod5s/ --emit-moves > calls.bam
 samtools fastq calls.bam > calls.fastq
@@ -523,7 +541,7 @@ Dorado `polish` is a **haploid** polishing tool and does _not_ implement any sor
 In order to polish diploid/polyploid assemblies, it is up to the user to properly separate haplotypes before giving the data to Dorado `polish`.
 
 We are currently working on a set of best practices. In the meantime, an unofficially suggested approach to polish diploid genomes would be to align the reads using the `lr:hqae` [Minimap2 setting](https://github.com/lh3/minimap2/releases/tag/v2.28) as this was specifically designed for alignment back to a diploid genome. This setting is available through Dorado `aligner` using the following option:
-```
+```bash
 dorado aligner --mm2-opts "-x lr:hqae" <ref> <reads>
 ```
 
@@ -531,12 +549,12 @@ dorado aligner --mm2-opts "-x lr:hqae" <ref> <reads>
 
 ###### GPU Memory Issues
 The default inference batch size (`16`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
-```
+```bash
 dorado polish reads_to_draft.bam draft.fasta --batchsize <number> > consensus.fasta
 ```
 
 Alternatively, consider running inference on the CPU, although this can take longer:
-```
+```bash
 dorado polish reads_to_draft.bam draft.fasta --device "cpu" > consensus.fasta
 ```
 
@@ -544,7 +562,7 @@ Note that using multiple CPU inference threads can cause much higher memory usag
 
 ###### "[error] Could not open index for BAM file: 'aln.bam'!"
 Example message:
-```
+```bash
 $ dorado polish aln.bam assembly.fasta > polished.fasta
 [2024-12-23 07:18:23.978] [info] Running: "polish" "aln.bam" "assembly.fasta"
 [E::idx_find_and_load] Could not retrieve index file for 'aln.bam'
@@ -554,14 +572,14 @@ $ dorado polish aln.bam assembly.fasta > polished.fasta
 This message means that there the input BAM file does not have an accompanying index file `.bai`. This may also mean that the input BAM file is not sorted, which is a prerequisite for producing the `.bai` index using `samtools`.
 
 Dorado `polish` requires input alignments to be produced using Dorado `aligner`. When Dorado `aligner` outputs alignments to `stdout`, they are not sorted automatically. Instead, `samtools` needs to be used to sort and index the BAM file. For example:
-```
+```bash
 dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aln.bam
 samtools index aln.bam
 ```
 Note that the sorting step is added after the pipe symbol.
 
 The output from dorado aligner is already sorted when the output is to a folder, specified using the `--output-dir` option.
-```
+```bash
 dorado aligner --output-dir <out_dir> <draft.fasta> <reads.bam>
 ```
 
@@ -569,26 +587,37 @@ dorado aligner --output-dir <out_dir> <draft.fasta> <reads.bam>
 
 Dorado `polish` requires that the aligned BAM has one or more `@RG` lines in the header. Each `@RG` line needs to contain a basecaller model used for generating the reads in this group. This information is required to determine the compatibility of the selected polishing model, as well as for auto-resolving the model from data.
 
-When using Dorado `aligner` please provide the input basecalled reads in the BAM format. The basecalled reads BAM file (`e.g. calls.bam`) contains the `@RG` header lines, and this will be propagated into the aligned BAM file.
-
-However, if input reads are given in the `FASTQ`, the output aligned BAM file will _not_ contain `@RG` lines, and it will not be possible to use it for polishing.
-
-Note that, even if the input FASTQ file has header lines in the form of:
+When using Dorado `aligner` please provide the input basecalled reads in the BAM format. The basecalled reads BAM file (e.g. `calls.bam`) contains the `@RG` header lines, and this will be propagated into the aligned BAM file. Example:
+```bash
+dorado aligner draft.fasta calls.bam | samtools sort --threads <num_threads> > aligned_reads.bam
+samtools index aligned_reads.bam
 ```
+Alternatively, Dorado `aligner` will automatically sort and index the alignments when an output directory is specified instead of `stdout`.
+```bash
+dorado aligner --output-dir out draft.fasta calls.bam
+```
+
+However, if input basecalled reads are given in the **FASTQ** format, the aligned BAM file will _not_ contain `@RG` lines by default.
+In this case, a flag `--add-fastq-rg` can be passed to Dorado `aligner`. Dorado `aligner` will then perform an additional pass over the input FASTQ data and collect all the read group / basecaller information and add it to the header.
+
+Note that this feature will only work for the HTS-style FASTQ headers, such as:
+```bash
 @74960cfd-0b82-43ed-ae04-05162e3c0a5a qs:f:27.7534 du:f:75.1604 ns:i:375802 ts:i:1858 mx:i:1 ch:i:295 st:Z:2024-08-29T22:06:03.400+00:00 rn:i:585 fn:Z:FBA17175_7da7e070_f8e851a5_5.pod5 sm:f:414.101 sd:f:107.157 sv:Z:pa dx:i:0 RG:Z:f8e851a5d56475e9ecaa43496da18fad316883d8_dna_r10.4.1_e8.2_400bps_sup@v5.0.0
 ```
-Dorado `aligner` will not automatically add the `@RG` header lines. BAM input needs to be used for now (not FASTQ):
 
+Example usage:
+```bash
+dorado aligner --add-fastq-rg --output-dir out draft.fasta calls.bam
 ```
-dorado aligner draft.fasta calls.bam
-```
+
+Dorado `polish` currently supports data generated using only the simplex basecallers.
 
 ###### "[error] Input BAM file was not aligned using Dorado."
 
 Dorado `polish` accepts only BAMs aligned with Dorado `aligner`. Aligners other than Dorado `aligner` are not supported.
 
 Example usage:
-```
+```bash
 dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aln.bam
 samtools index aln.bam
 ```
@@ -641,7 +670,7 @@ Although Dorado `polish` can also generate a VCF file of variants, there are som
 
 #### Quick Start
 
-```
+```bash
 # Align the reads using dorado aligner, sort and index
 dorado aligner <ref.fasta> <reads.bam> | samtools sort --threads <num_threads> > aligned_reads.bam
 samtools index aligned_reads.bam
@@ -652,10 +681,16 @@ dorado variant <aligned_reads.bam> <ref.fasta> > variants.vcf
 
 For this preview release, current models require signal-level information encoded in the move tables in the input BAM file. This requires the `--emit-moves` flag to be set during basecalling.
 
+In case the input basecalled reads are in a FASTQ format with the HTS-style ONT tags, please use the `--add-fastq-rg` option with Dorado `aligner` to ensure proper header formatting:
+```bash
+# Align the reads using dorado aligner, sort and index
+dorado aligner --add-fastq-rg <ref.fasta> <reads.fastq> | samtools sort --threads <num_threads> > aligned_reads.bam
+samtools index aligned_reads.bam
+```
 
 ##### Output to a folder
 
-```
+```bash
 dorado variant <aligned_reads> <reference> -o <output_dir>
 ```
 
@@ -676,7 +711,7 @@ To specify resources manually use:
 
 Example:
 
-```
+```bash
 dorado variant aligned_reads.bam reference.fasta --device cuda:0 --threads 24 > variants.vcf
 ```
 
@@ -686,7 +721,7 @@ By default, `variant` queries the BAM and selects the best model for the basecal
 
 Alternatively, a model can be selected through the command line in the following way:
 
-```dorado
+```bash
 dorado variant --model <value> ...
 ```
 
@@ -721,13 +756,13 @@ Please see the following section in Dorado `polish`:
 
 The default inference batch size (`10`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
 
-```
+```bash
 dorado variant aligned_reads.bam reference.fasta --batchsize <number> > variants.vcf
 ```
 
 or the number of inference workers (the default is `2` workers per device):
 
-```
+```bash
 dorado variant aligned_reads.bam reference.fasta --infer-threads 1 > variants.vcf
 ```
 
@@ -738,10 +773,14 @@ Note that the GPU memory consumption also depends on the coverage of the input d
 Dorado `variant` accepts only BAMs aligned with Dorado `aligner`. Aligners other than Dorado `aligner` are not supported.
 
 Example usage:
-```
+```bash
 dorado aligner <draft.fasta> <reads.bam> | samtools sort --threads <num_threads> > aln.bam
 samtools index aln.bam
 ```
+
+###### "[error] Input BAM file has no basecaller models listed in the header."
+
+Please refer to this [section](#error-input-bam-file-has-no-basecaller-models-listed-in-the-header).
 
 ##### "[error] Duplex basecalling models are not supported."
 
