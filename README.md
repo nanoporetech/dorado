@@ -471,23 +471,25 @@ dorado polish reads_to_draft.bam draft.fasta --device cuda:0 --threads 24 > cons
 
 #### Models
 
-By default, `polish` queries the BAM and selects the best model for the basecalled reads, if supported.
+Dorado `polish` auto-resolves the polishing model based on the input BAM file. The BAM file needs to contain the `@RG` headers with the basecaller model name specified, otherwise the model will not be resolved. If the input BAM records contain move tables, an appropriate move-aware polishing model will be selected.
 
-Alternatively, a model can be selected through the command line in the following way:
+Once the model is resolved, Dorado `polish` will either download it or look it up in the models-directory if specified.
+
+For example:
 ```bash
---model <value>
+dorado polish reads_to_draft.bam draft.fasta > consensus.fasta
 ```
-| Value    | Description |
-| -------- | ------- |
-| auto  | Determine the best compatible model based on input data. |
-| \<basecaller_model\> | Simplex basecaller model name (e.g. `dna_r10.4.1_e8.2_400bps_sup@v5.2.0`) |
-| \<polishing_model\> | Polishing model name (e.g. `dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl_mv`) |
-| \<path\> | Local path on disk where the model will be loaded from. |
+will find the compatible model based on the input BAM file and download it to a temporary folder.
 
-When `auto` or `<basecaller_model>` syntax is used and the input is a v5.2.0 dataset, the data will be queried for the presence move tables and an best polishing model selected for the data. Move tables need to be exported during basecalling. If available, this allows for higher polishing accuracy.
+When `--models-directory` is specified, the resolved polishing model will first be looked up in the models-directory, and only downloaded if the model does not exist. The specified models-directory must exist. Example:
+```bash
+mkdir -p models
+dorado polish --models-directory models reads_to_draft.bam draft.fasta > consensus.fasta
+```
 
-If a non-compatible model is selected for the input data, or there are multiple read groups in the input dataset which were generated using different basecaller models, Dorado `polish` will report an error and stop execution.
+More information about the `--models-directory` can be found in [this section](#model-search-directory-and-temporary-model-downloads)
 
+If there are multiple read groups in the input dataset which were generated using different basecaller models, Dorado `polish` will report an error and stop execution.
 
 ##### Move Table Aware Models
 
