@@ -79,15 +79,12 @@ std::string NestedFileStructure::get_path(const HtsData& hts_data) {
     const auto path = directory / format_filename(hts_data);
     create_output_folder(path);
     return path.string();
-};
+}
 
 std::filesystem::path NestedFileStructure::format_directory(const HtsData& hts_data) {
-    // clang-format off
-    return get_core(hts_data.read_attrs) / 
-        format_status(hts_data.read_attrs) /
-        format_classification(hts_data.barcoding_result);
-    // clang-format on
-};
+    return get_core(hts_data.read_attrs) / format_status(hts_data.read_attrs) /
+           format_classification(hts_data.barcoding_result);
+}
 
 const std::filesystem::path& NestedFileStructure::get_core(const HtsData::ReadAttributes& attrs) {
     // The "core" part of a filepath is common to many reads in a run - cache it to avoid
@@ -112,13 +109,11 @@ std::string NestedFileStructure::format_sample(const HtsData::ReadAttributes& at
 
 std::string NestedFileStructure::format_run(const HtsData::ReadAttributes& attrs) const {
     const auto datetime = utils::get_minknow_timestamp_from_unix_time(attrs.protocol_start_time_ms);
-    // clang-format off
     std::ostringstream oss;
-    oss << datetime << "_"
-        << attrs.position_id << "_"
-        << attrs.flowcell_id << "_"
-        << truncate(attrs.protocol_run_id);
-    // clang-format on
+    oss << datetime << "_";
+    oss << attrs.position_id << "_";
+    oss << attrs.flowcell_id << "_";
+    oss << truncate(attrs.protocol_run_id);
     return std::move(oss).str();
 };
 
@@ -146,18 +141,16 @@ std::string NestedFileStructure::format_classification(
 }
 
 std::string NestedFileStructure::format_filename(const HtsData& hts_data) const {
-    std::ostringstream oss;
     // https://nanoporetech.github.io/ont-output-specifications/latest/read_formats/bam/
     // {flow_cell_id}_{status}_{alias_}{short_protocol_run_id}_{short_run_id}_{batch_number}.{filetype}
-    // clang-format off
-oss << hts_data.read_attrs.flowcell_id << "_" 
-    << format_status(hts_data.read_attrs) << "_"
-    << alias(hts_data) 
-    << truncate(hts_data.read_attrs.protocol_run_id) << "_"
-    << truncate(hts_data.read_attrs.acquisition_id) << "_"
-    << batch_number()
-    << get_suffix(m_mode);
-    // clang-format on
+    std::ostringstream oss;
+    oss << hts_data.read_attrs.flowcell_id << "_";
+    oss << format_status(hts_data.read_attrs) << "_";
+    oss << alias(hts_data);
+    oss << truncate(hts_data.read_attrs.protocol_run_id) << "_";
+    oss << truncate(hts_data.read_attrs.acquisition_id) << "_";
+    oss << batch_number();
+    oss << get_suffix(m_mode);
     return std::move(oss).str();
 };
 
@@ -199,14 +192,44 @@ std::string NestedFileStructure::alias(const HtsData& hts_data) const {
     return bc_alias + (bc_alias.empty() ? "" : "_");
 };
 
-std::string NestedFileStructure::batch_number() const {
-    // TODO: Is batch number constant in Dorado?
-    return "0";
-};
+std::string NestedFileStructure::batch_number() const { return "0"; };
 
 std::string_view NestedFileStructure::truncate(std::string_view field) const {
     return field.substr(0, std::min(field.size(), size_t(8)));
 };
+
+bool NestedFileStructure::ReadAttributesCoreComparator::operator()(
+        const dorado::HtsData::ReadAttributes& lhs,
+        const dorado::HtsData::ReadAttributes& rhs) const {
+    // Only using a subset ReadAttributes fields to index the core directory paths
+    // clang-format off
+    return  lhs.experiment_id == rhs.experiment_id &&
+        lhs.sample_id == rhs.sample_id &&
+        lhs.position_id == rhs.position_id &&
+        lhs.flowcell_id == rhs.flowcell_id &&
+        lhs.protocol_run_id == rhs.protocol_run_id &&
+        lhs.protocol_start_time_ms == rhs.protocol_start_time_ms;
+    // clang-format on
+};
+
+size_t NestedFileStructure::ReadAttributesCoreHasher::operator()(
+        const dorado::HtsData::ReadAttributes& attr) const {
+    // Only using a subset ReadAttributes fields to index the core directory paths
+    std::size_t seed = 0;
+    hash_combine(seed, attr.experiment_id);
+    hash_combine(seed, attr.sample_id);
+    hash_combine(seed, attr.position_id);
+    hash_combine(seed, attr.flowcell_id);
+    hash_combine(seed, attr.protocol_run_id);
+    hash_combine(seed, attr.protocol_start_time_ms);
+    return seed;
+};
+
+template <typename T>
+void NestedFileStructure::ReadAttributesCoreHasher::hash_combine(std::size_t& seed,
+                                                                 const T& value) const {
+    seed ^= std::hash<T>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
 
 }  // namespace hts_writer
 }  // namespace dorado
