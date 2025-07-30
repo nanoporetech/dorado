@@ -23,8 +23,8 @@ void add_basecaller_output_arguments(utils::arg_parse::ArgParser& parser) {
             .default_value(false)
             .implicit_value(true);
     parser.visible.add_argument("-o", OUTPUT_DIR_ARG)
-            .help("Optional output folder, if specified output will be written to a calls file "
-                  "(calls_<timestamp>.sam|.bam|.fastq) in the given folder.");
+            .help("Optional output folder which becomes the root of the nested output folder "
+                  "structure.");
 }
 
 bool get_emit_fastq(const utils::arg_parse::ArgParser& parser) {

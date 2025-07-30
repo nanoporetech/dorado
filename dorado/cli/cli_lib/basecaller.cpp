@@ -164,7 +164,8 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
     {
         parser.visible.add_group("Output arguments");
         parser.visible.add_argument("--min-qscore")
-                .help("Discard reads with mean Q-score below this threshold.")
+                .help("Discard reads with mean Q-score below this threshold or write them to "
+                      "output files marked `fail` if `--output-dir` is set.")
                 .default_value(0)
                 .scan<'i', int>();
         parser.visible.add_argument("--emit-moves")
@@ -349,7 +350,7 @@ void setup(const std::vector<std::string>& args,
            const ModelComplex& model_complex,
            const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
            const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
-           std::unique_ptr<const utils::SampleSheet> sample_sheet) {
+           std::shared_ptr<const utils::SampleSheet> sample_sheet) {
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());
     const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
@@ -499,7 +500,7 @@ void setup(const std::vector<std::string>& args,
                 });
         auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
-                progress_callback, description_callback, gpu_names);
+                progress_callback, description_callback, gpu_names, sample_sheet);
 
         if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
             spdlog::error(
@@ -539,11 +540,16 @@ void setup(const std::vector<std::string>& args,
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
-            modbase_params.threshold, std::move(sample_sheet), 1000);
+            modbase_params.threshold, std::move(sample_sheet), 1000, min_qscore);
 
-    current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
-            {current_sink_node}, min_qscore, default_parameters.min_sequence_length,
-            std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
+    {
+        // When writing to output, write reads below min_qscore to "fail"
+        const size_t maybe_min_qscore = output_dir.has_value() ? 0 : min_qscore;
+
+        current_sink_node = pipeline_desc.add_node<ReadFilterNode>(
+                {current_sink_node}, maybe_min_qscore, default_parameters.min_sequence_length,
+                std::unordered_set<std::string>{}, thread_allocations.read_filter_threads);
+    }
 
     if ((barcoding_info && barcoding_info->trim) || adapter_trimming_enabled) {
         current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
@@ -610,6 +616,11 @@ void setup(const std::vector<std::string>& args,
 
     std::unordered_set<std::string> reads_already_processed;
     if (!resume_from_file.empty()) {
+        if (output_dir.has_value()) {
+            spdlog::error("--resume-from cannot be used with --output-dir.");
+            std::exit(EXIT_FAILURE);
+        }
+
         spdlog::info("> Inspecting resume file...");
         // Turn off warning logging as header info is fetched.
         auto initial_hts_log_level = hts_get_log_level();
@@ -814,7 +825,7 @@ int basecaller(int argc, char* argv[]) {
     }
 
     std::shared_ptr<demux::BarcodingInfo> barcoding_info{};
-    std::unique_ptr<const utils::SampleSheet> sample_sheet{};
+    std::shared_ptr<const utils::SampleSheet> sample_sheet{};
     if (parser.visible.is_used("--kit-name")) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.visible.get<std::string>("--kit-name");
@@ -858,7 +869,7 @@ int basecaller(int argc, char* argv[]) {
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
-            sample_sheet = std::make_unique<const utils::SampleSheet>(barcode_sample_sheet, false);
+            sample_sheet = std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, false);
             barcoding_info->allowed_barcodes = sample_sheet->get_barcode_values();
         }
 

@@ -5,6 +5,7 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "hts_writer/StructuredHtsFileWriter.h"
+#include "utils/SampleSheet.h"
 #include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -23,11 +24,12 @@ namespace fs = std::filesystem;
 HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            bool emit_sam,
                                            bool reference_requested,
-                                           const std::optional<std::string> &output_dir,
+                                           const std::optional<std::string> & output_dir,
                                            int threads,
                                            utils::ProgressCallback progress_callback,
                                            utils::DescriptionCallback description_callback,
-                                           std::string gpu_names)
+                                           std::string gpu_names,
+                                           std::shared_ptr<const utils::SampleSheet> sample_sheet)
         : m_emit_fastq(emit_fastq),
           m_emit_sam(emit_sam),
           m_reference_requested(reference_requested),
@@ -36,6 +38,7 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_progress_callback(std::move(progress_callback)),
           m_description_callback(std::move(description_callback)),
           m_gpu_names(std::move(gpu_names)),
+          m_sample_sheet(std::move(sample_sheet)),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {};
 
@@ -83,8 +86,11 @@ std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
     if (!m_output_dir.has_value()) {
         return std::make_unique<StreamHtsFileWriter>(cfg);
     }
-    auto structure = std::make_unique<SingleFileStructure>(m_output_dir.value(), m_output_mode);
-    return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(structure), m_sort);
+
+    auto nested_structure = std::make_unique<NestedFileStructure>(m_output_dir.value(),
+                                                                  m_output_mode, m_sample_sheet);
+
+    return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(nested_structure), m_sort);
 }
 
 OutputMode HtsFileWriterBuilder::get_output_mode() {

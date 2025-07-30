@@ -48,6 +48,9 @@ public:
 
     int model_stride{-1};  // The down sampling factor of the model
 
+    /*
+    Note: Update read_utils shallow_copy_read to ensure split reads copy all fields
+    */
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
     std::string qstring;                  // Read Qstring (Phred)
@@ -58,7 +61,8 @@ public:
     std::string sequencing_kit;  // Sequencing kit - Used in primer detection/classification
     std::string flowcell_id;     // Flowcell ID - used in read group and for sample sheet aliasing
     std::string position_id;     // Position ID - used for sample sheet aliasing
-    std::string experiment_id;   // Experiment ID - used for sample sheet aliasing
+    std::string acquisition_id;  // Acquisition ID - IDs an acquisition within a protocol.
+    std::string experiment_id;   // Experiment ID - used in aliasing
     std::string model_name;      // Read group
     std::string sample_id;       // User-supplied name for the sample being analysed.
     int64_t protocol_start_time_ms;  // Start time of the protocol

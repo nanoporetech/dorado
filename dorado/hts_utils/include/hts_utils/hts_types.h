@@ -106,13 +106,24 @@ struct ReadGroup {
 
 class HtsData {
 public:
+    struct ReadAttributes {
+        std::string sequencing_kit{};
+        std::string experiment_id{};
+        std::string sample_id{};
+        std::string position_id{};
+        std::string flowcell_id{};
+        std::string protocol_run_id{};
+        std::string acquisition_id{};
+        int64_t protocol_start_time_ms{0};
+        std::size_t subread_id{0};
+        bool is_status_pass{true};
+    };
+
     BamPtr bam_ptr;
-    std::string sequencing_kit{};
+    ReadAttributes read_attrs{};
     std::shared_ptr<BarcodeScoreResult> barcoding_result{};
     PrimerClassification primer_classification{};
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
-    std::size_t subread_id{0};
 };
-
 }  // namespace dorado

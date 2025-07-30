@@ -28,7 +28,7 @@ void ReadFilterNode::input_thread_fn() {
         };
 
         // Filter based on qscore.
-        if ((read_common.calculate_mean_qscore() < m_min_qscore) ||
+        if ((m_min_qscore > 0 && read_common.calculate_mean_qscore() < m_min_qscore) ||
             read_common.seq.size() < m_min_read_length ||
             (m_read_ids_to_filter.find(read_common.read_id) != m_read_ids_to_filter.end())) {
             log_filtering();

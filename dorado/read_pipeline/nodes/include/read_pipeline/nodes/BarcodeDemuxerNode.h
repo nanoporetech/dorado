@@ -24,7 +24,7 @@ public:
     BarcodeDemuxerNode(const std::string& output_dir,
                        size_t htslib_threads,
                        bool write_fastq,
-                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                       std::shared_ptr<const utils::SampleSheet> sample_sheet,
                        bool sort_bam);
     ~BarcodeDemuxerNode();
 
@@ -50,7 +50,7 @@ private:
     int write(bam1_t& record);
     const bool m_write_fastq;
     const bool m_sort_bam;
-    const std::unique_ptr<const utils::SampleSheet> m_sample_sheet;
+    const std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
 };
 
 }  // namespace dorado
