@@ -12,18 +12,15 @@
 namespace dorado::utils::string_view {
 
 DEFINE_TEST("split") {
-    // clang-format off
-    auto [input, delimiter, expected_results] = GENERATE(
-        table<std::string, char, std::vector<std::string>>({
-            std::make_tuple("",            ',', std::vector<std::string>{""}),
-            std::make_tuple("test",        ',', std::vector<std::string>{"test"}),
+    auto [input, delimiter,
+          expected_results] = GENERATE(table<std::string, char, std::vector<std::string>>({
+            std::make_tuple("", ',', std::vector<std::string>{""}),
+            std::make_tuple("test", ',', std::vector<std::string>{"test"}),
             std::make_tuple("word1;word2", ',', std::vector<std::string>{"word1;word2"}),
             std::make_tuple("word1;word2", ';', std::vector<std::string>{"word1", "word2"}),
             std::make_tuple("word1;word2;", ';', std::vector<std::string>{"word1", "word2", ""}),
             std::make_tuple(",", ',', std::vector<std::string>{"", ""}),
-        })
-    );
-    // clang-format on
+    }));
 
     CATCH_CAPTURE(input);
     CATCH_CAPTURE(delimiter);
@@ -32,18 +29,18 @@ DEFINE_TEST("split") {
 }
 
 DEFINE_TEST("split_view") {
-    // clang-format off
-    auto [input, delimiter, expected_results] = GENERATE(
-        table<std::string_view, char, std::vector<std::string_view>>({
-            std::make_tuple("",            ',', std::vector<std::string_view>{}),
-            std::make_tuple("test",        ',', std::vector<std::string_view>{"test"}),
-            std::make_tuple("word1;word2", ',', std::vector<std::string_view>{"word1;word2"}),
-            std::make_tuple("word1;word2", ';', std::vector<std::string_view>{"word1", "word2"}),
-            std::make_tuple("word1;word2;", ';', std::vector<std::string_view>{"word1", "word2", ""}),
-            std::make_tuple(",", ',', std::vector<std::string_view>{"", ""}),
-        })
-    );
-    // clang-format on
+    auto [input, delimiter, expected_results] =
+            GENERATE(table<std::string_view, char, std::vector<std::string_view>>({
+                    std::make_tuple("", ',', std::vector<std::string_view>{}),
+                    std::make_tuple("test", ',', std::vector<std::string_view>{"test"}),
+                    std::make_tuple("word1;word2", ',',
+                                    std::vector<std::string_view>{"word1;word2"}),
+                    std::make_tuple("word1;word2", ';',
+                                    std::vector<std::string_view>{"word1", "word2"}),
+                    std::make_tuple("word1;word2;", ';',
+                                    std::vector<std::string_view>{"word1", "word2", ""}),
+                    std::make_tuple(",", ',', std::vector<std::string_view>{"", ""}),
+            }));
 
     CATCH_CAPTURE(input);
     CATCH_CAPTURE(delimiter);
@@ -52,17 +49,16 @@ DEFINE_TEST("split_view") {
 }
 
 DEFINE_TEST("join") {
-    // clang-format off
-    auto [inputs, separator, expected_result] = GENERATE(
-            table<std::vector<std::string>, std::string, std::string >({
-            std::make_tuple(std::vector<std::string>{""}, ",", ""),
-            std::make_tuple(std::vector<std::string>{"test"}, " ", "test"),
-            std::make_tuple(std::vector<std::string>{"a", "b", "c"}, "", "abc"),
-            std::make_tuple(std::vector<std::string>{"a", "b", "c"}, " ", "a b c"),
-            std::make_tuple(std::vector<std::string>{"word1;word2"}, ",", "word1;word2"),
-            std::make_tuple(std::vector<std::string>{"word1", "word2", "word3"}, "; ", "word1; word2; word3"),
-    }));
-    // clang-format on
+    auto [inputs, separator, expected_result] =
+            GENERATE(table<std::vector<std::string>, std::string, std::string>({
+                    std::make_tuple(std::vector<std::string>{""}, ",", ""),
+                    std::make_tuple(std::vector<std::string>{"test"}, " ", "test"),
+                    std::make_tuple(std::vector<std::string>{"a", "b", "c"}, "", "abc"),
+                    std::make_tuple(std::vector<std::string>{"a", "b", "c"}, " ", "a b c"),
+                    std::make_tuple(std::vector<std::string>{"word1;word2"}, ",", "word1;word2"),
+                    std::make_tuple(std::vector<std::string>{"word1", "word2", "word3"}, "; ",
+                                    "word1; word2; word3"),
+            }));
 
     CATCH_CAPTURE(inputs);
     CATCH_CAPTURE(separator);
@@ -71,19 +67,15 @@ DEFINE_TEST("join") {
 }
 
 DEFINE_TEST("starts_with") {
-    // clang-format off
-    auto [input, prefix, expected_results] = GENERATE(
-        table<std::string, std::string, bool>({
-            std::make_tuple("",       "",       true),
-            std::make_tuple("aaa",    "bbb",    false),
-            std::make_tuple("word",   "word",   true),
-            std::make_tuple("word",   "rd",     false),
-            std::make_tuple("word",   "",       true),
-            std::make_tuple("word",   "vor",    false),
-            std::make_tuple("word",   " wor",   false),
-        })
-    );
-    // clang-format on
+    auto [input, prefix, expected_results] = GENERATE(table<std::string, std::string, bool>({
+            std::make_tuple("", "", true),
+            std::make_tuple("aaa", "bbb", false),
+            std::make_tuple("word", "word", true),
+            std::make_tuple("word", "rd", false),
+            std::make_tuple("word", "", true),
+            std::make_tuple("word", "vor", false),
+            std::make_tuple("word", " wor", false),
+    }));
 
     CATCH_CAPTURE(input);
     CATCH_CAPTURE(prefix);
@@ -92,19 +84,15 @@ DEFINE_TEST("starts_with") {
 }
 
 DEFINE_TEST("ends_with") {
-    // clang-format off
-    auto [input, suffix, expected_results] = GENERATE(
-        table<std::string, std::string, bool>({
-            std::make_tuple("",       "",       true),
-            std::make_tuple("aaa",    "bbb",    false),
-            std::make_tuple("word",   "word",   true),
-            std::make_tuple("word",   "rd",     true),
-            std::make_tuple("word",   "",       true),
-            std::make_tuple("word",   "orc",    false),
-            std::make_tuple("word",   "ord ",   false),
-        })
-    );
-    // clang-format on
+    auto [input, suffix, expected_results] = GENERATE(table<std::string, std::string, bool>({
+            std::make_tuple("", "", true),
+            std::make_tuple("aaa", "bbb", false),
+            std::make_tuple("word", "word", true),
+            std::make_tuple("word", "rd", true),
+            std::make_tuple("word", "", true),
+            std::make_tuple("word", "orc", false),
+            std::make_tuple("word", "ord ", false),
+    }));
 
     CATCH_CAPTURE(input);
     CATCH_CAPTURE(suffix);
@@ -130,9 +118,7 @@ DEFINE_TEST("contains") {
 }
 
 DEFINE_TEST("rtrim_view") {
-    // clang-format off
-    auto [input, expected] = GENERATE(
-            table<std::string, std::string_view>({
+    auto [input, expected] = GENERATE(table<std::string, std::string_view>({
             {"", ""},
             {"a", "a"},
             {"abc", "abc"},
@@ -142,7 +128,7 @@ DEFINE_TEST("rtrim_view") {
             {"abc  \t\n  z", "abc  \t\n  z"},
             {"abc  \t\n  z  ", "abc  \t\n  z"},
     }));
-    // clang-format on
+
     CATCH_CAPTURE(input);
 
     auto actual = rtrim_view(input);
