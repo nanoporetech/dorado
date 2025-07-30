@@ -7,6 +7,7 @@
 #include <toml.hpp>
 
 #include <algorithm>
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -195,7 +196,6 @@ bool try_configure_custom_barcode_sequences(const std::optional<std::string>& cu
         barcode_kits::add_custom_barcodes(custom_barcodes);
     } catch (const std::exception& e) {
         spdlog::error("Unable to parse custom sequences file: '{}' - '{}'", *custom_seqs, e.what());
-        spdlog::error(e.what());
         return false;
     } catch (...) {
         spdlog::error("Unable to parse custom sequences file '{}'", *custom_seqs);

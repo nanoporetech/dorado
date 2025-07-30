@@ -5,9 +5,12 @@
 namespace dorado::cli {
 
 void add_basecaller_output_arguments(utils::arg_parse::ArgParser& parser);
+void add_demux_output_arguments(utils::arg_parse::ArgParser& parser);
 
 bool get_emit_fastq(const utils::arg_parse::ArgParser& parser);
 bool get_emit_sam(const utils::arg_parse::ArgParser& parser);
+bool get_emit_summary(const utils::arg_parse::ArgParser& parser);
+
 std::optional<std::string> get_output_dir(const utils::arg_parse::ArgParser& parser);
 
 }  // namespace dorado::cli
