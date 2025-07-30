@@ -42,7 +42,8 @@ void create_output_folder(const std::filesystem::path& path) {
         return;
     }
 
-    spdlog::debug("Creating output folder: '{}' length:{}", path.string(), path.string().size());
+    spdlog::debug("Creating output folder: '{}'. Length:{}", path.parent_path().string(),
+                  path.string().size());
     std::error_code creation_error;
     // N.B. No error code if folder already exists.
     fs::create_directories(path.parent_path(), creation_error);

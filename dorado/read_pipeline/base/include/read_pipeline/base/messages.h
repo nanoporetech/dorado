@@ -48,6 +48,9 @@ public:
 
     int model_stride{-1};  // The down sampling factor of the model
 
+    /*
+    Note: Update read_utils shallow_copy_read to ensure split reads copy all fields
+    */
     std::string read_id;                  // Unique read ID (UUID4)
     std::string seq;                      // Read basecall
     std::string qstring;                  // Read Qstring (Phred)

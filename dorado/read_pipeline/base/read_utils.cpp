@@ -37,11 +37,15 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     copy->read_common.qstring = read.read_common.qstring;
     copy->read_common.moves = read.read_common.moves;
     copy->read_common.run_id = read.read_common.run_id;
+    copy->read_common.flow_cell_product_code = read.read_common.flow_cell_product_code;
+    copy->read_common.sequencing_kit = read.read_common.sequencing_kit;
     copy->read_common.flowcell_id = read.read_common.flowcell_id;
     copy->read_common.position_id = read.read_common.position_id;
+    copy->read_common.acquisition_id = read.read_common.acquisition_id;
     copy->read_common.experiment_id = read.read_common.experiment_id;
     copy->read_common.model_name = read.read_common.model_name;
-    copy->read_common.sequencing_kit = read.read_common.sequencing_kit;
+    copy->read_common.sample_id = read.read_common.sample_id;
+    copy->read_common.protocol_start_time_ms = read.read_common.protocol_start_time_ms;
 
     copy->read_common.base_mod_probs = read.read_common.base_mod_probs;
     copy->read_common.mod_base_info = read.read_common.mod_base_info;

@@ -38,7 +38,7 @@ public:
     NestedFileStructure(const std::string &output_dir,
                         OutputMode mode,
                         std::shared_ptr<const utils::SampleSheet> sample_sheet)
-            : m_output_dir(std::filesystem::path(output_dir)),
+            : m_output_dir(std::filesystem::weakly_canonical(std::filesystem::path(output_dir))),
               m_mode(mode),
               m_sample_sheet(std::move(sample_sheet)) {};
 

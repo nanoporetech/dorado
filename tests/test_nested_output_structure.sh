@@ -167,17 +167,16 @@ check_structure() {
 }
 
 {
-    # Demultiplexing with sample sheet into FASTQ
-    echo "Testing nested output structure with demultiplexing and sample sheet into FASTQ"
-    dest="${output_dir}/demux_sample_sheet_structure"
-    core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    # Demultiplexing split reads - 
+    echo "Testing nested output structure with split reads"
+    dest="${output_dir}/demux_split_read"
+    core="E8p2p1_400bps/no_sample/20231121_1559_5B_PAS14411_76cd574f"
     expected=(
-        "${core}/fastq_pass/barcode01/PAO25751_fastq_pass_patient_id_1_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/unclassified/PAO25751_fastq_pass_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/bam_pass/PAS14411_bam_pass_76cd574f_f78e5963_0.bam"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv --emit-fastq
+    $dorado_bin basecaller ${model} ${data_dir}/single_split_read -b ${batch} --models-directory ${models_directory} -v --output-dir ${dest} 
     check_structure ${dest} "${expected[@]}"
 }
 
-rm -rf ${TMPDIR}
+# rm -rf ${TMPDIR} // Trap will clean-up
