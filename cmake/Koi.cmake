@@ -20,10 +20,10 @@ endfunction()
 
 function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
-    set(hash__libkoi__0_6_2__Linux__aarch64__cuda__12_6 "d4c1112cd99e985a6a50fb7f888bba00b963f86c96194a06d24e31b9c0103d34")
-    set(hash__libkoi__0_6_2__Linux__x86_64__cuda__11_8 "436ce1bf8b4add7ee964b34dab7777aa7f792b7c120f1002123fd2c85831f679")
-    set(hash__libkoi__0_6_2__Linux__x86_64__cuda__12_8 "a61b8627485c53e310ff13ca9b9d97b6291f223a0337ca70ff774420cfc5a721")
-    set(hash__libkoi__0_6_2__Windows__AMD64__cuda__12_8 "03062dab15294225f7ca3621d80f45086d5a4d4f546d6a70f4261f5ef777662c")
+    set(hash__libkoi__0_6_2__Linux__aarch64__cuda__12_6 "ba31727021f549ed380c3d96cc584ee108a474a2fa078ed073f5a1a4d8d55c67")
+    set(hash__libkoi__0_6_2__Linux__x86_64__cuda__11_8 "e2b5efad53fb17516d6e3e8c8273c42dbd468d625e8dda2ff9751a5477be3c00")
+    set(hash__libkoi__0_6_2__Linux__x86_64__cuda__12_8 "41e9eac8492df4414d81ba4267d2828230c12255b0e323e9ca2669ea4faa806e")
+    set(hash__libkoi__0_6_2__Windows__AMD64__cuda__12_8 "15cd2f8f009e99b2547292047435d15b5e2bc53aa593646e7b8399e192a54744")
 
     # Do the lookup.
     string(REPLACE "." "_" hash_key ${KOI_DIR})
