@@ -67,7 +67,7 @@ void apply_sample_sheet_alias(const utils::SampleSheet& sample_sheet,
 BarcodeDemuxerNode::BarcodeDemuxerNode(const std::string& output_dir,
                                        size_t htslib_threads,
                                        bool write_fastq,
-                                       std::unique_ptr<const utils::SampleSheet> sample_sheet,
+                                       std::shared_ptr<const utils::SampleSheet> sample_sheet,
                                        bool sort_bam)
         : MessageSink(10000, 1),
           m_output_dir(output_dir),

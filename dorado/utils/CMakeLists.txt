@@ -85,6 +85,7 @@ dorado_add_library(
     DEPENDS_PRIVATE
         dorado_compat
         minimap2
+        ZLIB::ZLIB
     NO_TORCH
 )
 

@@ -50,7 +50,7 @@ void HtsFileWriter::update_stats(const HtsData &hts_data) {
         if (pid_tag) {
             m_split_reads_written.fetch_add(1, std::memory_order_relaxed);
         }
-        if ((hts_data.subread_id == 0) && (is_unmapped || is_primary)) {
+        if ((hts_data.read_attrs.subread_id == 0) && (is_unmapped || is_primary)) {
             m_primary_simplex_reads_written.fetch_add(1, std::memory_order_relaxed);
         }
     }

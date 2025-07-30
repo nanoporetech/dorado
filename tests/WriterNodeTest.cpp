@@ -68,7 +68,7 @@ private:
                 auto pid_tag = bam_aux_get(bam_message.data.bam_ptr.get(), "pi");
                 if (pid_tag) {
                     std::string read_id = bam_aux2Z(pid_tag);
-                    bam_message.data.subread_id = read_id_counts[read_id]++;
+                    bam_message.data.read_attrs.subread_id = read_id_counts[read_id]++;
                 }
             }
             send_message_to_sink(std::move(bam_message));
@@ -100,7 +100,7 @@ protected:
 
             auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
                     emit_fastq, emit_sam, false, out_dir, num_threads, progress_cb, description_cb,
-                    GPU_NAMES);
+                    GPU_NAMES, nullptr);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -137,7 +137,7 @@ std::string get_output_file(const std::filesystem::path &output_dir,
                             hts_writer::OutputMode output_mode) {
     const auto suffix = get_suffix(output_mode);
     std::optional<std::string> found;
-    for (const auto &entry : std::filesystem::directory_iterator(
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(
                  output_dir, std::filesystem::directory_options::skip_permission_denied)) {
         if (entry.path().extension().string() != suffix) {
             continue;
@@ -153,8 +153,7 @@ std::string get_output_file(const std::filesystem::path &output_dir,
     if (found.has_value()) {
         return found.value();
     }
-    throw std::runtime_error("Expected temp_directory to contain output file with suffix: '" +
-                             suffix + "'");
+    throw std::runtime_error("Expected tmpdir to have '" + suffix + "' file");
 };
 
 }  // namespace
@@ -200,7 +199,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
         std::optional<std::string> out_dir = tmp_dir.m_path.string();
 
         auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-                true, false, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES);
+                true, false, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES, nullptr);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -225,7 +224,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
     CATCH_CHECK_THAT(bam_aux2Z(st_tag), Equals("2023-06-22T07:17:48.308+00:00"));
 
     BamPtr bam_ptr{bam_dup1(reader.record.get())};
-    BamMessage bam_message{HtsData{std::move(bam_ptr), "kit2"}, nullptr};
+    BamMessage bam_message{HtsData{std::move(bam_ptr), {"kit2"}}, nullptr};
 
     writer.restart();
     writer.push_message(std::move(bam_message));
@@ -272,8 +271,9 @@ CATCH_TEST_CASE(
             auto description_cb = utils::DescriptionCallback([](const std::string &) {});
             std::optional<std::string> out_dir = tmp_dir.m_path.string();
 
-            auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-                    false, true, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES);
+            auto hts_writer_builder =
+                    hts_writer::HtsFileWriterBuilder(false, true, false, out_dir, 1, progress_cb,
+                                                     description_cb, GPU_NAMES, nullptr);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -285,10 +285,12 @@ CATCH_TEST_CASE(
             writers.push_back(std::move(hts_file_writer));
         }
         WriterNode writer(std::move(writers));
-        // Write into temporary folder.
 
         BamPtr bam_ptr{bam_dup1(fastq_reader.record.get())};
-        BamMessage bam_message{HtsData{std::move(bam_ptr), "kit2"}, nullptr};
+        BamMessage bam_message{
+                HtsData{std::move(bam_ptr),
+                        {"kit", "exp", "sample", "pos", "fc", "proto", "acq", 94678224500, 1}},
+                nullptr};
 
         writer.restart();
         writer.push_message(std::move(bam_message));

@@ -6,7 +6,9 @@
 #include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
+#include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/fastq_tags.h"
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
@@ -22,6 +24,7 @@
 
 #include <minimap.h>
 #include <spdlog/spdlog.h>
+#include <utils/string_utils.h>
 
 #include <algorithm>
 #include <chrono>
@@ -30,7 +33,7 @@
 #include <memory>
 #include <string>
 #include <thread>
-#include <unordered_set>
+#include <unordered_map>
 #include <vector>
 
 #ifndef _WIN32
@@ -95,6 +98,28 @@ void add_pg_hdr(sam_hdr_t* hdr) {
     sam_hdr_add_pg(hdr, "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION, nullptr);
 }
 
+std::unordered_map<std::string, dorado::ReadGroup> collect_read_groups(
+        const std::filesystem::path& in_path) {
+    spdlog::debug("> collecting headers from: '{}'.", in_path.string());
+
+    dorado::hts_io::FastxSequentialReader reader(in_path);
+
+    std::unordered_map<std::string, dorado::ReadGroup> read_groups;
+
+    dorado::hts_io::FastxRecord record;
+    while (reader.get_next(record)) {
+        // Check if the tags are HTS-style and parse them.
+        dorado::utils::ReadGroupData rg_data =
+                dorado::utils::parse_rg_from_hts_tags(record.comment);
+        if (!rg_data.found || (read_groups.count(rg_data.id) > 0)) {
+            continue;
+        }
+        read_groups[rg_data.id] = std::move(rg_data.data);
+    }
+
+    return read_groups;
+}
+
 }  // namespace
 
 namespace dorado {
@@ -144,6 +169,10 @@ int aligner(int argc, char* argv[]) {
             .help("maximum number of reads to process (for debugging, 0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
+    parser.visible.add_argument("--add-fastq-rg")
+            .help("Adds FASTQ read group information as @RG header lines in the output BAM. "
+                  "Initial parsing over all input FASTQ file(s) may take time.")
+            .flag();
     int verbosity = 0;
     parser.visible.add_argument("-v", "--verbose")
             .default_value(false)
@@ -192,6 +221,8 @@ int aligner(int argc, char* argv[]) {
     auto threads(parser.visible.get<int>("threads"));
 
     auto max_reads(parser.visible.get<int>("max-reads"));
+
+    const bool add_fastq_rg = parser.visible.get<bool>("add-fastq-rg");
 
     std::string err_msg{};
     auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
@@ -256,6 +287,7 @@ int aligner(int argc, char* argv[]) {
 
     for (const auto& file_info : all_files) {
         spdlog::info("processing {} -> {}", file_info.input, file_info.output);
+
         HtsReader reader(file_info.input, std::nullopt);
         reader.set_client_info(client_info);
         if (file_info.output != "-" &&
@@ -268,6 +300,16 @@ int aligner(int argc, char* argv[]) {
         utils::add_hd_header_line(header.get());
         add_pg_hdr(header.get());
         dorado::utils::strip_alignment_data_from_header(header.get());
+
+        const hts_io::SequenceFormatType input_fmt = hts_io::parse_sequence_format(file_info.input);
+        if (add_fastq_rg && ((input_fmt == hts_io::SequenceFormatType::FASTA) ||
+                             (input_fmt == hts_io::SequenceFormatType::FASTQ))) {
+            spdlog::debug("> collecting read groups from: {}", file_info.input);
+            const std::unordered_map<std::string, ReadGroup> read_groups =
+                    collect_read_groups(file_info.input);
+            utils::add_rg_headers(header.get(), read_groups);
+            spdlog::debug("> done adding RG headers from input file: {}", file_info.input);
+        }
 
         const bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
                                file_info.output != "-");

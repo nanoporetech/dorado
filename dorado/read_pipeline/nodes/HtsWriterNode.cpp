@@ -81,7 +81,7 @@ void HtsWriterNode::input_thread_fn() {
             if (pid_tag) {
                 m_split_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
-            if ((bam_message.data.subread_id == 0) && (is_unmapped || is_primary)) {
+            if ((bam_message.data.read_attrs.subread_id == 0) && (is_unmapped || is_primary)) {
                 m_primary_simplex_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
         }

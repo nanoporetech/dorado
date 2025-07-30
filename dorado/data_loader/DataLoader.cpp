@@ -164,16 +164,18 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.attributes.channel_number = read_data.channel;
     new_read->read_common.attributes.start_time = start_time;
     new_read->read_common.run_id = run_info_data->protocol_run_id;
+    new_read->read_common.acquisition_id = run_info_data->acquisition_id;
     new_read->start_sample = read_data.start_sample;
     new_read->end_sample = read_data.start_sample + read_data.num_samples;
     new_read->read_common.flowcell_id = run_info_data->flow_cell_id;
     new_read->read_common.sequencing_kit = run_info_data->sequencing_kit;
     new_read->read_common.flow_cell_product_code = run_info_data->flow_cell_product_code;
     new_read->read_common.position_id = run_info_data->sequencer_position;
-    new_read->read_common.experiment_id = run_info_data->experiment_name;
     new_read->read_common.sample_id = run_info_data->sample_id;
     new_read->read_common.protocol_start_time_ms = run_info_data->protocol_start_time_ms;
     new_read->read_common.is_duplex = false;
+
+    new_read->read_common.experiment_id = run_info_data->experiment_name;
 
     // Get the condition_info from the run_info_data to determine if the sequencing kit
     // used has a rapid adapter and which one.

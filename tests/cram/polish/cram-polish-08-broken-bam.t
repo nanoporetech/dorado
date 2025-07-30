@@ -4,7 +4,7 @@ This should fail.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.broken_single.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 2000 ${in_bam} ${in_draft} -t 4 --infer-threads 2 ${model_var} -vv > out/out.fasta 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[error\] //g'
@@ -16,7 +16,7 @@ Same as above, but this should succeed (because of --continue-on-error) and thro
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.broken_single.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --continue-on-error --device cpu --window-len 1000 --window-overlap 100 --bam-chunk 2000 ${in_bam} ${in_draft} -t 4 --infer-threads 2 ${model_var} -vv > out/out.fasta 2> out/stderr
   > echo "Exit code: $?"
   > ${DORADO_BIN} aligner ${in_draft} out/out.fasta 1> out/out.sam 2> out/out.sam.stderr

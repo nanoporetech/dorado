@@ -17,7 +17,9 @@ CATCH_TEST_CASE(CUT_TAG " split", CUT_TAG) {
             std::make_tuple("",            ',', std::vector<std::string>{""}),
             std::make_tuple("test",        ',', std::vector<std::string>{"test"}),
             std::make_tuple("word1;word2", ',', std::vector<std::string>{"word1;word2"}),
-            std::make_tuple("word1;word2", ';', std::vector<std::string>{"word1", "word2"})
+            std::make_tuple("word1;word2", ';', std::vector<std::string>{"word1", "word2"}),
+            std::make_tuple("word1;word2;", ';', std::vector<std::string>{"word1", "word2", ""}),
+            std::make_tuple(",", ',', std::vector<std::string>{"", ""}),
         })
     );
     // clang-format on
@@ -25,6 +27,26 @@ CATCH_TEST_CASE(CUT_TAG " split", CUT_TAG) {
     CATCH_CAPTURE(input);
     CATCH_CAPTURE(delimiter);
     auto tokens = dorado::utils::split(input, delimiter);
+    CATCH_CHECK(tokens == expected_results);
+}
+
+CATCH_TEST_CASE(CUT_TAG " split_view", CUT_TAG) {
+    // clang-format off
+    auto [input, delimiter, expected_results] = GENERATE(
+        table<std::string_view, char, std::vector<std::string_view>>({
+            std::make_tuple("",            ',', std::vector<std::string_view>{}),
+            std::make_tuple("test",        ',', std::vector<std::string_view>{"test"}),
+            std::make_tuple("word1;word2", ',', std::vector<std::string_view>{"word1;word2"}),
+            std::make_tuple("word1;word2", ';', std::vector<std::string_view>{"word1", "word2"}),
+            std::make_tuple("word1;word2;", ';', std::vector<std::string_view>{"word1", "word2", ""}),
+            std::make_tuple(",", ',', std::vector<std::string_view>{"", ""}),
+        })
+    );
+    // clang-format on
+
+    CATCH_CAPTURE(input);
+    CATCH_CAPTURE(delimiter);
+    const std::vector<std::string_view> tokens = dorado::utils::split_view(input, delimiter);
     CATCH_CHECK(tokens == expected_results);
 }
 

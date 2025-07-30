@@ -584,7 +584,7 @@ CATCH_TEST_CASE(
     read->read_common.client_info = std::move(client_info);
 
     BamMessage bam_read{HtsData{std::move(record_copy)}, read->read_common.client_info};
-    bam_read.data.sequencing_kit = TEST_KIT2;
+    bam_read.data.read_attrs.sequencing_kit = TEST_KIT2;
 
     // Push a Symplex read type.
     pipeline->push_message(std::move(read));

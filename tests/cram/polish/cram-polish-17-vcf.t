@@ -4,7 +4,7 @@ VCF output to stdout (variants only).
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.variants.vcf
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/variants.vcf 2> out/stderr
   > echo "Exit code: $?"
   > grep -v "#" ${expected} > out/expected.no_header.vcf
@@ -19,7 +19,7 @@ IMPORTANT: not comparing the variant/genotype qualities because they may vary wi
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.variants.gvcf.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --gvcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/variants.vcf 2> out/stderr
   > echo "Exit code: $?"
   > gunzip -d --stdout ${expected} | grep -v "#" | sed 's/70\.0/70/g' | sort > out/expected.no_header.vcf
@@ -35,7 +35,7 @@ No VCF output to a directory. By default, when specifying an output directory th
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/stderr
   > echo "Exit code: $?"
   > ls -1 out
@@ -49,7 +49,7 @@ VCF output to a directory (variants only).
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.variants.vcf
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/stderr
   > echo "Exit code: $?"
   > ls -1 out
@@ -68,7 +68,7 @@ IMPORTANT: not comparing the variant/genotype qualities because they may vary wi
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.variants.gvcf.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --gvcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/stderr
   > echo "Exit code: $?"
   > ls -1 out
@@ -88,7 +88,7 @@ Both --vcf and --gvcf are specified, this should fail.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam=${in_dir}/calls_to_draft.bam
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --vcf --gvcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[error\] //g'

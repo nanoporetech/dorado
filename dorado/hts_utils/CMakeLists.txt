@@ -9,27 +9,34 @@ dorado_add_library(
         fasta_fastq_utils.h
         fasta_reader.h
         fastq_reader.h
+        fastq_tags.h
         FastxRandomReader.h
+        FastxSequentialReader.h
         hts_file.h
         hts_types.h
         KString.h
         MergeHeaders.h
+        sequence_file_format.h
     SOURCES_PRIVATE
         bam_utils.cpp
         fai_utils.cpp
         fasta_fastq_utils.cpp
         fasta_reader.cpp
         fastq_reader.cpp
+        fastq_tags.cpp
         FastxRandomReader.cpp
+        FastxSequentialReader.cpp
         hts_file.cpp
         hts_types.cpp
         KString.cpp
         MergeHeaders.cpp
+        sequence_file_format.cpp
     DEPENDS_PUBLIC
         # nothing
     DEPENDS_PRIVATE
         dorado_utils
         htslib
         spdlog::spdlog
+        ZLIB::ZLIB
     NO_TORCH
 )

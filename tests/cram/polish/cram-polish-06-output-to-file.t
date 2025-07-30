@@ -15,7 +15,7 @@ Write output to a directory defined by the `-o` option.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" -o out 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/consensus.fasta
@@ -33,7 +33,7 @@ Write output to a directory defined by the `--output-dir` option.
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" --output-dir out 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/consensus.fasta
@@ -50,7 +50,7 @@ Output directory matches an existing file.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > touch out/file.txt
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out/file.txt 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
@@ -65,7 +65,7 @@ Although this results in the same error as above, this test safeguards that the 
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > cp ${in_draft}* out/
   > ${DORADO_BIN} polish --device cpu ${in_bam} out/draft.fasta.gz -t 4 ${model_var} -o out/draft.fasta.gz 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
@@ -80,7 +80,7 @@ Although this results in the same error as above, this test safeguards that the 
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > cp ${in_bam}* out/
   > ${DORADO_BIN} polish --device cpu out/in.micro.bam ${in_draft} -t 4 ${model_var} -o out/in.micro.bam 2> out/consensus.fasta.stderr
   > echo "Exit code: $?"
@@ -96,7 +96,7 @@ IMPORTANT: not comparing the qualities because they may vary with Torch versions
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" --qualities > out/out.fastq 2> out/out.fastq.stderr
   > echo "Exit code: $?"
   > wc -l out/out.fastq | awk '{ print $1 }'
@@ -117,7 +117,7 @@ IMPORTANT: not comparing the qualities because they may vary with Torch versions
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} --regions "contig_1:1-100" --qualities --output-dir out 2> out/consensus.fastq.stderr
   > echo "Exit code: $?"
   > wc -l out/consensus.fastq | awk '{ print $1 }'

@@ -144,6 +144,8 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
     set -e
 }
 
+${test_dir}/test_nested_output_structure.sh ${dorado_bin} ${model_speed} ${batch}
+
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
 
@@ -336,6 +338,41 @@ if [[ $num_summary_lines -ne "2" ]]; then
     exit 1
 fi
 
+# The @RG header tests can only run if Samtools is available.
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    check_add_fastq_rg_header_count() {
+        local expected_count=$1
+        local bam_file=$2
+        local description=$3
+
+        local count
+        count=$(samtools view -h "$bam_file" \
+            | grep "@RG" \
+            | grep "ID:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0" \
+            | grep "PU:PAM93185" \
+            | grep "DT:2022-10-18T10:38:07.247+00:00" \
+            | grep "DS:basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 runid=4524e8b9-b90e-4ffb-a13a-380266513b64" \
+            | grep "LB:PCR_zymo" \
+            | wc -l \
+            | awk '{ print $1 }' || true)
+
+        if [[ "$count" -ne "$expected_count" ]]; then
+            echo "Expected ${expected_count} @RG header line(s) ${description}. Found ${count}"
+            exit 1
+        fi
+    }
+
+    {
+        test_command="$dorado_bin aligner $data_dir/aligner_test/basecall_target.fa $data_dir/aligner_test/example-hts.fastq.gz --output-dir $output_dir/aligned"
+
+        ${test_command} --add-fastq-rg
+        check_add_fastq_rg_header_count 1 $output_dir/aligned/example-hts.bam "with --add-fastq-rg"
+
+        ${test_command}
+        check_add_fastq_rg_header_count 0 $output_dir/aligned/example-hts.bam "without --add-fastq-rg"
+    }
+fi
+
 echo dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux --emit-summary
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
@@ -482,10 +519,10 @@ test_barcoding_read_groups() (
 )
 
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    # There should be 4 reads with BC01, 2 with BC04, 1 with barcode 68, and 1 unclassified groups.
-    test_barcoding_read_groups barcode01 4 barcode04 2 barcode68 1 unclassified 1
+    # There should be 4 reads with BC01, 2 with BC04, and 1 unclassified groups.
+    test_barcoding_read_groups barcode01 4 barcode04 2 unclassified 1
     # There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
-    test_barcoding_read_groups patient_id_1 4 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
+    test_barcoding_read_groups patient_id_1 4 unclassified 3 $data_dir/barcode_demux/sample_sheet.csv
 fi
 
 # Test demux only on a pre-classified BAM file

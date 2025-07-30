@@ -84,7 +84,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         return;
     }
 
-    auto kit_name = bam_message.data.sequencing_kit;
+    auto kit_name = bam_message.data.read_attrs.sequencing_kit;
     if (kit_name.empty()) {
         if (adapter_info->kit_name) {
             // For the standalone trim application, the kit name is provided on

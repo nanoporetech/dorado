@@ -6,6 +6,7 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "utils/PostCondition.h"
+#include "utils/SampleSheet.h"
 
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -17,6 +18,7 @@
 #include <numeric>
 #include <optional>
 #include <random>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -320,7 +322,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP)
                   out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES);
+                                               p_cb, d_cb, GPU_NAMES, nullptr);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -339,7 +341,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ throws given reference", 
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES);
+                                               p_cb, d_cb, GPU_NAMES, nullptr);
 
     CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
 }
@@ -356,7 +358,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusiv
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES);
+                                               p_cb, d_cb, GPU_NAMES, nullptr);
 
     CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
 }
@@ -377,7 +379,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
                   out_dir.has_value());
 
     auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES);
+                                               p_cb, d_cb, GPU_NAMES, nullptr);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -403,7 +405,8 @@ public:
                                    writer_threads,
                                    std::move(progress_callback),
                                    std::move(description_callback),
-                                   std::move(gpu_names)) {
+                                   std::move(gpu_names),
+                                   nullptr) {
         m_is_fd_tty = is_fd_tty;
         m_is_fd_pipe = is_fd_pipe;
     };
@@ -474,7 +477,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     auto description_cb = utils::DescriptionCallback(
             [&description_res](const std::string& value) { description_res = value; });
     auto writer_builder = HtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
-                                               progress_cb, description_cb, GPU_NAMES);
+                                               progress_cb, description_cb, GPU_NAMES, nullptr);
     auto writer = writer_builder.build();
 
     auto& writer_ref = *writer;
@@ -528,6 +531,135 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     CATCH_CHECK(extension == get_suffix(output_mode));
 
     // Regardless of the input data the output path should be the same for SingleFileStructure
-    const auto& single_path2 = structure.get_path(HtsData{nullptr, "kit", nullptr});
+    const auto& single_path2 = structure.get_path(HtsData{nullptr, {"kit"}, nullptr});
     CATCH_CHECK(single_path == single_path2);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) {
+    using namespace hts_writer;
+    namespace fs = std::filesystem;
+
+    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
+    const auto root = tmp_dir.m_path.string();
+
+    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+            {OutputMode::FASTQ, "fastq"},
+            {OutputMode::SAM, "bam"},
+            {OutputMode::BAM, "bam"},
+            {OutputMode::UBAM, "bam"},
+    }));
+
+    auto [attrs, expected_dir, expected_stem] = GENERATE_COPY(table<HtsData::ReadAttributes,
+                                                                    std::string, std::string>(
+
+            {{
+                     HtsData::ReadAttributes{
+                             "sequencing_kit",
+                             "experiment-id",
+                             "sample-id",
+                             "position-id",
+                             "flowcell-id",
+                             "protocol-id",
+                             "acquisition-id",
+                             0,
+                             0,
+                     },
+                     "experiment-id/sample-id/19700101_0000_position-id_flowcell-id_protocol/" +
+                             ftype + "_pass",
+                     "flowcell-id_" + ftype + "_pass_protocol_acquisit_0",
+             },
+             {
+                     HtsData::ReadAttributes{
+                             "kit",
+                             "exp",
+                             "sample",
+                             "pos",
+                             "fc",
+                             "proto",
+                             "acq",
+                             946782245000 /* 2000/01/02 03:04:05 */,
+                             1,
+                     },
+                     "exp/sample/20000102_0304_pos_fc_proto/" + ftype + "_pass",
+                     "fc_" + ftype + "_pass_proto_acq_0",
+             }}));
+
+    hts_writer::NestedFileStructure structure(root, output_mode, nullptr);
+    const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs}));
+    CATCH_CAPTURE(root, path, output_mode, attrs.experiment_id);
+
+    // Check root is the parent of the output
+    CATCH_CHECK(path.string().substr(0, root.size()) == fs::path(root).string());
+    // Check the folder structure
+    CATCH_CHECK(fs::relative(path.parent_path(), root) == fs::path(expected_dir));
+    // Check the filename
+    CATCH_CHECK(path.stem() == expected_stem);
+    // Check the file type / extension
+    const std::string extension = get_suffix(output_mode);
+    CATCH_CHECK(path.extension() == extension);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP) {
+    using namespace hts_writer;
+    namespace fs = std::filesystem;
+
+    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
+    const auto root = tmp_dir.m_path.string();
+
+    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+            {OutputMode::FASTQ, "fastq"},
+            {OutputMode::BAM, "bam"},
+    }));
+
+    auto [barcode_name, alias] = GENERATE_COPY(table<std::string, std::string>(
+            {{"", ""}, {"barcode99", ""}, {"unclassified", ""}, {"barcode01", "patient_id_5"}}));
+
+    auto barcode_score_result = std::make_shared<BarcodeScoreResult>();
+    barcode_score_result->barcode_name = barcode_name;
+
+    dorado::utils::SampleSheet loaded_sample_sheet;
+    auto single_barcode_filename = fs::path(get_data_dir("sample_sheets")) / "single_barcode.csv";
+    CATCH_REQUIRE_NOTHROW(loaded_sample_sheet.load(single_barcode_filename.string()));
+
+    // FIXME: Sample sheet isn't working - maybe because the barcode data is incomplete?
+    const auto sample_sheet = std::make_shared<utils::SampleSheet>(loaded_sample_sheet);
+
+    const HtsData::ReadAttributes attrs{
+            "SQK-RBK114-96",
+            "",
+            "barcoding_run",
+            "fc-pos",
+            "PAO25751",
+            "proto-id",
+            "acq-id",
+            946782245000 /* 2000/01/02 03:04:05 */,
+            0,
+    };
+
+    const std::string expected_base =
+            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
+
+    std::ostringstream oss;
+    oss << "PAO25751_" << ftype << "_pass_" << alias << (alias.empty() ? "" : "_")
+        << "proto-id_acq-id_0";
+    const std::string expected_fname = oss.str();
+
+    hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet);
+    const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
+
+    CATCH_CAPTURE(root, path, output_mode, barcode_name);
+    // Check root is the parent of the output
+    CATCH_CHECK(path.string().substr(0, root.size()) == root);
+    // Check the filename
+    CATCH_CHECK(path.stem() == expected_fname);
+    // Check the file type / extension
+    const std::string extension = get_suffix(output_mode);
+    CATCH_CHECK(path.extension() == extension);
+
+    // Expect an additional subdir for the classification of the barcode is set
+    const auto base = barcode_name.empty() ? path.parent_path() : path.parent_path().parent_path();
+    // Check the folder base structure (excluding the classification)
+    CATCH_CHECK(fs::relative(base, root) == fs::path(expected_base));
+    // Check the classification subdir
+    CATCH_CHECK(fs::relative(path, base).parent_path() == fs::path(barcode_name));
 }
