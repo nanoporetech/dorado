@@ -229,8 +229,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--primer-sequences")
                 .help("Path to fasta file with custom primer sequences, or the name of a supported "
                       "3rd-party primer set. If specifying a supported primer set, choose from: " +
-                      extended_primer_codes + ".")
-                .default_value(std::string(""));
+                      extended_primer_codes + ".");
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -884,7 +883,6 @@ int basecaller(int argc, char* argv[]) {
             std::exit(EXIT_FAILURE);
         }
     }
-    adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
     if (barcoding_info && !barcoding_info->kit_name.empty()) {
         demux::KitInfoProvider provider(barcoding_info->kit_name);

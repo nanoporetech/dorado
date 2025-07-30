@@ -56,8 +56,7 @@ int trim(int argc, char* argv[]) {
     parser.add_argument("--primer-sequences")
             .help("Path to fasta file with custom primer sequences, or the name of a supported "
                   "3rd-party primer set. If specifying a supported primer set, choose from: " +
-                  extended_primer_codes + ".")
-            .default_value(std::string(""));
+                  extended_primer_codes + ".");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to trim.")
             .default_value(std::string(""));

@@ -42,7 +42,8 @@ const std::vector<std::string>& extended_primer_names() {
 }
 
 bool AdapterInfo::set_primer_sequences(const std::string& primer_sequences) {
-    if (utils::ends_with(primer_sequences, ".fa") || utils::ends_with(primer_sequences, ".fasta")) {
+    if (utils::ends_with(utils::to_uppercase(primer_sequences), ".FA") ||
+        utils::ends_with(utils::to_uppercase(primer_sequences), ".FASTA")) {
         custom_seqs = primer_sequences;
         return true;
     }
