@@ -5,6 +5,7 @@
 #include "demux/parse_custom_sequences.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 #include "utils/types.h"
 
 #include <edlib.h>
@@ -27,7 +28,15 @@ namespace {
 // When present, the tag will either immediately follow the PCS110 SSP sequence near the beginning
 // of the read, or its RC will immediately precede the RC of the PCS110 SSP sequence near the end
 // of the read. Note that the Vs are wildcards, which could be any of "A", "C", or "G".
-const std::string umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
+const std::string_view umi_search_pattern = "TTTVVVVTTVVVVTTVVVVTTVVVVTTT";
+
+// For the GEN10X primers, depending on the specific configuration, there may be a TSO sequence
+// following the UMI tag (if not, there will be a run of polyT). And for the VNP sequence, there
+// may be an additional bit of sequence just before the VNP sequence. This is because there are
+// actually two different VNP primers, but they are nearly identical, except for this extra bit
+// of sequence, so treating them as different primers would greatly complicate things.
+const std::string_view gen10x_tso_sequence = "TTTCTTATATGGG";
+const std::string_view gen10x_polyt_sequence = "TTTTTTTTTTTTT";
 
 // This indicates how many bases before the end of the detected SSP primer the UMI search window
 // should begin. Note that the first 3 bases of the UMI tag are also the last 3 bases of the primer.
@@ -140,8 +149,9 @@ AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq,
 }
 
 AdapterScoreResult AdapterDetector::find_primers(const std::string& seq,
-                                                 const std::string& kit_name) {
-    const auto& primer_sequences = get_primer_sequences(kit_name);
+                                                 const std::string& kit_name,
+                                                 PrimerAux primer_aux) {
+    const auto& primer_sequences = get_primer_sequences(kit_name, primer_aux);
     return detect(seq, primer_sequences, PRIMER);
 }
 
@@ -173,7 +183,8 @@ std::vector<AdapterDetector::Query>& AdapterDetector::get_adapter_sequences(
 }
 
 std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences(
-        const std::string& kit_name) {
+        const std::string& kit_name,
+        PrimerAux primer_aux) {
     std::lock_guard<std::mutex> guard(m_mutex);
     auto it = m_primer_sequences.find(kit_name);
     if (it != m_primer_sequences.end()) {
@@ -183,7 +194,7 @@ std::vector<AdapterDetector::Query>& AdapterDetector::get_primer_sequences(
     // and the RC of the rear sequence near the end. For reverse reads we need to
     // look for the rear sequence near the beginning of the read, and the RC of
     // the front sequence near the end.
-    auto primers = m_sequence_manager->get_primers(kit_name);
+    auto primers = m_sequence_manager->get_primers(kit_name, primer_aux);
     std::vector<Query> primer_queries;
     for (const auto& primer : primers) {
         auto front_rev_seq = utils::reverse_complement(primer.front_sequence);
@@ -266,9 +277,13 @@ PrimerClassification AdapterDetector::classify_primers(const AdapterScoreResult&
         classification.primer_name = rear_name;
         classification.orientation = get_dir(rear_name);
     }
-    // For the PCS110 primer, we need to check for a UMI tag after the SSP primer.
-    if (classification.primer_name.substr(0, 6) == "PCS110") {
+    // For the PCS110 primers, we need to check for a UMI tag after the SSP primer.
+    if (utils::starts_with(classification.primer_name, "PCS110")) {
         check_for_umi_tags(result, classification, sequence, trim_interval);
+    }
+    // For the GEN10X primers, we need to apply some additional analysis checks.
+    if (utils::starts_with(classification.primer_name, "10X_Genomics")) {
+        check_10x_primers(classification, sequence, trim_interval);
     }
     return classification;
 }
@@ -310,6 +325,51 @@ void AdapterDetector::check_for_umi_tags(const AdapterScoreResult& primer_result
     } else if (classification.orientation == StrandOrientation::REVERSE) {
         auto new_pos = trim_interval.second + UMI_WINDOW_FRONT_OVERLAP - result.position.second - 1;
         trim_interval.second = new_pos;
+    }
+}
+
+void AdapterDetector::check_10x_primers(PrimerClassification& classification,
+                                        const std::string& sequence,
+                                        std::pair<int, int>& trim_interval) {
+    // We need to look for the UMI tag after the SSP primer.
+    std::string search_window;
+    const int UMI_PADDING = 56;
+    if (classification.orientation == StrandOrientation::FORWARD && trim_interval.first != 0) {
+        int window_start = trim_interval.first;
+        int window_end = std::min(trim_interval.second, window_start + UMI_PADDING);
+        int window_len = window_end - window_start;
+        search_window = sequence.substr(window_start, window_len);
+    } else if (classification.orientation == StrandOrientation::REVERSE &&
+               trim_interval.second != int(sequence.size())) {
+        int window_start = std::max(trim_interval.first, trim_interval.second - UMI_PADDING);
+        int window_end = trim_interval.second;
+        int window_len = window_end - window_start;
+        search_window = utils::reverse_complement(sequence.substr(window_start, window_len));
+    }
+    if (search_window.empty()) {
+        return;
+    }
+    // Search for both the TSO and PolyT sequences within the window.
+    EdlibAlignConfig placement_config = init_edlib_config_for_adapters();
+    auto result_polyt = align(gen10x_polyt_sequence, search_window, -1, placement_config);
+    auto result_tso = align(gen10x_tso_sequence, search_window, -1, placement_config);
+    bool polyt_is_better = (result_polyt.score > result_tso.score);
+    const auto& result = polyt_is_better ? result_polyt : result_tso;
+    if (result.score > UMI_SCORE_THRESHOLD) {
+        // Adjust the trim_window. We trim the TSO sequence, but not the polyT.
+        auto trim_point = polyt_is_better ? result.position.first : result.position.second + 1;
+        if (classification.orientation == StrandOrientation::FORWARD) {
+            trim_interval.first += trim_point;
+        } else {
+            trim_interval.second -= trim_point;
+        }
+        // Extract everything betweem the SSP primer and the TSO/PolyT.
+        // This is the cell-barcode(s) and the UMI tag. Since we don't know what any of those
+        // sequences are, or exactly how long any of them should be, we can't do any further
+        // processing on them. So just return the entire chunk of sequence in the RX BAM tag.
+        if (trim_point > 0) {
+            classification.umi_tag_sequence = search_window.substr(0, result.position.first);
+        }
     }
 }
 

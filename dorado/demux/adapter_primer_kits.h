@@ -1,6 +1,7 @@
 #pragma once
 
 #include "demux/AdapterDetector.h"
+#include "demux/adapter_info.h"
 
 #include <string>
 #include <unordered_map>
@@ -35,7 +36,7 @@ public:
      *  sequences, and whether any of the sequences are listed as being compatible with all kits.
      */
     std::vector<Candidate> get_adapters(const std::string& kit_name) const {
-        return get_candidates(kit_name, ADAPTERS);
+        return get_candidates(kit_name, demux::PrimerAux::DEFAULT, ADAPTERS);
     }
 
     /** Get the primer to search for corresponding to the specified kit.
@@ -49,8 +50,9 @@ public:
      *  be empty, depending on whether the specified kit matches the metadata of any of the custom
      *  sequences, and whether any of the sequences are listed as being compatible with all kits.
      */
-    std::vector<Candidate> get_primers(const std::string& kit_name) const {
-        return get_candidates(kit_name, PRIMERS);
+    std::vector<Candidate> get_primers(const std::string& kit_name,
+                                       demux::PrimerAux primer_aux) const {
+        return get_candidates(kit_name, primer_aux, PRIMERS);
     }
 
 private:
@@ -58,7 +60,9 @@ private:
     std::unordered_map<std::string, std::vector<Candidate>> m_kit_adapter_lut;
     std::unordered_map<std::string, std::vector<Candidate>> m_kit_primer_lut;
 
-    std::vector<Candidate> get_candidates(const std::string& kit_name, CandidateType ty) const;
+    std::vector<Candidate> get_candidates(const std::string& kit_name,
+                                          demux::PrimerAux primer_aux,
+                                          CandidateType ty) const;
 };
 
 }  // namespace dorado::adapter_primer_kits

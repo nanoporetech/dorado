@@ -13,6 +13,7 @@
 #include "utils/basecaller_utils.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -51,6 +52,11 @@ int trim(int argc, char* argv[]) {
             .scan<'i', int>();
     parser.add_argument("-k", "--sequencing-kit")
             .help("Sequencing kit name to use for selecting adapters and primers to trim.");
+    const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
+    parser.add_argument("--primer-sequences")
+            .help("Path to fasta file with custom primer sequences, or the name of a supported "
+                  "3rd-party primer set. If specifying a supported primer set, choose from: " +
+                  extended_primer_codes + ".");
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to trim.")
             .default_value(std::string(""));
@@ -69,7 +75,6 @@ int trim(int argc, char* argv[]) {
             .help("Skip primer detection and trimming. Only adapters will be detected and trimmed.")
             .default_value(false)
             .implicit_value(true);
-    parser.add_argument("--primer-sequences").help("Path to file with custom primer sequences.");
 
     try {
         parser.parse_args(argc, argv);
@@ -142,11 +147,6 @@ int trim(int argc, char* argv[]) {
         output_mode = OutputMode::UBAM;
     }
 
-    std::optional<std::string> custom_primer_file = std::nullopt;
-    if (parser.is_used("--primer-sequences")) {
-        custom_primer_file = parser.get<std::string>("--primer-sequences");
-    }
-
     utils::HtsFile hts_file("-", output_mode, trim_writer_threads, false);
     hts_file.set_header(header.get());
 
@@ -159,7 +159,12 @@ int trim(int argc, char* argv[]) {
     adapter_info->trim_adapters = true;
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
     adapter_info->kit_name = kit_name;
-    adapter_info->custom_seqs = custom_primer_file;
+    auto primer_sequences = parser.present<std::string>("--primer-sequences");
+    if (primer_sequences) {
+        if (!adapter_info->set_primer_sequences(*primer_sequences)) {
+            std::exit(EXIT_FAILURE);
+        }
+    }
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);

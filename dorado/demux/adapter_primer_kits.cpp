@@ -16,7 +16,7 @@ namespace {
 
 enum class AdapterCode { LSK110, RNA004 };
 
-enum class PrimerCode { cDNA, PCS110, RAD };
+enum class PrimerCode { cDNA, PCS110, RAD, GEN10X };
 
 using AC = AdapterCode;
 using PC = PrimerCode;
@@ -41,13 +41,14 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
                       KC::SQK_RBK114_96_260, KC::SQK_RPB114_24,     KC::SQK_RPB114_24_260}},
         {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL, KC::SQK_DRB004_24}}};
 
-// Note that for cDNA and PCS110 primers, what would normally be considered the "rear" primer
-// will actually be found near the beginning of a forward read, and vice-versa for reverse
-// reads. So for example, we list the SSP cDNA primer as the frint primer, and the VNP one as
-// the rear primer, so that the code will work properly. The PCS and RAD primer sequences used
-// here are also truncated from the beginning. This does not affect trimming, because trimming
-// is done from the end of the detected primer. It does allow these sequences to be used with
-// barcoding, where a truncated version of the primer appears as the inside flanking region.
+// This maps primer codes to the details of the primers. Note that for cDNA and PCS110 primers,
+// what would normally be considered the "rear" primer will actually be found near the beginning
+// of a forward read, and vice-versa for reverse reads. So for example, we list the SSP cDNA primer
+// as the front primer, and the VNP one as the rear primer, so that the code will work properly.
+// The PCS and RAD primer sequences used here are also truncated from the beginning. This does not
+// affect trimming, because trimming is done from the end of the detected primer. It does allow these
+// sequences to be used with barcoding, where a truncated version of the primer appears as the inside
+// flanking region.
 const std::unordered_map<PrimerCode, Candidate> primers = {
         {PC::cDNA,
          {
@@ -67,13 +68,21 @@ const std::unordered_map<PrimerCode, Candidate> primers = {
                  // This is also a truncated version of the actual primer sequence.
                  "RAD", "GTTTTCGCATTTATCGTGAAACGCTTTCGCGTTTTTCGTGCGCCGCTTCA",
                  ""  // No rear primer for RAD
-         }}};
+         }},
+        {PC::GEN10X,
+         {
+                 "10X_Genomics",
+                 "CTACACGACGCTCTTCCGATCT",    // SSP
+                 "GTACTCTGCGTTGATACCACTGCTT"  // VNP
+         }},
+};
 
-// Only Kit14 sequencing kits are listed here. If the kit is specified, and found in this map,
-// then we will search for the specified front primer sequence near the beginning of the read,
-// and the RC of the specified rear primer sequence near the end of the read. Likewise we will
-// search for the rear primer sequence at the beginning, and the RC of the front primer sequence
-// at the end of the read, which is what we should see if we've sequenced the reverse strand.
+// This maps primer codes to the set of kit codes that those primers can be used with. Only Kit14
+// sequencing kits are listed here. If the kit is specified, and found in this map, then we will
+// search for the specified front primer sequence near the beginning of the read, and the RC of the
+// specified rear primer sequence near the end of the read. Likewise we will search for the rear
+// primer sequence at the beginning, and the RC of the front primer sequence at the end of the read,
+// which is what we should see if we've sequenced the reverse strand.
 const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_kit_map = {
         {
                 PC::cDNA,
@@ -88,6 +97,10 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
                 {KC::SQK_RAD114, KC::SQK_RAD114_260, KC::SQK_ULK114, KC::SQK_ULK114_260,
                  KC::SQK_RBK114_24, KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
                  KC::SQK_RBK114_96_260},
+        },
+        {
+                PC::GEN10X,
+                {KC::SQK_LSK114, KC::SQK_LSK114_260, KC::SQK_LSK114_XL, KC::SQK_LSK114_XL_260},
         },
 };
 
@@ -271,11 +284,16 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
 }
 
 std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& kit_name,
+                                                            demux::PrimerAux primer_aux,
                                                             CandidateType ty) const {
     // If the requested kit name is "ALL", then all candidates will be returned, regardless of kit
     // compatibility. Otherwise only candidates matching the requested kit, and candidates listed
     // as being for any kit, will be included. Note that the latter will only exist if a custom
     // adapter/primer file was used, for entries with no kit information provided.
+    // The primer_aux field applies only for primers. If a primer_aux value is associated with
+    // a particular primer, then that primer will only be returned as a candidate if the associated
+    // primer_aux value was passed here. Likewise primers which have no primer_aux value associated
+    // with them will only be returned if the primer_aux value DEFAULT is passed here.
     const std::unordered_map<std::string, std::vector<Candidate>>* candidate_lut = nullptr;
     switch (ty) {
     case ADAPTERS:
@@ -303,7 +321,27 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
     if (iter != candidate_lut->end()) {
         results.insert(results.end(), iter->second.begin(), iter->second.end());
     }
-    return results;
+    if (ty == ADAPTERS) {
+        return results;
+    }
+    std::vector<Candidate> filtered_results;
+    for (auto& item : results) {
+        auto aux = demux::extended_primers_by_name(item.name);
+        if (aux == dorado::demux::PrimerAux::UNKNOWN) {
+            // No primer_aux value associated with candidate, so only include if no
+            // special primer_aux was requested.
+            if (primer_aux == demux::PrimerAux::DEFAULT) {
+                filtered_results.emplace_back(std::move(item));
+            }
+        } else {
+            // This candidate should only be included if the associated primer_aux value
+            // matches what was requested.
+            if (primer_aux == aux) {
+                filtered_results.emplace_back(std::move(item));
+            }
+        }
+    }
+    return filtered_results;
 }
 
 }  // namespace dorado::adapter_primer_kits

@@ -226,8 +226,11 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--barcode-sequences")
                 .help("Path to file with custom barcode sequences. Requires --kit-name and "
                       "--barcode-arrangement.");
+        const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
         parser.visible.add_argument("--primer-sequences")
-                .help("Path to file with custom primer sequences.");
+                .help("Path to fasta file with custom primer sequences, or the name of a supported "
+                      "3rd-party primer set. If specifying a supported primer set, choose from: " +
+                      extended_primer_codes + ".");
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -885,7 +888,12 @@ int basecaller(int argc, char* argv[]) {
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = trim_adapters;
     adapter_info->trim_primers = trim_primers;
-    adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
+    auto primer_sequences = parser.visible.present<std::string>("--primer-sequences");
+    if (primer_sequences) {
+        if (!adapter_info->set_primer_sequences(*primer_sequences)) {
+            std::exit(EXIT_FAILURE);
+        }
+    }
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
     if (barcoding_info && !barcoding_info->kit_name.empty()) {
         demux::KitInfoProvider provider(barcoding_info->kit_name);
