@@ -19,4 +19,8 @@ bool check_normalized_id_pattern(const std::string& pattern);
 std::pair<std::string, dorado::barcode_kits::KitInfo> get_custom_barcode_kit_info(
         const std::string& custom_kit_file);
 
+bool try_configure_custom_barcode_sequences(const std::optional<std::string>& custom_seqs);
+
+bool try_configure_custom_barcode_arrangement(const std::optional<std::string>& custom_kit);
+
 }  // namespace dorado::demux

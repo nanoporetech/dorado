@@ -227,6 +227,7 @@ int demuxer(int argc, char* argv[]) {
     auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
 
     HtsReader reader(all_files[0].input, read_list);
+
     utils::MergeHeaders hdr_merger(strip_alignment);
     hdr_merger.add_header(reader.header(), all_files[0].input);
 
@@ -258,43 +259,17 @@ int demuxer(int argc, char* argv[]) {
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
-            {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
-            std::move(sample_sheet), sort_bam);
+            {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"), std::move(sample_sheet), sort_bam);
 
     if (barcoding_info) {
-        std::optional<std::string> custom_seqs =
-                parser.visible.present<std::string>("--barcode-sequences");
-        if (custom_seqs.has_value()) {
-            try {
-                std::unordered_map<std::string, std::string> custom_barcodes;
-                auto custom_sequences = demux::parse_custom_sequences(*custom_seqs);
-                for (const auto& entry : custom_sequences) {
-                    custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
-                }
-                barcode_kits::add_custom_barcodes(custom_barcodes);
-            } catch (const std::exception& e) {
-                spdlog::error(e.what());
-                std::exit(EXIT_FAILURE);
-            } catch (...) {
-                spdlog::error("Unable to parse custom sequences file {}", *custom_seqs);
-                std::exit(EXIT_FAILURE);
-            }
+        if (!demux::try_configure_custom_barcode_sequences(
+                    parser.visible.present<std::string>("--barcode-sequences"))) {
+            std::exit(EXIT_FAILURE);
         }
 
-        std::optional<std::string> custom_kit =
-                parser.visible.present<std::string>("--barcode-arrangement");
-        if (custom_kit.has_value()) {
-            try {
-                auto [kit_name, kit_info] = demux::get_custom_barcode_kit_info(*custom_kit);
-                barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
-            } catch (const std::exception& e) {
-                spdlog::error("Unable to load custom barcode arrangement file: {}\n{}", *custom_kit,
-                              e.what());
-                std::exit(EXIT_FAILURE);
-            } catch (...) {
-                spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
-                std::exit(EXIT_FAILURE);
-            }
+        if (!demux::try_configure_custom_barcode_arrangement(
+                    parser.visible.present<std::string>("--barcode-arrangement"))) {
+            std::exit(EXIT_FAILURE);
         }
 
         if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
