@@ -225,25 +225,12 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--barcode-sequences")
                 .help("Path to file with custom barcode sequences. Requires --kit-name and "
                       "--barcode-arrangement.");
-        parser.visible.add_argument("--primer-sequences")
-                .help("Path to file with custom primer sequences.");
         const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
-        parser.visible.add_argument("--extended-primers")
-                .help("Specify a supported 3rd-party primer set to search for, instead of the "
-                      "standard ONT primers. "
-                      "Choose from: " +
+        parser.visible.add_argument("--primer-sequences")
+                .help("Path to fasta file with custom primer sequences, or the name of a supported "
+                      "3rd-party primer set. If specifying a supported primer set, choose from: " +
                       extended_primer_codes + ".")
-                .default_value(std::string(""))
-                .action([extended_primer_codes](const std::string& value) {
-                    const auto& codes = demux::extended_primer_names();
-                    if (std::find(codes.begin(), codes.end(), value) == codes.end()) {
-                        spdlog::error(
-                                "'{}' is not a supported extended primer. please select from {}",
-                                value, extended_primer_codes);
-                        std::exit(EXIT_FAILURE);
-                    }
-                    return value;
-                });
+                .default_value(std::string(""));
     }
     {
         parser.visible.add_group("Trimming arguments");
@@ -891,18 +878,18 @@ int basecaller(int argc, char* argv[]) {
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = trim_adapters;
     adapter_info->trim_primers = trim_primers;
+    auto primer_sequences = parser.visible.present<std::string>("--primer-sequences");
+    if (primer_sequences) {
+        if (!adapter_info->set_primer_sequences(*primer_sequences)) {
+            std::exit(EXIT_FAILURE);
+        }
+    }
     adapter_info->custom_seqs = parser.visible.present<std::string>("--primer-sequences");
     adapter_info->rna_adapters = parser.hidden.get<bool>("--rna-adapters");
     if (barcoding_info && !barcoding_info->kit_name.empty()) {
         demux::KitInfoProvider provider(barcoding_info->kit_name);
         const barcode_kits::KitInfo& kit_info = provider.get_kit_info(barcoding_info->kit_name);
         adapter_info->rna_adapters = kit_info.rna_barcodes;
-    }
-    const auto& extended_primers = parser.visible.get<std::string>("--extended-primers");
-    adapter_info->primer_aux = demux::extended_primers_by_name(extended_primers);
-    if (adapter_info->primer_aux == demux::PrimerAux::UNKNOWN) {
-        spdlog::error("Unknown value of --extended-primers option: '{}'.", extended_primers);
-        std::exit(EXIT_FAILURE);
     }
 
     fs::path model_path;

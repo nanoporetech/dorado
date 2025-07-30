@@ -53,21 +53,11 @@ int trim(int argc, char* argv[]) {
     parser.add_argument("-k", "--sequencing-kit")
             .help("Sequencing kit name to use for selecting adapters and primers to trim.");
     const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
-    parser.add_argument("--extended-primers")
-            .help("Specify a supported 3rd-party primer set to search for, instead of the standard "
-                  "ONT primers. "
-                  "Choose from: " +
+    parser.add_argument("--primer-sequences")
+            .help("Path to fasta file with custom primer sequences, or the name of a supported "
+                  "3rd-party primer set. If specifying a supported primer set, choose from: " +
                   extended_primer_codes + ".")
-            .default_value(std::string(""))
-            .action([extended_primer_codes](const std::string& value) {
-                const auto& codes = demux::extended_primer_names();
-                if (std::find(codes.begin(), codes.end(), value) == codes.end()) {
-                    spdlog::error("'{}' is not a supported extended primer. please select from {}",
-                                  value, extended_primer_codes);
-                    std::exit(EXIT_FAILURE);
-                }
-                return value;
-            });
+            .default_value(std::string(""));
     parser.add_argument("-l", "--read-ids")
             .help("A file with a newline-delimited list of reads to trim.")
             .default_value(std::string(""));
@@ -86,7 +76,6 @@ int trim(int argc, char* argv[]) {
             .help("Skip primer detection and trimming. Only adapters will be detected and trimmed.")
             .default_value(false)
             .implicit_value(true);
-    parser.add_argument("--primer-sequences").help("Path to file with custom primer sequences.");
 
     try {
         parser.parse_args(argc, argv);
@@ -159,11 +148,6 @@ int trim(int argc, char* argv[]) {
         output_mode = OutputMode::UBAM;
     }
 
-    std::optional<std::string> custom_primer_file = std::nullopt;
-    if (parser.is_used("--primer-sequences")) {
-        custom_primer_file = parser.get<std::string>("--primer-sequences");
-    }
-
     utils::HtsFile hts_file("-", output_mode, trim_writer_threads, false);
     hts_file.set_header(header.get());
 
@@ -176,12 +160,11 @@ int trim(int argc, char* argv[]) {
     adapter_info->trim_adapters = true;
     adapter_info->trim_primers = !parser.get<bool>("--no-trim-primers");
     adapter_info->kit_name = kit_name;
-    adapter_info->custom_seqs = custom_primer_file;
-    const auto& extended_primers = parser.get<std::string>("--extended-primers");
-    adapter_info->primer_aux = demux::extended_primers_by_name(extended_primers);
-    if (adapter_info->primer_aux == demux::PrimerAux::UNKNOWN) {
-        spdlog::error("Unknown value of --extended-primers option: '{}'.", extended_primers);
-        return EXIT_FAILURE;
+    auto primer_sequences = parser.present<std::string>("--primer-sequences");
+    if (primer_sequences) {
+        if (!adapter_info->set_primer_sequences(*primer_sequences)) {
+            std::exit(EXIT_FAILURE);
+        }
     }
 
     auto client_info = std::make_shared<DefaultClientInfo>();

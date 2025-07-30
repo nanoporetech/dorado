@@ -1,5 +1,9 @@
 #include "demux/adapter_info.h"
 
+#include "utils/string_utils.h"
+
+#include <spdlog/spdlog.h>
+
 #include <map>
 
 namespace {
@@ -35,6 +39,25 @@ const std::vector<std::string>& extended_primer_names() {
         }
     }
     return names;
+}
+
+bool AdapterInfo::set_primer_sequences(const std::string& primer_sequences) {
+    if (utils::ends_with(primer_sequences, ".fa") || utils::ends_with(primer_sequences, ".fasta")) {
+        custom_seqs = primer_sequences;
+        return true;
+    }
+    auto aux_code_entry = primer_set_map.find(primer_sequences);
+    if (aux_code_entry == primer_set_map.end()) {
+        const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
+        spdlog::error(
+                "Error: Invalid value {} for --primer_sequences option. This must be either the "
+                "full path of a fasta file, or a supported 3rd-party primer set code. Supported "
+                "codes are: {}",
+                primer_sequences, extended_primer_codes);
+        return false;
+    }
+    primer_aux = aux_code_entry->second;
+    return true;
 }
 
 }  // namespace dorado::demux

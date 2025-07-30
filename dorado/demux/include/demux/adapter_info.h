@@ -26,6 +26,8 @@ struct AdapterInfo {
     PrimerAux primer_aux{PrimerAux::DEFAULT};
     std::optional<std::string> kit_name = std::nullopt;
     std::optional<std::string> custom_seqs = std::nullopt;
+
+    bool set_primer_sequences(const std::string& primer_sequences);
 };
 
 }  // namespace dorado::demux
