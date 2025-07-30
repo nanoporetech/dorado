@@ -21,7 +21,7 @@ HAC v5.0.0 with dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv
@@ -38,7 +38,7 @@ Bacterial HAC v5.0.0 with dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
@@ -55,7 +55,7 @@ SUP v5.0.0 with dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl_mv
@@ -72,7 +72,7 @@ Bacterial SUP v5.0.0 with dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
@@ -91,7 +91,7 @@ HAC v5.0.0 with no dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl
@@ -110,7 +110,7 @@ Bacterial HAC v5.0.0 with no dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
@@ -129,7 +129,7 @@ SUP v5.0.0 with no dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl
@@ -148,7 +148,7 @@ Bacterial SUP v5.0.0 with no dwells.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "Resolved model" out/out.fasta.stderr | sed -E 's/.*\[debug\] //g'
-  > grep "Downloading model" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
   Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0

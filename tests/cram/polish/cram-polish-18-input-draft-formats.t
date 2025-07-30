@@ -17,7 +17,7 @@ Input is .fasta.gz.
   > in_bam="data/in.micro.bam"
   > in_draft=${in_dir}/draft.fasta.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -37,7 +37,7 @@ Same tiny test but use a non-bgzipped .fasta reference.
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fasta
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -57,7 +57,7 @@ Same tiny test but use a non-bgzipped .fa reference.
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fa
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -77,7 +77,7 @@ Same tiny test but use a .fa.gz reference.
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fa.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -97,7 +97,7 @@ Same tiny test but use a .fna reference.
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fna
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -117,7 +117,7 @@ Same tiny test but use a .fna.gz reference.
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fna.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -141,7 +141,7 @@ Input draft is a .fastq file (added dummy qualities to existing test data).
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fastq
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -165,7 +165,7 @@ Input draft is a .fq file (added dummy qualities to existing test data).
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fq
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -190,7 +190,7 @@ Input draft is a .fastq.gz file (added dummy qualities to existing test data).
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fastq.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -215,7 +215,7 @@ Input draft is a .fq.gz file (added dummy qualities to existing test data).
   > in_bam="data/in.micro.bam"
   > in_draft=out/draft.fq.gz
   > expected=${in_dir}/medaka.consensus.fastq.gz
-  > model_var=${MODEL_DIR:+--model ${MODEL_DIR}}
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_draft} -t 4 --regions "contig_1:1-100" ${model_var} > out/out.fasta 2> out/out.fasta.stderr
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta

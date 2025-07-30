@@ -195,4 +195,6 @@ std::vector<secondary::Variant> call_variants(
         int32_t num_threads,
         bool continue_on_exception);
 
+secondary::ModelConfig load_model(const std::filesystem::path& model_dir, bool load_scripted_model);
+
 }  // namespace dorado::polisher

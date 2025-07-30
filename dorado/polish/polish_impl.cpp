@@ -1871,4 +1871,15 @@ std::vector<secondary::Variant> call_variants(
     return all_results;
 }
 
+secondary::ModelConfig load_model(const std::filesystem::path& model_dir,
+                                  const bool load_scripted_model) {
+    const std::filesystem::path model_config_file = model_dir / "config.toml";
+    const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
+
+    spdlog::info("Parsing the model config: {}", (model_config_file).string());
+    secondary::ModelConfig model_config =
+            secondary::parse_model_config(model_config_file, model_file);
+    return model_config;
+}
+
 }  // namespace dorado::polisher
