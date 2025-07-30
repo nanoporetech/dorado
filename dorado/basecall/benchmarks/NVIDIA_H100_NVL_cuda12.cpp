@@ -47,10 +47,6 @@ void AddNVIDIA_H100_NVLBenchmarks(std::map<std::pair<std::string, std::string>,
             {896, 0.218387f},  {960, 0.203906f},  {1024, 0.19705f},  {1664, 0.196604f},
             {1792, 0.196161f}, {1920, 0.194501f}, {2368, 0.194455f},
     };
-    chunk_benchmarks[{"NVIDIA H100 NVL", "dna_r10.4.1_e8.2_400bps_sup@v5.0.0"}] = {
-            {32, 0.243502f},
-            {64, 0.218685f},
-    };
     chunk_benchmarks[{"NVIDIA H100 NVL", "rna004_130bps_fast@v5.1.0"}] = {
             {64, 0.06891f},     {128, 0.0367485f},  {192, 0.0258808f},  {256, 0.0202738f},
             {320, 0.0171969f},  {384, 0.0149813f},  {448, 0.013334f},   {512, 0.0123299f},
@@ -69,9 +65,6 @@ void AddNVIDIA_H100_NVLBenchmarks(std::map<std::pair<std::string, std::string>,
             {2240, 0.0363533f}, {2368, 0.0339871f}, {2560, 0.0337946f}, {2624, 0.0334085f},
             {2816, 0.0327639f}, {2880, 0.0312725f}, {3200, 0.0301318f}, {3264, 0.0299586f},
             {3392, 0.0299015f}, {3456, 0.029888f},
-    };
-    chunk_benchmarks[{"NVIDIA H100 NVL", "rna004_130bps_sup@v5.1.0"}] = {
-            {32, 0.330881f},
     };
 
     chunk_benchmarks[{"NVIDIA H100 NVL", "dna_r10.4.1_e8.2_400bps_fast@v5.2.0"}] = {
