@@ -2,6 +2,27 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.1.0] (31 July 2025)
+
+This Dorado release introduces up to 30% basecalling speed increase for the HAC model on a wide range of Nvidia GPUs including Blackwell, Ada and Ampere. Changes have been introduced in Dorado `basecaller` to match [Oxford Nanopore Output Specifications](https://nanoporetech.github.io/ont-output-specifications/latest/). Support for primer detection and trimming with compatible 10x Genomics libraries has also been added, with the section of the read corresponding to the cell barcodes and UMI tags going into the `RX:Z` BAM tag. Other improvements and fixes include updates to Dorado `polish`  options (removal of `--model` and addition of `--models-directory`) and a new `--add-fastq-rg` option for Dorado `aligner`. Please note that for this and future Dorado releases, Jetson TX2 is no longer supported.
+
+* d7e06c56968c819050e89fa4e3c56f83c53796a0 - Improve speed of HAC basecalling models on a range of Nvidia GPUs
+* 4b551088ab1f20426544b3b4730b9e1094c3aeaa - Improve speed of Transformer-based SUP basecalling models running on Nvidia Hopper GPUs
+* 1ce5c40d916d9209e85dd67282ffbef6c12a1f8f - Match MinKNOW output structure when using `--output-dir` in Dorado `basecaller` or `duplex`
+* 4b8efb4b48706988d4d2f7ee2badf69a2fb82ba9 - Add `--disable-read-splitting` argument to Dorado `basecaller`
+* 8ef69e0ab331713d59548215bd487ef629e6ca00 - Support for primer detection and trimming for 10x Genomics libraries using `--primer-sequences` with Dorado `basecaller` and `trim`
+* 2fc539287220d348bab746335cb3f5922a7dadbd - Correct contents of `SM` and `al` tags for barcode name and alias to meet Oxford Nanopore Output Specification
+* 9fae1119bb5aa1c40cab46600d1dae42f90ca826 - Remove the Dorado `polish` `--model` option and add `--models-directory` option
+* f1ce47a939aecf6a4fd5f2dd6649cdae24a4e760 - Add `--add-fastq-rg` option in Dorado `aligner` to add FASTQ read group information in the output BAM
+* aacf16ebd28476bc60976d5d8f84b46f884105a2 - Hide `--chunksize` and `--overlap` CLI arguments in Dorado basecaller
+* 5ebe4c2ae7b78357d562977d9148f2a4b67b6c65 - Fix a memory leak in Dorado `basecaller`
+* 15a5f53bf7c0bfba1e2755e8b9778c8da14decb3 - Fix an issue with handling of corrupt POD5 files
+* c34a0826a95006fa354cd0d05f5df795b2620025 - Avoid querying CUDA devices when requested device is CPU
+* e754c9e556cbc10f4d6ef3a4fa9e8ee1ac9ccd8f - Fix calculation of available host memory for CPU basecalling
+* b0f09915e9e225a47b1b32c91dc459fc778f4928 - Removed code supporting Jetson TX2 devices
+* a5f4f70b7dda9661c7777332df2c942dbde6bc62 - Minimum supported compiler for Linux builds is now GCC 11
+
+
 # [1.0.2] (12 June 2025)
 
 This release includes improvements to Poly(A/T) estimation.
