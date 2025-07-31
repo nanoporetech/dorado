@@ -169,10 +169,15 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
             device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
         }
 
+#if DORADO_ORIN
+        int flags = utils::get_dev_opt<int>("koi_lstm_flags", 2);
+#else
+        int flags = utils::get_dev_opt<int>("koi_lstm_flags", 0);
+#endif
         host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size, wm.T, reverse ? -1 : 1,
                           int(in.stride(1)), in.data_ptr(), device_weights[layer_idx].data_ptr(),
                           device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
-                          state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, 0);
+                          state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, flags);
 
         if (type_id == KOI_F16) {
             utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
