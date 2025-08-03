@@ -7,7 +7,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019-large]
+        os: [ubuntu-24.04, windows-2019-large]
         include:
           - os: windows-2019-large
             arch: "-A x64"
@@ -15,18 +15,19 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     - name: Clean up diskspace
-      if: matrix.os == 'ubuntu-22.04'
-      run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+      if: matrix.os == 'ubuntu-24.04'
+      run: |
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android "$AGENT_TOOLSDIRECTORY"
     - name: Set up cmake
-      uses: jwlawson/actions-setup-cmake@v1.13
+      uses: jwlawson/actions-setup-cmake@v2.02
       with:
         cmake-version: '3.25.x'
-    - uses: Jimver/cuda-toolkit@v0.2.22
+    - uses: Jimver/cuda-toolkit@v0.2.26
       id: cuda-toolkit
       with:
         cuda: '12.8.0'
     - name: Install dependencies from apt
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-24.04'
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev autoconf
