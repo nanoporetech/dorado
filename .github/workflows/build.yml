@@ -32,7 +32,7 @@ jobs:
         sudo apt-get autoremove -y || true
         sudo apt-get clean || true
     - name: Set up cmake
-      uses: jwlawson/actions-setup-cmake@v2.0.ls2
+      uses: jwlawson/actions-setup-cmake@v2.0.2
       with:
         cmake-version: '3.25.x'
     - uses: Jimver/cuda-toolkit@v0.2.26
