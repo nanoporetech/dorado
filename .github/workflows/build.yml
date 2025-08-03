@@ -19,7 +19,7 @@ jobs:
       run: |
         sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android "$AGENT_TOOLSDIRECTORY"
     - name: Set up cmake
-      uses: jwlawson/actions-setup-cmake@v2.02
+      uses: jwlawson/actions-setup-cmake@v2.0.2
       with:
         cmake-version: '3.25.x'
     - uses: Jimver/cuda-toolkit@v0.2.26
