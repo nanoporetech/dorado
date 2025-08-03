@@ -7,9 +7,9 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-24.04, windows-2019]
+        os: [ubuntu-24.04, windows-2022]
         include:
-          - os: windows-2019
+          - os: windows-2022
             arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
@@ -46,7 +46,7 @@ jobs:
         sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev autoconf
     - name: Set up Windows path
       uses: myci-actions/export-env-var-powershell@1
-      if: matrix.os == 'windows-2019'
+      if: matrix.os == 'windows-2022'
       with:
         name: PATH
         value: C:\a\dorado\dorado\dist\bin;$env:PATH
