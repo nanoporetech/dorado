@@ -5,7 +5,7 @@
 arrow:
     description: >
         The universal columnar format.
-    version: "12.0.0"
+    version: "18.0.0"
     url: https://arrow.apache.org/
     license: PATH_NOT_AVAILABLE
     files:
@@ -18,11 +18,28 @@ flatbuffers:
     license: PATH_NOT_AVAILABLE
     files:
         - PATH_NOT_AVAILABLE
+GSL Lite:
+    description: >
+        Functions and types suggested for use by the C++ Core Guidelines
+        <https://github.com/isocpp/CppCoreGuidelines>.
+    version: "0.38.1"
+    url: https://github.com/martinmoene/gsl-lite
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
 jemalloc:
     description: >
         A general purpose malloc(3) implementation that emphasizes fragmentation avoidance and scalable concurrency support.
     version: "5.2.1"
     url: http://jemalloc.net/
+    license: PATH_NOT_AVAILABLE
+    files:
+        - PATH_NOT_AVAILABLE
+re2:
+    description: >
+        A regular expression library.
+    version: "20220601"
+    url: https://github.com/google/re2
     license: PATH_NOT_AVAILABLE
     files:
         - PATH_NOT_AVAILABLE
@@ -42,11 +59,11 @@ zstd:
     license: PATH_NOT_AVAILABLE
     files:
         - PATH_NOT_AVAILABLE
-re2:
+zlib:
     description: >
-        A regular expression library.
-    version: "20220601"
-    url: https://github.com/google/re2
+        zlib data compression library.
+    version: "1.2.13"
+    url: https://github.com/madler/zlib
     license: PATH_NOT_AVAILABLE
     files:
         - PATH_NOT_AVAILABLE
