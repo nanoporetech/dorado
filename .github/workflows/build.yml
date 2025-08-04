@@ -7,32 +7,46 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-22.04, windows-2019-large]
+        os: [ubuntu-24.04, windows-2022]
         include:
-          - os: windows-2019-large
+          - os: windows-2022
             arch: "-A x64"
     runs-on: ${{ matrix.os }}
     steps:
     - uses: actions/checkout@v3
     - name: Clean up diskspace
-      if: matrix.os == 'ubuntu-22.04'
-      run: sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost "$AGENT_TOOLSDIRECTORY"
+      if: matrix.os == 'ubuntu-24.04'
+      run: |
+        sudo rm -rf /usr/share/dotnet /opt/ghc /usr/local/share/boost /usr/local/lib/android "$AGENT_TOOLSDIRECTORY"
+        sudo swapoff -a || true
+        sudo rm -f /mnt/swapfile || true
+        sudo apt-get remove -y '^aspnetcore-.*' || true
+        sudo apt-get remove -y '^dotnet-.*' --fix-missing || true
+        sudo apt-get remove -y '^llvm-.*' --fix-missing || true
+        sudo apt-get remove -y 'php.*' --fix-missing || true
+        sudo apt-get remove -y '^mongodb-.*' --fix-missing || true
+        sudo apt-get remove -y '^mysql-.*' --fix-missing || true
+        sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel libgl1-mesa-dri --fix-missing || true
+        sudo apt-get remove -y google-cloud-sdk --fix-missing || true
+        sudo apt-get remove -y google-cloud-cli --fix-missing || true
+        sudo apt-get autoremove -y || true
+        sudo apt-get clean || true
     - name: Set up cmake
-      uses: jwlawson/actions-setup-cmake@v1.13
+      uses: jwlawson/actions-setup-cmake@v2.0.2
       with:
         cmake-version: '3.25.x'
-    - uses: Jimver/cuda-toolkit@v0.2.22
+    - uses: Jimver/cuda-toolkit@v0.2.24
       id: cuda-toolkit
       with:
         cuda: '12.8.0'
     - name: Install dependencies from apt
-      if: matrix.os == 'ubuntu-22.04'
+      if: matrix.os == 'ubuntu-24.04'
       run: |
         sudo apt-get update
         sudo apt-get install -y --no-install-recommends libhdf5-dev libssl-dev autoconf
     - name: Set up Windows path
       uses: myci-actions/export-env-var-powershell@1
-      if: matrix.os == 'windows-2019-large'
+      if: matrix.os == 'windows-2022'
       with:
         name: PATH
         value: C:\a\dorado\dorado\dist\bin;$env:PATH
