@@ -13,23 +13,15 @@ constexpr std::string_view EMIT_SAM_ARG{"--emit-sam"};
 constexpr std::string_view EMIT_SUMMARY_ARG{"--emit-summary"};
 
 void add_emit_types(utils::arg_parse::ArgParser& parser) {
-    parser.visible.add_argument(EMIT_FASTQ_ARG)
-            .help("Output in fastq format.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument(EMIT_SAM_ARG)
-            .help("Output in SAM format.")
-            .default_value(false)
-            .implicit_value(true);
+    parser.visible.add_argument(EMIT_FASTQ_ARG).help("Output in fastq format.").flag();
+    parser.visible.add_argument(EMIT_SAM_ARG).help("Output in SAM format.").flag();
 }
 
 void add_emit_summary(utils::arg_parse::ArgParser& parser) {
     parser.visible.add_argument(EMIT_SUMMARY_ARG)
             .help("If specified, a summary file containing the details of the primary "
                   "alignments for each read will be emitted to the root of the output folder.")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0);
+            .flag();
 }
 
 }  // namespace

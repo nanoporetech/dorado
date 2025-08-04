@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -183,7 +184,7 @@ std::pair<std::string, dorado::barcode_kits::KitInfo> get_custom_barcode_kit_inf
 }
 
 bool try_configure_custom_barcode_sequences(const std::optional<std::string>& custom_seqs) {
-    if (!custom_seqs.has_value()) {
+    if (!custom_seqs) {
         return true;
     }
 
@@ -205,7 +206,7 @@ bool try_configure_custom_barcode_sequences(const std::optional<std::string>& cu
 }
 
 bool try_configure_custom_barcode_arrangement(const std::optional<std::string>& custom_kit) {
-    if (!custom_kit.has_value()) {
+    if (!custom_kit) {
         return true;
     }
 

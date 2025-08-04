@@ -87,8 +87,7 @@ int demuxer(int argc, char* argv[]) {
 
     int verbosity = 0;
     parser.visible.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
+            .flag()
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
@@ -98,9 +97,7 @@ int demuxer(int argc, char* argv[]) {
         parser.visible.add_argument("-r", "--recursive")
                 .help("If the 'reads' positional argument is a folder any subfolders will also be "
                       "searched for input files.")
-                .default_value(false)
-                .implicit_value(true)
-                .nargs(0);
+                .flag();
         parser.visible.add_argument("-n", "--max-reads")
                 .help("Maximum number of reads to process. Mainly for debugging. Process all reads "
                       "by default.")
@@ -116,16 +113,14 @@ int demuxer(int argc, char* argv[]) {
         parser.visible.add_argument("--sort-bam")
                 .help("Sort any BAM output files that contain mapped reads. Using this option "
                       "requires that the --no-trim option is also set.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
     }
     {
         parser.visible.add_group("Barcoding arguments");
         parser.visible.add_argument("--no-classify")
                 .help("Skip barcode classification. Only demux based on existing classification in "
                       "reads. Cannot be used with --kit-name or --sample-sheet.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
         parser.visible.add_argument("--kit-name")
                 .help("Barcoding kit name. Cannot be used with --no-classify. Choose "
                       "from: " +
@@ -135,8 +130,7 @@ int demuxer(int argc, char* argv[]) {
                 .default_value(std::string(""));
         parser.visible.add_argument("--barcode-both-ends")
                 .help("Require both ends of a read to be barcoded for a double ended barcode.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
         parser.visible.add_argument("--barcode-arrangement")
                 .help("Path to file with custom barcode arrangement.");
         parser.visible.add_argument("--barcode-sequences")
@@ -149,8 +143,7 @@ int demuxer(int argc, char* argv[]) {
                       "Note that you should use this option if your input data is mapped and you "
                       "want to preserve the mapping in the output files, as trimming will result "
                       "in any mapping information from the input file(s) being discarded.")
-                .default_value(false)
-                .implicit_value(true);
+                .flag();
     }
     {
         parser.visible.add_group("Advanced arguments");
