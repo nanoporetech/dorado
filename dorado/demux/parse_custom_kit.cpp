@@ -1,9 +1,14 @@
 #include "demux/parse_custom_kit.h"
 
+#include "demux/parse_custom_sequences.h"
+
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <algorithm>
+#include <optional>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -176,6 +181,47 @@ std::pair<std::string, dorado::barcode_kits::KitInfo> get_custom_barcode_kit_inf
     custom_kit_info.second.scoring_params =
             parse_scoring_params(custom_kit_file, dorado::barcode_kits::BarcodeKitScoringParams{});
     return custom_kit_info;
+}
+
+bool try_configure_custom_barcode_sequences(const std::optional<std::string>& custom_seqs) {
+    if (!custom_seqs) {
+        return true;
+    }
+
+    try {
+        std::unordered_map<std::string, std::string> custom_barcodes;
+        auto custom_sequences = parse_custom_sequences(*custom_seqs);
+        for (const auto& entry : custom_sequences) {
+            custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+        }
+        barcode_kits::add_custom_barcodes(custom_barcodes);
+    } catch (const std::exception& e) {
+        spdlog::error("Unable to parse custom sequences file: '{}' - '{}'", *custom_seqs, e.what());
+        return false;
+    } catch (...) {
+        spdlog::error("Unable to parse custom sequences file '{}'", *custom_seqs);
+        return false;
+    }
+    return true;
+}
+
+bool try_configure_custom_barcode_arrangement(const std::optional<std::string>& custom_kit) {
+    if (!custom_kit) {
+        return true;
+    }
+
+    try {
+        auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
+        barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
+    } catch (const std::exception& e) {
+        spdlog::error("Unable to load custom barcode arrangement file: '{}' - '{}'", *custom_kit,
+                      e.what());
+        return false;
+    } catch (...) {
+        spdlog::error("Unable to load custom barcode arrangement file: '{}'", *custom_kit);
+        return false;
+    }
+    return true;
 }
 
 }  // namespace dorado::demux

@@ -835,39 +835,14 @@ int basecaller(int argc, char* argv[]) {
         barcoding_info->barcode_both_ends = parser.visible.get<bool>("--barcode-both-ends");
         barcoding_info->trim = trim_barcodes;
 
-        std::optional<std::string> custom_seqs =
-                parser.visible.present<std::string>("--barcode-sequences");
-        if (custom_seqs.has_value()) {
-            try {
-                std::unordered_map<std::string, std::string> custom_barcodes;
-                auto custom_sequences = demux::parse_custom_sequences(*custom_seqs);
-                for (const auto& entry : custom_sequences) {
-                    custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
-                }
-                barcode_kits::add_custom_barcodes(custom_barcodes);
-            } catch (const std::exception& e) {
-                spdlog::error(e.what());
-                std::exit(EXIT_FAILURE);
-            } catch (...) {
-                spdlog::error("Unable to parse custom sequences file {}", *custom_seqs);
-                std::exit(EXIT_FAILURE);
-            }
+        if (!demux::try_configure_custom_barcode_sequences(
+                    parser.visible.present<std::string>("--barcode-sequences"))) {
+            std::exit(EXIT_FAILURE);
         }
 
-        std::optional<std::string> custom_kit =
-                parser.visible.present<std::string>("--barcode-arrangement");
-        if (custom_kit.has_value()) {
-            try {
-                auto [kit_name, kit_info] = demux::get_custom_barcode_kit_info(*custom_kit);
-                barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
-            } catch (const std::exception& e) {
-                spdlog::error("Unable to load custom barcode arrangement file: {}\n{}", *custom_kit,
-                              e.what());
-                std::exit(EXIT_FAILURE);
-            } catch (...) {
-                spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
-                std::exit(EXIT_FAILURE);
-            }
+        if (!demux::try_configure_custom_barcode_arrangement(
+                    parser.visible.present<std::string>("--barcode-arrangement"))) {
+            std::exit(EXIT_FAILURE);
         }
 
         auto barcode_sample_sheet = parser.visible.get<std::string>("--sample-sheet");

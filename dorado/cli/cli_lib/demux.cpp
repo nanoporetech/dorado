@@ -1,5 +1,6 @@
 #include "ProgressTracker.h"
 #include "alignment/alignment_processing_items.h"
+#include "basecall_output_args.h"
 #include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "demux/barcoding_info.h"
@@ -83,82 +84,79 @@ int demuxer(int argc, char* argv[]) {
             .help("An input file or the folder containing input file(s) (any HTS format).")
             .nargs(argparse::nargs_pattern::optional)
             .default_value(std::string{});
-    parser.visible.add_argument("-r", "--recursive")
-            .help("If the 'reads' positional argument is a folder any subfolders will also be "
-                  "searched for input files.")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0);
-    parser.visible.add_argument("-o", "--output-dir")
-            .help("Output folder for demultiplexed reads.")
-            .required();
-    parser.visible.add_argument("--kit-name")
-            .help("Barcoding kit name. Cannot be used with --no-classify. Choose "
-                  "from: " +
-                  dorado::barcode_kits::barcode_kits_list_str() + ".");
-    parser.visible.add_argument("--sample-sheet")
-            .help("Path to the sample sheet to use.")
-            .default_value(std::string(""));
-    parser.visible.add_argument("--no-classify")
-            .help("Skip barcode classification. Only demux based on existing classification in "
-                  "reads. Cannot be used with --kit-name or --sample-sheet.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("-t", "--threads")
-            .help("Combined number of threads for barcoding and output generation. Default uses "
-                  "all available threads.")
-            .default_value(0)
-            .scan<'i', int>();
-    parser.visible.add_argument("-n", "--max-reads")
-            .help("Maximum number of reads to process. Mainly for debugging. Process all reads by "
-                  "default.")
-            .default_value(0)
-            .scan<'i', int>();
-    parser.visible.add_argument("-l", "--read-ids")
-            .help("A file with a newline-delimited list of reads to demux.")
-            .default_value(std::string(""));
+
     int verbosity = 0;
     parser.visible.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
+            .flag()
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
-    parser.visible.add_argument("--emit-fastq")
-            .help("Output in fastq format. Default is BAM.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--emit-summary")
-            .help("If specified, a summary file containing the details of the primary alignments "
-                  "for each "
-                  "read will be emitted to the root of the output folder.")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0);
+
+    {
+        parser.visible.add_group("Input data arguments");
+        parser.visible.add_argument("-r", "--recursive")
+                .help("If the 'reads' positional argument is a folder any subfolders will also be "
+                      "searched for input files.")
+                .flag();
+        parser.visible.add_argument("-n", "--max-reads")
+                .help("Maximum number of reads to process. Mainly for debugging. Process all reads "
+                      "by default.")
+                .default_value(0)
+                .scan<'i', int>();
+        parser.visible.add_argument("-l", "--read-ids")
+                .help("A file with a newline-delimited list of reads to demux.")
+                .default_value(std::string(""));
+    }
+    {
+        parser.visible.add_group("Output arguments");
+        cli::add_demux_output_arguments(parser);
+        parser.visible.add_argument("--sort-bam")
+                .help("Sort any BAM output files that contain mapped reads. Using this option "
+                      "requires that the --no-trim option is also set.")
+                .flag();
+    }
+    {
+        parser.visible.add_group("Barcoding arguments");
+        parser.visible.add_argument("--no-classify")
+                .help("Skip barcode classification. Only demux based on existing classification in "
+                      "reads. Cannot be used with --kit-name or --sample-sheet.")
+                .flag();
+        parser.visible.add_argument("--kit-name")
+                .help("Barcoding kit name. Cannot be used with --no-classify. Choose "
+                      "from: " +
+                      dorado::barcode_kits::barcode_kits_list_str() + ".");
+        parser.visible.add_argument("--sample-sheet")
+                .help("Path to the sample sheet to use.")
+                .default_value(std::string(""));
+        parser.visible.add_argument("--barcode-both-ends")
+                .help("Require both ends of a read to be barcoded for a double ended barcode.")
+                .flag();
+        parser.visible.add_argument("--barcode-arrangement")
+                .help("Path to file with custom barcode arrangement.");
+        parser.visible.add_argument("--barcode-sequences")
+                .help("Path to file with custom barcode sequences.");
+    }
+    {
+        parser.visible.add_group("Trimming arguments");
+        parser.visible.add_argument("--no-trim")
+                .help("Skip barcode trimming. If this option is not chosen, trimming is enabled. "
+                      "Note that you should use this option if your input data is mapped and you "
+                      "want to preserve the mapping in the output files, as trimming will result "
+                      "in any mapping information from the input file(s) being discarded.")
+                .flag();
+    }
+    {
+        parser.visible.add_group("Advanced arguments");
+        parser.visible.add_argument("-t", "--threads")
+                .help("Combined number of threads for barcoding and output generation. Default "
+                      "uses all available threads.")
+                .default_value(0)
+                .scan<'i', int>();
+    }
     parser.hidden.add_argument("--progress_stats_frequency")
             .help("Frequency in seconds in which to report progress statistics")
             .default_value(0)
             .scan<'i', int>();
-    parser.visible.add_argument("--barcode-both-ends")
-            .help("Require both ends of a read to be barcoded for a double ended barcode.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--no-trim")
-            .help("Skip barcode trimming. If this option is not chosen, trimming is enabled. "
-                  "Note that you should use this option if your input data is mapped and you "
-                  "want to preserve the mapping in the output files, as trimming will result "
-                  "in any mapping information from the input file(s) being discarded.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--sort-bam")
-            .help("Sort any BAM output files that contain mapped reads. Using this option "
-                  "requires that the --no-trim option is also set.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.visible.add_argument("--barcode-arrangement")
-            .help("Path to file with custom barcode arrangement.");
-    parser.visible.add_argument("--barcode-sequences")
-            .help("Path to file with custom barcode sequences.");
 
     try {
         utils::arg_parse::parse(parser, argc, argv);
@@ -189,12 +187,14 @@ int demuxer(int argc, char* argv[]) {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
 
-    auto reads(parser.visible.get<std::string>("reads"));
-    auto recursive_input(parser.visible.get<bool>("recursive"));
-    auto output_dir(parser.visible.get<std::string>("output-dir"));
-    auto emit_summary = parser.visible.get<bool>("emit-summary");
-    auto threads(parser.visible.get<int>("threads"));
-    auto max_reads(parser.visible.get<int>("max-reads"));
+    const std::string reads(parser.visible.get<std::string>("reads"));
+    const std::string output_dir = cli::get_output_dir(parser).value();
+    const bool recursive_input(parser.visible.get<bool>("recursive"));
+    const bool emit_fastq = cli::get_emit_fastq(parser);
+    const bool emit_summary = cli::get_emit_summary(parser);
+    int threads(parser.visible.get<int>("threads"));
+    const int max_reads(parser.visible.get<int>("max-reads"));
+
     auto strip_alignment = !no_trim;
     std::vector<std::string> args(argv, argv + argc);
 
@@ -227,6 +227,7 @@ int demuxer(int argc, char* argv[]) {
     auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
 
     HtsReader reader(all_files[0].input, read_list);
+
     utils::MergeHeaders hdr_merger(strip_alignment);
     hdr_merger.add_header(reader.header(), all_files[0].input);
 
@@ -258,43 +259,17 @@ int demuxer(int argc, char* argv[]) {
 
     PipelineDescriptor pipeline_desc;
     auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
-            {}, output_dir, demux_writer_threads, parser.visible.get<bool>("--emit-fastq"),
-            std::move(sample_sheet), sort_bam);
+            {}, output_dir, demux_writer_threads, emit_fastq, std::move(sample_sheet), sort_bam);
 
     if (barcoding_info) {
-        std::optional<std::string> custom_seqs =
-                parser.visible.present<std::string>("--barcode-sequences");
-        if (custom_seqs.has_value()) {
-            try {
-                std::unordered_map<std::string, std::string> custom_barcodes;
-                auto custom_sequences = demux::parse_custom_sequences(*custom_seqs);
-                for (const auto& entry : custom_sequences) {
-                    custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
-                }
-                barcode_kits::add_custom_barcodes(custom_barcodes);
-            } catch (const std::exception& e) {
-                spdlog::error(e.what());
-                std::exit(EXIT_FAILURE);
-            } catch (...) {
-                spdlog::error("Unable to parse custom sequences file {}", *custom_seqs);
-                std::exit(EXIT_FAILURE);
-            }
+        if (!demux::try_configure_custom_barcode_sequences(
+                    parser.visible.present<std::string>("--barcode-sequences"))) {
+            std::exit(EXIT_FAILURE);
         }
 
-        std::optional<std::string> custom_kit =
-                parser.visible.present<std::string>("--barcode-arrangement");
-        if (custom_kit.has_value()) {
-            try {
-                auto [kit_name, kit_info] = demux::get_custom_barcode_kit_info(*custom_kit);
-                barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
-            } catch (const std::exception& e) {
-                spdlog::error("Unable to load custom barcode arrangement file: {}\n{}", *custom_kit,
-                              e.what());
-                std::exit(EXIT_FAILURE);
-            } catch (...) {
-                spdlog::error("Unable to load custom barcode arrangement file: {}", *custom_kit);
-                std::exit(EXIT_FAILURE);
-            }
+        if (!demux::try_configure_custom_barcode_arrangement(
+                    parser.visible.present<std::string>("--barcode-arrangement"))) {
+            std::exit(EXIT_FAILURE);
         }
 
         if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
