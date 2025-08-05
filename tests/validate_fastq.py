@@ -1,3 +1,4 @@
+import argparse
 import pathlib
 import sys
 
@@ -14,8 +15,13 @@ from ont_output_specification_validator.specification import (
 
 from ont_output_specification_validator.validators.fastq import HtsFastqValidator
 
-fastq_file = sys.argv[1]
-spec_folder = sys.argv[2]
+parser = argparse.ArgumentParser()
+parser.add_argument("fastq_file", help="Input fastq file to validate")
+parser.add_argument(
+    "spec_folder",
+    help="Folder containing the specification to validate fastq_file against",
+)
+args = parser.parse_args()
 
 exp_settings = settings.ExperimentSettings(
     gpu_calling_enabled=False,
@@ -30,18 +36,18 @@ exp_settings = settings.ExperimentSettings(
     offline_analysis_enabled=False,
 )
 
-spec_path = pathlib.Path(spec_folder)
+spec_path = pathlib.Path(args.spec_folder)
 specification_bundle = load_local_specification_bundle(spec_path)
 validator = HtsFastqValidator(
     specification_bundle.get_file_content("fastq/header-spec-hts.yaml")
 )
 validator_errors = errors.ErrorContainer()
 
-validate_file(pathlib.Path(fastq_file), exp_settings, validator_errors, validator)
+validate_file(pathlib.Path(args.fastq_file), exp_settings, validator_errors, validator)
 
 if validator_errors.has_errors():
     formatted_errors = validator_errors.format_errors()
     print(f"Errors from validation:\n{formatted_errors}")
     sys.exit(1)
 else:
-    print(f"FastQ file {fastq_file} validated")
+    print(f"FastQ file {args.fastq_file} validated")
