@@ -58,7 +58,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
     bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
-                   (uint8_t *)attributes.start_time.c_str());
+                   reinterpret_cast<const uint8_t *>(attributes.start_time.c_str()));
 
     if (primer_classification.orientation != StrandOrientation::UNKNOWN) {
         auto sense_data = uint8_t(to_char(primer_classification.orientation));
@@ -75,7 +75,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     bam_aux_append(aln, "rn", 'i', sizeof(rn), (uint8_t *)&rn);
 
     bam_aux_append(aln, "fn", 'Z', int(attributes.filename.length() + 1),
-                   (uint8_t *)attributes.filename.c_str());
+                   reinterpret_cast<const uint8_t *>(attributes.filename.c_str()));
 
     float sm = shift;
     bam_aux_append(aln, "sm", 'f', sizeof(sm), (uint8_t *)&sm);
@@ -84,19 +84,20 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     bam_aux_append(aln, "sd", 'f', sizeof(sd), (uint8_t *)&sd);
 
     bam_aux_append(aln, "sv", 'Z', int(scaling_method.size() + 1),
-                   (uint8_t *)scaling_method.c_str());
+                   reinterpret_cast<const uint8_t *>(scaling_method.c_str()));
 
     int32_t dx = (is_duplex_parent ? -1 : 0);
     bam_aux_append(aln, "dx", 'i', sizeof(dx), (uint8_t *)&dx);
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
-        bam_aux_append(aln, "RG", 'Z', int(rg.length() + 1), (uint8_t *)rg.c_str());
+        bam_aux_append(aln, "RG", 'Z', int(rg.length() + 1),
+                       reinterpret_cast<const uint8_t *>(rg.c_str()));
     }
 
     if (!parent_read_id.empty()) {
         bam_aux_append(aln, "pi", 'Z', int(parent_read_id.size() + 1),
-                       (uint8_t *)parent_read_id.c_str());
+                       reinterpret_cast<const uint8_t *>(parent_read_id.c_str()));
         // For split reads, also store the start coordinate of the new read
         // in the original signal.
         bam_aux_append(aln, "sp", 'i', sizeof(split_point), (uint8_t *)&split_point);
@@ -141,16 +142,17 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     bam_aux_append(aln, "ch", 'i', sizeof(ch), (uint8_t *)&ch);
 
     bam_aux_append(aln, "st", 'Z', int(attributes.start_time.length() + 1),
-                   (uint8_t *)attributes.start_time.c_str());
+                   reinterpret_cast<const uint8_t *>(attributes.start_time.c_str()));
 
     auto rg = generate_read_group();
     if (!rg.empty()) {
-        bam_aux_append(aln, "RG", 'Z', int(rg.length() + 1), (uint8_t *)rg.c_str());
+        bam_aux_append(aln, "RG", 'Z', int(rg.length() + 1),
+                       reinterpret_cast<const uint8_t *>(rg.c_str()));
     }
 
     if (!parent_read_id.empty()) {
         bam_aux_append(aln, "pi", 'Z', int(parent_read_id.size() + 1),
-                       (uint8_t *)parent_read_id.c_str());
+                       reinterpret_cast<const uint8_t *>(parent_read_id.c_str()));
     }
 }
 
@@ -301,7 +303,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
     int seq_len = int(seq.length());
     bam_aux_append(aln, "MN", 'i', sizeof(seq_len), (uint8_t *)&seq_len);
     bam_aux_append(aln, "MM", 'Z', int(modbase_string.length() + 1),
-                   (uint8_t *)modbase_string.c_str());
+                   reinterpret_cast<const uint8_t *>(modbase_string.c_str()));
     bam_aux_update_array(aln, "ML", 'C', int(modbase_prob.size()), (uint8_t *)modbase_prob.data());
 }
 
@@ -357,7 +359,8 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
              (char *)qscore.data(), 0);
 
     if (!barcode.empty() && barcode != UNCLASSIFIED) {
-        bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1), (uint8_t *)barcode.c_str());
+        bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1),
+                       reinterpret_cast<const uint8_t *>(barcode.c_str()));
     }
 
     if (is_duplex) {

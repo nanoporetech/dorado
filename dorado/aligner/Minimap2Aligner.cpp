@@ -70,7 +70,8 @@ void add_sa_tag(bam1_t* record,
     }
     std::string sa = ss.str();
     if (!sa.empty()) {
-        bam_aux_append(record, "SA", 'Z', int(sa.length() + 1), (uint8_t*)sa.c_str());
+        bam_aux_append(record, "SA", 'Z', int(sa.length() + 1),
+                       reinterpret_cast<const uint8_t*>(sa.c_str()));
     }
 }
 

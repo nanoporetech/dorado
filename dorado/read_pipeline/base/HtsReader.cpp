@@ -49,7 +49,6 @@ void write_bam_aux_tag_from_string(bam1_t& record, const std::string& bam_tag_st
         return;
     }
 
-    //int bam_aux_append(bam1_t * b, const char tag[2], char type, int len, const uint8_t* data);
     bam_aux_append(&record, tag_id.data(), tag_type.at(0), static_cast<int>(tag_data.size() + 1),
                    reinterpret_cast<const uint8_t*>(tag_data.c_str()));
 }

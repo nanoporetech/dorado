@@ -33,7 +33,8 @@ std::vector<BamPtr> create_bam_reader(const std::string& bc) {
     read_common.read_id = bc;
     auto records = read_common.extract_sam_lines(false, std::nullopt, false);
     for (auto& rec : records) {
-        bam_aux_append(rec.get(), "BC", 'Z', int(bc.length() + 1), (uint8_t*)bc.c_str());
+        bam_aux_append(rec.get(), "BC", 'Z', int(bc.length() + 1),
+                       reinterpret_cast<const uint8_t*>(bc.c_str()));
     }
     return records;
 }
