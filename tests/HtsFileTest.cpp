@@ -645,7 +645,8 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     const std::string expected_fname = oss.str();
 
     hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet);
-    const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
+    const auto path =
+            fs::path(structure.get_path(HtsData{nullptr, attrs, "PAO25751", barcode_score_result}));
 
     CATCH_CAPTURE(root, path, output_mode, barcode_name);
     // Check root is the parent of the output
