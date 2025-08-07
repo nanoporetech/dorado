@@ -931,6 +931,11 @@ int basecaller(int argc, char* argv[]) {
         }
     }
 
+    // We only enable loading of deprecated models here so that we won't try to auto-download one.
+    if (parser.hidden.get<bool>("--enable-deprecated-models")) {
+        dorado::models::enable_loading_deprecated_models();
+    }
+
     BasecallModelConfig model_config;
     try {
         model_config = load_model_config(model_path);
