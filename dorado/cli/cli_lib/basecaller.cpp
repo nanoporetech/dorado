@@ -277,6 +277,10 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
+        parser.hidden.add_argument("--enable-deprecated-models")
+                .help("(WARNING: For expert users only) Allow loading of deprecated models.")
+                .default_value(false)
+                .implicit_value(true);
     }
     cli::add_internal_arguments(parser);
 }

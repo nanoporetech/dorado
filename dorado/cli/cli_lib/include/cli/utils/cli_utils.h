@@ -71,10 +71,6 @@ inline void add_internal_arguments(utils::arg_parse::ArgParser& parser) {
             .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
             .default_value(false)
             .implicit_value(true);
-    parser.hidden.add_argument("--enable-deprecated-models")
-            .help("(WARNING: For expert users only) Allow loading of deprecated models.")
-            .default_value(false)
-            .implicit_value(true);
     parser.hidden.add_argument("--dump_stats_file")
             .help("Internal processing stats. output filename.")
             .default_value(std::string(""));
