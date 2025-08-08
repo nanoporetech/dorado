@@ -51,6 +51,8 @@ std::vector<std::string> modified_model_variants();
 
 bool is_valid_model(const std::string& selected_model);
 
+void enable_loading_deprecated_models();
+
 // Get ModelInfo if this name matches is a known deprecated model
 std::optional<ModelInfo> get_deprecated_model(const std::string& model_name);
 
