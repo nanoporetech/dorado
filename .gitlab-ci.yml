@@ -122,8 +122,8 @@ variables:
   # Uploading these allows us to avoid checking out the repo in tests.
   - echo Zipping test files
   - |
-    zip -r  tests.archive tests/*.sh tests/data tests/cram ||
-    tar -cf tests.archive tests/*.sh tests/data tests/cram
+    zip -r  tests.archive tests/*.sh tests/*.py tests/data tests/cram ||
+    tar -cf tests.archive tests/*.sh tests/*.py tests/data tests/cram
 
 .unzip_test_files:
   - echo Unzipping test files
@@ -439,6 +439,8 @@ build_archive:macos:arm:
     NO_TEST_DORADO_CORRECT: 0
     NO_TEST_DORADO_POLISH: 0
     NO_TEST_DUPLEX: 0
+    VALIDATE_FASTQ: 1
+    PYTHON: python3
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
@@ -464,6 +466,8 @@ build_archive:macos:arm:
   variables:
     GIT_STRATEGY: none
     SAMTOOLS_UNAVAILABLE: sadly_yes
+    VALIDATE_FASTQ: 1
+    PYTHON: python
   script:
     # Do everything inside a newly created folder, since some runners only run
     # tests and hence never perform a git clean.
@@ -493,6 +497,11 @@ build_archive:macos:arm:
     # We just want to check that dorado will run here, so simply display the verbose version info
     - ./dorado-*/bin/dorado -vv
 
+.enable_ont_python:
+    - curl -LfsS ${PYTHON_URL} > ont_python.tar.gz
+    - tar -xf ont_python.tar.gz
+    - export PATH=${PWD}/ont-python/bin:${PWD}/ont-python:${PATH}
+
 # Test stages
 
 test:windows:
@@ -504,6 +513,11 @@ test:windows:
 
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+  variables:
+    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+  script:
+    - !reference [.enable_ont_python]
+    - !reference [.test_dorado, script]
   extends:
     - .linux_test_dependencies
     - .linux_runner
@@ -513,6 +527,11 @@ test:linux:x86:focal:
 
 test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  variables:
+    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-aarch64-3.12.1-1.tar.gz
+  script:
+    - !reference [.enable_ont_python]
+    - !reference [.test_dorado, script]
   extends:
     - .linux_test_dependencies
     - .linux_orin_cuda_12_runner
@@ -521,6 +540,8 @@ test:linux:arm64:jammy:
     - build:linux:arm64:jammy
 
 test:macos:arm:
+  variables:
+    PYTHON: python3.10
   extends:
     - .macos_arm_runner
     - .test_dorado
