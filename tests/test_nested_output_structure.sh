@@ -32,9 +32,12 @@ mkdir -p ${models_directory}
 # Data source
 data_dir=${test_dir}/data
 demux_data=${data_dir}/barcode_demux/read_group_test
+align_data=${data_dir}/pod5/dna_r10.4.1_e8.2_400bps_5khz
+split_data=${data_dir}/single_split_read
 
 # Common arguments
-common_args=" basecaller ${model} ${demux_data} -b ${batch} --models-directory ${models_directory} -v "
+basic_args="-b ${batch} --models-directory ${models_directory} -v"
+common_args=" basecaller ${model} ${demux_data} ${basic_args} "
 
 check_structure() {
     set +x
@@ -109,21 +112,6 @@ check_structure() {
 }
 
 {
-    # Demultiplexing without sample sheet into SAM
-    echo "Testing nested output structure with demultiplexing into SAM"
-    dest="${output_dir}/demux_structure_SAM"
-    core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
-    expected=(
-        "${core}/bam_pass/barcode01/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
-        "${core}/bam_pass/barcode04/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
-        "${core}/bam_pass/unclassified/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
-    )
-
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-sam
-    check_structure ${dest} "${expected[@]}"
-}
-
-{
     # Demultiplexing without sample sheet into FASTQ
     echo "Testing nested output structure with demultiplexing into FASTQ"
     dest="${output_dir}/demux_structure_FASTQ"
@@ -139,16 +127,16 @@ check_structure() {
 }
 
 {
-    # Demultiplexing with sample sheet into BAM
-    echo "Testing nested output structure with demultiplexing and sample sheet into BAM"
-    dest="${output_dir}/demux_sample_sheet_structure_BAM"
+    # Demultiplexing with sample sheet into SAM
+    echo "Testing nested output structure with demultiplexing and sample sheet into SAM"
+    dest="${output_dir}/demux_sample_sheet_structure_SAM"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
-        "${core}/bam_pass/barcode01/PAO25751_bam_pass_patient_id_1_0d85015e_9bf5b3eb_0.bam"
-        "${core}/bam_pass/unclassified/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/barcode01/PAO25751_bam_pass_patient_id_1_0d85015e_9bf5b3eb_0.sam"
+        "${core}/bam_pass/unclassified/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-sam --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
     check_structure ${dest} "${expected[@]}"
 }
 
@@ -167,7 +155,7 @@ check_structure() {
 }
 
 {
-    # Demultiplexing split reads - 
+    # Demultiplexing split reads 
     echo "Testing nested output structure with split reads"
     dest="${output_dir}/demux_split_read"
     core="E8p2p1_400bps/no_sample/20231121_1559_5B_PAS14411_76cd574f"
@@ -175,7 +163,22 @@ check_structure() {
         "${core}/bam_pass/PAS14411_bam_pass_76cd574f_f78e5963_0.bam"
     )
 
-    $dorado_bin basecaller ${model} ${data_dir}/single_split_read -b ${batch} --models-directory ${models_directory} -v --output-dir ${dest} 
+    $dorado_bin basecaller ${model} ${split_data} ${basic_args} --output-dir ${dest} 
+    check_structure ${dest} "${expected[@]}"
+}
+
+{
+    # Demultiplexing aligned reads
+    echo "Testing nested output structure with aligned reads"
+    dest="${output_dir}/demux_aligned_reads"
+    core="test/test/20231125_1913_test_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_bam_pass_4524e8b9_test_0.bam"
+        "${core}/bam_pass/TEST_bam_pass_4524e8b9_test_0.bam.bai"
+    )
+    ref="${output_dir}/ref.fq"
+    $dorado_bin basecaller ${model} ${align_data} ${basic_args} --emit-fastq > $ref
+    $dorado_bin basecaller ${model} ${align_data} ${basic_args} --output-dir ${dest} --reference $ref
     check_structure ${dest} "${expected[@]}"
 }
 
