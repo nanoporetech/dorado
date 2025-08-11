@@ -3,9 +3,9 @@ OPTION(BUILD_KOI_FROM_SOURCE OFF)
 function(get_best_compatible_koi_version KOI_CUDA)
     if (${CMAKE_SYSTEM_PROCESSOR} STREQUAL "aarch64")
         # Koi provides binaries for these cuda versions when targeting aarch64
-        set(SUPPORTED_VERSIONS 12.6 11.4 10.2)
+        set(SUPPORTED_VERSIONS 12.6)
     else()
-        set(SUPPORTED_VERSIONS 12.8 12.4 12.0 11.8)
+        set(SUPPORTED_VERSIONS 12.8 11.8)
     endif()
 
     list(SORT SUPPORTED_VERSIONS COMPARE NATURAL ORDER DESCENDING)
