@@ -99,9 +99,9 @@ private:
     torch::nn::Sequential m_lstm{nullptr};
 
     std::pair<at::Tensor, at::Tensor> forward_impl(const at::Tensor& in_x);
-    std::pair<at::Tensor, at::Tensor> quick_phase(torch::Tensor hap_probs_unphased,
-                                                  at::Tensor attn,
-                                                  at::Tensor features) const;
+    std::pair<at::Tensor, at::Tensor> quick_phase(at::Tensor hap_probs_unphased,
+                                                  const at::Tensor& attn,
+                                                  const at::Tensor& features) const;
 
     /// @brief KMeans clustering of x with k clusters and n_iters iterations.
     ///        Init random cluster centers by selecting k points.
@@ -112,7 +112,7 @@ private:
     /// @param k K clusters.
     /// @param n_iters Number of iterations.
     /// @return Tensor of cluster labels.
-    at::Tensor kmeans_cluster(at::Tensor x, int32_t k, int32_t n_iters) const;
+    at::Tensor kmeans_cluster(const at::Tensor& x, int32_t k, int32_t n_iters) const;
 };
 
 }  // namespace dorado::secondary

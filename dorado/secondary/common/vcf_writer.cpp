@@ -54,8 +54,11 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
 
     // Add FILTER entries.
     for (const auto& [id, description] : filters) {
-        const std::string filter_entry =
-                "##FILTER=<ID=" + id + ",Description=\"" + description + "\">";  // NOLINT
+        const auto filter_entry = std::string("##FILTER=<ID=")
+                                          .append(id)
+                                          .append(",Description=\"")
+                                          .append(description)
+                                          .append("\">");
         bcf_hdr_append(m_header.get(), filter_entry.c_str());
     }
 

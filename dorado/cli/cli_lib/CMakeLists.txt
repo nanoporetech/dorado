@@ -30,6 +30,7 @@ dorado_add_library(
         ProgressTracker.h
         read_output_progress_stats.cpp
         read_output_progress_stats.h
+        SimpleProgressBar.h
         summary.cpp
         trim.cpp
         variant_progress_tracker.cpp

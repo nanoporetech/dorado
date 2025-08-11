@@ -20,7 +20,7 @@
 namespace dorado::api {
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
-        basecall::BasecallerCreationParams params,
+        const basecall::BasecallerCreationParams& params,
         size_t num_gpu_runners,
         size_t num_cpu_runners) {
     std::vector<basecall::RunnerPtr> runners;

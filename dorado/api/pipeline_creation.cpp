@@ -60,9 +60,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
         throw std::runtime_error("Overlap and model stride must be evenly divisible.");
     }
 
-    std::string model_name =
-            std::filesystem::canonical(model_config.model_path).filename().string();
-
     const bool is_rna = is_rna_model(model_config);
     NodeHandle first_node_handle = PipelineDescriptor::InvalidNodeHandle;
 
@@ -86,9 +83,9 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     }
     NodeHandle current_node_handle = scaler_node;
 
-    auto basecaller_node =
-            pipeline_desc.add_node<BasecallerNode>({}, std::move(runners), overlap, model_name,
-                                                   1000, "BasecallerNode", mean_qscore_start_pos);
+    auto basecaller_node = pipeline_desc.add_node<BasecallerNode>(
+            {}, std::move(runners), overlap, model_config.model_name(), 1000, "BasecallerNode",
+            mean_qscore_start_pos);
     pipeline_desc.add_node_sink(current_node_handle, basecaller_node);
     current_node_handle = basecaller_node;
 
@@ -135,10 +132,8 @@ void create_stereo_duplex_pipeline(PipelineDescriptor& pipeline_desc,
                                    NodeHandle source_node_handle) {
     const auto& model_config = runners.front()->config();
     const auto& stereo_model_config = stereo_runners.front()->config();
-    std::string model_name =
-            std::filesystem::canonical(model_config.model_path).filename().string();
-    auto stereo_model_name =
-            std::filesystem::canonical(stereo_model_config.model_path).filename().string();
+    std::string model_name = model_config.model_name();
+    auto stereo_model_name = stereo_model_config.model_name();
     auto duplex_rg_name = std::string(model_name + "_" + stereo_model_name);
 
     // configs should have called normalise_basecaller_params()

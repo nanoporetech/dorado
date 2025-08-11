@@ -70,8 +70,8 @@ void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_
             config.mean_qscore_start_pos = toml::find<int32_t>(qscore, "mean_qscore_start_pos");
         } else {
             // If information is not present in the config, find start position by model name.
-            const std::string model_name = config.model_path.filename().string();
-            config.mean_qscore_start_pos = get_mean_qscore_start_pos_by_model_name(model_name);
+            config.mean_qscore_start_pos =
+                    get_mean_qscore_start_pos_by_model_name(config.model_name());
         }
         if (config.mean_qscore_start_pos < 0) {
             throw std::runtime_error(
@@ -132,9 +132,7 @@ void parse_run_info(BasecallModelConfig &config, const toml::value &config_toml)
 
     using namespace dorado::models;
     if (config.sample_type == SampleType::UNKNOWN) {
-        const std::string model_name =
-                std::filesystem::canonical(config.model_path).filename().string();
-        config.sample_type = get_sample_type_from_model_name(model_name);
+        config.sample_type = get_sample_type_from_model_name(config.model_name());
         if (config.sample_type == SampleType::UNKNOWN) {
             throw std::runtime_error(
                     "Failed to determine model sample type from model name or config");
@@ -591,6 +589,10 @@ std::string CRFEncoderParams::to_string() const {
         << " permute:"       << std::boolalpha << !permute.empty() << " }";
     return oss.str();
     // clang-format on
+}
+
+std::string BasecallModelConfig::model_name() const {
+    return models::extract_model_name_from_path(model_path);
 }
 
 std::string BasecallModelConfig::to_string() const {
