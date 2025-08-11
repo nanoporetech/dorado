@@ -45,7 +45,12 @@ void HtsWriterNode::input_thread_fn() {
         if (m_file.get_output_mode() == utils::HtsFile::OutputMode::FASTQ) {
             if (!m_gpu_names.empty()) {
                 bam_aux_append(aln.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
-                               (uint8_t*)m_gpu_names.c_str());
+                               reinterpret_cast<const uint8_t*>(m_gpu_names.c_str()));
+            }
+            if (!bam_message.data.flowcell_id.empty()) {
+                bam_aux_append(
+                        aln.get(), "PU", 'Z', int(bam_message.data.flowcell_id.length() + 1),
+                        reinterpret_cast<const uint8_t*>(bam_message.data.flowcell_id.c_str()));
             }
         }
 

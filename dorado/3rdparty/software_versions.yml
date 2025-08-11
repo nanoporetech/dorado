@@ -96,7 +96,6 @@ intervaltree:
     license: intervaltree/LICENSE
     files:
         - intervaltree
-
 ksort:
     description: >
         Sorting library from the klib library. Modified from the original version to enable cross-platform building.
@@ -105,7 +104,6 @@ ksort:
     license: kadayashi/src/haplotag_lib/ksort.h
     files:
         - kadayashi/src/haplotag_lib/ksort.h
-
 kvec:
     description: >
         Vector manipulation from the klib library. Modified from the original version to enable cross-platform building.
@@ -114,7 +112,6 @@ kvec:
     license: kadayashi/include/kvec.h
     files:
         - kadayashi/include/kvec.h
-
 minimap2:
     description: >
         Sequence alignment program
@@ -181,11 +178,3 @@ zlib-ng:
     license: ont-minimap2/src/3rdparty/zlib-ng/LICENSE.md
     files:
         - ont-minimap2/src/3rdparty/zlib-ng
-zstd:
-    description: >
-        Fast lossless compression algorithm.
-    version: "v1.5.6"
-    url: https://github.com/facebook/zstd
-    license: zstd/LICENSE
-    files:
-        - zstd

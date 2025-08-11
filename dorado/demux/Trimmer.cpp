@@ -181,7 +181,7 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
     if (!trimmed_modbase_str.empty()) {
         bam_aux_del(out_record, bam_aux_get(out_record, "MM"));
         bam_aux_append(out_record, "MM", 'Z', int(trimmed_modbase_str.length() + 1),
-                       (uint8_t*)trimmed_modbase_str.c_str());
+                       reinterpret_cast<const uint8_t*>(trimmed_modbase_str.c_str()));
         bam_aux_del(out_record, bam_aux_get(out_record, "ML"));
         bam_aux_update_array(out_record, "ML", 'C', int(trimmed_modbase_probs.size()),
                              (uint8_t*)trimmed_modbase_probs.data());
