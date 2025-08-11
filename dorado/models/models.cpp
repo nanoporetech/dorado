@@ -1455,6 +1455,10 @@ bool is_valid_model(const std::string& model_name) {
     return false;
 }
 
+static bool s_allow_deprecated_models = false;  // By default, deprecated models are not allowed
+
+void enable_loading_deprecated_models() { s_allow_deprecated_models = true; }
+
 std::optional<ModelInfo> get_deprecated_model(const std::string& model_name) {
     for (const auto& collection : {simplex::deprecated, modified::deprecated}) {
         for (const ModelInfo& model_info : collection) {
@@ -1467,6 +1471,10 @@ std::optional<ModelInfo> get_deprecated_model(const std::string& model_name) {
 }
 
 void throw_on_deprecated_model(const std::string& model_name) {
+    if (s_allow_deprecated_models) {
+        return;
+    }
+
     const std::optional<ModelInfo> deprecated_model = get_deprecated_model(model_name);
     if (!deprecated_model.has_value()) {
         return;
