@@ -127,7 +127,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .nargs(0)
                 .action([&](const auto&) { ++verbosity; })
                 .append();
-        cli::add_device_arg(parser);
+        cli::add_device_arg(parser.visible);
         parser.visible.add_argument("--models-directory")
                 .default_value(std::string("."))
                 .help("Optional directory to search for existing models or download new models "
@@ -282,7 +282,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
                 .default_value(false)
                 .implicit_value(true);
     }
-    cli::add_internal_arguments(parser);
+    cli::add_internal_arguments(parser.hidden);
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,

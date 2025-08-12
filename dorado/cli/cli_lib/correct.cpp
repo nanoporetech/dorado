@@ -98,7 +98,7 @@ ParserPtr create_cli(int& verbosity) {
 #endif
                 .scan<'i', int>();
 
-        cli::add_device_arg(*parser);
+        cli::add_device_arg(parser->visible);
 
         // Default "Optional arguments" group
         parser->visible.add_argument("-v", "--verbose")

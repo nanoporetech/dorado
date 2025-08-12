@@ -329,7 +329,7 @@ int duplex(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_device_arg(parser);
+    cli::add_device_arg(parser.visible);
 
     parser.visible.add_argument("--models-directory")
             .default_value(std::string("."))
@@ -415,7 +415,7 @@ int duplex(int argc, char* argv[]) {
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
     }
-    cli::add_internal_arguments(parser);
+    cli::add_internal_arguments(parser.hidden);
 
     parser.hidden.add_argument("--stereo-model")
             .help("Path to stereo model")
