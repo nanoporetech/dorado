@@ -80,6 +80,19 @@ T parse_string_to_size(const std::string& str) {
     return parse_string_to_sizes<T>(str)[0];
 }
 
+inline void parse(argparse::ArgumentParser& parser, const std::vector<std::string>& arguments) {
+    parser.add_argument("--devopts")
+            .hidden()
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
+    parser.parse_args(arguments);
+    utils::details::extract_dev_options(parser.get<std::string>("--devopts"));
+}
+
+inline void parse(argparse::ArgumentParser& parser, int argc, const char* const argv[]) {
+    return parse(parser, {argv, argv + argc});
+}
+
 inline void parse(ArgParser& parser, const std::vector<std::string>& arguments) {
     parser.hidden.add_argument("--devopts")
             .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
