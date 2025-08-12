@@ -196,7 +196,9 @@ void AlignerNode::align_bam_message(BamMessage&& bam_message) {
                 auto ref_id = record->core.tid;
                 add_bed_hits_to_record(m_header_sequence_names.at(ref_id), record.get());
             }
-            send_message_to_sink(BamMessage{HtsData{std::move(record)}, bam_message_.client_info});
+            send_message_to_sink(
+                    BamMessage{HtsData{std::move(record), bam_message_.data.read_attrs},
+                               bam_message_.client_info});
         }
     });
 }
