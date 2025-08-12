@@ -363,7 +363,7 @@ int duplex(int argc, char* argv[]) {
         parser.visible.add_argument("--reference")
                 .help("Path to reference for alignment.")
                 .default_value(std::string(""));
-        alignment::mm2::add_options_string_arg(parser);
+        alignment::mm2::add_options_string_arg(parser.visible);
         parser.visible.add_argument("--bed-file")
                 .help("Optional bed-file. If specified, overlaps between the alignments and "
                       "bed-file "

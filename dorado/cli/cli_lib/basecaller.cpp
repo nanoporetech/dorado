@@ -179,7 +179,7 @@ void set_dorado_basecaller_args(utils::arg_parse::ArgParser& parser, int& verbos
         parser.visible.add_argument("--reference")
                 .help("Path to reference for alignment.")
                 .default_value(std::string{});
-        alignment::mm2::add_options_string_arg(parser);
+        alignment::mm2::add_options_string_arg(parser.visible);
     }
     {
         const std::string mods_codes = utils::join(models::modified_model_variants(), ", ");

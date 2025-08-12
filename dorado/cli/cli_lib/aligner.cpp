@@ -181,7 +181,7 @@ int aligner(int argc, char* argv[]) {
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    alignment::mm2::add_options_string_arg(parser);
+    alignment::mm2::add_options_string_arg(parser.visible);
 
     std::vector<std::string> args_excluding_mm2_opts{};
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},

@@ -1,6 +1,7 @@
 #include "alignment/minimap2_args.h"
 
 #include "alignment/minimap2_wrappers.h"
+#include "utils/arg_parse_ext.h"
 #include "utils/string_utils.h"
 
 #include <minimap.h>
@@ -79,55 +80,57 @@ std::string extract_options_string_arg(const std::vector<std::string>& args,
     return *mm2_opt_value_itr;
 }
 
-void add_options_string_arg(utils::arg_parse::ArgParser& parser) {
-    parser.visible.add_argument(MM2_OPTS_ARG)
+void add_options_string_arg(argparse::ArgumentParser& parser) {
+    parser.add_argument(MM2_OPTS_ARG)
             .help("Optional minimap2 options string. For multiple arguments surround with double "
                   "quotes.");
 }
 
 namespace {
 
-void add_arguments(utils::arg_parse::ArgParser& parser) {
-    parser.visible.add_argument("-k")
+void add_arguments(argparse::ArgumentParser& parser) {
+    parser.add_argument("-k")
             .help("minimap2 k-mer size for alignment (maximum 28).")
             .template scan<'i', int>();
 
-    parser.visible.add_argument("-w")
+    parser.add_argument("-w")
             .help("minimap2 minimizer window size for alignment.")
             .template scan<'i', int>();
 
-    parser.visible.add_argument("-I").help("minimap2 index batch size.");
+    parser.add_argument("-I").help("minimap2 index batch size.");
 
-    parser.visible.add_argument("--secondary").help("minimap2 outputs secondary alignments");
+    parser.add_argument("--secondary").help("minimap2 outputs secondary alignments");
 
-    parser.visible.add_argument("-N")
+    parser.add_argument("-N")
             .help("minimap2 retains at most INT secondary alignments")
             .template scan<'i', int>();
 
-    parser.visible.add_argument("-Y")
+    parser.add_argument("-Y")
             .help("minimap2 uses soft clipping for supplementary alignments")
             .implicit_value(true);
 
-    parser.visible.add_argument("-r").help(
+    parser.add_argument("-r").help(
             "minimap2 chaining/alignment bandwidth and optionally long-join bandwidth "
             "specified as NUM,[NUM]");
 
-    parser.visible.add_argument("--junc-bed")
+    parser.add_argument("--junc-bed")
             .help("Optional file with gene annotations in the BED12 format (aka 12-column BED), or "
                   "intron positions in 5-column BED. With this option, minimap2 prefers splicing "
                   "in annotations.");
 
     // Setting options to lr:hq which is appropriate for high quality nanopore reads.
-    parser.visible.add_argument("-x")
+    parser.add_argument("-x")
             .help("minimap2 preset for indexing and mapping.")
             .default_value(std::string{DEFAULT_MM_PRESET});
 
-    parser.hidden.add_argument("--secondary-seq")
+    parser.add_argument("--secondary-seq")
+            .hidden()
             .help("minimap2 output seq/qual for secondary and supplementary alignments")
             .default_value(false)
             .implicit_value(true);
 
-    parser.hidden.add_argument("--print-aln-seq")
+    parser.add_argument("--print-aln-seq")
+            .hidden()
             .help("minimap2 debug print qname and aln_seq")
             .default_value(false)
             .implicit_value(true);
@@ -141,30 +144,30 @@ void apply_preset(Minimap2Options& options, const std::string& preset) {
     throw std::runtime_error("Cannot set mm2 options with preset: " + preset);
 }
 
-void apply_indexing_options(const utils::arg_parse::ArgParser& parser, mm_idxopt_t& options) {
-    auto kmer = get_optional_as<short>(parser.visible.present<int>("k"));
+void apply_indexing_options(const argparse::ArgumentParser& parser, mm_idxopt_t& options) {
+    auto kmer = get_optional_as<short>(parser.present<int>("k"));
     if (kmer) {
         options.k = *kmer;
     }
-    auto window_size = get_optional_as<short>(parser.visible.present<int>("w"));
+    auto window_size = get_optional_as<short>(parser.present<int>("w"));
     if (window_size) {
         options.w = *window_size;
     }
-    auto index_batch_size = parser.visible.present<std::string>("I");
+    auto index_batch_size = parser.present<std::string>("I");
     if (index_batch_size) {
         options.batch_size = utils::arg_parse::parse_string_to_size<uint64_t>(*index_batch_size);
     }
     options.mini_batch_size = options.batch_size;
 }
 
-void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_t& options) {
-    auto secondary = parser.visible.present<std::string>("--secondary");
+void apply_mapping_options(const argparse::ArgumentParser& parser, mm_mapopt_t& options) {
+    auto secondary = parser.present<std::string>("--secondary");
     bool print_secondary{true};
     if (secondary && !utils::arg_parse::parse_yes_or_no(*secondary)) {
         print_secondary = false;
     }
 
-    auto best_n_secondary = parser.visible.present<int>("N");
+    auto best_n_secondary = parser.present<int>("N");
     if (best_n_secondary.value_or(1) == 0) {
         spdlog::warn("Ignoring '-N 0', using preset default");
         print_secondary = true;
@@ -176,7 +179,7 @@ void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_
         options.flag |= MM_F_NO_PRINT_2ND;
     }
 
-    auto optional_bandwidth = parser.visible.present<std::string>("-r");
+    auto optional_bandwidth = parser.present<std::string>("-r");
     if (optional_bandwidth) {
         auto bandwidth = utils::arg_parse::parse_string_to_sizes<int>(*optional_bandwidth);
         switch (bandwidth.size()) {
@@ -191,23 +194,23 @@ void apply_mapping_options(const utils::arg_parse::ArgParser& parser, mm_mapopt_
                     "Wrong number of arguments for minimap2 bandwidth option '-r'.");
         }
     }
-    auto soft_clipping = parser.visible.present<bool>("Y");
+    auto soft_clipping = parser.present<bool>("Y");
     if (soft_clipping.value_or(false)) {
         options.flag |= MM_F_SOFTCLIP;
     }
-    if (parser.hidden.get<bool>("secondary-seq")) {
+    if (parser.get<bool>("secondary-seq")) {
         options.flag |= MM_F_SECONDARY_SEQ;
     }
 }
 
-std::optional<Minimap2Options> process_arguments(const utils::arg_parse::ArgParser& parser,
+std::optional<Minimap2Options> process_arguments(const argparse::ArgumentParser& parser,
                                                  std::string& error_message) {
     Minimap2Options res{};
     res.index_options->get() = mm_idxopt_default();
     res.mapping_options->get() = mm_mapopt_default();
 
     // apply preset before overwriting with other user supplied options.
-    apply_preset(res, parser.visible.get<std::string>("-x"));
+    apply_preset(res, parser.get<std::string>("-x"));
 
     apply_indexing_options(parser, res.index_options->get());
     apply_mapping_options(parser, res.mapping_options->get());
@@ -219,12 +222,12 @@ std::optional<Minimap2Options> process_arguments(const utils::arg_parse::ArgPars
     }
 
     // Cache the --junc-bed arg with the index options for use when the index is loaded
-    auto junc_bed = parser.visible.present<std::string>("--junc-bed");
+    auto junc_bed = parser.present<std::string>("--junc-bed");
     if (junc_bed) {
         res.junc_bed = std::move(*junc_bed);
     }
 
-    if (parser.hidden.get<bool>("print-aln-seq")) {
+    if (parser.get<bool>("print-aln-seq")) {
         // set the global flags
         mm_dbg_flag |= MM_DBG_PRINT_QNAME | MM_DBG_PRINT_ALN_SEQ;
     }
@@ -235,10 +238,10 @@ std::optional<Minimap2Options> process_arguments(const utils::arg_parse::ArgPars
 }  // namespace
 
 std::string get_help_message() {
-    utils::arg_parse::ArgParser parser("minimap2_options");
+    argparse::ArgumentParser parser("minimap2_options");
     add_arguments(parser);
     std::ostringstream parser_stream;
-    parser_stream << parser.visible;
+    parser_stream << parser;
     return parser_stream.str();
 }
 
@@ -254,7 +257,7 @@ Minimap2Options parse_options(const std::string& minimap2_option_string) {
 
 namespace {
 
-std::optional<Minimap2Options> try_parse_options_impl(utils::arg_parse::ArgParser& parser,
+std::optional<Minimap2Options> try_parse_options_impl(argparse::ArgumentParser& parser,
                                                       const std::string& minimap2_option_string,
                                                       std::string& error_message) {
     std::vector<std::string> mm2_args = [&minimap2_option_string] {
@@ -278,13 +281,14 @@ std::optional<Minimap2Options> try_parse_options_impl(utils::arg_parse::ArgParse
 
 std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
                                                  std::string& error_message) {
-    utils::arg_parse::ArgParser parser("minimap2_options");
+    argparse::ArgumentParser parser("minimap2_options");
     return try_parse_options_impl(parser, minimap2_option_string, error_message);
 }
 
 std::optional<Minimap2Options> try_parse_options_no_help(const std::string& minimap2_option_string,
                                                          std::string& error_message) {
-    utils::arg_parse::ArgParser parser("minimap2_options", argparse::default_arguments::none);
+    argparse::ArgumentParser parser("minimap2_options", MM_VERSION,
+                                    argparse::default_arguments::none);
     return try_parse_options_impl(parser, minimap2_option_string, error_message);
 }
 
