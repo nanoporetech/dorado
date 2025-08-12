@@ -58,8 +58,6 @@ namespace dorado {
 
 namespace {
 
-using ParserPtr = std::unique_ptr<utils::arg_parse::ArgParser>;
-
 enum class VariantCallingFormatEnum {
     VCF,
     GVCF,
@@ -111,24 +109,22 @@ struct Options {
 };
 
 /// \brief Define the CLI options.
-ParserPtr create_cli(int& verbosity) {
-    ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado variant");
-
-    parser->visible.add_description("Diploid variant calling tool");
+void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
+    parser.add_description("Diploid variant calling tool");
 
     {
         // Positional arguments group
-        parser->visible.add_argument("in_aln_bam").help("Aligned reads in BAM format");
-        parser->visible.add_argument("in_ref_fastx").help("Reference sequences");
+        parser.add_argument("in_aln_bam").help("Aligned reads in BAM format");
+        parser.add_argument("in_ref_fastx").help("Reference sequences");
     }
     {
         // Default "Optional arguments" group
-        parser->visible.add_argument("-t", "--threads")
+        parser.add_argument("-t", "--threads")
                 .help("Number of threads for processing (0=unlimited).")
                 .default_value(0)
                 .scan<'i', int>();
 
-        parser->visible.add_argument("--infer-threads")
+        parser.add_argument("--infer-threads")
                 .help("Number of threads for inference")
 #if DORADO_CUDA_BUILD
                 .default_value(2)
@@ -137,7 +133,7 @@ ParserPtr create_cli(int& verbosity) {
 #endif
                 .scan<'i', int>();
 
-        parser->visible.add_argument("-x", "--device")
+        parser.add_argument("-x", "--device")
                 .help(std::string{"Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or "
                                   "'cuda:<device_id>[,<device_id>...]'. The 'cuda' option is only "
                                   "available on CUDA-enabled systems. Specifying 'auto' will "
@@ -145,134 +141,133 @@ ParserPtr create_cli(int& verbosity) {
                                   "a GPU device."})
                 .default_value(std::string{"auto"});
 
-        parser->visible.add_argument("-v", "--verbose")
+        parser.add_argument("-v", "--verbose")
                 .flag()
                 .action([&](const auto&) { ++verbosity; })
                 .append();
     }
     {
-        parser->visible.add_group("Input/output options");
-        parser->visible.add_argument("-o", "--output-dir")
+        parser.add_group("Input/output options");
+        parser.add_argument("-o", "--output-dir")
                 .help("If specified, output files will be written to the given folder. Otherwise, "
                       "output is to stdout.")
                 .default_value("");
-        parser->visible.add_argument("-m", "--model")
+        parser.add_argument("-m", "--model")
                 .help("Path to the model folder.")
                 .default_value("auto");
-        parser->visible.add_argument("--gvcf").help("Output a gVCF instead of a VCF.").flag();
-        parser->visible.add_argument("--ambig-ref")
+        parser.add_argument("--gvcf").help("Output a gVCF instead of a VCF.").flag();
+        parser.add_argument("--ambig-ref")
                 .help("Decode variants at ambiguous reference positions.")
                 .flag();
     }
     {
-        parser->visible.add_group("Advanced options");
-        parser->visible.add_argument("-b", "--batchsize")
+        parser.add_group("Advanced options");
+        parser.add_argument("-b", "--batchsize")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
                 .default_value(10)
                 .scan<'i', int>();
-        parser->visible.add_argument("--ref-batchsize")
+        parser.add_argument("--ref-batchsize")
                 .help("Approximate batch size for processing input reference sequences.")
                 .default_value(std::string{"200M"});
-        parser->visible.add_argument("--window-len")
+        parser.add_argument("--window-len")
                 .help("Window size for processing.")
                 .default_value(10000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--window-overlap")
+        parser.add_argument("--window-overlap")
                 .help("Overlap length between windows.")
                 .default_value(1000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--bam-chunk")
+        parser.add_argument("--bam-chunk")
                 .help("Size of reference chunks to parse from the input BAM at a time.")
                 .default_value(1000000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--bam-subchunk")
+        parser.add_argument("--bam-subchunk")
                 .help("Size of regions to split the bam_chunk in to for parallel processing")
                 .default_value(100000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--regions")
+        parser.add_argument("--regions")
                 .help("Process only these regions of the input. Can be either a path to a BED file "
                       "or a list of comma-separated Htslib-formatted regions (start is 1-based, "
                       "end "
                       "is inclusive).");
-        parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
-        parser->visible.add_argument("--ignore-read-groups")
-                .help("Ignore read groups in bam file.")
-                .flag();
-        parser->visible.add_argument("--tag-name")
+        parser.add_argument("--RG").help("Read group to select.").default_value("");
+        parser.add_argument("--ignore-read-groups").help("Ignore read groups in bam file.").flag();
+        parser.add_argument("--tag-name")
                 .help("Two-letter BAM tag name for filtering the alignments during feature "
                       "generation")
                 .default_value("");
-        parser->visible.add_argument("--tag-value")
+        parser.add_argument("--tag-value")
                 .help("Value of the tag for filtering the alignments during feature generation")
                 .default_value(0)
                 .scan<'i', int>();
 
-        parser->visible.add_argument("--tag-keep-missing")
+        parser.add_argument("--tag-keep-missing")
                 .help("Keep alignments when tag is missing. If specified, overrides "
                       "the same option in the model config.")
                 .flag();
-        parser->visible.add_argument("--min-mapq")
+        parser.add_argument("--min-mapq")
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
                 .scan<'i', int>();
-        parser->visible.add_argument("--min-depth")
+        parser.add_argument("--min-depth")
                 .help("Sites with depth lower than this value will not be processed.")
                 .default_value(0)
                 .scan<'i', int>();
-        parser->visible.add_argument("--pass-qual-filter")
+        parser.add_argument("--pass-qual-filter")
                 .help("Set quality filter for PASS variants.")
                 .default_value(3.0f)
                 .scan<'g', float>();
     }
     {
-        parser->visible.add_group("Phasing options");
-        parser->visible.add_argument("--hp-tag")
+        parser.add_group("Phasing options");
+        parser.add_argument("--hp-tag")
                 .help("Use the HP tag from the input BAM file to load phasing information, instead "
                       "of computing it.")
-                .flag()
-                .default_value(false);
-        parser->hidden.add_argument("--phasing-bin")
+                .flag();
+        parser.add_argument("--phasing-bin")
+                .hidden()
                 .help("The .bin file containing phasing information for reads in the given BAM.");
-        parser->visible.add_argument("--unphased")
-                .help("Deactivate phasing.")
-                .flag()
-                .default_value(false);
+        parser.add_argument("--unphased").help("Deactivate phasing.").flag().default_value(false);
     }
 
     // Hidden advanced arguments.
     {
-        parser->hidden.add_argument("--full-precision")
+        parser.add_argument("--full-precision")
+                .hidden()
                 .help("Always use full precision for inference.")
                 .flag();
-        parser->hidden.add_argument("--queue-size")
+        parser.add_argument("--queue-size")
+                .hidden()
                 .help("Queue size for processing.")
                 .default_value(1000)
                 .scan<'i', int>();
-        parser->hidden.add_argument("--scripted")
+        parser.add_argument("--scripted")
+                .hidden()
                 .help("Load the scripted Torch model instead of building one internally.")
                 .flag();
-        parser->hidden.add_argument("--any-bam")
+        parser.add_argument("--any-bam")
+                .hidden()
                 .help("Allow any BAM as input, not just Dorado aligned.")
                 .flag();
-        parser->hidden.add_argument("--skip-model-compatibility-check")
+        parser.add_argument("--skip-model-compatibility-check")
+                .hidden()
                 .help("Allow any model to be applied on the data.")
                 .flag();
-        parser->hidden.add_argument("--continue-on-error")
+        parser.add_argument("--continue-on-error")
+                .hidden()
                 .help("Continue the process even if an exception is thrown. This "
                       "may leave some regions unprocessed.")
                 .flag();
     }
-
-    return parser;
 }
 
-int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
+int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     try {
         utils::arg_parse::parse(parser, argc, argv);
 
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
-        parser_stream << parser.visible;
+        parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
@@ -281,21 +276,21 @@ int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
 }
 
 /// \brief This function simply fills out the Options struct with the parsed CLI args.
-Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosity) {
+Options set_options(const argparse::ArgumentParser& parser, const int verbosity) {
     Options opt;
 
-    opt.in_aln_bam_fn = parser.visible.get<std::string>("in_aln_bam");
-    opt.in_ref_fastx_fn = parser.visible.get<std::string>("in_ref_fastx");
+    opt.in_aln_bam_fn = parser.get<std::string>("in_aln_bam");
+    opt.in_ref_fastx_fn = parser.get<std::string>("in_ref_fastx");
 
-    opt.output_dir = parser.visible.get<std::string>("output-dir");
-    opt.model_str = parser.visible.get<std::string>("model");
-    opt.out_format = parser.visible.get<bool>("gvcf") ? VariantCallingFormatEnum::GVCF
-                                                      : VariantCallingFormatEnum::VCF;
-    opt.threads = parser.visible.get<int>("threads");
+    opt.output_dir = parser.get<std::string>("output-dir");
+    opt.model_str = parser.get<std::string>("model");
+    opt.out_format = parser.get<bool>("gvcf") ? VariantCallingFormatEnum::GVCF
+                                              : VariantCallingFormatEnum::VCF;
+    opt.threads = parser.get<int>("threads");
     opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : (opt.threads);
-    opt.infer_threads = parser.visible.get<int>("infer-threads");
+    opt.infer_threads = parser.get<int>("infer-threads");
 
-    opt.device_str = parser.visible.get<std::string>("device");
+    opt.device_str = parser.get<std::string>("device");
     if (opt.device_str == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
         opt.device_str = "cpu";
@@ -304,38 +299,36 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 #endif
     }
 
-    opt.batch_size = parser.visible.get<int>("batchsize");
-    opt.ref_batch_size =
-            std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
-                                         parser.visible.get<std::string>("ref-batchsize")));
-    opt.window_len = parser.visible.get<int>("window-len");
-    opt.window_overlap = parser.visible.get<int>("window-overlap");
-    opt.bam_chunk = parser.visible.get<int>("bam-chunk");
-    opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
+    opt.batch_size = parser.get<int>("batchsize");
+    opt.ref_batch_size = std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
+                                                      parser.get<std::string>("ref-batchsize")));
+    opt.window_len = parser.get<int>("window-len");
+    opt.window_overlap = parser.get<int>("window-overlap");
+    opt.bam_chunk = parser.get<int>("bam-chunk");
+    opt.bam_subchunk = parser.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
-    opt.regions_str = parser.visible.present<std::string>("regions");
+    opt.regions_str = parser.present<std::string>("regions");
     if (opt.regions_str) {
         opt.regions = secondary::parse_regions(*opt.regions_str);
     }
-    opt.min_depth = parser.visible.get<int>("min-depth");
+    opt.min_depth = parser.get<int>("min-depth");
 
-    opt.full_precision = parser.hidden.get<bool>("full-precision");
-    opt.load_scripted_model = parser.hidden.get<bool>("scripted");
-    opt.queue_size = parser.hidden.get<int>("queue-size");
-    opt.any_bam = parser.hidden.get<bool>("any-bam");
-    opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
-    opt.continue_on_error = parser.hidden.get<bool>("continue-on-error");
-    opt.read_group = (parser.visible.is_used("--RG")) ? parser.visible.get<std::string>("RG") : "";
-    opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
-    opt.tag_name = parser.visible.get<std::string>("tag-name");
-    opt.tag_value = parser.visible.get<int>("tag-value");
+    opt.full_precision = parser.get<bool>("full-precision");
+    opt.load_scripted_model = parser.get<bool>("scripted");
+    opt.queue_size = parser.get<int>("queue-size");
+    opt.any_bam = parser.get<bool>("any-bam");
+    opt.any_model = parser.get<bool>("skip-model-compatibility-check");
+    opt.continue_on_error = parser.get<bool>("continue-on-error");
+    opt.read_group = (parser.is_used("--RG")) ? parser.get<std::string>("RG") : "";
+    opt.ignore_read_groups = parser.get<bool>("ignore-read-groups");
+    opt.tag_name = parser.get<std::string>("tag-name");
+    opt.tag_value = parser.get<int>("tag-value");
     // The `"--tag-keep-missing` is a special case because it's a flag, and we cannot use `present`.
-    opt.tag_keep_missing =
-            (parser.visible.is_used("--tag-keep-missing"))
-                    ? std::optional<bool>{parser.visible.get<bool>("tag-keep-missing")}
-                    : std::nullopt;
-    opt.min_mapq = parser.visible.present<int32_t>("min-mapq");
-    opt.ambig_ref = parser.visible.get<bool>("ambig-ref");
+    opt.tag_keep_missing = (parser.is_used("--tag-keep-missing"))
+                                   ? std::optional<bool>{parser.get<bool>("tag-keep-missing")}
+                                   : std::nullopt;
+    opt.min_mapq = parser.present<int32_t>("min-mapq");
+    opt.ambig_ref = parser.get<bool>("ambig-ref");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
         spdlog::warn(
@@ -345,11 +338,11 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
         opt.bam_subchunk = opt.bam_chunk;
     }
 
-    opt.pass_min_qual = parser.visible.get<float>("pass-qual-filter");
+    opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
-    opt.phasing_bin_path = parser.hidden.present<std::string>("phasing-bin");
-    opt.hp_tag_from_bam = parser.visible.get<bool>("hp-tag");
-    opt.unphased = parser.visible.get<bool>("unphased");
+    opt.phasing_bin_path = parser.present<std::string>("phasing-bin");
+    opt.hp_tag_from_bam = parser.get<bool>("hp-tag");
+    opt.unphased = parser.get<bool>("unphased");
     opt.haplotag_source = (opt.phasing_bin_path)  ? secondary::HaplotagSource::BIN_FILE
                           : (opt.hp_tag_from_bam) ? secondary::HaplotagSource::BAM_HAP_TAG
                           : (opt.unphased)        ? secondary::HaplotagSource::UNPHASED
@@ -940,17 +933,18 @@ int variant_caller(int argc, char* argv[]) {
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
         int verbosity = 0;
-        ParserPtr parser = create_cli(verbosity);
+        argparse::ArgumentParser parser("dorado variant");
+        add_arguments(parser, verbosity);
 
         // Parse the arguments.
-        const int rv_parse = parse_args(argc, argv, *parser);
+        const int rv_parse = parse_args(argc, argv, parser);
 
         if (rv_parse != EXIT_SUCCESS) {
             return rv_parse;
         }
 
         // Initialize the options from the CLI.
-        const Options opt = set_options(*parser, verbosity);
+        const Options opt = set_options(parser, verbosity);
 
         if (opt.verbosity == 0) {
             spdlog::set_level(spdlog::level::info);
