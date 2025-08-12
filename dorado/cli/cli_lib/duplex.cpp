@@ -72,12 +72,12 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-BatchParams get_batch_params(const utils::arg_parse::ArgParser& arg) {
+BatchParams get_batch_params(const argparse::ArgumentParser& arg) {
     BatchParams basecaller{};
     basecaller.update(BatchParams::Priority::CLI_ARG,
-                      cli::get_optional_argument<int>("--chunksize", arg.hidden),
-                      cli::get_optional_argument<int>("--overlap", arg.hidden),
-                      cli::get_optional_argument<int>("--batchsize", arg.visible));
+                      cli::get_optional_argument<int>("--chunksize", arg),
+                      cli::get_optional_argument<int>("--overlap", arg),
+                      cli::get_optional_argument<int>("--batchsize", arg));
     return basecaller;
 }
 
@@ -253,19 +253,19 @@ DuplexModels load_models(const std::string& model_arg,
 }
 
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
-                                           utils::arg_parse::ArgParser& parser,
+                                           argparse::ArgumentParser& parser,
                                            size_t device_count) {
     // Convert path to params.
     auto params = get_modbase_params(paths, device_count);
 
     // Allow user to override batchsize.
-    if (auto modbase_batchsize = parser.visible.present<int>("--modified-bases-batchsize");
+    if (auto modbase_batchsize = parser.present<int>("--modified-bases-batchsize");
         modbase_batchsize.has_value()) {
         params.batchsize = *modbase_batchsize;
     }
 
     // Allow user to override threshold.
-    if (auto methylation_threshold = parser.visible.present<float>("--modified-bases-threshold");
+    if (auto methylation_threshold = parser.present<float>("--modified-bases-threshold");
         methylation_threshold.has_value()) {
         if (methylation_threshold < 0.f || methylation_threshold > 1.f) {
             throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
@@ -313,45 +313,41 @@ int duplex(int argc, char* argv[]) {
     // cached CUBLAS workspace from the stero model. This causes OOM.
     //utils::make_torch_deterministic();
 
-    utils::arg_parse::ArgParser parser("dorado");
+    argparse::ArgumentParser parser("dorado");
 
-    parser.visible.add_argument("model").help(
+    parser.add_argument("model").help(
             "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
             "modbases, or path to existing model directory.");
-    parser.visible.add_argument("reads").help(
-            "Reads in POD5 format or BAM/SAM format for basespace.");
+    parser.add_argument("reads").help("Reads in POD5 format or BAM/SAM format for basespace.");
 
     int verbosity = 0;
-    parser.visible.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
+    parser.add_argument("-v", "--verbose")
+            .flag()
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    cli::add_device_arg(parser.visible);
+    cli::add_device_arg(parser);
 
-    parser.visible.add_argument("--models-directory")
+    parser.add_argument("--models-directory")
             .default_value(std::string("."))
             .help("Optional directory to search for existing models or download new models into.");
     {
-        parser.visible.add_group("Input data arguments");
-        parser.visible.add_argument("-r", "--recursive")
+        parser.add_group("Input data arguments");
+        parser.add_argument("-r", "--recursive")
                 .help("Recursively scan through directories to load POD5 files.")
-                .default_value(false)
-                .implicit_value(true);
-        parser.visible.add_argument("-l", "--read-ids")
+                .flag();
+        parser.add_argument("-l", "--read-ids")
                 .help("A file with a newline-delimited list of reads to basecall. If not provided, "
                       "all reads will be basecalled.")
                 .default_value(std::string(""));
-        parser.visible.add_argument("--pairs")
+        parser.add_argument("--pairs")
                 .default_value(std::string(""))
                 .help("Space-delimited csv containing read ID pairs. If not provided, pairing will "
                       "be performed automatically.");
     }
     {
-        parser.visible.add_group("Output arguments");
-        parser.visible.add_argument("--min-qscore")
+        parser.add_group("Output arguments");
+        parser.add_argument("--min-qscore")
                 .help("Discard reads with mean Q-score below this threshold or write them to "
                       "output files marked `fail` if `--output-dir` is set.")
                 .default_value(0)
@@ -359,12 +355,12 @@ int duplex(int argc, char* argv[]) {
         cli::add_basecaller_output_arguments(parser);
     }
     {
-        parser.visible.add_group("Alignment arguments");
-        parser.visible.add_argument("--reference")
+        parser.add_group("Alignment arguments");
+        parser.add_argument("--reference")
                 .help("Path to reference for alignment.")
                 .default_value(std::string(""));
-        alignment::mm2::add_options_string_arg(parser.visible);
-        parser.visible.add_argument("--bed-file")
+        alignment::mm2::add_options_string_arg(parser);
+        parser.add_argument("--bed-file")
                 .help("Optional bed-file. If specified, overlaps between the alignments and "
                       "bed-file "
                       "entries will be counted, and recorded in BAM output using the 'bh' read "
@@ -373,8 +369,8 @@ int duplex(int argc, char* argv[]) {
     }
     {
         const std::string options = utils::join(models::modified_model_variants(), ", ");
-        parser.visible.add_group("Modified model arguments");
-        parser.visible.add_argument("--modified-bases")
+        parser.add_group("Modified model arguments");
+        parser.add_argument("--modified-bases")
                 .help("A space separated list of modified base codes. Choose from: " + options +
                       ".")
                 .nargs(argparse::nargs_pattern::at_least_one)
@@ -387,37 +383,40 @@ int duplex(int argc, char* argv[]) {
                     }
                     return value;
                 });
-        parser.visible.add_argument("--modified-bases-models")
+        parser.add_argument("--modified-bases-models")
                 .help("A comma separated list of modified base models")
                 .default_value(std::string());
-        parser.visible.add_argument("--modified-bases-threshold")
+        parser.add_argument("--modified-bases-threshold")
                 .help("The minimum predicted methylation probability for a modified base to be "
                       "emitted in an all-context model, [0, 1].")
                 .scan<'f', float>();
-        parser.visible.add_argument("--modified-bases-batchsize")
+        parser.add_argument("--modified-bases-batchsize")
                 .scan<'i', int>()
                 .help("The modified base models batch size.");
     }
     {
-        parser.visible.add_group("Advanced arguments");
-        parser.visible.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
-        parser.visible.add_argument("-b", "--batchsize")
+        parser.add_group("Advanced arguments");
+        parser.add_argument("-t", "--threads").default_value(0).scan<'i', int>();
+        parser.add_argument("-b", "--batchsize")
                 .help("The number of chunks in a batch. If 0 an optimal batchsize will be "
                       "selected.")
                 .default_value(default_parameters.batchsize)
                 .scan<'i', int>();
-        parser.hidden.add_argument("-c", "--chunksize")
+        parser.add_argument("-c", "--chunksize")
+                .hidden()
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
-        parser.hidden.add_argument("--overlap")
+        parser.add_argument("--overlap")
+                .hidden()
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
     }
-    cli::add_internal_arguments(parser.hidden);
+    cli::add_internal_arguments(parser);
 
-    parser.hidden.add_argument("--stereo-model")
+    parser.add_argument("--stereo-model")
+            .hidden()
             .help("Path to stereo model")
             .default_value(std::string(""));
 
@@ -429,7 +428,7 @@ int duplex(int argc, char* argv[]) {
     try {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
 
-        auto device{parser.visible.get<std::string>("-x")};
+        auto device{parser.get<std::string>("-x")};
         if (!cli::validate_device_string(device)) {
             return EXIT_FAILURE;
         }
@@ -437,25 +436,25 @@ int duplex(int argc, char* argv[]) {
             device = utils::get_auto_detected_device();
         }
 
-        auto model(parser.visible.get<std::string>("model"));
+        auto model(parser.get<std::string>("model"));
 
-        auto reads(parser.visible.get<std::string>("reads"));
-        std::string pairs_file = parser.visible.get<std::string>("--pairs");
-        auto threads = static_cast<size_t>(parser.visible.get<int>("--threads"));
-        auto min_qscore(parser.visible.get<int>("--min-qscore"));
-        auto ref = parser.visible.get<std::string>("--reference");
-        auto bed = parser.visible.get<std::string>("--bed-file");
+        auto reads(parser.get<std::string>("reads"));
+        std::string pairs_file = parser.get<std::string>("--pairs");
+        auto threads = static_cast<size_t>(parser.get<int>("--threads"));
+        auto min_qscore(parser.get<int>("--min-qscore"));
+        auto ref = parser.get<std::string>("--reference");
+        auto bed = parser.get<std::string>("--bed-file");
         const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
-        if (parser.visible.get<bool>("--verbose")) {
+        if (parser.get<bool>("--verbose")) {
             utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
         }
 
-        auto mod_bases = parser.visible.get<std::vector<std::string>>("--modified-bases");
-        auto mod_bases_models = parser.visible.get<std::string>("--modified-bases-models");
+        auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
+        auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
 
         std::map<std::string, std::string> template_complement_map;
-        auto read_list = utils::load_read_list(parser.visible.get<std::string>("--read-ids"));
+        auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
         std::unordered_set<std::string> read_list_from_pairs;
 
@@ -471,17 +470,17 @@ int duplex(int argc, char* argv[]) {
 
         bool emit_moves = false;
 
-        if (parser.visible.get<std::string>("--reference").empty() &&
-            !parser.visible.get<std::string>("--bed-file").empty()) {
+        if (parser.get<std::string>("--reference").empty() &&
+            !parser.get<std::string>("--bed-file").empty()) {
             spdlog::error("--bed-file cannot be used without --reference.");
             return EXIT_FAILURE;
         }
 
-        const std::string dump_stats_file = parser.hidden.get<std::string>("--dump_stats_file");
-        const std::string dump_stats_filter = parser.hidden.get<std::string>("--dump_stats_filter");
+        const std::string dump_stats_file = parser.get<std::string>("--dump_stats_file");
+        const std::string dump_stats_filter = parser.get<std::string>("--dump_stats_filter");
         const size_t max_stats_records = static_cast<size_t>(dump_stats_file.empty() ? 0 : 100000);
 
-        const bool recursive_file_loading = parser.visible.get<bool>("--recursive");
+        const bool recursive_file_loading = parser.get<bool>("--recursive");
 
         DataLoader::InputFiles input_pod5_files;
         try {
@@ -640,12 +639,12 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-            const std::string stereo_model_arg = parser.hidden.get<std::string>("--stereo-model");
+            const std::string stereo_model_arg = parser.get<std::string>("--stereo-model");
             const auto batch_params = get_batch_params(parser);
             const bool skip_model_compatibility_check =
-                    parser.hidden.get<bool>("--skip-model-compatibility-check");
+                    parser.get<bool>("--skip-model-compatibility-check");
 
-            const auto models_directory = model_resolution::get_models_directory(parser.visible);
+            const auto models_directory = model_resolution::get_models_directory(parser);
             const DuplexModels models = load_models(
                     model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
                     input_pod5_files.get(), batch_params, skip_model_compatibility_check, device);
