@@ -8,6 +8,8 @@
 #include "torch_utils/cuda_utils.h"
 #endif
 
+#include "utils/dev_utils.h"
+
 #include <argparse/argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -27,6 +29,19 @@
 namespace dorado {
 
 namespace cli {
+
+inline void parse(argparse::ArgumentParser& parser, const std::vector<std::string>& arguments) {
+    parser.add_argument("--devopts")
+            .hidden()
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
+    parser.parse_args(arguments);
+    utils::details::extract_dev_options(parser.get<std::string>("--devopts"));
+}
+
+inline void parse(argparse::ArgumentParser& parser, int argc, const char* const argv[]) {
+    return parse(parser, {argv, argv + argc});
+}
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.

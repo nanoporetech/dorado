@@ -263,7 +263,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
 
 int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     try {
-        utils::arg_parse::parse(parser, argc, argv);
+        cli::parse(parser, argc, argv);
 
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;

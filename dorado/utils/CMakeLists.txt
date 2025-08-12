@@ -76,7 +76,6 @@ dorado_add_library(
         container_utils.cpp
         io_utils.cpp
     DEPENDS_PUBLIC
-        argparse::argparse
         date::date
         dorado_version
         edlib

@@ -159,7 +159,7 @@ int demuxer(int argc, char* argv[]) {
             .scan<'i', int>();
 
     try {
-        utils::arg_parse::parse(parser, argc, argv);
+        cli::parse(parser, argc, argv);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;

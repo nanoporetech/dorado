@@ -4,6 +4,7 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/string_utils.h"
 
+#include <argparse/argparse.hpp>
 #include <minimap.h>
 #include <mmpriv.h>
 #include <spdlog/spdlog.h>
@@ -268,7 +269,7 @@ std::optional<Minimap2Options> try_parse_options_impl(argparse::ArgumentParser& 
     }();
     add_arguments(parser);
     try {
-        utils::arg_parse::parse(parser, mm2_args);
+        parser.parse_args(mm2_args);
     } catch (const std::exception& e) {
         error_message = e.what();
         return std::nullopt;

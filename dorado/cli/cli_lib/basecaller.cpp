@@ -732,7 +732,7 @@ int basecaller(int argc, char* argv[]) {
                                                                         args_excluding_mm2_opts);
 
     try {
-        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
+        cli::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;

@@ -43,6 +43,7 @@ dorado_add_library(
         dorado_version
         htslib
         spdlog::spdlog
+        argparse::argparse
     DEPENDS_PRIVATE
         dorado_compat
         dorado_file_info

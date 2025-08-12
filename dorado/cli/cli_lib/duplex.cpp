@@ -426,7 +426,7 @@ int duplex(int argc, char* argv[]) {
 
     std::set<fs::path> temp_model_paths;
     try {
-        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
+        cli::parse(parser, args_excluding_mm2_opts);
 
         auto device{parser.get<std::string>("-x")};
         if (!cli::validate_device_string(device)) {

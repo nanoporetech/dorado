@@ -182,7 +182,7 @@ int aligner(int argc, char* argv[]) {
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
                                                                         args_excluding_mm2_opts);
     try {
-        utils::arg_parse::parse(parser, args_excluding_mm2_opts);
+        cli::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
