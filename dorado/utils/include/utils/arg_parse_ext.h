@@ -19,19 +19,6 @@
 
 namespace dorado::utils::arg_parse {
 
-static constexpr auto HIDDEN_PROGRAM_NAME = "internal_args";
-
-struct ArgParser {
-    ArgParser(std::string program_name)
-            : visible(std::move(program_name), DORADO_VERSION, argparse::default_arguments::help),
-              hidden(HIDDEN_PROGRAM_NAME, DORADO_VERSION, argparse::default_arguments::none) {}
-    ArgParser(std::string program_name, argparse::default_arguments add_args)
-            : visible(std::move(program_name), DORADO_VERSION, add_args),
-              hidden(HIDDEN_PROGRAM_NAME, DORADO_VERSION, argparse::default_arguments::none) {}
-    argparse::ArgumentParser visible;
-    argparse::ArgumentParser hidden;
-};
-
 inline bool parse_yes_or_no(const std::string& str) {
     if (str == "yes" || str == "y") {
         return true;
@@ -90,20 +77,6 @@ inline void parse(argparse::ArgumentParser& parser, const std::vector<std::strin
 }
 
 inline void parse(argparse::ArgumentParser& parser, int argc, const char* const argv[]) {
-    return parse(parser, {argv, argv + argc});
-}
-
-inline void parse(ArgParser& parser, const std::vector<std::string>& arguments) {
-    parser.hidden.add_argument("--devopts")
-            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
-            .default_value(std::string(""));
-    auto remaining_args = parser.visible.parse_known_args(arguments);
-    remaining_args.insert(remaining_args.begin(), HIDDEN_PROGRAM_NAME);
-    parser.hidden.parse_args(remaining_args);
-    utils::details::extract_dev_options(parser.hidden.get<std::string>("--devopts"));
-}
-
-inline void parse(ArgParser& parser, int argc, const char* const argv[]) {
     return parse(parser, {argv, argv + argc});
 }
 
