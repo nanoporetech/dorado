@@ -46,7 +46,6 @@ namespace dorado {
 namespace {
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
-using ParserPtr = std::unique_ptr<utils::arg_parse::ArgParser>;
 
 /// \brief All options for the Dorado Correct tool.
 struct Options {
@@ -72,24 +71,21 @@ struct Options {
 };
 
 /// \brief Define the CLI options.
-ParserPtr create_cli(int& verbosity) {
-    ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado correct");
-
-    parser->visible.add_description("Dorado read correction tool");
+void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
+    parser.add_description("Dorado read correction tool");
 
     {
         // Positional arguments group
-        parser->visible.add_argument("reads").help(
-                "Path to a file with reads to correct in FASTQ format.");
+        parser.add_argument("reads").help("Path to a file with reads to correct in FASTQ format.");
     }
     {
         // Default "Optional arguments" group
-        parser->visible.add_argument("-t", "--threads")
+        parser.add_argument("-t", "--threads")
                 .help("Number of threads for processing. "
                       "Default uses all available threads.")
                 .default_value(0)
                 .scan<'i', int>();
-        parser->visible.add_argument("--infer-threads")
+        parser.add_argument("--infer-threads")
                 .help("Number of threads per device.")
 #if DORADO_CUDA_BUILD
                 .default_value(3)
@@ -98,26 +94,21 @@ ParserPtr create_cli(int& verbosity) {
 #endif
                 .scan<'i', int>();
 
-        cli::add_device_arg(parser->visible);
+        cli::add_device_arg(parser);
 
         // Default "Optional arguments" group
-        parser->visible.add_argument("-v", "--verbose")
-                .default_value(false)
-                .implicit_value(true)
-                .nargs(0)
+        parser.add_argument("-v", "--verbose")
+                .flag()
                 .action([&](const auto&) { ++verbosity; })
                 .append();
     }
     {
-        parser->visible.add_group("Input/output arguments");
-        parser->visible.add_argument("-m", "--model-path").help("Path to correction model folder.");
-        parser->visible.add_argument("-p", "--from-paf")
+        parser.add_group("Input/output arguments");
+        parser.add_argument("-m", "--model-path").help("Path to correction model folder.");
+        parser.add_argument("-p", "--from-paf")
                 .help("Path to a PAF file with alignments. Skips alignment computation.");
-        parser->visible.add_argument("--to-paf")
-                .help("Generate PAF alignments and skip consensus.")
-                .default_value(false)
-                .implicit_value(true);
-        parser->visible.add_argument("--resume-from")
+        parser.add_argument("--to-paf").help("Generate PAF alignments and skip consensus.").flag();
+        parser.add_argument("--resume-from")
                 .help("Resume a previously interrupted run. Requires a path to a file where "
                       "sequence headers are stored in the first column (whitespace delimited), one "
                       "per row. The header can also occupy a full row with no other columns. For "
@@ -126,59 +117,63 @@ ParserPtr create_cli(int& verbosity) {
                 .default_value("");
     }
     {
-        parser->visible.add_group("Advanced arguments");
-        parser->visible.add_argument("-b", "--batch-size")
+        parser.add_group("Advanced arguments");
+        parser.add_argument("-b", "--batch-size")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
                 .default_value(0)
                 .scan<'i', int>();
-        parser->visible.add_argument("-i", "--index-size")
+        parser.add_argument("-i", "--index-size")
                 .help("Size of index for mapping and alignment. Default 8G. Decrease index size to "
                       "lower memory footprint.")
                 .default_value(std::string{"8G"});
-        parser->visible.add_argument("--compute-num-blocks")
+        parser.add_argument("--compute-num-blocks")
                 .help("Computes and returns one number: the number of index blocks which would be "
                       "processed on a normal run.")
                 .flag();
-        parser->visible.add_argument("--run-block-id")
+        parser.add_argument("--run-block-id")
                 .help("ID of the index block to run. If specified, only this block will be run.")
                 .scan<'i', int>();
     }
     {
-        parser->hidden.add_argument("--kmer-size")
+        parser.add_argument("--kmer-size")
+                .hidden()
                 .help("Minimizer kmer size for overlapping.")
                 .default_value(25)
                 .scan<'i', int>();
-        parser->hidden.add_argument("--ovl-window-size")
+        parser.add_argument("--ovl-window-size")
+                .hidden()
                 .help("Minimizer window size score for overlapping.")
                 .default_value(17)
                 .scan<'i', int>();
-        parser->hidden.add_argument("--min-chain-score")
+        parser.add_argument("--min-chain-score")
+                .hidden()
                 .help("Minimum chaining score for overlapping.")
                 .default_value(2500)
                 .scan<'i', int>();
-        parser->hidden.add_argument("--mid-occ-frac")
+        parser.add_argument("--mid-occ-frac")
+                .hidden()
                 .help("Filter out top FLOAT fraction of repetitive minimizers during the overlap "
                       "process.")
                 .default_value(0.05f)
                 .scan<'g', float>();
-        parser->hidden.add_argument("--debug-tnames")
+        parser.add_argument("--debug-tnames")
+                .hidden()
                 .help("Comma separated list of one or more target read names to process.")
                 .default_value("");
-        parser->hidden.add_argument("--legacy-windowing")
+        parser.add_argument("--legacy-windowing")
+                .hidden()
                 .help("Runs legacy windowing instead of the new version.")
                 .flag();
     }
-
-    return parser;
 }
 
-int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
+int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     try {
         utils::arg_parse::parse(parser, argc, argv);
 
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
-        parser_stream << parser.visible;
+        parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
@@ -187,27 +182,23 @@ int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
 }
 
 /// \brief This function simply fills out the Options struct with the parsed CLI args.
-Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosity) {
+Options set_options(const argparse::ArgumentParser& parser, const int verbosity) {
     Options opt;
 
-    opt.in_reads_fns = parser.visible.get<std::vector<std::string>>("reads");
-    opt.infer_threads = parser.visible.get<int>("infer-threads");
-    opt.batch_size = parser.visible.get<int>("batch-size");
+    opt.in_reads_fns = parser.get<std::vector<std::string>>("reads");
+    opt.infer_threads = parser.get<int>("infer-threads");
+    opt.batch_size = parser.get<int>("batch-size");
     opt.index_size = std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
-                                                  parser.visible.get<std::string>("index-size")));
-    opt.to_paf = parser.visible.get<bool>("to-paf");
-    opt.in_paf_fn = (parser.visible.is_used("--from-paf"))
-                            ? parser.visible.get<std::string>("from-paf")
-                            : "";
-    opt.resume_path_fn = parser.visible.get<std::string>("resume-from");
-    opt.model_path = (parser.visible.is_used("--model-path"))
-                             ? parser.visible.get<std::string>("model-path")
-                             : "";
+                                                  parser.get<std::string>("index-size")));
+    opt.to_paf = parser.get<bool>("to-paf");
+    opt.in_paf_fn = (parser.is_used("--from-paf")) ? parser.get<std::string>("from-paf") : "";
+    opt.resume_path_fn = parser.get<std::string>("resume-from");
+    opt.model_path = (parser.is_used("--model-path")) ? parser.get<std::string>("model-path") : "";
 
-    opt.threads = parser.visible.get<int>("threads");
+    opt.threads = parser.get<int>("threads");
     opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : opt.threads;
 
-    opt.device = parser.visible.get<std::string>("device");
+    opt.device = parser.get<std::string>("device");
 
     if (opt.device == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
@@ -219,18 +210,18 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 
     opt.verbosity = verbosity;
 
-    opt.compute_num_blocks = parser.visible.get<bool>("compute-num-blocks");
-    opt.run_block_id = parser.visible.present<int>("run-block-id");
+    opt.compute_num_blocks = parser.get<bool>("compute-num-blocks");
+    opt.run_block_id = parser.present<int>("run-block-id");
 
     // Hidden parameters.
-    opt.kmer_size = parser.hidden.get<int>("kmer-size");
-    opt.ovl_window_size = parser.hidden.get<int>("ovl-window-size");
-    opt.min_chain_score = parser.hidden.get<int>("min-chain-score");
-    opt.mid_occ_frac = parser.hidden.get<float>("mid-occ-frac");
-    opt.legacy_windowing = parser.hidden.get<bool>("legacy-windowing");
+    opt.kmer_size = parser.get<int>("kmer-size");
+    opt.ovl_window_size = parser.get<int>("ovl-window-size");
+    opt.min_chain_score = parser.get<int>("min-chain-score");
+    opt.mid_occ_frac = parser.get<float>("mid-occ-frac");
+    opt.legacy_windowing = parser.get<bool>("legacy-windowing");
 
     // Debug option, hidden.
-    const std::string tnames_str = parser.hidden.get<std::string>("debug-tnames");
+    const std::string tnames_str = parser.get<std::string>("debug-tnames");
     if (!std::empty(tnames_str)) {
         const std::vector<std::string> tnames = utils::split(tnames_str, ',');
         opt.debug_tnames.insert(std::begin(tnames), std::end(tnames));
@@ -390,17 +381,18 @@ int correct(int argc, char* argv[]) {
     // Initialize CLI options. The parse_args below requires a non-const reference.
     // Verbosity is passed into a callback, so we need it here.
     int verbosity = 0;
-    ParserPtr parser = create_cli(verbosity);
+    argparse::ArgumentParser parser("dorado correct");
+    add_arguments(parser, verbosity);
 
     // Parse the arguments.
-    const int rv_parse = parse_args(argc, argv, *parser);
+    const int rv_parse = parse_args(argc, argv, parser);
 
     if (rv_parse != EXIT_SUCCESS) {
         return rv_parse;
     }
 
     // Initialize the options from the CLI.
-    const Options opt = set_options(*parser, verbosity);
+    const Options opt = set_options(parser, verbosity);
 
     // Initialize the log level.
     if (opt.verbosity) {
