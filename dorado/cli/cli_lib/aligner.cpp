@@ -125,63 +125,58 @@ std::unordered_map<std::string, dorado::ReadGroup> collect_read_groups(
 namespace dorado {
 
 int aligner(int argc, char* argv[]) {
-    utils::arg_parse::ArgParser parser("dorado aligner");
-    parser.visible.add_description(
+    argparse::ArgumentParser parser("dorado aligner");
+    parser.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
             "The default parameters use the lr:hq preset.\n"
             "NOTE: Not all arguments from minimap2 are currently available. Additionally, "
             "parameter names are not finalized and may change.");
-    parser.visible.add_argument("index").help("reference in (fastq/fasta/mmi).");
-    parser.visible.add_argument("reads")
+    parser.add_argument("index").help("reference in (fastq/fasta/mmi).");
+    parser.add_argument("reads")
             .help("An input file or the folder containing input file(s) (any HTS format).")
             .nargs(argparse::nargs_pattern::optional)
             .default_value(std::string{});
-    parser.visible.add_argument("-r", "--recursive")
+    parser.add_argument("-r", "--recursive")
             .help("If the 'reads' positional argument is a folder any subfolders will also be "
                   "searched for input files.")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0);
-    parser.visible.add_argument("-o", "--output-dir")
+            .flag();
+    parser.add_argument("-o", "--output-dir")
             .help("If specified output files will be written to the given folder, otherwise output "
                   "is to stdout. Required if the 'reads' positional argument is a folder.")
             .default_value(std::string{});
-    parser.visible.add_argument("--emit-summary")
+    parser.add_argument("--emit-summary")
             .help("If specified, a summary file containing the details of the primary alignments "
                   "for each read will be emitted to the root of the output folder. This option "
                   "requires that the '--output-dir' option is also set.")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0);
-    parser.visible.add_argument("--bed-file")
+            .flag();
+    parser.add_argument("--bed-file")
             .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
                   "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
             .default_value(std::string(""));
-    parser.hidden.add_argument("--progress_stats_frequency")
+    parser.add_argument("--progress_stats_frequency")
+            .hidden()
             .help("Frequency in seconds in which to report progress statistics")
             .default_value(0)
             .scan<'i', int>();
-    parser.visible.add_argument("-t", "--threads")
+    parser.add_argument("-t", "--threads")
             .help("number of threads for alignment and BAM writing (0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
-    parser.visible.add_argument("-n", "--max-reads")
+    parser.add_argument("-n", "--max-reads")
             .help("maximum number of reads to process (for debugging, 0=unlimited).")
             .default_value(0)
             .scan<'i', int>();
-    parser.visible.add_argument("--add-fastq-rg")
+    parser.add_argument("--add-fastq-rg")
             .help("Adds FASTQ read group information as @RG header lines in the output BAM. "
                   "Initial parsing over all input FASTQ file(s) may take time.")
             .flag();
     int verbosity = 0;
-    parser.visible.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
+    parser.add_argument("-v", "--verbose")
+            .flag()
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    alignment::mm2::add_options_string_arg(parser.visible);
+    alignment::mm2::add_options_string_arg(parser);
 
     std::vector<std::string> args_excluding_mm2_opts{};
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
@@ -190,39 +185,39 @@ int aligner(int argc, char* argv[]) {
         utils::arg_parse::parse(parser, args_excluding_mm2_opts);
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
-        parser_stream << parser.visible;
+        parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
-    if (parser.visible.get<bool>("--verbose")) {
+    if (parser.get<bool>("--verbose")) {
         mm_verbose = 3;
     }
 
-    auto progress_stats_frequency(parser.hidden.get<int>("progress_stats_frequency"));
+    auto progress_stats_frequency(parser.get<int>("progress_stats_frequency"));
     if (progress_stats_frequency > 0) {
         utils::EnsureInfoLoggingEnabled(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     } else {
         utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
     }
     auto align_info = std::make_shared<alignment::AlignmentInfo>();
-    align_info->reference_file = parser.visible.get<std::string>("index");
-    align_info->bed_file = parser.visible.get<std::string>("bed-file");
-    auto reads(parser.visible.get<std::string>("reads"));
-    auto recursive_input = parser.visible.get<bool>("recursive");
-    auto output_folder = parser.visible.get<std::string>("output-dir");
+    align_info->reference_file = parser.get<std::string>("index");
+    align_info->bed_file = parser.get<std::string>("bed-file");
+    auto reads(parser.get<std::string>("reads"));
+    auto recursive_input = parser.get<bool>("recursive");
+    auto output_folder = parser.get<std::string>("output-dir");
 
-    auto emit_summary = parser.visible.get<bool>("emit-summary");
+    auto emit_summary = parser.get<bool>("emit-summary");
     if (emit_summary && output_folder.empty()) {
         spdlog::error("Cannot specify '--emit-summary' if '--output-dir' is not also specified.");
         return EXIT_FAILURE;
     }
 
-    auto threads(parser.visible.get<int>("threads"));
+    auto threads(parser.get<int>("threads"));
 
-    auto max_reads(parser.visible.get<int>("max-reads"));
+    auto max_reads(parser.get<int>("max-reads"));
 
-    const bool add_fastq_rg = parser.visible.get<bool>("add-fastq-rg");
+    const bool add_fastq_rg = parser.get<bool>("add-fastq-rg");
 
     std::string err_msg{};
     auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
@@ -234,7 +229,7 @@ int aligner(int argc, char* argv[]) {
 
     // Only allow `reads` to be empty if we're accepting input from a pipe
     if (reads.empty() && utils::is_fd_tty(stdin)) {
-        std::cout << parser.visible << '\n';
+        std::cout << parser << '\n';
         return EXIT_FAILURE;
     }
 
