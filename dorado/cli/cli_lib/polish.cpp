@@ -60,8 +60,6 @@ namespace dorado {
 
 namespace {
 
-using ParserPtr = std::unique_ptr<utils::arg_parse::ArgParser>;
-
 enum class OutputFormat {
     FASTA,
     FASTQ,
@@ -118,24 +116,22 @@ struct Options {
 };
 
 /// \brief Define the CLI options.
-ParserPtr create_cli(int& verbosity) {
-    ParserPtr parser = std::make_unique<utils::arg_parse::ArgParser>("dorado polish");
-
-    parser->visible.add_description("Consensus tool for polishing draft assemblies");
+void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
+    parser.add_description("Consensus tool for polishing draft assemblies");
 
     {
         // Positional arguments group
-        parser->visible.add_argument("in_aln_bam").help("Aligned reads in BAM format");
-        parser->visible.add_argument("in_draft_fastx").help("Draft assembly for polishing");
+        parser.add_argument("in_aln_bam").help("Aligned reads in BAM format");
+        parser.add_argument("in_draft_fastx").help("Draft assembly for polishing");
     }
     {
         // Default "Optional arguments" group
-        parser->visible.add_argument("-t", "--threads")
+        parser.add_argument("-t", "--threads")
                 .help("Number of threads for processing (0=unlimited).")
                 .default_value(0)
                 .scan<'i', int>();
 
-        parser->visible.add_argument("--infer-threads")
+        parser.add_argument("--infer-threads")
                 .help("Number of threads for inference")
 #if DORADO_CUDA_BUILD
                 .default_value(2)
@@ -144,101 +140,98 @@ ParserPtr create_cli(int& verbosity) {
 #endif
                 .scan<'i', int>();
 
-        parser->visible.add_argument("-x", "--device")
+        parser.add_argument("-x", "--device")
                 .help(std::string{"Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or "
                                   "'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will "
                                   "choose either 'cpu' "
                                   "or 'cuda:all' depending on the presence of a GPU device."})
                 .default_value(std::string{"auto"});
 
-        parser->visible.add_argument("-v", "--verbose")
+        parser.add_argument("-v", "--verbose")
                 .flag()
                 .action([&](const auto&) { ++verbosity; })
                 .append();
     }
     {
-        parser->visible.add_group("Input/output options");
-        parser->visible.add_argument("-o", "--output-dir")
+        parser.add_group("Input/output options");
+        parser.add_argument("-o", "--output-dir")
                 .help("If specified, output files will be written to the given folder. Otherwise, "
                       "output is to stdout.")
                 .default_value("");
-        parser->visible.add_argument("--models-directory")
+        parser.add_argument("--models-directory")
                 .help("Optional directory to search for existing models or download new models "
                       "into.");
-        parser->visible.add_argument("--bacteria")
+        parser.add_argument("--bacteria")
                 .help("Optimise polishing for plasmids and bacterial genomes.")
                 .flag();
-        parser->visible.add_argument("-q", "--qualities")
+        parser.add_argument("-q", "--qualities")
                 .help("Output with per-base quality scores (FASTQ).")
                 .flag();
-        parser->visible.add_argument("--vcf")
+        parser.add_argument("--vcf")
                 .help("Output a VCF file with variant calls to --output-dir if specified, "
                       "otherwise to stdout.")
                 .flag();
-        parser->visible.add_argument("--gvcf")
+        parser.add_argument("--gvcf")
                 .help("Output a gVCF file to --output-dir if specified, otherwise to stdout.")
                 .flag();
-        parser->visible.add_argument("--ambig-ref")
+        parser.add_argument("--ambig-ref")
                 .help("Decode variants at ambiguous reference positions.")
                 .flag();
     }
     {
-        parser->visible.add_group("Advanced options");
-        parser->visible.add_argument("-b", "--batchsize")
+        parser.add_group("Advanced options");
+        parser.add_argument("-b", "--batchsize")
                 .help("Batch size for inference.")
                 .default_value(16)
                 .scan<'i', int>();
-        parser->visible.add_argument("--draft-batchsize")
+        parser.add_argument("--draft-batchsize")
                 .help("Approximate batch size for processing input draft sequences.")
                 .default_value(std::string{"200M"});
-        parser->visible.add_argument("--window-len")
+        parser.add_argument("--window-len")
                 .help("Window size for calling consensus.")
                 .default_value(10000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--window-overlap")
+        parser.add_argument("--window-overlap")
                 .help("Overlap length between windows.")
                 .default_value(1000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--bam-chunk")
+        parser.add_argument("--bam-chunk")
                 .help("Size of draft chunks to parse from the input BAM at a time.")
                 .default_value(1000000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--bam-subchunk")
+        parser.add_argument("--bam-subchunk")
                 .help("Size of regions to split the bam_chunk in to for parallel processing")
                 .default_value(100000)
                 .scan<'i', int>();
-        parser->visible.add_argument("--no-fill-gaps")
+        parser.add_argument("--no-fill-gaps")
                 .help("Do not fill gaps in consensus sequence with draft sequence.")
                 .flag();
-        parser->visible.add_argument("--fill-char")
-                .help("Use a designated character to fill gaps.");
-        parser->visible.add_argument("--regions")
+        parser.add_argument("--fill-char").help("Use a designated character to fill gaps.");
+        parser.add_argument("--regions")
                 .help("Process only these regions of the input. Can be either a path to a BED file "
                       "or a list of comma-separated Htslib-formatted regions (start is 1-based, "
                       "end "
                       "is inclusive).");
-        parser->visible.add_argument("--RG").help("Read group to select.").default_value("");
-        parser->visible.add_argument("--ignore-read-groups")
-                .help("Ignore read groups in bam file.")
-                .flag();
-        parser->visible.add_argument("--tag-name")
+        parser.add_argument("--RG").help("Read group to select.").default_value("");
+        parser.add_argument("--ignore-read-groups").help("Ignore read groups in bam file.").flag();
+        parser.add_argument("--tag-name")
                 .help("Two-letter BAM tag name for filtering the alignments during feature "
                       "generation")
                 .default_value("");
-        parser->visible.add_argument("--tag-value")
+        parser.add_argument("--tag-value")
                 .help("Value of the tag for filtering the alignments during feature generation")
                 .default_value(0)
                 .scan<'i', int>();
 
-        parser->visible.add_argument("--tag-keep-missing")
+        parser.add_argument("--tag-keep-missing")
                 .help("Keep alignments when tag is missing. If specified, overrides "
                       "the same option in the model config.")
                 .flag();
-        parser->visible.add_argument("--min-mapq")
+        parser.add_argument("--min-mapq")
                 .help("Minimum mapping quality of the input alignments. If specified, overrides "
                       "the same option in the model config.")
                 .scan<'i', int>();
-        parser->visible.add_argument("--min-depth")
+        parser.add_argument("--min-depth")
                 .help("Sites with depth lower than this value will not be processed.")
                 .default_value(0)
                 .scan<'i', int>();
@@ -246,41 +239,46 @@ ParserPtr create_cli(int& verbosity) {
 
     // Hidden advanced arguments.
     {
-        parser->hidden.add_argument("--full-precision")
+        parser.add_argument("--full-precision")
+                .hidden()
                 .help("Always use full precision for inference.")
                 .flag();
-        parser->hidden.add_argument("--queue-size")
+        parser.add_argument("--queue-size")
+                .hidden()
                 .help("Queue size for processing.")
                 .default_value(1000)
                 .scan<'i', int>();
-        parser->hidden.add_argument("--scripted")
+        parser.add_argument("--scripted")
+                .hidden()
                 .help("Load the scripted Torch model instead of building one internally.")
                 .flag();
-        parser->hidden.add_argument("--any-bam")
+        parser.add_argument("--any-bam")
+                .hidden()
                 .help("Allow any BAM as input, not just Dorado aligned.")
                 .flag();
-        parser->hidden.add_argument("--skip-model-compatibility-check")
+        parser.add_argument("--skip-model-compatibility-check")
+                .hidden()
                 .help("Allow any model to be applied on the data.")
                 .flag();
-        parser->hidden.add_argument("--continue-on-error")
+        parser.add_argument("--continue-on-error")
+                .hidden()
                 .help("Continue the process even if an exception is thrown. This "
                       "may leave some regions unprocessed.")
                 .flag();
-        parser->hidden.add_argument("--model-override")
+        parser.add_argument("--model-override")
+                .hidden()
                 .help("Path to a model folder or an exact name of a model to use.")
                 .default_value("");
     }
-
-    return parser;
 }
 
-int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
+int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     try {
-        utils::arg_parse::parse(parser, argc, argv);
+        cli::parse(parser, argc, argv);
 
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
-        parser_stream << parser.visible;
+        parser_stream << parser;
         spdlog::error("{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
@@ -289,25 +287,24 @@ int parse_args(int argc, char** argv, utils::arg_parse::ArgParser& parser) {
 }
 
 /// \brief This function simply fills out the Options struct with the parsed CLI args.
-Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosity) {
+Options set_options(const argparse::ArgumentParser& parser, const int verbosity) {
     Options opt;
 
-    opt.in_aln_bam_fn = parser.visible.get<std::string>("in_aln_bam");
-    opt.in_draft_fastx_fn = parser.visible.get<std::string>("in_draft_fastx");
+    opt.in_aln_bam_fn = parser.get<std::string>("in_aln_bam");
+    opt.in_draft_fastx_fn = parser.get<std::string>("in_draft_fastx");
 
-    opt.output_dir = parser.visible.get<std::string>("output-dir");
-    opt.bacteria = parser.visible.get<bool>("bacteria");
+    opt.output_dir = parser.get<std::string>("output-dir");
+    opt.bacteria = parser.get<bool>("bacteria");
 
-    opt.models_directory = model_resolution::get_models_directory(parser.visible);
+    opt.models_directory = model_resolution::get_models_directory(parser);
 
-    opt.out_format =
-            parser.visible.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
-    opt.threads = parser.visible.get<int>("threads");
+    opt.out_format = parser.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
+    opt.threads = parser.get<int>("threads");
     opt.threads = (opt.threads == 0) ? std::thread::hardware_concurrency() : (opt.threads);
 
-    opt.infer_threads = parser.visible.get<int>("infer-threads");
+    opt.infer_threads = parser.get<int>("infer-threads");
 
-    opt.device_str = parser.visible.get<std::string>("device");
+    opt.device_str = parser.get<std::string>("device");
 
     if (opt.device_str == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
@@ -317,43 +314,42 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
 #endif
     }
 
-    opt.batch_size = parser.visible.get<int>("batchsize");
+    opt.batch_size = parser.get<int>("batchsize");
     opt.draft_batch_size =
             std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
-                                         parser.visible.get<std::string>("draft-batchsize")));
-    opt.window_len = parser.visible.get<int>("window-len");
-    opt.window_overlap = parser.visible.get<int>("window-overlap");
-    opt.bam_chunk = parser.visible.get<int>("bam-chunk");
-    opt.bam_subchunk = parser.visible.get<int>("bam-subchunk");
+                                         parser.get<std::string>("draft-batchsize")));
+    opt.window_len = parser.get<int>("window-len");
+    opt.window_overlap = parser.get<int>("window-overlap");
+    opt.bam_chunk = parser.get<int>("bam-chunk");
+    opt.bam_subchunk = parser.get<int>("bam-subchunk");
     opt.verbosity = verbosity;
-    opt.regions_str = parser.visible.present<std::string>("regions");
+    opt.regions_str = parser.present<std::string>("regions");
     if (opt.regions_str) {
         opt.regions = secondary::parse_regions(*opt.regions_str);
     }
-    opt.min_depth = parser.visible.get<int>("min-depth");
+    opt.min_depth = parser.get<int>("min-depth");
 
-    opt.full_precision = parser.hidden.get<bool>("full-precision");
-    opt.load_scripted_model = parser.hidden.get<bool>("scripted");
-    opt.queue_size = parser.hidden.get<int>("queue-size");
-    opt.any_bam = parser.hidden.get<bool>("any-bam");
-    opt.any_model = parser.hidden.get<bool>("skip-model-compatibility-check");
-    opt.continue_on_error = parser.hidden.get<bool>("continue-on-error");
-    opt.model_str = parser.hidden.get<std::string>("model-override");
+    opt.full_precision = parser.get<bool>("full-precision");
+    opt.load_scripted_model = parser.get<bool>("scripted");
+    opt.queue_size = parser.get<int>("queue-size");
+    opt.any_bam = parser.get<bool>("any-bam");
+    opt.any_model = parser.get<bool>("skip-model-compatibility-check");
+    opt.continue_on_error = parser.get<bool>("continue-on-error");
+    opt.model_str = parser.get<std::string>("model-override");
 
-    opt.fill_gaps = !parser.visible.get<bool>("no-fill-gaps");
-    opt.fill_char = (parser.visible.is_used("--fill-char"))
-                            ? std::optional<char>{parser.visible.get<std::string>("fill-char")[0]}
+    opt.fill_gaps = !parser.get<bool>("no-fill-gaps");
+    opt.fill_char = (parser.is_used("--fill-char"))
+                            ? std::optional<char>{parser.get<std::string>("fill-char")[0]}
                             : std::nullopt;
-    opt.read_group = (parser.visible.is_used("--RG")) ? parser.visible.get<std::string>("RG") : "";
-    opt.ignore_read_groups = parser.visible.get<bool>("ignore-read-groups");
-    opt.tag_name = parser.visible.get<std::string>("tag-name");
-    opt.tag_value = parser.visible.get<int>("tag-value");
+    opt.read_group = (parser.is_used("--RG")) ? parser.get<std::string>("RG") : "";
+    opt.ignore_read_groups = parser.get<bool>("ignore-read-groups");
+    opt.tag_name = parser.get<std::string>("tag-name");
+    opt.tag_value = parser.get<int>("tag-value");
     // The `"--tag-keep-missing` is a special case because it's a flag, and we cannot use `present`.
-    opt.tag_keep_missing =
-            (parser.visible.is_used("--tag-keep-missing"))
-                    ? std::optional<bool>{parser.visible.get<bool>("tag-keep-missing")}
-                    : std::nullopt;
-    opt.min_mapq = parser.visible.present<int32_t>("min-mapq");
+    opt.tag_keep_missing = (parser.is_used("--tag-keep-missing"))
+                                   ? std::optional<bool>{parser.get<bool>("tag-keep-missing")}
+                                   : std::nullopt;
+    opt.min_mapq = parser.present<int32_t>("min-mapq");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
         spdlog::warn(
@@ -364,8 +360,8 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     }
 
     // Variant calling setup.
-    const bool vcf = parser.visible.get<bool>("vcf");
-    const bool gvcf = parser.visible.get<bool>("gvcf");
+    const bool vcf = parser.get<bool>("vcf");
+    const bool gvcf = parser.get<bool>("gvcf");
     opt.run_variant_calling = false;
     if (vcf && gvcf) {
         throw std::runtime_error{
@@ -377,7 +373,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
         opt.vc_type = VariantCallingEnum::GVCF;
         opt.run_variant_calling = true;
     }
-    opt.ambig_ref = parser.visible.get<bool>("ambig-ref");
+    opt.ambig_ref = parser.get<bool>("ambig-ref");
 
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
@@ -1178,17 +1174,18 @@ int polish(int argc, char* argv[]) {
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
         int verbosity = 0;
-        ParserPtr parser = create_cli(verbosity);
+        argparse::ArgumentParser parser("dorado polish");
+        add_arguments(parser, verbosity);
 
         // Parse the arguments.
-        const int rv_parse = parse_args(argc, argv, *parser);
+        const int rv_parse = parse_args(argc, argv, parser);
 
         if (rv_parse != EXIT_SUCCESS) {
             return rv_parse;
         }
 
         // Initialize the options from the CLI.
-        const Options opt = set_options(*parser, verbosity);
+        const Options opt = set_options(parser, verbosity);
 
         if (opt.verbosity == 0) {
             spdlog::set_level(spdlog::level::info);

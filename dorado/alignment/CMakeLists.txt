@@ -31,6 +31,7 @@ dorado_add_library(
         dorado_utils
     DEPENDS_PRIVATE
         spdlog::spdlog
+        argparse::argparse
     # Minimap2Aligner.cpp was moved to another target to allow
     # this one to be torch-less.
     NO_TORCH

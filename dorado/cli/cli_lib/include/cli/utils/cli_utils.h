@@ -3,12 +3,14 @@
 
 #include "dorado_version.h"
 #include "hts_utils/bam_utils.h"
-#include "utils/arg_parse_ext.h"
 
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 #endif
 
+#include "utils/dev_utils.h"
+
+#include <argparse/argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
@@ -27,6 +29,19 @@
 namespace dorado {
 
 namespace cli {
+
+inline void parse(argparse::ArgumentParser& parser, const std::vector<std::string>& arguments) {
+    parser.add_argument("--devopts")
+            .hidden()
+            .help("Internal options for testing & debugging, 'key=value' pairs separated by ';'")
+            .default_value(std::string(""));
+    parser.parse_args(arguments);
+    utils::details::extract_dev_options(parser.get<std::string>("--devopts"));
+}
+
+inline void parse(argparse::ArgumentParser& parser, int argc, const char* const argv[]) {
+    return parse(parser, {argv, argv + argc});
+}
 
 // Determine the thread allocation for writer and aligner threads
 // in dorado aligner.
@@ -66,27 +81,29 @@ inline void add_pg_hdr(sam_hdr_t* hdr,
     sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
 }
 
-inline void add_internal_arguments(utils::arg_parse::ArgParser& parser) {
-    parser.hidden.add_argument("--skip-model-compatibility-check")
+inline void add_internal_arguments(argparse::ArgumentParser& parser) {
+    parser.add_argument("--skip-model-compatibility-check")
+            .hidden()
             .help("(WARNING: For expert users only) Skip model and data compatibility checks.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.hidden.add_argument("--dump_stats_file")
+            .flag();
+    parser.add_argument("--dump_stats_file")
+            .hidden()
             .help("Internal processing stats. output filename.")
             .default_value(std::string(""));
-    parser.hidden.add_argument("--dump_stats_filter")
+    parser.add_argument("--dump_stats_filter")
+            .hidden()
             .help("Internal processing stats. name filter regex.")
             .default_value(std::string(""));
-    parser.hidden.add_argument("--run-batchsize-benchmarks")
+    parser.add_argument("--run-batchsize-benchmarks")
+            .hidden()
             .help("run auto batchsize selection benchmarking instead of using cached benchmark "
                   "figures.")
-            .default_value(false)
-            .implicit_value(true);
-    parser.hidden.add_argument("--emit-batchsize-benchmarks")
+            .flag();
+    parser.add_argument("--emit-batchsize-benchmarks")
+            .hidden()
             .help("Write out a CSV and CPP file to the working directory with the auto batchsize "
                   "selection performance stats. Implies --run-batchsize-benchmarks")
-            .default_value(false)
-            .implicit_value(true);
+            .flag();
 }
 
 inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
@@ -118,8 +135,8 @@ constexpr inline std::string_view DEVICE_HELP{
         "or 'cuda:all' depending on the presence of a GPU device."};
 constexpr inline std::string_view AUTO_DETECT_DEVICE{"auto"};
 
-inline void add_device_arg(utils::arg_parse::ArgParser& parser) {
-    parser.visible.add_argument("-x", "--device")
+inline void add_device_arg(argparse::ArgumentParser& parser) {
+    parser.add_argument("-x", "--device")
             .help(std::string{DEVICE_HELP})
             .default_value(std::string{AUTO_DETECT_DEVICE});
 }

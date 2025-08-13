@@ -1,13 +1,16 @@
 #pragma once
 
 #include "Minimap2Options.h"
-#include "utils/arg_parse_ext.h"
 
 #include <optional>
 #include <string>
 #include <vector>
 
 using namespace std::literals;
+
+namespace argparse {
+class ArgumentParser;
+}
 
 namespace dorado::alignment::mm2 {
 
@@ -16,7 +19,7 @@ std::string extract_options_string_arg(const std::vector<std::string>& args,
                                        std::vector<std::string>& remaining_args);
 
 // Adds the minimap2 options string argument to the parser.
-void add_options_string_arg(utils::arg_parse::ArgParser& parser);
+void add_options_string_arg(argparse::ArgumentParser& parser);
 
 // Parses the given option string to a Minimap2Options instance.
 // Will throw if there is an error.
