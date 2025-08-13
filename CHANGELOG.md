@@ -2,6 +2,17 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.1.1] (13 August 2025)
+
+This Dorado release includes improved DNA modified base 5mC_5hmC models, fixes for basecalling on Hopper devices and improvements to the format of output files.
+
+* 15ce9719c1d1cce3ee8099f44ef978e331c5f8f3 - Update to improved 5mC_5hmC and 5mCG_5hmCG modified base models for DNA v5.2.0 HAC and SUP
+* 8f00d46418bc7df8fd14f7f99c9bcaef6c086d57 - Fix a runtime error when modified base calling on Hopper GPUs
+* 23a46fb139b96b9f76933b61ac3f95436992d340 - Add "ch" and "PU" tags to fastq headers
+* 9e4fbc63cd0386c4b61c5d0601997c01356c26a6 - Fix missing metadata in output folder and file names for dorado align command
+* 4ede30ec839c383c70eb76f616d2963cfd347b55 - Update supported koi distributions to CUDA 11.8 and 12.8 only
+
+
 # [1.1.0] (31 July 2025)
 
 This Dorado release introduces up to 30% basecalling speed increase for the HAC model on a wide range of Nvidia GPUs including Blackwell, Ada and Ampere. Changes have been introduced in Dorado `basecaller` to match [Oxford Nanopore Output Specifications](https://nanoporetech.github.io/ont-output-specifications/latest/). Support for primer detection and trimming with compatible 10x Genomics libraries has also been added, with the section of the read corresponding to the cell barcodes and UMI tags going into the `RX:Z` BAM tag. Other improvements and fixes include updates to Dorado `polish`  options (removal of `--model` and addition of `--models-directory`) and a new `--add-fastq-rg` option for Dorado `aligner`. Please note that for this and future Dorado releases, Jetson TX2 is no longer supported.
