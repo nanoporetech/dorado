@@ -15,6 +15,14 @@ cpp-httplib:
     license: cpp-httplib/LICENSE
     files:
         - cpp-httplib
+CxxUrl:
+    description: >
+      C++ URL handling class with a simple API, and with lazy URL parsing and building
+    version: "v0.3"
+    url: https://github.com/chmike/CxxUrl
+    license: CxxUrl/LICENCE
+    files: 
+        - CxxUrl
 cuda-toolkit:
     description: >
         CUDA is a software layer that gives direct access to the GPU's virtual instruction set.

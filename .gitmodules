@@ -39,3 +39,6 @@
 [submodule "dorado/3rdparty/catch2"]
 	path = dorado/3rdparty/catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "dorado/3rdparty/CxxUrl"]
+	path = dorado/3rdparty/CxxUrl
+	url = https://github.com/chmike/CxxUrl
