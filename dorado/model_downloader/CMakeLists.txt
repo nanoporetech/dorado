@@ -12,6 +12,7 @@ dorado_add_library(
     DEPENDS_PUBLIC
         dorado_models_lib
     DEPENDS_PRIVATE
+        chmike::CxxUrl
         dorado_utils
         elzip
         httplib

@@ -5,6 +5,7 @@
 
 #include <elzip/elzip.hpp>
 #include <spdlog/spdlog.h>
+#include <url.hpp>
 
 #include <filesystem>
 #include <sstream>
@@ -30,8 +31,27 @@ namespace dorado::model_downloader {
 namespace {
 
 namespace urls {
-const std::string URL_ROOT = "https://cdn.oxfordnanoportal.com";
-const std::string URL_PATH = "/software/analysis/dorado/";
+
+const std::string URL_ROOT = [] {
+    const char* dorado_cdn_url = std::getenv("DORADO_CDN_URL_OVERRIDE");
+    if (dorado_cdn_url != nullptr) {
+        Url url(dorado_cdn_url);
+        return Url().scheme(url.scheme()).host(url.host()).str();
+    }
+    return std::string("https://cdn.oxfordnanoportal.com");
+}();
+
+// use the same override that we have for 3rdparty packages
+// in this case, models will be stored in a "/dorado" subdirectory
+const std::string URL_PATH = [] {
+    const char* dorado_cdn_url = std::getenv("DORADO_CDN_URL_OVERRIDE");
+    if (dorado_cdn_url != nullptr) {
+        Url url(dorado_cdn_url);
+        return url.path() + "/dorado/";
+    }
+    return std::string("/software/analysis/dorado/");
+}();
+
 }  // namespace urls
 
 std::string calculate_checksum(std::string_view data) {
@@ -104,6 +124,10 @@ void set_ssl_cert_file() {
 auto Downloader::create_client() {
     set_ssl_cert_file();
 
+    const char* dorado_cdn_url = std::getenv("DORADO_CDN_URL_OVERRIDE");
+    if (dorado_cdn_url) {
+        spdlog::info("Using model download override location \"{}\"", dorado_cdn_url);
+    }
     auto http = std::make_unique<httplib::Client>(urls::URL_ROOT);
     http->set_follow_location(true);
     http->set_connection_timeout(20);
