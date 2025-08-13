@@ -30,6 +30,9 @@ add_subdirectory(argparse EXCLUDE_FROM_ALL)
 # catch2
 add_subdirectory(catch2 EXCLUDE_FROM_ALL)
 
+# CxxUrl
+add_subdirectory(CxxUrl EXCLUDE_FROM_ALL)
+
 # cpp-httplib
 add_library(httplib INTERFACE)
 target_include_directories(httplib SYSTEM INTERFACE
