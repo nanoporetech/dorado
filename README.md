@@ -837,8 +837,8 @@ The versioning of modification models is bound to the basecalling model. This me
 | Basecalling Models | Compatible<br />Modifications | Modifications<br />Model<br />Version | Data<br />Sampling<br />Frequency |
 | :-------- | :------- | :--- | :--- |
 | **dna_r10.4.1_e8.2_400bps_fast@v5.2.0** | | | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_hac@v5.2.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
-| **dna_r10.4.1_e8.2_400bps_sup@v5.2.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v1<br />v1<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_hac@v5.2.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v2<br />v2<br />v1 | 5 kHz |
+| **dna_r10.4.1_e8.2_400bps_sup@v5.2.0** | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v1<br />v2<br />v2<br />v1 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_fast@v5.0.0 | | | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_hac@v5.0.0 | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v3<br />v3<br />v3<br />v3 | 5 kHz |
 | dna_r10.4.1_e8.2_400bps_sup@v5.0.0 | 4mC_5mC<br />5mCG_5hmCG<br />5mC_5hmC<br />6mA<br /> | v3<br />v3<br />v3<br />v3 | 5 kHz |
