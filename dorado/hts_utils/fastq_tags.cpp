@@ -18,7 +18,7 @@ ReadGroupData parse_rg_from_hts_tags(const std::string_view tag_str) {
     constexpr std::string_view KEY_READ_GROUP{"RG:Z:"};
     constexpr std::string_view KEY_FLOWCELL_ID{"PU:Z:"};
     constexpr std::string_view KEY_DEVICE_ID{"PM:Z:"};
-    constexpr std::string_view KEY_EXPERIMENT_START_TIME{"st:Z:"};
+    constexpr std::string_view KEY_EXPERIMENT_START_TIME{"DT:Z:"};
     constexpr std::string_view KEY_SAMPLE_ID{"LB:Z:"};
 
     const std::regex pattern(R"(^([0-9a-f\-]{1,})_(.*@v\d+\.\d+\.\d+)(.*)$)");

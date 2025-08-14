@@ -52,6 +52,7 @@ CATCH_TEST_CASE("Normal tags, tab separated, run_id UUID style",
 
     constexpr std::string_view IN_STR{
             "RG:Z:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0	"
+            "DT:Z:2022-10-18T10:00:00.250+00:00	"
             "ch:i:63	st:Z:2022-10-18T10:38:07.247+00:00	PU:Z:PAM93185	LB:Z:PCR_zymo	"
             "SM:Z:barcode03	al:Z:alias_for_bc03	"
             "pi:Z:e4994c62-93f9-439a-bc8f-d20c95a137a5	DS:Z:gpu:Tesla V100-PCIE-16GB	"
@@ -68,7 +69,7 @@ CATCH_TEST_CASE("Normal tags, tab separated, run_id UUID style",
                             .run_id = "4524e8b9-b90e-4ffb-a13a-380266513b64",
                             .basecalling_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                             .flowcell_id = "PAM93185",
-                            .exp_start_time = "2022-10-18T10:38:07.247+00:00",
+                            .exp_start_time = "2022-10-18T10:00:00.250+00:00",
                             .sample_id = "PCR_zymo",
                     },
     };
@@ -82,6 +83,7 @@ CATCH_TEST_CASE("Normal tags, tab separated, protocol_id UUID style",
 
     constexpr std::string_view IN_STR{
             "@f5f11551-1f50-4f75-a5a9-ade67e104a60	NM:i:337	ms:i:9265	"
+            "DT:Z:2022-10-18T10:00:00.250+00:00	"
             "AS:i:9200	nn:i:0	tp:A:P	cm:i:497	s1:i:3376	s2:i:2609	"
             "de:f:0.0485	SA:Z:contig_49,34690,+,1813M25D5590S,60,136;	rl:i:1862	"
             "qs:f:12.4662	du:f:20.0252	ns:i:100126	ts:i:460	mx:i:3	"
@@ -101,7 +103,7 @@ CATCH_TEST_CASE("Normal tags, tab separated, protocol_id UUID style",
                     {
                             .run_id = "bc8993f4557dd53bf0cbda5fd68453fea5e94485",
                             .basecalling_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
-                            .exp_start_time = "2023-11-02T21:22:44.417+00:00",
+                            .exp_start_time = "2022-10-18T10:00:00.250+00:00",
                     },
     };
 
@@ -115,6 +117,7 @@ CATCH_TEST_CASE("Suffix after the basecaller version, UUID is run_id style",
     constexpr std::string_view IN_STR{
             "RG:Z:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-"
             "barcode01	"
+            "DT:Z:2022-10-18T10:00:00.250+00:00	"
             "ch:i:63	st:Z:2022-10-18T10:38:07.247+00:00	PU:Z:PAM93185	LB:Z:PCR_zymo	"
             "SM:Z:barcode03	al:Z:alias_for_bc03	"
             "pi:Z:e4994c62-93f9-439a-bc8f-d20c95a137a5	DS:Z:gpu:Tesla V100-PCIE-16GB	"
@@ -132,7 +135,7 @@ CATCH_TEST_CASE("Suffix after the basecaller version, UUID is run_id style",
                             .run_id = "4524e8b9-b90e-4ffb-a13a-380266513b64",
                             .basecalling_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                             .flowcell_id = "PAM93185",
-                            .exp_start_time = "2022-10-18T10:38:07.247+00:00",
+                            .exp_start_time = "2022-10-18T10:00:00.250+00:00",
                             .sample_id = "PCR_zymo",
                     },
     };
@@ -147,6 +150,7 @@ CATCH_TEST_CASE("Suffix after the basecaller version, UUID is protocol_id style"
     constexpr std::string_view IN_STR{
             "@f5f11551-1f50-4f75-a5a9-ade67e104a60	NM:i:337	ms:i:9265	"
             "AS:i:9200	nn:i:0	tp:A:P	cm:i:497	s1:i:3376	s2:i:2609	"
+            "DT:Z:2022-10-18T10:00:00.250+00:00	"
             "de:f:0.0485	SA:Z:contig_49,34690,+,1813M25D5590S,60,136;	rl:i:1862	"
             "qs:f:12.4662	du:f:20.0252	ns:i:100126	ts:i:460	mx:i:3	"
             "ch:i:958	st:Z:2023-11-02T21:22:44.417+00:00	rn:i:108109	"
@@ -167,7 +171,7 @@ CATCH_TEST_CASE("Suffix after the basecaller version, UUID is protocol_id style"
                     {
                             .run_id = "bc8993f4557dd53bf0cbda5fd68453fea5e94485",
                             .basecalling_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
-                            .exp_start_time = "2023-11-02T21:22:44.417+00:00",
+                            .exp_start_time = "2022-10-18T10:00:00.250+00:00",
                     },
     };
 
@@ -202,6 +206,7 @@ CATCH_TEST_CASE("Normal tags, mix of HTS-style and non-HTS tokens is allowed",
     constexpr std::string_view IN_STR{
             "nonhts	"
             "RG:Z:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0	"
+            "DT:Z:2022-10-18T10:00:00.250+00:00	"
             "another_non	htsch:i:63	st:Z:2022-10-18T10:38:07.247+00:00	"
             "PU:Z:PAM93185	LB:Z:PCR_zymo	SM:Z:barcode03	al:Z:alias_for_bc03	"
             "pi:Z:e4994c62-93f9-439a-bc8f-d20c95a137a5	DS:Z:gpu:Tesla V100-PCIE-16GB	"
@@ -218,7 +223,7 @@ CATCH_TEST_CASE("Normal tags, mix of HTS-style and non-HTS tokens is allowed",
                             .run_id = "4524e8b9-b90e-4ffb-a13a-380266513b64",
                             .basecalling_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                             .flowcell_id = "PAM93185",
-                            .exp_start_time = "2022-10-18T10:38:07.247+00:00",
+                            .exp_start_time = "2022-10-18T10:00:00.250+00:00",
                             .sample_id = "PCR_zymo",
                     },
     };
@@ -231,6 +236,7 @@ CATCH_TEST_CASE("Space separated tags don't work", "fastq_tags parse_rg_from_hts
 
     constexpr std::string_view IN_STR{
             "RG:Z:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0 ch:i:63 "
+            "DT:Z:2022-10-18T10:00:00.250+00:00 "
             "st:Z:2022-10-18T10:38:07.247+00:00 PU:Z:PAM93185 LB:Z:PCR_zymo SM:Z:barcode03 "
             "al:Z:alias_for_bc03 pi:Z:e4994c62-93f9-439a-bc8f-d20c95a137a5 DS:Z:gpu:Tesla "
             "V100-PCIE-16GB qs:f:30.0 mx:i:2 rn:i:432 ts:i:1048 pt:i:120 pa:B:i,12,30,45,232,242"};
@@ -242,6 +248,7 @@ CATCH_TEST_CASE("Space separated tags don't work", "fastq_tags parse_rg_from_hts
     const ReadGroupData expected{
             .found = true,
             .id = "4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0 ch:i:63 "
+                  "DT:Z:2022-10-18T10:00:00.250+00:00 "
                   "st:Z:2022-10-18T10:38:07.247+00:00 PU:Z:PAM93185 LB:Z:PCR_zymo SM:Z:barcode03 "
                   "al:Z:alias_for_bc03 pi:Z:e4994c62-93f9-439a-bc8f-d20c95a137a5 DS:Z:gpu:Tesla "
                   "V100-PCIE-16GB qs:f:30.0 mx:i:2 rn:i:432 ts:i:1048 pt:i:120 "
@@ -289,6 +296,7 @@ CATCH_TEST_CASE("Cannot parse an 'unknown' model.", "fastq_tags parse_rg_from_ht
 
     constexpr std::string_view IN_STR{
             "RG:Z:4524e8b9-b90e-4ffb-a13a-380266513b64_unknown_barcode01	"
+            "DT:Z:2022-10-18T10:00:00.250+00:00	"
             "ch:i:63	st:Z:2022-10-18T10:38:07.247+00:00	PU:Z:PAM93185	LB:Z:PCR_zymo	"
             "SM:Z:barcode03	al:Z:alias_for_bc03	"
             "pi:Z:e4994c62-93f9-439a-bc8f-d20c95a137a5	DS:Z:gpu:Tesla V100-PCIE-16GB	"
@@ -303,7 +311,7 @@ CATCH_TEST_CASE("Cannot parse an 'unknown' model.", "fastq_tags parse_rg_from_ht
             .data =
                     {
                             .flowcell_id = "PAM93185",
-                            .exp_start_time = "2022-10-18T10:38:07.247+00:00",
+                            .exp_start_time = "2022-10-18T10:00:00.250+00:00",
                             .sample_id = "PCR_zymo",
                     },
     };
