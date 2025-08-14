@@ -531,7 +531,8 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     CATCH_CHECK(extension == get_suffix(output_mode));
 
     // Regardless of the input data the output path should be the same for SingleFileStructure
-    const auto& single_path2 = structure.get_path(HtsData{nullptr, {"kit"}, "FLOWCELL", nullptr});
+    const auto& single_path2 =
+            structure.get_path(HtsData{nullptr, {"kit", "", "", "", "FLOWCELL"}, nullptr});
     CATCH_CHECK(single_path == single_path2);
 }
 
@@ -645,8 +646,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     const std::string expected_fname = oss.str();
 
     hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet);
-    const auto path =
-            fs::path(structure.get_path(HtsData{nullptr, attrs, "PAO25751", barcode_score_result}));
+    const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
     CATCH_CAPTURE(root, path, output_mode, barcode_name);
     // Check root is the parent of the output

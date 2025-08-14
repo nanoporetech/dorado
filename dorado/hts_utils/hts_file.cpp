@@ -26,7 +26,7 @@ bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& 
 }
 
 // BAM tags to add to the read header for fastx output
-constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs", "ch", "PU"};
+constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs", "ch", "PU", "DT"};
 
 }  // namespace
 
