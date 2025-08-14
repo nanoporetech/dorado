@@ -485,7 +485,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
     CATCH_CHECK(writer->get_threads() == 0);
 
-    CATCH_CHECK(writer->get_gpu_names() == GPU_NAMES);
+    CATCH_CHECK(writer->get_gpu_names() == "gpu:" + GPU_NAMES);
 
     const int test_progress = 100;
     writer->set_progress(test_progress);
