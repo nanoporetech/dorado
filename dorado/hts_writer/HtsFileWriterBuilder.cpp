@@ -37,7 +37,7 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_writer_threads(threads),
           m_progress_callback(std::move(progress_callback)),
           m_description_callback(std::move(description_callback)),
-          m_gpu_names(std::move(gpu_names)),
+          m_gpu_names(gpu_names.empty() ? "" : ("gpu:" + std::move(gpu_names))),
           m_sample_sheet(std::move(sample_sheet)),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {};
