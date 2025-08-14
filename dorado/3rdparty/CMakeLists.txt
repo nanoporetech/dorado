@@ -22,8 +22,6 @@ function (apply_3rdparty_patch NAME)
     endif()
 endfunction()
 
-
-
 # argparse
 add_subdirectory(argparse EXCLUDE_FROM_ALL)
 
@@ -31,6 +29,7 @@ add_subdirectory(argparse EXCLUDE_FROM_ALL)
 add_subdirectory(catch2 EXCLUDE_FROM_ALL)
 
 # CxxUrl
+option(ENABLE_INSTALL "" OFF)
 add_subdirectory(CxxUrl EXCLUDE_FROM_ALL)
 
 # cpp-httplib
