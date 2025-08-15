@@ -1,10 +1,12 @@
 #include "secondary/common/bam_info.h"
 
+#include "hts_utils/header_utils.h"
 #include "secondary/common/bam_file.h"
 #include "utils/container_utils.h"
 #include "utils/string_utils.h"
 
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -14,10 +16,10 @@ namespace dorado::secondary {
 
 BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::string& cli_read_group) {
     BamInfo ret;
-
     BamFile bam(in_aln_bam_fn);
 
-    const std::vector<HeaderLineData> header = bam.parse_header();
+    const std::vector<utils::HeaderLineData> header =
+            utils::parse_header(bam.hdr(), {utils::HeaderLineType::PG, utils::HeaderLineType::RG});
 
     // Get info from headers: program and the read groups.
     for (const auto& line : header) {
@@ -30,7 +32,7 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
             return local_ret;
         }();
 
-        if (line.header_type == "@PG") {
+        if (line.header_type == utils::HeaderLineType::PG) {
             // Example PG line:
             //      @PG	ID:aligner	PP:samtools.2	PN:dorado	VN:0.0.0+2852e11d	DS:2.27-r1193
 
@@ -53,7 +55,7 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
                     ret.uses_dorado_aligner = true;
                 }
             }
-        } else if (line.header_type == "@RG") {
+        } else if (line.header_type == utils::HeaderLineType::RG) {
             // Example RG line:
             //      @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0	DT:2022-10-18T10:38:07.247961+00:00	DS:runid=e705d8cfbbe8a6bc43a865c71ace09553e8f15cd basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 modbase_models=dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mC_5hmC@v2,dna_r10.4.1_e8.2_400bps_hac@v5.0.0_6mA@v2	LB:PCR_zymo	PL:ONT	PM:4A	PU:PAM93185	al:PCR_zymo
 

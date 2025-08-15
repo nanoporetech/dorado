@@ -3,8 +3,6 @@
 #include "hts_utils/hts_types.h"
 
 #include <filesystem>
-#include <iosfwd>
-#include <tuple>
 #include <vector>
 
 struct htsFile;
@@ -37,8 +35,6 @@ public:
     hts_idx_t* idx() { return m_idx.get(); }
     sam_hdr_t* hdr() { return m_hdr.get(); }
 
-    std::vector<HeaderLineData> parse_header() const;
-
     BamPtr get_next();
 
 private:
@@ -46,9 +42,5 @@ private:
     HtsIdxPtr m_idx;
     SamHdrPtr m_hdr;
 };
-
-void header_to_stream(std::ostream& os, const std::vector<HeaderLineData>& header);
-
-std::string header_to_string(const std::vector<HeaderLineData>& header);
 
 }  // namespace dorado::secondary

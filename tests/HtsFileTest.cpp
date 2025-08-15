@@ -1,4 +1,5 @@
 #include "TestUtils.h"
+#include "hts_utils/header_utils.h"
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
@@ -663,4 +664,54 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     CATCH_CHECK(fs::relative(base, root) == fs::path(expected_base));
     // Check the classification subdir
     CATCH_CHECK(fs::relative(path, base).parent_path() == fs::path(barcode_name));
+}
+
+CATCH_TEST_CASE("HtsReaderTest: parse htslib header line type", TEST_GROUP) {
+    using HLT = utils::HeaderLineType;
+    auto [header_line, expected] = GENERATE(table<std::string, HLT>({
+            {"@CO a very interesting comment indeed", HLT::CO},
+            {"@HD key=value", HLT::HD},
+            {"@PG?! CL:dorado basecaller", HLT::PG},
+            {"@RG CO HD PG SQ", HLT::RG},
+            {"@SQ\tSN:reference\tLN:2000", HLT::SQ},
+            {"RG", HLT::UNKNOWN},
+            {"CO @CO", HLT::UNKNOWN},
+            {"", HLT::UNKNOWN},
+
+    }));
+    CATCH_CAPTURE(header_line);
+    const auto result = dorado::utils::parse_header_line_type(header_line);
+    CATCH_CHECK(result == expected);
+}
+
+CATCH_TEST_CASE("HtsReaderTest: parse htslib header", TEST_GROUP) {
+    using HLT = utils::HeaderLineType;
+    const std::string example_1 =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@SQ\tSN:ref1\tLN:1000\n"
+            "@CO\tfoo\n"
+            "@CO\tbar\n";
+
+    CATCH_SECTION("parse all") {
+        const auto expected_types =
+                std::vector({HLT::HD, HLT::PG, HLT::RG, HLT::SQ, HLT::CO, HLT::CO});
+        const auto lines = utils::parse_header(example_1.c_str(), {});
+        CATCH_CHECK(lines.size() == expected_types.size());
+        for (size_t i = 0; i < expected_types.size(); i++) {
+            CATCH_CHECK(expected_types[i] == lines[i].header_type);
+        }
+    }
+
+    CATCH_SECTION("parse selection") {
+        const auto selection = std::set({HLT::SQ, HLT::RG});
+        const auto expected_types = std::vector({HLT::RG, HLT::SQ});
+        const auto lines = utils::parse_header(example_1.c_str(), selection);
+        CATCH_CHECK(lines.size() == expected_types.size());
+        for (size_t i = 0; i < expected_types.size(); i++) {
+            CATCH_CHECK(expected_types[i] == lines[i].header_type);
+        }
+    }
 }
