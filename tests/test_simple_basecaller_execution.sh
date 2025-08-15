@@ -34,7 +34,7 @@ models_directory_arg="--models-directory ${models_directory}"
 ONT_OUTPUT_SPEC_REF="INSTX-10694_hts_style_fastq"
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
-VALIDATOR_BRANCH="INSTX-10694_hts_style_fastq"
+VALIDATOR_COMMIT="3d7cf74ef1c45328f8cc545d82c3b1b43757b1fb"
 
 # Set up the output specification validator so we can check output file formats
 if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
@@ -44,7 +44,10 @@ if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
     source ./venv/*/activate
     # Install output-file specification validator.
     rm -rf ont-output-specification-validator
-    git clone --single-branch --branch ${VALIDATOR_BRANCH} https://gitlab-ci-token:${CI_JOB_TOKEN}@${VALIDATOR_REPO}
+    git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${VALIDATOR_REPO}
+    pushd ont-output-specification-validator
+    git checkout ${VALIDATOR_COMMIT}
+    popd
     pip install -e ont-output-specification-validator
     curl -LfsS ${SPECIFICATION_URL} > ${SPECIFICATION_FILE}
 fi
