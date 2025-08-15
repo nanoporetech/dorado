@@ -12,6 +12,7 @@ dorado_add_library(
         fastq_tags.h
         FastxRandomReader.h
         FastxSequentialReader.h
+        header_utils.h
         hts_file.h
         hts_types.h
         KString.h
@@ -26,6 +27,7 @@ dorado_add_library(
         fastq_tags.cpp
         FastxRandomReader.cpp
         FastxSequentialReader.cpp
+        header_utils.cpp
         hts_file.cpp
         hts_types.cpp
         KString.cpp
