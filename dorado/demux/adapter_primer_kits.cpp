@@ -38,7 +38,8 @@ const std::unordered_map<AdapterCode, std::set<dorado::models::KitCode>> adapter
                       KC::SQK_NBD114_24,     KC::SQK_NBD114_24_260, KC::SQK_NBD114_96,
                       KC::SQK_NBD114_96_260, KC::SQK_PCB114_24,     KC::SQK_PCB114_24_260,
                       KC::SQK_RBK114_24,     KC::SQK_RBK114_24_260, KC::SQK_RBK114_96,
-                      KC::SQK_RBK114_96_260, KC::SQK_RPB114_24,     KC::SQK_RPB114_24_260}},
+                      KC::SQK_RBK114_96_260, KC::SQK_RPB114_24,     KC::SQK_RPB114_24_260,
+                      KC::SQK_HTB114_96}},
         {AC::RNA004, {KC::SQK_RNA004, KC::SQK_RNA004_XL, KC::SQK_DRB004_24}}};
 
 // This maps primer codes to the details of the primers. Note that for cDNA and PCS110 primers,

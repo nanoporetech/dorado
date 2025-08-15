@@ -284,6 +284,7 @@ std::unordered_map<std::string, KitInfo> kit_info_map = {
         {"SQK-NBD114-24", kit_nb24},
         {"EXP-NBD114-24", kit_nb24},
         // NB96
+        {"SQK-HTB114-96", kit_nb96},
         {"EXP-NBD196", kit_nb96},
         {"SQK-MLK111-96-XL", kit_nb96},
         {"SQK-NBD111-96", kit_nb96},
