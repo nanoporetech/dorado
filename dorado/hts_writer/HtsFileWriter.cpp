@@ -2,6 +2,7 @@
 
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
+#include "utils/time_utils.h"
 
 #include <htslib/sam.h>
 
@@ -23,11 +24,16 @@ void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
             bam_aux_append(hts_data.bam_ptr.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
                            reinterpret_cast<const uint8_t *>(m_gpu_names.c_str()));
         }
-        if (!hts_data.flowcell_id.empty()) {
-            bam_aux_append(hts_data.bam_ptr.get(), "PU", 'Z',
-                           int(hts_data.flowcell_id.length() + 1),
-                           reinterpret_cast<const uint8_t *>(hts_data.flowcell_id.c_str()));
+        if (!hts_data.read_attrs.flowcell_id.empty()) {
+            bam_aux_append(
+                    hts_data.bam_ptr.get(), "PU", 'Z',
+                    int(hts_data.read_attrs.flowcell_id.length() + 1),
+                    reinterpret_cast<const uint8_t *>(hts_data.read_attrs.flowcell_id.c_str()));
         }
+        std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time(
+                hts_data.read_attrs.protocol_start_time_ms);
+        bam_aux_append(hts_data.bam_ptr.get(), "DT", 'Z', int(exp_start_time_str.length() + 1),
+                       reinterpret_cast<const uint8_t *>(exp_start_time_str.c_str()));
     }
 
     // Verify that the MN tag, if it exists, and the sequence length are in sync.

@@ -379,7 +379,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
             | grep "@RG" \
             | grep "ID:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0" \
             | grep "PU:PAM93185" \
-            | grep "DT:2022-10-18T10:38:07.247+00:00" \
+            | grep "DT:2022-10-18T10:18:07.247+00:00" \
             | grep "DS:basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 runid=4524e8b9-b90e-4ffb-a13a-380266513b64" \
             | grep "LB:PCR_zymo" \
             | wc -l \

@@ -1,5 +1,7 @@
 #include "read_pipeline/nodes/HtsWriterNode.h"
 
+#include "utils/time_utils.h"
+
 #include <htslib/bgzf.h>
 #include <htslib/kroundup.h>
 #include <htslib/sam.h>
@@ -47,11 +49,16 @@ void HtsWriterNode::input_thread_fn() {
                 bam_aux_append(aln.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
                                reinterpret_cast<const uint8_t*>(m_gpu_names.c_str()));
             }
-            if (!bam_message.data.flowcell_id.empty()) {
-                bam_aux_append(
-                        aln.get(), "PU", 'Z', int(bam_message.data.flowcell_id.length() + 1),
-                        reinterpret_cast<const uint8_t*>(bam_message.data.flowcell_id.c_str()));
+            if (!bam_message.data.read_attrs.flowcell_id.empty()) {
+                bam_aux_append(aln.get(), "PU", 'Z',
+                               int(bam_message.data.read_attrs.flowcell_id.length() + 1),
+                               reinterpret_cast<const uint8_t*>(
+                                       bam_message.data.read_attrs.flowcell_id.c_str()));
             }
+            std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time(
+                    bam_message.data.read_attrs.protocol_start_time_ms);
+            bam_aux_append(aln.get(), "DT", 'Z', int(exp_start_time_str.length() + 1),
+                           reinterpret_cast<const uint8_t*>(exp_start_time_str.c_str()));
         }
 
         auto res = write(aln.get());
