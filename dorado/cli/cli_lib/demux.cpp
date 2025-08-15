@@ -7,6 +7,7 @@
 #include "demux/parse_custom_kit.h"
 #include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
 #include "read_output_progress_stats.h"
@@ -203,12 +204,7 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
-    if (!processing_items.initialise()) {
-        spdlog::error("Could not initialise for input {}", reads);
-        return EXIT_FAILURE;
-    }
-    const auto& all_files = processing_items.get();
+    const auto all_files = alignment::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
         spdlog::info("No input files found");
         return EXIT_SUCCESS;
@@ -225,25 +221,10 @@ int demuxer(int argc, char* argv[]) {
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
-    HtsReader reader(all_files[0].input, read_list);
+    HtsReader reader(all_files[0], read_list);
 
-    utils::MergeHeaders hdr_merger(strip_alignment);
-    hdr_merger.add_header(reader.header(), all_files[0].input);
-
-    // Fold in the headers from all the other files in the input list.
-    for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
-        HtsReader header_reader(all_files[input_idx].input, read_list);
-        auto error_msg = hdr_merger.add_header(header_reader.header(), all_files[input_idx].input);
-        if (!error_msg.empty()) {
-            spdlog::error("Unable to combine headers from all input files: " + error_msg);
-            return EXIT_FAILURE;
-        }
-    }
-
-    hdr_merger.finalize_merge();
-    auto sq_mapping = hdr_merger.get_sq_mapping();
-    auto header = SamHdrPtr(sam_hdr_dup(hdr_merger.get_merged_header()));
-    cli::add_pg_hdr(header.get(), "demux", args, "cpu");
+    utils::HeaderMapper header_mapper(all_files, strip_alignment);
+    // cli::add_pg_hdr(header.get(), "demux", args, "cpu");
 
     auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
     std::shared_ptr<const utils::SampleSheet> sample_sheet;
@@ -298,7 +279,7 @@ int demuxer(int argc, char* argv[]) {
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework.
     auto& demux_writer_ref = pipeline->get_node_ref<BarcodeDemuxerNode>(demux_writer);
-    demux_writer_ref.set_header(header.get());
+    // demux_writer_ref.set_header(header.get());
 
     // All progress reporting is in the post-processing part.
     ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
@@ -329,10 +310,11 @@ int demuxer(int argc, char* argv[]) {
     // End stats counting setup.
 
     spdlog::info("> starting barcode demuxing");
-    if (!strip_alignment) {
-        reader.set_record_mutator(
-                [&sq_mapping](BamPtr& record) { adjust_tid(sq_mapping[0], record); });
-    }
+    // TODO:
+    // if (!strip_alignment) {
+    // reader.set_record_mutator(
+    //         [&sq_mapping](BamPtr& record) { adjust_tid(sq_mapping[0], record); });
+    // }
     auto num_reads_in_file = reader.read(*pipeline, max_reads);
     spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
 
@@ -340,13 +322,14 @@ int demuxer(int argc, char* argv[]) {
 
     // Barcode all the other files passed in
     for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
-        HtsReader input_reader(all_files[input_idx].input, read_list);
+        HtsReader input_reader(all_files[input_idx], read_list);
         input_reader.set_client_info(client_info);
-        if (!strip_alignment) {
-            input_reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
-                adjust_tid(sq_mapping[input_idx], record);
-            });
-        }
+        // TODO:
+        // if (!strip_alignment) {
+        //     input_reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
+        //         adjust_tid(sq_mapping[input_idx], record);
+        //     });
+        // }
         num_reads_in_file = input_reader.read(*pipeline, max_reads);
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);

@@ -13,6 +13,7 @@ dorado_add_library(
         FastxRandomReader.h
         FastxSequentialReader.h
         header_utils.h
+        HeaderMapper.h
         hts_file.h
         hts_types.h
         KString.h
@@ -28,6 +29,7 @@ dorado_add_library(
         FastxRandomReader.cpp
         FastxSequentialReader.cpp
         header_utils.cpp
+        HeaderMapper.cpp
         hts_file.cpp
         hts_types.cpp
         KString.cpp
