@@ -1,6 +1,8 @@
 #include "TestUtils.h"
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/barcode_kits.h"
@@ -308,4 +310,45 @@ CATCH_TEST_CASE("BamUtilsTest: Remove all alignment tags", TEST_GROUP) {
     utils::remove_alignment_tags_from_record(record);
 
     CATCH_CHECK(bam_aux_first(record) == nullptr);
+}
+
+CATCH_TEST_CASE("BamUtilsTest: HeaderMapper basic", TEST_GROUP) {
+    fs::path aligner_test_dir = fs::path(get_data_dir("aligner_test"));
+    auto sam = aligner_test_dir / "basecall.sam";
+
+    utils::HeaderMapper mapper({sam}, false);
+    const auto &map = mapper.get_header_map();
+
+    const HtsData::ReadAttributes expected_attr{
+            "",
+            "",
+            "no_sample",
+            "0",
+            "PAK21298",
+            "a16f403b6a3655419511bf356ce3b40b65abfae4",
+            "0000000000000000000000000000000000000000",
+            1651078077305,
+            0,
+            true,
+    };
+
+    // @RG	ID:a16f403b6a3655419511bf356ce3b40b65abfae4_dna_r9.4.1_e8_hac@v3.3	PU:PAK21298	PM:PAPAP48
+    // DT:2022-04-27T16:47:57.305+00:00	PL:ONT	DS:basecall_model=dna_r9.4.1_e8_hac@v3.3 modbase_models=dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1
+    // runid=a16f403b6a3655419511bf356ce3b40b65abfae4	LB:no_sample	SM:no_sample
+
+    CATCH_REQUIRE(map.size() == 1);
+
+    const auto &k = map.cbegin()->first;
+    CATCH_CHECK(k.sequencing_kit == expected_attr.sequencing_kit);
+    CATCH_CHECK(k.experiment_id == expected_attr.experiment_id);
+    CATCH_CHECK(k.sample_id == expected_attr.sample_id);
+    CATCH_CHECK(k.position_id == expected_attr.position_id);
+    CATCH_CHECK(k.flowcell_id == expected_attr.flowcell_id);
+    CATCH_CHECK(k.protocol_run_id == expected_attr.protocol_run_id);
+    CATCH_CHECK(k.acquisition_id == expected_attr.acquisition_id);
+    CATCH_CHECK(k.protocol_start_time_ms == expected_attr.protocol_start_time_ms);
+    CATCH_CHECK(k.subread_id == expected_attr.subread_id);
+    CATCH_CHECK(k.is_status_pass == expected_attr.is_status_pass);
+
+    CATCH_REQUIRE(map.contains(expected_attr));
 }
