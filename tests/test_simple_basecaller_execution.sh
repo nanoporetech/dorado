@@ -31,7 +31,7 @@ mkdir -p ${models_directory}
 
 models_directory_arg="--models-directory ${models_directory}"
 
-ONT_OUTPUT_SPEC_REF="INSTX-10694_hts_style_fastq"
+ONT_OUTPUT_SPEC_REF="5f68db59dd2e9062124313cba81bc5865a9243d8" # currently INSTX-10694_hts_style_fastq branch
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
 VALIDATOR_COMMIT="3d7cf74ef1c45328f8cc545d82c3b1b43757b1fb"
