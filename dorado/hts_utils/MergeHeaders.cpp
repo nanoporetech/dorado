@@ -6,7 +6,6 @@
 #include <htslib/sam.h>
 
 #include <limits>
-#include <numeric>
 #include <sstream>
 
 namespace {
@@ -24,6 +23,12 @@ namespace dorado::utils {
 MergeHeaders::MergeHeaders(bool strip_alignment) : m_strip_alignment(strip_alignment) {}
 
 std::string MergeHeaders::add_header(sam_hdr_t* hdr, const std::string& filename) {
+    return add_header(hdr, filename, "");
+}
+
+std::string MergeHeaders::add_header(sam_hdr_t* hdr,
+                                     const std::string& filename,
+                                     const std::string& read_group_selection) {
     if (!m_strip_alignment) {
         auto res = check_and_add_ref_data(hdr);
         if (res == -1) {
@@ -34,7 +39,7 @@ std::string MergeHeaders::add_header(sam_hdr_t* hdr, const std::string& filename
         }
     }
 
-    auto res = check_and_add_rg_data(hdr);
+    auto res = check_and_add_rg_data(hdr, read_group_selection);
     if (res == -1) {
         return "Error merging header " + filename + ". Invalid RG line in header.";
     }
@@ -98,26 +103,35 @@ int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
     return 0;
 }
 
-int MergeHeaders::check_and_add_rg_data(sam_hdr_t* hdr) {
+int MergeHeaders::check_and_add_rg_data(sam_hdr_t* hdr, const std::string& read_group_selection) {
     int num_lines = sam_hdr_count_lines(hdr, "RG");
     for (int i = 0; i < num_lines; ++i) {
         auto idp = sam_hdr_line_name(hdr, "RG", i);
         if (!idp) {
             return -1;
         }
+
+        // Filter only useful read groups
+        std::string read_group_id(idp);
+        if (!read_group_selection.empty() && read_group_selection != read_group_id) {
+            continue;
+        }
+
+        // Read the RG line
         KString line_wrapper(1000000);
         auto line_data = line_wrapper.get();
         auto res = sam_hdr_find_line_pos(hdr, "RG", i, &line_data);
         if (res < 0) {
             return -1;
         }
-        std::string key(idp);
-        std::string line(ks_str(&line_data));
-        auto entry = m_read_group_lut.find(key);
+        std::string read_group_line(ks_str(&line_data));
+
+        // Add the RG_line to the LUT or error if it a different record already exists
+        auto entry = m_read_group_lut.find(read_group_id);
         if (entry == m_read_group_lut.end()) {
-            m_read_group_lut[key] = std::move(line);
+            m_read_group_lut[read_group_id] = std::move(read_group_line);
         } else {
-            if (entry->second != line) {
+            if (entry->second != read_group_line) {
                 return -2;
             }
         }
