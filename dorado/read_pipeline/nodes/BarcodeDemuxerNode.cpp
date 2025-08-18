@@ -86,7 +86,7 @@ void BarcodeDemuxerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         auto bam_message = std::move(std::get<BamMessage>(message));
-        write(*bam_message.data.bam_ptr);
+        write(*bam_message.data->bam_ptr);
     }
 }
 

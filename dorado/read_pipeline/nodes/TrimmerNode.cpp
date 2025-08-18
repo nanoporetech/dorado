@@ -89,7 +89,7 @@ void TrimmerNode::input_thread_fn() {
         if (std::holds_alternative<BamMessage>(message)) {
             auto bam_message = std::get<BamMessage>(std::move(message));
             // If the read is a secondary or supplementary read, ignore it.
-            if (bam_message.data.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
+            if (bam_message.data->bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY)) {
                 continue;
             }
             process_read(bam_message);
@@ -105,7 +105,7 @@ void TrimmerNode::input_thread_fn() {
 }
 
 void TrimmerNode::process_read(BamMessage& bam_message) {
-    HtsData& read = bam_message.data;
+    HtsData& read = *bam_message.data;
     bam1_t* irecord = read.bam_ptr.get();
     int seqlen = irecord->core.l_qseq;
 

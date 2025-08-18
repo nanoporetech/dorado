@@ -233,9 +233,10 @@ void PairingNode::pair_list_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] = is_within_alignment_criteria(
                         *template_read, *complement_read, delta, false, tid);
                 if (is_pair) {
-                    ReadPair read_pair;
-                    read_pair.template_read = ReadPair::ReadData::from_read(*template_read, qs, qe);
-                    read_pair.complement_read =
+                    auto read_pair = std::make_unique<ReadPair>();
+                    read_pair->template_read =
+                            ReadPair::ReadData::from_read(*template_read, qs, qe);
+                    read_pair->complement_read =
                             ReadPair::ReadData::from_read(*complement_read, rs, re);
 
                     template_read->is_duplex_parent = true;
@@ -366,9 +367,9 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*read_ptr, *later_read, tid);
                 if (is_pair) {
-                    ReadPair pair;
-                    pair.template_read = ReadPair::ReadData::from_read(*read_ptr, qs, qe);
-                    pair.complement_read = ReadPair::ReadData::from_read(*later_read, rs, re);
+                    auto pair = std::make_unique<ReadPair>();
+                    pair->template_read = ReadPair::ReadData::from_read(*read_ptr, qs, qe);
+                    pair->complement_read = ReadPair::ReadData::from_read(*later_read, rs, re);
 
                     read_ptr->is_duplex_parent = true;
                     later_read->is_duplex_parent = true;
@@ -381,9 +382,9 @@ void PairingNode::pair_generating_worker_thread(int tid) {
                 auto [is_pair, qs, qe, rs, re] =
                         is_within_time_and_length_criteria(*earlier_read, *read_ptr, tid);
                 if (is_pair) {
-                    ReadPair pair;
-                    pair.template_read = ReadPair::ReadData::from_read(*earlier_read, qs, qe);
-                    pair.complement_read = ReadPair::ReadData::from_read(*read_ptr, rs, re);
+                    auto pair = std::make_unique<ReadPair>();
+                    pair->template_read = ReadPair::ReadData::from_read(*earlier_read, qs, qe);
+                    pair->complement_read = ReadPair::ReadData::from_read(*read_ptr, rs, re);
 
                     earlier_read->is_duplex_parent = true;
                     read_ptr->is_duplex_parent = true;

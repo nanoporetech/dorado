@@ -66,7 +66,8 @@ CATCH_TEST_CASE("BarcodeDemuxerNode: check correct output files are created", TE
         for (auto bc : {"bc01", "bc02", "bc03"}) {
             auto records = create_bam_reader(bc);
             for (auto& rec : records) {
-                pipeline->push_message(BamMessage{HtsData{std::move(rec)}, client_info});
+                auto hts_data = std::make_unique<HtsData>(HtsData{std::move(rec)});
+                pipeline->push_message(BamMessage{std::move(hts_data), client_info});
             }
         }
 

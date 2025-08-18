@@ -20,7 +20,7 @@ void WriterNode::input_thread_fn() {
     while (get_input_message(message)) {
         if (std::holds_alternative<BamMessage>(message)) {
             const auto &bam_message = std::get<BamMessage>(message);
-            auto item = std::ref(bam_message.data);
+            auto item = std::ref(*bam_message.data);
             for (const auto &writer : m_writers) {
                 writer->process(item);
             }

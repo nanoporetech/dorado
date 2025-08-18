@@ -222,6 +222,7 @@ struct ReadPair {
     ReadData template_read;
     ReadData complement_read;
 };
+using ReadPairPtr = std::unique_ptr<ReadPair>;
 
 class CacheFlushMessage {
 public:
@@ -280,9 +281,10 @@ struct CorrectionAlignments {
         return si;
     }
 };
+using CorrectionAlignmentsPtr = std::unique_ptr<CorrectionAlignments>;
 
 struct BamMessage {
-    HtsData data;
+    std::unique_ptr<HtsData> data;
     std::shared_ptr<ClientInfo> client_info;
 };
 
@@ -296,10 +298,15 @@ struct BamMessage {
 // To add more message types, simply add them to the list of types in the std::variant.
 using Message = std::variant<SimplexReadPtr,
                              BamMessage,
-                             ReadPair,
+                             ReadPairPtr,
                              CacheFlushMessage,
                              DuplexReadPtr,
-                             CorrectionAlignments>;
+                             CorrectionAlignmentsPtr>;
+// 32 was chosen arbitrarily (it's the current size). In the future we might want to change the
+// logic to have |Message| be the full objects, ie not holding pointers, and instead pass around
+// a |unique_ptr<Message>|.
+static_assert(sizeof(Message) <= 32,
+              "Messages should be kept small since they're shared by all nodes");
 
 bool is_read_message(const Message& message);
 

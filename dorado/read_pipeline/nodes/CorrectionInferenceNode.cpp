@@ -114,12 +114,16 @@ void CorrectionInferenceNode::concat_features_and_send(const std::vector<std::st
     LOG_TRACE("decoding window for {}", read_name);
     auto corrected_seqs = concatenate_corrected_windows(to_decode);
     if (corrected_seqs.size() == 1) {
-        BamMessage rec{HtsData{create_bam_record(read_name, corrected_seqs[0])}, nullptr};
+        auto hts_data =
+                std::make_unique<HtsData>(HtsData{create_bam_record(read_name, corrected_seqs[0])});
+        BamMessage rec{std::move(hts_data), nullptr};
         send_message_to_sink(std::move(rec));
     } else {
         for (size_t s = 0; s < corrected_seqs.size(); s++) {
             const std::string new_name = read_name + ":" + std::to_string(s);
-            BamMessage rec{HtsData{create_bam_record(new_name, corrected_seqs[s])}, nullptr};
+            auto hts_data = std::make_unique<HtsData>(
+                    HtsData{create_bam_record(new_name, corrected_seqs[s])});
+            BamMessage rec{std::move(hts_data), nullptr};
             send_message_to_sink(std::move(rec));
         }
     }
@@ -344,10 +348,10 @@ void CorrectionInferenceNode::input_thread_fn() {
 
     Message message;
     while (get_input_message(message)) {
-        if (std::holds_alternative<CorrectionAlignments>(message)) {
+        if (std::holds_alternative<CorrectionAlignmentsPtr>(message)) {
             utils::ScopedProfileRange spr("input_loop", 1);
 
-            auto alignments = std::get<CorrectionAlignments>(std::move(message));
+            auto alignments = std::move(*std::get<CorrectionAlignmentsPtr>(message));
             auto tname = alignments.read_name;
 
             if (alignments.overlaps.empty()) {

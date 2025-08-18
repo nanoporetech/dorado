@@ -42,21 +42,21 @@ void HtsWriterNode::input_thread_fn() {
         }
 
         auto bam_message = std::move(std::get<BamMessage>(message));
-        BamPtr aln = std::move(bam_message.data.bam_ptr);
+        BamPtr aln = std::move(bam_message.data->bam_ptr);
 
         if (m_file.get_output_mode() == utils::HtsFile::OutputMode::FASTQ) {
             if (!m_gpu_names.empty()) {
                 bam_aux_append(aln.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
                                reinterpret_cast<const uint8_t*>(m_gpu_names.c_str()));
             }
-            if (!bam_message.data.read_attrs.flowcell_id.empty()) {
+            if (!bam_message.data->read_attrs.flowcell_id.empty()) {
                 bam_aux_append(aln.get(), "PU", 'Z',
-                               int(bam_message.data.read_attrs.flowcell_id.length() + 1),
+                               int(bam_message.data->read_attrs.flowcell_id.length() + 1),
                                reinterpret_cast<const uint8_t*>(
-                                       bam_message.data.read_attrs.flowcell_id.c_str()));
+                                       bam_message.data->read_attrs.flowcell_id.c_str()));
             }
             std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time_ms(
-                    bam_message.data.read_attrs.protocol_start_time_ms);
+                    bam_message.data->read_attrs.protocol_start_time_ms);
             bam_aux_append(aln.get(), "DT", 'Z', int(exp_start_time_str.length() + 1),
                            reinterpret_cast<const uint8_t*>(exp_start_time_str.c_str()));
         }
@@ -93,7 +93,7 @@ void HtsWriterNode::input_thread_fn() {
             if (pid_tag) {
                 m_split_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
-            if ((bam_message.data.read_attrs.subread_id == 0) && (is_unmapped || is_primary)) {
+            if ((bam_message.data->read_attrs.subread_id == 0) && (is_unmapped || is_primary)) {
                 m_primary_simplex_reads_written.fetch_add(1, std::memory_order_relaxed);
             }
         }

@@ -44,16 +44,16 @@ private:
             auto bam_message = std::get<BamMessage>(std::move(message));
 
             int64_t dx_tag = 0;
-            auto tag_str = bam_aux_get(bam_message.data.bam_ptr.get(), "dx");
+            auto tag_str = bam_aux_get(bam_message.data->bam_ptr.get(), "dx");
             if (tag_str) {
                 dx_tag = bam_aux2i(tag_str);
             }
 
             if (dx_tag != 1) {
-                auto pid_tag = bam_aux_get(bam_message.data.bam_ptr.get(), "pi");
+                auto pid_tag = bam_aux_get(bam_message.data->bam_ptr.get(), "pi");
                 if (pid_tag) {
                     std::string read_id = bam_aux2Z(pid_tag);
-                    bam_message.data.read_attrs.subread_id = read_id_counts[read_id]++;
+                    bam_message.data->read_attrs.subread_id = read_id_counts[read_id]++;
                 }
             }
             send_message_to_sink(std::move(bam_message));

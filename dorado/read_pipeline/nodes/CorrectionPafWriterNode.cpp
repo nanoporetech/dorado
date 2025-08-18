@@ -17,12 +17,12 @@ std::string CorrectionPafWriterNode::get_name() const { return "CorrectionPafWri
 void CorrectionPafWriterNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
-        if (!std::holds_alternative<CorrectionAlignments>(message)) {
+        const auto *alignments_ptr = std::get_if<CorrectionAlignmentsPtr>(&message);
+        if (!alignments_ptr) {
             continue;
         }
 
-        const CorrectionAlignments alignments = std::get<CorrectionAlignments>(std::move(message));
-
+        const CorrectionAlignments &alignments = **alignments_ptr;
         for (size_t i = 0; i < std::size(alignments.qnames); ++i) {
             utils::serialize_to_paf(std::cout, alignments.qnames[i], alignments.read_name,
                                     alignments.overlaps[i], 0, 0, 60, alignments.cigars[i]);

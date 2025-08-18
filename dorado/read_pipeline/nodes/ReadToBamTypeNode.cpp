@@ -51,9 +51,9 @@ void ReadToBamTypeNode::input_thread_fn() {
                 read_common_data.subread_id,     is_status_pass};
 
         for (auto& aln : alns) {
-            BamMessage bam_msg{
-                    HtsData{std::move(aln), read_attrs, read_common_data.barcoding_result},
-                    read_common_data.client_info};
+            auto hts_data = std::make_unique<HtsData>(
+                    HtsData{std::move(aln), read_attrs, read_common_data.barcoding_result});
+            BamMessage bam_msg{std::move(hts_data), read_common_data.client_info};
             send_message_to_sink(std::move(bam_msg));
         }
     }
