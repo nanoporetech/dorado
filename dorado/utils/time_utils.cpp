@@ -1,7 +1,5 @@
 #include "utils/time_utils.h"
 
-#include <iomanip>
-
 #if __cplusplus >= 202002L && 0  // Most stdlibs don't support parse()/from_stream() yet
 namespace date = std::chrono;
 #else
@@ -14,7 +12,7 @@ namespace date = std::chrono;
 
 namespace {
 
-auto get_timepoint_from_ms(time_t ms) {
+auto get_timepoint_from_ms(int64_t ms) {
     using namespace std::chrono;
     auto tp = system_clock::from_time_t(ms / 1000);
     tp += milliseconds(ms % 1000);
@@ -23,12 +21,11 @@ auto get_timepoint_from_ms(time_t ms) {
     return time_ms;
 }
 
-std::string format_timestamp(const std::string& format, int64_t ms) {
-    std::ostringstream date_time;
+std::string format_timestamp(const char* format, int64_t ms) {
     auto tp = get_timepoint_from_ms(ms);
-    date_time << date::format(format, tp);
-    return date_time.str();
+    return date::format(format, tp);
 }
+
 }  // namespace
 
 namespace dorado::utils {
@@ -37,13 +34,13 @@ std::string get_minknow_timestamp_from_unix_time(int64_t ms) {
     return format_timestamp("%Y%m%d_%H%M", ms);
 }
 
-std::string get_string_timestamp_from_unix_time(time_t ms) {
+std::string get_string_timestamp_from_unix_time(int64_t ms) {
     return format_timestamp("%FT%T%Ez", ms);
 }
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".
 // Time stamp can be specified up to microseconds
-time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
+int64_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
     std::istringstream ss(time_stamp);
     date::sys_time<std::chrono::microseconds> time_us;
     ss >> date::parse("%FT%T%Ez", time_us);
@@ -59,12 +56,12 @@ time_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
     return value.count();
 }
 
-std::string adjust_time_ms(const std::string& time_stamp, uint64_t offset_ms) {
+std::string adjust_time_ms(const std::string& time_stamp, int64_t offset_ms) {
     return get_string_timestamp_from_unix_time(get_unix_time_from_string_timestamp(time_stamp) +
                                                offset_ms);
 }
 
-std::string adjust_time(const std::string& time_stamp, uint32_t offset) {
+std::string adjust_time(const std::string& time_stamp, int64_t offset) {
     // Expects the time to be encoded like "2017-09-12T9:50:12Z".
     // Adds the offset (in seconds) to the timeStamp.
 
