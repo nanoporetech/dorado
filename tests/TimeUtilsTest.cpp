@@ -19,8 +19,10 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
 
     CATCH_SECTION("With timezone HH:MM") {
         auto [timestamp, unix_time_ms] = GENERATE(table<std::string, time_t>({
-                make_tuple("1970-01-01T00:00:00.000000+00:00", sys::to_time_t(time_point(0s)) * 1000),
-                make_tuple("1970-01-02T00:00:00.000000+00:00", sys::to_time_t(time_point(24h)) * 1000),
+                make_tuple("1970-01-01T00:00:00.000000+00:00",
+                           sys::to_time_t(time_point(0s)) * 1000),
+                make_tuple("1970-01-02T00:00:00.000000+00:00",
+                           sys::to_time_t(time_point(24h)) * 1000),
                 make_tuple("1971-01-02T00:00:00.000000+00:00",
                            sys::to_time_t(time_point(8784h)) * 1000),
                 make_tuple("1975-01-02T00:00:00.000000+00:00",
