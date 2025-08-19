@@ -30,7 +30,7 @@ void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
                     int(hts_data.read_attrs.flowcell_id.length() + 1),
                     reinterpret_cast<const uint8_t *>(hts_data.read_attrs.flowcell_id.c_str()));
         }
-        std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time(
+        std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time_ms(
                 hts_data.read_attrs.protocol_start_time_ms);
         bam_aux_append(hts_data.bam_ptr.get(), "DT", 'Z', int(exp_start_time_str.length() + 1),
                        reinterpret_cast<const uint8_t *>(exp_start_time_str.c_str()));

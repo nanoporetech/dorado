@@ -15,7 +15,7 @@ using namespace std::chrono_literals;
 
 CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
     using sys = std::chrono::system_clock;
-    using time_point = std::chrono::system_clock::time_point;
+    using time_point = sys::time_point;
 
     time_t unix_time_ms;
     std::string timestamp;
@@ -31,10 +31,10 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
         }));
         CATCH_CAPTURE(timestamp);
 
-        auto result_str = dorado::utils::get_string_timestamp_from_unix_time(unix_time_ms);
+        auto result_str = dorado::utils::get_string_timestamp_from_unix_time_ms(unix_time_ms);
         CATCH_CHECK(result_str == timestamp);
 
-        auto result_ms = dorado::utils::get_unix_time_from_string_timestamp(timestamp);
+        auto result_ms = dorado::utils::get_unix_time_ms_from_string_timestamp(timestamp);
         CATCH_CHECK(result_ms == unix_time_ms);
     }
 
@@ -48,7 +48,7 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
                 // clang-format on
         }));
         CATCH_CAPTURE(timestamp);
-        auto result_ms = dorado::utils::get_unix_time_from_string_timestamp(timestamp);
+        auto result_ms = dorado::utils::get_unix_time_ms_from_string_timestamp(timestamp);
         CATCH_CHECK(result_ms == unix_time_ms);
     }
 
@@ -62,7 +62,7 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
                 // clang-format on
         }));
         CATCH_CAPTURE(timestamp);
-        auto result_ms = dorado::utils::get_unix_time_from_string_timestamp(timestamp);
+        auto result_ms = dorado::utils::get_unix_time_ms_from_string_timestamp(timestamp);
         CATCH_CHECK(result_ms == unix_time_ms);
     }
 }
@@ -88,9 +88,9 @@ CATCH_TEST_CASE(CUT_TAG ": adjust_time", CUT_TAG) {
 }
 
 CATCH_TEST_CASE(CUT_TAG ": MinKnow datetime format from pod5 timestamp", CUT_TAG) {
-    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time(0) == "19700101_0000");
-    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time(1110371400000) ==
+    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(0) == "19700101_0000");
+    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(1110371400000) ==
                 "20050309_1230");
-    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time(1750411401000) ==
+    CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(1750411401000) ==
                 "20250620_0923");
 }

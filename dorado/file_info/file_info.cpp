@@ -74,7 +74,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
                     modbase_model_names,
                     std::move(flowcell_id),
                     std::move(device_id),
-                    utils::get_string_timestamp_from_unix_time(exp_start_time_ms),
+                    utils::get_string_timestamp_from_unix_time_ms(exp_start_time_ms),
                     std::move(sample_id),
                     std::move(position_id),
                     std::move(experiment_id),

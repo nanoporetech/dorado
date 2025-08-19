@@ -127,7 +127,7 @@ DORADO_EXPORT void reference_all_public_functions() {
     // utils/string_utils.h
     force_reference(&dorado::utils::split);
     // utils/time_utils.h
-    force_reference(&dorado::utils::get_string_timestamp_from_unix_time);
+    force_reference(&dorado::utils::get_string_timestamp_from_unix_time_ms);
     // torch_utils/torch_utils.h
     force_reference(&dorado::utils::make_torch_deterministic);
     // utils/uuid_utils.h

@@ -30,17 +30,17 @@ std::string format_timestamp(const char* format, int64_t ms) {
 
 namespace dorado::utils {
 
-std::string get_minknow_timestamp_from_unix_time(int64_t ms) {
+std::string get_minknow_timestamp_from_unix_time_ms(int64_t ms) {
     return format_timestamp("%Y%m%d_%H%M", ms);
 }
 
-std::string get_string_timestamp_from_unix_time(int64_t ms) {
+std::string get_string_timestamp_from_unix_time_ms(int64_t ms) {
     return format_timestamp("%FT%T%Ez", ms);
 }
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".
 // Time stamp can be specified up to microseconds
-int64_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
+int64_t get_unix_time_ms_from_string_timestamp(const std::string& time_stamp) {
     std::istringstream ss(time_stamp);
     date::sys_time<std::chrono::microseconds> time_us;
     ss >> date::parse("%FT%T%Ez", time_us);
@@ -57,8 +57,8 @@ int64_t get_unix_time_from_string_timestamp(const std::string& time_stamp) {
 }
 
 std::string adjust_time_ms(const std::string& time_stamp, int64_t offset_ms) {
-    return get_string_timestamp_from_unix_time(get_unix_time_from_string_timestamp(time_stamp) +
-                                               offset_ms);
+    return get_string_timestamp_from_unix_time_ms(
+            get_unix_time_ms_from_string_timestamp(time_stamp) + offset_ms);
 }
 
 std::string adjust_time(const std::string& time_stamp, int64_t offset) {
