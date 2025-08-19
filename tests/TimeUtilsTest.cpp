@@ -68,9 +68,9 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
     CATCH_SECTION("Seconds + Z") {
         auto [timestamp, unix_time_s] = GENERATE(table<std::string, time_t>({
                 make_tuple("1970-01-01T00:00:00Z", sys::to_time_t(time_point(0s))),
-                make_tuple("1970-01-02T00:00:00Z", sys::to_time_t(time_point(24h))),
-                make_tuple("1971-01-02T00:00:00Z", sys::to_time_t(time_point(8784h))),
-                make_tuple("1975-01-02T00:00:00Z", sys::to_time_t(time_point(43848h))),
+                make_tuple("1970-01-02T00:00:01Z", sys::to_time_t(time_point(24h)) + 1),
+                make_tuple("1971-01-02T00:02:00Z", sys::to_time_t(time_point(8784h)) + 2 * 60),
+                make_tuple("1975-01-02T03:00:00Z", sys::to_time_t(time_point(43848h)) + 3 * 3600),
         }));
         CATCH_CAPTURE(timestamp);
         auto result_str = dorado::utils::get_string_timestamp_from_unix_time_sZ(unix_time_s);
