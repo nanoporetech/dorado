@@ -12,12 +12,12 @@ namespace date = std::chrono;
 
 namespace {
 
-auto get_timepoint_from_ms(int64_t ms) {
+auto get_us_timepoint_from_ms(int64_t ms) {
     using namespace std::chrono;
     auto tp = system_clock::from_time_t(ms / 1000);
     tp += milliseconds(ms % 1000);
-    auto delta = duration_cast<milliseconds>(tp.time_since_epoch());
-    return date::sys_time<milliseconds>(delta);
+    auto delta = duration_cast<microseconds>(tp.time_since_epoch());
+    return date::sys_time<microseconds>(delta);
 }
 
 auto get_timepoint_from_s(int64_t s) {
@@ -32,12 +32,12 @@ auto get_timepoint_from_s(int64_t s) {
 namespace dorado::utils {
 
 std::string get_minknow_timestamp_from_unix_time_ms(int64_t ms) {
-    auto tp = get_timepoint_from_ms(ms);
+    auto tp = get_us_timepoint_from_ms(ms);
     return date::format("%Y%m%d_%H%M", tp);
 }
 
 std::string get_string_timestamp_from_unix_time_ms(int64_t ms) {
-    auto tp = get_timepoint_from_ms(ms);
+    auto tp = get_us_timepoint_from_ms(ms);
     return date::format("%FT%T%Ez", tp);
 }
 

@@ -72,10 +72,14 @@ CATCH_TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CATCH_CHECK(split_res[2]->read_common.seq.size() == 5185);
     CATCH_CHECK(split_res[3]->read_common.seq.size() == 5168);
 
-    CATCH_CHECK(split_res[0]->read_common.attributes.start_time == "2023-02-21T12:46:01.529+00:00");
-    CATCH_CHECK(split_res[1]->read_common.attributes.start_time == "2023-02-21T12:46:25.837+00:00");
-    CATCH_CHECK(split_res[2]->read_common.attributes.start_time == "2023-02-21T12:46:39.607+00:00");
-    CATCH_CHECK(split_res[3]->read_common.attributes.start_time == "2023-02-21T12:46:53.105+00:00");
+    CATCH_CHECK(split_res[0]->read_common.attributes.start_time ==
+                "2023-02-21T12:46:01.529000+00:00");
+    CATCH_CHECK(split_res[1]->read_common.attributes.start_time ==
+                "2023-02-21T12:46:25.837000+00:00");
+    CATCH_CHECK(split_res[2]->read_common.attributes.start_time ==
+                "2023-02-21T12:46:39.607000+00:00");
+    CATCH_CHECK(split_res[3]->read_common.attributes.start_time ==
+                "2023-02-21T12:46:53.105000+00:00");
 
     CATCH_CHECK(split_res[0]->read_common.start_time_ms == 1676983561529);
     CATCH_CHECK(split_res[1]->read_common.start_time_ms == 1676983585837);
