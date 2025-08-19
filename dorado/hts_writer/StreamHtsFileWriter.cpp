@@ -35,11 +35,11 @@ void StreamHtsFileWriter::handle(const HtsData& data) {
     }
 
     if (m_hts_file == nullptr) {
-        if (m_header == nullptr) {
+        if (m_shared_header == nullptr) {
             throw std::logic_error("HtsFileWriter header not set before writing records.");
         }
         m_hts_file = std::make_unique<utils::HtsFile>(m_path, m_mode, m_threads, false);
-        m_hts_file->set_header(m_header.get());
+        m_hts_file->set_header(m_shared_header.get());
     }
     m_hts_file->write(data.bam_ptr.get());
 }

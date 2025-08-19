@@ -17,11 +17,11 @@ public:
     ~WriterNode();
     std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions &terminate_options) override;
+    void terminate(const TerminateOptions & terminate_options) override;
     void restart() override;
 
     // Set the header for all hts file writers
-    void set_hts_file_header(SamHdrPtr hdr) const;
+    void set_shared_header(SamHdrPtr hdr) const;
 
 private:
     void input_thread_fn();

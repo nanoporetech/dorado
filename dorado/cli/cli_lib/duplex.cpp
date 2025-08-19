@@ -634,7 +634,7 @@ int duplex(int argc, char* argv[]) {
 
             // Write header as no read group info is needed.
             const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
-            hts_writer_ref.set_hts_file_header(std::move(hdr));
+            hts_writer_ref.set_shared_header(std::move(hdr));
 
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
@@ -804,7 +804,7 @@ int duplex(int argc, char* argv[]) {
 
             // Write header as no read group info is needed.
             const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
-            hts_writer_ref.set_hts_file_header(std::move(hdr));
+            hts_writer_ref.set_shared_header(std::move(hdr));
 
             DataLoader loader(*pipeline, "cpu", num_devices, 0, std::move(read_list), {});
             loader.add_read_initialiser(client_info_init_func);

@@ -56,7 +56,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
         return;
     }
 
-    if (m_header == nullptr) {
+    if (m_shared_header == nullptr) {
         throw std::logic_error("HtsFileWriter header not set before writing records.");
     }
 
@@ -65,7 +65,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
         hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
-        hts_file->set_header(m_header.get());
+        hts_file->set_header(m_shared_header.get());
     }
 
     hts_file->write(item.bam_ptr.get());

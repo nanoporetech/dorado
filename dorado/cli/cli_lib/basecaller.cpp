@@ -607,7 +607,7 @@ void setup(const std::vector<std::string>& args,
     {
         // Set the sam header for all writers
         const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
-        hts_writer_ref.set_hts_file_header(std::move(hdr));
+        hts_writer_ref.set_shared_header(std::move(hdr));
     }
 
     std::unordered_set<std::string> reads_already_processed;

@@ -34,8 +34,7 @@ public:
     std::string get_name() const override { return "HtsFileWriter"; }
     stats::NamedStats sample_stats() const override;
 
-    void set_header(SamHdrSharedPtr header) { m_header = std::move(header); };
-    SamHdrSharedPtr& get_header() { return m_header; }
+    void set_shared_header(SamHdrSharedPtr header) { m_shared_header = std::move(header); };
 
     void process(const Processable item) override;
 
@@ -55,7 +54,7 @@ protected:
     const utils::ProgressCallback m_progress_callback;
     const utils::DescriptionCallback m_description_callback;
 
-    SamHdrSharedPtr m_header{nullptr};
+    SamHdrSharedPtr m_shared_header{nullptr};
 
     std::string m_gpu_names{};
 

@@ -117,7 +117,7 @@ protected:
 
         const auto &writer_ref = pipeline->get_node_ref<WriterNode>(writer);
         SamHdrPtr hdr(sam_hdr_dup(reader.header()));
-        writer_ref.set_hts_file_header(std::move(hdr));
+        writer_ref.set_shared_header(std::move(hdr));
 
         reader.read(*pipeline, 1000);
         pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
@@ -206,7 +206,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
         CATCH_CHECK(hts_file_writer->get_mode() == OutputMode::FASTQ);
 
         SamHdrSharedPtr header(sam_hdr_init());
-        hts_file_writer->set_header(header);
+        hts_file_writer->set_shared_header(header);
 
         writers.push_back(std::move(hts_file_writer));
     }
@@ -281,7 +281,7 @@ CATCH_TEST_CASE(
             CATCH_CHECK(hts_file_writer->get_mode() == OutputMode::SAM);
 
             SamHdrSharedPtr header(sam_hdr_init());
-            hts_file_writer->set_header(header);
+            hts_file_writer->set_shared_header(header);
 
             writers.push_back(std::move(hts_file_writer));
         }

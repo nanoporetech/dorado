@@ -47,11 +47,11 @@ void WriterNode::terminate(const TerminateOptions &terminate_options) {
     }
 }
 
-void WriterNode::set_hts_file_header(SamHdrPtr hdr) const {
+void WriterNode::set_shared_header(SamHdrPtr hdr) const {
     SamHdrSharedPtr shared_header(std::move(hdr));
     for (const auto &writer : m_writers) {
         if (auto w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
-            w->set_header(shared_header);
+            w->set_shared_header(shared_header);
         }
     }
 }
