@@ -34,7 +34,7 @@ auto make_read(int delay_ms, std::string seq) {
             read->run_acquisition_start_time_ms +
             uint64_t(std::round(read->start_sample * 1000. / read->read_common.sample_rate));
     read->read_common.attributes.start_time =
-            dorado::utils::get_string_timestamp_from_unix_time(read->read_common.start_time_ms);
+            dorado::utils::get_string_timestamp_from_unix_time_ms(read->read_common.start_time_ms);
     read->read_common.qstring = std::string(seq.length(), '~');
     read->read_common.seq = std::move(seq);
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();

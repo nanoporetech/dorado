@@ -112,14 +112,15 @@ std::string NestedFileStructure::format_sample(const HtsData::ReadAttributes& at
 }
 
 std::string NestedFileStructure::format_run(const HtsData::ReadAttributes& attrs) const {
-    const auto datetime = utils::get_minknow_timestamp_from_unix_time(attrs.protocol_start_time_ms);
+    const auto datetime =
+            utils::get_minknow_timestamp_from_unix_time_ms(attrs.protocol_start_time_ms);
     std::ostringstream oss;
     oss << datetime << "_";
     oss << attrs.position_id << "_";
     oss << attrs.flowcell_id << "_";
     oss << truncate(attrs.protocol_run_id);
     return std::move(oss).str();
-};
+}
 
 std::string NestedFileStructure::format_status(const HtsData::ReadAttributes& attrs) const {
     std::ostringstream oss;

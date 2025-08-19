@@ -55,7 +55,7 @@ void HtsWriterNode::input_thread_fn() {
                                reinterpret_cast<const uint8_t*>(
                                        bam_message.data.read_attrs.flowcell_id.c_str()));
             }
-            std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time(
+            std::string exp_start_time_str = utils::get_string_timestamp_from_unix_time_ms(
                     bam_message.data.read_attrs.protocol_start_time_ms);
             bam_aux_append(aln.get(), "DT", 'Z', int(exp_start_time_str.length() + 1),
                            reinterpret_cast<const uint8_t*>(exp_start_time_str.c_str()));
