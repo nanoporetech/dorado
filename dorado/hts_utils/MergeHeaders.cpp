@@ -4,9 +4,13 @@
 #include "hts_utils/bam_utils.h"
 
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <iterator>
 #include <limits>
 #include <sstream>
+#include <stdexcept>
 
 namespace {
 void update_and_add_pg_line(sam_hdr_t* hdr, const std::string& key, std::string line) {
@@ -29,6 +33,9 @@ std::string MergeHeaders::add_header(sam_hdr_t* hdr, const std::string& filename
 std::string MergeHeaders::add_header(sam_hdr_t* hdr,
                                      const std::string& filename,
                                      const std::string& read_group_selection) {
+    // Append the filepath to index into sq_mappings
+    m_filepaths.push_back(filename);
+
     if (!m_strip_alignment) {
         auto res = check_and_add_ref_data(hdr);
         if (res == -1) {
@@ -70,6 +77,22 @@ std::vector<std::vector<uint32_t>> MergeHeaders::get_sq_mapping() const {
                 "Error in MergeHeaders. get_sq_mapping() called before finalize_merge().");
     }
     return m_sq_mapping;
+}
+
+const std::vector<uint32_t>& MergeHeaders::get_sq_mapping(const std::string& filename) const {
+    if (!m_merged_header) {
+        throw std::logic_error(
+                "Error in MergeHeaders. get_sq_mapping() called before finalize_merge().");
+    }
+
+    const auto it = std::find(m_filepaths.cbegin(), m_filepaths.cend(), filename);
+    if (it == m_filepaths.cend()) {
+        spdlog::error("Couldn't find '{}' in MergedHeaders.", filename);
+        throw std::runtime_error("Error in MergeHeaders. get_sq_mapping() couldn't find file.");
+    }
+
+    const auto index = std::distance(m_filepaths.cbegin(), it);
+    return m_sq_mapping[index];
 }
 
 int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {

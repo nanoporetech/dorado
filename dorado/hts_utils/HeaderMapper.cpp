@@ -1,6 +1,7 @@
 #include "hts_utils/HeaderMapper.h"
 
 #include "hts_utils/MergeHeaders.h"
+#include "hts_utils/bam_utils.h"
 #include "hts_utils/fastq_reader.h"
 #include "hts_utils/header_utils.h"
 #include "hts_utils/hts_types.h"
@@ -68,7 +69,9 @@ std::string_view parse_DS_tag_key(const std::vector<std::string>& tokens, const 
 namespace dorado::utils {
 
 HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs, bool strip_alignment)
-        : m_strip_alignment(strip_alignment) {
+        : m_strip_alignment(strip_alignment),
+          m_read_group_to_attributes(std::make_shared<HeaderMapper::AttributeMap>()),
+          m_merged_headers(std::make_shared<HeaderMapper::HeaderMap>()) {
     process(inputs);
 }
 
@@ -79,6 +82,11 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
         } else {
             process_bam(input);
         }
+    }
+
+    // Finalize the headers
+    for (const auto& [_, merged_header_ptr] : *m_merged_headers) {
+        merged_header_ptr->finalize_merge();
     }
 };
 
@@ -99,18 +107,19 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
     // Map read group ids to ReadAttributes (struct containing file naming parameters)
     const auto rg_to_attrs_lut = get_read_attrs_lut(header_lines);
 
-    // Merge the headers for each output file only including the read groups that will be used.
+    auto& read_group_to_attributes = *m_read_group_to_attributes;
+    auto& merged_headers = *m_merged_headers;
+
+    // Add the new read attrs and merge the headers for each output
+    // file only including the read groups that will be used.
     for (const auto& [read_group_id, read_attrs] : rg_to_attrs_lut) {
-        auto& merged_header_ptr = m_merged_headers_lut[read_attrs];
+        read_group_to_attributes[read_group_id] = read_attrs;
+
+        auto& merged_header_ptr = merged_headers[read_attrs];
         if (!merged_header_ptr) {
             merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
         }
         merged_header_ptr->add_header(header.get(), path.string(), read_group_id);
-    }
-
-    // Finalize the headers
-    for (const auto& [_, merged_header_ptr] : m_merged_headers_lut) {
-        merged_header_ptr->finalize_merge();
     }
 }
 
@@ -179,4 +188,44 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
 void HeaderMapper::process_fastq([[maybe_unused]] const std::filesystem::path& path) {
     throw std::logic_error("HeaderMapper::process_fastq is not implemented");
 };
+
+void HeaderMapper::modify_headers(const Modifier& modifier) const {
+    for (const auto& [_, merged_header_ptr] : *m_merged_headers) {
+        modifier(merged_header_ptr->get_merged_header());
+    }
+};
+
+const HtsData::ReadAttributes& HeaderMapper::get_read_attributes(const bam1_t* record) const {
+    // Get the read group ID from the record
+    const std::string read_group = utils::get_read_group_tag(record);
+    if (read_group.empty()) {
+        spdlog::error("Read group of htslib record is unexpectedly empty");
+        throw std::runtime_error("Invalid record edit - Read group is Empty");
+    }
+
+    // Lookup the ReadAttributes for this read_group
+    const auto attr_it = m_read_group_to_attributes->find(read_group);
+    if (attr_it == m_read_group_to_attributes->cend()) {
+        spdlog::error("Read group was not found in mapped attributes: '{}'", read_group);
+        throw std::runtime_error("Invalid record edit - Attributes not found");
+    }
+
+    return attr_it->second;
+};
+const MergeHeaders& HeaderMapper::get_merged_header(const bam1_t* record) const {
+    return get_merged_header(get_read_attributes(record));
+}
+
+const MergeHeaders& HeaderMapper::get_merged_header(const HtsData::ReadAttributes& attrs) const {
+    // Lookup the merged header for these ReadAttributes
+    const auto header_it = m_merged_headers->find(attrs);
+    if (header_it == m_merged_headers->cend()) {
+        spdlog::error("Read group attributes were not found in mapped headers: runid='{}'.",
+                      attrs.protocol_run_id);
+        throw std::runtime_error("Merged header not found");
+    }
+
+    return *header_it->second;
+};
+
 }  // namespace dorado::utils

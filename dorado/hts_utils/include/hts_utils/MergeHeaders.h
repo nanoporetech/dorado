@@ -3,6 +3,7 @@
 
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 struct sam_hdr_t;
@@ -87,6 +88,15 @@ public:
      */
     std::vector<std::vector<uint32_t>> get_sq_mapping() const;
 
+    /** Get the mapping of indexes of SQ lines from original headers to
+     *  the merged header by filename. 
+     *
+     *  Calls get_sq_mapping but drops the outer vector which encodes the
+     *  insertion order of the headers by looking up the position of the the 
+     *  given filename.
+     */
+    const std::vector<uint32_t>& get_sq_mapping(const std::string& filename) const;
+
 private:
     struct RefInfo {
         uint32_t index;         // Index of SQ line in original header.
@@ -96,6 +106,9 @@ private:
     bool m_strip_alignment;
     SamHdrPtr m_merged_header;
     std::vector<std::vector<uint32_t>> m_sq_mapping;
+
+    // Collection of filepaths to index into m_sq_mapping
+    std::vector<std::string> m_filepaths;
 
     // Stores unique RG lines across all headers.
     std::map<std::string, std::string> m_read_group_lut;

@@ -317,7 +317,7 @@ CATCH_TEST_CASE("BamUtilsTest: HeaderMapper basic", TEST_GROUP) {
     auto sam = aligner_test_dir / "basecall.sam";
 
     utils::HeaderMapper mapper({sam}, false);
-    const auto &map = mapper.get_header_map();
+    const auto &map = *mapper.get_merged_headers_map();
 
     const HtsData::ReadAttributes expected_attr{
             "",
