@@ -28,7 +28,7 @@ Sample create_mock_sample(const std::vector<int64_t>& shape) {
 
 }  // namespace
 
-CATCH_TEST_CASE("compute_collated_padded_shape empty buffer", TEST_GROUP) {
+CATCH_TEST_CASE("compute_collated_padded_shape - with new_sample, empty buffer", TEST_GROUP) {
     // Create input data.
     const std::vector<Sample> buffered_samples;
     const Sample new_sample = create_mock_sample({10000, 30, 6});
@@ -43,7 +43,8 @@ CATCH_TEST_CASE("compute_collated_padded_shape empty buffer", TEST_GROUP) {
     CATCH_CHECK(result == expected);
 }
 
-CATCH_TEST_CASE("compute_collated_padded_shape buffer with samples", TEST_GROUP) {
+CATCH_TEST_CASE("compute_collated_padded_shape - with new_sample, buffer with samples",
+                TEST_GROUP) {
     // Create input data.
     const std::vector<Sample> buffered_samples{
             create_mock_sample({3000, 10, 5}),
@@ -61,7 +62,8 @@ CATCH_TEST_CASE("compute_collated_padded_shape buffer with samples", TEST_GROUP)
     CATCH_CHECK(result == expected);
 }
 
-CATCH_TEST_CASE("compute_collated_padded_shape tensor shape size mismatch", TEST_GROUP) {
+CATCH_TEST_CASE("compute_collated_padded_shape - with new_sample, tensor shape size mismatch",
+                TEST_GROUP) {
     // Create input data.
     const std::vector<Sample> buffered_samples{
             create_mock_sample({3000, 10}),  // E.g. Non read-level models
@@ -74,7 +76,9 @@ CATCH_TEST_CASE("compute_collated_padded_shape tensor shape size mismatch", TEST
                           std::runtime_error);
 }
 
-CATCH_TEST_CASE("compute_collated_padded_shape buffer has tensors of different shape", TEST_GROUP) {
+CATCH_TEST_CASE(
+        "compute_collated_padded_shape - with new_sample, buffer has tensors of different shape",
+        TEST_GROUP) {
     // Create input data.
     // The following buffered_samples should not even be possible, since each sample has a different shape.
     const std::vector<Sample> buffered_samples{
@@ -88,7 +92,8 @@ CATCH_TEST_CASE("compute_collated_padded_shape buffer has tensors of different s
                           std::runtime_error);
 }
 
-CATCH_TEST_CASE("compute_collated_padded_shape new_sample is uninitialized", TEST_GROUP) {
+CATCH_TEST_CASE("compute_collated_padded_shape - with new_sample, new_sample is uninitialized",
+                TEST_GROUP) {
     // Create input data.
     // Using the buffered samples shape of size 1 (one dimensional) because uninitialized torch::Tensor
     // objects have .sizes().size() == 1 for some reason (and not 0).
@@ -104,7 +109,9 @@ CATCH_TEST_CASE("compute_collated_padded_shape new_sample is uninitialized", TES
                           std::runtime_error);
 }
 
-CATCH_TEST_CASE("compute_collated_padded_shape one buffered sample is uninitialized", TEST_GROUP) {
+CATCH_TEST_CASE(
+        "compute_collated_padded_shape - with new_sample, one buffered sample is uninitialized",
+        TEST_GROUP) {
     // Create input data.
     const std::vector<Sample> buffered_samples{
             create_mock_sample({3000}), create_mock_sample({}),  // Uninitialized, should throw.
@@ -114,6 +121,62 @@ CATCH_TEST_CASE("compute_collated_padded_shape one buffered sample is uninitiali
     // Eval.
     CATCH_CHECK_THROWS_AS(compute_collated_padded_shape(buffered_samples, new_sample),
                           std::runtime_error);
+}
+
+CATCH_TEST_CASE("compute_collated_padded_shape - no new_sample, empty buffer", TEST_GROUP) {
+    // Create input data.
+    const std::vector<Sample> buffered_samples;
+
+    // Expected results.
+    const std::vector<int64_t> expected;
+
+    // Run UUT.
+    const std::vector<int64_t> result = compute_collated_padded_shape(buffered_samples);
+
+    // Eval.
+    CATCH_CHECK(result == expected);
+}
+
+CATCH_TEST_CASE("compute_collated_padded_shape - no new_sample, buffer with samples", TEST_GROUP) {
+    // Create input data.
+    const std::vector<Sample> buffered_samples{
+            create_mock_sample({3000, 10, 6}),
+            create_mock_sample({30000, 20, 5}),
+    };
+
+    // Expected results.
+    const std::vector<int64_t> expected{2, 30000, 20, 6};
+
+    // Run UUT.
+    const std::vector<int64_t> result = compute_collated_padded_shape(buffered_samples);
+
+    // Eval.
+    CATCH_CHECK(result == expected);
+}
+
+CATCH_TEST_CASE(
+        "compute_collated_padded_shape - no new_sample, buffer has tensors of different shape",
+        TEST_GROUP) {
+    // Create input data.
+    const std::vector<Sample> buffered_samples{
+            create_mock_sample({3000, 10}),  // E.g. Non read-level models
+            create_mock_sample({30000, 10, 5}),
+    };
+
+    // Eval.
+    CATCH_CHECK_THROWS_AS(compute_collated_padded_shape(buffered_samples), std::runtime_error);
+}
+
+CATCH_TEST_CASE(
+        "compute_collated_padded_shape - no new_sample, one buffered sample is uninitialized",
+        TEST_GROUP) {
+    // Create input data.
+    const std::vector<Sample> buffered_samples{
+            create_mock_sample({3000}), create_mock_sample({}),  // Uninitialized, should throw.
+    };
+
+    // Eval.
+    CATCH_CHECK_THROWS_AS(compute_collated_padded_shape(buffered_samples), std::runtime_error);
 }
 
 }  // namespace dorado::secondary::sample_collate_utils::tests
