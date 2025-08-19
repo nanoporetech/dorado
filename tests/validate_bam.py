@@ -34,6 +34,7 @@ exp_settings = settings.ExperimentSettings(
     estimate_polya_tail_enabled=False,
     has_input_sample_sheet=True,
     offline_analysis_enabled=False,
+    moves=False,  # Note that moves are not emitted by default by dorado standalone
 )
 
 spec_path = pathlib.Path(args.spec_folder)
