@@ -1,11 +1,12 @@
 #pragma once
 
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/hts_file.h"
 #include "interface.h"
 #include "utils/stats.h"
 
+#include <memory>
 #include <string>
-#include <utility>
 
 namespace dorado {
 
@@ -34,7 +35,10 @@ public:
     std::string get_name() const override { return "HtsFileWriter"; }
     stats::NamedStats sample_stats() const override;
 
-    void set_shared_header(SamHdrSharedPtr header) { m_shared_header = std::move(header); };
+    // Set a single header to write to all output files
+    void set_shared_header(SamHdrSharedPtr header);
+    // Set a lookup for pre-built output headers based indexed on read attributes at file write time.
+    void set_dynamic_header(const std::shared_ptr<utils::HeaderMapper::HeaderMap>& header_map);
 
     void process(const Processable item) override;
 
@@ -55,6 +59,7 @@ protected:
     const utils::DescriptionCallback m_description_callback;
 
     SamHdrSharedPtr m_shared_header{nullptr};
+    std::shared_ptr<utils::HeaderMapper::HeaderMap> m_dynamic_header{nullptr};
 
     std::string m_gpu_names{};
 

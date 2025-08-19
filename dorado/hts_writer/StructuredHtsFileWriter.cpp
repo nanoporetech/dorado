@@ -56,8 +56,8 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
         return;
     }
 
-    if (m_shared_header == nullptr) {
-        throw std::logic_error("HtsFileWriter header not set before writing records.");
+    if (m_shared_header == nullptr && m_dynamic_header == nullptr) {
+        throw std::logic_error("StructuredHtsFileWriter - header not set before writing records.");
     }
 
     const std::string path = m_structure->get_path(item);

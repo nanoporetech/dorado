@@ -1,8 +1,10 @@
 #pragma once
 
+#include "hts_utils/HeaderMapper.h"
 #include "read_pipeline/base/MessageSink.h"
 
 #include <cstddef>
+#include <memory>
 #include <string>
 
 namespace dorado {
@@ -22,6 +24,9 @@ public:
 
     // Set the header for all hts file writers
     void set_shared_header(SamHdrPtr hdr) const;
+    // Set a header map where new files will lookup their own header at runtime
+    void set_dynamic_header(
+            const std::shared_ptr<utils::HeaderMapper::HeaderMap> & header_map) const;
 
 private:
     void input_thread_fn();

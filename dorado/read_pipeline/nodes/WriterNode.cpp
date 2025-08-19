@@ -1,10 +1,12 @@
 #include "read_pipeline/nodes/WriterNode.h"
 
+#include "hts_utils/HeaderMapper.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/interface.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/stats.h"
 
+#include <memory>
 #include <utility>
 #include <variant>
 
@@ -52,6 +54,15 @@ void WriterNode::set_shared_header(SamHdrPtr hdr) const {
     for (const auto &writer : m_writers) {
         if (auto w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
             w->set_shared_header(shared_header);
+        }
+    }
+}
+
+void WriterNode::set_dynamic_header(
+        const std::shared_ptr<utils::HeaderMapper::HeaderMap> &header_map) const {
+    for (const auto &writer : m_writers) {
+        if (auto w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
+            w->set_dynamic_header(header_map);
         }
     }
 }
