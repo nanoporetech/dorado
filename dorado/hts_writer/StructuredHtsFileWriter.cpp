@@ -1,5 +1,6 @@
 #include "hts_writer/StructuredHtsFileWriter.h"
 
+#include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
@@ -65,7 +66,19 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
         hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
-        hts_file->set_header(m_shared_header.get());
+        if (m_shared_header != nullptr) {
+            hts_file->set_header(m_shared_header.get());
+        } else {
+            const auto &it = m_dynamic_header->find(item.read_attrs);
+            if (it == m_dynamic_header->cend()) {
+                spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
+                              utils::get_read_group_tag(item.bam_ptr.get()),
+                              item.read_attrs.protocol_run_id);
+                throw std::runtime_error(
+                        "StructuredHtsFileWriter - Failed to load dynamic header.");
+            }
+            hts_file->set_header(it->second->get_merged_header());
+        }
     }
 
     hts_file->write(item.bam_ptr.get());

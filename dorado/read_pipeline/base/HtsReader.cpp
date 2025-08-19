@@ -1,10 +1,10 @@
 #include "read_pipeline/base/HtsReader.h"
 
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/fastq_reader.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
-#include "utils/types.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -12,7 +12,6 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -144,14 +143,29 @@ public:
     }
 };
 
+// This function allows us to map the reference id from input BAM records to what
+// they should be in the output file, based on the new ordering of references in
+// the merged header.
+void adjust_tid(const std::vector<uint32_t>& mapping, BamPtr& record) {
+    auto tid = record.get()->core.tid;
+    if (tid >= 0) {
+        if (tid >= int32_t(mapping.size())) {
+            throw std::range_error("BAM tid field out of range with respect to SQ lines.");
+        }
+        record.get()->core.tid = int32_t(mapping.at(tid));
+    }
+}
+
 }  // namespace
 
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
-        : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
-    if (!try_initialise_generator<FastqBamRecordGenerator>(filename) &&
-        !try_initialise_generator<HtsLibBamRecordGenerator>(filename)) {
-        throw std::runtime_error("Could not open file: " + filename);
+        : m_filename(filename),
+          m_client_info(std::make_shared<DefaultClientInfo>()),
+          m_read_list(std::move(read_list)) {
+    if (!try_initialise_generator<FastqBamRecordGenerator>(m_filename) &&
+        !try_initialise_generator<HtsLibBamRecordGenerator>(m_filename)) {
+        throw std::runtime_error("Could not open file: " + m_filename);
     }
     is_aligned = m_header->n_targets > 0;
 
@@ -188,10 +202,6 @@ void HtsReader::set_client_info(std::shared_ptr<ClientInfo> client_info) {
     m_client_info = std::move(client_info);
 }
 
-void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
-    m_record_mutator = std::move(mutator);
-}
-
 bool HtsReader::read() { return m_bam_record_generator(*record); }
 
 bool HtsReader::has_tag(const char* tagname) {
@@ -208,11 +218,43 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
                 continue;
             }
         }
-        if (m_record_mutator) {
-            m_record_mutator(record);
-        }
 
         auto hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get()))});
+        BamMessage bam_message{std::move(hts_data), m_client_info};
+        pipeline.push_message(std::move(bam_message));
+        ++num_reads;
+        if (max_reads > 0 && num_reads >= max_reads) {
+            break;
+        }
+        if (num_reads % 50000 == 0) {
+            spdlog::debug("Processed {} reads", num_reads);
+        }
+    }
+    spdlog::debug("Total reads processed: {}", num_reads);
+    return num_reads;
+}
+
+std::size_t HtsReader::demux_read(Pipeline& pipeline,
+                                  std::size_t max_reads,
+                                  const bool strip_aligments,
+                                  const utils::HeaderMapper& header_mapper) {
+    std::size_t num_reads = 0;
+    while (this->read()) {
+        if (m_read_list) {
+            std::string read_id = bam_get_qname(record.get());
+            if (m_read_list->find(read_id) == m_read_list->end()) {
+                continue;
+            }
+        }
+        const auto& sq_mapping =
+                header_mapper.get_merged_header(record.get()).get_sq_mapping(m_filename);
+        if (!strip_aligments) {
+            adjust_tid(sq_mapping, record);
+        }
+
+        const auto& read_attrs = header_mapper.get_read_attributes(record.get());
+        auto hts_data =
+                std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get())), read_attrs});
         BamMessage bam_message{std::move(hts_data), m_client_info};
         pipeline.push_message(std::move(bam_message));
         ++num_reads;
