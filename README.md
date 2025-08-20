@@ -469,7 +469,7 @@ To specify resources manually use:
 - `-x / --device` - to specify specific GPU resources (if available).
 - `--threads` -  to set the maximum number of threads to be used for everything but the inference.
 - `--infer-threads` -  to set the number of CPU threads for inference (when "--device cpu" is used).
-- `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
+- `--batchsize` - batch size for inference, important to control memory usage on the GPUs. Automatically computed by default (`--batchsize 0`).
 
 Example:
 
@@ -557,20 +557,44 @@ dorado aligner --mm2-opts "-x lr:hqae" <ref> <reads>
 
 ##### Troubleshooting
 
-###### GPU Memory Issues
-The default inference batch size (`16`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
-```bash
-dorado polish reads_to_draft.bam draft.fasta --batchsize <number> > consensus.fasta
-```
+###### Memory consumption / Torch out-of-memory (OOM) issues
 
-Alternatively, consider running inference on the CPU, although this can take longer:
-```bash
-dorado polish reads_to_draft.bam draft.fasta --device "cpu" > consensus.fasta
-```
+The inference batch size is computed to fit the largest possible batches into the available GPU memory (default `--batchsize 0`).
 
-Note that using multiple CPU inference threads can cause much higher memory usage.
+There are two cases when an OOM issue can happen:
+
+1. The auto batch size feature is underestimating the memory consumption. If an Out-Of-Memory (OOM) warning/error is raised with the default auto batch size, try setting the batch size manually to a fixed value instead. For example:
+    ```bash
+    dorado polish reads_to_draft.bam draft.fasta --batchsize <number> > consensus.fasta
+    ```
+    A good rule of thumb would be `--batchsize 16` for a large GPU, or try using a smaller value if this is still too high.
+
+    Additionally, the number of inference workers can be reduced to lower the memory usage (the default is `2` workers per device):
+    ```bash
+    dorado polish reads_to_draft.bam draft.fasta --infer-threads 1 > consensus.fasta
+    ```
+
+    Alternatively, consider running inference on the CPU, although this can take longer:
+    ```bash
+    dorado polish reads_to_draft.bam draft.fasta --device "cpu" > consensus.fasta
+    ```
+
+    Note that using multiple CPU inference threads can cause much higher memory usage.
+
+2. GPU memory fragmentation during the run. This can happen when there were many small allocations followed by a large memory allocation which then cannot be fitted into a single contiguous block of memory. Such errors will have a specific Torch error message which looks like this:
+    > Exception caught: CUDA out of memory. Tried to allocate 15.12 GiB. GPU 1 has a total capacity of 31.73 GiB of which 14.77 GiB is free. Including non-PyTorch memory, this process has 16.95 GiB memory in use. Of the allocated memory 2.10 GiB is allocated by PyTorch, and 14.46 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+    The key portion here is: `2.10 GiB is allocated by PyTorch, and 14.46 GiB is reserved by PyTorch but unallocated.`, which means that almost all non-free memory is actually unused.
+
+    In this case, follow the suggestion from the error message, and it should resolve the issue.
+
+    Example:
+    ```
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True dorado polish reads_to_draft.bam draft.fasta > consensus.fasta
+    ```
 
 ###### "[error] Could not open index for BAM file: 'aln.bam'!"
+
 Example message:
 ```bash
 $ dorado polish aln.bam assembly.fasta > polished.fasta
@@ -717,7 +741,7 @@ To specify resources manually use:
 - `-x / --device` - to specify specific GPU resources (if available).
 - `--threads` - to set the maximum number of threads to be used for everything but the inference.
 - `--infer-threads` - number of inference workers to use (per device). For CPU-only runs, this specifies the number of CPU inference threads.
-- `--batchsize` - batch size for inference, important to control memory usage on the GPUs.
+- `--batchsize` - batch size for inference, important to control memory usage on the GPUs. Automatically computed by default (`--batchsize 0`).
 
 Example:
 
@@ -764,19 +788,32 @@ Please see the following section in Dorado `polish`:
 
 ##### Memory consumption / Torch out-of-memory (OOM) issues
 
-The default inference batch size (`10`) may be too high for your GPU. If you are experiencing warnings/errors regarding available GPU memory, try reducing the batch size:
+The inference batch size is computed to fit the largest possible batches into the available GPU memory (default `--batchsize 0`).
 
-```bash
-dorado variant aligned_reads.bam reference.fasta --batchsize <number> > variants.vcf
-```
+There are two cases when an OOM issue can happen:
 
-or the number of inference workers (the default is `2` workers per device):
+1. The auto batch size feature is underestimating the memory consumption. If an Out-Of-Memory (OOM) warning/error is raised with the default auto batch size, try setting the batch size manually to a fixed value instead. For example:
+    ```bash
+    dorado variant aligned_reads.bam reference.fasta --batchsize <number> > variants.vcf
+    ```
+    A good rule of thumb would be `--batchsize 10` for a large GPU, or try using a smaller value if this is still too high.
 
-```bash
-dorado variant aligned_reads.bam reference.fasta --infer-threads 1 > variants.vcf
-```
+    Additionally, the number of inference workers can be reduced to lower the memory usage (the default is `2` workers per device):
+    ```bash
+    dorado variant aligned_reads.bam reference.fasta --infer-threads 1 > variants.vcf
+    ```
 
-Note that the GPU memory consumption also depends on the coverage of the input data, as feature tensor size varies relative to this.
+2. GPU memory fragmentation during the run. This can happen when there were many small allocations followed by a large memory allocation which then cannot be fitted into a single contiguous block of memory. Such errors will have a specific Torch error message which looks like this:
+    > Exception caught: CUDA out of memory. Tried to allocate 15.12 GiB. GPU 1 has a total capacity of 31.73 GiB of which 14.77 GiB is free. Including non-PyTorch memory, this process has 16.95 GiB memory in use. Of the allocated memory 2.10 GiB is allocated by PyTorch, and 14.46 GiB is reserved by PyTorch but unallocated. If reserved but unallocated memory is large try setting PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True to avoid fragmentation.  See documentation for Memory Management  (https://pytorch.org/docs/stable/notes/cuda.html#environment-variables)
+
+    The key portion here is: `2.10 GiB is allocated by PyTorch, and 14.46 GiB is reserved by PyTorch but unallocated.`, which means that almost all non-free memory is actually unused.
+
+    In this case, follow the suggestion from the error message, and it should resolve the issue.
+
+    Example:
+    ```
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True dorado variant aligned_reads.bam reference.fasta > variants.vcf
+    ```
 
 ##### "[error] Input BAM file was not aligned using Dorado."
 
