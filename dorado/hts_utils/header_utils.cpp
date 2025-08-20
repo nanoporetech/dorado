@@ -32,9 +32,9 @@ HeaderLineType parse_header_line_type(const std::string& header_line) {
 }
 
 std::vector<utils::HeaderLineData> parse_header(
-        sam_hdr_t* header,
+        sam_hdr_t& header,
         const std::set<HeaderLineType>& selected_line_types) {
-    const char* hdr_text = sam_hdr_str(header);
+    const char* hdr_text = sam_hdr_str(&header);
     if (!hdr_text) {
         spdlog::warn("Could not retrieve BAM header text!");
         return {};

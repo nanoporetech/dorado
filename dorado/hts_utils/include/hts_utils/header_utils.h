@@ -26,7 +26,7 @@ struct HeaderLineData {
 HeaderLineType parse_header_line_type(const std::string& header_line);
 
 std::vector<utils::HeaderLineData> parse_header(
-        sam_hdr_t* header,
+        sam_hdr_t& header,
         const std::set<HeaderLineType>& selected_line_types);
 
 std::vector<utils::HeaderLineData> parse_header(
