@@ -17,11 +17,6 @@ using HtsIdxPtr = std::unique_ptr<hts_idx_t, HtsIdxDestructor>;
 
 namespace dorado::secondary {
 
-struct HeaderLineData {
-    std::string header_type;
-    std::vector<std::pair<std::string, std::string>> tags;
-};
-
 class BamFile {
 public:
     BamFile(const std::filesystem::path& in_fn);
