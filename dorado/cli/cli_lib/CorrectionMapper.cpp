@@ -169,7 +169,7 @@ void CorrectionMapper::send_data_fn(Pipeline& pipeline) {
                     spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
                     continue;
                 }
-                pipeline.push_message(std::move(r));
+                pipeline.push_message(std::make_unique<CorrectionAlignments>(std::move(r)));
                 ++num_pushed;
             }
             m_reads_to_infer.fetch_add(num_pushed);

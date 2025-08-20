@@ -279,11 +279,18 @@ public:
     const std::string& get_name() const { return m_name; }
 
     std::unordered_map<std::string, double> sample_stats() const {
+        double num_items, num_pushes, num_pops;
+        {
+            std::lock_guard<std::mutex> lock(m_mutex);
+            num_items = double(m_items.size());
+            num_pushes = double(m_num_pushes);
+            num_pops = double(m_num_pops);
+        }
+
         std::unordered_map<std::string, double> stats;
-        std::lock_guard<std::mutex> lock(m_mutex);
-        stats["items"] = double(m_items.size());
-        stats["pushes"] = double(m_num_pushes);
-        stats["pops"] = double(m_num_pops);
+        stats["items"] = num_items;
+        stats["pushes"] = num_pushes;
+        stats["pops"] = num_pops;
         return stats;
     }
 };

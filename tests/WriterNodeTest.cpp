@@ -59,16 +59,16 @@ private:
             auto bam_message = std::get<BamMessage>(std::move(message));
 
             int64_t dx_tag = 0;
-            auto tag_str = bam_aux_get(bam_message.data.bam_ptr.get(), "dx");
+            auto tag_str = bam_aux_get(bam_message.data->bam_ptr.get(), "dx");
             if (tag_str) {
                 dx_tag = bam_aux2i(tag_str);
             }
 
             if (dx_tag != 1) {
-                auto pid_tag = bam_aux_get(bam_message.data.bam_ptr.get(), "pi");
+                auto pid_tag = bam_aux_get(bam_message.data->bam_ptr.get(), "pi");
                 if (pid_tag) {
                     std::string read_id = bam_aux2Z(pid_tag);
-                    bam_message.data.read_attrs.subread_id = read_id_counts[read_id]++;
+                    bam_message.data->read_attrs.subread_id = read_id_counts[read_id]++;
                 }
             }
             send_message_to_sink(std::move(bam_message));
@@ -224,7 +224,8 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
     CATCH_CHECK_THAT(bam_aux2Z(st_tag), Equals("2023-06-22T07:17:48.308+00:00"));
 
     BamPtr bam_ptr{bam_dup1(reader.record.get())};
-    BamMessage bam_message{HtsData{std::move(bam_ptr), {"kit2"}}, nullptr};
+    auto hts_data = std::make_unique<HtsData>(HtsData{std::move(bam_ptr), {"kit2"}});
+    BamMessage bam_message{std::move(hts_data), nullptr};
 
     writer.restart();
     writer.push_message(std::move(bam_message));
@@ -287,10 +288,10 @@ CATCH_TEST_CASE(
         WriterNode writer(std::move(writers));
 
         BamPtr bam_ptr{bam_dup1(fastq_reader.record.get())};
-        BamMessage bam_message{
+        auto hts_data = std::make_unique<HtsData>(
                 HtsData{std::move(bam_ptr),
-                        {"kit", "exp", "sample", "pos", "fc", "proto", "acq", 94678224500, 1}},
-                nullptr};
+                        {"kit", "exp", "sample", "pos", "fc", "proto", "acq", 94678224500, 1}});
+        BamMessage bam_message{std::move(hts_data), nullptr};
 
         writer.restart();
         writer.push_message(std::move(bam_message));

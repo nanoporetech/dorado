@@ -93,13 +93,13 @@ void StereoDuplexEncoderNode::input_thread_fn() {
 
     Message message;
     while (get_input_message(message)) {
-        if (!std::holds_alternative<ReadPair>(message)) {
+        auto* read_pair_ptr = std::get_if<ReadPairPtr>(&message);
+        if (!read_pair_ptr) {
             send_message_to_sink(std::move(message));
             continue;
         }
 
-        auto read_pair = std::get<ReadPair>(std::move(message));
-        auto stereo_encoded_read = stereo_encode(std::move(read_pair));
+        auto stereo_encoded_read = stereo_encode(std::move(**read_pair_ptr));
 
         send_message_to_sink(
                 std::move(stereo_encoded_read));  // Stereo-encoded read created, send it to sink

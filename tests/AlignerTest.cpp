@@ -93,7 +93,7 @@ protected:
         std::vector<dorado::BamPtr> result{};
         result.reserve(bam_messages.size());
         for (auto& bam_message : bam_messages) {
-            result.push_back(std::move(bam_message.data.bam_ptr));
+            result.push_back(std::move(bam_message.data->bam_ptr));
         }
         return result;
     }

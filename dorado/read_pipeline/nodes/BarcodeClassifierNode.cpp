@@ -69,7 +69,7 @@ void BarcodeClassifierNode::input_thread_fn() {
             // client requires read trimming.
             const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
             if (barcoding_info && barcoding_info->trim &&
-                (bam_message.data.bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                (bam_message.data->bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
                 continue;
             }
 
@@ -92,7 +92,7 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     }
     auto barcoder = m_barcoder_selector.get_barcoder(*barcoding_info);
 
-    HtsData& read = message.data;
+    HtsData& read = *message.data;
     bam1_t* irecord = read.bam_ptr.get();
     bool is_input_reversed = irecord->core.flag & BAM_FREVERSE;
     std::string seq = utils::extract_sequence(irecord);

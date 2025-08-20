@@ -122,7 +122,6 @@ float qscore_mean(const std::string& qstring, splitter::PosRange r) {
 
 struct DuplexReadSplitter::ExtRead {
     SimplexReadPtr read;
-    at::Tensor data_as_float32;
     std::vector<uint64_t> move_sums;
     splitter::PosRanges possible_pore_regions;
 };
@@ -130,10 +129,10 @@ struct DuplexReadSplitter::ExtRead {
 DuplexReadSplitter::ExtRead DuplexReadSplitter::create_ext_read(SimplexReadPtr r) const {
     ExtRead ext_read;
     ext_read.read = std::move(r);
+    assert(ext_read.read->read_common.raw_data.dtype() == at::ScalarType::Half);
     ext_read.move_sums = utils::move_cum_sums(ext_read.read->read_common.moves);
     assert(!ext_read.move_sums.empty());
     assert(ext_read.move_sums.back() == ext_read.read->read_common.seq.length());
-    ext_read.data_as_float32 = ext_read.read->read_common.raw_data.to(at::kFloat);
     ext_read.possible_pore_regions = possible_pore_regions(ext_read);
     return ext_read;
 }
@@ -142,8 +141,8 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
     utils::trace_log("Analyzing signal in read {}", read.read->read_common.read_id);
 
     auto pore_sample_ranges =
-            detect_pore_signal<float>(read.data_as_float32, m_settings.pore_thr,
-                                      m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
+            detect_pore_signal<c10::Half>(read.read->read_common.raw_data, m_settings.pore_thr,
+                                          m_settings.pore_cl_dist, m_settings.expect_pore_prefix);
 
     std::vector<std::pair<float, PosRange>> candidate_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
@@ -317,7 +316,7 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
         const auto spike_search_begin_s =
                 from_basespace(adapter_match.first - max_spike_adapter_dist);
         const auto spike_search_end_s = from_basespace(muA_range.first);
-        const auto search_span = read.data_as_float32.index(
+        const auto search_span = read.read->read_common.raw_data.index(
                 {at::indexing::Slice(spike_search_begin_s, spike_search_end_s)});
         const auto spike_peak_s = spike_search_begin_s + search_span.argmax().item().toLong();
         // Convert back to base space.
