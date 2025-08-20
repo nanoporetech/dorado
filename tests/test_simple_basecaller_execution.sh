@@ -34,7 +34,7 @@ models_directory_arg="--models-directory ${models_directory}"
 ONT_OUTPUT_SPEC_REF="00d8b1220133b35f5c29de1d67af85fef3530f6f" # currently DOR-1280_dorado_bam_validation branch
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
-VALIDATOR_COMMIT="ff94d6e2d391638ae54c31c5174663c413087772"
+VALIDATOR_COMMIT="7dd56117df3dc354ae5b641e144fc8c5d9188261"
 
 # Set up the output specification validator so we can check output file formats
 if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
