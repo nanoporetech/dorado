@@ -58,10 +58,11 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
            << "ONT"
            << "\t";
         rg << "DS:"
-           << "basecall_model=" << value_or_unknown(read_group.basecalling_model)
+           << "runid=" << value_or_unknown(read_group.run_id)
+           << " basecall_model=" << value_or_unknown(read_group.basecalling_model)
            << (read_group.modbase_models.empty() ? ""
                                                  : (" modbase_models=" + read_group.modbase_models))
-           << " runid=" << value_or_unknown(read_group.run_id) << "\t";
+           << "\t";
         rg << "LB:" << value_or_unknown(read_group.sample_id);
     }
     return rg.str();

@@ -31,7 +31,7 @@ mkdir -p ${models_directory}
 
 models_directory_arg="--models-directory ${models_directory}"
 
-ONT_OUTPUT_SPEC_REF="5f68db59dd2e9062124313cba81bc5865a9243d8" # currently INSTX-10694_hts_style_fastq branch
+ONT_OUTPUT_SPEC_REF="c85d5f094a5b4a73b98b939d0ab3bfd014add372" # currently INSTX-10694_hts_style_fastq branch
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
 VALIDATOR_COMMIT="3d7cf74ef1c45328f8cc545d82c3b1b43757b1fb"
@@ -382,8 +382,8 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
             | grep "@RG" \
             | grep "ID:4524e8b9-b90e-4ffb-a13a-380266513b64_dna_r10.4.1_e8.2_400bps_hac@v5.0.0" \
             | grep "PU:PAM93185" \
-            | grep "DT:2022-10-18T10:18:07.247+00:00" \
-            | grep "DS:basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0 runid=4524e8b9-b90e-4ffb-a13a-380266513b64" \
+            | grep "DT:2022-10-18T10:18:07.247000+00:00" \
+            | grep "DS:runid=4524e8b9-b90e-4ffb-a13a-380266513b64 basecall_model=dna_r10.4.1_e8.2_400bps_hac@v5.0.0" \
             | grep "LB:PCR_zymo" \
             | wc -l \
             | awk '{ print $1 }' || true)
