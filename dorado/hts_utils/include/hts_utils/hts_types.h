@@ -109,11 +109,11 @@ public:
     struct ReadAttributes {
         std::string sequencing_kit{};
         std::string experiment_id{};
-        std::string sample_id{};
-        std::string position_id{};
-        std::string flowcell_id{};
-        std::string protocol_run_id{};
-        std::string acquisition_id{};
+        std::string sample_id{"no_sample"};
+        std::string position_id{"0"};
+        std::string flowcell_id{"UNKNOWN"};
+        std::string protocol_run_id{"00000000-0000-0000-0000-000000000000"};
+        std::string acquisition_id{"0000000000000000000000000000000000000000"};
         int64_t protocol_start_time_ms{0};
         std::size_t subread_id{0};
         bool is_status_pass{true};
