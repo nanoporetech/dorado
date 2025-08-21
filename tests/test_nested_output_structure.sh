@@ -89,7 +89,7 @@ check_structure() {
     dest="${output_dir}/basic_structure"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
-        "${core}/bam_pass/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/PAO25751_pass_0d85015e_9bf5b3eb_0.bam"
     )
 
     $dorado_bin ${common_args} --output-dir ${dest}
@@ -102,9 +102,9 @@ check_structure() {
     dest="${output_dir}/demux_structure_BAM"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
-        "${core}/bam_pass/barcode01/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.bam"
-        "${core}/bam_pass/barcode04/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.bam"
-        "${core}/bam_pass/unclassified/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/barcode01/PAO25751_pass_barcode01_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/barcode04/PAO25751_pass_barcode04_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.bam"
     )
 
     $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96
@@ -117,9 +117,9 @@ check_structure() {
     dest="${output_dir}/demux_structure_FASTQ"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
-        "${core}/fastq_pass/barcode01/PAO25751_fastq_pass_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/barcode04/PAO25751_fastq_pass_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/unclassified/PAO25751_fastq_pass_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/barcode01/PAO25751_pass_barcode01_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/barcode04/PAO25751_pass_barcode04_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.fastq"
     )
 
     $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-fastq
@@ -132,8 +132,8 @@ check_structure() {
     dest="${output_dir}/demux_sample_sheet_structure_SAM"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
-        "${core}/bam_pass/barcode01/PAO25751_bam_pass_patient_id_1_0d85015e_9bf5b3eb_0.sam"
-        "${core}/bam_pass/unclassified/PAO25751_bam_pass_0d85015e_9bf5b3eb_0.sam"
+        "${core}/bam_pass/patient_id_1/PAO25751_pass_patient_id_1_0d85015e_9bf5b3eb_0.sam"
+        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.sam"
     )
 
     $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-sam --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
@@ -146,8 +146,8 @@ check_structure() {
     dest="${output_dir}/demux_sample_sheet_structure"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
-        "${core}/fastq_pass/barcode01/PAO25751_fastq_pass_patient_id_1_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/unclassified/PAO25751_fastq_pass_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/patient_id_1/PAO25751_pass_patient_id_1_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.fastq"
     )
 
     $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv --emit-fastq
@@ -160,7 +160,7 @@ check_structure() {
     dest="${output_dir}/demux_split_read"
     core="E8p2p1_400bps/no_sample/20231121_1559_5B_PAS14411_76cd574f"
     expected=(
-        "${core}/bam_pass/PAS14411_bam_pass_76cd574f_f78e5963_0.bam"
+        "${core}/bam_pass/PAS14411_pass_76cd574f_f78e5963_0.bam"
     )
 
     $dorado_bin basecaller ${model} ${split_data} ${basic_args} --output-dir ${dest} 
@@ -173,8 +173,8 @@ check_structure() {
     dest="${output_dir}/demux_aligned_reads"
     core="test/test/20231125_1913_test_TEST_4524e8b9"
     expected=(
-        "${core}/bam_pass/TEST_bam_pass_4524e8b9_test_0.bam"
-        "${core}/bam_pass/TEST_bam_pass_4524e8b9_test_0.bam.bai"
+        "${core}/bam_pass/TEST_pass_4524e8b9_test_0.bam"
+        "${core}/bam_pass/TEST_pass_4524e8b9_test_0.bam.bai"
     )
     ref="${output_dir}/ref.fq"
     $dorado_bin basecaller ${model} ${align_data} ${basic_args} --emit-fastq > $ref

@@ -568,7 +568,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                      },
                      "experiment-id/sample-id/19700101_0000_position-id_flowcell-id_protocol/" +
                              ftype + "_pass",
-                     "flowcell-id_" + ftype + "_pass_protocol_acquisit_0",
+                     "flowcell-id_pass_protocol_acquisit_0",
              },
              {
                      HtsData::ReadAttributes{
@@ -583,7 +583,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                              1,
                      },
                      "exp/sample/20000102_0304_pos_fc_proto/" + ftype + "_pass",
-                     "fc_" + ftype + "_pass_proto_acq_0",
+                     "fc_pass_proto_acq_0",
              }}));
 
     hts_writer::NestedFileStructure structure(root, output_mode, nullptr);
@@ -613,8 +613,12 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
             {OutputMode::BAM, "bam"},
     }));
 
-    auto [barcode_name, alias] = GENERATE_COPY(table<std::string, std::string>(
-            {{"", ""}, {"barcode99", ""}, {"unclassified", ""}, {"barcode01", "patient_id_5"}}));
+    auto [barcode_name, alias, description] =
+            GENERATE_COPY(table<std::string, std::string, std::string>(
+                    {{"", "", "test without barcode or alias"},
+                     {"barcode99", "barcode99", "test with barcode but without alias"},
+                     {"unclassified", "unclassified", "test unclassified read"},
+                     {"barcode01", "patient_id_5", "test with barcode and alias"}}));
 
     auto barcode_score_result = std::make_shared<BarcodeScoreResult>();
     barcode_score_result->barcode_name = barcode_name;
@@ -642,28 +646,33 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
             "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
 
     std::ostringstream oss;
-    oss << "PAO25751_" << ftype << "_pass_" << alias << (alias.empty() ? "" : "_")
-        << "proto-id_acq-id_0";
+    oss << "PAO25751" << "_pass_" << alias << (alias.empty() ? "" : "_") << "proto-id_acq-id_0";
     const std::string expected_fname = oss.str();
 
     hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
-    CATCH_CAPTURE(root, path, output_mode, barcode_name);
-    // Check root is the parent of the output
-    CATCH_CHECK(path.string().substr(0, root.size()) == root);
-    // Check the filename
-    CATCH_CHECK(path.stem() == expected_fname);
-    // Check the file type / extension
-    const std::string extension = get_suffix(output_mode);
-    CATCH_CHECK(path.extension() == extension);
+    CATCH_SECTION(description) {
+        CATCH_CAPTURE(root, path, output_mode, barcode_name);
+        // Check root is the parent of the output
+        CATCH_CHECK(path.string().substr(0, root.size()) == root);
+        // Check the filename
+        CATCH_CHECK(path.stem() == expected_fname);
+        // Check the file type / extension
+        const std::string extension = get_suffix(output_mode);
+        CATCH_CHECK(path.extension() == extension);
 
-    // Expect an additional subdir for the classification of the barcode is set
-    const auto base = barcode_name.empty() ? path.parent_path() : path.parent_path().parent_path();
-    // Check the folder base structure (excluding the classification)
-    CATCH_CHECK(fs::relative(base, root) == fs::path(expected_base));
-    // Check the classification subdir
-    CATCH_CHECK(fs::relative(path, base).parent_path() == fs::path(barcode_name));
+        // Expect an additional subdir for the classification if the barcode is set
+        const auto base =
+                barcode_name.empty() ? path.parent_path() : path.parent_path().parent_path();
+        // Check the folder base structure (excluding the classification)
+        const auto relative_base_folder = fs::relative(base, root);
+        CATCH_CHECK(relative_base_folder == fs::path(expected_base));
+
+        // Check the classification subdir should be the alias name
+        const auto classification_folder = fs::relative(path, base).parent_path();
+        CATCH_CHECK(classification_folder == fs::path(alias));
+    }
 }
 
 CATCH_TEST_CASE("HtsReaderTest: parse htslib header line type", TEST_GROUP) {

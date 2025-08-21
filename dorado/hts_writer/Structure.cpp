@@ -79,15 +79,16 @@ std::string SingleFileStructure::get_filename() const {
 }
 
 std::string NestedFileStructure::get_path(const HtsData& hts_data) {
-    const auto directory = format_directory(hts_data);
-    const auto path = directory / format_filename(hts_data);
+    const auto alias = format_alias(hts_data);
+    const auto directory = format_directory(hts_data, alias);
+    const auto path = directory / format_filename(hts_data, alias);
     create_output_folder(path);
     return path.string();
 }
 
-std::filesystem::path NestedFileStructure::format_directory(const HtsData& hts_data) {
-    return get_core(hts_data.read_attrs) / format_status(hts_data.read_attrs) /
-           format_classification(hts_data.barcoding_result);
+std::filesystem::path NestedFileStructure::format_directory(const HtsData& hts_data,
+                                                            const std::string& alias) {
+    return get_core(hts_data.read_attrs) / format_filetype_status(hts_data.read_attrs) / alias;
 }
 
 const std::filesystem::path& NestedFileStructure::get_core(const HtsData::ReadAttributes& attrs) {
@@ -122,36 +123,22 @@ std::string NestedFileStructure::format_run(const HtsData::ReadAttributes& attrs
     return std::move(oss).str();
 }
 
-std::string NestedFileStructure::format_status(const HtsData::ReadAttributes& attrs) const {
+std::string NestedFileStructure::format_filetype_status(
+        const HtsData::ReadAttributes& attrs) const {
     std::ostringstream oss;
-    oss << status_filetype() << "_" << pass_fail(attrs);
+    oss << filetype() << status(attrs);
     return std::move(oss).str();
 }
 
-std::string NestedFileStructure::format_classification(
-        const std::shared_ptr<const BarcodeScoreResult>& result) const {
-    if (!result) {
-        return "";
-    }
-
-    if (result->barcode_name.empty()) {
-        return "";
-    }
-
-    if (result->barcode_name == UNCLASSIFIED_STR) {
-        return UNCLASSIFIED_STR;
-    }
-
-    return dorado::barcode_kits::normalize_barcode_name(result->barcode_name);
-}
-
-std::string NestedFileStructure::format_filename(const HtsData& hts_data) const {
+std::string NestedFileStructure::format_filename(const HtsData& hts_data,
+                                                 const std::string& alias) const {
     // https://nanoporetech.github.io/ont-output-specifications/latest/read_formats/bam/
-    // {flow_cell_id}_{status}_{alias_}{short_protocol_run_id}_{short_run_id}_{batch_number}.{filetype}
+    // {flow_cell_id}{_status}_{alias_}{short_protocol_run_id}_{short_run_id}_{batch_number}.{filetype}
+    // const auto alias = format_alias(hts_data);
     std::ostringstream oss;
-    oss << hts_data.read_attrs.flowcell_id << "_";
-    oss << format_status(hts_data.read_attrs) << "_";
-    oss << alias(hts_data);
+    oss << hts_data.read_attrs.flowcell_id;
+    oss << status(hts_data.read_attrs) << "_";
+    oss << alias << (!alias.empty() ? "_" : "");
     oss << truncate(hts_data.read_attrs.protocol_run_id) << "_";
     oss << truncate(hts_data.read_attrs.acquisition_id) << "_";
     oss << batch_number();
@@ -159,11 +146,11 @@ std::string NestedFileStructure::format_filename(const HtsData& hts_data) const 
     return std::move(oss).str();
 };
 
-std::string NestedFileStructure::pass_fail(const HtsData::ReadAttributes& attrs) const {
-    return attrs.is_status_pass ? "pass" : "fail";
+std::string NestedFileStructure::status(const HtsData::ReadAttributes& attrs) const {
+    return attrs.is_status_pass ? "_pass" : "_fail";
 };
 
-std::string NestedFileStructure::status_filetype() const {
+std::string NestedFileStructure::filetype() const {
     switch (m_mode) {
     case utils::HtsFile::OutputMode::UBAM:
     case utils::HtsFile::OutputMode::BAM:
@@ -180,21 +167,28 @@ std::string NestedFileStructure::status_filetype() const {
     throw std::logic_error(oss.str());
 };
 
-std::string NestedFileStructure::alias(const HtsData& hts_data) const {
-    if (!m_sample_sheet) {
+std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
+    // No barcoding - return empty
+    if (!hts_data.barcoding_result || hts_data.barcoding_result->barcode_name.empty()) {
         return "";
     }
 
-    if (!hts_data.barcoding_result || hts_data.barcoding_result->barcode_name.empty() ||
-        hts_data.barcoding_result->barcode_name == UNCLASSIFIED_STR) {
-        return "";
+    // Always return "unclassified" as there's no alias
+    if (hts_data.barcoding_result->barcode_name == UNCLASSIFIED_STR) {
+        return UNCLASSIFIED_STR;
     }
 
-    const auto& attrs = hts_data.read_attrs;
-    const auto bc_alias = m_sample_sheet->get_alias(
-            attrs.flowcell_id, attrs.position_id, attrs.experiment_id,
-            dorado::barcode_kits::normalize_barcode_name(hts_data.barcoding_result->barcode_name));
-    return bc_alias + (bc_alias.empty() ? "" : "_");
+    // Return the alias if found otherwise fall back to the barcode name
+    auto barcode_name =
+            barcode_kits::normalize_barcode_name(hts_data.barcoding_result->barcode_name);
+    if (m_sample_sheet) {
+        const auto& attrs = hts_data.read_attrs;
+        const auto bc_alias = m_sample_sheet->get_alias(attrs.flowcell_id, attrs.position_id,
+                                                        attrs.experiment_id, barcode_name);
+        return !bc_alias.empty() ? bc_alias : barcode_name;
+    }
+
+    return barcode_name;
 };
 
 std::string NestedFileStructure::batch_number() const { return "0"; };
