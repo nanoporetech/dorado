@@ -43,7 +43,6 @@ public:
     }
 
     const HtsData::ReadAttributes& get_read_attributes(const bam1_t* record) const;
-    const MergeHeaders& get_merged_header(const bam1_t* record) const;
     const MergeHeaders& get_merged_header(const HtsData::ReadAttributes& attrs) const;
 
 private:
@@ -56,7 +55,7 @@ private:
     void process_bam(const std::filesystem::path& path);
     void process_fastq(const std::filesystem::path& path);
 
-    AttributeMap get_read_attrs_lut(const std::vector<utils::HeaderLineData>& header_lines);
+    AttributeMap get_read_attrs_by_id(const std::vector<utils::HeaderLineData>& header_lines);
 };
 
 }  // namespace dorado::utils

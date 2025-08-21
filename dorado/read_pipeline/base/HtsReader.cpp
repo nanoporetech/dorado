@@ -246,13 +246,13 @@ std::size_t HtsReader::demux_read(Pipeline& pipeline,
                 continue;
             }
         }
+        const auto& read_attrs = header_mapper.get_read_attributes(record.get());
         const auto& sq_mapping =
-                header_mapper.get_merged_header(record.get()).get_sq_mapping(m_filename);
+                header_mapper.get_merged_header(read_attrs).get_sq_mapping(m_filename);
         if (!strip_aligments) {
             adjust_tid(sq_mapping, record);
         }
 
-        const auto& read_attrs = header_mapper.get_read_attributes(record.get());
         auto hts_data =
                 std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get())), read_attrs});
         BamMessage bam_message{std::move(hts_data), m_client_info};

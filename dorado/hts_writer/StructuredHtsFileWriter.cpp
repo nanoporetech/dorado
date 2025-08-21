@@ -57,31 +57,40 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
         return;
     }
 
-    if (m_shared_header == nullptr && m_dynamic_header == nullptr) {
-        throw std::logic_error("StructuredHtsFileWriter - header not set before writing records.");
-    }
-
     const std::string path = m_structure->get_path(item);
-
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
         hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
-        if (m_shared_header != nullptr) {
-            hts_file->set_header(m_shared_header.get());
-        } else {
-            const auto &it = m_dynamic_header->find(item.read_attrs);
-            if (it == m_dynamic_header->cend()) {
-                spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
-                              utils::get_read_group_tag(item.bam_ptr.get()),
-                              item.read_attrs.protocol_run_id);
-                throw std::runtime_error(
-                        "StructuredHtsFileWriter - Failed to load dynamic header.");
-            }
-            hts_file->set_header(it->second->get_merged_header());
-        }
+        set_hts_file_header(item, *hts_file);
     }
 
     hts_file->write(item.bam_ptr.get());
+}
+
+void StructuredHtsFileWriter::set_hts_file_header(const HtsData &item,
+                                                  utils::HtsFile &hts_file) const {
+    if (m_mode == OutputMode::FASTQ || m_mode == OutputMode::FASTA) {
+        return;
+    }
+
+    if (m_shared_header != nullptr) {
+        hts_file.set_header(m_shared_header.get());
+        return;
+    }
+
+    if (m_dynamic_header != nullptr) {
+        const auto &it = m_dynamic_header->find(item.read_attrs);
+        if (it == m_dynamic_header->cend()) {
+            spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
+                          utils::get_read_group_tag(item.bam_ptr.get()),
+                          item.read_attrs.protocol_run_id);
+            throw std::runtime_error("StructuredHtsFileWriter - Failed to load dynamic header.");
+        }
+        hts_file.set_header(it->second->get_merged_header());
+        return;
+    }
+
+    throw std::logic_error("StructuredHtsFileWriter - header not set before writing records.");
 }
 
 }  // namespace hts_writer

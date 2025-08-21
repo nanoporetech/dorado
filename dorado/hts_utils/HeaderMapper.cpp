@@ -1,8 +1,10 @@
 #include "hts_utils/HeaderMapper.h"
 
+#include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/fastq_reader.h"
+#include "hts_utils/fastq_tags.h"
 #include "hts_utils/header_utils.h"
 #include "hts_utils/hts_types.h"
 #include "spdlog/spdlog.h"
@@ -64,6 +66,12 @@ std::string_view parse_DS_tag_key(const std::vector<std::string>& tokens, const 
     return "";
 }
 
+void assign_not_empty(std::string& attr_target, const std::string_view maybe_value) {
+    if (!maybe_value.empty()) {
+        attr_target = maybe_value;
+    }
+};
+
 }  // anonymous namespace
 
 namespace dorado::utils {
@@ -90,6 +98,53 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
     }
 };
 
+void HeaderMapper::process_fastq(const std::filesystem::path& path) {
+    spdlog::debug("HeaderMapper processing headers from: '{}'.", path.string());
+
+    hts_io::FastxSequentialReader reader(path);
+    hts_io::FastxRecord record;
+
+    std::unordered_map<std::string, HtsData::ReadAttributes> rg_id_to_attrs_lut;
+
+    int64_t record_index = -1;
+    while (reader.get_next(record)) {
+        record_index++;
+
+        // Check if the tags are HTS-style and parse them.
+        ReadGroupData rg_data = dorado::utils::parse_rg_from_hts_tags(record.comment);
+
+        if (!rg_data.found) {
+            spdlog::error("FASTQ record {} missing read group data in file '{}'", record_index,
+                          path.string());
+            throw std::runtime_error("Invalid FASTQ file");
+        }
+
+        auto [it, inserted] = m_read_group_to_attributes->try_emplace(rg_data.id);
+        if (!inserted) {
+            continue;
+        }
+
+        HtsData::ReadAttributes& attrs = it->second;
+        assign_not_empty(attrs.flowcell_id, rg_data.data.flowcell_id);
+        assign_not_empty(attrs.position_id, rg_data.data.device_id);
+        assign_not_empty(attrs.sample_id, rg_data.data.sample_id);
+        assign_not_empty(attrs.protocol_run_id, rg_data.data.run_id);
+        assign_not_empty(attrs.experiment_id, rg_data.data.experiment_id);
+
+        if (!rg_data.data.exp_start_time.empty()) {
+            attrs.protocol_start_time_ms =
+                    utils::get_unix_time_ms_from_string_timestamp(rg_data.data.exp_start_time);
+        }
+
+        // Create a new empty merged header
+        auto& merged_header_ptr = (*m_merged_headers)[attrs];
+        if (!merged_header_ptr) {
+            merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+            merged_header_ptr->add_header(sam_hdr_init(), path.string(), rg_data.id);
+        }
+    }
+}
+
 void HeaderMapper::process_bam(const std::filesystem::path& path) {
     auto file = dorado::HtsFilePtr(hts_open(path.string().c_str(), "r"));
     if (!file) {
@@ -105,15 +160,14 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
     const auto header_lines = utils::parse_header(*header.get(), {utils::HeaderLineType::RG});
 
     // Map read group ids to ReadAttributes (struct containing file naming parameters)
-    const auto rg_to_attrs_lut = get_read_attrs_lut(header_lines);
+    const auto rg_to_attrs_lut = get_read_attrs_by_id(header_lines);
 
-    auto& read_group_to_attributes = *m_read_group_to_attributes;
     auto& merged_headers = *m_merged_headers;
 
     // Add the new read attrs and merge the headers for each output
     // file only including the read groups that will be used.
     for (const auto& [read_group_id, read_attrs] : rg_to_attrs_lut) {
-        read_group_to_attributes[read_group_id] = read_attrs;
+        (*m_read_group_to_attributes)[read_group_id] = read_attrs;
 
         auto& merged_header_ptr = merged_headers[read_attrs];
         if (!merged_header_ptr) {
@@ -123,7 +177,7 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
     }
 }
 
-std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_attrs_lut(
+std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_attrs_by_id(
         const std::vector<utils::HeaderLineData>& rg_lines) {
     // Example RG line:
     // @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0
@@ -152,41 +206,29 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
         }
 
         // Get the read attributes for this read group or create a new default one.
-        HtsData::ReadAttributes& attrs = rg_id_to_attrs_lut[rg_id];
+        auto [it, inserted] = rg_id_to_attrs_lut.try_emplace(rg_id);
+        if (!inserted) {
+            continue;
+        }
+
+        HtsData::ReadAttributes& attrs = it->second;
         attrs.protocol_start_time_ms = parse_DT_tag(tags);
 
-        const auto flowcell_id = get_tag("PU", tags);
-        if (!flowcell_id.empty()) {
-            attrs.flowcell_id = flowcell_id;
-        }
+        assign_not_empty(attrs.flowcell_id, get_tag("PU", tags));
+        assign_not_empty(attrs.sample_id, get_tag("LB", tags));
+        // There is no position id tag defined
+        // assign_not_empty(attrs.position_id, get_tag("PM", tags));
 
-        const auto position_id = get_tag("PM", tags);
-        if (!position_id.empty()) {
-            attrs.position_id = position_id;
-        }
-
-        const auto sample_id = get_tag("LB", tags);
-        if (!sample_id.empty()) {
-            attrs.sample_id = sample_id;
-        }
-
-        {
-            const auto& it = tags.find("DS");
-            const std::string ds = (it != std::end(tags)) ? it->second : "";
-
-            const auto ds_tokens = tokenize(ds, ' ');
-            attrs.protocol_run_id = parse_DS_tag_key(ds_tokens, "runid=");
-            // TODO: These fields are not in the specification yet
-            // attrs.experiment_id = parse_DS_tag_key(ds_tokens, "experiment_name");
-            // attrs.acquisition_id = parse_DS_tag_key(ds_tokens, "acquisition_id");
-        }
+        const auto& tag_it = tags.find("DS");
+        const std::string ds = (tag_it != std::end(tags)) ? tag_it->second : "";
+        const auto ds_tokens = tokenize(ds, ' ');
+        assign_not_empty(attrs.protocol_run_id, parse_DS_tag_key(ds_tokens, "runid="));
+        // TODO: These fields are not in the specification yet
+        // assign_not_empty(attrs.experiment_id, ...);
+        // assign_not_empty(attrs.acquisition_id, ...);
     }
 
     return rg_id_to_attrs_lut;
-};
-
-void HeaderMapper::process_fastq([[maybe_unused]] const std::filesystem::path& path) {
-    throw std::logic_error("HeaderMapper::process_fastq is not implemented");
 };
 
 void HeaderMapper::modify_headers(const Modifier& modifier) const {
@@ -212,9 +254,6 @@ const HtsData::ReadAttributes& HeaderMapper::get_read_attributes(const bam1_t* r
 
     return attr_it->second;
 };
-const MergeHeaders& HeaderMapper::get_merged_header(const bam1_t* record) const {
-    return get_merged_header(get_read_attributes(record));
-}
 
 const MergeHeaders& HeaderMapper::get_merged_header(const HtsData::ReadAttributes& attrs) const {
     // Lookup the merged header for these ReadAttributes
