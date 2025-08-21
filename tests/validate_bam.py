@@ -13,13 +13,13 @@ from ont_output_specification_validator.specification import (
     load_local_specification_bundle,
 )
 
-from ont_output_specification_validator.validators.fastq import HtsFastqValidator
+from ont_output_specification_validator.validators.bam import BamValidator
 
 parser = argparse.ArgumentParser()
-parser.add_argument("fastq_file", help="Input fastq file to validate")
+parser.add_argument("bam_file", help="Input bam file to validate")
 parser.add_argument(
     "spec_folder",
-    help="Folder containing the specification to validate fastq_file against",
+    help="Folder containing the specification to validate bam_file against",
 )
 args = parser.parse_args()
 
@@ -34,21 +34,19 @@ exp_settings = settings.ExperimentSettings(
     estimate_polya_tail_enabled=False,
     has_input_sample_sheet=True,
     offline_analysis_enabled=False,
-    moves=False,
+    moves=False,  # Note that moves are not emitted by default by dorado standalone
 )
 
 spec_path = pathlib.Path(args.spec_folder)
 specification_bundle = load_local_specification_bundle(spec_path)
-validator = HtsFastqValidator(
-    specification_bundle.get_file_content("fastq/header-spec-hts.yaml")
-)
+validator = BamValidator(specification_bundle.get_file_content("bam/spec.yaml"))
 validator_errors = errors.ErrorContainer()
 
-validate_file(pathlib.Path(args.fastq_file), exp_settings, validator_errors, validator)
+validate_file(pathlib.Path(args.bam_file), exp_settings, validator_errors, validator)
 
 if validator_errors.has_errors():
     formatted_errors = validator_errors.format_errors()
-    print(f"Errors from validation:\n{formatted_errors}")
+    print(f"Errors from validating {args.bam_file}:\n{formatted_errors}")
     sys.exit(1)
 else:
-    print(f"FastQ file {args.fastq_file} validated")
+    print(f"BAM file {args.bam_file} validated")

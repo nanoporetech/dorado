@@ -440,6 +440,7 @@ build_archive:macos:arm:
     NO_TEST_DORADO_POLISH: 0
     NO_TEST_DUPLEX: 0
     VALIDATE_FASTQ: 1
+    VALIDATE_BAM: 1
     PYTHON: python3
   script:
     # Do everything inside a newly created folder, since some runners only run

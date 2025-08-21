@@ -31,14 +31,14 @@ mkdir -p ${models_directory}
 
 models_directory_arg="--models-directory ${models_directory}"
 
-ONT_OUTPUT_SPEC_REF="c85d5f094a5b4a73b98b939d0ab3bfd014add372" # currently INSTX-10694_hts_style_fastq branch
+ONT_OUTPUT_SPEC_REF="00d8b1220133b35f5c29de1d67af85fef3530f6f" # currently DOR-1280_dorado_bam_validation branch
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
-VALIDATOR_COMMIT="3d7cf74ef1c45328f8cc545d82c3b1b43757b1fb"
+VALIDATOR_COMMIT="7dd56117df3dc354ae5b641e144fc8c5d9188261"
 
 # Set up the output specification validator so we can check output file formats
-if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
-    echo "Enabling validation of fastq files against spec from ${SPECIFICATION_URL}"
+if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
+    echo "Enabling validation of output files against spec from ${SPECIFICATION_URL}"
     $PYTHON --version
     $PYTHON -m venv venv
     source ./venv/*/activate
@@ -63,6 +63,10 @@ $dorado_bin download --model ${model_name_rna004} ${models_directory_arg}
 model_rna004=${models_directory}/${model_name_rna004}
 
 dorado_check_bam_not_empty() {
+    if [[ "${VALIDATE_BAM}" -eq "1" ]]; then
+        $PYTHON ./${test_dir}/validate_bam.py $output_dir/calls.bam $SPECIFICATION_FILE
+    fi
+
     if [[ -n "$SAMTOOLS_UNAVAILABLE" ]]; then
         echo "Skipping dorado_check_bam_not_empty as SAMTOOLS_UNAVAILABLE is set"
         return 0
