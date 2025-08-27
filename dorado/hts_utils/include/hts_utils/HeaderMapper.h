@@ -37,7 +37,7 @@ public:
     // Apply a HeaderModifier function to all merged headers.
     void modify_headers(const Modifier& modifier) const;
 
-    std::shared_ptr<HeaderMap> get_merged_headers_map() const { return m_merged_headers; };
+    std::shared_ptr<HeaderMap> get_merged_headers_map() const { return m_merged_headers_map; };
     std::shared_ptr<AttributeMap> get_read_attributes_map() const {
         return m_read_group_to_attributes;
     }
@@ -47,13 +47,16 @@ public:
 
 private:
     const bool m_strip_alignment;
+    // Store this fallback for when we don't find a read group
+    // This can happen when a FASTQ has no header metadata
+    HtsData::ReadAttributes m_fallback_read_attrs{};
 
     std::shared_ptr<AttributeMap> m_read_group_to_attributes{nullptr};
-    std::shared_ptr<HeaderMap> m_merged_headers{nullptr};
+    std::shared_ptr<HeaderMap> m_merged_headers_map{nullptr};
 
     void process(const std::vector<std::filesystem::path>& inputs);
     void process_bam(const std::filesystem::path& path);
-    void process_fastq(const std::filesystem::path& path);
+    void process_fastx(const std::filesystem::path& path);
 
     AttributeMap get_read_attrs_by_id(const std::vector<utils::HeaderLineData>& header_lines);
 };

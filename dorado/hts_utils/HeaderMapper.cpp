@@ -3,6 +3,7 @@
 #include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/fasta_reader.h"
 #include "hts_utils/fastq_reader.h"
 #include "hts_utils/fastq_tags.h"
 #include "hts_utils/header_utils.h"
@@ -79,44 +80,47 @@ namespace dorado::utils {
 HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs, bool strip_alignment)
         : m_strip_alignment(strip_alignment),
           m_read_group_to_attributes(std::make_shared<HeaderMapper::AttributeMap>()),
-          m_merged_headers(std::make_shared<HeaderMapper::HeaderMap>()) {
+          m_merged_headers_map(std::make_shared<HeaderMapper::HeaderMap>()) {
+    m_merged_headers_map->emplace(m_fallback_read_attrs,
+                                  std::make_unique<MergeHeaders>(m_strip_alignment));
     process(inputs);
 }
 
 void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
     for (const auto& input : inputs) {
-        if (is_fastq(input.string())) {
-            process_fastq(input);
+        spdlog::trace("HeaderMapper processing headers from: '{}'.", input.string());
+        if (is_fastq(input.string()) || is_fasta(input.string())) {
+            process_fastx(input);
         } else {
             process_bam(input);
         }
     }
 
     // Finalize the headers
-    for (const auto& [_, merged_header_ptr] : *m_merged_headers) {
+    for (const auto& [_, merged_header_ptr] : *m_merged_headers_map) {
         merged_header_ptr->finalize_merge();
     }
 };
 
-void HeaderMapper::process_fastq(const std::filesystem::path& path) {
-    spdlog::debug("HeaderMapper processing headers from: '{}'.", path.string());
-
+void HeaderMapper::process_fastx(const std::filesystem::path& path) {
     hts_io::FastxSequentialReader reader(path);
     hts_io::FastxRecord record;
 
     std::unordered_map<std::string, HtsData::ReadAttributes> rg_id_to_attrs_lut;
+    const auto& fallback_merged_header = m_merged_headers_map->at(m_fallback_read_attrs);
 
-    int64_t record_index = -1;
+    bool debug_msg_issued = false;
     while (reader.get_next(record)) {
-        record_index++;
-
         // Check if the tags are HTS-style and parse them.
         ReadGroupData rg_data = dorado::utils::parse_rg_from_hts_tags(record.comment);
 
         if (!rg_data.found) {
-            spdlog::error("FASTQ record {} missing read group data in file '{}'", record_index,
-                          path.string());
-            throw std::runtime_error("Invalid FASTQ file");
+            if (!debug_msg_issued) {
+                spdlog::debug("FASTQ record missing read group data in file '{}'", path.string());
+            }
+            fallback_merged_header->add_header(sam_hdr_init(), path.string(),
+                                               m_fallback_read_attrs.protocol_run_id);
+            continue;
         }
 
         auto [it, inserted] = m_read_group_to_attributes->try_emplace(rg_data.id);
@@ -137,7 +141,7 @@ void HeaderMapper::process_fastq(const std::filesystem::path& path) {
         }
 
         // Create a new empty merged header
-        auto& merged_header_ptr = (*m_merged_headers)[attrs];
+        auto& merged_header_ptr = (*m_merged_headers_map)[attrs];
         if (!merged_header_ptr) {
             merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
             merged_header_ptr->add_header(sam_hdr_init(), path.string(), rg_data.id);
@@ -162,7 +166,7 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
     // Map read group ids to ReadAttributes (struct containing file naming parameters)
     const auto rg_to_attrs_lut = get_read_attrs_by_id(header_lines);
 
-    auto& merged_headers = *m_merged_headers;
+    auto& merged_headers = *m_merged_headers_map;
 
     // Add the new read attrs and merge the headers for each output
     // file only including the read groups that will be used.
@@ -216,23 +220,20 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
 
         assign_not_empty(attrs.flowcell_id, get_tag("PU", tags));
         assign_not_empty(attrs.sample_id, get_tag("LB", tags));
-        // There is no position id tag defined
-        // assign_not_empty(attrs.position_id, get_tag("PM", tags));
+        // TODO: position_id is not in the specification yet
 
         const auto& tag_it = tags.find("DS");
         const std::string ds = (tag_it != std::end(tags)) ? tag_it->second : "";
         const auto ds_tokens = tokenize(ds, ' ');
         assign_not_empty(attrs.protocol_run_id, parse_DS_tag_key(ds_tokens, "runid="));
-        // TODO: These fields are not in the specification yet
-        // assign_not_empty(attrs.experiment_id, ...);
-        // assign_not_empty(attrs.acquisition_id, ...);
+        // TODO: experiment_id and acquisition_id are not in the specification yet
     }
 
     return rg_id_to_attrs_lut;
 };
 
 void HeaderMapper::modify_headers(const Modifier& modifier) const {
-    for (const auto& [_, merged_header_ptr] : *m_merged_headers) {
+    for (const auto& [_, merged_header_ptr] : *m_merged_headers_map) {
         modifier(merged_header_ptr->get_merged_header());
     }
 };
@@ -241,15 +242,13 @@ const HtsData::ReadAttributes& HeaderMapper::get_read_attributes(const bam1_t* r
     // Get the read group ID from the record
     const std::string read_group = utils::get_read_group_tag(record);
     if (read_group.empty()) {
-        spdlog::error("Read group of htslib record is unexpectedly empty");
-        throw std::runtime_error("Invalid record edit - Read group is Empty");
+        return m_fallback_read_attrs;
     }
 
     // Lookup the ReadAttributes for this read_group
     const auto attr_it = m_read_group_to_attributes->find(read_group);
     if (attr_it == m_read_group_to_attributes->cend()) {
-        spdlog::error("Read group was not found in mapped attributes: '{}'", read_group);
-        throw std::runtime_error("Invalid record edit - Attributes not found");
+        return m_fallback_read_attrs;
     }
 
     return attr_it->second;
@@ -257,8 +256,8 @@ const HtsData::ReadAttributes& HeaderMapper::get_read_attributes(const bam1_t* r
 
 const MergeHeaders& HeaderMapper::get_merged_header(const HtsData::ReadAttributes& attrs) const {
     // Lookup the merged header for these ReadAttributes
-    const auto header_it = m_merged_headers->find(attrs);
-    if (header_it == m_merged_headers->cend()) {
+    const auto header_it = m_merged_headers_map->find(attrs);
+    if (header_it == m_merged_headers_map->cend()) {
         spdlog::error("Read group attributes were not found in mapped headers: runid='{}'.",
                       attrs.protocol_run_id);
         throw std::runtime_error("Merged header not found");
