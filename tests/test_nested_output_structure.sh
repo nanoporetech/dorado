@@ -87,7 +87,7 @@ check_structure() {
     return $failed
 }
 
-TEST_INLINE_DEMUX=0
+TEST_INLINE_DEMUX=1
 TEST_POSTRUN_DEMUX=1
 
 # Testing for inline demux where we have basecall, barcode and demux at once
