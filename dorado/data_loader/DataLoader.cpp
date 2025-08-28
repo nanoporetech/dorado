@@ -100,7 +100,6 @@ SimplexReadPtr process_pod5_thread_fn(
         const std::string& path,
         const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
         const std::unordered_map<std::string, size_t>& read_id_to_index) {
-    utils::set_thread_name("process_pod5");
     uint16_t read_table_version = 0;
 
     const std::string filename = std::filesystem::path(path).filename().string();
@@ -597,6 +596,11 @@ void DataLoader::check_read(const SimplexReadPtr& read) {
     }
 }
 
+static void on_worker_start() {
+    // Setting the thread name is expensive, so do it once per thread at startup.
+    utils::set_thread_name("dataloader_pod5");
+}
+
 DataLoader::DataLoader(Pipeline& pipeline,
                        const std::string& device,
                        size_t num_worker_threads,
@@ -605,7 +609,7 @@ DataLoader::DataLoader(Pipeline& pipeline,
                        std::unordered_set<std::string> read_ignore_list)
         : m_pipeline(pipeline),
           m_device(device),
-          m_thread_pool(num_worker_threads),
+          m_thread_pool(num_worker_threads, on_worker_start),
           m_allowed_read_ids(std::move(read_list)),
           m_ignored_read_ids(std::move(read_ignore_list)) {
     m_max_reads = max_reads == 0 ? std::numeric_limits<decltype(m_max_reads)>::max() : max_reads;

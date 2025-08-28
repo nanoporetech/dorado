@@ -1,14 +1,8 @@
-commit 4d8526e93771c4728cbdcd238369e434bad58d32
-Author: Christian Blume <chr.blume@gmail.com>
-Date:   Sun Mar 20 20:37:09 2022 +1300
-
-    use declval in place of result_of
-
 diff --git a/src/cxxpool.h b/src/cxxpool.h
-index fe200fb..fd69975 100644
+index 36ce36b..39d4141 100644
 --- a/src/cxxpool.h
 +++ b/src/cxxpool.h
-@@ -22,7 +22,7 @@ namespace detail {
+@@ -23,7 +23,7 @@ namespace detail {
  template<typename Iterator>
  struct future_info {
      typedef typename std::iterator_traits<Iterator>::value_type future_type;
@@ -16,4 +10,50 @@ index fe200fb..fd69975 100644
 +    typedef decltype(std::declval<future_type>().get()) value_type;
      static constexpr bool is_void = std::is_void<value_type>::value;
  };
+ 
+@@ -211,14 +211,15 @@ public:
+     // Constructor. No threads are launched
+     thread_pool()
+     : done_{false}, paused_{false}, threads_{}, tasks_{}, task_counter_{},
+-      task_cond_var_{}, task_mutex_{}, thread_mutex_{}
++      task_cond_var_{}, task_mutex_{}, thread_mutex_{}, on_worker_start_{}
+     {}
+ 
+     // Constructor. Launches the desired number of threads. Passing 0 is
+     // equivalent to calling the no-argument constructor
+-    explicit thread_pool(std::size_t n_threads)
++    explicit thread_pool(std::size_t n_threads, std::function<void()> on_worker_start)
+     : thread_pool{}
+     {
++        on_worker_start_ = std::move(on_worker_start);
+         if (n_threads > 0) {
+             std::lock_guard<std::mutex> thread_lock(thread_mutex_);
+             const auto n_target = threads_.size() + n_threads;
+@@ -241,6 +242,10 @@ public:
+         }
+     }
+ 
++    explicit thread_pool(std::size_t n_threads)
++    : thread_pool(n_threads, nullptr)
++    {}
++
+     // Destructor. Joins all threads launched. Waits for all running tasks
+     // to complete
+     ~thread_pool() {
+@@ -339,6 +344,8 @@ public:
+ private:
+ 
+     void worker() {
++        if (on_worker_start_)
++            on_worker_start_();
+         for (;;) {
+             cxxpool::detail::priority_task task;
+             {
+@@ -376,6 +383,7 @@ private:
+     std::condition_variable task_cond_var_;
+     mutable std::mutex task_mutex_;
+     mutable std::mutex thread_mutex_;
++    std::function<void()> on_worker_start_;
+ };
+ 
  
