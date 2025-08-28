@@ -118,19 +118,6 @@ void HtsFile::initialise_threads() {
     }
 }
 
-void HtsFile::set_num_threads(std::size_t threads) {
-    if (m_threads > 0) {
-        throw std::runtime_error("HtsFile num threads cannot be changed if already initialised");
-    }
-
-    if (threads < 1) {
-        throw std::runtime_error("HtsFile num threads must be greater than 0");
-    }
-
-    m_threads = static_cast<int>(threads);
-    initialise_threads();
-}
-
 HtsFile::~HtsFile() {
     if (!m_finalised) {
         spdlog::error("finalise() not called on a HtsFile.");

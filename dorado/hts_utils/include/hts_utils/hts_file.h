@@ -28,9 +28,6 @@ public:
     HtsFile(const HtsFile&) = delete;
     HtsFile& operator=(const HtsFile&) = delete;
 
-    // Support for setting threads after construction
-    void set_num_threads(std::size_t threads);
-
     void set_buffer_size(size_t buff_size);
     int set_header(const sam_hdr_t* header);
     int write(bam1_t* record);

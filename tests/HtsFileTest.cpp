@@ -179,19 +179,6 @@ CATCH_TEST_CASE("HtsFileTest: construct with zero threads for unsorted BAM does 
                                                           HtsFile::OutputMode::BAM, 0, false));
 }
 
-CATCH_TEST_CASE(
-        "HtsFileTest: set_num_threads with 2 after constructed with zero threads for unsorted BAM "
-        "does not throw",
-        TEST_GROUP) {
-    Tester tester;
-    std::unique_ptr<HtsFile> cut{};
-    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
-    cut = std::make_unique<HtsFile>(tester.file_out_path.string(), HtsFile::OutputMode::BAM, 0,
-                                    false);
-
-    cut->set_num_threads(2);
-}
-
 CATCH_TEST_CASE("FileMergeBatcher: Single batch", TEST_GROUP) {
     auto files = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 0);
     utils::FileMergeBatcher batcher(files, filepath("folder", "merged.bam"), 4);
