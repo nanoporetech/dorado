@@ -981,22 +981,34 @@ void sample_producer(PolisherResources& resources,
                     continue;
                 }
 
+                const std::vector<int64_t> curr_batch_shape =
+                        secondary::compute_collated_padded_shape(buffer.samples);
+                const double estimated_memory_curr =
+                        std::empty(curr_batch_shape)
+                                ? 0.0
+                                : model->estimate_batch_memory(curr_batch_shape);
+
                 // Cut batches either on memory consumption or on the absolute count.
                 if (batch_size <= 0) {
                     // Auto batch size computation.
                     const std::vector<int64_t> next_batch_shape =
                             secondary::compute_collated_padded_shape(buffer.samples, samples[i]);
 
-                    const double estimated_memory = model->estimate_batch_memory(next_batch_shape);
+                    const double estimated_memory_next =
+                            model->estimate_batch_memory(next_batch_shape);
 
-                    spdlog::trace("Using auto-estimated batch-size.");
-                    if (!std::empty(buffer.samples) && (estimated_memory >= max_available_mem)) {
-                        spdlog::trace("Estimating next batch memory:");
-                        spdlog::trace("    - estimated_memory = {} GB", estimated_memory);
+                    if (!std::empty(buffer.samples) &&
+                        (estimated_memory_next >= max_available_mem)) {
+                        spdlog::trace("[producer] Estimating batch memory for auto batch size:");
                         spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
+                        spdlog::trace("    - estimated_memory_next = {} GB", estimated_memory_next);
                         spdlog::trace(
                                 "    - next_batch_shape = {}",
                                 utils::print_container_as_string(next_batch_shape, ",", true));
+                        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
+                        spdlog::trace(
+                                "    - curr_batch_shape = {}",
+                                utils::print_container_as_string(curr_batch_shape, ",", true));
 
                         spdlog::trace(
                                 "[producer] Pushing a batch of data to infer_data queue (1a). "
@@ -1007,13 +1019,20 @@ void sample_producer(PolisherResources& resources,
                     }
 
                 } else {
-                    spdlog::trace("Using fixed batch-size of {}.", batch_size);
                     if (dorado::ssize(buffer.samples) >= batch_size) {
                         // Fixed batch size.
+                        spdlog::trace("[producer] Estimating batch memory for fixed batch size:");
+                        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
+                        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
+                        spdlog::trace(
+                                "    - curr_batch_shape = {}",
+                                utils::print_container_as_string(curr_batch_shape, ",", true));
+
                         spdlog::trace(
                                 "[producer] Pushing a batch of data to infer_data queue (1b). "
                                 "buffer.samples.size() = {}",
                                 std::size(buffer.samples));
+
                         move_buffer_data_to_queue(buffer, infer_data, true);
                     }
                 }
@@ -1042,6 +1061,17 @@ void sample_producer(PolisherResources& resources,
     }
 
     if (!std::empty(buffer.samples)) {
+        const std::vector<int64_t> curr_batch_shape =
+                secondary::compute_collated_padded_shape(buffer.samples);
+        const double estimated_memory_curr =
+                std::empty(curr_batch_shape) ? 0.0 : model->estimate_batch_memory(curr_batch_shape);
+
+        spdlog::trace("[producer] Estimating batch memory for the final batch:");
+        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
+        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
+        spdlog::trace("    - curr_batch_shape = {}",
+                      utils::print_container_as_string(curr_batch_shape, ",", true));
+
         spdlog::trace(
                 "[producer] Pushing a batch of data to infer_data queue (2). "
                 "buffer.samples.size() = {} (final)",

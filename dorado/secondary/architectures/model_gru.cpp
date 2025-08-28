@@ -38,9 +38,14 @@ double ModelGRU::estimate_batch_memory(const std::vector<int64_t>& batch_tensor_
     const int64_t batch_size = batch_tensor_shape[0];
     const int64_t num_positions = batch_tensor_shape[1];
 
-    // IMPORTANT: The following equation was determined as part of the DOR-1293 effort.
-    return 1.0424 + (0.0003441 * batch_size) + (0.0000019 * num_positions) +
-           (-0.0000026 * std::pow(batch_size, 2)) + (0.0000120 * batch_size * num_positions);
+    // Limit the maximum batch size to the bounds used for model estimation.
+    constexpr int64_t MAX_BATCH_SIZE = 200;
+    if (batch_size > MAX_BATCH_SIZE) {
+        return MEMORY_ESTIMATE_UPPER_CAP;
+    }
+
+    // IMPORTANT: The following equation was determined as part of the DOR-1350 effort.
+    return (1.050216 * 1) + (0.000007 * batch_size) + (0.000012 * batch_size * num_positions);
 }
 
 }  // namespace dorado::secondary

@@ -164,7 +164,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
         parser.add_group("Advanced options");
         parser.add_argument("-b", "--batchsize")
                 .help("Batch size for inference. Default: 0 for auto batch size detection.")
-                .default_value(10)
+                .default_value(0)
                 .scan<'i', int>();
         parser.add_argument("--ref-batchsize")
                 .help("Approximate batch size for processing input reference sequences.")
@@ -366,8 +366,8 @@ void validate_options(const Options& opt) {
         spdlog::error("Input file {} does not exist or is empty.", opt.in_ref_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
-    if (opt.batch_size <= 0) {
-        spdlog::error("Batch size should be > 0. Given: {}.", opt.batch_size);
+    if (opt.batch_size < 0) {
+        spdlog::error("Batch size should be >= 0. Given: {}.", opt.batch_size);
         std::exit(EXIT_FAILURE);
     }
     if (opt.ref_batch_size <= 0) {
@@ -747,7 +747,7 @@ void run_variant_calling(const Options& opt,
         }
         return ret;
     }();
-    constexpr double AVAILABLE_MEMORY_FACTOR = 0.95;
+    constexpr double AVAILABLE_MEMORY_FACTOR = 0.85;
     const double usable_mem = (min_avail_mem * AVAILABLE_MEMORY_FACTOR) / opt.infer_threads;
 
     if (opt.batch_size > 0) {

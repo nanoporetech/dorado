@@ -248,15 +248,18 @@ double ModelLatentSpaceLSTM::estimate_batch_memory(
     const int64_t num_positions = batch_tensor_shape[1];
     const int64_t coverage = batch_tensor_shape[2];
 
-    // IMPORTANT: The following equation was determined as part of the DOR-1293 effort.
-    return 4.8018 + (-0.0895660 * batch_size) + (-0.1243827 * coverage) +
-           (0.0006471 * std::pow(batch_size, 2)) + (0.0000128 * batch_size * num_positions) +
-           (0.0020464 * batch_size * coverage) + (0.0000062 * num_positions * coverage) +
-           (0.0019146 * std::pow(coverage, 2)) + (-0.0000001 * std::pow(batch_size, 3)) +
-           (-0.0000001 * std::pow(batch_size, 2) * num_positions) +
-           (-0.0000113 * std::pow(batch_size, 2) * coverage) +
-           (0.0000018 * batch_size * num_positions * coverage) +
-           (-0.0000016 * batch_size * std::pow(coverage, 2)) + (-0.0000119 * std::pow(coverage, 3));
+    // Limit the maximum batch size and maximum coverage to the bounds used for model estimation.
+    constexpr int64_t MAX_BATCH_SIZE = 100;
+    constexpr int64_t MAX_COVERAGE = 100;
+    if ((batch_size > MAX_BATCH_SIZE) || (coverage > MAX_COVERAGE)) {
+        return MEMORY_ESTIMATE_UPPER_CAP;
+    }
+
+    // IMPORTANT: The following equation was determined as part of the DOR-1350 effort.
+    return (3.451962 * 1) + (0.007107 * batch_size) + (0.000037 * num_positions) +
+           (0.000060 * coverage) + (0.000002 * batch_size * num_positions) +
+           (0.000002 * batch_size * num_positions * coverage) +
+           (0.000003 * batch_size * std::pow(coverage, 2));
 }
 
 }  // namespace dorado::secondary
