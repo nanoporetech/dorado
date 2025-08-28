@@ -1,10 +1,13 @@
 #include "hts_utils/header_utils.h"
 
+#include "utils/string_utils.h"
+
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <ostream>
 #include <sstream>
+#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -32,9 +35,9 @@ HeaderLineType parse_header_line_type(const std::string& header_line) {
 }
 
 std::vector<utils::HeaderLineData> parse_header(
-        sam_hdr_t* header,
+        sam_hdr_t& header,
         const std::set<HeaderLineType>& selected_line_types) {
-    const char* hdr_text = sam_hdr_str(header);
+    const char* hdr_text = sam_hdr_str(&header);
     if (!hdr_text) {
         spdlog::warn("Could not retrieve BAM header text!");
         return {};
@@ -60,19 +63,14 @@ std::vector<utils::HeaderLineData> parse_header(
         }
 
         // Split line by tabs.
-        std::vector<std::string> fields;
-        std::string field;
-        std::istringstream line_stream(line);
-        while (std::getline(line_stream, field, '\t')) {
-            fields.emplace_back(std::move(field));
-        }
+        const std::vector<std::string_view> fields = utils::split_view(line, '\t');
 
         // Malformed lines.
         if (std::empty(fields)) {
             continue;
         }
 
-        const auto header_type = parse_header_line_type(fields.front());
+        const HeaderLineType header_type = parse_header_line_type(std::string{fields.front()});
         if (!selected_line_types.empty() && !selected_line_types.contains(header_type)) {
             continue;
         }
@@ -82,8 +80,8 @@ std::vector<utils::HeaderLineData> parse_header(
         for (size_t i = 1; i < std::size(fields); ++i) {
             const auto pos = fields[i].find(':');
             if (pos != std::string::npos) {
-                std::string key = fields[i].substr(0, pos);
-                std::string value = fields[i].substr(pos + 1);
+                std::string key{fields[i].substr(0, pos)};
+                std::string value{fields[i].substr(pos + 1)};
                 key_value_pairs.emplace_back(std::move(key), std::move(value));
             } else {
                 key_value_pairs.emplace_back(fields[i], std::string());

@@ -19,7 +19,7 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
     BamFile bam(in_aln_bam_fn);
 
     const std::vector<utils::HeaderLineData> header =
-            utils::parse_header(bam.hdr(), {utils::HeaderLineType::PG, utils::HeaderLineType::RG});
+            utils::parse_header(*bam.hdr(), {utils::HeaderLineType::PG, utils::HeaderLineType::RG});
 
     // Get info from headers: program and the read groups.
     for (const auto& line : header) {
