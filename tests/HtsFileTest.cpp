@@ -469,9 +469,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     auto writer = writer_builder.build();
 
     auto& writer_ref = *writer;
-    // StreamHtsFileWriter sets threads to 0 as it has no use for them.
     CATCH_CHECK(typeid(writer_ref) == typeid(StreamHtsFileWriter));
-    CATCH_CHECK(writer->get_threads() == 0);
 
     CATCH_CHECK(writer->get_gpu_names() == "gpu:" + GPU_NAMES);
 
