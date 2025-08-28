@@ -19,7 +19,7 @@ batch=${3:-384}
 
 # Test ion a tempdir to shorted filepaths which can cause issues on windows
 TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t tmp)"
-# trap 'rm -rf "$TMPDIR"' EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
 output_dir_name=test_output_nested_structure_${RANDOM}
 output_dir=${TMPDIR}/${output_dir_name}

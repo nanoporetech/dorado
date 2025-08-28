@@ -1,12 +1,10 @@
 #include "read_pipeline/nodes/WriterNode.h"
 
-#include "hts_utils/HeaderMapper.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/interface.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/stats.h"
 
-#include <memory>
 #include <utility>
 #include <variant>
 

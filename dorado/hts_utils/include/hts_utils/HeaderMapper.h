@@ -4,13 +4,14 @@
 #include "hts_utils/header_utils.h"
 #include "hts_utils/hts_types.h"
 
-#include <htslib/sam.h>
-
 #include <filesystem>
 #include <functional>
 #include <memory>
 #include <unordered_map>
 #include <vector>
+
+struct sam_hdr_t;
+struct bam1_t;
 
 namespace dorado::utils {
 
