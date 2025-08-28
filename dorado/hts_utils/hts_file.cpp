@@ -96,6 +96,9 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool
         throw std::runtime_error("Unknown output mode selected: " +
                                  std::to_string(static_cast<int>(m_mode)));
     }
+    if (m_finalise_is_noop && !m_file) {
+        throw std::runtime_error("Could not open file: " + m_filename);
+    }
 
     if (m_threads > 0) {
         initialise_threads();
@@ -105,9 +108,6 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool
 void HtsFile::initialise_threads() {
     if (!m_finalise_is_noop) {
         return;
-    }
-    if (!m_file) {
-        throw std::runtime_error("Could not open file: " + m_filename);
     }
 
     if (m_file->format.compression == bgzf) {
