@@ -152,6 +152,9 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     auto tempfilename = m_filename + "." + std::to_string(file_index) + ".tmp";
     m_temp_files.push_back(tempfilename);
     m_file.reset(hts_open(tempfilename.c_str(), "wb"));
+    if (!m_file) {
+        throw std::runtime_error("Could not open file: " + tempfilename);
+    }
     if (hts_set_threads(m_file.get(), m_threads) < 0) {
         throw std::runtime_error("Could not enable multi threading for file writing");
     }
