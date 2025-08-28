@@ -209,7 +209,10 @@ bool HtsReader::has_tag(const char* tagname) {
     return static_cast<bool>(tag);
 }
 
-std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
+std::size_t HtsReader::read(Pipeline& pipeline,
+                            std::size_t max_reads,
+                            const bool strip_alignments,
+                            const std::unique_ptr<utils::HeaderMapper> header_mapper) {
     std::size_t num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
@@ -219,44 +222,26 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
             }
         }
 
-        auto hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get()))});
-        BamMessage bam_message{std::move(hts_data), m_client_info};
-        pipeline.push_message(std::move(bam_message));
-        ++num_reads;
-        if (max_reads > 0 && num_reads >= max_reads) {
-            break;
-        }
-        if (num_reads % 50000 == 0) {
-            spdlog::debug("Processed {} reads", num_reads);
-        }
-    }
-    spdlog::debug("Total reads processed: {}", num_reads);
-    return num_reads;
-}
+        std::unique_ptr<HtsData> hts_data;
+        if (header_mapper == nullptr) {
+            hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get()))});
+        } else {
+            // Get read attributes by read group ID
+            const auto& read_attrs = header_mapper->get_read_attributes(record.get());
 
-std::size_t HtsReader::demux_read(Pipeline& pipeline,
-                                  std::size_t max_reads,
-                                  const bool strip_aligments,
-                                  const utils::HeaderMapper& header_mapper) {
-    std::size_t num_reads = 0;
-    while (this->read()) {
-        if (m_read_list) {
-            std::string read_id = bam_get_qname(record.get());
-            if (m_read_list->find(read_id) == m_read_list->end()) {
-                continue;
+            if (!strip_alignments) {
+                const auto& sq_mapping =
+                        header_mapper->get_merged_header(read_attrs).get_sq_mapping(m_filename);
+                adjust_tid(sq_mapping, record);
             }
-        }
-        const auto& read_attrs = header_mapper.get_read_attributes(record.get());
-        const auto& sq_mapping =
-                header_mapper.get_merged_header(read_attrs).get_sq_mapping(m_filename);
-        if (!strip_aligments) {
-            adjust_tid(sq_mapping, record);
+
+            hts_data =
+                    std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get())), read_attrs});
         }
 
-        auto hts_data =
-                std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get())), read_attrs});
         BamMessage bam_message{std::move(hts_data), m_client_info};
         pipeline.push_message(std::move(bam_message));
+
         ++num_reads;
         if (max_reads > 0 && num_reads >= max_reads) {
             break;

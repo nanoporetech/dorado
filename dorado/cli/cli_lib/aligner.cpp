@@ -352,7 +352,7 @@ int aligner(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         spdlog::info("> starting alignment");
-        auto num_reads_in_file = reader.read(*pipeline, max_reads);
+        auto num_reads_in_file = reader.read(*pipeline, max_reads, false, nullptr);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.

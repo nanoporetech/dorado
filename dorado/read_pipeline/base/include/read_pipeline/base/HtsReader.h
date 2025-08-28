@@ -34,11 +34,10 @@ public:
 
     // If reading directly into a pipeline need to set the client info on the messages
     void set_client_info(std::shared_ptr<ClientInfo> client_info);
-    std::size_t read(Pipeline& pipeline, std::size_t max_reads);
-    std::size_t demux_read(Pipeline& pipeline,
-                           std::size_t max_reads,
-                           const bool strip_aligments,
-                           const utils::HeaderMapper& header_mapper);
+    std::size_t read(Pipeline& pipeline,
+                     std::size_t max_reads,
+                     const bool strip_alignments,
+                     const std::unique_ptr<utils::HeaderMapper> header_mapper);
 
     template <typename T>
     T get_tag(const char* tagname);
