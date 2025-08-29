@@ -248,9 +248,8 @@ int demuxer(int argc, char* argv[]) {
                     tracker.set_description(description);
                 });
 
-        // TODO: Sort BAM
-        auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
-                emit_fastq, false, false, output_dir, demux_writer_threads, progress_callback,
+        auto hts_writer_builder = hts_writer::DemuxHtsFileWriterBuilder(
+                emit_fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
                 description_callback, "", sample_sheet);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();

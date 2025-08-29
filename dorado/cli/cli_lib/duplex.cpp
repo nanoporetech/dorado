@@ -524,7 +524,7 @@ int duplex(int argc, char* argv[]) {
                     });
 
             constexpr int WRITER_THREADS = 4;
-            auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+            auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                     cli::get_emit_fastq(parser), cli::get_emit_sam(parser), !ref.empty(),
                     cli::get_output_dir(parser), WRITER_THREADS, progress_callback,
                     description_callback, gpu_names, nullptr);

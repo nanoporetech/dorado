@@ -494,7 +494,7 @@ void setup(const std::vector<std::string>& args,
                 utils::DescriptionCallback([&tracker](const std::string& description) {
                     tracker.set_description(description);
                 });
-        auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+        auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
                 progress_callback, description_callback, gpu_names, sample_sheet);
 
