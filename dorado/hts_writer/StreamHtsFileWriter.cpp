@@ -10,9 +10,7 @@
 namespace dorado {
 namespace hts_writer {
 
-StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig& cfg)
-        : HtsFileWriter(
-                  {cfg.mode, 0, cfg.progress_callback, cfg.description_callback, cfg.gpu_names}) {}
+StreamHtsFileWriter::StreamHtsFileWriter(const HtsFileWriterConfig& cfg) : HtsFileWriter(cfg) {}
 
 void StreamHtsFileWriter::shutdown() {
     if (std::exchange(m_has_shutdown, true)) {
@@ -40,7 +38,7 @@ void StreamHtsFileWriter::handle(const HtsData& data) {
         if (m_header == nullptr) {
             throw std::logic_error("HtsFileWriter header not set before writing records.");
         }
-        m_hts_file = std::make_unique<utils::HtsFile>(m_path, m_mode, 0, false);
+        m_hts_file = std::make_unique<utils::HtsFile>(m_path, m_mode, m_threads, false);
         m_hts_file->set_header(m_header.get());
     }
     m_hts_file->write(data.bam_ptr.get());

@@ -1,9 +1,12 @@
 #include "utils/AsyncQueue.h"
 
+#include "utils/concurrency/synchronisation.h"
+#include "utils/jthread.h"
+
+#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-
-#define TEST_GROUP "AsyncQueue "
+#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <numeric>
@@ -11,6 +14,8 @@
 
 using dorado::utils::AsyncQueue;
 using dorado::utils::AsyncQueueStatus;
+
+#define TEST_GROUP "AsyncQueue "
 
 CATCH_TEST_CASE(TEST_GROUP ": InputsMatchOutputs") {
     const int n = 10;
@@ -99,7 +104,7 @@ CATCH_TEST_CASE(TEST_GROUP ": PopFromOtherThread") {
     std::atomic_bool thread_started{false};
     AsyncQueueStatus pop_status;
 
-    auto popping_thread = std::thread([&]() {
+    auto popping_thread = dorado::utils::jthread([&]() {
         thread_started.store(true);
         int val = -1;
         // catch2 isn't thread safe so we have to check this on the main thread
@@ -126,7 +131,7 @@ CATCH_TEST_CASE(TEST_GROUP ": TerminateFromOtherThread") {
     std::atomic_bool thread_started{false};
     AsyncQueueStatus pop_status;
 
-    auto popping_thread = std::thread([&]() {
+    auto popping_thread = dorado::utils::jthread([&]() {
         thread_started.store(true);
         int val = -1;
         // catch2 isn't thread safe so we have to check this on the main thread
@@ -182,3 +187,69 @@ CATCH_TEST_CASE(TEST_GROUP ": name") {
     queue.set_name("test");
     CATCH_CHECK(queue.get_name() == "test");
 }
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+CATCH_TEST_CASE(TEST_GROUP ": benchmarks") {
+    const int run_for_ms = 2'500;
+
+    const bool unbounded = GENERATE(true, false);
+    const int num_producers = GENERATE(1, 2, 4);
+    const int num_consumers = GENERATE(1, 2, 4);
+
+    using Item = std::unique_ptr<int>;
+    AsyncQueue<Item> queue(unbounded ? 1'000'000 : 10);
+    dorado::utils::concurrency::Latch latch(num_producers + num_consumers);
+    std::vector<std::size_t> processed_counts(num_consumers);
+
+    // Start the threads.
+    std::vector<dorado::utils::jthread> threads;
+    threads.reserve(num_producers + num_consumers);
+    for (int i = 0; i < num_producers; i++) {
+        threads.emplace_back([&latch, &queue] {
+            latch.count_down();
+            latch.wait();
+
+            while (true) {
+                auto res = queue.try_push(Item{});
+                if (res == AsyncQueueStatus::Terminate) {
+                    break;
+                }
+            }
+        });
+    }
+    for (int i = 0; i < num_consumers; i++) {
+        auto &counter = processed_counts.at(i);
+        threads.emplace_back([&latch, &queue, &counter] {
+            latch.count_down();
+            latch.wait();
+
+            std::size_t processed = 0;
+            while (true) {
+                Item item;
+                auto res = queue.try_pop(item);
+                if (res == AsyncQueueStatus::Terminate) {
+                    break;
+                }
+                processed++;
+            }
+
+            counter = processed;
+        });
+    }
+
+    // Wait for the threads to start, then let them run for a bit.
+    latch.wait();
+    std::this_thread::sleep_for(std::chrono::milliseconds(run_for_ms));
+    queue.terminate(dorado::utils::AsyncQueueTerminateFast::Yes);
+    threads.clear();
+
+    // Collect timings.
+    const double total_processed =
+            std::accumulate(processed_counts.begin(), processed_counts.end(), std::size_t{0});
+    const double speed = total_processed * 1000.0 / run_for_ms;
+    spdlog::info(TEST_GROUP
+                 ": Speed for unbounded={}, producers={}, consumers={}: {:.2e} items in {}ms "
+                 "({:.2e}items/s)",
+                 unbounded, num_producers, num_consumers, total_processed, run_for_ms, speed);
+}
+#endif

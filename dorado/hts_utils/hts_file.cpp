@@ -58,7 +58,7 @@ struct HtsFile::ProgressUpdater {
 
 HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam)
         : m_filename(filename),
-          m_threads(int(threads)),
+          m_threads(threads),
           m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
           m_mode(mode) {
@@ -96,6 +96,9 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool
         throw std::runtime_error("Unknown output mode selected: " +
                                  std::to_string(static_cast<int>(m_mode)));
     }
+    if (m_finalise_is_noop && !m_file) {
+        throw std::runtime_error("Could not open file: " + m_filename);
+    }
 
     if (m_threads > 0) {
         initialise_threads();
@@ -106,29 +109,10 @@ void HtsFile::initialise_threads() {
     if (!m_finalise_is_noop) {
         return;
     }
-    if (!m_file) {
-        throw std::runtime_error("Could not open file: " + m_filename);
-    }
 
-    if (m_file->format.compression == bgzf) {
-        auto res = bgzf_mt(m_file->fp.bgzf, m_threads, 128);
-        if (res < 0) {
-            throw std::runtime_error("Could not enable multi threading for BAM generation.");
-        }
+    if (hts_set_threads(m_file.get(), m_threads) < 0) {
+        throw std::runtime_error("Could not enable multi threading for file writing");
     }
-}
-
-void HtsFile::set_num_threads(std::size_t threads) {
-    if (m_threads > 0) {
-        throw std::runtime_error("HtsFile num threads cannot be changed if already initialised");
-    }
-
-    if (threads < 1) {
-        throw std::runtime_error("HtsFile num threads must be greater than 0");
-    }
-
-    m_threads = static_cast<int>(threads);
-    initialise_threads();
 }
 
 HtsFile::~HtsFile() {
@@ -168,11 +152,11 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     auto tempfilename = m_filename + "." + std::to_string(file_index) + ".tmp";
     m_temp_files.push_back(tempfilename);
     m_file.reset(hts_open(tempfilename.c_str(), "wb"));
-    if (m_file->format.compression == bgzf) {
-        auto res = bgzf_mt(m_file->fp.bgzf, m_threads, 128);
-        if (res < 0) {
-            throw std::runtime_error("Could not enable multi threading for BAM generation.");
-        }
+    if (!m_file) {
+        throw std::runtime_error("Could not open file: " + tempfilename);
+    }
+    if (hts_set_threads(m_file.get(), m_threads) < 0) {
+        throw std::runtime_error("Could not enable multi threading for file writing");
     }
     if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
         if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {

@@ -42,7 +42,6 @@ public:
     OutputMode get_mode() const { return m_mode; }
     virtual bool finalise_is_noop() const = 0;
 
-    int get_threads() const { return m_threads; }
     const std::string& get_gpu_names() const { return m_gpu_names; }
 
     void set_progress(size_t progress) const { m_progress_callback(progress); }
