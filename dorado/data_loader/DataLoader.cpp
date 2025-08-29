@@ -92,6 +92,25 @@ void issue_pod5_error(std::string_view err, std::string_view filename, std::stri
     spdlog::error("POD5 {} - '{}' @ '{}' [{}].", err, pod5_get_error_string(), filename, read_id);
 }
 
+bool should_process_pod5_row(const ReadBatchRowInfo_t& read_data,
+                             const std::string& filename,
+                             size_t batch_index,
+                             size_t row,
+                             const std::optional<std::unordered_set<std::string>>& allowed_read_ids,
+                             const std::unordered_set<std::string>& ignored_read_ids) {
+    char read_id_tmp[POD5_READ_ID_LEN]{};
+    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
+        issue_pod5_error("Failed to format read id", filename, batch_index, row);
+        return false;
+    }
+
+    std::string read_id_str(read_id_tmp);
+    bool read_in_ignore_list = ignored_read_ids.find(read_id_str) != ignored_read_ids.end();
+    bool read_in_read_list =
+            !allowed_read_ids || (allowed_read_ids->find(read_id_str) != allowed_read_ids->end());
+    return read_in_read_list && !read_in_ignore_list;
+}
+
 SimplexReadPtr process_pod5_thread_fn(
         size_t row,
         size_t batch_index,
@@ -99,7 +118,9 @@ SimplexReadPtr process_pod5_thread_fn(
         const Pod5FileReader* file,
         const std::string& path,
         const std::unordered_map<int, std::vector<DataLoader::ReadSortInfo>>& reads_by_channel,
-        const std::unordered_map<std::string, size_t>& read_id_to_index) {
+        const std::unordered_map<std::string, size_t>& read_id_to_index,
+        const std::optional<std::unordered_set<std::string>>& allowed_read_ids,
+        const std::unordered_set<std::string>& ignored_read_ids) {
     uint16_t read_table_version = 0;
 
     const std::string filename = std::filesystem::path(path).filename().string();
@@ -108,6 +129,12 @@ SimplexReadPtr process_pod5_thread_fn(
     if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
                                           &read_table_version) != POD5_OK) {
         issue_pod5_error("Failed to get read", filename, batch_index, row);
+        return nullptr;
+    }
+
+    // Reading ReadBatchRowInfo_t is expensive, so we do the filtering here in the worker thread.
+    if (!should_process_pod5_row(read_data, filename, batch_index, row, allowed_read_ids,
+                                 ignored_read_ids)) {
         return nullptr;
     }
 
@@ -213,36 +240,6 @@ SimplexReadPtr process_pod5_thread_fn(
     }
 
     return new_read;
-}
-
-bool can_process_pod5_row(const Pod5ReadRecordBatch_t* batch,
-                          const std::string& filename,
-                          size_t batch_index,
-                          size_t row,
-                          const std::optional<std::unordered_set<std::string>>& allowed_read_ids,
-                          const std::unordered_set<std::string>& ignored_read_ids) {
-    uint16_t read_table_version = 0;
-    ReadBatchRowInfo_t read_data{};
-    if (pod5_get_read_batch_row_info_data(batch, row, READ_BATCH_ROW_INFO_VERSION, &read_data,
-                                          &read_table_version) != POD5_OK) {
-        issue_pod5_error("Failed to get read", filename, batch_index, row);
-        return false;
-    }
-
-    char read_id_tmp[POD5_READ_ID_LEN]{};
-    if (pod5_format_read_id(read_data.read_id, read_id_tmp) != POD5_OK) {
-        issue_pod5_error("Failed to format read id", filename, batch_index, row);
-        return false;
-    }
-
-    std::string read_id_str(read_id_tmp);
-    bool read_in_ignore_list = ignored_read_ids.find(read_id_str) != ignored_read_ids.end();
-    bool read_in_read_list =
-            !allowed_read_ids || (allowed_read_ids->find(read_id_str) != allowed_read_ids->end());
-    if (!read_in_ignore_list && read_in_read_list) {
-        return true;
-    }
-    return false;
 }
 
 }  // namespace
@@ -483,23 +480,23 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             }
         });
 
+        const std::size_t num_rows = traversal_batch_counts[batch_index];
         std::vector<std::future<SimplexReadPtr>> futures;
-        for (std::size_t row_idx = 0; row_idx < traversal_batch_counts[batch_index]; row_idx++) {
+        futures.reserve(num_rows);
+        for (std::size_t row_idx = 0; row_idx < num_rows; row_idx++) {
             uint32_t row = traversal_batch_rows[row_idx + row_offset];
-
-            if (can_process_pod5_row(batch, path, batch_index, row, m_allowed_read_ids,
-                                     m_ignored_read_ids)) {
-                futures.push_back(m_thread_pool.push([row, batch_index, batch, file, &path, this] {
-                    return process_pod5_thread_fn(row, batch_index, batch, file, path,
-                                                  m_reads_by_channel, m_read_id_to_index);
-                }));
-            }
+            futures.push_back(m_thread_pool.push([row, batch_index, batch, file, &path, this] {
+                return process_pod5_thread_fn(row, batch_index, batch, file, path,
+                                              m_reads_by_channel, m_read_id_to_index,
+                                              m_allowed_read_ids, m_ignored_read_ids);
+            }));
         }
 
         for (auto& v : futures) {
             auto read = v.get();
             if (!read) {
-                // POD5 read errors are issued in the loader processes
+                // This was either a POD5 error, in which case the worker logged
+                // an error, or a filtered read.
                 continue;
             }
             initialise_read(read->read_common);
@@ -555,22 +552,20 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
 
         std::vector<std::future<SimplexReadPtr>> futures;
 
+        futures.reserve(batch_row_count);
         for (std::size_t row = 0; row < batch_row_count; ++row) {
-            // TODO - check the read ID here, for each one, only send the row if it is in the list of ones we care about
-
-            if (can_process_pod5_row(batch, path, batch_index, row, m_allowed_read_ids,
-                                     m_ignored_read_ids)) {
-                futures.push_back(m_thread_pool.push([row, batch_index, batch, file, &path, this] {
-                    return process_pod5_thread_fn(row, batch_index, batch, file, path,
-                                                  m_reads_by_channel, m_read_id_to_index);
-                }));
-            }
+            futures.push_back(m_thread_pool.push([row, batch_index, batch, file, &path, this] {
+                return process_pod5_thread_fn(row, batch_index, batch, file, path,
+                                              m_reads_by_channel, m_read_id_to_index,
+                                              m_allowed_read_ids, m_ignored_read_ids);
+            }));
         }
 
         for (auto& v : futures) {
             auto read = v.get();
             if (!read) {
-                // POD5 read errors are issued in the loader processes
+                // This was either a POD5 error, in which case the worker logged
+                // an error, or a filtered read.
                 continue;
             }
             initialise_read(read->read_common);
