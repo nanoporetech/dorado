@@ -82,6 +82,66 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 }
 #endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 
+#if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
+#if ENABLE_AVX2_IMPL
+__attribute__((target("default")))
+#endif
+void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
+    tensor = tensor.to(at::ScalarType::Float).sub_(shift).div_(scale).to(at::ScalarType::Half);
+}
+#endif  // ENABLE_NEON_IMPL
+
+#if ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
+#if ENABLE_AVX2_IMPL
+// We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
+// feature from AVX2.  All relevant CPUs have it.
+__attribute__((target("avx2,f16c")))
+#endif
+void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
+#if ENABLE_AVX2_IMPL
+    // Unrolling a bit seems to give best performance (tested on a prom).
+    constexpr std::size_t kUnrollFactor = 4;
+#else
+    // No unrolling seems to perform best on NEON.
+    constexpr std::size_t kUnrollFactor = 1;
+#endif
+
+    constexpr std::size_t elem_size = 2;
+    constexpr std::size_t elems_per_block = simd::kFloatsPerRegister * kUnrollFactor;
+
+    std::int16_t* data = static_cast<std::int16_t*>(tensor.mutable_data_ptr());
+    const std::size_t size = tensor.numel();
+
+    // Process in blocks.
+    const simd::FloatRegister shift_f32 = simd_load1_f32(&shift);
+    const simd::FloatRegister scale_f32 = simd_load1_f32(&scale);
+    for (std::size_t block = 0; block < size / elems_per_block; block++) {
+        for (std::size_t unroll_i = 0; unroll_i < kUnrollFactor; unroll_i++) {
+            const simd::Int16Register data_i16 = simd_load_i16(data);
+            const simd::FloatRegister data_f32 = simd_convert_i16_f32(data_i16);
+            const simd::FloatRegister scaled_f32 = (data_f32 - shift_f32) / scale_f32;
+            const simd::HalfRegister scaled_f16 = simd_convert_f32_f16(scaled_f32);
+            simd_store_f16(data, scaled_f16);
+            data += simd::kFloatsPerRegister;
+        }
+    }
+
+    // Do the tail.
+    std::int16_t block_in[elems_per_block];
+    c10::Half block_out[elems_per_block];
+    const std::size_t remaining = size % elems_per_block;
+    std::memcpy(block_in, data, remaining * elem_size);
+    for (std::size_t i = 0; i < remaining; i++) {
+        const float val = static_cast<float>(block_in[i]);
+        block_out[i] = (val - shift) / scale;
+    }
+    std::memcpy(data, block_out, remaining * elem_size);
+
+    // The tensor should now be viewed as halfs.
+    tensor = tensor.view(at::ScalarType::Half);
+}
+#endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
+
 }  // namespace
 
 void serialise_tensor(const at::Tensor& t, const std::string& path) {
@@ -194,42 +254,8 @@ void convert_f32_to_f16(c10::Half* const dest, const float* const src, std::size
 void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& tensor, float shift, float scale) {
     assert(tensor.dtype() == at::ScalarType::Short);
     assert(tensor.is_contiguous());
-
-    constexpr std::size_t elem_size = 2;
-    assert(tensor.element_size() == elem_size);
-
-    // For now relying on autovectorisation gives a big performance boost.
-    // TODO: proper SIMD
-    constexpr std::size_t block_size = 16;
-    std::int16_t block_i16[block_size];
-    c10::Half block_f16[block_size];
-
-    auto* data = static_cast<std::int16_t*>(tensor.mutable_data_ptr());
-    const std::size_t size = tensor.numel();
-
-    // Process in blocks.
-    for (std::size_t block = 0; block < size / block_size; block++, data += block_size) {
-        std::memcpy(block_i16, data, block_size * elem_size);
-        for (std::size_t i = 0; i < block_size; i++) {
-            float f = block_i16[i];
-            f = (f - shift) / scale;
-            block_f16[i] = f;
-        }
-        std::memcpy(data, block_f16, block_size * elem_size);
-    }
-
-    // And do the tail.
-    const std::size_t remaining = size % block_size;
-    std::memcpy(block_i16, data, remaining * elem_size);
-    for (std::size_t i = 0; i < remaining; i++) {
-        float f = block_i16[i];
-        f = (f - shift) / scale;
-        block_f16[i] = f;
-    }
-    std::memcpy(data, block_f16, remaining * elem_size);
-
-    // The tensor should now be viewed as halfs.
-    tensor = tensor.view(at::ScalarType::Half);
+    assert(tensor.element_size() == 2);
+    shift_scale_tensor_i16_to_f16_inplace_impl(tensor, shift, scale);
 }
 
 void copy_tensor_elems(at::Tensor& dest_tensor,
