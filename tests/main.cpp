@@ -24,6 +24,9 @@ int main(int argc, char* argv[]) {
         nvtx3::scoped_range loop{__func__};
     }
 
+    // Only inference during tests or benchmarks.
+    at::InferenceMode inference_mode_guard;
+
     int result = Catch::Session().run(argc, argv);
 
     return result;
