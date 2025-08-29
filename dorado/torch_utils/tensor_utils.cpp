@@ -61,9 +61,9 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
         for (size_t unroll_i = 0; unroll_i < kUnrollFactor; ++unroll_i) {
-            const simd::FloatRegister elems_f32 = simd_load_32(src_ptr);
-            const simd::HalfRegister elems_f16 = simd_convert_32_16(elems_f32);
-            simd_store_16(dest_ptr, elems_f16);
+            const simd::FloatRegister elems_f32 = simd_load_f32(src_ptr);
+            const simd::HalfRegister elems_f16 = simd_convert_f32_f16(elems_f32);
+            simd_store_f16(dest_ptr, elems_f16);
             src_ptr += simd::kFloatsPerRegister;
             dest_ptr += simd::kFloatsPerRegister;
         }
@@ -73,9 +73,9 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     // TODO -- probably nicer to use masked loads/stores.
     const size_t remaining_count = count % kUnroll;
     for (size_t i = 0; i < remaining_count; ++i) {
-        const simd::FloatRegister elem_f32 = simd_load1_32(src_ptr);
-        const simd::HalfRegister elem_f16 = simd_convert_32_16(elem_f32);
-        simd_store1_16(dest_ptr, elem_f16);
+        const simd::FloatRegister elem_f32 = simd_load1_f32(src_ptr);
+        const simd::HalfRegister elem_f16 = simd_convert_f32_f16(elem_f32);
+        simd_store1_f16(dest_ptr, elem_f16);
         ++src_ptr;
         ++dest_ptr;
     }
