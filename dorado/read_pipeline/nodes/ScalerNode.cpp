@@ -189,10 +189,7 @@ void ScalerNode::input_thread_fn() {
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
-        read->read_common.raw_data = read->read_common.raw_data.to(at::kFloat)
-                                             .sub_(shift)
-                                             .div_(scale)
-                                             .to(at::ScalarType::Half);
+        utils::shift_scale_tensor_i16_to_f16_inplace(read->read_common.raw_data, shift, scale);
 
         // move the shift and scale into pA.
         read->read_common.scale = read->scaling * scale;

@@ -118,6 +118,51 @@ CATCH_TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
 #endif  // DORADO_ENABLE_BENCHMARK_TESTS
 }
 
+CATCH_TEST_CASE(CUT_TAG ": shift_scale_tensor_i16_to_f16", CUT_TAG) {
+    torch::manual_seed(42);
+    std::minstd_rand rng(42);
+    std::uniform_real_distribution<float> dist;
+    using Range = decltype(dist)::param_type;
+
+    for (int i = 0; i < 10; ++i) {
+        const int num_elems = rng() % 100;
+        const float shift = dist(rng, Range{-100, 100});
+        const float scale = dist(rng, Range{0.1f, 100});
+
+        const auto elems_i16 = torch::rand({num_elems}, torch::kFloat32).to(torch::kInt16);
+        const auto expected = ((elems_i16.to(torch::kFloat32) - shift) / scale).to(torch::kHalf);
+
+        auto mutable_elems = elems_i16.clone();
+        dorado::utils::shift_scale_tensor_i16_to_f16_inplace(mutable_elems, shift, scale);
+
+        CATCH_CHECK(mutable_elems.dtype() == torch::kHalf);
+
+        const float kRelTolerance = 0.0f;
+        const float kAbsTolerance = 0.0f;
+        CATCH_CHECK(torch::allclose(mutable_elems, expected, kRelTolerance, kAbsTolerance));
+    }
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+    {
+        const auto num_elems = GENERATE(1'000, 100'000, 10'000'000);
+        const auto elems_i16 = torch::rand({num_elems}, torch::kFloat32).to(torch::kInt16);
+        const float shift = 1.23f;
+        const float scale = 3.14f;
+
+        CATCH_BENCHMARK(fmt::format("torch shift scale {}", num_elems)) {
+            return ((elems_i16.to(torch::kFloat32) - shift) / scale).to(torch::kHalf);
+        };
+        CATCH_BENCHMARK(fmt::format("torch shift scale inplace {}", num_elems)) {
+            return elems_i16.to(torch::kFloat32).sub_(shift).div_(scale).to(torch::kHalf);
+        };
+        CATCH_BENCHMARK(fmt::format("our shift scale {}", num_elems)) {
+            auto mutable_elems = elems_i16.view(torch::kInt16);
+            dorado::utils::shift_scale_tensor_i16_to_f16_inplace(mutable_elems, shift, scale);
+        };
+    }
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
+}
+
 CATCH_TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
     torch::manual_seed(42);
     srand(42);

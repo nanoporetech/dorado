@@ -191,6 +191,47 @@ void convert_f32_to_f16(c10::Half* const dest, const float* const src, std::size
     return convert_f32_to_f16_impl(dest, src, count);
 }
 
+void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& tensor, float shift, float scale) {
+    assert(tensor.dtype() == at::ScalarType::Short);
+    assert(tensor.is_contiguous());
+
+    constexpr std::size_t elem_size = 2;
+    assert(tensor.element_size() == elem_size);
+
+    // For now relying on autovectorisation gives a big performance boost.
+    // TODO: proper SIMD
+    constexpr std::size_t block_size = 16;
+    std::int16_t block_i16[block_size];
+    c10::Half block_f16[block_size];
+
+    auto* data = static_cast<std::int16_t*>(tensor.mutable_data_ptr());
+    const std::size_t size = tensor.numel();
+
+    // Process in blocks.
+    for (std::size_t block = 0; block < size / block_size; block++, data += block_size) {
+        std::memcpy(block_i16, data, block_size * elem_size);
+        for (std::size_t i = 0; i < block_size; i++) {
+            float f = block_i16[i];
+            f = (f - shift) / scale;
+            block_f16[i] = f;
+        }
+        std::memcpy(data, block_f16, block_size * elem_size);
+    }
+
+    // And do the tail.
+    const std::size_t remaining = size % block_size;
+    std::memcpy(block_i16, data, remaining * elem_size);
+    for (std::size_t i = 0; i < remaining; i++) {
+        float f = block_i16[i];
+        f = (f - shift) / scale;
+        block_f16[i] = f;
+    }
+    std::memcpy(data, block_f16, remaining * elem_size);
+
+    // The tensor should now be viewed as halfs.
+    tensor = tensor.view(at::ScalarType::Half);
+}
+
 void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t dest_offset,
                        const at::Tensor& src_tensor,

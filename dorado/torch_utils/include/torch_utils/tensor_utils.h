@@ -33,6 +33,9 @@ at::Tensor quantile_counting(const at::Tensor& t, const at::Tensor& q);
 // the result pointed to by dest.
 void convert_f32_to_f16(c10::Half* dest, const float* src, std::size_t count);
 
+// Shift and scale the i16 tensor |t| in f32, then convert to f16, all in-place.
+void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& t, float shift, float scale);
+
 // Copies count elements from src_offset elements into src to
 // dest_elements into dst.  The tensors must be contiguous.
 void copy_tensor_elems(at::Tensor& dest_tensor,
