@@ -8,9 +8,9 @@
 #define ENABLE_AVX2_IMPL 0
 #endif
 
-#if defined(__APPLE__) && defined(__arm64__)
+#if defined(__arm64__) || defined(__aarch64__)
 #define ENABLE_NEON_IMPL 1
-#include "arm_neon.h"
+#include <arm_neon.h>
 #else
 #define ENABLE_NEON_IMPL 0
 #endif
