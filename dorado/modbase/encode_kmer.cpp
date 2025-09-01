@@ -68,7 +68,7 @@ inline std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& s
 }
 
 #if ENABLE_AVX2_IMPL
-__attribute__((target("avx2"))) void avx2_encode_kmer_len9(
+[[maybe_unused]] __attribute__((target("avx2"))) void avx2_encode_kmer_len9(
         std::byte* output_t_ptr,
         const std::vector<int>& seq,
         const std::vector<uint64_t>& seq_mappings,
@@ -155,7 +155,7 @@ __attribute__((target("avx2"))) void avx2_encode_kmer_len9(
 
 // For non-AVX we use the generic path that handles any kmer length.
 #if ENABLE_AVX2_IMPL
-__attribute__((target("default")))
+[[maybe_unused]] __attribute__((target("default")))
 #endif
 std::vector<int8_t>
 encode_kmer_context_len9(const std::vector<int>& seq,
@@ -221,7 +221,7 @@ inline std::vector<int8_t> encode_kmer_chunk_generic(const std::vector<int>& seq
 
 // For non-AVX we use the generic path that handles any kmer length.
 #if ENABLE_AVX2_IMPL
-__attribute__((target("default")))
+[[maybe_unused]] __attribute__((target("default")))
 #endif
 std::vector<int8_t>
 encode_kmer_chunk_len9(const std::vector<int>& seq,
@@ -236,7 +236,7 @@ encode_kmer_chunk_len9(const std::vector<int>& seq,
 }
 
 #if ENABLE_AVX2_IMPL
-__attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_chunk_len9(
+[[maybe_unused]] __attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_chunk_len9(
         const std::vector<int>& seq,
         const std::vector<uint64_t>& seq_mappings,
         const std::vector<bool>& base_skips,

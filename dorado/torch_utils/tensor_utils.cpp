@@ -24,7 +24,7 @@ namespace {
 
 #if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
 #if ENABLE_AVX2_IMPL
-__attribute__((target("default")))
+[[maybe_unused]] __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int64_t>(count)});
@@ -37,7 +37,7 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 #if ENABLE_AVX2_IMPL
 // We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
 // feature from AVX2.  All relevant CPUs have it.
-__attribute__((target("avx2,f16c")))
+[[maybe_unused]] __attribute__((target("avx2,f16c")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     if (!count) {
@@ -84,7 +84,7 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 
 #if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
 #if ENABLE_AVX2_IMPL
-__attribute__((target("default")))
+[[maybe_unused]] __attribute__((target("default")))
 #endif
 void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
     tensor = tensor.to(at::ScalarType::Float).sub_(shift).div_(scale).to(at::ScalarType::Half);
@@ -95,7 +95,7 @@ void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift,
 #if ENABLE_AVX2_IMPL
 // We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
 // feature from AVX2.  All relevant CPUs have it.
-__attribute__((target("avx2,f16c")))
+[[maybe_unused]] __attribute__((target("avx2,f16c")))
 #endif
 void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
 #if ENABLE_AVX2_IMPL
