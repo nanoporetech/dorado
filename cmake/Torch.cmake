@@ -138,8 +138,8 @@ if (APPLE)
     )
 endif()
 
-if (TORCH_VERSION VERSION_EQUAL 2.7.1 AND LINUX AND CMAKE_SYSTEM_PROCESSOR STREQUAL "x86_64")
-    # For some reason cublas is missing in non-static Linux builds (ie sanitized), so do that here.
+if (TORCH_VERSION VERSION_EQUAL 2.7.1 AND LINUX)
+    # For some reason cublas is missing in non-static Linux builds, so do that here.
     list(APPEND TORCH_LIBRARIES CUDA::cublas)
 endif()
 
