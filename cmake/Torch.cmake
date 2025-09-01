@@ -57,26 +57,31 @@ else()
     # Otherwise download a new one
     if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
         if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
-            set(TORCH_URL ${DORADO_CDN_URL}/torch-2.7.1-linux-aarch64-ont.zip)
-            set(TORCH_PATCH_SUFFIX -ont)
-            set(TORCH_HASH "7e741501d7c8b050d3de853c31f79e91f6eb7ba370694431029f3c7dbba69ad3")
-            set(TORCH_LIB_SUFFIX "/libtorch")
+            set(TORCH_URL ${DORADO_CDN_URL}/torch-2.7.1.0-ont-CUDA-12.6-linux-aarch64.zip)
+            set(TORCH_PATCH_SUFFIX .0-ont)
+            set(TORCH_HASH "26fbe0e0b876a68d5f0e78bfee84fb9ec6f57bc69bbcc72d7212edfadef91d31")
+            set(TORCH_LIB_SUFFIX "libtorch")
+        elseif(CUDAToolkit_VERSION VERSION_GREATER_EQUAL 12.8)
+            set(TORCH_URL ${DORADO_CDN_URL}/torch-2.7.1.0-ont-CUDA-12.8-linux-x64-cxx11-abi.zip)
+            set(TORCH_PATCH_SUFFIX .0-ont-cxx11-abi)
+            set(TORCH_HASH "4bfb80621057614cde1a28daeda70b50f84a2b4a5cca5d39340911612abdf96b")
+            set(TORCH_LIB_SUFFIX "libtorch")
         else()
-            set(TORCH_URL https://download.pytorch.org/libtorch/cu126/libtorch-cxx11-abi-shared-with-deps-${TORCH_VERSION}%2Bcu126.zip)
-            set(TORCH_PATCH_SUFFIX -cxx11-abi)
-            set(TORCH_HASH "15708d647d720eb703994f022488bca9ae29a07cf19e76e8b218d0a07be2a943")
-            set(TORCH_LIB_SUFFIX "/libtorch")
+            set(TORCH_URL ${DORADO_CDN_URL}/torch-2.7.1.0-ont-CUDA-11.8-linux-x64-cxx11-abi.zip)
+            set(TORCH_PATCH_SUFFIX .0-ont-cxx11-abi)
+            set(TORCH_HASH "6fbb32feb5311ffbb8d540118a099bae61ec9693b994d24687a9748b8d658e78")
+            set(TORCH_LIB_SUFFIX "libtorch")  
         endif()
-
     elseif(APPLE)
-        # Taken from https://pypi.org/project/torch/#files
-        set(TORCH_URL https://files.pythonhosted.org/packages/b3/17/41f681b87290a1d2f1394f943e470f8b0b3c2987b7df8dc078d8831fce5b/torch-${TORCH_VERSION}-cp39-none-macosx_11_0_arm64.whl)
-        set(TORCH_HASH "265f70de5fd45b864d924b64be1797f86e76c8e48a02c2a3a6fc7ec247d2226c")
-        set(TORCH_LIB_SUFFIX "/torch")
+        set(TORCH_URL ${DORADO_CDN_URL}/torch-2.7.1.0-ont-macos-m1.zip)
+        set(TORCH_PATCH_SUFFIX .0-ont)
+        set(TORCH_HASH "819251d91b47b22f368461dceeafbfc1ea0f651eb5f8719d74beab585d876d52")
+        set(TORCH_LIB_SUFFIX "libtorch")
     elseif(WIN32)
-        set(TORCH_URL https://download.pytorch.org/libtorch/cu126/libtorch-win-shared-with-deps-${TORCH_VERSION}%2Bcu126.zip)
-        set(TORCH_HASH "89ed2ae468555487ad153bf6f1b0bcce17814da314ba14996c4d63602e94c8c9")
-        set(TORCH_LIB_SUFFIX "/libtorch")
+        set(TORCH_URL ${DORADO_CDN_URL}/torch-2.7.1.0-ont-windows.zip)
+        set(TORCH_PATCH_SUFFIX .0-ont)
+        set(TORCH_HASH "e7fed9cc19e1e0c0c1a0b4448fe8c067d8230bbdcd3077a6dd764b2a26f83a06")
+        set(TORCH_LIB_SUFFIX "libtorch")
     endif()
 
     # Get libtorch (if we don't already have it)
@@ -90,22 +95,18 @@ list(PREPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
 
 find_package(Torch REQUIRED)
 
-if(APPLE)
-    set(TORCH_BUILD_VERSION ${TORCH_VERSION})
+if(EXISTS "${TORCH_LIB}/build-version")
+    file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
 else()
-    if(EXISTS "${TORCH_LIB}/build-version")
-        file(STRINGS "${TORCH_LIB}/build-version" TORCH_BUILD_VERSION)
-    else()
-        set(PYTORCH_BUILD_VERSION "import torch; print('%s+cu%s' % (torch.__version__, torch.version.cuda.replace('.', '')), end='')")
-        execute_process(
-            COMMAND python3 -c "${PYTORCH_BUILD_VERSION}"
-            OUTPUT_VARIABLE TORCH_BUILD_VERSION
-            WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
-            COMMAND_ERROR_IS_FATAL ANY
-        )
-    endif()
-    message(STATUS "TORCH_BUILD_VERSION: ${TORCH_BUILD_VERSION}")
+    set(PYTORCH_BUILD_VERSION "import torch; print('%s+cu%s' % (torch.__version__, torch.version.cuda.replace('.', '')), end='')")
+    execute_process(
+        COMMAND python3 -c "${PYTORCH_BUILD_VERSION}"
+        OUTPUT_VARIABLE TORCH_BUILD_VERSION
+        WORKING_DIRECTORY ${PROJECT_SOURCE_DIR}
+        COMMAND_ERROR_IS_FATAL ANY
+    )
 endif()
+message(STATUS "TORCH_BUILD_VERSION: ${TORCH_BUILD_VERSION}")
 
 if (NOT TORCH_BUILD_VERSION VERSION_EQUAL TORCH_VERSION)
   message(WARNING "expected ${TORCH_VERSION} but found ${TORCH_BUILD_VERSION}")
