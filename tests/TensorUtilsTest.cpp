@@ -129,7 +129,7 @@ CATCH_TEST_CASE(CUT_TAG ": shift_scale_tensor_i16_to_f16", CUT_TAG) {
         const float shift = dist(rng, Range{-100, 100});
         const float scale = dist(rng, Range{0.1f, 100});
 
-        const auto elems_i16 = torch::rand({num_elems}, torch::kFloat32).to(torch::kInt16);
+        const auto elems_i16 = (torch::rand({num_elems}, torch::kFloat32) * 1000).to(torch::kInt16);
         const auto expected = ((elems_i16.to(torch::kFloat32) - shift) / scale).to(torch::kHalf);
 
         auto mutable_elems = elems_i16.clone();
@@ -145,7 +145,7 @@ CATCH_TEST_CASE(CUT_TAG ": shift_scale_tensor_i16_to_f16", CUT_TAG) {
 #if DORADO_ENABLE_BENCHMARK_TESTS
     {
         const auto num_elems = GENERATE(1'000, 100'000, 10'000'000);
-        const auto elems_i16 = torch::rand({num_elems}, torch::kFloat32).to(torch::kInt16);
+        const auto elems_i16 = (torch::rand({num_elems}, torch::kFloat32) * 1000).to(torch::kInt16);
         const float shift = 1.23f;
         const float scale = 3.14f;
 
