@@ -140,3 +140,25 @@ endif()
 add_library(torch_lib INTERFACE)
 target_link_libraries(torch_lib INTERFACE ${TORCH_LIBRARIES})
 target_include_directories(torch_lib SYSTEM INTERFACE ${TORCH_INCLUDE_DIRS})
+
+if (WIN32)
+    # Note we need to use the generator expression to avoid setting this for CUDA.
+    target_compile_options(torch_lib INTERFACE
+        # from libtorch: destructor was implicitly defined as deleted
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4624>
+        # from libtorch: structure was padded due to alignment specifier
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4324>
+        # from libtorch: possible loss of data
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4267>
+        # from libtorch: 'initializing': conversion from 'X' to 'Y', possible loss of data
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4244>
+        # Unreachable code warnings are emitted from Torch's Optional class, even though they should be disabled by the
+        # MSVC /external:W0 setting.  This is a limitation of /external: for some C47XX backend warnings.  See:
+        # https://learn.microsoft.com/en-us/cpp/build/reference/external-external-headers-diagnostics?view=msvc-170#limitations
+        $<$<COMPILE_LANGUAGE:CXX>:/wd4702>
+    )
+    target_compile_definitions(torch_lib INTERFACE
+        # Torch Windows static build includes some win headers without defining NOMINMAX.
+        NOMINMAX
+    )
+endif()
