@@ -102,12 +102,6 @@ if (ECM_ENABLE_SANITIZERS)
     endif()
 endif()
 
-if(DORADO_USING_OLD_CPP_ABI)
-  # We need to force the use of the old ABI here, if we are building in an old ABI context, as otherwise elzip builds
-  # with the libc++11 ABI and we can't link against it.
-  add_compile_definitions(_GLIBCXX_USE_CXX11_ABI=0)
-endif()
-
 # For capturing test coverage.
 option(GENERATE_TEST_COVERAGE "Build with code coverage enabled" OFF)
 if (GENERATE_TEST_COVERAGE)
