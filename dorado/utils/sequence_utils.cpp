@@ -21,7 +21,7 @@
 namespace {
 
 #if ENABLE_AVX2_IMPL
-__attribute__((target("default")))
+[[maybe_unused]] __attribute__((target("default")))
 #endif
 std::string
 reverse_complement_impl(const std::string& sequence) {
@@ -47,7 +47,8 @@ reverse_complement_impl(const std::string& sequence) {
 // AVX2 implementation that does in-register lookups of 32 bases at once, using
 // PSHUFB. On strings with over several thousand bases this was measured to be about 10x the speed
 // of the default implementation on Skylake.
-__attribute__((target("avx2"))) std::string reverse_complement_impl(const std::string& sequence) {
+[[maybe_unused]] __attribute__((target("avx2"))) std::string reverse_complement_impl(
+        const std::string& sequence) {
     const auto len = sequence.size();
     std::string rev_comp_sequence;
     rev_comp_sequence.resize(len);

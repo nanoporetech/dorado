@@ -24,7 +24,7 @@ namespace {
 
 #if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
 #if ENABLE_AVX2_IMPL
-__attribute__((target("default")))
+[[maybe_unused]] __attribute__((target("default")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int64_t>(count)});
@@ -37,7 +37,7 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 #if ENABLE_AVX2_IMPL
 // We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
 // feature from AVX2.  All relevant CPUs have it.
-__attribute__((target("avx2,f16c")))
+[[maybe_unused]] __attribute__((target("avx2,f16c")))
 #endif
 void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
     if (!count) {
@@ -61,9 +61,9 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
         for (size_t unroll_i = 0; unroll_i < kUnrollFactor; ++unroll_i) {
-            const simd::FloatRegister elems_f32 = simd_load_32(src_ptr);
-            const simd::HalfRegister elems_f16 = simd_convert_32_16(elems_f32);
-            simd_store_16(dest_ptr, elems_f16);
+            const simd::FloatRegister elems_f32 = simd_load_f32(src_ptr);
+            const simd::HalfRegister elems_f16 = simd_convert_f32_f16(elems_f32);
+            simd_store_f16(dest_ptr, elems_f16);
             src_ptr += simd::kFloatsPerRegister;
             dest_ptr += simd::kFloatsPerRegister;
         }
@@ -73,12 +73,72 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
     // TODO -- probably nicer to use masked loads/stores.
     const size_t remaining_count = count % kUnroll;
     for (size_t i = 0; i < remaining_count; ++i) {
-        const simd::FloatRegister elem_f32 = simd_load1_32(src_ptr);
-        const simd::HalfRegister elem_f16 = simd_convert_32_16(elem_f32);
-        simd_store1_16(dest_ptr, elem_f16);
+        const simd::FloatRegister elem_f32 = simd_load1_f32(src_ptr);
+        const simd::HalfRegister elem_f16 = simd_convert_f32_f16(elem_f32);
+        simd_store1_f16(dest_ptr, elem_f16);
         ++src_ptr;
         ++dest_ptr;
     }
+}
+#endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
+
+#if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
+#if ENABLE_AVX2_IMPL
+[[maybe_unused]] __attribute__((target("default")))
+#endif
+void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
+    tensor = tensor.to(at::ScalarType::Float).sub_(shift).div_(scale).to(at::ScalarType::Half);
+}
+#endif  // ENABLE_NEON_IMPL
+
+#if ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
+#if ENABLE_AVX2_IMPL
+// We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
+// feature from AVX2.  All relevant CPUs have it.
+[[maybe_unused]] __attribute__((target("avx2,f16c")))
+#endif
+void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
+#if ENABLE_AVX2_IMPL
+    // Unrolling a bit seems to give best performance (tested on a prom).
+    constexpr std::size_t kUnrollFactor = 4;
+#else
+    // No unrolling seems to perform best on NEON.
+    constexpr std::size_t kUnrollFactor = 1;
+#endif
+
+    constexpr std::size_t elem_size = 2;
+    constexpr std::size_t elems_per_block = simd::kFloatsPerRegister * kUnrollFactor;
+
+    std::int16_t* data = static_cast<std::int16_t*>(tensor.mutable_data_ptr());
+    const std::size_t size = tensor.numel();
+
+    // Process in blocks.
+    const simd::FloatRegister shift_f32 = simd_load1_f32(&shift);
+    const simd::FloatRegister scale_f32 = simd_load1_f32(&scale);
+    for (std::size_t block = 0; block < size / elems_per_block; block++) {
+        for (std::size_t unroll_i = 0; unroll_i < kUnrollFactor; unroll_i++) {
+            const simd::Int16Register data_i16 = simd_load_i16(data);
+            const simd::FloatRegister data_f32 = simd_convert_i16_f32(data_i16);
+            const simd::FloatRegister scaled_f32 = (data_f32 - shift_f32) / scale_f32;
+            const simd::HalfRegister scaled_f16 = simd_convert_f32_f16(scaled_f32);
+            simd_store_f16(data, scaled_f16);
+            data += simd::kFloatsPerRegister;
+        }
+    }
+
+    // Do the tail.
+    std::int16_t block_in[elems_per_block];
+    c10::Half block_out[elems_per_block];
+    const std::size_t remaining = size % elems_per_block;
+    std::memcpy(block_in, data, remaining * elem_size);
+    for (std::size_t i = 0; i < remaining; i++) {
+        const float val = static_cast<float>(block_in[i]);
+        block_out[i] = (val - shift) / scale;
+    }
+    std::memcpy(data, block_out, remaining * elem_size);
+
+    // The tensor should now be viewed as halfs.
+    tensor = tensor.view(at::ScalarType::Half);
 }
 #endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 
@@ -189,6 +249,13 @@ at::Tensor quantile_counting(const at::Tensor& t, const at::Tensor& q) {
 // version.
 void convert_f32_to_f16(c10::Half* const dest, const float* const src, std::size_t count) {
     return convert_f32_to_f16_impl(dest, src, count);
+}
+
+void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& tensor, float shift, float scale) {
+    assert(tensor.dtype() == at::ScalarType::Short);
+    assert(tensor.is_contiguous());
+    assert(tensor.element_size() == 2);
+    shift_scale_tensor_i16_to_f16_inplace_impl(tensor, shift, scale);
 }
 
 void copy_tensor_elems(at::Tensor& dest_tensor,
