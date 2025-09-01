@@ -131,7 +131,7 @@ if (APPLE)
     )
 endif()
 
-if (TORCH_VERSION VERSION_EQUAL 2.7.1 AND LINUX)
+if (TORCH_VERSION VERSION_EQUAL 2.7.1 AND (LINUX OR WIN32))
     # For some reason cublas is missing in non-static Linux builds, so do that here.
     list(APPEND TORCH_LIBRARIES CUDA::cublas)
 endif()
