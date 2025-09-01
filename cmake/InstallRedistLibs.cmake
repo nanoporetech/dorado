@@ -1,18 +1,20 @@
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     # CUDA toolkit DLLs we depend on:
     set(VERSIONED_CUDA_LIBS
-        libcublas*.so*
+        libcublasLt.so*
+        libcublas.so*
         libcudart*.so*
         libnvrtc*.so*
         libnvToolsExt*.so*
+        libnvJitLink*.so*
+        libcusolver.so*
+        libcusparse.so*
+        libcufft.so*
     )
 
     if(CMAKE_SYSTEM_PROCESSOR STREQUAL "aarch64")
         list(APPEND VERSIONED_CUDA_LIBS
-            "*cusparse.so*"
             "*curand.so*"
-            "*cusolver.so*"
-            "*cufft.so*"
             "*cupti.so*"
         )
     endif()
