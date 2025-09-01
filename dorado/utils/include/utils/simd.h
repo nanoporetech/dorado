@@ -8,9 +8,9 @@
 #define ENABLE_AVX2_IMPL 0
 #endif
 
-#if defined(__APPLE__) && defined(__arm64__)
+#if defined(__arm64__) || defined(__aarch64__)
 #define ENABLE_NEON_IMPL 1
-#include "arm_neon.h"
+#include <arm_neon.h>
 #else
 #define ENABLE_NEON_IMPL 0
 #endif
@@ -29,17 +29,17 @@ using HalfRegister = float16x4_t;
 using Int16Register = int16x4_t;
 
 #define simd_load_f32(ptr) vld1q_f32(ptr)
-#define simd_load1_f32(ptr) vdupq_n_f32(*ptr)
+#define simd_load1_f32(ptr) vdupq_n_f32(*(ptr))
 #define simd_convert_f32_f16(reg) vcvt_f16_f32(reg)
 #define simd_store_f32(ptr, reg) vst1q_f32(ptr, reg)
 #define simd_store1_f32(ptr, reg) *(ptr) = vgetq_lane_f32(reg, 0)
 
 #define simd_load_f16(ptr) vld1_f16(reinterpret_cast<float16_t const *>(ptr))
-#define simd_load1_f16(ptr) vdup_n_f16(*ptr)
+#define simd_load1_f16(ptr) vdup_n_f16(*(ptr))
 #define simd_convert_f16_f32(reg) vcvt_f32_f16(reg)
 #define simd_add_f16(regA, regB) vadd_f16(regA, regB)
 #define simd_store_f16(ptr, reg) vst1_f16(reinterpret_cast<float16_t *>(ptr), reg)
-#define simd_store1_f16(ptr, reg) *(ptr) = c10::Half(vget_lane_u16(reg, 0), c10::Half::from_bits())
+#define simd_store1_f16(ptr, reg) *(ptr) = vget_lane_f16(reg, 0)
 
 #define simd_load_i16(ptr) vreinterpret_s16_f16(simd_load_f16(ptr))
 #define simd_convert_i16_f32(reg) vcvtq_f32_s32(vmovl_s16(reg))
@@ -63,7 +63,7 @@ using Int16Register = __m128i;
 #define simd_load_f16(ptr) _mm_loadu_si128(reinterpret_cast<const __m128i *>(ptr))
 #define simd_store_f16(ptr, reg) _mm_storeu_si128(reinterpret_cast<__m128i *>(ptr), reg)
 #define simd_store1_f16(ptr, reg) \
-    *ptr = c10::Half(_mm_extract_epi16(reg, 0), c10::Half::from_bits())
+    *(ptr) = c10::Half(_mm_extract_epi16(reg, 0), c10::Half::from_bits())
 
 #define simd_load_i16(ptr) simd_load_f16(ptr)
 #define simd_convert_i16_f32(reg) _mm256_cvtepi32_ps(_mm256_cvtepi16_epi32(reg))
