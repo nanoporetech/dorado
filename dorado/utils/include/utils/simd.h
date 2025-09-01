@@ -39,7 +39,8 @@ using Int16Register = int16x4_t;
 #define simd_convert_f16_f32(reg) vcvt_f32_f16(reg)
 #define simd_add_f16(regA, regB) vadd_f16(regA, regB)
 #define simd_store_f16(ptr, reg) vst1_f16(reinterpret_cast<float16_t *>(ptr), reg)
-#define simd_store1_f16(ptr, reg) *(ptr) = c10::Half(vget_lane_u16(reg, 0), c10::Half::from_bits())
+#define simd_store1_f16(ptr, reg) \
+    *(ptr) = c10::Half(vget_lane_u16(vreinterpret_u16_f16(reg), 0), c10::Half::from_bits())
 
 #define simd_load_i16(ptr) vreinterpret_s16_f16(simd_load_f16(ptr))
 #define simd_convert_i16_f32(reg) vcvtq_f32_s32(vmovl_s16(reg))
