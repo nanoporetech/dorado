@@ -1,6 +1,5 @@
 #include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 
-#include "hts_utils/fastq_reader.h"
 #include "hts_utils/hts_file.h"
 #include "utils/SampleSheet.h"
 
@@ -17,19 +16,6 @@ namespace {
 constexpr size_t BAM_BUFFER_SIZE =
         20000000;  // 20 MB per barcode classification. So roughly 2 GB for 96 barcodes.
 
-std::string get_run_id_from_fq_tag(const bam1_t& record) {
-    auto fastq_id_tag = bam_aux_get(&record, "fq");
-    if (!fastq_id_tag) {
-        return {};
-    }
-    const std::string header{bam_aux2Z(fastq_id_tag)};
-    utils::FastqRecord fastq_record{};
-    if (!fastq_record.set_header(header)) {
-        return {};
-    }
-    return std::string{fastq_record.run_id_view()};
-}
-
 std::string get_run_id_from_rg_tag(const bam1_t& record) {
     const auto read_group_tag = bam_aux_get(&record, "RG");
     if (read_group_tag) {
@@ -45,9 +31,6 @@ std::string get_run_id_from_rg_tag(const bam1_t& record) {
 
 std::string get_run_id(const bam1_t& record) {
     auto run_id = get_run_id_from_rg_tag(record);
-    if (run_id.empty()) {
-        run_id = get_run_id_from_fq_tag(record);
-    }
     return run_id.empty() ? "unknown_run_id" : run_id;
 }
 

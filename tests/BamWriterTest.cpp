@@ -162,43 +162,4 @@ CATCH_TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
                      Equals("2023-06-22T07:17:48.308+00:00"));
 }
 
-CATCH_TEST_CASE(
-        "HtsWriterTest: Read fastq with minKNOW header does not write out the bam tag containing "
-        "the input fastq header",
-        TEST_GROUP) {
-    const fs::path bam_test_dir = fs::path(get_data_dir("bam_reader"));
-    const auto minknow_fastq_file = bam_test_dir / "fastq_with_minknow_header.fq";
-    dorado::HtsReader fastq_reader(minknow_fastq_file.string(), std::nullopt);
-    const auto tmp_dir = make_temp_dir("writer_test");
-    const auto out_sam = tmp_dir.m_path / "output.sam";
-
-    // Read the minkow style fastq and confirm the header line is written to the bam aux tag 'fq'
-    CATCH_CHECK(fastq_reader.read());
-    auto fq_tag = bam_aux_get(fastq_reader.record.get(), "fq");
-    CATCH_REQUIRE(fq_tag != nullptr);
-    const auto fq_tag_value = bam_aux2Z(fq_tag);
-    CATCH_REQUIRE(fq_tag_value != nullptr);
-    const std::string fq_header{fq_tag_value};
-    CATCH_CHECK(fq_header ==
-                "@c2707254-5445-4cfb-a414-fce1f12b56c0 "
-                "runid=5c76f4079ee8f04e80b4b8b2c4b677bce7bebb1e "
-                "read=1728 ch=332 start_time=2017-06-16T15:31:55Z");
-
-    {
-        // Write into temporary folder.
-        utils::HtsFile hts_file(out_sam.string(), HtsFile::OutputMode::SAM, 2, false);
-        hts_file.set_header(fastq_reader.header());
-        HtsWriterNode writer(hts_file, "");
-        writer.write(fastq_reader.record.get());
-        hts_file.finalise([](size_t) { /* noop */ });
-    }
-
-    // Read temporary file to make sure the 'fq' tag was not output.
-    HtsReader new_fastq_reader(out_sam.string(), std::nullopt);
-    new_fastq_reader.read();
-
-    fq_tag = bam_aux_get(new_fastq_reader.record.get(), "fq");
-    CATCH_REQUIRE(fq_tag == nullptr);
-}
-
 }  // namespace dorado::hts_writer::test
