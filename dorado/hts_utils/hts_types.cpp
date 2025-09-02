@@ -29,4 +29,36 @@ void HtsFileDestructor::operator()(htsFile* hts_file) {
     }
 }
 
+bool HtsData::ReadAttributesCoreComparator::operator()(
+        const dorado::HtsData::ReadAttributes& lhs,
+        const dorado::HtsData::ReadAttributes& rhs) const {
+    // Only using a subset ReadAttributes fields to index the core directory paths
+    // clang-format off
+    return  lhs.experiment_id == rhs.experiment_id &&
+        lhs.sample_id == rhs.sample_id &&
+        lhs.position_id == rhs.position_id &&
+        lhs.flowcell_id == rhs.flowcell_id &&
+        lhs.protocol_run_id == rhs.protocol_run_id &&
+        lhs.protocol_start_time_ms == rhs.protocol_start_time_ms;
+    // clang-format on
+};
+
+template <typename T>
+void HtsData::ReadAttributesCoreHasher::hash_combine(std::size_t& seed, const T& value) const {
+    seed ^= std::hash<T>{}(value) + 0x9e3779b9 + (seed << 6) + (seed >> 2);
+}
+
+size_t HtsData::ReadAttributesCoreHasher::operator()(
+        const dorado::HtsData::ReadAttributes& attr) const {
+    // Only using a subset ReadAttributes fields to index the core directory paths
+    std::size_t seed = 0;
+    hash_combine(seed, attr.experiment_id);
+    hash_combine(seed, attr.sample_id);
+    hash_combine(seed, attr.position_id);
+    hash_combine(seed, attr.flowcell_id);
+    hash_combine(seed, attr.protocol_run_id);
+    hash_combine(seed, attr.protocol_start_time_ms);
+    return seed;
+};
+
 }  // namespace dorado

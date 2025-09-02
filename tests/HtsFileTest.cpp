@@ -309,8 +309,8 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP)
     CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
                   out_dir.has_value());
 
-    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES, nullptr);
+    auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -328,10 +328,9 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ throws given reference", 
     bool emit_sam = false;
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
-    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES, nullptr);
-
-    CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
+    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr),
+                          std::runtime_error);
 }
 
 CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusive", TEST_GROUP) {
@@ -345,10 +344,9 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusiv
     bool ref_req = false;
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
-    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES, nullptr);
-
-    CATCH_CHECK_THROWS_AS(writer_builder.build(), std::runtime_error);
+    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr),
+                          std::runtime_error);
 }
 
 CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) {
@@ -366,8 +364,8 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
     CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
                   out_dir.has_value());
 
-    auto writer_builder = HtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                               p_cb, d_cb, GPU_NAMES, nullptr);
+    auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -464,8 +462,9 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     std::string description_res{};
     auto description_cb = utils::DescriptionCallback(
             [&description_res](const std::string& value) { description_res = value; });
-    auto writer_builder = HtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
-                                               progress_cb, description_cb, GPU_NAMES, nullptr);
+    auto writer_builder =
+            BasecallHtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
+                                         progress_cb, description_cb, GPU_NAMES, nullptr);
     auto writer = writer_builder.build();
 
     auto& writer_ref = *writer;

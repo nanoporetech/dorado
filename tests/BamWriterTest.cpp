@@ -82,7 +82,7 @@ protected:
         pipeline_desc.add_node<SubreadIdTaggerNode>({writer});
         auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
 
-        reader.read(*pipeline, 1000);
+        reader.read(*pipeline, 1000, false, nullptr);
         pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
 
         auto &writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);

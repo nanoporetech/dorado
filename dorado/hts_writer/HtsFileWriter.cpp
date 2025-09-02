@@ -80,5 +80,20 @@ stats::NamedStats HtsFileWriter::sample_stats() const {
     return stats;
 }
 
+void HtsFileWriter::set_shared_header(SamHdrSharedPtr header) {
+    if (m_shared_header != nullptr) {
+        throw std::logic_error("set_shared_header is incompatible with set_dynamic_header.");
+    }
+    m_shared_header = std::move(header);
+};
+
+void HtsFileWriter::set_dynamic_header(
+        const std::shared_ptr<utils::HeaderMapper::HeaderMap> &header_map) {
+    if (m_shared_header != nullptr) {
+        throw std::logic_error("set_dynamic_header is incompatible with set_shared_header.");
+    }
+    m_dynamic_header = header_map;
+};
+
 }  // namespace hts_writer
 }  // namespace dorado

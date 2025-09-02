@@ -148,3 +148,38 @@ CATCH_TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
     CATCH_CHECK(sq_mapping[2][0] == 0);
     CATCH_CHECK(sq_mapping[2][1] == 2);
 }
+
+CATCH_TEST_CASE("MergeHeadersTest: strip alignment, filtered", TEST_GROUP) {
+    std::string hdr1_txt =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@RG\tID:filtered_out\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n";
+    std::string hdr2_txt =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@RG\tID:also_excluded\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n";
+    SamHdrPtr header1(sam_hdr_parse(hdr1_txt.size(), hdr1_txt.c_str()));
+    SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
+
+    MergeHeaders merger(true);
+    auto res1 = merger.add_header(header1.get(), "header1", "run1_model1");
+    CATCH_CHECK(res1.empty());
+    auto res2 = merger.add_header(header2.get(), "header2", "run1_model1");
+    CATCH_CHECK(res2.empty());
+
+    merger.finalize_merge();
+    auto merged_hdr = merger.get_merged_header();
+    std::string merged_hdr_txt = sam_hdr_str(merged_hdr);
+    std::string expected_hdr_txt =
+            "@HD\tVN:1.6\tSO:unknown\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n";
+    CATCH_CHECK(merged_hdr_txt == expected_hdr_txt);
+}

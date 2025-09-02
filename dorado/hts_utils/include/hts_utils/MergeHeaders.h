@@ -3,6 +3,7 @@
 
 #include <map>
 #include <set>
+#include <string>
 #include <vector>
 
 struct sam_hdr_t;
@@ -31,6 +32,24 @@ public:
      *  merged, this will result in an error.
      */
     std::string add_header(sam_hdr_t* hdr, const std::string& filename);
+
+    /** Add a header.
+     *  @param hdr The header to add.
+     *  @param filename The name that should be reported if any errors
+     *         occur while trying to merge in the header data.
+     *  @param read_group_selection A read group to filter on - other are ignored
+     *  @return An error string indicating what went wrong. If the header
+     *          was successfully merged this will be empty.
+     * 
+     *  The HD line from the first header added will be used
+     *  as the HD line for the merged header.
+     * 
+     *  If any RG or SQ lines conflict with ones that have already been
+     *  merged, this will result in an error.
+     */
+    std::string add_header(sam_hdr_t* hdr,
+                           const std::string& filename,
+                           const std::string& read_group_selection);
 
     // Call this when you have added all the headers.
     void finalize_merge();
@@ -69,6 +88,15 @@ public:
      */
     std::vector<std::vector<uint32_t>> get_sq_mapping() const;
 
+    /** Get the mapping of indexes of SQ lines from original headers to
+     *  the merged header by filename. 
+     *
+     *  Calls get_sq_mapping but drops the outer vector which encodes the
+     *  insertion order of the headers by looking up the position of the the 
+     *  given filename.
+     */
+    const std::vector<uint32_t>& get_sq_mapping(const std::string& filename) const;
+
 private:
     struct RefInfo {
         uint32_t index;         // Index of SQ line in original header.
@@ -78,6 +106,9 @@ private:
     bool m_strip_alignment;
     SamHdrPtr m_merged_header;
     std::vector<std::vector<uint32_t>> m_sq_mapping;
+
+    // Collection of filepaths to index into m_sq_mapping
+    std::vector<std::string> m_filepaths;
 
     // Stores unique RG lines across all headers.
     std::map<std::string, std::string> m_read_group_lut;
@@ -97,8 +128,9 @@ private:
     // One entry for each header. Key = ref name, Value = info for ref.
     std::vector<std::map<std::string, RefInfo>> m_ref_info_lut;
 
+    // Add unique read_groups by their ID - optionally select a read_group
+    int check_and_add_rg_data(sam_hdr_t* hdr, const std::string& read_group_selection);
     int check_and_add_ref_data(sam_hdr_t* hdr);
-    int check_and_add_rg_data(sam_hdr_t* hdr);
     int add_pg_data(sam_hdr_t* hdr);
     void add_other_lines(sam_hdr_t* hdr);
 };

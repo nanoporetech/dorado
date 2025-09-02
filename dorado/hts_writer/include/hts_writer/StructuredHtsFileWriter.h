@@ -26,6 +26,7 @@ private:
     bool m_has_shutdown{false};
 
     void handle(const HtsData& data) override;
+    void set_hts_file_header(const HtsData& data, utils::HtsFile& hts_file) const;
 };
 
 }  // namespace hts_writer

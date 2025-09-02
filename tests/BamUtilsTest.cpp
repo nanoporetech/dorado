@@ -1,6 +1,8 @@
 #include "TestUtils.h"
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "utils/PostCondition.h"
 #include "utils/barcode_kits.h"

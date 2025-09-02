@@ -50,23 +50,10 @@ private:
 
     const std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
 
-    struct ReadAttributesCoreComparator {
-        bool operator()(const dorado::HtsData::ReadAttributes &,
-                        const dorado::HtsData::ReadAttributes &) const;
-    };
-
-    struct ReadAttributesCoreHasher {
-        size_t operator()(const dorado::HtsData::ReadAttributes &) const;
-
-    private:
-        template <typename T>
-        void hash_combine(std::size_t &seed, const T &value) const;
-    };
-
     std::unordered_map<HtsData::ReadAttributes,
                        std::filesystem::path,
-                       ReadAttributesCoreHasher,
-                       ReadAttributesCoreComparator>
+                       HtsData::ReadAttributesCoreHasher,
+                       HtsData::ReadAttributesCoreComparator>
             m_core_cache;
 
     /*

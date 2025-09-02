@@ -98,7 +98,7 @@ protected:
             bool emit_sam = mode == hts_writer::OutputMode::SAM;
             std::optional<std::string> out_dir = m_out_path.m_path.string();
 
-            auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+            auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                     emit_fastq, emit_sam, false, out_dir, num_threads, progress_cb, description_cb,
                     GPU_NAMES, nullptr);
 
@@ -117,9 +117,9 @@ protected:
 
         const auto &writer_ref = pipeline->get_node_ref<WriterNode>(writer);
         SamHdrPtr hdr(sam_hdr_dup(reader.header()));
-        writer_ref.set_hts_file_header(std::move(hdr));
+        writer_ref.set_shared_header(std::move(hdr));
 
-        reader.read(*pipeline, 1000);
+        reader.read(*pipeline, 1000, false, nullptr);
         pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
         stats = writer_ref.sample_stats();
@@ -198,7 +198,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
         auto description_cb = utils::DescriptionCallback([](const std::string &) {});
         std::optional<std::string> out_dir = tmp_dir.m_path.string();
 
-        auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+        auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                 true, false, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES, nullptr);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
@@ -206,7 +206,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
         CATCH_CHECK(hts_file_writer->get_mode() == OutputMode::FASTQ);
 
         SamHdrSharedPtr header(sam_hdr_init());
-        hts_file_writer->set_header(header);
+        hts_file_writer->set_shared_header(header);
 
         writers.push_back(std::move(hts_file_writer));
     }
@@ -272,16 +272,16 @@ CATCH_TEST_CASE(
             auto description_cb = utils::DescriptionCallback([](const std::string &) {});
             std::optional<std::string> out_dir = tmp_dir.m_path.string();
 
-            auto hts_writer_builder =
-                    hts_writer::HtsFileWriterBuilder(false, true, false, out_dir, 1, progress_cb,
-                                                     description_cb, GPU_NAMES, nullptr);
+            auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
+                    false, true, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES,
+                    nullptr);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             CATCH_CHECK_FALSE(hts_file_writer == nullptr);
             CATCH_CHECK(hts_file_writer->get_mode() == OutputMode::SAM);
 
             SamHdrSharedPtr header(sam_hdr_init());
-            hts_file_writer->set_header(header);
+            hts_file_writer->set_shared_header(header);
 
             writers.push_back(std::move(hts_file_writer));
         }

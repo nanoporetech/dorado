@@ -87,7 +87,7 @@ protected:
                 alignment_info);
         reader.set_client_info(client_info);
 
-        reader.read(*pipeline, 100);
+        reader.read(*pipeline, 100, false, nullptr);
         pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
         auto bam_messages = ConvertMessages<dorado::BamMessage>(std::move(m_output_messages));
         std::vector<dorado::BamPtr> result{};

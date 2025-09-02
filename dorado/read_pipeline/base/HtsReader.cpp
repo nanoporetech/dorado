@@ -1,10 +1,10 @@
 #include "read_pipeline/base/HtsReader.h"
 
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/fastq_reader.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
-#include "utils/types.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -12,7 +12,6 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <string>
@@ -144,14 +143,29 @@ public:
     }
 };
 
+// This function allows us to map the reference id from input BAM records to what
+// they should be in the output file, based on the new ordering of references in
+// the merged header.
+void adjust_tid(const std::vector<uint32_t>& mapping, BamPtr& record) {
+    auto tid = record.get()->core.tid;
+    if (tid >= 0) {
+        if (tid >= int32_t(mapping.size())) {
+            throw std::range_error("BAM tid field out of range with respect to SQ lines.");
+        }
+        record.get()->core.tid = int32_t(mapping.at(tid));
+    }
+}
+
 }  // namespace
 
 HtsReader::HtsReader(const std::string& filename,
                      std::optional<std::unordered_set<std::string>> read_list)
-        : m_client_info(std::make_shared<DefaultClientInfo>()), m_read_list(std::move(read_list)) {
-    if (!try_initialise_generator<FastqBamRecordGenerator>(filename) &&
-        !try_initialise_generator<HtsLibBamRecordGenerator>(filename)) {
-        throw std::runtime_error("Could not open file: " + filename);
+        : m_filename(filename),
+          m_client_info(std::make_shared<DefaultClientInfo>()),
+          m_read_list(std::move(read_list)) {
+    if (!try_initialise_generator<FastqBamRecordGenerator>(m_filename) &&
+        !try_initialise_generator<HtsLibBamRecordGenerator>(m_filename)) {
+        throw std::runtime_error("Could not open file: " + m_filename);
     }
     is_aligned = m_header->n_targets > 0;
 
@@ -188,10 +202,6 @@ void HtsReader::set_client_info(std::shared_ptr<ClientInfo> client_info) {
     m_client_info = std::move(client_info);
 }
 
-void HtsReader::set_record_mutator(std::function<void(BamPtr&)> mutator) {
-    m_record_mutator = std::move(mutator);
-}
-
 bool HtsReader::read() { return m_bam_record_generator(*record); }
 
 bool HtsReader::has_tag(const char* tagname) {
@@ -199,7 +209,10 @@ bool HtsReader::has_tag(const char* tagname) {
     return static_cast<bool>(tag);
 }
 
-std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
+std::size_t HtsReader::read(Pipeline& pipeline,
+                            std::size_t max_reads,
+                            const bool strip_alignments,
+                            const std::unique_ptr<utils::HeaderMapper> header_mapper) {
     std::size_t num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
@@ -208,13 +221,27 @@ std::size_t HtsReader::read(Pipeline& pipeline, std::size_t max_reads) {
                 continue;
             }
         }
-        if (m_record_mutator) {
-            m_record_mutator(record);
+
+        std::unique_ptr<HtsData> hts_data;
+        if (header_mapper == nullptr) {
+            hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get()))});
+        } else {
+            // Get read attributes by read group ID
+            const auto& read_attrs = header_mapper->get_read_attributes(record.get());
+
+            if (!strip_alignments) {
+                const auto& sq_mapping =
+                        header_mapper->get_merged_header(read_attrs).get_sq_mapping(m_filename);
+                adjust_tid(sq_mapping, record);
+            }
+
+            hts_data =
+                    std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get())), read_attrs});
         }
 
-        auto hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get()))});
         BamMessage bam_message{std::move(hts_data), m_client_info};
         pipeline.push_message(std::move(bam_message));
+
         ++num_reads;
         if (max_reads > 0 && num_reads >= max_reads) {
             break;

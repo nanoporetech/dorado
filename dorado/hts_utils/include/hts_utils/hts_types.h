@@ -119,6 +119,19 @@ public:
         bool is_status_pass{true};
     };
 
+    struct ReadAttributesCoreComparator {
+        bool operator()(const dorado::HtsData::ReadAttributes&,
+                        const dorado::HtsData::ReadAttributes&) const;
+    };
+
+    struct ReadAttributesCoreHasher {
+        size_t operator()(const dorado::HtsData::ReadAttributes&) const;
+
+    private:
+        template <typename T>
+        void hash_combine(std::size_t& seed, const T& value) const;
+    };
+
     BamPtr bam_ptr;
     ReadAttributes read_attrs{};
     std::shared_ptr<BarcodeScoreResult> barcoding_result{};
