@@ -56,8 +56,8 @@ struct HtsFile::ProgressUpdater {
     }
 };
 
-HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam)
-        : m_filename(filename),
+HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam)
+        : m_filename(std::move(filename)),
           m_threads(threads),
           m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
@@ -67,7 +67,7 @@ HtsFile::HtsFile(const std::string& filename, OutputMode mode, int threads, bool
         m_file.reset(hts_open(m_filename.c_str(), "wf"));
         break;
     case OutputMode::FASTA:
-        m_file.reset(hts_open(filename.c_str(), "wF"));
+        m_file.reset(hts_open(m_filename.c_str(), "wF"));
         break;
     case OutputMode::BAM:
         if (m_filename != "-" && m_sort_bam) {
