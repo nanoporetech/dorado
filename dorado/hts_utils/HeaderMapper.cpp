@@ -4,10 +4,10 @@
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/fasta_reader.h"
-#include "hts_utils/fastq_reader.h"
 #include "hts_utils/fastq_tags.h"
 #include "hts_utils/header_utils.h"
 #include "hts_utils/hts_types.h"
+#include "hts_utils/sequence_file_format.h"
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
@@ -89,7 +89,7 @@ HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs, boo
 void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
     for (const auto& input : inputs) {
         spdlog::trace("HeaderMapper processing headers from: '{}'.", input.string());
-        if (is_fastq(input.string()) || is_fasta(input.string())) {
+        if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ || hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
             process_fastx(input);
         } else {
             process_bam(input);

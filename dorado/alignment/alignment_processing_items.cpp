@@ -1,6 +1,5 @@
 #include "alignment/alignment_processing_items.h"
 
-#include "hts_utils/fastq_reader.h"
 #include "utils/PostCondition.h"
 #include "utils/fs_utils.h"
 #include "utils/scoped_trace_log.h"
@@ -34,7 +33,7 @@ std::set<std::string>& get_supported_compression_extensions() {
     return supported_compression_extensions;
 };
 
-bool is_loadable_by_htslib(const fs::path& input_path) {
+bool is_valid_input_file(const fs::path& input_path) {
     dorado::HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
     if (!hts_file) {
         return false;
@@ -42,10 +41,6 @@ bool is_loadable_by_htslib(const fs::path& input_path) {
 
     dorado::SamHdrPtr header(sam_hdr_read(hts_file.get()));
     return header != nullptr;
-}
-
-bool is_valid_input_file(const fs::path& input_path) {
-    return is_loadable_by_htslib(input_path) || dorado::utils::is_fastq(input_path.string());
 }
 
 fs::path replace_extension(fs::path output_path) {
