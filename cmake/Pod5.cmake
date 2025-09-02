@@ -1,7 +1,7 @@
 # CMake errors out if we try to create the pod5_libs target twice, which happens in ont_core.
 include_guard(GLOBAL)
 
-set(POD5_VERSION 0.3.27)
+set(POD5_VERSION 0.3.33)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
 
@@ -19,10 +19,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(LIB_DIR "lib64")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
       set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-arm64.tar.gz")
-      set(POD5_HASH "fc6b331f1c27651518894ad56403853f2aaffc3b50ebdbf0adafc9b00628bb70")
+      set(POD5_HASH "2b997ed4991e65515669fc9c78cc1749c133a078dea365d7a61019a2a28e85a6")
     else()
       set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-x64.tar.gz")
-      set(POD5_HASH "c610e70851d92644cc1589a8f2dfdb14c708949f2a06bbbf003945e39882a324")
+      set(POD5_HASH "3a179c703c180fe8dbab38504a56aaf1264088f072b1febbef54517910fe9ba0")
     endif()
     if(POD5_STATIC)
       set(POD5_LIBRARIES
@@ -36,7 +36,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 elseif(APPLE)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-osx-11.0-arm64.tar.gz")
-    set(POD5_HASH "f8ae07a182ec8898b9b4433f8c55465bd6767b709b5c66f82dad2580872acaa0")
+    set(POD5_HASH "e6155bcf6415c84e1c37ec214034fd9f5b81cbac2a8d2f7746e2af24d7078fe3")
     if(POD5_STATIC)
       set(POD5_LIBRARIES
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.a
@@ -48,7 +48,7 @@ elseif(APPLE)
     endif()
 elseif(WIN32)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-win-x64.tar.gz")
-    set(POD5_HASH "9be398d65a7ea76c55754c465f9612f8a94347ebcffd73b267c657732463bb31")
+    set(POD5_HASH "29099ab7d86689919202bc8b906103d8cf6208356a7565a7c8f1a2edf514f95e")
     set(POD5_LIBRARIES
       ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
       ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/arrow_static.lib
