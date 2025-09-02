@@ -72,7 +72,6 @@ if(NOT TARGET htslib) # lazy include guard
             PREFIX ${HTSLIB_BUILD}
             SOURCE_DIR ${HTSLIB_BUILD}/htslib
             BUILD_IN_SOURCE 1
-            PATCH_COMMAND patch < ${DORADO_3RD_PARTY_SOURCE}/patches/htslib.patch
             CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
             COMMAND ${AUTOCONF_COMMAND}
             COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${hts_configure_flags}
