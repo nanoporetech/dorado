@@ -84,7 +84,7 @@ GSL Lite:
 htslib:
     description: >
         C library for accessing common file formats, such as SAM, CRAM and VCF
-    version: "1.21"
+    version: "1.22.1"
     url: https://github.com/samtools/htslib
     license: htslib/LICENSE
     files:
