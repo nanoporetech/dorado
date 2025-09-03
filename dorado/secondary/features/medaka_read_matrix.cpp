@@ -364,6 +364,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     int32_t pos = 0;
     int32_t tid = 0;
     int32_t n_plp = 0;
+    int32_t last_pos = -1;
 
     // allocate output assuming one insertion per ref position
     int32_t n_pos = 0;
@@ -385,6 +386,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
 
     while ((ret = bam_mplp_auto(mplp, &tid, &pos, &n_plp,
                                 const_cast<const bam_pileup1_t **>(std::data(plp)))) > 0) {
+        // Store the last position because bam_mplp_auto will set it to 0 if it returns empty.
+        last_pos = pos;
         const char *c_name = data->hdr->target_name[tid];
         if (c_name != chr_name) {
             continue;
@@ -636,9 +639,11 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
         n_pos += max_ins;
     }
 
+    ++last_pos;
+
     for (size_t r = 0, nleft = 0, nright = 0; r < std::size(read_array); ++r) {
         const Read &read = read_array[r];
-        if (read.ref_end >= pos) {
+        if (read.ref_end >= last_pos) {
             pileup.read_ids_right[r] = read.qname;
         } else {
             ++nright;
