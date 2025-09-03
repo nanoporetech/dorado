@@ -5,7 +5,7 @@ if(NOT TARGET htslib) # lazy include guard
         download_and_extract(
             ${HTSLIB_ARTIFACTORY_URL}/htslib-win-v1.22.1.tar.gz
             htslib-win
-            "a09b7e6c6ce72a34d605fb7b2285c84f4d048834390c7d7aad2e3bcb6acd5aa4"
+            "df162faa178396f64a46d68629df88a47c2e0f838a4f77066de6c4435387faee"
         )
         set(HTSLIB_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/htslib-win CACHE STRING
                     "Path to htslib repo")
