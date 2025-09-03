@@ -2,6 +2,7 @@
 
 #include "compat/compat_utils.h"
 
+#include <c10/util/Backtrace.h>
 #include <torch/torch.h>
 #include <torch/version.h>
 
@@ -69,6 +70,14 @@ void set_torch_allocator_max_split_size() {
 
     c10::cuda::CUDACachingAllocator::setAllocatorSettings(settings);
 #endif
+}
+
+std::string torch_stacktrace() {
+    auto trace = c10::get_backtrace();
+    if (trace.empty()) {
+        trace = "Couldn't get backtrace from torch";
+    }
+    return trace;
 }
 
 }  // namespace dorado::utils

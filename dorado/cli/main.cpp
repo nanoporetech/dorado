@@ -1,5 +1,7 @@
 #include "cli/cli.h"
 #include "dorado_version.h"
+#include "torch_utils/torch_utils.h"
+#include "utils/crash_handlers.h"
 #include "utils/locale_utils.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -68,6 +70,11 @@ int main(int argc, char* argv[]) {
     spdlog::cfg::load_env_levels();
     dorado::utils::InitLogging();
     dorado::utils::ensure_user_locale_may_be_set();
+
+    // Setup crash handlers.
+    dorado::utils::install_segfault_handler();
+    dorado::utils::install_uncaught_exception_handler();
+    dorado::utils::set_stacktrace_getter(dorado::utils::torch_stacktrace);
 
     const std::map<std::string, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},
