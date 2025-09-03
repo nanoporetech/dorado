@@ -13,7 +13,7 @@
 
 #include <iostream>
 #include <map>
-#include <string>
+#include <string_view>
 #include <vector>
 
 #ifndef __APPLE__
@@ -49,12 +49,12 @@ using entry_ptr = int (*)(int, char**);
 
 namespace {
 
-void usage(const std::vector<std::string>& commands) {
+void usage(const std::map<std::string_view, entry_ptr>& commands) {
     std::cerr << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:\n";
 
     for (const auto& command : commands) {
-        std::cerr << command << '\n';
+        std::cerr << command.first << '\n';
     }
 
     std::cerr << "\nOptional arguments:\n"
@@ -76,7 +76,7 @@ int main(int argc, char* argv[]) {
     dorado::utils::install_uncaught_exception_handler();
     dorado::utils::set_stacktrace_getter(dorado::utils::torch_stacktrace);
 
-    const std::map<std::string, entry_ptr> subcommands = {
+    const std::map<std::string_view, entry_ptr> subcommands = {
             {"basecaller", &dorado::basecaller},
             {"duplex", &dorado::duplex},
             {"download", &dorado::download},
@@ -89,16 +89,9 @@ int main(int argc, char* argv[]) {
             {"variant", &dorado::variant_caller},
     };
 
-    std::vector<std::string> arguments(argv + 1, argv + argc);
-    std::vector<std::string> keys;
-
-    keys.reserve(subcommands.size());
-    for (const auto& [key, _] : subcommands) {
-        keys.push_back(key);
-    }
-
+    const std::vector<std::string_view> arguments(argv + 1, argv + argc);
     if (arguments.size() == 0) {
-        usage(keys);
+        usage(subcommands);
         return EXIT_SUCCESS;
     }
 
@@ -119,12 +112,12 @@ int main(int argc, char* argv[]) {
         std::cerr << "minimap2: " << MM_VERSION << '\n';
 
     } else if (subcommand == "-h" || subcommand == "--help") {
-        usage(keys);
+        usage(subcommands);
         return EXIT_SUCCESS;
     } else if (subcommands.find(subcommand) != subcommands.end()) {
         return subcommands.at(subcommand)(--argc, ++argv);
     } else {
-        usage(keys);
+        usage(subcommands);
         return EXIT_FAILURE;
     }
 

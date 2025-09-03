@@ -36,7 +36,8 @@ inline std::vector<std::string_view> split_view(const std::string_view input,
     return result;
 }
 
-inline std::string join(const std::vector<std::string>& inputs, const std::string& separator) {
+template <typename StringLike>
+inline std::string join(const std::vector<StringLike>& inputs, std::string_view separator) {
     std::string result;
     for (const auto& item : inputs) {
         if (!result.empty()) {
