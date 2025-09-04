@@ -531,10 +531,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                     }
                 } else {
                     read_i = array_size;
-                    if (array_size > max_n_reads) {
-                        max_n_reads = array_size;
-                    }
                 }
+
                 // no completed reads, append instead
                 if (read_i == array_size) {
                     if (read_i < pileup.buffer_reads) {
@@ -543,6 +541,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                     read_map[qname] = read_i;
                 }
             }
+
+            max_n_reads = std::max<int32_t>(max_n_reads, std::ssize(read_array));
 
             if ((read_i < 0) || (read_i >= (pileup.buffer_reads))) {
                 continue;
@@ -656,11 +656,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     }
 
     pileup.n_pos = n_pos;
-    if (row_per_read) {
-        pileup.n_reads = static_cast<int32_t>(std::size(read_array));
-    } else {
-        pileup.n_reads = max_n_reads;
-    }
+    pileup.n_reads = static_cast<int32_t>(std::size(read_array));
     pileup.n_reads = std::min(max_reads, pileup.n_reads);
 
     pileup.major.resize(n_pos);
