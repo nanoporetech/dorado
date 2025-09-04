@@ -76,6 +76,7 @@ add_executable(dorado_tests
     WriterNodeTest.cpp
     PafUtilsTest.cpp
     SecondaryDecodeVariantsTest.cpp
+    SecondaryEncoderReadAlignmentTest.cpp
     SecondaryEncoderUtilsTest.cpp
     SecondaryKadayashiUtils.cpp
     SecondaryNormalizeVariantsTest.cpp
