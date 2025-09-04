@@ -1,9 +1,8 @@
 if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib")
-        set(HTSLIB_ARTIFACTORY_URL "$ENV{HTSLIB_ARTIFACTORY_URL}")
         download_and_extract(
-            ${HTSLIB_ARTIFACTORY_URL}/htslib-win-v1.22.1.tar.gz
+            ${DORADO_CDN_URL}/htslib-win-v1.22.1.tar.gz
             htslib-win
             "8cedc027d0c796e6fe6c8e30fe8ec161c46122d9ab66d5d6339f039ffc91b2ea"
         )
