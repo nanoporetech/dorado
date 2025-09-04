@@ -7,6 +7,8 @@
 
 namespace dorado::alignment {
 
+std::vector<std::filesystem::path> collect_inputs(const std::string& input_folder, bool recursive);
+
 struct AlignmentProcessingInfo {
     AlignmentProcessingInfo() {}
     AlignmentProcessingInfo(std::string input_,

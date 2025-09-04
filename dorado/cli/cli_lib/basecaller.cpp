@@ -494,7 +494,7 @@ void setup(const std::vector<std::string>& args,
                 utils::DescriptionCallback([&tracker](const std::string& description) {
                     tracker.set_description(description);
                 });
-        auto hts_writer_builder = hts_writer::HtsFileWriterBuilder(
+        auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
                 progress_callback, description_callback, gpu_names, sample_sheet);
 
@@ -607,7 +607,7 @@ void setup(const std::vector<std::string>& args,
     {
         // Set the sam header for all writers
         const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
-        hts_writer_ref.set_hts_file_header(std::move(hdr));
+        hts_writer_ref.set_shared_header(std::move(hdr));
     }
 
     std::unordered_set<std::string> reads_already_processed;

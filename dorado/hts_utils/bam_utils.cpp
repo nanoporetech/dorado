@@ -169,6 +169,18 @@ void strip_alignment_data_from_header(sam_hdr_t* hdr) {
     sam_hdr_change_HD(hdr, "SO", "unknown");
 }
 
+std::string get_read_group_tag(const bam1_t* record) {
+    if (record == nullptr) {
+        throw std::invalid_argument("get_read_group_tag - record cannot be nullptr");
+    }
+
+    const auto read_group_tag = bam_aux_get(record, "RG");
+    if (read_group_tag) {
+        return std::string(bam_aux2Z(read_group_tag));
+    }
+    return {};
+}
+
 std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const char* key) {
     if (header == nullptr) {
         throw std::invalid_argument("header cannot be nullptr");

@@ -5,10 +5,11 @@
 #include "cli/utils/cli_utils.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
-#include "demux/parse_custom_sequences.h"
 #include "dorado_version.h"
-#include "hts_utils/MergeHeaders.h"
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_writer/HtsFileWriterBuilder.h"
+#include "hts_writer/interface.h"
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
@@ -16,6 +17,7 @@
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 #include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
+#include "read_pipeline/nodes/WriterNode.h"
 #include "summary/summary.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
@@ -25,6 +27,7 @@
 #include "utils/stats.h"
 #include "utils/tty_utils.h"
 
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <chrono>
@@ -41,19 +44,6 @@ using namespace std::chrono_literals;
 #endif
 
 namespace {
-
-// This function allows us to map the reference id from input BAM records to what
-// they should be in the output file, based on the new ordering of references in
-// the merged header.
-void adjust_tid(const std::vector<uint32_t>& mapping, dorado::BamPtr& record) {
-    auto tid = record.get()->core.tid;
-    if (tid >= 0) {
-        if (tid >= int32_t(mapping.size())) {
-            throw std::range_error("BAM tid field out of range with respect to SQ lines.");
-        }
-        record.get()->core.tid = int32_t(mapping.at(tid));
-    }
-}
 
 std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
         argparse::ArgumentParser& parser,
@@ -203,12 +193,7 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_dir, true};
-    if (!processing_items.initialise()) {
-        spdlog::error("Could not initialise for input {}", reads);
-        return EXIT_FAILURE;
-    }
-    const auto& all_files = processing_items.get();
+    const auto all_files = alignment::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
         spdlog::info("No input files found");
         return EXIT_SUCCESS;
@@ -225,40 +210,61 @@ int demuxer(int argc, char* argv[]) {
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
-    HtsReader reader(all_files[0].input, read_list);
-
-    utils::MergeHeaders hdr_merger(strip_alignment);
-    hdr_merger.add_header(reader.header(), all_files[0].input);
-
-    // Fold in the headers from all the other files in the input list.
-    for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
-        HtsReader header_reader(all_files[input_idx].input, read_list);
-        auto error_msg = hdr_merger.add_header(header_reader.header(), all_files[input_idx].input);
-        if (!error_msg.empty()) {
-            spdlog::error("Unable to combine headers from all input files: " + error_msg);
-            return EXIT_FAILURE;
-        }
-    }
-
-    hdr_merger.finalize_merge();
-    auto sq_mapping = hdr_merger.get_sq_mapping();
-    auto header = SamHdrPtr(sam_hdr_dup(hdr_merger.get_merged_header()));
-    cli::add_pg_hdr(header.get(), "demux", args, "cpu");
-
     auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
     std::shared_ptr<const utils::SampleSheet> sample_sheet;
     if (!barcode_sample_sheet.empty()) {
         sample_sheet = std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, true);
     }
-
-    auto client_info = std::make_shared<DefaultClientInfo>();
-    reader.set_client_info(client_info);
-
     auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
 
+    auto header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_alignment);
+    auto add_pg_hdr = utils::HeaderMapper::Modifier(
+            [&args](sam_hdr_t* hdr) { cli::add_pg_hdr(hdr, "demux", args, "cpu"); });
+    header_mapper->modify_headers(add_pg_hdr);
+
+    // All progress reporting is in the post-processing part.
+    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
+    if (progress_stats_frequency > 0) {
+        tracker.disable_progress_reporting();
+    }
+    tracker.set_description("Demuxing");
+
+    ReadOutputProgressStats progress_stats(
+            std::chrono::seconds{progress_stats_frequency}, all_files.size(),
+            ReadOutputProgressStats::StatsCollectionMode::single_collector);
+    progress_stats.set_post_processing_percentage(0.4f);
+    progress_stats.start();
+
+    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+    {
+        auto progress_callback =
+                utils::ProgressCallback([&tracker, &progress_stats](size_t progress) {
+                    // Called as part of hts finalize
+                    tracker.update_post_processing_progress(static_cast<float>(progress));
+                    progress_stats.update_post_processing_progress(static_cast<float>(progress));
+                });
+        auto description_callback =
+                utils::DescriptionCallback([&tracker](const std::string& description) {
+                    tracker.set_description(description);
+                });
+
+        auto hts_writer_builder = hts_writer::DemuxHtsFileWriterBuilder(
+                emit_fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
+                description_callback, "", sample_sheet);
+
+        std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
+        if (hts_file_writer == nullptr) {
+            spdlog::error("Failed to create hts file writer");
+            std::exit(EXIT_FAILURE);
+        }
+
+        writers.push_back(std::move(hts_file_writer));
+    }
+
+    auto client_info = std::make_shared<DefaultClientInfo>();
+
     PipelineDescriptor pipeline_desc;
-    auto demux_writer = pipeline_desc.add_node<BarcodeDemuxerNode>(
-            {}, output_dir, demux_writer_threads, emit_fastq, std::move(sample_sheet), sort_bam);
+    auto writer_node = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
 
     if (barcoding_info) {
         if (!demux::try_configure_custom_barcode_sequences(
@@ -280,9 +286,9 @@ int demuxer(int argc, char* argv[]) {
         }
 
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
-        auto current_node = demux_writer;
+        auto current_node = writer_node;
         if (!no_trim) {
-            current_node = pipeline_desc.add_node<TrimmerNode>({demux_writer}, 1);
+            current_node = pipeline_desc.add_node<TrimmerNode>({writer_node}, 1);
         }
         pipeline_desc.add_node<BarcodeClassifierNode>({current_node}, demux_threads);
     }
@@ -295,28 +301,14 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    // At present, header output file header writing relies on direct node method calls
-    // rather than the pipeline framework.
-    auto& demux_writer_ref = pipeline->get_node_ref<BarcodeDemuxerNode>(demux_writer);
-    demux_writer_ref.set_header(header.get());
-
-    // All progress reporting is in the post-processing part.
-    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
-    if (progress_stats_frequency > 0) {
-        tracker.disable_progress_reporting();
-    }
-    tracker.set_description("Demuxing");
+    // Set the dynamic header map
+    pipeline->get_node_ref<WriterNode>(writer_node)
+            .set_dynamic_header(header_mapper->get_merged_headers_map());
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
     stats_callables.push_back(
             [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-
-    ReadOutputProgressStats progress_stats(
-            std::chrono::seconds{progress_stats_frequency}, all_files.size(),
-            ReadOutputProgressStats::StatsCollectionMode::single_collector);
-    progress_stats.set_post_processing_percentage(0.4f);
-    progress_stats.start();
 
     stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
         progress_stats.update_stats(stats);
@@ -325,29 +317,15 @@ int demuxer(int argc, char* argv[]) {
     constexpr auto kStatsPeriod = 100ms;
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
-
     // End stats counting setup.
 
     spdlog::info("> starting barcode demuxing");
-    if (!strip_alignment) {
-        reader.set_record_mutator(
-                [&sq_mapping](BamPtr& record) { adjust_tid(sq_mapping[0], record); });
-    }
-    auto num_reads_in_file = reader.read(*pipeline, max_reads);
-    spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
+    for (const auto& input : all_files) {
+        HtsReader reader(input.string(), read_list);
+        reader.set_client_info(client_info);
 
-    progress_stats.update_reads_per_file_estimate(num_reads_in_file);
-
-    // Barcode all the other files passed in
-    for (size_t input_idx = 1; input_idx < all_files.size(); input_idx++) {
-        HtsReader input_reader(all_files[input_idx].input, read_list);
-        input_reader.set_client_info(client_info);
-        if (!strip_alignment) {
-            input_reader.set_record_mutator([&sq_mapping, input_idx](BamPtr& record) {
-                adjust_tid(sq_mapping[input_idx], record);
-            });
-        }
-        num_reads_in_file = input_reader.read(*pipeline, max_reads);
+        const auto num_reads_in_file =
+                reader.read(*pipeline, max_reads, strip_alignment, std::move(header_mapper));
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
     }
@@ -361,10 +339,6 @@ int demuxer(int argc, char* argv[]) {
 
     // Finalise the files that were created.
     tracker.set_description("Sorting output files");
-    demux_writer_ref.finalise_hts_files([&](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-        progress_stats.update_post_processing_progress(static_cast<float>(progress));
-    });
 
     tracker.summarize();
     progress_stats.report_final_stats();

@@ -36,6 +36,7 @@ add_executable(dorado_tests
     FileInfoTest.cpp
     gpu_monitor_test.cpp
     gzip_reader_test.cpp
+    HeaderMapperTest.cpp
     HtsFileTest.cpp
     IndexFileAccessTest.cpp
     MathUtilsTest.cpp

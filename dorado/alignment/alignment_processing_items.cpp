@@ -75,6 +75,23 @@ std::unordered_map<std::string, std::vector<fs::path>> get_output_to_input_files
 
 namespace dorado::alignment {
 
+std::vector<std::filesystem::path> collect_inputs(const std::string& input_folder, bool recursive) {
+    const auto all_files = dorado::utils::fetch_directory_entries(input_folder, recursive);
+
+    std::vector<std::filesystem::path> inputs;
+    inputs.reserve(all_files.size());
+    for (const fs::directory_entry& dir_entry : all_files) {
+        if (!is_valid_input_file(dir_entry.path())) {
+            continue;
+        }
+        inputs.push_back(dir_entry.path());
+    }
+
+    spdlog::trace("Collected {} valid input files from '{}'{}.", inputs.size(), input_folder,
+                  recursive ? " recursively" : "");
+    return inputs;
+}
+
 AlignmentProcessingItems::AlignmentProcessingItems(std::string input_path,
                                                    bool recursive_input,
                                                    std::string output_folder,

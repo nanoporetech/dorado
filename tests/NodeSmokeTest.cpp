@@ -422,7 +422,7 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test simple pipeline with fastq and sam 
     for (auto& test_file : {data1, data2}) {
         dorado::HtsReader reader(test_file.string(), std::nullopt);
         reader.set_client_info(client_info);
-        reader.read(*pipeline, 0);
+        reader.read(*pipeline, 0, false, nullptr);
     }
 }
 

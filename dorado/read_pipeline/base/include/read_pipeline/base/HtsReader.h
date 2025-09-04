@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hts_utils/HeaderMapper.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/stats.h"
 
@@ -33,7 +34,10 @@ public:
 
     // If reading directly into a pipeline need to set the client info on the messages
     void set_client_info(std::shared_ptr<ClientInfo> client_info);
-    std::size_t read(Pipeline& pipeline, std::size_t max_reads);
+    std::size_t read(Pipeline& pipeline,
+                     std::size_t max_reads,
+                     const bool strip_alignments,
+                     const std::unique_ptr<utils::HeaderMapper> header_mapper);
 
     template <typename T>
     T get_tag(const char* tagname);
@@ -41,7 +45,6 @@ public:
     std::vector<T> get_array(const char* tagname);
 
     bool has_tag(const char* tagname);
-    void set_record_mutator(std::function<void(BamPtr&)> mutator);
 
     bool is_aligned{false};
     BamPtr record;
@@ -51,6 +54,7 @@ public:
     const std::string& format() const;
 
 private:
+    const std::string m_filename;
     sam_hdr_t* m_header{nullptr};  // non-owning
     std::string m_format;
     std::shared_ptr<ClientInfo> m_client_info;

@@ -53,6 +53,17 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 void strip_alignment_data_from_header(sam_hdr_t* hdr);
 
 /**
+ * @brief Get the read group tag content from a SAM/BAM/CRAM record
+ *
+ * This function extracts and returns the read group tag string from a 
+ * SAM/BAM/CRAM record's RG:Z tag.
+ * 
+ * @param record A pointer to a valid bam1_t object representing a SAM/BAM/CRAM record
+ * @return A string containing the read group ID.
+*/
+std::string get_read_group_tag(const bam1_t* record);
+
+/**
  * @brief Retrieves read group information from a SAM/BAM/CRAM file header based on a specified key.
  *
  * This function extracts read group information from a SAM/BAM/CRAM file header

@@ -23,7 +23,7 @@ public:
         FASTA,
     };
 
-    HtsFile(const std::string& filename, OutputMode mode, int threads, bool sort_bam);
+    HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam);
     ~HtsFile();
     HtsFile(const HtsFile&) = delete;
     HtsFile& operator=(const HtsFile&) = delete;
@@ -39,11 +39,11 @@ public:
     OutputMode get_output_mode() const { return m_mode; }
 
 private:
-    std::string m_filename;
+    const std::string m_filename;
     HtsFilePtr m_file;
     SamHdrPtr m_header;
     size_t m_num_records{0};
-    int m_threads{0};
+    const int m_threads{0};
     bool m_finalised{false};
     bool m_finalise_is_noop;
     bool m_sort_bam;

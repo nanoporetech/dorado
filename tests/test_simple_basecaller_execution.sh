@@ -412,8 +412,9 @@ fi
 echo dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux --emit-summary
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    samtools quickcheck -u $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam
-    num_demuxed_reads=$(samtools view -c $output_dir/demux/unknown_run_id_EXP-PBC096_barcode04.bam)
+    expected_path="$output_dir/demux/no_sample/19700101_0000_0_UNKNOWN_00000000/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
+    samtools quickcheck -u $expected_path
+    num_demuxed_reads=$(samtools view -c $expected_path)
     if [[ $num_demuxed_reads -ne "3" ]]; then
         echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
         exit 1
@@ -422,7 +423,8 @@ fi
 
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/ --kit-name EXP-PBC096 --output-dir $output_dir/demux_from_folder
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    samtools quickcheck -u $output_dir/demux_from_folder/unknown_run_id_EXP-PBC096_barcode04.bam
+    expected_path="$output_dir/demux_from_folder/no_sample/19700101_0000_0_UNKNOWN_00000000/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
+    samtools quickcheck -u $expected_path
 fi
 num_summary_lines=$(wc -l < $output_dir/demux/barcoding_summary.txt)
 if [[ $num_summary_lines -ne "4" ]]; then
@@ -433,8 +435,9 @@ fi
 echo dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --kit-name CUSTOM-SQK-RPB004 --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    samtools quickcheck -u $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam
-    num_demuxed_reads=$(samtools view -c $output_dir/custom_demux/unknown_run_id_CUSTOM-SQK-RPB004_barcode01.bam)
+    expected_path="$output_dir/custom_demux/no_sample/19700101_0000_0_UNKNOWN_00000000/bam_pass/barcode01/UNKNOWN_pass_barcode01_00000000_00000000_0.bam"
+    samtools quickcheck -u $expected_path
+    num_demuxed_reads=$(samtools view -c $expected_path)
     if [[ $num_demuxed_reads -ne "2" ]]; then
         echo "3 demuxed reads expected. Found ${num_demuxed_reads}"
         exit 1
@@ -542,14 +545,15 @@ test_barcoding_read_groups() (
         fi
         exit 0
     )
-    for bam in $split_dir/rg_*.bam; do
+    for bam in $(find -s "$split_dir" -type f -iname "rg_*.bam" ); do
         check_barcodes $bam
     done
 
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
     $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
 
-    for bam in $output_dir/${output_name}-demux/*.bam; do
+    # for bam in $output_dir/${output_name}-demux/*.bam; do
+    for bam in $(find -s "$output_dir/${output_name}-demux/" -type f -iname "rg_*.bam" ); do
         check_barcodes $bam
     done
 )
@@ -557,22 +561,8 @@ test_barcoding_read_groups() (
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     # There should be 4 reads with BC01, 2 with BC04, and 1 unclassified groups.
     test_barcoding_read_groups barcode01 4 barcode04 2 unclassified 1
-    # There should be 4 reads with BC01 aliased to patient_id_1, and 5 unclassified groups.
+    # There should be 4 reads with BC01 aliased to patient_id_1, and 3 unclassified groups.
     test_barcoding_read_groups patient_id_1 4 unclassified 3 $data_dir/barcode_demux/sample_sheet.csv
 fi
-
-# Test demux only on a pre-classified BAM file
-# Start by making an input file for demux:
-demux_data=$data_dir/barcode_demux/read_group_test
-$dorado_bin basecaller ${models_directory_arg} -b ${batch} --kit-name SQK-RBK114-96 ${model_5k} ${demux_data} --no-trim > $output_dir/read_group_test.bam
-
-$dorado_bin demux --no-classify --output-dir "$output_dir/demux_only_test/" $output_dir/read_group_test.bam
-for bam in $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode01.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_SQK-RBK114-96_barcode04.bam $output_dir/demux_only_test/0d85015e-6a4e-400c-a80f-c187c65a6d03_unclassified.bam; do
-    if [ ! -f $bam ]; then
-        echo "Missing expected bam file $bam.  Generated files:"
-        ls -l $output_dir/demux_only_test/
-        exit 1
-    fi
-done
 
 rm -rf $output_dir

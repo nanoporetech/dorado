@@ -193,7 +193,7 @@ int trim(int argc, char* argv[]) {
     // End stats counting setup.
 
     spdlog::info("> starting adapter/primer trimming");
-    reader.read(*pipeline, max_reads);
+    reader.read(*pipeline, max_reads, false, nullptr);
 
     // Wait for the pipeline to complete.  When it does, we collect
     // final stats to allow accurate summarisation.

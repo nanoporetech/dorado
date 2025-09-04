@@ -26,7 +26,7 @@ CATCH_TEST_CASE("HtsReaderTest: Read fasta to sink", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::HtsReader reader(fasta.string(), std::nullopt);
-    reader.read(*pipeline, 100);
+    reader.read(*pipeline, 100, false, nullptr);
     pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
     CATCH_REQUIRE(bam_records.size() == 10);  // FASTA file has 10 reads.
 }
@@ -62,7 +62,7 @@ CATCH_TEST_CASE("HtsReaderTest: Read SAM to sink", TEST_GROUP) {
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
 
     dorado::HtsReader reader(sam.string(), std::nullopt);
-    reader.read(*pipeline, 100);
+    reader.read(*pipeline, 100, false, nullptr);
     pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
     CATCH_REQUIRE(bam_records.size() == 11);  // SAM file has 11 reads.
 }
