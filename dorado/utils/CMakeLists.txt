@@ -16,6 +16,7 @@ dorado_add_library(
         concurrency/synchronisation.h
         concurrency/task_priority.h
         context_container.h
+        crash_handlers.h
         crypto_utils.h
         dev_utils.h
         fs_utils.h
@@ -55,6 +56,7 @@ dorado_add_library(
         concurrency/async_task_executor.cpp
         concurrency/detail/priority_task_queue.cpp
         concurrency/multi_queue_thread_pool.cpp
+        crash_handlers.cpp
         crypto_utils.cpp
         dev_utils.cpp
         fs_utils.cpp
