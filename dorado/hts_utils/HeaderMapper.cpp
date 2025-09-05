@@ -89,7 +89,8 @@ HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs, boo
 void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
     for (const auto& input : inputs) {
         spdlog::trace("HeaderMapper processing headers from: '{}'.", input.string());
-        if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ || hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
+        if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ ||
+            hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
             process_fastx(input);
         } else {
             process_bam(input);
