@@ -3,7 +3,6 @@
 #include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
-#include "hts_utils/fasta_reader.h"
 #include "hts_utils/fastq_tags.h"
 #include "hts_utils/header_utils.h"
 #include "hts_utils/hts_types.h"
