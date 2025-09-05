@@ -2,9 +2,9 @@ if(NOT TARGET htslib) # lazy include guard
     if(WIN32)
         message(STATUS "Fetching htslib")
         download_and_extract(
-            ${DORADO_CDN_URL}/htslib-win.tar.gz
+            ${DORADO_CDN_URL}/htslib-win-v1.22.1.tar.gz
             htslib-win
-            "7b1719da1ae3d2ea059bb1e7f02e5e3aac57aa41e4fc38d3ab0c20fd68143d08"
+            "8cedc027d0c796e6fe6c8e30fe8ec161c46122d9ab66d5d6339f039ffc91b2ea"
         )
         set(HTSLIB_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/htslib-win CACHE STRING
                     "Path to htslib repo")
@@ -72,7 +72,6 @@ if(NOT TARGET htslib) # lazy include guard
             PREFIX ${HTSLIB_BUILD}
             SOURCE_DIR ${HTSLIB_BUILD}/htslib
             BUILD_IN_SOURCE 1
-            PATCH_COMMAND patch < ${DORADO_3RD_PARTY_SOURCE}/patches/htslib.patch
             CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
             COMMAND ${AUTOCONF_COMMAND}
             COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${hts_configure_flags}
