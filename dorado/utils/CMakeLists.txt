@@ -20,7 +20,6 @@ dorado_add_library(
         crypto_utils.h
         dev_utils.h
         fs_utils.h
-        gzip_reader.h
         jthread.h
         locale_utils.h
         log_utils.h
@@ -60,7 +59,6 @@ dorado_add_library(
         crypto_utils.cpp
         dev_utils.cpp
         fs_utils.cpp
-        gzip_reader.cpp
         locale_utils.cpp
         log_utils.cpp
         memory_utils.cpp
