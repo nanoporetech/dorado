@@ -1,5 +1,6 @@
 #include "encoder_read_alignment.h"
 
+#include "encoder_utils.h"
 #include "medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
@@ -125,105 +126,19 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
 
         std::vector<at::Tensor> reordered_chunks{chunks[0]};
 
-        std::vector<std::string> rids_out = read_ids_out[0];
+        std::vector<std::string> prev_rids_out = read_ids_out[0];
 
         for (int64_t n = 1; n < dorado::ssize(chunks); ++n) {
-            auto& chunk = chunks[n];
-            const auto& rids_in = read_ids_in[n];
+            LOG_TRACE("[reorder_reads] Reordering chunk n = {}", n);
 
-            LOG_TRACE(
-                    "[reorder_reads] n = {}, rids_out.size() = {}, rids_in.size() = {}, "
-                    "chunk.shape = {}",
-                    n, std::size(rids_out), std::size(rids_in),
-                    utils::tensor_shape_as_string(chunk));
-
-            // Create a lookup.
-            std::unordered_map<std::string, int64_t> rids_in_map;
-            for (int64_t i = 0; i < dorado::ssize(rids_in); ++i) {
-                rids_in_map[rids_in[i]] = i;
-            }
-
-            // Find the indices of the out reads in the in reads.
-            std::vector<int64_t> new_indices(std::size(rids_out), -1);
-            for (int64_t i = 0; i < dorado::ssize(rids_out); ++i) {
-                const auto& rid = rids_out[i];
-                const auto it = rids_in_map.find(rid);
-                new_indices[i] = (it != std::end(rids_in_map)) ? it->second : -1;
-            }
-
-            // Find missing out indices.
-            std::vector<int64_t> missing_out_indices;
-            for (int64_t i = 0; i < dorado::ssize(new_indices); ++i) {
-                if (new_indices[i] == -1) {
-                    missing_out_indices.emplace_back(i);
-                }
-            }
-
-            // Find missing in indices.
-            const std::unordered_set<int64_t> new_indices_set(std::begin(new_indices),
-                                                              std::end(new_indices));
-            std::vector<int64_t> missing_in_indices;
-            for (int64_t i = 0; i < dorado::ssize(rids_in); ++i) {
-                if (new_indices_set.count(i) == 0) {
-                    missing_in_indices.emplace_back(i);
-                }
-            }
-
-            LOG_TRACE(
-                    "[reorder_reads] n = {}, missing_in_indices.size() = {}, "
-                    "missing_out_indices.size() = {}",
-                    n, std::size(missing_in_indices), std::size(missing_out_indices));
-            LOG_TRACE("[reorder_reads] n = {}, missing_in_indices: {}", n,
-                      utils::print_container_as_string(missing_in_indices, ", ", true));
-            LOG_TRACE("[reorder_reads] n = {}, missing_out_indices: {}", n,
-                      utils::print_container_as_string(missing_out_indices, ", ", true));
-
-            // Fill out the gaps in the array with some of the extra indices.
-            for (size_t i = 0;
-                 i < std::min(std::size(missing_out_indices), std::size(missing_in_indices)); ++i) {
-                new_indices[missing_out_indices[i]] = missing_in_indices[i];
-            }
-
-            // Add remaining missing in-indices.
-            if (std::size(missing_in_indices) > std::size(missing_out_indices)) {
-                new_indices.insert(std::end(new_indices),
-                                   std::begin(missing_in_indices) + std::size(missing_out_indices),
-                                   std::end(missing_in_indices));
-            }
-
-            LOG_TRACE("[reorder_reads] n = {}, creating an empty reordered_chunk.", n);
-
-            // Permute.
-            auto reordered_chunk = torch::zeros(
-                    {chunk.size(0),
-                     static_cast<int64_t>(std::max(
-                             {std::size(new_indices), std::size(rids_in), std::size(rids_out)})),
-                     chunk.size(2)},
-                    chunk.options());
-            for (size_t i = 0; i < std::size(new_indices); ++i) {
-                if (new_indices[i] == -1) {
-                    continue;
-                }
-                reordered_chunk.index_put_({torch::indexing::Slice(), static_cast<int64_t>(i),
-                                            torch::indexing::Slice()},
-                                           chunk.index({torch::indexing::Slice(), new_indices[i],
-                                                        torch::indexing::Slice()}));
-            }
+            auto [reordered_chunk, next_rids_out] =
+                    reorder_chunk(chunks[n], prev_rids_out, read_ids_in[n], read_ids_out[n]);
 
             reordered_chunks.emplace_back(std::move(reordered_chunk));
 
-            LOG_TRACE("[reorder_reads] n = {}, updating the previous out column.", n);
+            prev_rids_out = std::move(next_rids_out);
 
-            // Update read_ids_out for the next chunk.
-            if ((n + 1) < dorado::ssize(chunks)) {
-                rids_out.clear();
-                rids_out.resize(std::size(new_indices));
-                for (int64_t i = 0; i < dorado::ssize(new_indices); ++i) {
-                    const int64_t idx = new_indices[i];
-                    rids_out[i] = (idx == -1) ? ("__inserted_" + std::to_string(i))
-                                              : read_ids_out[n][idx];
-                }
-            }
+            LOG_TRACE("[reorder_reads] n = {}, updating the previous out column.", n);
 
             LOG_TRACE("[reorder_reads] n = {}, done.", n);
         }

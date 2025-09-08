@@ -18,6 +18,8 @@ dorado_add_library(
         encoder_factory.cpp
         encoder_read_alignment.cpp
         encoder_read_alignment.h
+        encoder_utils.cpp
+        encoder_utils.h
         kadayashi_utils.cpp
         medaka_bamiter.cpp
         medaka_bamiter.h
