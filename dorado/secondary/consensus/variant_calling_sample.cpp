@@ -274,8 +274,13 @@ std::vector<VariantCallingSample> trim_vc_samples(
     local_samples.reserve(std::size(group));
     for (const auto& [start, id] : group) {
         const auto& vc_sample = vc_input_data[id];
-        local_samples.emplace_back(Sample(vc_sample.seq_id, {}, vc_sample.positions_major,
-                                          vc_sample.positions_minor, {}, {}, {}));
+        local_samples.emplace_back(Sample{.seq_id = vc_sample.seq_id,
+                                          .features = {},
+                                          .positions_major = vc_sample.positions_major,
+                                          .positions_minor = vc_sample.positions_minor,
+                                          .depth = {},
+                                          .read_ids_left = {},
+                                          .read_ids_right = {}});
     }
 
     // Compute trimming of all samples for this group.

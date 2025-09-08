@@ -19,23 +19,6 @@ struct Sample {
     std::vector<std::string> read_ids_left;
     std::vector<std::string> read_ids_right;
 
-    Sample() = default;
-
-    Sample(const int32_t seq_id_,
-           at::Tensor features_,
-           std::vector<int64_t> positions_major_,
-           std::vector<int64_t> positions_minor_,
-           at::Tensor depth_,
-           std::vector<std::string> read_ids_left_,
-           std::vector<std::string> read_ids_right_)
-            : seq_id{seq_id_},
-              features{std::move(features_)},
-              positions_major{std::move(positions_major_)},
-              positions_minor{std::move(positions_minor_)},
-              depth{std::move(depth_)},
-              read_ids_left{std::move(read_ids_left_)},
-              read_ids_right{std::move(read_ids_right_)} {}
-
     int64_t start() const { return (std::empty(positions_major) ? -1 : (positions_major.front())); }
 
     int64_t end() const {
