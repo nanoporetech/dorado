@@ -374,9 +374,9 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     const int32_t extra_featlen = include_dwells + include_haplotype_column + (num_dtypes > 1);
     ReadAlignmentData pileup(n_pos, max_n_reads, buffer_pos, buffer_reads, extra_featlen, 0);
 
-    int64_t major_col = 0;  // index into `pileup` corresponding to pos
-    n_pos = 0;              // number of processed columns (including insertions)
-    int64_t min_gap = 5;    // minimum gap before starting a new read on an existing row
+    int64_t major_col = 0;          // index into `pileup` corresponding to pos
+    n_pos = 0;                      // number of processed columns (including insertions)
+    constexpr int64_t MIN_GAP = 5;  // minimum gap before starting a new read on an existing row
 
     // A vector to store all read structs.
     std::vector<Read> read_array;
@@ -523,7 +523,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 if (!row_per_read) {
                     for (read_i = 0; read_i < array_size; ++read_i) {
                         const Read &current_read = read_array[read_i];
-                        if (pos >= (current_read.ref_end + min_gap)) {
+                        if (pos >= (current_read.ref_end + MIN_GAP)) {
                             read_array[read_i] = std::move(read);
                             read_map[qname] = read_i;
                             break;
@@ -656,7 +656,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     }
 
     pileup.n_pos = n_pos;
-    pileup.n_reads = static_cast<int32_t>(std::size(read_array));
+    pileup.n_reads = std::ssize(read_array);
     pileup.n_reads = std::min(max_reads, pileup.n_reads);
 
     pileup.major.resize(n_pos);
