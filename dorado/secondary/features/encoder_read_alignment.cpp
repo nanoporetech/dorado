@@ -196,7 +196,8 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             // Permute.
             auto reordered_chunk = torch::zeros(
                     {chunk.size(0),
-                     static_cast<int64_t>(std::max(std::size(rids_out), std::size(rids_in))),
+                     static_cast<int64_t>(std::max(
+                             {std::size(new_indices), std::size(rids_in), std::size(rids_out)})),
                      chunk.size(2)},
                     chunk.options());
             for (size_t i = 0; i < std::size(new_indices); ++i) {
