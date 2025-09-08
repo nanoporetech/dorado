@@ -19,19 +19,13 @@ constexpr std::size_t MAX_COLS{12};
 
 bool get_tokens(const std::string& bed_line, std::vector<std::string>& tokens) {
     tokens.clear();
-    std::istringstream bed_line_stream(bed_line);
 
-    // if too many columns include an extra column so caller can validate and find the error
-    for (std::size_t col{0}; col <= MAX_COLS; ++col) {
-        std::string token;
-        if (!std::getline(bed_line_stream, token, '\t')) {
-            break;
-        }
-        if (token.empty()) {
-            return false;
-        }
-        tokens.push_back(std::move(token));
+    std::size_t start = 0, end;
+    while ((end = bed_line.find('\t', start)) != std::string::npos) {
+        tokens.push_back(bed_line.substr(start, end - start));
+        start = end + 1;
     }
+    tokens.push_back(bed_line.substr(start));
 
     return !tokens.empty();
 }
@@ -64,7 +58,7 @@ bool is_header(const std::string& candidate) {
 }
 
 bool is_comment(const std::string& candidate) {
-    return candidate.empty() || candidate.at(0) == '#';
+    return utils::rtrim_view(candidate).empty() || candidate.at(0) == '#';
 }
 
 class BedFileEntryParser {
@@ -81,7 +75,6 @@ private:
 
     void reset(std::string bed_line) {
         m_candidate_bed_line = std::move(bed_line);
-        utils::rtrim(m_candidate_bed_line);
         m_is_comment_line = is_comment(m_candidate_bed_line);
         m_entry = {};
         m_genome = {};
@@ -132,6 +125,12 @@ private:
 
     bool try_process_tokens() {
         BedFile::Entry new_entry{};
+
+        if (m_tokens[0].empty()) {
+            m_error_reason = "Unable to read column 1: [CHROM]";
+            return false;
+        }
+
         if (!try_get(m_tokens[1], new_entry.start)) {
             m_error_reason = "Unable to read column 2: [START]";
             return false;

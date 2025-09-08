@@ -163,17 +163,30 @@ CATCH_TEST_CASE(CUT_TAG " load from stream with inconsistent number of columns r
     CATCH_REQUIRE_FALSE(cut.load(input_stream));
 }
 
-CATCH_TEST_CASE(
-        CUT_TAG
-        " load from stream 2 records where second record has empty last column returns false.",
-        CUT_TAG) {
+CATCH_TEST_CASE(CUT_TAG
+                " load from stream 2 records where second record has empty last required column "
+                "returns false.",
+                CUT_TAG) {
+    const std::string three_column_line{"Lambda\t1234\t2345\n"};
+    const std::string three_column_line_empty_last_col{"Lambda\t1234\t\n"};
+    std::istringstream input_stream{three_column_line + three_column_line_empty_last_col};
+    dorado::alignment::BedFile cut{};
+
+    utils::SuppressStdout suppress_load_error_message{};
+    CATCH_REQUIRE_FALSE(cut.load(input_stream));
+}
+
+CATCH_TEST_CASE(CUT_TAG
+                " load from stream 2 records where second record has empty last un-required column "
+                "returns true.",
+                CUT_TAG) {
     const std::string four_column_line{"Lambda\t1234\t2345\tcomment\n"};
     const std::string four_column_line_empty_last_col{"Lambda\t1234\t2345\t\n"};
     std::istringstream input_stream{four_column_line + four_column_line_empty_last_col};
     dorado::alignment::BedFile cut{};
 
     utils::SuppressStdout suppress_load_error_message{};
-    CATCH_REQUIRE_FALSE(cut.load(input_stream));
+    CATCH_REQUIRE(cut.load(input_stream));
 }
 
 CATCH_TEST_CASE(CUT_TAG " load valid bed with empty line at start.", CUT_TAG) {
@@ -247,7 +260,7 @@ CATCH_TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
             {"Lambda\t1234\t2345\tinvalid strand\t100\tTTT", "Lambda", 0, 0, '\0', false},
             {"12Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t123,234\t456,567", "12Fields", 1, 2, '+', true},
             {"13Fields\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t0\t1,2\t4,5\t0", "13Fields", 0, 0, '\0', false},
-            {"empty_middle_column\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_column", 0, 0, '\0', false},
+            {"empty_middle_column\t1\t2\tab c\t100\t+\t0\t0\t1,2,3\t\t123,234\t456,567", "empty_middle_column", 1, 2, '+', true},
             {"empty_last_column\t1\t2\tab c\t100\t+\t\t \t", "empty_last_column", 1, 2, '+', true},
         }));
     // clang-format on
