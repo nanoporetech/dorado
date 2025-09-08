@@ -14,6 +14,10 @@ namespace dorado::adapter_primer_kits {
 
 namespace {
 
+// These HTS tags can be used in custom sequence fasta files for custom adapters and primers.
+const std::string ENTRY_TYPE_TAG = "et";  // Use "adapter" or "primer" to indicate sequence type.
+const std::string SEQ_KITS_TAG = "sk";    // Comma-delimited list of supported sequencing kits.
+
 enum class AdapterCode { LSK110, RNA004 };
 
 enum class PrimerCode { cDNA, PCS110, RAD, GEN10X };
@@ -169,7 +173,7 @@ std::set<std::string> parse_kit_names(const std::string& kit_string) {
 }
 
 CustomItem::ItemType item_type(const std::unordered_map<std::string, std::string>& tags) {
-    auto type_field = tags.find("type");
+    auto type_field = tags.find(ENTRY_TYPE_TAG);
     if (type_field == tags.end()) {
         return CustomItem::UNKNOWN;
     }
@@ -203,7 +207,7 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record
 }
 
 std::set<std::string> kit_names(const std::unordered_map<std::string, std::string>& tags) {
-    auto kits_field = tags.find("kits");
+    auto kits_field = tags.find(SEQ_KITS_TAG);
     if (kits_field == tags.end()) {
         spdlog::error("Custom adapter/primer parsing error: No 'kits' field found.");
         throw std::runtime_error("Error parsing custom adapter/primer file.");

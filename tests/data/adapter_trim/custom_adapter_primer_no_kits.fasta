@@ -1,12 +1,12 @@
->adapter1_front type=adapter kits=any
+>adapter1_front	et:Z:adapter	sk:Z:any
 AGGGAACT
->adapter1_rear type=adapter kits=any
+>adapter1_rear	et:Z:adapter	sk:Z:any
 AGTTCC
->primer1_front type=primer kits=any
+>primer1_front	et:Z:primer	sk:Z:any
 TGCGAAT
->primer1_rear type=primer kits=any
+>primer1_rear	et:Z:primer	sk:Z:any
 CAGAGGTC
->primer2_front type=primer kits=any
+>primer2_front	et:Z:primer	sk:Z:any
 CTGACGT
->primer2_rear type=primer kits=any
+>primer2_rear	et:Z:primer	sk:Z:any
 CAATGAA

@@ -1,52 +1,37 @@
 #include "demux/parse_custom_sequences.h"
 
-#include "hts_utils/fasta_reader.h"
+#include "hts_utils/bam_utils.h"
+#include "read_pipeline/base/HtsReader.h"
 
-#include <stdexcept>
-#include <tuple>
-
-namespace {
-std::pair<std::string, std::string> parse_token(const std::string& token) {
-    auto split_pos = token.find('=');
-    if (split_pos == 0 || split_pos == token.size() - 1 || split_pos == std::string::npos) {
-        return {};
-    }
-    auto key = token.substr(0, split_pos);
-    auto value = token.substr(split_pos + 1);
-    return {key, value};
-}
-}  // namespace
+#include <htslib/sam.h>
 
 namespace dorado::demux {
 
 std::vector<CustomSequence> parse_custom_sequences(const std::string& sequences_file) {
-    utils::FastaReader reader(sequences_file);
-    if (!reader.is_valid()) {
-        throw std::runtime_error("Failed to extract sequences from '" + sequences_file + "'.");
-    }
+    HtsReader reader(sequences_file, std::nullopt);
     std::vector<CustomSequence> sequences;
-    while (true) {
-        auto record = reader.try_get_next_record();
-        if (!record) {
-            break;
-        }
+    while (reader.read()) {
         CustomSequence custom;
-        custom.name = record->record_name();
-        custom.sequence = record->sequence();
-        const auto& tokens = record->get_tokens();
-        if (tokens.size() > 1) {
-            for (auto iter = tokens.begin() + 1; iter != tokens.end(); ++iter) {
-                auto [key, value] = parse_token(*iter);
-                if (key.empty()) {
-                    custom.tags.clear();
-                    break;
-                }
-                custom.tags.emplace(std::move(key), std::move(value));
+        custom.name = bam_get_qname(reader.record.get());
+        custom.sequence = utils::extract_sequence(reader.record.get());
+        const auto& tag_list = get_custom_sequence_tag_list();
+        for (const auto& tag : tag_list) {
+            if (reader.has_tag(tag.c_str())) {
+                auto value = reader.get_tag<std::string>(tag.c_str());
+                custom.tags.emplace(tag, std::move(value));
             }
         }
-        sequences.push_back(std::move(custom));
+        sequences.emplace_back(std::move(custom));
     }
     return sequences;
+}
+
+const std::vector<std::string>& get_custom_sequence_tag_list() {
+    static std::vector<std::string> tag_list = {
+            "et",  // Sequence entry type tag. For use in adapter/primer custom sequence files.
+            "sk",  // Sequencing kits tag. For use in adapter/primer custom sequence files.
+    };
+    return tag_list;
 }
 
 }  // namespace dorado::demux
