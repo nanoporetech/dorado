@@ -6,6 +6,9 @@
 
 namespace dorado::demux {
 
+/// Provides a list of all supported custom sequence tags.
+const std::vector<std::string>& get_custom_sequence_tag_list();
+
 struct CustomSequence {
     std::string name;
     std::string sequence;

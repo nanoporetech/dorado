@@ -2,14 +2,16 @@
 
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
-#include "hts_utils/fasta_reader.h"
+#include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
+#include "read_pipeline/base/HtsReader.h"
 #include "utils/sequence_utils.h"
 #include "utils/time_utils.h"
 
 #include <ATen/Functions.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <htslib/sam.h>
 
 #include <filesystem>
 
@@ -57,11 +59,11 @@ DEFINE_TEST("Split read pairing") {
 
     // Load a pre-determined read to exercise the mapping pathway.
     const auto fa_file = std::filesystem::path(get_aligner_data_dir()) / "long_target.fa";
-    dorado::utils::FastaReader fa_reader(fa_file.string());
-    auto record = fa_reader.try_get_next_record();
-    record = fa_reader.try_get_next_record();  // Skip the first sequence and use the second one.
-    CATCH_REQUIRE(record.has_value());
-    const std::string seq = record->sequence();
+    dorado::HtsReader reader(fa_file.string(), std::nullopt);
+    // Skip the first sequence and use the second one.
+    CATCH_REQUIRE(reader.read());
+    CATCH_REQUIRE(reader.read());
+    const std::string seq = dorado::utils::extract_sequence(reader.record.get());
     auto seq_rc = dorado::utils::reverse_complement(seq);
     seq_rc = seq_rc.substr(0, size_t(seq.length() * 0.8f));
 

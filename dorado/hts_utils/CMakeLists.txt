@@ -6,8 +6,6 @@ dorado_add_library(
     SOURCES_PUBLIC
         bam_utils.h
         fai_utils.h
-        fasta_fastq_utils.h
-        fasta_reader.h
         fastq_tags.h
         FastxRandomReader.h
         FastxSequentialReader.h
@@ -21,8 +19,6 @@ dorado_add_library(
     SOURCES_PRIVATE
         bam_utils.cpp
         fai_utils.cpp
-        fasta_fastq_utils.cpp
-        fasta_reader.cpp
         fastq_tags.cpp
         FastxRandomReader.cpp
         FastxSequentialReader.cpp
