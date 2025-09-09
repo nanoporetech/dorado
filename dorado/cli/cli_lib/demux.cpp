@@ -27,6 +27,7 @@
 #include "utils/stats.h"
 #include "utils/tty_utils.h"
 
+#include <argparse/argparse.hpp>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
@@ -67,7 +68,8 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
 namespace dorado {
 
 int demuxer(int argc, char* argv[]) {
-    argparse::ArgumentParser parser("dorado demux");
+    argparse::ArgumentParser parser("dorado demux", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     parser.add_description("Barcode demultiplexing tool. Users need to specify the kit name(s).");
     parser.add_argument("reads")
             .help("An input file or the folder containing input file(s) (any HTS format).")

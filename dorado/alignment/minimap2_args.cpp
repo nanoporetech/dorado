@@ -239,11 +239,10 @@ std::optional<Minimap2Options> process_arguments(const argparse::ArgumentParser&
 }  // namespace
 
 std::string get_help_message() {
-    argparse::ArgumentParser parser("minimap2_options");
+    argparse::ArgumentParser parser("minimap2_options", MM_VERSION,
+                                    argparse::default_arguments::none);
     add_arguments(parser);
-    std::ostringstream parser_stream;
-    parser_stream << parser;
-    return parser_stream.str();
+    return parser.help().str();
 }
 
 Minimap2Options parse_options(const std::string& minimap2_option_string) {
@@ -282,7 +281,7 @@ std::optional<Minimap2Options> try_parse_options_impl(argparse::ArgumentParser& 
 
 std::optional<Minimap2Options> try_parse_options(const std::string& minimap2_option_string,
                                                  std::string& error_message) {
-    argparse::ArgumentParser parser("minimap2_options");
+    argparse::ArgumentParser parser("minimap2_options", MM_VERSION);
     return try_parse_options_impl(parser, minimap2_option_string, error_message);
 }
 

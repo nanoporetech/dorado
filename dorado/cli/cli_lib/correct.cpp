@@ -381,7 +381,8 @@ int correct(int argc, char* argv[]) {
     // Initialize CLI options. The parse_args below requires a non-const reference.
     // Verbosity is passed into a callback, so we need it here.
     int verbosity = 0;
-    argparse::ArgumentParser parser("dorado correct");
+    argparse::ArgumentParser parser("dorado correct", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     add_arguments(parser, verbosity);
 
     // Parse the arguments.
