@@ -93,6 +93,7 @@ endif()
 # Our libtorch should be chosen over any others on the system
 list(PREPEND CMAKE_PREFIX_PATH "${TORCH_LIB}")
 
+set(CAFFE2_STATIC_LINK_CUDA ON)
 find_package(Torch REQUIRED)
 
 if(EXISTS "${TORCH_LIB}/build-version")
