@@ -119,25 +119,22 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
             "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
             "modbases, or path to existing model directory.");
     parser.add_argument("data").help("The data directory or POD5 file path.");
-    {
-        // Default "Optional arguments" group
-        parser.add_argument("-v", "--verbose")
-                .default_value(false)
-                .implicit_value(true)
-                .nargs(0)
-                .action([&](const auto&) { ++verbosity; })
-                .append();
-        cli::add_device_arg(parser);
-        parser.add_argument("--models-directory")
-                .default_value(std::string("."))
-                .help("Optional directory to search for existing models or download new models "
-                      "into.");
-        parser.add_argument("--bed-file")
-                .help("Optional bed-file. If specified, overlaps between the alignments and "
-                      "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
-                      "read tag.")
-                .default_value(std::string{});
-    }
+
+    // Default "Optional arguments" group
+    parser.add_argument("-v", "--verbose")
+            .default_value(false)
+            .implicit_value(true)
+            .nargs(0)
+            .action([&](const auto&) { ++verbosity; })
+            .append();
+
+    cli::add_device_arg(parser);
+
+    parser.add_argument("--models-directory")
+            .default_value(std::string("."))
+            .help("Optional directory to search for existing models or download new models "
+                  "into.");
+
     {
         parser.add_group("Input data arguments");
         parser.add_argument("-r", "--recursive")
@@ -171,6 +168,11 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
         parser.add_group("Alignment arguments");
         parser.add_argument("--reference")
                 .help("Path to reference for alignment.")
+                .default_value(std::string{});
+        parser.add_argument("--bed-file")
+                .help("Optional bed-file. If specified, overlaps between the alignments and "
+                      "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
+                      "read tag.")
                 .default_value(std::string{});
         alignment::mm2::add_options_string_arg(parser);
     }

@@ -132,52 +132,70 @@ int aligner(int argc, char* argv[]) {
             "The default parameters use the lr:hq preset.\n"
             "NOTE: Not all arguments from minimap2 are currently available. Additionally, "
             "parameter names are not finalized and may change.");
+
     parser.add_argument("index").help("reference in (fastq/fasta/mmi).");
     parser.add_argument("reads")
             .help("An input file or the folder containing input file(s) (any HTS format).")
             .nargs(argparse::nargs_pattern::optional)
             .default_value(std::string{});
-    parser.add_argument("-r", "--recursive")
-            .help("If the 'reads' positional argument is a folder any subfolders will also be "
-                  "searched for input files.")
-            .flag();
-    parser.add_argument("-o", "--output-dir")
-            .help("If specified output files will be written to the given folder, otherwise output "
-                  "is to stdout. Required if the 'reads' positional argument is a folder.")
-            .default_value(std::string{});
-    parser.add_argument("--emit-summary")
-            .help("If specified, a summary file containing the details of the primary alignments "
-                  "for each read will be emitted to the root of the output folder. This option "
-                  "requires that the '--output-dir' option is also set.")
-            .flag();
-    parser.add_argument("--bed-file")
-            .help("Optional bed-file. If specified, overlaps between the alignments and bed-file "
-                  "entries will be counted, and recorded in BAM output using the 'bh' read tag.")
-            .default_value(std::string(""));
-    parser.add_argument("--progress_stats_frequency")
-            .hidden()
-            .help("Frequency in seconds in which to report progress statistics")
-            .default_value(0)
-            .scan<'i', int>();
-    parser.add_argument("-t", "--threads")
-            .help("number of threads for alignment and BAM writing (0=unlimited).")
-            .default_value(0)
-            .scan<'i', int>();
-    parser.add_argument("-n", "--max-reads")
-            .help("maximum number of reads to process (for debugging, 0=unlimited).")
-            .default_value(0)
-            .scan<'i', int>();
-    parser.add_argument("--add-fastq-rg")
-            .help("Adds FASTQ read group information as @RG header lines in the output BAM. "
-                  "Initial parsing over all input FASTQ file(s) may take time.")
-            .flag();
+
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
             .flag()
             .action([&](const auto&) { ++verbosity; })
             .append();
 
-    alignment::mm2::add_options_string_arg(parser);
+    {
+        parser.add_group("Input data arguments");
+        parser.add_argument("-r", "--recursive")
+                .help("If the 'reads' positional argument is a folder any subfolders will also be "
+                      "searched for input files.")
+                .flag();
+        parser.add_argument("-n", "--max-reads")
+                .help("maximum number of reads to process (for debugging, 0=unlimited).")
+                .default_value(0)
+                .scan<'i', int>();
+    }
+    {
+        parser.add_group("Alignment arguments");
+        alignment::mm2::add_options_string_arg(parser);
+        parser.add_argument("--bed-file")
+                .help("Optional bed-file. If specified, overlaps between the alignments and "
+                      "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
+                      "read tag.")
+                .default_value(std::string(""));
+        parser.add_argument("--add-fastq-rg")
+                .help("Adds FASTQ read group information as @RG header lines in the output BAM. "
+                      "Initial parsing over all input FASTQ file(s) may take time.")
+                .flag();
+    }
+    {
+        parser.add_group("Output arguments");
+        parser.add_argument("-o", "--output-dir")
+                .help("If specified output files will be written to the given folder, otherwise "
+                      "output "
+                      "is to stdout. Required if the 'reads' positional argument is a folder.")
+                .default_value(std::string{});
+        parser.add_argument("--emit-summary")
+                .help("If specified, a summary file containing the details of the primary "
+                      "alignments "
+                      "for each read will be emitted to the root of the output folder. This option "
+                      "requires that the '--output-dir' option is also set.")
+                .flag();
+    }
+    {
+        parser.add_group("Advanced arguments");
+        parser.add_argument("-t", "--threads")
+                .help("number of threads for alignment and BAM writing (0=unlimited).")
+                .default_value(0)
+                .scan<'i', int>();
+    }
+
+    parser.add_argument("--progress_stats_frequency")
+            .hidden()
+            .help("Frequency in seconds in which to report progress statistics")
+            .default_value(0)
+            .scan<'i', int>();
 
     std::vector<std::string> args_excluding_mm2_opts{};
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
