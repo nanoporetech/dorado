@@ -125,7 +125,8 @@ std::unordered_map<std::string, dorado::ReadGroup> collect_read_groups(
 namespace dorado {
 
 int aligner(int argc, char* argv[]) {
-    argparse::ArgumentParser parser("dorado aligner");
+    argparse::ArgumentParser parser("dorado aligner", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     parser.add_description(
             "Alignment using minimap2. The outputs are expected to be equivalent to minimap2.\n"
             "The default parameters use the lr:hq preset.\n"

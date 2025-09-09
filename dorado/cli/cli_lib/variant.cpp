@@ -921,7 +921,8 @@ int variant_caller(int argc, char* argv[]) {
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
         int verbosity = 0;
-        argparse::ArgumentParser parser("dorado variant");
+        argparse::ArgumentParser parser("dorado variant", DORADO_VERSION,
+                                        argparse::default_arguments::help);
         add_arguments(parser, verbosity);
 
         // Parse the arguments.
