@@ -268,10 +268,6 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 .help("The number of samples overlapping neighbouring chunks.")
                 .default_value(default_parameters.overlap)
                 .scan<'i', int>();
-        parser.add_argument("--enable-deprecated-models")
-                .hidden()
-                .help("(WARNING: For expert users only) Allow loading of deprecated models.")
-                .flag();
     }
     cli::add_internal_arguments(parser);
 }
@@ -923,11 +919,6 @@ int basecaller(int argc, char* argv[]) {
             utils::clean_temporary_models(downloader.temporary_models());
             return EXIT_FAILURE;
         }
-    }
-
-    // We only enable loading of deprecated models here so that we won't try to auto-download one.
-    if (parser.get<bool>("--enable-deprecated-models")) {
-        dorado::models::enable_loading_deprecated_models();
     }
 
     BasecallModelConfig model_config;

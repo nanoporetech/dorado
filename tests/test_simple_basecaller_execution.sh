@@ -94,15 +94,6 @@ dorado_check_bam_not_empty
 $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -x cpu --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
 dorado_check_bam_not_empty
 
-# Test that we can run the deprecated 9.4.1 HAC models for Q V2.
-pushd $models_directory
-curl -LfsS https://cdn.oxfordnanoportal.com/software/analysis/dorado/dna_r9.4.1_e8_hac@v3.3.zip > dna_r9.4.1_e8_hac@v3.3.zip
-unzip dna_r9.4.1_e8_hac@v3.3.zip
-curl -LfsS https://cdn.oxfordnanoportal.com/software/analysis/dorado/dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0.zip > dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0.zip
-unzip dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0.zip
-popd
-$dorado_bin basecaller ${models_directory}/dna_r9.4.1_e8_hac@v3.3 $pod5_data/ --modified-bases-models ${models_directory}/dna_r9.4.1_e8_hac@v3.3_5mCG_5hmCG@v0 --skip-model-compatibility-check --enable-deprecated-models > $output_dir/calls.bam
-
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ ${models_directory_arg} -b ${batch} --emit-moves > $output_dir/calls.bam
 
 # Check that the read group has the required model info in its header
