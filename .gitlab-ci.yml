@@ -353,6 +353,7 @@ build:windows_koi_from_source:
     - !reference ["build:windows", before_script]
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -G \"Visual Studio 16 2019\""
   artifacts: null
+  timeout: 1h 30m
 
 build:windows:no_ccache:
   extends:
