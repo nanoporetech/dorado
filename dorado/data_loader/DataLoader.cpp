@@ -180,6 +180,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
     new_read->offset = read_data.calibration_offset;
+    new_read->open_pore_level = read_data.open_pore_level;
     new_read->read_common.read_id = std::move(read_id_str);
     new_read->read_common.num_trimmed_samples = 0;
     new_read->read_common.attributes.read_number = read_data.read_number;
