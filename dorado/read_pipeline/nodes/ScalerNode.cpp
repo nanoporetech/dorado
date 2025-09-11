@@ -16,8 +16,10 @@
 #include <algorithm>
 #include <array>
 #include <cassert>
+#include <cmath>
 #include <cstdint>
 #include <iterator>
+#include <unordered_map>
 #include <utility>
 
 static constexpr float EPS = 1e-9f;
@@ -111,6 +113,30 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     return break_point;
 }
 
+constexpr float pore_level_kit14_prom = 199.21f;
+constexpr float pore_level_kit14_min = 197.61f;
+constexpr float pore_level_rna004_prom = 194.97f;
+constexpr float pore_level_rna004_min = 195.50f;
+constexpr float pore_level_flongle = 200.0f;
+
+using FC = dorado::models::Flowcell;
+std::unordered_map<FC, float> flowcell_expected_pore_levels{
+        {FC::FLO_FLG114, pore_level_flongle},      {FC::FLO_FLG114HD, pore_level_flongle},
+        {FC::FLO_MIN004RA, pore_level_rna004_min}, {FC::FLO_PRO004RA, pore_level_rna004_prom},
+        {FC::FLO_MIN114, pore_level_kit14_min},    {FC::FLO_MIN114HD, pore_level_kit14_min},
+        {FC::FLO_PRO114, pore_level_kit14_prom},   {FC::FLO_PRO114HD, pore_level_kit14_prom},
+        {FC::FLO_PRO114M, pore_level_kit14_prom},
+};
+
+std::optional<float> get_expected_open_pore_level(const std::string& flow_cell_code) {
+    auto pore_level =
+            flowcell_expected_pore_levels.find(dorado::models::flowcell_code(flow_cell_code));
+    if (pore_level == flowcell_expected_pore_levels.end()) {
+        return std::nullopt;
+    }
+    return pore_level->second;
+}
+
 }  // anonymous namespace
 
 namespace dorado {
@@ -159,6 +185,7 @@ void ScalerNode::input_thread_fn() {
 
         float scale = 1.0f;
         float shift = 0.0f;
+        float open_pore_adjustment = 0.0f;
 
         read->read_common.scaling_method = to_string(m_scaling_params.strategy);
         if (m_scaling_params.strategy == ScalingStrategy::PA) {
@@ -177,6 +204,15 @@ void ScalerNode::input_thread_fn() {
                 scale = 1.f / read->scaling;
                 shift = -1.f * read->offset;
             }
+
+            if (!std::isnan(read->open_pore_level)) {
+                std::optional<float> expected_open_pore_level =
+                        get_expected_open_pore_level(read->read_common.flow_cell_product_code);
+                if (expected_open_pore_level.has_value()) {
+                    open_pore_adjustment =
+                            (read->open_pore_level - *expected_open_pore_level) / read->scaling;
+                }
+            }
         } else {
             // Ignore the RNA adapter. If this is DNA or we've already trimmed the adapter, this will be zero
             auto scaling_data = read->read_common.raw_data.index(
@@ -189,7 +225,8 @@ void ScalerNode::input_thread_fn() {
 
         // raw_data comes from DataLoader with dtype int16.  We send it on as float16 after
         // shifting/scaling in float32 form.
-        utils::shift_scale_tensor_i16_to_f16_inplace(read->read_common.raw_data, shift, scale);
+        utils::shift_scale_tensor_i16_to_f16_inplace(read->read_common.raw_data,
+                                                     shift + open_pore_adjustment, scale);
 
         // move the shift and scale into pA.
         read->read_common.scale = read->scaling * scale;
