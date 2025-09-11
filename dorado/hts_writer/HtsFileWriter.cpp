@@ -44,44 +44,75 @@ void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
     }
 }
 
+namespace {
+inline void atomic_increment(std::atomic<std::size_t> &v) {
+    v.fetch_add(1, std::memory_order_relaxed);
+}
+}  // namespace
+
 void HtsFileWriter::update_stats(const HtsData &hts_data) {
     const auto &aln = hts_data.bam_ptr.get();
-
     const uint16_t flags = aln->core.flag;
     const bool is_unmapped = ((flags & BAM_FUNMAP) != 0);
-    const bool is_primary = ((flags & BAM_FSECONDARY) == 0) && ((flags & BAM_FSUPPLEMENTARY) == 0);
+    const bool is_secondary = (flags & BAM_FSECONDARY) != 0;
+    const bool is_supplementary = (flags & BAM_FSUPPLEMENTARY) != 0;
+    const bool is_primary = !is_secondary && !is_supplementary;
+
+    atomic_increment(m_total_records_written);
+    if (is_unmapped) {
+        atomic_increment(m_unmapped_records_written);
+    }
+    if (is_secondary) {
+        atomic_increment(m_secondary_records_written);
+    }
+    if (is_supplementary) {
+        atomic_increment(m_supplementary_records_written);
+    }
+    if (is_primary) {
+        atomic_increment(m_primary_records_written);
+    }
 
     if (utils::is_duplex_record(hts_data.bam_ptr.get())) {
         // For the purpose of estimating write count, we ignore duplex reads
-        m_duplex_reads_written.fetch_add(1, std::memory_order_relaxed);
-    } else {
-        // We can end up with multiple records for a single input read because
-        // of read splitting or alignment.
-        // If read is a split read, only count it if the subread id is 0
-        // If read is an aligned read, only count it if it's the primary alignment
-        const auto pid_tag = bam_aux_get(aln, "pi");
-        if (pid_tag) {
-            m_split_reads_written.fetch_add(1, std::memory_order_relaxed);
-        }
-        if ((hts_data.read_attrs.subread_id == 0) && (is_unmapped || is_primary)) {
-            m_primary_simplex_reads_written.fetch_add(1, std::memory_order_relaxed);
-        }
+        atomic_increment(m_duplex_reads_written);
+        return;
+    }
+    // We can end up with multiple records for a single input read because
+    // of read splitting or alignment.
+    // If read is a split read, only count it if the subread id is 0
+    // If read is an aligned read, only count it if it's the primary alignment
+    const auto pid_tag = bam_aux_get(aln, "pi");
+    if (pid_tag) {
+        atomic_increment(m_split_reads_written);
+    }
+    if ((hts_data.read_attrs.subread_id == 0) && (is_unmapped || is_primary)) {
+        atomic_increment(m_primary_simplex_reads_written);
     }
 }
 
+namespace {
+inline double atomic_load(const std::atomic<std::size_t> &v) {
+    return static_cast<double>(v.load(std::memory_order_relaxed));
+}
+}  // namespace
+
 stats::NamedStats HtsFileWriter::sample_stats() const {
     stats::NamedStats stats;
-    stats["unique_simplex_reads_written"] =
-            static_cast<double>(m_primary_simplex_reads_written.load(std::memory_order_relaxed));
-    stats["duplex_reads_written"] =
-            static_cast<double>(m_duplex_reads_written.load(std::memory_order_relaxed));
-    stats["split_reads_written"] =
-            static_cast<double>(m_split_reads_written.load(std::memory_order_relaxed));
+    stats["total_records_written"] = atomic_load(m_total_records_written);
+    stats["unmapped_records_written"] = atomic_load(m_unmapped_records_written);
+    stats["secondary_records_written"] = atomic_load(m_secondary_records_written);
+    stats["supplementary_records_written"] = atomic_load(m_supplementary_records_written);
+    stats["primary_records_written"] = atomic_load(m_primary_records_written);
+
+    stats["unique_simplex_reads_written"] = atomic_load(m_primary_simplex_reads_written);
+    stats["unique_simplex_reads_written"] = atomic_load(m_primary_simplex_reads_written);
+    stats["duplex_reads_written"] = atomic_load(m_duplex_reads_written);
+    stats["split_reads_written"] = atomic_load(m_split_reads_written);
     return stats;
 }
 
 void HtsFileWriter::set_shared_header(SamHdrSharedPtr header) {
-    if (m_shared_header != nullptr) {
+    if (m_dynamic_header != nullptr) {
         throw std::logic_error("set_shared_header is incompatible with set_dynamic_header.");
     }
     m_shared_header = std::move(header);

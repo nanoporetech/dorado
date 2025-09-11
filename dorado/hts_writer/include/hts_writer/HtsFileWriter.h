@@ -68,6 +68,12 @@ protected:
     void update_stats(const HtsData& item);
 
     // Stats counters
+    std::atomic<std::size_t> m_total_records_written{0};
+    std::atomic<std::size_t> m_primary_records_written{0};
+    std::atomic<std::size_t> m_unmapped_records_written{0};
+    std::atomic<std::size_t> m_secondary_records_written{0};
+    std::atomic<std::size_t> m_supplementary_records_written{0};
+
     std::atomic<std::size_t> m_primary_simplex_reads_written{0};
     std::atomic<std::size_t> m_duplex_reads_written{0};
     std::atomic<std::size_t> m_split_reads_written{0};

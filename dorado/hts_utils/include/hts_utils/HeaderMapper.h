@@ -46,6 +46,9 @@ public:
     const HtsData::ReadAttributes& get_read_attributes(const bam1_t* record) const;
     const MergeHeaders& get_merged_header(const HtsData::ReadAttributes& attrs) const;
 
+    // Create a shared sam header by merging all dynamic headers.
+    SamHdrPtr get_shared_merged_header() const;
+
 private:
     const bool m_strip_alignment;
     // Store this fallback for when we don't find a read group

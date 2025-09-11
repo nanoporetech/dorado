@@ -28,19 +28,25 @@ void add_emit_summary(argparse::ArgumentParser& parser) {
 
 }  // namespace
 
-void add_basecaller_output_arguments(argparse::ArgumentParser& parser) {
-    add_emit_types(parser);
+void add_output_dir_argument(argparse::ArgumentParser& parser) {
     parser.add_argument("-o", OUTPUT_DIR_ARG)
             .help("Optional output folder which becomes the root of the nested output folder "
                   "structure.");
 }
 
+std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser) {
+    return parser.present<std::string>(OUTPUT_DIR_ARG);
+}
+
+void add_basecaller_output_arguments(argparse::ArgumentParser& parser) {
+    add_emit_types(parser);
+    add_output_dir_argument(parser);
+}
+
 void add_demux_output_arguments(argparse::ArgumentParser& parser) {
-    parser.add_argument("-o", OUTPUT_DIR_ARG)
-            .help("Output folder which is the root of the nested output folder structure.")
-            .required();
     add_emit_types(parser);
     add_emit_summary(parser);
+    add_output_dir_argument(parser);
 }
 
 bool get_emit_fastq(const argparse::ArgumentParser& parser) {
@@ -51,10 +57,6 @@ bool get_emit_sam(const argparse::ArgumentParser& parser) { return parser.get<bo
 
 bool get_emit_summary(const argparse::ArgumentParser& parser) {
     return parser.get<bool>(EMIT_SUMMARY_ARG);
-}
-
-std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser) {
-    return parser.present<std::string>(OUTPUT_DIR_ARG);
 }
 
 }  // namespace dorado::cli

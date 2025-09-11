@@ -270,4 +270,14 @@ const MergeHeaders& HeaderMapper::get_merged_header(const HtsData::ReadAttribute
     return *header_it->second;
 };
 
+SamHdrPtr HeaderMapper::get_shared_merged_header() const {
+    // Do NOT strip alignments here
+    MergeHeaders merged(false);
+    for (const auto& [read_attrs, header] : *get_merged_headers_map()) {
+        merged.add_header(header->get_merged_header(), "-");
+    }
+    merged.finalize_merge();
+    return SamHdrPtr(sam_hdr_dup(merged.get_merged_header()));
+};
+
 }  // namespace dorado::utils
