@@ -139,5 +139,22 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
                                std::move(gpu_names),
                                std::move(sample_sheet)) {};
 
+AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
+        bool emit_sam,
+        bool sort_requested,
+        const std::optional<std::string>& output_dir,
+        int writer_threads,
+        utils::ProgressCallback progress_callback,
+        utils::DescriptionCallback description_callback)
+        : HtsFileWriterBuilder(false,
+                               emit_sam,
+                               sort_requested,
+                               output_dir,
+                               writer_threads,
+                               std::move(progress_callback),
+                               std::move(description_callback),
+                               std::string(),
+                               nullptr) {};
+
 }  // namespace hts_writer
 }  // namespace dorado

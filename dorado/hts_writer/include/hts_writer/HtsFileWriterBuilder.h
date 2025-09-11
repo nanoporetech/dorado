@@ -73,5 +73,15 @@ public:
                               std::shared_ptr<const utils::SampleSheet> sample_sheet);
 };
 
+class AlignerHtsFileWriterBuilder final : public HtsFileWriterBuilder {
+public:
+    AlignerHtsFileWriterBuilder(bool emit_sam,
+                                bool sort_requested,
+                                const std::optional<std::string>& output_dir,
+                                int writer_threads,
+                                utils::ProgressCallback progress_callback,
+                                utils::DescriptionCallback description_callback);
+};
+
 }  // namespace hts_writer
 }  // namespace dorado
