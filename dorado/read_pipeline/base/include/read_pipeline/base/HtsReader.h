@@ -2,7 +2,6 @@
 
 #include "hts_utils/HeaderMapper.h"
 #include "read_pipeline/base/messages.h"
-#include "utils/stats.h"
 
 #include <htslib/sam.h>
 
@@ -37,7 +36,7 @@ public:
     std::size_t read(Pipeline& pipeline,
                      std::size_t max_reads,
                      const bool strip_alignments,
-                     const std::unique_ptr<utils::HeaderMapper> header_mapper,
+                     const utils::HeaderMapper* header_mapper,
                      const bool skip_sec_supp);
 
     template <typename T>
