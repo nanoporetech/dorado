@@ -266,4 +266,6 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
 
 void ProgressTracker::disable_progress_reporting() { m_is_progress_reporting_disabled = true; }
 
+void ProgressTracker::mark_as_completed() { m_progress_bar.mark_as_completed(); };
+
 }  // namespace dorado

@@ -25,6 +25,7 @@ public:
     void set_total_reads(int num_reads) { m_num_reads_expected = num_reads; }
     void set_post_processing_percentage(float pct) { m_post_processing_percentage = pct; }
 
+    void mark_as_completed();
     void summarize() const;
     void update_progress_bar(const stats::NamedStats& stats);
     void update_post_processing_progress(float progress);
