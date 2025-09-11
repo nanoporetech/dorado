@@ -60,6 +60,8 @@ private:
     void process_fastx(const std::filesystem::path& path);
 
     AttributeMap get_read_attrs_by_id(const std::vector<utils::HeaderLineData>& header_lines);
+
+    bool m_fastq_runtime_warning_issued{false};
 };
 
 }  // namespace dorado::utils

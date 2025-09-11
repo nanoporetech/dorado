@@ -90,6 +90,10 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
         spdlog::trace("HeaderMapper processing headers from: '{}'.", input.string());
         if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ ||
             hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
+            if (!m_fastq_runtime_warning_issued) {
+                m_fastq_runtime_warning_issued = true;
+                spdlog::warn("Mapping headers from FASTQ files. This might take some time.");
+            }
             process_fastx(input);
         } else {
             process_bam(input);
