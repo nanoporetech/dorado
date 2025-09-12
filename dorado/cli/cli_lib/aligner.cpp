@@ -339,7 +339,7 @@ int aligner(int argc, char* argv[]) {
 
     for (const auto& file_info : all_files) {
         spdlog::info("processing '{}'", file_info.string());
-        HtsReader reader(file_info, std::nullopt);
+        HtsReader reader(file_info.string(), std::nullopt);
         reader.set_client_info(client_info);
         spdlog::debug("> input:'{}' fmt:'{}' aligned:'{}'", file_info.filename().string(),
                       reader.format(), reader.is_aligned);
