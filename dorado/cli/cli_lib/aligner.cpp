@@ -189,6 +189,9 @@ int aligner(int argc, char* argv[]) {
                 .help("number of threads for alignment and BAM writing (0=unlimited).")
                 .default_value(0)
                 .scan<'i', int>();
+        parser.add_argument("--allow-sec-supp")
+                .help("Align secondary and supplementary records from the input BAM if present.")
+                .flag();
     }
 
     parser.add_argument("--progress_stats_frequency")
@@ -225,6 +228,7 @@ int aligner(int argc, char* argv[]) {
     auto reads(parser.get<std::string>("reads"));
     auto recursive_input = parser.get<bool>("recursive");
     auto output_folder = parser.get<std::string>("output-dir");
+    const bool skip_sec_supp = !parser.get<bool>("--allow-sec-supp");
 
     auto emit_summary = parser.get<bool>("emit-summary");
     if (emit_summary && output_folder.empty()) {
@@ -371,7 +375,7 @@ int aligner(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
         spdlog::info("> starting alignment");
-        auto num_reads_in_file = reader.read(*pipeline, max_reads, false, nullptr);
+        auto num_reads_in_file = reader.read(*pipeline, max_reads, false, nullptr, skip_sec_supp);
 
         // Wait for the pipeline to complete.  When it does, we collect
         // final stats to allow accurate summarisation.

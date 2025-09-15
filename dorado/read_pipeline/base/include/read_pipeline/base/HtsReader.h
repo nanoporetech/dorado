@@ -37,7 +37,8 @@ public:
     std::size_t read(Pipeline& pipeline,
                      std::size_t max_reads,
                      const bool strip_alignments,
-                     const std::unique_ptr<utils::HeaderMapper> header_mapper);
+                     const std::unique_ptr<utils::HeaderMapper> header_mapper,
+                     const bool skip_sec_supp);
 
     template <typename T>
     T get_tag(const char* tagname);
