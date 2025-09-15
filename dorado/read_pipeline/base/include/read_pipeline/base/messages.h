@@ -206,6 +206,9 @@ public:
     // Track the previous/next read fom the same channel/mux.
     std::string prev_read;
     std::string next_read;
+
+    // Loaded from V4+ pod5 files
+    float open_pore_level{std::numeric_limits<float>::quiet_NaN()};
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;
