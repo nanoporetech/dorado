@@ -208,7 +208,7 @@ void ScalerNode::input_thread_fn() {
             if (!std::isnan(read->open_pore_level)) {
                 std::optional<float> expected_open_pore_level =
                         get_expected_open_pore_level(read->read_common.flow_cell_product_code);
-                if (expected_open_pore_level.has_value()) {
+                if (expected_open_pore_level.has_value() && *expected_open_pore_level != 0) {
                     open_pore_adjustment =
                             (read->open_pore_level - *expected_open_pore_level) / read->scaling;
                 }
