@@ -133,6 +133,10 @@ std::size_t HtsReader::read(Pipeline& pipeline,
             }
         }
 
+        if ((record->core.flag & BAM_FSECONDARY) || (record->core.flag & BAM_FSUPPLEMENTARY)) {
+            continue;
+        }
+
         std::unique_ptr<HtsData> hts_data;
         if (header_mapper == nullptr) {
             hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(record.get()))});
