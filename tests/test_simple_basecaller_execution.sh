@@ -278,7 +278,95 @@ dorado_aligner_options_test() (
     done
     $RETURN
 )
+
+function dorado_aligner_secondary_supplementary_test {
+    ###############################################################
+    ### This tests that Dorado Aligner will not align           ###
+    ### secondary/supplementary alignments when input is a BAM. ###
+    ###############################################################
+    set +e
+    set +x
+
+    echo "Testing Dorado Aligner - realigning a BAM with secondary/supplementary alignments"
+
+    local in_all_reads="${data_dir}/aligner_test/dataset.fastq"
+    local in_all_ref="${data_dir}/aligner_test/lambda_ecoli.fasta"
+
+    local local_out_dir="${output_dir}/aligner-01"
+    local generated_ref="${local_out_dir}/ref.fasta"
+    local generated_reads="${local_out_dir}/reads.fasta"
+
+    mkdir -p ${local_out_dir}
+
+    # Create a synthetic reference which will cause secondary/supplementary alignments.
+    samtools faidx ${in_all_ref} "Lambda:1-45000" > ${generated_ref}
+    samtools faidx ${in_all_ref} "Lambda:45001-48400" >> ${generated_ref}
+    samtools faidx ${in_all_ref} "Lambda:1-10000" >> ${generated_ref}
+    samtools faidx ${generated_ref}
+
+    # Create a small input - extract only a handful of reads.
+    # There are duplicate reads in the input `datasets.fastq` file.
+    # This has a unique mapping and should be just a primary alignment:
+    #       `de6f1738-5247-4648-9bc6-c12dc681f029    7191    2       7187    +       Lambda  48400   17660   24971   6937    7185    60`
+    local seq1_prim=$(grep -A1 "de6f1738-5247-4648-9bc6-c12dc681f029" ${in_all_reads} | head -n 2 | tail -n 1)
+    # This one aligns further down and is longer, good for a split alignment:
+    #       `c7bbae11-7498-45a2-99bc-b03194889968    11837   32      11821   -       Lambda  48400   36158   48400   11556   11789   60`
+    local seq2_suppl=$(grep -A1 "c7bbae11-7498-45a2-99bc-b03194889968" ${in_all_reads} | head -n 2 | tail -n 1)
+    # This one alignes to the front of the reference:
+    #       `b4195a0e-3a95-4f96-8852-2aa6beba19a8    3433    32      3416    -       Lambda  48400   0       3650    3225    3384    60`
+    local seq3_sec=$(grep -A1 "b4195a0e-3a95-4f96-8852-2aa6beba19a8" ${in_all_reads} | head -n 2 | tail -n 1)
+
+    # Write the test input.
+    printf ">read1-prim\n%s\n" ${seq1_prim} > ${generated_reads}
+    printf ">read2-suppl\n%s\n" ${seq2_suppl} >> ${generated_reads}
+    printf ">read3-sec\n%s\n" ${seq3_sec} >> ${generated_reads}
+    samtools faidx ${generated_reads}
+
+    # 1. Align the input reads.
+    ${dorado_bin} aligner ${generated_ref} ${generated_reads} | samtools sort > ${local_out_dir}/aligned.01.bam
+
+    # 2. Align manually filtered BAM.
+    samtools view -hb -F 0x900 ${local_out_dir}/aligned.01.bam > ${local_out_dir}/aligned.01.filtered.bam
+    ${dorado_bin} aligner ${generated_ref} ${local_out_dir}/aligned.01.filtered.bam | samtools sort > ${local_out_dir}/aligned.02.bam
+    samtools view ${local_out_dir}/aligned.02.bam > ${local_out_dir}/aligned.02.sam
+
+    # 3. Align the full unfiltered aligned BAM.
+    ${dorado_bin} aligner ${generated_ref} ${local_out_dir}/aligned.01.bam | samtools sort > ${local_out_dir}/aligned.03.bam
+    samtools view ${local_out_dir}/aligned.03.bam > ${local_out_dir}/aligned.03.sam
+
+    # 4. Align the full unfiltered aligned BAM and allow the secondary/supplementary alignments to be used as input.
+    ${dorado_bin} aligner --allow-sec-supp ${generated_ref} ${local_out_dir}/aligned.01.bam | samtools sort > ${local_out_dir}/aligned.04.bam
+    samtools view ${local_out_dir}/aligned.04.bam > ${local_out_dir}/aligned.04.sam
+
+    # Test that the default does not align secondary/supplementary.
+    local num_diff_lines=$(diff ${local_out_dir}/aligned.02.sam ${local_out_dir}/aligned.03.sam | wc -l | awk '{ print $1 }')
+    if [[ "${num_diff_lines}" != "0" ]]; then
+        echo "ERROR: Dorado Aligner also aligned secondary/supplementary records!"
+        exit 1
+    fi
+
+    # Test that the `--alow-sec-supp` will also realign the secondary/supplementary alignments.
+    echo "read1-prim 0 Lambda:1-45000 17661 60
+read2-suppl 16 Lambda:1-45000 36159 60
+read2-suppl 16 Lambda:45001-48400 1 60
+read2-suppl 2064 Lambda:45001-48400 1 60
+read3-sec 16 Lambda:1-45000 1 0
+read3-sec 272 Lambda:1-10000 1 0
+read3-sec 272 Lambda:1-10000 1 0" > ${local_out_dir}/expected.txt
+    samtools view ${local_out_dir}/aligned.04.bam | awk '{ print $1, $2, $3, $4, $5 }' | sort > ${local_out_dir}/result.txt
+    num_diff_lines=$(diff ${local_out_dir}/expected.txt ${local_out_dir}/result.txt | wc -l | awk '{ print $1 }')
+    if [[ "${num_diff_lines}" != "0" ]]; then
+        echo "ERROR: Unexpected records found!"
+        exit 1
+    fi
+
+    echo success
+}
+
 dorado_aligner_options_test
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    dorado_aligner_secondary_supplementary_test
+fi
 
 # Skip duplex tests if NO_TEST_DUPLEX is set.
 if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then

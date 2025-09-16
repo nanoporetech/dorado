@@ -119,7 +119,7 @@ protected:
         SamHdrPtr hdr(sam_hdr_dup(reader.header()));
         writer_ref.set_shared_header(std::move(hdr));
 
-        reader.read(*pipeline, 1000, false, nullptr);
+        reader.read(*pipeline, 1000, false, nullptr, false);
         pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
         stats = writer_ref.sample_stats();

@@ -123,7 +123,8 @@ bool HtsReader::has_tag(const char* tagname) {
 std::size_t HtsReader::read(Pipeline& pipeline,
                             std::size_t max_reads,
                             const bool strip_alignments,
-                            const std::unique_ptr<utils::HeaderMapper> header_mapper) {
+                            const std::unique_ptr<utils::HeaderMapper> header_mapper,
+                            const bool skip_sec_supp) {
     std::size_t num_reads = 0;
     while (this->read()) {
         if (m_read_list) {
@@ -131,6 +132,11 @@ std::size_t HtsReader::read(Pipeline& pipeline,
             if (m_read_list->find(read_id) == m_read_list->end()) {
                 continue;
             }
+        }
+
+        if (skip_sec_supp &&
+            ((record->core.flag & BAM_FSECONDARY) || (record->core.flag & BAM_FSUPPLEMENTARY))) {
+            continue;
         }
 
         std::unique_ptr<HtsData> hts_data;

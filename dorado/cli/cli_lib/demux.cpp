@@ -327,7 +327,7 @@ int demuxer(int argc, char* argv[]) {
         reader.set_client_info(client_info);
 
         const auto num_reads_in_file =
-                reader.read(*pipeline, max_reads, strip_alignment, std::move(header_mapper));
+                reader.read(*pipeline, max_reads, strip_alignment, std::move(header_mapper), false);
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
     }
