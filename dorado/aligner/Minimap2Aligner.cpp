@@ -299,7 +299,7 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
 
     // just return the input record
     if (hits == 0) {
-        results.push_back(BamPtr(bam_dup1(irecord)));
+        results.push_back(BamPtr(utils::new_unmapped_record(irecord, {}, {})));
     }
 
     for (int j = 0; j < hits; j++) {
