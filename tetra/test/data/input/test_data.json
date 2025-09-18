@@ -1,0 +1,206 @@
+{
+    "tests": [
+        {
+            "name": "alignment_tests",
+            "result": "completed",
+            "subfolders": [
+                "FLO-MIN114_SQK-LSK114_fast",
+                "FLO-MIN114_SQK-LSK114_fast_filtering",
+                "FLO-MIN114_SQK-LSK114_fast_filtering/fail",
+                "FLO-MIN114_SQK-LSK114_fast_filtering/pass",
+                "RNA_mod_truth_sets_fast"
+            ],
+            "test_files": [
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "bam_runid_d432feef-df8b-49c6-86fd-346bd736e506_0_0.bam",
+                    "subfolder": "FLO-MIN114_SQK-LSK114_fast",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "FLO-MIN114_SQK-LSK114_fast",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "bam_runid_d432feef-df8b-49c6-86fd-346bd736e506_0_0.bam",
+                    "subfolder": "FLO-MIN114_SQK-LSK114_fast_filtering/fail",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "FLO-MIN114_SQK-LSK114_fast_filtering",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "bam_runid_d432feef-df8b-49c6-86fd-346bd736e506_0_0.bam",
+                    "subfolder": "FLO-MIN114_SQK-LSK114_fast_filtering/pass",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "FLO-MIN114_SQK-LSK114_fast_filtering",
+                    "validation_passed": false
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "bam_runid_2688965d-3e0d-43c7-a3e4-da7cdbf8d43a_0_0.bam",
+                    "subfolder": "RNA_mod_truth_sets_fast",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "RNA_mod_truth_sets_fast",
+                    "validation_passed": true
+                }
+            ],
+            "test_folder": "alignment_tests"
+        },
+        {
+            "name": "barcoding_tests",
+            "result": "completed",
+            "subfolders": [
+                "FLO-MIN114_SQK-NBD114-96_fast",
+                "FLO-MIN114_SQK-NBD114-96_fast/barcode18",
+                "FLO-MIN114_SQK-NBD114-96_fast/barcode22",
+                "FLO-MIN114_SQK-NBD114-96_fast/unclassified",
+                "FLO-MIN114_SQK-NBD114-96_fast_trim",
+                "FLO-MIN114_SQK-NBD114-96_fast_trim/barcode18",
+                "FLO-MIN114_SQK-NBD114-96_fast_trim/barcode22",
+                "FLO-MIN114_SQK-NBD114-96_fast_trim/unclassified"
+            ],
+            "test_files": [
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_9bf51088-8205-4cfa-9c95-98867d24702e_0_0.fastq",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast/barcode18",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_9bf51088-8205-4cfa-9c95-98867d24702e_0_0.fastq",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast/barcode22",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_9bf51088-8205-4cfa-9c95-98867d24702e_0_0.fastq",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast/unclassified",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast_trim",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_9bf51088-8205-4cfa-9c95-98867d24702e_0_0.fastq",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast_trim/barcode18",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_9bf51088-8205-4cfa-9c95-98867d24702e_0_0.fastq",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast_trim/barcode22",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_9bf51088-8205-4cfa-9c95-98867d24702e_0_0.fastq",
+                    "subfolder": "FLO-MIN114_SQK-NBD114-96_fast_trim/unclassified",
+                    "validation_passed": true
+                }
+            ],
+            "test_folder": "barcoding_tests"
+        },
+        {
+            "name": "basecalling_tests",
+            "result": "completed",
+            "subfolders": [
+                "Kit14_cDNA_fast",
+                "Kit14_cDNA_hac"
+            ],
+            "test_files": [
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "Kit14_cDNA_fast",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_33bad0b2-e060-43d9-a727-74ea5c9cbed2_0_0.fastq",
+                    "subfolder": "Kit14_cDNA_fast",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "sequencing_summary.txt",
+                    "subfolder": "Kit14_cDNA_hac",
+                    "validation_passed": true
+                },
+                {
+                    "exists_in_output": true,
+                    "exists_in_ref": true,
+                    "matches": true,
+                    "name": "fastq_runid_33bad0b2-e060-43d9-a727-74ea5c9cbed2_0_0.fastq",
+                    "subfolder": "Kit14_cDNA_hac",
+                    "validation_passed": true
+                }
+            ],
+            "test_folder": "basecalling_tests"
+        }
+    ]
+}

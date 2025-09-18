@@ -1,0 +1,3 @@
+read_id	sequence_length	mean_qscore	barcode
+read1	1000	15.0	barcode1
+read2	2000	10.0	barcode2

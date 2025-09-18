@@ -5,6 +5,8 @@
 .vscode
 .devcontainer
 *.qdrep
+*.egg-info
+*__pycache__*
 dist
 build
 build-*
