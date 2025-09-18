@@ -352,13 +352,59 @@ read2-suppl 16 Lambda:45001-48400 1 60
 read2-suppl 2064 Lambda:45001-48400 1 60
 read3-sec 16 Lambda:1-45000 1 0
 read3-sec 272 Lambda:1-10000 1 0
-read3-sec 272 Lambda:1-10000 1 0" > ${local_out_dir}/expected.txt
+read3-sec 4 * 0 0" > ${local_out_dir}/expected.txt
     samtools view ${local_out_dir}/aligned.04.bam | awk '{ print $1, $2, $3, $4, $5 }' | sort > ${local_out_dir}/result.txt
-    num_diff_lines=$(diff ${local_out_dir}/expected.txt ${local_out_dir}/result.txt | wc -l | awk '{ print $1 }')
-    if [[ "${num_diff_lines}" != "0" ]]; then
-        echo "ERROR: Unexpected records found!"
-        exit 1
-    fi
+    set -ex
+    diff ${local_out_dir}/expected.txt ${local_out_dir}/result.txt
+    set +ex
+
+    echo success
+}
+
+function dorado_aligner_realigning_and_unmapped {
+    ###############################################################
+    ### When Dorado Aligner fails to realign a read (i.e. it is ###
+    ### unmapped), it should reset the alignment information.   ###
+    ###############################################################
+    set +e
+    set +x
+
+    echo "Testing Dorado Aligner - realigning a BAM with secondary/supplementary alignments"
+
+    local in_all_reads="${data_dir}/aligner_test/dataset.fastq"
+    local in_all_ref="${data_dir}/aligner_test/lambda_ecoli.fasta"
+
+    local local_out_dir="${output_dir}/aligner-02"
+    local generated_ref="${local_out_dir}/lambda.fasta"
+    local generated_dummy_ref="${local_out_dir}/dummy.fasta"
+    local generated_reads="${local_out_dir}/reads.fasta"
+
+    mkdir -p ${local_out_dir}
+
+    # Generate a small test case of 1 read and the Lambda reference, plus a dummy reference for realignemnt.
+    samtools faidx ${in_all_ref} "Lambda" > ${generated_ref}
+    samtools faidx ${in_all_ref} "Ecoli:100001-110000" > ${generated_dummy_ref}
+    local seq1=$(grep -A1 "de6f1738-5247-4648-9bc6-c12dc681f029" ${in_all_reads} | head -n 2 | tail -n 1)
+    printf ">de6f1738-5247-4648-9bc6-c12dc681f029\n%s\n" ${seq1} > ${generated_reads}
+
+    # 1. Align the input read to create a mapped record.
+    ${dorado_bin} aligner ${generated_ref} ${generated_reads} | samtools sort > ${local_out_dir}/aligned.01.bam
+
+    # 2. Realign the mapped BAM to a dummy reference. The read should not be aligned, and the mapping information should be reset.
+    ${dorado_bin} aligner ${generated_dummy_ref} ${local_out_dir}/aligned.01.bam | samtools sort > ${local_out_dir}/aligned.02.bam
+
+    echo "de6f1738-5247-4648-9bc6-c12dc681f029	0	Lambda	17661	60	2S7M1I2M1I5M5D31M3I23M1I29M2D10M1D1M3D9M3I1M1I69M1I4M1I27M1D11M1D5M1D24M1I6M2D20M2I30M1D17M1D12M1D3M1I31M1I11M1D39M3I41M1I83M2D11M1D46M5D20M1D38M1D46M1I16M2I12M2D62M1D16M2I5M1I47M1I32M1I18M2I11M1I36M1I42M3D22M2D2M1I5M2D2M3D8M3D4M3I2M3I5M2D4M1I14M2D26M1I36M1I9M2I18M2D1M1D2M3D16M1D21M1I5M1I43M2I42M1I9M1I27M1D4M2D4M1I61M4D17M2I18M7D24M3D40M1D21M1I2M1I15M1I24M1I2M1I9M2D3M1D7M1I54M1D11M1I16M1D8M1I13M2I19M1D2M3D15M1D27M2D10M1D13M1I5M4D1M1D26M1I34M1D20M1D6M2I10M2D13M1I56M1I10M1I58M4D44M5D9M1I6M1I3M1D42M1D2M3I21M1I14M2D21M1D10M1I4M3D39M2I10M2D4M1I8M2I5M1I29M4D15M1D1M1D11M3D1M2D12M2I2M1I10M1I18M1D28M1D2M1I25M1I13M2I15M2I18M1D1M1D1M2D20M2I7M1I12M4D8M2I18M1D10M1I2M2D4M1D23M4D9M1D27M1I25M1D6M2I7M1D13M1I8M2I5M1I6M1I7M1I31M4I8M1D39M1D9M1D9M1D17M1D3M1D30M3D59M2D17M1I11M2I3M3D17M4I24M1I6M2I3M1I20M1I4M1I14M2I9M1I31M1I8M2I29M2D36M1I14M1D2M2D63M4D96M1I9M2I2M1I13M5D22M2I34M1I19M1D10M1D59M1I59M1D15M2D5M1D5M1D1M1D32M6D7M4I3M2D18M2D3M2D2M2D72M2I3M3I15M1I28M1I33M2D126M1D2M1D2M1I15M1I5M1D1M2I2M1D23M1I8M2D28M1I25M2D7M1I31M1I8M1D10M1D28M3D15M3I20M1D39M1I11M2D14M3I9M4D54M1D27M2D6M1D3M1I5M6D21M1D24M2D9M5D8M4D3M1I12M2D8M1D47M1I12M1I7M1I9M1D15M2D16M2D5M2I45M6D61M3D3M1I93M2I21M4I5M1D10M1I53M4D32M1D6M1I1M1I4M1I33M1D7M2I15M1I41M1D15M2D3M2D11M1D6M1D24M2I2M2D22M1D51M1I83M1I20M1D11M1D24M2D2M3D18M1D19M1D7M1I16M7D5M1D30M4D13M1I42M2D58M1D13M1D51M1D6M1D21M3I3M1D22M1I7M1I56M1I52M1I12M1I3M1D23M1D16M5I31M3D6M1D32M1D20M1D7M1I1M1I8M1I22M1D16M1D4M1I11M1I1M2I8M1I2M1I8M3D38M1D6M1D21M1D70M1D4M1I59M1D45M3I4M1I68M1I12M1I26M3D36M1I9M1D11M3D27M2D7M2D14M1I6M1D40M5I4M2D1M1D30M1D10M1D7M1D4M1I7M1D17M3D15M1I4M1D28M1I20M1I19M1D8M1D3M2D43M1D46M9D5M1I25M1I5M1I86M1D53M1I1M2I8M2D16M3I19M2I12M1I6M4D19M2D20M4D5M1D5M1I6M1D24M1I7M4S	*	0	0" > ${local_out_dir}/expected.01.txt
+    echo "de6f1738-5247-4648-9bc6-c12dc681f029	4	*	0	0	*	*	0	0" > ${local_out_dir}/expected.02.txt
+
+    samtools view ${local_out_dir}/aligned.01.bam | cut -f 1-9 > ${local_out_dir}/aligned.01.bam.first_9
+    samtools view ${local_out_dir}/aligned.02.bam | cut -f 1-9 > ${local_out_dir}/aligned.02.bam.first_9
+
+    set -ex
+    # Check that the first BAM is successfully mapped.
+    diff ${local_out_dir}/expected.01.txt ${local_out_dir}/aligned.01.bam.first_9
+    # Check that the second BAM is not mapped.
+    diff ${local_out_dir}/expected.02.txt ${local_out_dir}/aligned.02.bam.first_9
+    set +ex
 
     echo success
 }
@@ -366,6 +412,7 @@ read3-sec 272 Lambda:1-10000 1 0" > ${local_out_dir}/expected.txt
 dorado_aligner_options_test
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     dorado_aligner_secondary_supplementary_test
+    dorado_aligner_realigning_and_unmapped
 fi
 
 # Skip duplex tests if NO_TEST_DUPLEX is set.
