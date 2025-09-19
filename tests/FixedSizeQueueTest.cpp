@@ -169,6 +169,6 @@ DEFINE_TEST("alignment check") {
     FixedSizeQueue<TestType> queue(10);
 
     for (int i = 0; i < 3; i++) {
-        queue.push({i});
+        queue.push(TestType{i});
     }
 }

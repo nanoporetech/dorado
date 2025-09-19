@@ -22,8 +22,6 @@ class FixedSizeQueue {
     std::size_t m_read_idx = 0;
     std::size_t m_write_idx = 0;
 
-    static_assert(std::is_move_constructible_v<Item>);
-
 public:
     explicit FixedSizeQueue(std::size_t capacity)
             // See above for the reasoning behind this +1.
@@ -33,12 +31,13 @@ public:
 
     // Push an item onto the queue.
     // Requires that the queue isn't full.
-    void push(Item item) {
+    template <typename ItemLike>
+    requires std::is_constructible_v<Item, ItemLike> void push(ItemLike &&item) {
         assert(!full());
 
         // Construct the new item in-place.
         auto *buffer = std::addressof(m_items[m_write_idx].data);
-        new (buffer) Item(std::move(item));
+        new (buffer) Item(std::forward<ItemLike>(item));
 
         // Move the write pointer.
         m_write_idx = (m_write_idx + 1) % m_capacity;
