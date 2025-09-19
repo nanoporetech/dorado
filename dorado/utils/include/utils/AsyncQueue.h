@@ -1,10 +1,11 @@
 #pragma once
 
+#include "utils/FixedSizeQueue.h"
+
 #include <algorithm>
 #include <cassert>
 #include <condition_variable>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <unordered_map>
 
@@ -30,10 +31,7 @@ class AsyncQueue {
     // Signalled when an item has been added, and the queue therefore is not empty.
     std::condition_variable m_not_empty_cv;
     // Holds the items.
-    std::queue<Item> m_items;
-    // Number of items that can be added before further additions block, pending
-    // consumption of items.
-    const size_t m_capacity;
+    FixedSizeQueue<Item> m_items;
     // If not No, CV waits should terminate regardless of other state.
     // Pending attempts to push items will fail, pop will fail only if Fast.
     enum class Terminate { No, WhenEmpty, Fast };
@@ -50,8 +48,7 @@ class AsyncQueue {
     void pop_item(std::unique_lock<std::mutex>& lock, Item& item) {
         assert(lock.owns_lock());
         assert(!m_items.empty());
-        item = std::move(m_items.front());
-        m_items.pop();
+        item = m_items.pop();
         ++m_num_pops;
 
         // Inform a waiting thread that the queue is not full.
@@ -69,8 +66,7 @@ class AsyncQueue {
         assert(!m_items.empty());
         size_t num_to_pop = std::min(m_items.size(), max_count);
         for (size_t i = 0; i < num_to_pop; ++i) {
-            process_fn(std::move(m_items.front()));
-            m_items.pop();
+            process_fn(m_items.pop());
         }
         m_num_pops += num_to_pop;
 
@@ -103,7 +99,7 @@ class AsyncQueue {
 
 public:
     // Attempts to push items beyond capacity will block.
-    explicit AsyncQueue(size_t capacity) : m_capacity(capacity) {}
+    explicit AsyncQueue(size_t capacity) : m_items(capacity) {}
 
     ~AsyncQueue() {
         // Ensure CV waits terminate before destruction.
@@ -127,9 +123,8 @@ public:
         std::unique_lock lock(m_mutex);
 
         // Ensure there is space for the new item, given our limit on capacity.
-        m_not_full_cv.wait(lock, [this] {
-            return m_items.size() < m_capacity || m_terminate != Terminate::No;
-        });
+        m_not_full_cv.wait(lock,
+                           [this] { return !m_items.full() || m_terminate != Terminate::No; });
 
         // We hold the mutex, and either there is space in the queue, or we have been
         // asked to terminate.
@@ -255,16 +250,14 @@ public:
     // Resets state to active following a terminate call.
     void restart() {
         std::lock_guard lock(m_mutex);
-        while (!m_items.empty()) {
-            m_items.pop();
-        }
+        m_items.clear();
         m_num_pushes = 0;
         m_num_pops = 0;
         m_terminate = Terminate::No;
     }
 
     // Maximum number of items the queue can contain.
-    size_t capacity() const { return m_capacity; }
+    size_t capacity() const { return m_items.capacity(); }
 
     // Current number of items in the queue.  Only useful for stats sampling and
     // testing.

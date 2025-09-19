@@ -30,6 +30,7 @@
 #include <iterator>
 #include <mutex>
 #include <optional>
+#include <queue>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
