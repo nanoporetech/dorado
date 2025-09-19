@@ -152,10 +152,16 @@ DEFINE_TEST("wrap behaviour") {
 }
 
 DEFINE_TEST("alignment check") {
+    // GCC's UBSan has issues with creating overly aligned structs on the stack, so
+    // use a smaller alignment in that case.
+#if defined(__GNUC__) && !defined(__clang__)
+    static constexpr std::size_t TestAlignment = alignof(std::max_align_t);
+#else
     static constexpr std::size_t TestAlignment = 128;
+#endif
 
     struct TestType {
-        alignas(TestAlignment) int i;
+        alignas(TestAlignment) std::uint8_t i;
 
         ~TestType() {
             const auto addr = reinterpret_cast<std::uintptr_t>(this);
@@ -168,7 +174,7 @@ DEFINE_TEST("alignment check") {
 
     FixedSizeQueue<TestType> queue(10);
 
-    for (int i = 0; i < 3; i++) {
+    for (std::uint8_t i = 0; i < 3; i++) {
         queue.push(TestType{i});
     }
 }
