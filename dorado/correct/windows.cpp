@@ -90,8 +90,12 @@ std::vector<int32_t> calc_max_step_per_pos(const CorrectionAlignments& alignment
                 ret[pos - 1] = std::max(ret[pos - 1], len + init_value);
 
             } else {
-                throw std::runtime_error(
-                        "Unsupported CIGAR operation when computing inclusive scan!");
+                std::ostringstream oss;
+                oss << "Unsupported CIGAR operation when computing inclusive scan! target name = '"
+                    << alignments.read_name << "', aln_id = " << aln_id << ", qname = '"
+                    << alignments.qnames[aln_id] << ", bad CIGAR op ID = " << cig_id
+                    << ", bad CIGAR op = '" << c << "', CIGAR: '" << cigar << "'";
+                throw std::runtime_error(oss.str());
             }
         }
     }
