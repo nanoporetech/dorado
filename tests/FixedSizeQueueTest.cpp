@@ -154,8 +154,8 @@ DEFINE_TEST("wrap behaviour") {
 DEFINE_TEST("alignment check") {
     static constexpr std::size_t TestAlignment = 128;
 
-    struct alignas(TestAlignment) TestType {
-        int i;
+    struct TestType {
+        alignas(TestAlignment) int i;
 
         ~TestType() {
             const auto addr = reinterpret_cast<std::uintptr_t>(this);
