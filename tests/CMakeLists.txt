@@ -12,8 +12,8 @@ add_executable(dorado_tests
     AlignerTest.cpp
     alignment_processing_items_test.cpp
     arg_parse_ext_test.cpp
-    AsyncQueueTest.cpp
     async_task_executor_test.cpp
+    AsyncQueueTest.cpp
     BamReaderTest.cpp
     BamUtilsTest.cpp
     BamWriterTest.cpp
@@ -26,17 +26,20 @@ add_executable(dorado_tests
     CigarTest.cpp
     CliUtilsTest.cpp
     context_container_test.cpp
+    CorrectionWindowTest.cpp
     CustomBarcodeParserTest.cpp
     DuplexReadTaggingNodeTest.cpp
     DuplexSplitTest.cpp
+    FastqTagsTest.cpp
     FastxRandomReaderTest.cpp
     FastxSequentialReaderTest.cpp
-    FastqTagsTest.cpp
     FileInfoTest.cpp
+    FixedSizeQueueTest.cpp
     gpu_monitor_test.cpp
     HeaderMapperTest.cpp
     HtsFileTest.cpp
     IndexFileAccessTest.cpp
+    KadayashiTest.cpp
     MathUtilsTest.cpp
     MergeHeadersTest.cpp
     Minimap2IndexTest.cpp
@@ -48,8 +51,9 @@ add_executable(dorado_tests
     ModelSearchTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
-    myers_test.cpp
     multi_queue_thread_pool_test.cpp
+    myers_test.cpp
+    PafUtilsTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
     Pod5DataLoaderTest.cpp
@@ -61,10 +65,22 @@ add_executable(dorado_tests
     ReadTest.cpp
     RealignMovesTest.cpp
     ResumeLoaderTest.cpp
+    RleTest.cpp
     RNASplitTest.cpp
     SampleSheetTests.cpp
     SamUtilsTest.cpp
     ScaledDotProductAttention.cpp
+    SecondaryDecodeVariantsTest.cpp
+    SecondaryEncoderReadAlignmentTest.cpp
+    SecondaryEncoderUtilsTest.cpp
+    SecondaryKadayashiUtils.cpp
+    SecondaryMergeVCSamplesTest.cpp
+    SecondaryModelFactory.cpp
+    SecondaryNormalizeVariantsTest.cpp
+    SecondarySampleCollateUtilsTest.cpp
+    SecondarySampleTest.cpp
+    SecondaryTrimTest.cpp
+    SecondaryWindowTest.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp
@@ -74,21 +90,6 @@ add_executable(dorado_tests
     TimeUtilsTest.cpp
     TrimTest.cpp
     WriterNodeTest.cpp
-    PafUtilsTest.cpp
-    SecondaryDecodeVariantsTest.cpp
-    SecondaryEncoderReadAlignmentTest.cpp
-    SecondaryEncoderUtilsTest.cpp
-    SecondaryKadayashiUtils.cpp
-    SecondaryNormalizeVariantsTest.cpp
-    SecondaryMergeVCSamplesTest.cpp
-    SecondaryModelFactory.cpp
-    SecondarySampleTest.cpp
-    SecondarySampleCollateUtilsTest.cpp
-    SecondaryTrimTest.cpp
-    SecondaryWindowTest.cpp
-    RleTest.cpp
-    CorrectionWindowTest.cpp
-    KadayashiTest.cpp
 )
 
 if(APPLE)

@@ -15,22 +15,29 @@ dorado_add_library(
         concurrency/multi_queue_thread_pool.h
         concurrency/synchronisation.h
         concurrency/task_priority.h
+        container_utils.h
         context_container.h
         crash_handlers.h
         crypto_utils.h
         dev_utils.h
+        FixedSizeQueue.h
         fs_utils.h
+        io_utils.h
         jthread.h
         locale_utils.h
         log_utils.h
         math_utils.h
         memory_utils.h
         overlap.h
+        paf_utils.h
         parameters.h
         PostCondition.h
+        rle.h
         SampleSheet.h
         scoped_trace_log.h
         sequence_utils.h
+        span.h
+        ssize.h
         stats.h
         stream_utils.h
         sys_stats.h
@@ -41,12 +48,6 @@ dorado_add_library(
         tty_utils.h
         types.h
         uuid_utils.h
-        paf_utils.h
-        container_utils.h
-        io_utils.h
-        rle.h
-        ssize.h
-        span.h
     SOURCES_PRIVATE
         alignment_utils.cpp
         barcode_kits.cpp
@@ -55,13 +56,16 @@ dorado_add_library(
         concurrency/async_task_executor.cpp
         concurrency/detail/priority_task_queue.cpp
         concurrency/multi_queue_thread_pool.cpp
+        container_utils.cpp
         crash_handlers.cpp
         crypto_utils.cpp
         dev_utils.cpp
         fs_utils.cpp
+        io_utils.cpp
         locale_utils.cpp
         log_utils.cpp
         memory_utils.cpp
+        paf_utils.cpp
         parameters.cpp
         SampleSheet.cpp
         scoped_trace_log.cpp
@@ -72,9 +76,6 @@ dorado_add_library(
         thread_utils.cpp
         time_utils.cpp
         uuid_utils.cpp
-        paf_utils.cpp
-        container_utils.cpp
-        io_utils.cpp
     DEPENDS_PUBLIC
         date::date
         dorado_version
