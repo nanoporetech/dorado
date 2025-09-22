@@ -17,7 +17,7 @@ DEFINE_TEST("smoke test") {
     FixedSizeQueue<int> queue(capacity);
     CATCH_CHECK(queue.capacity() == capacity);
     CATCH_CHECK(queue.size() == 0);
-    CATCH_CHECK(!queue.full());
+    CATCH_CHECK_FALSE(queue.full());
     CATCH_CHECK(queue.empty());
 
     // Push an item.
@@ -26,14 +26,14 @@ DEFINE_TEST("smoke test") {
     CATCH_CHECK(queue.size() == 1);
     const bool is_full = capacity == 1;
     CATCH_CHECK(queue.full() == is_full);
-    CATCH_CHECK(!queue.empty());
+    CATCH_CHECK_FALSE(queue.empty());
 
     // Pop the item.
     const int value = queue.pop();
     CATCH_CHECK(value == 123);
     CATCH_CHECK(queue.capacity() == capacity);
     CATCH_CHECK(queue.size() == 0);
-    CATCH_CHECK(!queue.full());
+    CATCH_CHECK_FALSE(queue.full());
     CATCH_CHECK(queue.empty());
 }
 
@@ -49,6 +49,10 @@ DEFINE_TEST("destructors run") {
         CATCH_CHECK(counter.use_count() == 2);
         queue.push(counter);
         CATCH_CHECK(counter.use_count() == 3);
+
+        // A copy of a popped item shouldn't remain in the queue.
+        (void)queue.pop();
+        CATCH_CHECK(counter.use_count() == 2);
 
         // Destroying them should reduce the count.
         queue.clear();
@@ -131,7 +135,7 @@ DEFINE_TEST("wrap behaviour") {
             // Push items in.
             for (std::size_t i = 0; i < capacity; i++) {
                 CATCH_CHECK(queue.size() == i);
-                CATCH_CHECK(!queue.full());
+                CATCH_CHECK_FALSE(queue.full());
                 queue.push(i);
             }
             CATCH_CHECK(queue.size() == capacity);
@@ -140,10 +144,10 @@ DEFINE_TEST("wrap behaviour") {
             // Pull items out.
             for (std::size_t i = 0; i < capacity; i++) {
                 CATCH_CHECK(queue.size() == capacity - i);
-                CATCH_CHECK(!queue.empty());
+                CATCH_CHECK_FALSE(queue.empty());
                 const std::size_t val = queue.pop();
                 CATCH_CHECK(val == i);
-                CATCH_CHECK(!queue.full());
+                CATCH_CHECK_FALSE(queue.full());
             }
             CATCH_CHECK(queue.size() == 0);
             CATCH_CHECK(queue.empty());

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <cassert>
+#include <limits>
 #include <memory>
 #include <new>
 #include <type_traits>
@@ -22,10 +23,17 @@ class FixedSizeQueue {
     std::size_t m_read_idx = 0;
     std::size_t m_write_idx = 0;
 
+    static std::size_t sanity_check_capacity(std::size_t capacity) {
+        // Sanity check that the increment isn't going to overflow.
+        assert(capacity < std::numeric_limits<std::size_t>::max());
+        // See above for the reasoning behind this +1.
+        return capacity + 1;
+    }
+
 public:
     explicit FixedSizeQueue(std::size_t capacity)
-            // See above for the reasoning behind this +1.
-            : m_capacity(capacity + 1), m_items(std::make_unique<ItemBuffer[]>(m_capacity)) {}
+            : m_capacity(sanity_check_capacity(capacity)),
+              m_items(std::make_unique<ItemBuffer[]>(m_capacity)) {}
 
     ~FixedSizeQueue() { clear(); }
 
