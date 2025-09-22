@@ -31,6 +31,7 @@ variables:
   BUILD_TARGET: install
   BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
+  PYTHON_VERSION: "python3.12"
   CUDA: "12.8"
   WIN_CUDA: "12.8"
   WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${WIN_CUDA}"
@@ -114,6 +115,40 @@ variables:
   - echo Dorado test stage
   - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
+.create_venv:
+  # Make a venv and install stuff we need.
+  - export KERNEL=$(uname -s)
+  - if [[ ${KERNEL} =~ "Linux" ]] && [[ -z $(command -v ${PYTHON_VERSION}) ]]; then
+  -   export DIST=$(lsb_release -cs)
+  -   echo "deb ${LOCAL_DEADSNAKES_REPO} ${DIST} main" > /etc/apt/sources.list.d/deadsnakes-ubuntu-${DIST}.list
+  -   apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BA6932366A755776
+  -   apt-get update || true
+  -   apt-get install -y --no-install-recommends software-properties-common ${PYTHON_VERSION} ${PYTHON_VERSION}-dev ${PYTHON_VERSION}-venv
+  -   curl -LfsS https://bootstrap.pypa.io/get-pip.py | ${PYTHON_VERSION} -
+  -   export PYTHON=${PYTHON_VERSION}
+  - elif [[ ${KERNEL} =~ "MINGW" ]]; then
+  -   /c/${PYTHON_VERSION//./}/python --version
+  -   export PATH="/c/${PYTHON_VERSION//./}/":${PATH}
+  -   echo $(which python)
+  -   export PYTHON=$(which python)
+  - else
+  -   export PYTHON=${PYTHON_VERSION}
+  - fi
+  - ${PYTHON} -m venv build_venv
+  - source build_venv/*/activate
+  - python --version
+  - python -m pip install -U pip
+
+.run_tetra_tests:
+  # psyam is not available on all platforms, but the tests can run without it.
+  - |
+    echo Running tetra unit tests
+    pip install pysam --only-binary :all: || true
+    pip install -e tetra
+    cd tetra
+    python -m unittest discover
+    cd -
+
 .run_dorado_cmake_cpack:
   - echo Dorado packaging stage
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
@@ -135,6 +170,8 @@ variables:
     - !reference [.run_dorado_cmake_build]
     - !reference [.run_dorado_cmake_ctest]
     - !reference [.zip_test_files]
+    - !reference [.create_venv]
+    - !reference [.run_tetra_tests]
   artifacts:
     paths:
       - dist
