@@ -38,6 +38,14 @@ bool try_add_fastq_header_tag(bam1_t* record, const std::string& fastq_header);
 
 int remove_fastq_header_tag(bam1_t* record);
 
+std::string format_read_group_header_line(const std::string& read_group_line,
+                                          const std::string& id,
+                                          const std::string& additional_tags);
+
+std::string format_read_group_header_line(const ReadGroup& read_group,
+                                          const std::string& id,
+                                          const std::string& additional_tags);
+
 void add_hd_header_line(sam_hdr_t* hdr);
 
 void add_rg_headers(sam_hdr_t* hdr, const std::unordered_map<std::string, ReadGroup>& read_groups);

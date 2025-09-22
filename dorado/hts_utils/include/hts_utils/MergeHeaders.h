@@ -51,6 +51,20 @@ public:
                            const std::string& filename,
                            const std::string& read_group_selection);
 
+    /** Add a ReadGroup header line.
+     *  @param read_group_id The read group id to add.
+     *  @param read_group_line The formatted read group line to add.
+     *  @return 0 on sucess, negative integer otherwise.
+     */
+    int add_rg(const std::string& read_group_id, std::string read_group_line);
+
+    /** Add a ReadGroup header line.
+     *  @param read_group_id The read group id to add.
+     *  @param read_group The ReadGroup to add.
+     *  @return 0 on sucess, negative integer otherwise.
+     */
+    int add_rg(const std::string& read_group_id, const ReadGroup& read_group);
+
     // Call this when you have added all the headers.
     void finalize_merge();
 

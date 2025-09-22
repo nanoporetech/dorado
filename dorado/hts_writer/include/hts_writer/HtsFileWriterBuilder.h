@@ -44,6 +44,8 @@ private:
     bool m_sort{false};
     OutputMode m_output_mode{OutputMode::BAM};
 
+    bool m_warn_fastq_called{false};
+
 protected:
     bool m_is_fd_tty{false}, m_is_fd_pipe{false};
 };

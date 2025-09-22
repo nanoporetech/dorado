@@ -15,6 +15,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace dorado {
 namespace hts_writer {
@@ -51,7 +52,10 @@ void HtsFileWriterBuilder::update() {
     const bool to_file = m_output_dir.has_value();
 
     if (m_emit_fastq) {
-        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
+        if (!std::exchange(m_warn_fastq_called, true)) {
+            spdlog::info(
+                    " - Note: FASTQ output is not recommended as not all data can be preserved.");
+        }
         m_output_mode = OutputMode::FASTQ;
         m_sort = false;
     } else if (!to_file && m_is_fd_tty) {

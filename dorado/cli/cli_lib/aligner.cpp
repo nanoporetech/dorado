@@ -1,7 +1,5 @@
 #include "ProgressTracker.h"
-#include "alignment/IndexFileAccess.h"
 #include "alignment/alignment_info.h"
-#include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
 #include "basecall_output_args.h"
 #include "cli/cli.h"
@@ -212,6 +210,11 @@ int aligner(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
+    if (reads.empty() && output_dir.has_value()) {
+        spdlog::error("--output-dir is not valid if input is stdin.");
+        return EXIT_FAILURE;
+    }
+
     const auto all_files = alignment::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
         spdlog::info("No input files found");
@@ -314,24 +317,28 @@ int aligner(int argc, char* argv[]) {
 
     // Construct the output headers map
     const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner_node);
-    bool strip_input_alignments = true;
-    auto header_mapper = utils::HeaderMapper(all_files, strip_input_alignments);
     auto modify_hdr = utils::HeaderMapper::Modifier([&aligner_ref](sam_hdr_t* hdr) {
         add_pg_hdr(hdr);
         utils::add_hd_header_line(hdr);
         utils::add_sq_hdr(hdr, aligner_ref.get_sequence_records_for_header());
     });
-    header_mapper.modify_headers(modify_hdr);
 
-    if (output_dir.has_value()) {
-        // Set the dynamic header map on the writer
-        pipeline->get_node_ref<WriterNode>(writer_node)
-                .set_dynamic_header(header_mapper.get_merged_headers_map());
-    } else {
-        // Convert the dynamic header into a single merged sharable header.
-        auto shared_merged_header = header_mapper.get_shared_merged_header();
-        pipeline->get_node_ref<WriterNode>(writer_node)
-                .set_shared_header(std::move(shared_merged_header));
+    std::unique_ptr<utils::HeaderMapper> header_mapper;
+    bool strip_input_alignments = true;
+    if (!reads.empty()) {
+        header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
+        header_mapper->modify_headers(modify_hdr);
+
+        if (output_dir.has_value()) {
+            // Set the dynamic header map on the writer
+            pipeline->get_node_ref<WriterNode>(writer_node)
+                    .set_dynamic_header(header_mapper->get_merged_headers_map());
+        } else {
+            // Convert the dynamic header into a single merged sharable header.
+            auto shared_merged_header = header_mapper->get_shared_merged_header();
+            pipeline->get_node_ref<WriterNode>(writer_node)
+                    .set_shared_header(std::move(shared_merged_header));
+        }
     }
 
     tracker.set_description("Aligning");
@@ -344,8 +351,14 @@ int aligner(int argc, char* argv[]) {
         spdlog::debug("> input:'{}' fmt:'{}' aligned:'{}'", file_info.filename().string(),
                       reader.format(), reader.is_aligned);
 
+        if (header_mapper == nullptr) {
+            SamHdrPtr hdr(sam_hdr_dup(reader.header()));
+            modify_hdr(hdr.get());
+            pipeline->get_node_ref<WriterNode>(writer_node).set_shared_header(std::move(hdr));
+        }
+
         auto num_reads_in_file = reader.read(*pipeline, max_reads, strip_input_alignments,
-                                             &header_mapper, skip_sec_supp);
+                                             header_mapper.get(), skip_sec_supp);
         max_reads -= num_reads_in_file;
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
     }

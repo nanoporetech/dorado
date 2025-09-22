@@ -87,7 +87,6 @@ HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs, boo
 
 void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
     for (const auto& input : inputs) {
-        spdlog::trace("HeaderMapper processing headers from: '{}'.", input.string());
         if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ ||
             hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
             if (!m_fastq_runtime_warning_issued) {
@@ -107,6 +106,8 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
 };
 
 void HeaderMapper::process_fastx(const std::filesystem::path& path) {
+    spdlog::trace("HeaderMapper::process_fastx processing '{}'", path.string());
+
     hts_io::FastxSequentialReader reader(path);
     hts_io::FastxRecord record;
 
@@ -120,6 +121,7 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
 
         if (!rg_data.found) {
             if (!debug_msg_issued) {
+                debug_msg_issued = true;
                 spdlog::debug("FASTQ record missing read group data in file '{}'", path.string());
             }
             fallback_merged_header->add_header(sam_hdr_init(), path.string(),
@@ -150,10 +152,13 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
             merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
             merged_header_ptr->add_header(sam_hdr_init(), path.string(), rg_data.id);
         }
+        merged_header_ptr->add_rg(rg_data.id, rg_data.data);
     }
 }
 
 void HeaderMapper::process_bam(const std::filesystem::path& path) {
+    spdlog::trace("HeaderMapper::process_bam processing '{}'", path.string());
+
     auto file = dorado::HtsFilePtr(hts_open(path.string().c_str(), "r"));
     if (!file) {
         spdlog::error("Failed to open file: '{}'.", path.string());
