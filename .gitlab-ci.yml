@@ -119,6 +119,7 @@ variables:
   # Make a venv and install stuff we need.
   - export KERNEL=$(uname -s)
   - if [[ ${KERNEL} =~ "Linux" ]] && [[ -z $(command -v ${PYTHON_VERSION}) ]]; then
+  -   export DEBIAN_FRONTEND=noninteractive
   -   export DIST=$(lsb_release -cs)
   -   echo "deb ${LOCAL_DEADSNAKES_REPO} ${DIST} main" > /etc/apt/sources.list.d/deadsnakes-ubuntu-${DIST}.list
   -   apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BA6932366A755776
