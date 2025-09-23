@@ -47,7 +47,7 @@ public:
     const MergeHeaders& get_merged_header(const HtsData::ReadAttributes& attrs) const;
 
     // Create a shared sam header by merging all dynamic headers.
-    SamHdrPtr get_shared_merged_header() const;
+    SamHdrPtr get_shared_merged_header(bool strip_alignments) const;
 
 private:
     const bool m_strip_alignment;

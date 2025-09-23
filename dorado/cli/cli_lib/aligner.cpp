@@ -1,5 +1,6 @@
 #include "ProgressTracker.h"
 #include "alignment/alignment_info.h"
+#include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
 #include "basecall_output_args.h"
 #include "cli/cli.h"
@@ -327,15 +328,19 @@ int aligner(int argc, char* argv[]) {
     bool strip_input_alignments = true;
     if (!reads.empty()) {
         header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
-        header_mapper->modify_headers(modify_hdr);
 
         if (output_dir.has_value()) {
+            header_mapper->modify_headers(modify_hdr);
             // Set the dynamic header map on the writer
             pipeline->get_node_ref<WriterNode>(writer_node)
                     .set_dynamic_header(header_mapper->get_merged_headers_map());
         } else {
-            // Convert the dynamic header into a single merged sharable header.
-            auto shared_merged_header = header_mapper->get_shared_merged_header();
+            // Convert the dynamic header into a single merged sharable header
+            // Strip the alignments and add them back in because merge header finalise
+            // can change the tid / sq line indexing
+            auto shared_merged_header =
+                    header_mapper->get_shared_merged_header(strip_input_alignments);
+            modify_hdr(shared_merged_header.get());
             pipeline->get_node_ref<WriterNode>(writer_node)
                     .set_shared_header(std::move(shared_merged_header));
         }

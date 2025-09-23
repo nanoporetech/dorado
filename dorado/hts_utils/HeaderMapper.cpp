@@ -275,9 +275,8 @@ const MergeHeaders& HeaderMapper::get_merged_header(const HtsData::ReadAttribute
     return *header_it->second;
 };
 
-SamHdrPtr HeaderMapper::get_shared_merged_header() const {
-    // Do NOT strip alignments here
-    MergeHeaders merged(false);
+SamHdrPtr HeaderMapper::get_shared_merged_header(bool strip_alignments) const {
+    MergeHeaders merged(strip_alignments);
     for (const auto& [read_attrs, header] : *get_merged_headers_map()) {
         merged.add_header(header->get_merged_header(), "-");
     }
