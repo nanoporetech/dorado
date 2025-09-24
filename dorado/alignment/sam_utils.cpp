@@ -49,25 +49,30 @@ public:
     }
 };
 
-std::pair<char, int> next_op(const char*& seq) {
-    const char* begin = seq;
+std::pair<char, int> next_op(std::string_view& seq) {
+    // Look for the type.
+    auto is_number = [](char c) { return '0' <= c && c <= '9'; };
+    const auto type = std::find_if_not(seq.begin(), seq.end(), is_number);
+    if (type == seq.begin() || type == seq.end()) {
+        throw std::runtime_error("Bad CIGAR sequence: " + std::string(seq));
+    }
+
+    // Read off the count.
     int read_number = 0;
-    while (seq && *seq >= '0' && *seq <= '9') {
-        read_number = read_number * 10 + int(*(seq++) - '0');
+    for (auto it = seq.begin(); it != type; ++it) {
+        read_number = read_number * 10 + static_cast<int>(*it - '0');
     }
-    if (!seq || !*seq || begin == seq) {
-        return std::make_pair('?', -1);
-    }
-    return std::make_pair(*(seq++), read_number);
+
+    // Drop the op we read and return it.
+    seq.remove_prefix(type - seq.begin() + 1);
+    return std::make_pair(*type, read_number);
 }
 
 }  // namespace
 
 namespace dorado::alignment {
 
-int parse_cigar(const std::string& cigar, dorado::AlignmentResult& result) {
-    const char* curr = cigar.c_str();
-    const char* end = curr + cigar.length();
+int parse_cigar(std::string_view cigar, dorado::AlignmentResult& result) {
     bool first = true;
     result.strand_start = 0;
     result.num_insertions = 0;
@@ -76,8 +81,8 @@ int parse_cigar(const std::string& cigar, dorado::AlignmentResult& result) {
     char type;
     int length;
     int hard_clipped = 0;
-    while (curr != end) {
-        std::tie(type, length) = next_op(curr);
+    while (!cigar.empty()) {
+        std::tie(type, length) = next_op(cigar);
         if (type == 'H') {
             type = 'S';
             hard_clipped += length;
