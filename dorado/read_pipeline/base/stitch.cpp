@@ -9,8 +9,7 @@
 
 namespace dorado::utils {
 
-void stitch_chunks(ReadCommon& read_common,
-                   const std::vector<std::unique_ptr<Chunk>>& called_chunks) {
+void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunks) {
     assert(static_cast<int>(div_round_closest(called_chunks[0]->raw_chunk_size,
                                               called_chunks[0]->moves.size())) ==
            read_common.model_stride);

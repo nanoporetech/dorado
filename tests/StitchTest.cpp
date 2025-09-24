@@ -68,7 +68,13 @@ CATCH_TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     dorado::ReadCommon read_common;
     read_common.model_stride = static_cast<int>(dorado::utils::div_round_closest(
             called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size()));
-    CATCH_REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read_common, called_chunks));
+
+    std::vector<const dorado::utils::Chunk *> chunks;
+    chunks.reserve(called_chunks.size());
+    for (const auto &chunk : called_chunks) {
+        chunks.emplace_back(chunk.get());
+    }
+    CATCH_REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read_common, chunks));
 
     const std::string expected_sequence = "ACGTCGCGTCGTCGTCCGT";
     const std::string expected_qstring = "!&.-&.&.-&.-&.-&&.-";
