@@ -4,8 +4,8 @@
 #include "utils/math_utils.h"
 #include "utils/string_utils.h"
 
-#include <algorithm>
 #include <cassert>
+#include <numeric>
 
 namespace dorado::utils {
 
@@ -34,8 +34,8 @@ void stitch_chunks(ReadCommon& read_common,
         const int mid_point_rear = overlap_down_sampled / 2;
 
         const int current_chunk_bases_to_trim =
-                std::accumulate(std::prev(current_chunk->moves.end(), mid_point_rear),
-                                current_chunk->moves.end(), 0);
+                std::reduce(std::prev(current_chunk->moves.end(), mid_point_rear),
+                            current_chunk->moves.end(), 0);
 
         const int current_chunk_seq_len = int(current_chunk->seq.size());
         const int end_pos = current_chunk_seq_len - current_chunk_bases_to_trim;
@@ -68,7 +68,7 @@ void stitch_chunks(ReadCommon& read_common,
         const int last_index_in_moves_to_keep =
                 int(read_common.get_raw_data_samples() / read_common.model_stride);
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
-        const int end = std::accumulate(moves.begin(), moves.end(), 0);
+        const int end = std::reduce(moves.begin(), moves.end(), 0);
         sequences.push_back(last_seq.substr(start_pos, end));
         qstrings.push_back(last_qstring.substr(start_pos, end));
 
@@ -90,7 +90,7 @@ void stitch_chunks(ReadCommon& read_common,
             read_common.qstring.pop_back();
         }
         read_common.moves.pop_back();
-        assert(size_t(std::accumulate(read_common.moves.begin(), read_common.moves.end(), 0)) ==
+        assert(size_t(std::reduce(read_common.moves.begin(), read_common.moves.end(), 0)) ==
                read_common.seq.size());
     }
 }
