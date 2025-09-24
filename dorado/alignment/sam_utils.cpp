@@ -228,22 +228,24 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
                                float(std::min(full_len, reference_length[res.genome]));
                 res.genome_end = res.genome_start + res.num_aligned + res.num_deletions;
                 res.strand_end = res.strand_start + res.num_aligned + res.num_insertions;
-                if (opt_values.find("NM") == opt_values.end()) {
+                auto opt_NM = opt_values.find("NM");
+                if (opt_NM == opt_values.end()) {
                     throw std::runtime_error("Input SAM line for read ID " + seq_name +
                                              " does not contain required 'NM' tag");
                 }
                 utils::trace_log("{} opt_values.at(\"NM\").Value: {}", __func__,
-                                 opt_values.at("NM").Value);
+                                 opt_NM->second.Value);
                 int edit_distance = std::stoi(opt_values.at("NM").Value);
                 int num_mismatches = edit_distance - res.num_insertions - res.num_deletions;
                 res.num_correct = res.num_aligned - num_mismatches;
                 res.identity = float(res.num_correct) / float(res.num_aligned);
                 res.accuracy = float(res.num_correct) /
                                float(res.num_aligned + res.num_insertions + res.num_deletions);
-                if (opt_values.find("AS") != opt_values.end()) {
+                auto opt_AS = opt_values.find("AS");
+                if (opt_AS != opt_values.end()) {
                     utils::trace_log("{} opt_values.at(\"AS\").Value: {}", __func__,
-                                     opt_values.at("AS").Value);
-                    res.strand_score = std::stoi(opt_values.at("AS").Value);
+                                     opt_AS->second.Value);
+                    res.strand_score = std::stoi(opt_AS->second.Value);
                 } else {
                     res.strand_score = 0;
                 }
