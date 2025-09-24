@@ -1,4 +1,5 @@
 #include "alignment/sam_utils.h"
+#include "catch2/matchers/catch_matchers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -6,7 +7,6 @@
 
 #include <algorithm>
 #include <numeric>
-#include <sstream>
 
 #define CUT_TAG "[sam_utils]"
 
@@ -14,12 +14,51 @@ using namespace dorado;
 using namespace dorado::alignment;
 
 CATCH_TEST_CASE(CUT_TAG " test parse cigar", CUT_TAG) {
-    std::string cigar = "13I15D17M13D1I6M48I";
+    std::string cigar =
+            "13I"
+            "15D"
+            "17M"
+            "13D"
+            "1I"
+            "6M"
+            "48I";
+    const int num_insertions = 13 + 1 + 48;
+    const int num_deletions = 15 + 13;
+    const int num_aligned = 17 + 6;
+
     AlignmentResult alres;
-    parse_cigar(cigar, alres);
-    CATCH_CHECK(13 + 1 + 48 == alres.num_insertions);
-    CATCH_CHECK(15 + 13 == alres.num_deletions);
-    CATCH_CHECK(17 + 6 == alres.num_aligned);
+    int hard_clipped = parse_cigar(cigar, alres);
+    CATCH_CHECK(0 == hard_clipped);
+    CATCH_CHECK(0 == alres.strand_start);
+    CATCH_CHECK(num_insertions == alres.num_insertions);
+    CATCH_CHECK(num_deletions == alres.num_deletions);
+    CATCH_CHECK(num_aligned == alres.num_aligned);
+
+    cigar = "5S" + cigar;
+    hard_clipped = parse_cigar(cigar, alres);
+    CATCH_CHECK(0 == hard_clipped);
+    CATCH_CHECK(5 == alres.strand_start);
+    CATCH_CHECK(num_insertions == alres.num_insertions);
+    CATCH_CHECK(num_deletions == alres.num_deletions);
+    CATCH_CHECK(num_aligned == alres.num_aligned);
+
+    cigar[1] = 'H';
+    hard_clipped = parse_cigar(cigar, alres);
+    CATCH_CHECK(5 == hard_clipped);
+    CATCH_CHECK(5 == alres.strand_start);
+    CATCH_CHECK(num_insertions == alres.num_insertions);
+    CATCH_CHECK(num_deletions == alres.num_deletions);
+    CATCH_CHECK(num_aligned == alres.num_aligned);
+}
+
+CATCH_TEST_CASE(CUT_TAG " bad cigar string", CUT_TAG) {
+    AlignmentResult alres;
+    CATCH_CHECK_THROWS_WITH(parse_cigar("I18M", alres),
+                            Catch::Matchers::ContainsSubstring("Bad CIGAR sequence"));
+    CATCH_CHECK_THROWS_WITH(parse_cigar("HIM", alres),
+                            Catch::Matchers::ContainsSubstring("Bad CIGAR sequence"));
+    CATCH_CHECK_THROWS_WITH(parse_cigar("1D6", alres),
+                            Catch::Matchers::ContainsSubstring("Bad CIGAR sequence"));
 }
 
 CATCH_TEST_CASE(CUT_TAG " test parse", CUT_TAG) {
