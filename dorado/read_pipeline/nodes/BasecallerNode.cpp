@@ -213,12 +213,13 @@ void BasecallerNode::working_reads_manager() {
             }
 
             // Cleanup the working read.
+            decltype(m_working_reads)::node_type working_read_node;
             {
                 std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
                 auto read_iter = m_working_reads.find(working_read);
                 if (read_iter != m_working_reads.end()) {
                     m_working_reads_signal_bytes -= read_common_data.raw_data.nbytes();
-                    m_working_reads.erase(read_iter);
+                    working_read_node = m_working_reads.extract(read_iter);
                     --m_working_reads_size;
                 } else {
                     throw std::runtime_error("Expected to find read id " +
@@ -227,9 +228,15 @@ void BasecallerNode::working_reads_manager() {
                 }
             }
 
+            // Destroy the working read now that we don't have the lock held.
+            working_read_node = {};
+
             // Send the read on its way.
             send_message_to_sink(std::move(source_read));
         }
+
+        // Release the chunk now rather than when it's assigned inside try_pop() (which happens under a lock).
+        chunk.reset();
     }
 }
 
