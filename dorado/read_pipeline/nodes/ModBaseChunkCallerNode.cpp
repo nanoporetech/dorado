@@ -1086,7 +1086,7 @@ void ModBaseChunkCallerNode::output_thread_fn() {
 
     std::unique_ptr<ModBaseChunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
-        auto working_read = chunk->working_read;
+        auto working_read = std::move(chunk->working_read);
         auto& read = get_read_common_data(working_read->read);
 
         // Extract useful modbase model parameters

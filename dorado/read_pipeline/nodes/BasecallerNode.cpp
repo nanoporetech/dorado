@@ -173,7 +173,7 @@ void BasecallerNode::working_reads_manager() {
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
-        auto working_read = chunk->owning_read;
+        auto working_read = std::move(chunk->owning_read);
         auto idx_in_read = chunk->idx_in_read;
         working_read->called_chunks[idx_in_read] = std::move(chunk);
         auto num_chunks_called = ++working_read->num_chunks_called;
