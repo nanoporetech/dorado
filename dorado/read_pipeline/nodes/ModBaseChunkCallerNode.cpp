@@ -123,6 +123,11 @@ struct ModBaseChunkCallerNode::ModBaseChunk {
     std::vector<float> scores;
 };
 
+struct ModBaseChunkCallerNode::EncodingData {
+    std::vector<uint64_t> seq_to_sig_map;
+    std::vector<int> int_seq;
+};
+
 ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                                                size_t modbase_threads,
                                                size_t canonical_stride,
