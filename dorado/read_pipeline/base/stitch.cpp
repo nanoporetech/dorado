@@ -24,7 +24,7 @@ void stitch_chunks(ReadCommon& read_common,
     sequences.reserve(called_chunks.size());
     qstrings.reserve(called_chunks.size());
 
-    for (int i = 0; i < int(called_chunks.size() - 1); i++) {
+    for (int i = 0; i < int(called_chunks.size()) - 1; i++) {
         auto& current_chunk = called_chunks[i];
         auto& next_chunk = called_chunks[i + 1];
         const int overlap_size = int((current_chunk->raw_chunk_size + current_chunk->input_offset) -
