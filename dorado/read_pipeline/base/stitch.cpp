@@ -27,19 +27,19 @@ void stitch_chunks(ReadCommon& read_common,
     for (int i = 0; i < int(called_chunks.size() - 1); i++) {
         auto& current_chunk = called_chunks[i];
         auto& next_chunk = called_chunks[i + 1];
-        int overlap_size = int((current_chunk->raw_chunk_size + current_chunk->input_offset) -
-                               (next_chunk->input_offset));
+        const int overlap_size = int((current_chunk->raw_chunk_size + current_chunk->input_offset) -
+                                     (next_chunk->input_offset));
         assert(overlap_size % read_common.model_stride == 0);
-        int overlap_down_sampled = overlap_size / read_common.model_stride;
-        int mid_point_rear = overlap_down_sampled / 2;
+        const int overlap_down_sampled = overlap_size / read_common.model_stride;
+        const int mid_point_rear = overlap_down_sampled / 2;
 
-        int current_chunk_bases_to_trim =
+        const int current_chunk_bases_to_trim =
                 std::accumulate(std::prev(current_chunk->moves.end(), mid_point_rear),
                                 current_chunk->moves.end(), 0);
 
-        int current_chunk_seq_len = int(current_chunk->seq.size());
-        int end_pos = current_chunk_seq_len - current_chunk_bases_to_trim;
-        int trimmed_len = end_pos - start_pos;
+        const int current_chunk_seq_len = int(current_chunk->seq.size());
+        const int end_pos = current_chunk_seq_len - current_chunk_bases_to_trim;
+        const int trimmed_len = end_pos - start_pos;
         const std::string_view seq = current_chunk->seq;
         const std::string_view qstring = current_chunk->qstring;
         sequences.push_back(seq.substr(start_pos, trimmed_len));
@@ -65,10 +65,10 @@ void stitch_chunks(ReadCommon& read_common,
 
     if (called_chunks.size() == 1) {
         // shorten the sequence, qstring & moves where the read is shorter than chunksize
-        int last_index_in_moves_to_keep =
+        const int last_index_in_moves_to_keep =
                 int(read_common.get_raw_data_samples() / read_common.model_stride);
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
-        int end = std::accumulate(moves.begin(), moves.end(), 0);
+        const int end = std::accumulate(moves.begin(), moves.end(), 0);
         sequences.push_back(last_seq.substr(start_pos, end));
         qstrings.push_back(last_qstring.substr(start_pos, end));
 
