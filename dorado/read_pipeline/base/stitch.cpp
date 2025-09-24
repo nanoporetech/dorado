@@ -1,7 +1,8 @@
 #include "read_pipeline/base/stitch.h"
 
-#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/base/messages.h"
 #include "utils/math_utils.h"
+#include "utils/string_utils.h"
 
 #include <algorithm>
 #include <cassert>
@@ -17,8 +18,11 @@ void stitch_chunks(ReadCommon& read_common,
     int start_pos = 0;
     int mid_point_front = 0;
     std::vector<uint8_t> moves;
-    std::vector<std::string> sequences;
-    std::vector<std::string> qstrings;
+    std::vector<std::string_view> sequences;
+    std::vector<std::string_view> qstrings;
+
+    sequences.reserve(called_chunks.size());
+    qstrings.reserve(called_chunks.size());
 
     for (int i = 0; i < int(called_chunks.size() - 1); i++) {
         auto& current_chunk = called_chunks[i];
@@ -36,8 +40,11 @@ void stitch_chunks(ReadCommon& read_common,
         int current_chunk_seq_len = int(current_chunk->seq.size());
         int end_pos = current_chunk_seq_len - current_chunk_bases_to_trim;
         int trimmed_len = end_pos - start_pos;
-        sequences.push_back(current_chunk->seq.substr(start_pos, trimmed_len));
-        qstrings.push_back(current_chunk->qstring.substr(start_pos, trimmed_len));
+        const std::string_view seq = current_chunk->seq;
+        const std::string_view qstring = current_chunk->qstring;
+        sequences.push_back(seq.substr(start_pos, trimmed_len));
+        qstrings.push_back(qstring.substr(start_pos, trimmed_len));
+
         moves.insert(moves.end(), std::next(current_chunk->moves.begin(), mid_point_front),
                      std::prev(current_chunk->moves.end(), mid_point_rear));
 
@@ -53,6 +60,8 @@ void stitch_chunks(ReadCommon& read_common,
     auto& last_chunk = called_chunks.back();
     moves.insert(moves.end(), std::next(last_chunk->moves.begin(), mid_point_front),
                  last_chunk->moves.end());
+    const std::string_view last_seq = last_chunk->seq;
+    const std::string_view last_qstring = last_chunk->qstring;
 
     if (called_chunks.size() == 1) {
         // shorten the sequence, qstring & moves where the read is shorter than chunksize
@@ -60,17 +69,17 @@ void stitch_chunks(ReadCommon& read_common,
                 int(read_common.get_raw_data_samples() / read_common.model_stride);
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
         int end = std::accumulate(moves.begin(), moves.end(), 0);
-        sequences.push_back(last_chunk->seq.substr(start_pos, end));
-        qstrings.push_back(last_chunk->qstring.substr(start_pos, end));
+        sequences.push_back(last_seq.substr(start_pos, end));
+        qstrings.push_back(last_qstring.substr(start_pos, end));
 
     } else {
-        sequences.push_back(last_chunk->seq.substr(start_pos));
-        qstrings.push_back(last_chunk->qstring.substr(start_pos));
+        sequences.push_back(last_seq.substr(start_pos));
+        qstrings.push_back(last_qstring.substr(start_pos));
     }
 
     // Set the read seq and qstring
-    read_common.seq = std::accumulate(sequences.begin(), sequences.end(), std::string(""));
-    read_common.qstring = std::accumulate(qstrings.begin(), qstrings.end(), std::string(""));
+    read_common.seq = utils::join(sequences, {});
+    read_common.qstring = utils::join(qstrings, {});
     read_common.moves = std::move(moves);
 
     // remove partial stride overhang
