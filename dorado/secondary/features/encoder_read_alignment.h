@@ -49,6 +49,10 @@ public:
 
     ~EncoderReadAlignment() = default;
 
+    std::unordered_map<std::string, int32_t> produce_haplotags(const std::string& ref_name,
+                                                               const int64_t ref_start,
+                                                               const int64_t ref_end) override;
+
     secondary::Sample encode_region(const std::string& ref_name,
                                     const int64_t ref_start,
                                     const int64_t ref_end,

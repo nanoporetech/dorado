@@ -1,7 +1,9 @@
 #include "encoder_read_alignment.h"
 
 #include "encoder_utils.h"
+#include "local_haplotagging.h"
 #include "medaka_read_matrix.h"
+#include "secondary/features/kadayashi_utils.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 #include "utils/ssize.h"
@@ -11,6 +13,7 @@
 
 #include <cassert>
 #include <cstddef>
+#include <iostream>
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
@@ -283,6 +286,44 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
                                                           include_haplotype_column,
                                                           include_snp_qv_column,
                                                           (m_num_dtypes > 1))} {}
+
+std::unordered_map<std::string, int32_t> EncoderReadAlignment::produce_haplotags(
+        const std::string& ref_name,
+        const int64_t ref_start,
+        const int64_t ref_end) {
+    std::cerr << "Haplotagging region: " << ref_name << ":" << (ref_start + 1) << "-" << ref_end
+              << ", source = " << secondary::haplotag_source_to_string(m_hap_source) << "\n";
+    if (m_hap_source == secondary::HaplotagSource::BIN_FILE) {
+        LOG_TRACE("Loading haplotags from a Kadayashi bin file for region: {}:{}-{}", ref_name,
+                  (ref_start + 1), ref_end);
+        return secondary::query_bin_file_get_qname2tag(m_phasing_bin ? *m_phasing_bin : "",
+                                                       ref_name, ref_start, ref_end);
+
+    } else if (m_hap_source == secondary::HaplotagSource::COMPUTE) {
+        LOG_TRACE("Running Kadayashi on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
+
+        constexpr bool DISABLE_INTERVAL_EXPANSION = false;
+        constexpr int32_t MIN_BASE_QUALITY = 5;
+        constexpr int32_t MIN_VARCALL_COVERAGE = 5;
+        constexpr float MIN_VARCALL_FRACTION = 0.2f;
+        constexpr int32_t MAX_CLIPPING = 200;
+        constexpr int32_t MIN_STRAND_COV = 3;
+        constexpr float MIN_STRAND_COV_FRAC = 0.03f;
+        constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
+
+        std::unordered_map<std::string, int32_t> ret =
+                kadayashi::kadayashi_dvr_single_region_wrapper(
+                        m_bam_file.fp(), m_bam_file.idx(), m_bam_file.hdr(),
+                        m_fastx_reader.get_raw_faidx_ptr(), ref_name.c_str(), ref_start, ref_end,
+                        DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
+                        MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
+                        MAX_GAPCOMPRESSED_SEQDIV);
+        LOG_TRACE("Kadayashi done on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
+        return ret;
+    }
+
+    return {};
+}
 
 secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_name,
                                                       const int64_t ref_start,
