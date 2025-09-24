@@ -42,7 +42,7 @@ public:
             spdlog::warn("Empty sam line field in stream. Continuing anyway.");
             val = default_value<T>();
         } else {
-            dynamic_cast<std::istringstream&>(*this) >> val;
+            static_cast<std::istringstream&>(*this) >> val;
         }
         get();
         return *this;
@@ -262,7 +262,7 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
             }
         }
         res.sam_string = sam_line_ostream.str();
-        results.push_back(res);
+        results.emplace_back(std::move(res));
     }
 
     // We want to make sure the primary alignment is first.

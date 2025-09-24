@@ -493,7 +493,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         res.kit = candidate.kit;
         res.barcode_kit = candidate.barcode_kit;
 
-        results.push_back(res);
+        results.emplace_back(std::move(res));
     }
     edlibFreeAlignResult(top_result_v1);
     edlibFreeAlignResult(bottom_result_v1);
@@ -649,7 +649,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         res.bottom_barcode_pos = {bottom_start + bottom_result.startLocations[0],
                                   bottom_start + bottom_result.endLocations[0]};
 
-        results.push_back(res);
+        results.emplace_back(std::move(res));
     }
     edlibFreeAlignResult(top_result);
     edlibFreeAlignResult(bottom_result);
