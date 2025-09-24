@@ -22,9 +22,7 @@ def get_platform() -> str:
         return "linux"
     elif platform_id == "darwin":
         processor = platform.processor()
-        if processor == "i386":
-            return "osx"
-        elif processor == "arm":
+        if processor == "arm":
             return "osx_arm"
         else:
             raise RuntimeError(f"Unknown macOS processor: {processor}")

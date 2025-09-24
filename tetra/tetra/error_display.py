@@ -46,7 +46,6 @@ def pretty_print_diffs(exp, act, tolerance=0):
                 if (
                     "barcode_" in col_name
                     or "alignment_" in col_name
-                    or "lamp_" in col_name
                     or "adapter_" in col_name
                     or "primer_" in col_name
                 ):

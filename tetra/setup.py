@@ -15,7 +15,7 @@ install_requirements = [
 setup(
     name="ont-tetra",
     description="Oxford Nanopore Technologies regression testing project",
-    python_requires=">=3.7",
+    python_requires=">=3.9",
     long_description=long_description,
     url="http://www.nanoporetech.com",
     install_requires=install_requirements,

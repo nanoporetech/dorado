@@ -141,7 +141,7 @@ variables:
   - python -m pip install -U pip
 
 .run_tetra_tests:
-  # psyam is not available on all platforms, but the tests can run without it.
+  # pysam is not available on all platforms, but the tests can run without it.
   - |
     echo Running tetra unit tests
     pip install pysam --only-binary :all: || true
