@@ -2,8 +2,11 @@
 
 #include <algorithm>
 #include <cctype>
+#include <charconv>
+#include <optional>
 #include <string>
 #include <string_view>
+#include <type_traits>
 #include <vector>
 
 namespace dorado::utils {
@@ -78,6 +81,20 @@ inline std::string to_uppercase(std::string in) {
     std::transform(in.begin(), in.end(), in.begin(),
                    [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return in;
+}
+
+template <typename T>
+inline std::optional<T> from_chars(std::string_view str) {
+    static_assert(std::is_integral_v<T>,
+                  "libc++ (macOS) won't provide floating point support until they're on LLVM 20 "
+                  "(_LIBCPP_VERSION >= 200000)");
+
+    T value = 0;
+    const auto res = std::from_chars(str.data(), str.data() + str.size(), value);
+    if (res.ec != std::errc{}) {
+        return std::nullopt;
+    }
+    return value;
 }
 
 }  // namespace dorado::utils

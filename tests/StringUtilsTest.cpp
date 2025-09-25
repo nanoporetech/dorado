@@ -6,9 +6,6 @@
 #define CUT_TAG "[dorado::utils::string_utils]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
-#include <string>
-#include <string_view>
-
 namespace dorado::utils::string_view {
 
 DEFINE_TEST("split") {
@@ -134,6 +131,14 @@ DEFINE_TEST("rtrim_view") {
     auto actual = rtrim_view(input);
 
     CATCH_REQUIRE(expected == actual);
+}
+
+DEFINE_TEST("from_chars") {
+    CATCH_CHECK(from_chars<int>("123") == 123);
+    CATCH_CHECK(from_chars<std::int64_t>("-10") == -10);
+
+    CATCH_CHECK(from_chars<int>("not a number") == std::nullopt);
+    CATCH_CHECK(from_chars<std::uint8_t>("256") == std::nullopt);
 }
 
 }  // namespace dorado::utils::string_view
