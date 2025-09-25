@@ -25,48 +25,48 @@ void test_split_on_separator(bool stream_ops, bool with_trailing) {
     const auto input = dorado::utils::join(inputs, separator_str);
 
     dorado::utils::SeparatedStream<Separator> stream(input);
-    CATCH_CHECK_FALSE(stream.eof());
+    CATCH_CHECK(stream);
 
     if (stream_ops) {
         std::string_view temp;
         CATCH_CHECK(stream.peek() == "this");
-        CATCH_CHECK_FALSE((stream >> temp).eof());
+        CATCH_CHECK(stream >> temp);
         CATCH_CHECK(temp == "this");
 
         CATCH_CHECK(stream.peek() == "is");
-        CATCH_CHECK_FALSE((stream >> temp).eof());
+        CATCH_CHECK(stream >> temp);
         CATCH_CHECK(temp == "is");
 
         CATCH_CHECK(stream.peek() == "a");
-        CATCH_CHECK_FALSE((stream >> temp).eof());
+        CATCH_CHECK(stream >> temp);
         CATCH_CHECK(temp == "a");
 
         CATCH_CHECK(stream.peek() == "test");
-        CATCH_CHECK_FALSE((stream >> temp).eof());
+        CATCH_CHECK(stream >> temp);
         CATCH_CHECK(temp == "test");
 
         CATCH_CHECK(stream.peek() == std::nullopt);
-        CATCH_CHECK((stream >> temp).eof());
+        CATCH_CHECK_FALSE(stream >> temp);
     } else {
         CATCH_CHECK(stream.peek() == "this");
         CATCH_CHECK(stream.getline() == "this");
-        CATCH_CHECK_FALSE(stream.eof());
+        CATCH_CHECK(stream);
 
         CATCH_CHECK(stream.peek() == "is");
         CATCH_CHECK(stream.getline() == "is");
-        CATCH_CHECK_FALSE(stream.eof());
+        CATCH_CHECK(stream);
 
         CATCH_CHECK(stream.peek() == "a");
         CATCH_CHECK(stream.getline() == "a");
-        CATCH_CHECK_FALSE(stream.eof());
+        CATCH_CHECK(stream);
 
         CATCH_CHECK(stream.peek() == "test");
         CATCH_CHECK(stream.getline() == "test");
-        CATCH_CHECK_FALSE(stream.eof());
+        CATCH_CHECK(stream);
 
         CATCH_CHECK(stream.peek() == std::nullopt);
         CATCH_CHECK(stream.getline() == std::nullopt);
-        CATCH_CHECK(stream.eof());
+        CATCH_CHECK_FALSE(stream);
     }
 }
 
@@ -86,20 +86,20 @@ DEFINE_TEST("no separator") {
 
     const std::string_view input = "no tabs";
     dorado::utils::TabSeparatedStream stream(input);
-    CATCH_CHECK_FALSE(stream.eof());
+    CATCH_CHECK(stream);
 
     if (stream_ops) {
         std::string_view temp;
-        CATCH_CHECK_FALSE((stream >> temp).eof());
+        CATCH_CHECK(stream >> temp);
         CATCH_CHECK(temp == input);
 
-        CATCH_CHECK((stream >> temp).eof());
+        CATCH_CHECK_FALSE(stream >> temp);
     } else {
         CATCH_CHECK(stream.getline() == input);
-        CATCH_CHECK_FALSE(stream.eof());
+        CATCH_CHECK(stream);
 
         CATCH_CHECK(stream.getline() == std::nullopt);
-        CATCH_CHECK(stream.eof());
+        CATCH_CHECK_FALSE(stream);
     }
 }
 
@@ -110,28 +110,28 @@ DEFINE_TEST("empty lines") {
 
     const std::string input(num_lines, '\n');
     dorado::utils::NewlineSeparatedStream stream(input);
-    CATCH_CHECK_FALSE(stream.eof());
+    CATCH_CHECK(stream);
 
     if (stream_ops) {
         std::string_view temp;
         for (int i = 0; i < num_lines; i++) {
             CATCH_CHECK(stream.peek() == "");
-            CATCH_CHECK_FALSE((stream >> temp).eof());
+            CATCH_CHECK(stream >> temp);
             CATCH_CHECK(temp == "");
         }
 
         CATCH_CHECK(stream.peek() == std::nullopt);
-        CATCH_CHECK((stream >> temp).eof());
+        CATCH_CHECK_FALSE(stream >> temp);
     } else {
         for (int i = 0; i < num_lines; i++) {
             CATCH_CHECK(stream.peek() == "");
             CATCH_CHECK(stream.getline() == "");
-            CATCH_CHECK_FALSE(stream.eof());
+            CATCH_CHECK(stream);
         }
 
         CATCH_CHECK(stream.peek() == std::nullopt);
         CATCH_CHECK(stream.getline() == std::nullopt);
-        CATCH_CHECK(stream.eof());
+        CATCH_CHECK_FALSE(stream);
     }
 }
 
@@ -145,10 +145,10 @@ DEFINE_TEST("stream operators") {
     std::string_view blah;
 
     dorado::utils::SpaceSeparatedStream stream(input);
-    CATCH_CHECK_FALSE(stream.eof());
+    CATCH_CHECK(stream);
 
     stream >> test >> num_123 >> num_negative_2 >> empty >> blah;
-    CATCH_CHECK_FALSE(stream.eof());
+    CATCH_CHECK(stream);
 
     CATCH_CHECK(test == "test");
     CATCH_CHECK(num_123 == 123);

@@ -34,6 +34,7 @@ public:
     // In line with the stdlib streams, this is only set once an
     // attempt is made to read past the end.
     [[nodiscard]] bool eof() const { return m_eof; }
+    [[nodiscard]] operator bool() const { return !eof(); }
 
     // Peek at the next element in the stream.
     [[nodiscard]] std::optional<std::string_view> peek() const {

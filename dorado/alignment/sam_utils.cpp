@@ -49,7 +49,7 @@ public:
         return *this;
     }
 
-    [[nodiscard]] bool eof() const { return m_stream.eof(); }
+    [[nodiscard]] operator bool() const { return m_stream; }
 };
 
 std::pair<char, int> next_op(std::string_view& seq) {
@@ -134,7 +134,7 @@ std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
     }
 
     // Read every alignment from the SAM file
-    for (std::string_view sam_line; !(sam_content_stream >> sam_line).eof();) {
+    for (std::string_view sam_line; sam_content_stream >> sam_line;) {
         AlignmentResult res{};
 
         // required fields
@@ -198,8 +198,7 @@ std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
 
         if (res.genome != "*") {
             // optional fields
-            std::string_view field;
-            while (!(sam_line_istream >> field).eof()) {
+            for (std::string_view field; sam_line_istream >> field;) {
                 if (field.length() < 5 || field[2] != ':' || field[4] != ':') {
                     throw std::runtime_error("optional SAM field '" + std::string(field) +
                                              "' could not be parsed.");
