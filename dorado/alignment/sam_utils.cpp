@@ -2,6 +2,7 @@
 
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -203,25 +204,25 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
         res.num_events = res.sequence == "*" ? 0 : static_cast<int>(res.sequence.size());
         res.mapping_quality = map_quality;
 
-        typedef struct {
-            std::string Type, Value;
-        } TypeValuePair;
+        struct TypeValuePair {
+            std::string_view Type, Value;
+        };
 
-        std::map<std::string, TypeValuePair> opt_values;
+        std::map<std::string_view, TypeValuePair> opt_values;
 
         if (res.genome != "*") {
             // optional fields
             while (!sam_line_istream.eof()) {
-                std::string field;
+                std::string_view field;
                 sam_line_istream >> field;
                 if (field.length() < 5 || field[2] != ':' || field[4] != ':') {
-                    throw std::runtime_error("optional SAM field '" + field +
+                    throw std::runtime_error("optional SAM field '" + std::string(field) +
                                              "' could not be parsed.");
                 }
-                std::string key = field.substr(0, 2);
-                char type = field[3];
-                std::string value = field.substr(5);
-                opt_values[key] = TypeValuePair{std::string(1, type), value};
+                std::string_view key = field.substr(0, 2);
+                std::string_view type = field.substr(3, 1);
+                std::string_view value = field.substr(5);
+                opt_values[key] = TypeValuePair{type, value};
             }
 
             // write to output structure
@@ -246,12 +247,12 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
                 res.strand_end = res.strand_start + res.num_aligned + res.num_insertions;
                 auto opt_NM = opt_values.find("NM");
                 if (opt_NM == opt_values.end()) {
-                    throw std::runtime_error("Input SAM line for read ID " + seq_name +
+                    throw std::runtime_error("Input SAM line for read ID " + std::string(seq_name) +
                                              " does not contain required 'NM' tag");
                 }
                 utils::trace_log("{} opt_values.at(\"NM\").Value: {}", __func__,
                                  opt_NM->second.Value);
-                int edit_distance = std::stoi(opt_values.at("NM").Value);
+                int edit_distance = utils::from_chars<int>(opt_values.at("NM").Value).value();
                 int num_mismatches = edit_distance - res.num_insertions - res.num_deletions;
                 res.num_correct = res.num_aligned - num_mismatches;
                 res.identity = float(res.num_correct) / float(res.num_aligned);
@@ -261,7 +262,7 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
                 if (opt_AS != opt_values.end()) {
                     utils::trace_log("{} opt_values.at(\"AS\").Value: {}", __func__,
                                      opt_AS->second.Value);
-                    res.strand_score = std::stoi(opt_AS->second.Value);
+                    res.strand_score = utils::from_chars<int>(opt_AS->second.Value).value();
                 } else {
                     res.strand_score = 0;
                 }
