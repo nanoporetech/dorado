@@ -5,6 +5,8 @@
 .vscode
 .devcontainer
 *.qdrep
+*.egg-info
+*__pycache__*
 dist
 build
 build-*
@@ -18,9 +20,7 @@ tests/test_output
 temp
 venv
 tests/test_output*
-log*
 *.t.err
-out*
 Makefile
 /models
 
