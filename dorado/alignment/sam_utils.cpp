@@ -184,7 +184,7 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
             }
         }
 
-        res.num_events = int(res.sequence.length());
+        res.num_events = res.sequence == "*" ? 0 : static_cast<int>(res.sequence.size());
         res.mapping_quality = map_quality;
 
         typedef struct {

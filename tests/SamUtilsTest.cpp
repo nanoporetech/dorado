@@ -146,7 +146,9 @@ CATCH_TEST_CASE(CUT_TAG " test parse not aligned reference", CUT_TAG) {
 
     const AlignmentResult& alres = results[0];
 
-    CATCH_CHECK(std::string("*") == alres.genome);
+    CATCH_CHECK("*" == alres.genome);
+    CATCH_CHECK("*" == alres.sequence);
+    CATCH_CHECK("*" == alres.qstring);
     CATCH_CHECK(0 == alres.genome_start);
     CATCH_CHECK(0 == alres.genome_end);
     CATCH_CHECK(0 == alres.num_events);
