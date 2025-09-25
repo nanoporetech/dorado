@@ -13,40 +13,58 @@
 #include <unordered_map>
 #include <utility>
 
+namespace dorado::alignment {
+
 namespace {
 
-class SamLineStream : public std::istringstream {
-    template <typename T>
-    using enable_if_integral_t = typename std::enable_if<
-            std::is_integral<typename std::remove_reference<T>::type>::value>::type;
-    template <typename T>
-    using enable_if_string_t = typename std::enable_if<
-            std::is_same<typename std::remove_reference<T>::type, std::string>::value>::type;
+class SamLineStream {
+    std::string_view m_line;
 
-    template <typename T, enable_if_integral_t<T>* = nullptr>
-    T default_value() {
-        return 0;
+    template <typename T>
+    static void parse_value(std::string_view in, T& out) requires std::is_integral_v<T> {
+        if (in.empty()) {
+            utils::trace_log("Empty sam line field in stream. Continuing anyway.");
+            out = 0;
+        } else {
+            out = utils::from_chars<T>(in).value();
+        }
     }
 
-    template <typename T, enable_if_string_t<T>* = nullptr>
-    T default_value() {
-        return "*";
+    template <typename T>
+    static void parse_value(std::string_view in, T& out)
+            requires(std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>) {
+        if (in.empty()) {
+            utils::trace_log("Empty sam line field in stream. Continuing anyway.");
+            out = "*";
+        } else {
+            out = in;
+        }
+    }
+
+    std::string_view consume_column() {
+        // Read off the column's data.
+        auto next_tab = m_line.find('\t');
+        auto column_data = m_line.substr(0, next_tab);
+
+        // Consume it, and the tab.
+        m_line.remove_prefix(column_data.size());
+        if (!eof()) {
+            m_line.remove_prefix(1);
+        }
+        return column_data;
     }
 
 public:
-    using std::istringstream::istringstream;
+    SamLineStream(std::string_view line) : m_line(line) {}
 
     template <typename T>
     SamLineStream& operator>>(T& val) {
-        if (peek() == '\t') {
-            spdlog::warn("Empty sam line field in stream. Continuing anyway.");
-            val = default_value<T>();
-        } else {
-            static_cast<std::istringstream&>(*this) >> val;
-        }
-        get();
+        auto column_data = consume_column();
+        parse_value(column_data, val);
         return *this;
     }
+
+    bool eof() const { return m_line.empty(); }
 };
 
 std::pair<char, int> next_op(std::string_view& seq) {
@@ -69,8 +87,6 @@ std::pair<char, int> next_op(std::string_view& seq) {
 }
 
 }  // namespace
-
-namespace dorado::alignment {
 
 int parse_cigar(std::string_view cigar, dorado::AlignmentResult& result) {
     bool first = true;
@@ -135,7 +151,7 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
         AlignmentResult res{};
 
         // required fields
-        std::string seq_name, cigar, rnext, aligned_seq, aligned_qstring;
+        std::string_view seq_name, cigar, rnext, aligned_seq, aligned_qstring;
         unsigned int flags;
         int map_quality, next_pos, seq_len;
         SamLineStream sam_line_istream(sam_line);
