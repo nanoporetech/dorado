@@ -24,7 +24,7 @@ namespace {
 [[maybe_unused]] __attribute__((target("default")))
 #endif
 std::string
-reverse_complement_impl(const std::string& sequence) {
+reverse_complement_impl(std::string_view sequence) {
     if (sequence.empty()) {
         return {};
     }
@@ -48,7 +48,7 @@ reverse_complement_impl(const std::string& sequence) {
 // PSHUFB. On strings with over several thousand bases this was measured to be about 10x the speed
 // of the default implementation on Skylake.
 [[maybe_unused]] __attribute__((target("avx2"))) std::string reverse_complement_impl(
-        const std::string& sequence) {
+        std::string_view sequence) {
     const auto len = sequence.size();
     std::string rev_comp_sequence;
     rev_comp_sequence.resize(len);
@@ -483,7 +483,7 @@ void reverse_seq_to_sig_map(std::vector<uint64_t>& seq_to_sig_map, size_t signal
 // Multiversioned function dispatch doesn't work across the dorado_lib linking
 // boundary.  Without this wrapper, AVX machines still only execute the default
 // version.
-std::string reverse_complement(const std::string& sequence) {
+std::string reverse_complement(std::string_view sequence) {
     NVTX3_FUNC_RANGE();
     return reverse_complement_impl(sequence);
 }

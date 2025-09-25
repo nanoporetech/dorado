@@ -111,29 +111,30 @@ int parse_cigar(std::string_view cigar, dorado::AlignmentResult& result) {
     return hard_clipped;
 }
 
-std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
-                                             const std::string& query_seq,
-                                             const std::string& query_qual) {
+std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
+                                             std::string_view query_seq,
+                                             std::string_view query_qual) {
     std::vector<AlignmentResult> results;
     utils::NewlineSeparatedStream sam_content_stream(sam_content);
-    std::unordered_map<std::string, int> reference_length;
+    std::unordered_map<std::string_view, int> reference_length;
+
     // read header
     while (sam_content_stream.peek().value_or("").starts_with('@')) {
         utils::TabSeparatedStream header_line(sam_content_stream.getline().value());
 
         // Read the genome sequence lengths from the header
-        std::string sq, reference, length_field;
+        std::string_view sq, reference, length_field;
         header_line >> sq >> reference >> length_field;
         if (sq == "@SQ") {
             utils::trace_log("{} length_field: {}", __func__, length_field);
-            int ref_length = std::stoi(length_field.substr(3, length_field.size()));
+            int ref_length =
+                    utils::from_chars<int>(length_field.substr(3, length_field.size())).value();
             reference_length[reference.substr(3, reference.size())] = ref_length;
         }
-        std::getline(sam_content_stream, header_line);
     }
 
     // Read every alignment from the SAM file
-    for (std::string sam_line; !(sam_content_stream >> sam_line).eof();) {
+    for (std::string_view sam_line; !(sam_content_stream >> sam_line).eof();) {
         AlignmentResult res{};
 
         // required fields
