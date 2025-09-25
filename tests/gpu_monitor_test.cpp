@@ -152,6 +152,8 @@ DEFINE_TEST_FIXTURE_METHOD(
     CATCH_CHECK(info->device_index == *first_accessible_device);
 }
 
+#ifndef DORADO_ORIN
+// device status for temps and utilisation are not supported on Jetson devices
 DEFINE_TEST_FIXTURE_METHOD(
         "get_device_status_info with valid device returns non-zero temperature") {
     if (!first_accessible_device) {
@@ -306,6 +308,7 @@ DEFINE_TEST_FIXTURE_METHOD(
     CATCH_REQUIRE(info->current_throttling_reason.has_value());
     CATCH_CHECK(*info->current_throttling_reason <= 0x1000ULL);
 }
+#endif  // DORADO_ORIN
 
 DEFINE_TEST_FIXTURE_METHOD(
         "get_device_status_info with valid device returns with non-empty device name") {
