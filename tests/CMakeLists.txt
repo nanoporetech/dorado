@@ -81,6 +81,7 @@ add_executable(dorado_tests
     SecondarySampleTest.cpp
     SecondaryTrimTest.cpp
     SecondaryWindowTest.cpp
+    SeparatedStreamTest.cpp
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp

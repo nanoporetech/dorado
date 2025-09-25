@@ -1,5 +1,6 @@
 #include "alignment/sam_utils.h"
 
+#include "utils/SeparatedStream.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
@@ -19,53 +20,36 @@ namespace dorado::alignment {
 namespace {
 
 class SamLineStream {
-    std::string_view m_line;
+    utils::TabSeparatedStream m_stream;
 
     template <typename T>
-    static void parse_value(std::string_view in, T& out) requires std::is_integral_v<T> {
-        if (in.empty()) {
-            utils::trace_log("Empty sam line field in stream. Continuing anyway.");
-            out = 0;
-        } else {
-            out = utils::from_chars<T>(in).value();
-        }
+    static T default_value() requires std::is_integral_v<T> {
+        return 0;
     }
 
     template <typename T>
-    static void parse_value(std::string_view in, T& out)
+    static T default_value()
             requires(std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>) {
-        if (in.empty()) {
-            utils::trace_log("Empty sam line field in stream. Continuing anyway.");
-            out = "*";
-        } else {
-            out = in;
-        }
-    }
-
-    std::string_view consume_column() {
-        // Read off the column's data.
-        auto next_tab = m_line.find('\t');
-        auto column_data = m_line.substr(0, next_tab);
-
-        // Consume it, and the tab.
-        m_line.remove_prefix(column_data.size());
-        if (!eof()) {
-            m_line.remove_prefix(1);
-        }
-        return column_data;
+        return "*";
     }
 
 public:
-    SamLineStream(std::string_view line) : m_line(line) {}
+    SamLineStream(std::string_view line) : m_stream(line) {}
 
     template <typename T>
     SamLineStream& operator>>(T& val) {
-        auto column_data = consume_column();
-        parse_value(column_data, val);
+        if (m_stream.peek().value_or("").empty()) {
+            utils::trace_log("Empty sam line field in stream. Continuing anyway.");
+            val = default_value<T>();
+            // Consume the empty field.
+            (void)m_stream.getline();
+        } else {
+            m_stream >> val;
+        }
         return *this;
     }
 
-    bool eof() const { return m_line.empty(); }
+    [[nodiscard]] bool eof() const { return m_stream.eof(); }
 };
 
 std::pair<char, int> next_op(std::string_view& seq) {
@@ -212,9 +196,8 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
 
         if (res.genome != "*") {
             // optional fields
-            while (!sam_line_istream.eof()) {
-                std::string_view field;
-                sam_line_istream >> field;
+            std::string_view field;
+            while (!(sam_line_istream >> field).eof()) {
                 if (field.length() < 5 || field[2] != ':' || field[4] != ':') {
                     throw std::runtime_error("optional SAM field '" + std::string(field) +
                                              "' could not be parsed.");
