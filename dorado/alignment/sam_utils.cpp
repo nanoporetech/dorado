@@ -258,18 +258,27 @@ std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
         res.supplementary_alignment = ((flags & 0x800u) != 0);
 
         // Rebuild the SAM line, since it may have been malformed, and is probably missing qual data.
-        std::ostringstream sam_line_ostream;
-        sam_line_ostream << seq_name << '\t' << flags << '\t' << res.genome << '\t'
-                         << res.genome_start << '\t' << map_quality << '\t' << cigar << '\t'
-                         << rnext << '\t' << next_pos << '\t' << seq_len << '\t' << res.sequence
-                         << '\t' << res.qstring;
+        std::string sam_string;
+        sam_string.reserve(sam_line.size());
+        sam_string.append(seq_name);
+        sam_string.append("\t").append(std::to_string(flags));
+        sam_string.append("\t").append(res.genome);
+        sam_string.append("\t").append(std::to_string(res.genome_start));
+        sam_string.append("\t").append(std::to_string(map_quality));
+        sam_string.append("\t").append(cigar);
+        sam_string.append("\t").append(rnext);
+        sam_string.append("\t").append(std::to_string(next_pos));
+        sam_string.append("\t").append(std::to_string(seq_len));
+        sam_string.append("\t").append(res.sequence);
+        sam_string.append("\t").append(res.qstring);
         if (!opt_values.empty()) {
             for (const auto& item : opt_values) {
-                sam_line_ostream << '\t' << item.first << ':' << item.second.Type << ':'
-                                 << item.second.Value;
+                sam_string.append("\t").append(item.first);
+                sam_string.append(":").append(item.second.Type);
+                sam_string.append(":").append(item.second.Value);
             }
         }
-        res.sam_string = sam_line_ostream.str();
+        res.sam_string = std::move(sam_string);
         results.emplace_back(std::move(res));
     }
 
