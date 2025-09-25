@@ -115,14 +115,15 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
                                              const std::string& query_seq,
                                              const std::string& query_qual) {
     std::vector<AlignmentResult> results;
-    std::istringstream sam_content_stream(sam_content);
+    utils::NewlineSeparatedStream sam_content_stream(sam_content);
     std::unordered_map<std::string, int> reference_length;
     // read header
-    std::string header_line;
-    std::string sq, reference, length_field;
-    while (char(sam_content_stream.peek()) == '@') {
+    while (sam_content_stream.peek().value_or("").starts_with('@')) {
+        utils::TabSeparatedStream header_line(sam_content_stream.getline().value());
+
         // Read the genome sequence lengths from the header
-        sam_content_stream >> sq >> reference >> length_field;
+        std::string sq, reference, length_field;
+        header_line >> sq >> reference >> length_field;
         if (sq == "@SQ") {
             utils::trace_log("{} length_field: {}", __func__, length_field);
             int ref_length = std::stoi(length_field.substr(3, length_field.size()));
@@ -132,7 +133,7 @@ std::vector<AlignmentResult> parse_sam_lines(const std::string& sam_content,
     }
 
     // Read every alignment from the SAM file
-    for (std::string sam_line; std::getline(sam_content_stream, sam_line);) {
+    for (std::string sam_line; !(sam_content_stream >> sam_line).eof();) {
         AlignmentResult res{};
 
         // required fields
