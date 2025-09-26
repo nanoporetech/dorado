@@ -9,7 +9,6 @@
 
 #include <algorithm>
 #include <map>
-#include <sstream>
 #include <tuple>
 #include <type_traits>
 #include <unordered_map>
@@ -55,19 +54,19 @@ public:
 std::pair<char, int> next_op(std::string_view& seq) {
     // Look for the type.
     auto is_number = [](char c) { return '0' <= c && c <= '9'; };
-    const auto type = std::find_if_not(seq.begin(), seq.end(), is_number);
-    if (type == seq.begin() || type == seq.end()) {
-        throw std::runtime_error("Bad CIGAR sequence: " + std::string(seq));
+    const auto type = std::find_if_not(seq.cbegin(), seq.cend(), is_number);
+    if (type == seq.cbegin() || type == seq.cend()) {
+        throw std::runtime_error(fmt::format("Bad CIGAR sequence: '{}'", seq));
     }
 
     // Read off the count.
     int read_number = 0;
-    for (auto it = seq.begin(); it != type; ++it) {
+    for (auto it = seq.cbegin(); it != type; ++it) {
         read_number = read_number * 10 + static_cast<int>(*it - '0');
     }
 
     // Drop the op we read and return it.
-    seq.remove_prefix(type - seq.begin() + 1);
+    seq.remove_prefix(type - seq.cbegin() + 1);
     return std::make_pair(*type, read_number);
 }
 
