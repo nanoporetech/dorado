@@ -215,7 +215,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                                wm.N, T_out, C_in * params.winlen, C_out, int(in.stride(0)),
                                params.stride * C_in, int(out_ntc.stride(0)), int(out_ntc.stride(1)),
                                in.data_ptr(), w_device.data_ptr(), out_ntc.data_ptr(), nullptr,
-                               b_device.data_ptr());
+                               nullptr, b_device.data_ptr());
         if (res != KOI_SUCCESS) {
             throw std::runtime_error(
                     std::string("Koi convolution (host_linear) failed with in size ") +

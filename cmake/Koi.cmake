@@ -20,10 +20,10 @@ endfunction()
 
 function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
-    set(hash__libkoi__0_6_3__Linux__aarch64__cuda__12_6 "7a6897bad13bfb02c7f2cbdd5f3fab5abf2e2e47c81bfe98a5c5fdbb6b9efe0c")
-    set(hash__libkoi__0_6_3__Linux__x86_64__cuda__11_8 "fc885360dfd2c1cb8a50627bd95a55f68ae934d91a1ebc04379a515b3409e5e0")
-    set(hash__libkoi__0_6_3__Linux__x86_64__cuda__12_8 "057e417107c372e10c1dd2847653d4d05ebe48f60331d0a8f562c7aced5e653a")
-    set(hash__libkoi__0_6_3__Windows__AMD64__cuda__12_8 "0fab29a7083e214122efa51df70ee2f8c000e807fde9b1f6c0298f3c3581292e")
+    set(hash__libkoi__0_6_4__Linux__aarch64__cuda__12_6 "d160d5ae41326dca1680bc6de5b27781cf34128e7e7b821c623342aa6101e1f6")
+    set(hash__libkoi__0_6_4__Linux__x86_64__cuda__11_8 "1d31a51da1067f440872ad3a89bd516b7273eaaa213939bbc0f7149bda784750")
+    set(hash__libkoi__0_6_4__Linux__x86_64__cuda__12_8 "d9b5422778f0465f2f564796db09c1163c4ce694271812904234c840ba124055")
+    set(hash__libkoi__0_6_4__Windows__AMD64__cuda__12_8 "15398a8a8d9320a0a44f673b0b4ad84be76f76eaf2fc69a652207f1c87bbb30b")
 
     # Do the lookup.
     string(REPLACE "." "_" hash_key ${KOI_DIR})
@@ -37,7 +37,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.6.3)
+    set(KOI_VERSION 0.6.4)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})
@@ -71,7 +71,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
                 COMMAND_ERROR_IS_FATAL ANY
             )
         endif()
-        add_subdirectory(${KOI_DIR}/koi/lib)
+        add_subdirectory(${KOI_DIR}/koi)
 
     else()
         find_package(CUDAToolkit REQUIRED)

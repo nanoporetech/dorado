@@ -92,7 +92,7 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
         auto res = host_linear(
                 stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N, wm.T, C_in,
                 C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)), int(out.stride(0)),
-                int(out.stride(1)), in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(),
+                int(out.stride(1)), in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(), nullptr,
                 weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
         if (res != KOI_SUCCESS) {
             throw std::runtime_error(std::string("Linear layer error:") + std::to_string(res));
