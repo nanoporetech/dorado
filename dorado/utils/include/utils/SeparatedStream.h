@@ -18,6 +18,8 @@ class SeparatedStream {
         auto parsed = utils::from_chars<T>(in);
         if (parsed.has_value()) {
             out = parsed.value();
+        } else {
+            out = 0;
         }
     }
 
@@ -67,6 +69,8 @@ public:
         auto column_data = getline();
         if (column_data.has_value()) {
             parse_value<T>(column_data.value(), val);
+        } else {
+            val = {};
         }
         return *this;
     }

@@ -156,3 +156,15 @@ DEFINE_TEST("stream operators") {
     CATCH_CHECK(empty == "");
     CATCH_CHECK(blah == "blah");
 }
+
+DEFINE_TEST("stream operator 0 default") {
+    dorado::utils::TabSeparatedStream stream("not a number");
+
+    int test = 123;
+    CATCH_CHECK(stream >> test);
+    CATCH_CHECK(test == 0);
+
+    test = 123;
+    CATCH_CHECK_FALSE(stream >> test);
+    CATCH_CHECK(test == 0);
+}
