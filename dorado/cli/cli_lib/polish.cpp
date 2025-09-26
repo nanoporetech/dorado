@@ -89,6 +89,7 @@ struct Options {
     std::string device_str;
     int32_t batch_size = 16;
     int64_t draft_batch_size = 200'000'000;
+    int32_t encoding_batch_size = 1;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
@@ -191,6 +192,10 @@ ParserPtr create_cli(int& verbosity) {
         parser->visible.add_argument("--draft-batchsize")
                 .help("Approximate batch size for processing input draft sequences.")
                 .default_value(std::string{"200M"});
+        parser->visible.add_argument("--encoding-batchsize")
+                .help("Approximate batch size of windows for encoding. (0=number of threads)")
+                .default_value(1)
+                .scan<'i', int>();
         parser->visible.add_argument("--window-len")
                 .help("Window size for calling consensus.")
                 .default_value(10000)
@@ -321,6 +326,7 @@ Options set_options(const utils::arg_parse::ArgParser& parser, const int verbosi
     opt.draft_batch_size =
             std::max<int64_t>(0, utils::arg_parse::parse_string_to_size<int64_t>(
                                          parser.visible.get<std::string>("draft-batchsize")));
+    opt.encoding_batch_size = std::max<int>(parser.visible.get<int>("encoding-batchsize"), opt.threads);
     opt.window_len = parser.visible.get<int>("window-len");
     opt.window_overlap = parser.visible.get<int>("window-overlap");
     opt.bam_chunk = parser.visible.get<int>("bam-chunk");
@@ -1022,7 +1028,7 @@ void run_polishing(const Options& opt,
                                      &batch_queue, &worker_terminate, &wrs_sample_producer] {
                             utils::set_thread_name("polish_produce");
                             polisher::sample_producer(
-                                    resources, bam_regions, draft_lens, opt.threads, opt.batch_size,
+                                    resources, bam_regions, draft_lens, opt.threads, opt.batch_size, opt.encoding_batch_size,
                                     opt.window_len, opt.window_overlap, opt.bam_subchunk,
                                     usable_mem, opt.continue_on_error, batch_queue,
                                     worker_terminate, wrs_sample_producer);
