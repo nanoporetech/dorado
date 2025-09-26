@@ -23,6 +23,7 @@ add_executable(dorado_tests
     BasecallModelConfigTest.cpp
     BatchParamsTest.cpp
     bed_file_test.cpp
+    ChunkTest.cpp
     CigarTest.cpp
     CliUtilsTest.cpp
     context_container_test.cpp

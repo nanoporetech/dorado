@@ -232,9 +232,8 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
             {model_config, device, 1.f, dorado::api::PipelineType::simplex, 0.f, false, false},
             default_params.num_runners, 1);
     CATCH_CHECK(num_devices != 0);
-    run_smoke_test<dorado::BasecallerNode>(std::move(runners),
-                                           dorado::utils::default_parameters.overlap, model_name,
-                                           1000, "BasecallerNode", 0);
+    run_smoke_test<dorado::BasecallerNode>(std::move(runners), model_config.basecaller.overlap(),
+                                           model_name, 1000, "BasecallerNode", 0);
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {

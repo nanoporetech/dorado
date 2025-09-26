@@ -2,6 +2,7 @@
 
 #include "basecall/ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
+#include "read_pipeline/base/chunk.h"
 #include "read_pipeline/base/read_utils.h"
 #include "read_pipeline/base/stitch.h"
 #include "utils/stats.h"
@@ -86,31 +87,21 @@ void BasecallerNode::input_thread_fn() {
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
-        size_t raw_size = read_common_data.raw_data.sizes().back();  // Time dimension.
-        size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
-        size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
+        const std::size_t raw_size = read_common_data.raw_data.sizes().back();  // Time dimension.
+        const std::size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
+        const std::size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
 
-        size_t offset = 0;
-        size_t chunk_in_read_idx = 0;
-        size_t signal_chunk_step = chunk_size - m_overlap;
         auto working_read = std::make_shared<BasecallingRead>();
         std::vector<std::unique_ptr<BasecallingChunk>> read_chunks;
-        read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
-                working_read, offset, chunk_in_read_idx++, chunk_size));
-        size_t num_chunks = 1;
-        auto last_chunk_offset = raw_size > chunk_size ? raw_size - chunk_size : 0;
-        auto misalignment = last_chunk_offset % m_model_stride;
-        if (misalignment != 0) {
-            // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
-            last_chunk_offset += m_model_stride - misalignment;
+
+        const std::vector<std::size_t> offsets =
+                utils::generate_chunks(raw_size, chunk_size, m_model_stride, m_overlap);
+        for (std::size_t i = 0; i < std::size(offsets); ++i) {
+            read_chunks.emplace_back(
+                    std::make_unique<BasecallingChunk>(working_read, offsets[i], i, chunk_size));
         }
-        while (offset + chunk_size < raw_size) {
-            offset = std::min(offset + signal_chunk_step, last_chunk_offset);
-            read_chunks.push_back(std::make_unique<BasecallingChunk>(
-                    working_read, offset, chunk_in_read_idx++, chunk_size));
-            ++num_chunks;
-        }
-        working_read->called_chunks.resize(num_chunks);
+
+        working_read->called_chunks.resize(std::size(read_chunks));
         working_read->num_chunks_called.store(0);
         working_read->read = std::move(message);
 
