@@ -448,7 +448,7 @@ endif()
 # Create the target which other libraries can link to
 add_library(torch_lib INTERFACE)
 target_link_libraries(torch_lib INTERFACE ${TORCH_LIBRARIES})
-target_include_directories(torch_lib SYSTEM INTERFACE ${TORCH_INCLUDE_DIRS})
+target_include_directories(torch_lib SYSTEM INTERFACE ${TORCH_INCLUDE_DIRS} ${CUDAToolkit_TARGET_DIR}/include/)
 
 if (WIN32 AND USING_STATIC_TORCH_LIB)
     # Note we need to use the generator expression to avoid setting this for CUDA.

@@ -1,15 +1,15 @@
 #include "utils/time_utils.h"
 
 #include <iomanip>
+#include <chrono>
 
-#if __cplusplus >= 202002L && 0  // Most stdlibs don't support parse()/from_stream() yet
+#if __cplusplus >= 202002L // Most stdlibs don't support parse()/from_stream() yet
 namespace date = std::chrono;
 #else
 #include <date/date.h>
 #include <date/tz.h>
 #endif
 
-#include <chrono>
 #include <sstream>
 
 namespace {
@@ -26,7 +26,13 @@ auto get_timepoint_from_ms(time_t ms) {
 std::string format_timestamp(const std::string& format, int64_t ms) {
     std::ostringstream date_time;
     auto tp = get_timepoint_from_ms(ms);
+
+    #if __cplusplus >= 202002L
+    date_time << std::vformat(format, std::make_format_args(tp));
+    #else
     date_time << date::format(format, tp);
+    #endif
+
     return date_time.str();
 }
 }  // namespace
