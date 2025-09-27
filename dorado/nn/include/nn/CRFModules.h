@@ -1,8 +1,11 @@
 #pragma once
 
+#include "AuxiliaryData.h"
 #include "WorkingMemory.h"
 
 #include <torch/nn.h>
+
+#include <memory>
 
 namespace dorado::nn {
 
@@ -10,8 +13,8 @@ struct LinearCRFImpl : torch::nn::Module {
     LinearCRFImpl(int insize, int outsize, bool bias_, bool tanh_and_scale);
     at::Tensor forward(const at::Tensor &x);
 #if DORADO_CUDA_BUILD
-    void reserve_working_memory(WorkingMemory &wm);
-    void run_koi(WorkingMemory &wm);
+    void reserve_working_memory(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
+    void run_koi(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
     at::Tensor w_device;
     at::Tensor weight_scale;
 #endif  // if DORADO_CUDA_BUILD

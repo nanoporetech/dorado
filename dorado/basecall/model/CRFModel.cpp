@@ -55,31 +55,42 @@ void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
 }
 
 #if DORADO_CUDA_BUILD
-at::Tensor CRFModelImpl::run_koi(const at::Tensor &in) {
+at::Tensor CRFModelImpl::run_koi(const at::Tensor &in, const nn::AuxiliaryData *const aux) {
     // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
     c10::cuda::CUDAGuard device_guard(in.device());
 
     // Determine working memory size
-    WorkingMemory wm(int(in.size(0)));
-    wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
-    convs->reserve_working_memory(wm, std::nullopt);
+    WorkingMemory wm(aux ? 1 : int(in.size(0)));
+    if (aux) {
+        wm.next_TC(int(aux->NT_in_max()), int(in.size(1)), TensorLayout::NTC);
+    } else {
+        wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
+    }
+
+    convs->reserve_working_memory(wm, aux, std::nullopt);
     rnns->reserve_working_memory(wm);
-    linear1->reserve_working_memory(wm);
+    linear1->reserve_working_memory(wm, aux);
     if (linear2) {
-        linear2->reserve_working_memory(wm);
+        linear2->reserve_working_memory(wm, nullptr);
     }
 
     wm.allocate_backing_tensor(in.device());
 
     // Copy `in` to working memory and run the model
-    auto wm_in = wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
-    wm_in.index({Slice()}) = in.transpose(1, 2);
+    if (aux) {
+        wm.next_N(1);
+        auto wm_in = wm.next_TC(int(aux->NT_in()), int(in.size(1)), TensorLayout::NTC);
+        wm_in.index({Slice()}) = in.transpose(1, 2).narrow(1, 0, aux->NT_in());
+    } else {
+        auto wm_in = wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
+        wm_in.index({Slice()}) = in.transpose(1, 2);
+    }
 
-    convs->run_koi(wm);
-    rnns->run_koi(wm);
-    linear1->run_koi(wm);
+    convs->run_koi(wm, aux);
+    rnns->run_koi(wm, aux);
+    linear1->run_koi(wm, aux);
     if (linear2) {
-        linear2->run_koi(wm);
+        linear2->run_koi(wm, nullptr);
     }
 
     // Clamping the scores to [-5, 5], if active (i.e. the role of `clamp1`), is performed by
@@ -92,12 +103,13 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in) {
 }
 #endif
 
-at::Tensor CRFModelImpl::forward(const at::Tensor &x) {
+at::Tensor CRFModelImpl::forward(const at::Tensor &x,
+                                 [[maybe_unused]] nn::AuxiliaryData *const aux) {
     utils::ScopedProfileRange spr("nn_forward", 1);
 #if DORADO_CUDA_BUILD
     if (x.is_cuda() && x.dtype() == torch::kF16) {
         // Output is [N, T, C]
-        return run_koi(x);
+        return run_koi(x, aux);
     }
 #endif
     // Output is [N, T, C]

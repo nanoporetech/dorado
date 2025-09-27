@@ -585,7 +585,7 @@ bool MetalTxCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count
 }
 
 bool MetalTxCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
-    auto scores_TNC = m_model->forward(task.input->to(m_model->m_options))
+    auto scores_TNC = m_model->forward(task.input->to(m_model->m_options), nullptr)
                               .transpose(0, 1)
                               .contiguous()
                               .to(m_scores_dtype);

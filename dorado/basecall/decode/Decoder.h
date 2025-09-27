@@ -1,6 +1,7 @@
 #pragma once
 
 #include "basecall/DecodedChunk.h"
+#include "nn/AuxiliaryData.h"
 
 #include <ATen/core/TensorBody.h>
 
@@ -17,6 +18,7 @@ struct DecodeData {
     at::Tensor data;
     int num_chunks;
     DecoderOptions options;
+    const nn::AuxiliaryData *aux{nullptr};
 };
 
 class Decoder {
@@ -29,6 +31,6 @@ public:
 };
 
 std::unique_ptr<Decoder> create_decoder(c10::Device device,
-                                        const config::BasecallModelConfig& config);
+                                        const config::BasecallModelConfig &config);
 
 }  // namespace dorado::basecall::decode

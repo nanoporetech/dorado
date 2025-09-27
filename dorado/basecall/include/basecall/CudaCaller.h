@@ -4,6 +4,7 @@
 #include "DecodedChunk.h"
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
+#include "nn/AuxiliaryData.h"
 #include "utils/stats.h"
 
 #include <c10/cuda/CUDAStream.h>
@@ -32,12 +33,21 @@ public:
     ~CudaCaller();
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
                                                   at::Tensor &output,
-                                                  int num_chunks);
+                                                  int num_chunks,
+                                                  nn::AuxiliaryData *aux /* = nullptr */);
 
     void terminate();
     void restart();
 
-    std::pair<at::Tensor, at::Tensor> create_input_output_tensor(size_t batch_dims_idx) const;
+    std::tuple<at::Tensor, at::Tensor, at::Tensor> create_input_output_tensor(
+            size_t batch_dims_idx) const;
+    std::size_t batch_size(const std::size_t batch_dims_idx) const {
+        return m_batch_dims[batch_dims_idx].N;
+    }
+    std::size_t chunk_size(const std::size_t batch_dims_idx) const {
+        return m_batch_dims[batch_dims_idx].T_in;
+    }
+    bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
     size_t num_batch_dims() const { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
     const config::BasecallModelConfig &config() const { return m_config; }
@@ -86,6 +96,8 @@ private:
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called{0};
     std::atomic<int64_t> m_model_decode_ms{0};
+
+    bool m_variable_chunk_sizes{false};
 };
 
 }  // namespace dorado::basecall

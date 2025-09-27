@@ -34,14 +34,19 @@ at::Tensor LinearCRFImpl::forward(const at::Tensor &x) {
 }
 
 #if DORADO_CUDA_BUILD
-void LinearCRFImpl::reserve_working_memory(WorkingMemory &wm) {
+void LinearCRFImpl::reserve_working_memory(WorkingMemory &wm, const AuxiliaryData *const aux) {
     bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
     if (use_torch && wm.layout != TensorLayout::NTC) {
         wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
     }
-    wm.next_TC(wm.T, int(linear->weight.size(0)), TensorLayout::NTC);
+    if (aux) {
+        wm.next_N(1);
+        wm.next_TC(aux->NT_out_max(), int(linear->weight.size(0)), TensorLayout::NTC);
+    } else {
+        wm.next_TC(wm.T, int(linear->weight.size(0)), TensorLayout::NTC);
+    }
 }
-void LinearCRFImpl::run_koi(WorkingMemory &wm) {
+void LinearCRFImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
     auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
@@ -51,6 +56,10 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
 
     bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
     if (use_torch || (wm.layout == TensorLayout::NTC && !activation)) {
+        if (aux) {
+            throw std::runtime_error(
+                    "Linear layer error: unsupported variable chunk sizes code path!");
+        }
         utils::ScopedProfileRange spr("linear", 2);
         if (wm.layout != TensorLayout::NTC) {
             // Convert/transpose input layout to NTC, F16 if necessary
@@ -78,8 +87,19 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
         }
     } else {
         utils::ScopedProfileRange spr("koi_linear", 2);
-        auto in_ntc = wm.get_current_NTC_view();
-        auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
+        at::Tensor in_ntc;
+        void *out_layout = nullptr;
+        if (aux) {
+            in_ntc = wm.current.narrow(0, 3, wm.T);
+            out_layout = aux->device_out_layout.data_ptr();
+            wm.next_N(1);
+            wm.next_TC(aux->NT_out(), C_out, TensorLayout::NTC);
+        } else {
+            in_ntc = wm.get_current_NTC_view();
+            wm.next_TC(wm.T, C_out, TensorLayout::NTC);
+        }
+        at::Tensor out = wm.current;
+
         if (!w_device.defined()) {
             if (type_id == KOI_F16) {
                 w_device = linear->weight.contiguous().to(in_ntc.options());
@@ -90,9 +110,10 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm) {
             }
         }
         auto res = host_linear(
-                stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16, wm.N, wm.T, C_in,
-                C_out, int(in_ntc.stride(0)), int(in_ntc.stride(1)), int(out.stride(0)),
-                int(out.stride(1)), in_ntc.data_ptr(), w_device.data_ptr(), out.data_ptr(), nullptr,
+                stream, type_id, activation ? KOI_TANH_X5 : KOI_IDENTITY, KOI_F16,
+                int(in_ntc.size(0)), int(in_ntc.size(1)), C_in, C_out, int(in_ntc.stride(0)),
+                int(in_ntc.stride(1)), int(out.stride(0)), int(out.stride(1)), in_ntc.data_ptr(),
+                w_device.data_ptr(), out.data_ptr(), out_layout,
                 weight_scale.defined() ? weight_scale.data_ptr() : nullptr, bias_ptr);
         if (res != KOI_SUCCESS) {
             throw std::runtime_error(std::string("Linear layer error:") + std::to_string(res));

@@ -1,17 +1,23 @@
 #pragma once
 
+#include "AuxiliaryData.h"
 #include "WorkingMemory.h"
 #include "config/common.h"
 
 #include <torch/nn.h>
+
+#include <optional>
+#include <vector>
 
 namespace dorado::nn {
 
 struct ConvStackImpl : torch::nn::Module {
     explicit ConvStackImpl(const std::vector<config::ConvParams> &layer_params);
 #if DORADO_CUDA_BUILD
-    void reserve_working_memory(WorkingMemory &wm, std::optional<TensorLayout> output_layout);
-    void run_koi(WorkingMemory &wm);
+    void reserve_working_memory(WorkingMemory &wm,
+                                const AuxiliaryData *aux /* = nullptr */,
+                                std::optional<TensorLayout> output_layout);
+    void run_koi(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
 #endif  // if DORADO_CUDA_BUILD
 
     at::Tensor forward(at::Tensor x);
@@ -25,10 +31,11 @@ struct ConvStackImpl : torch::nn::Module {
         bool cutlass_conv{false};
         int output_T_padding{0};
         at::Tensor w_device;
+        at::Tensor w_t_device;
         at::Tensor b_device;
 
-        void reserve_working_memory(WorkingMemory &wm);
-        void run_koi(WorkingMemory &wm);
+        void reserve_working_memory(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
+        void run_koi(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
 #endif  // if DORADO_CUDA_BUILD
     };
 

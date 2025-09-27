@@ -24,6 +24,7 @@
 #include "models/kits.h"
 #include "models/model_complex.h"
 #include "models/models.h"
+#include "nn/KoiUtils.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
@@ -263,6 +264,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 .help("The number of samples in a chunk.")
                 .default_value(default_parameters.chunksize)
                 .scan<'i', int>();
+        parser.add_argument("--disable-variable-chunk-sizes").flag().hidden();
         parser.add_argument("--overlap")
                 .hidden()
                 .help("The number of samples overlapping neighbouring chunks.")
@@ -339,6 +341,7 @@ void setup(const std::vector<std::string>& args,
            bool emit_batchsize_benchmarks,
            const std::string& resume_from_file,
            bool enable_read_splitting,
+           [[maybe_unused]] bool variable_chunk_sizes,
            bool estimate_poly_a,
            const std::string& polya_config,
            const ModelComplex& model_complex,
@@ -399,10 +402,17 @@ void setup(const std::vector<std::string>& args,
     cli::log_requested_cuda_devices(initial_device_info);
 #endif
 
+#if DORADO_CUDA_BUILD
+    variable_chunk_sizes = variable_chunk_sizes && model_config.is_lstm_model() &&
+                           (model_config.lstm_size > 128) && (model_config.lstm_size <= 1024) &&
+                           ((model_config.lstm_size % 128) == 0) && nn::koi_can_use_cutlass();
+#else
+    variable_chunk_sizes = false;
+#endif
+
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto modbase_runners = api::create_modbase_runners(
             modbase_models, device, modbase_params.runners_per_caller, modbase_params.batchsize);
-
     std::vector<basecall::RunnerPtr> runners;
     size_t num_devices = 0;
 #if DORADO_CUDA_BUILD
@@ -431,7 +441,8 @@ void setup(const std::vector<std::string>& args,
             std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                     api::create_basecall_runners(
                             {model_config, device_id, fraction, api::PipelineType::simplex, 0.f,
-                             run_batchsize_benchmarks, emit_batchsize_benchmarks},
+                             run_batchsize_benchmarks, emit_batchsize_benchmarks,
+                             variable_chunk_sizes},
                             num_runners, 0);
             return basecaller_runners;
         };
@@ -962,9 +973,10 @@ int basecaller(int argc, char* argv[]) {
               parser.get<std::string>("--dump_stats_filter"), run_batchsize_benchmarks,
               parser.get<bool>("--emit-batchsize-benchmarks"),
               parser.get<std::string>("--resume-from"),
-              !parser.get<bool>("--disable-read-splitting"), parser.get<bool>("--estimate-poly-a"),
-              polya_config, model_complex, std::move(barcoding_info), std::move(adapter_info),
-              std::move(sample_sheet));
+              !parser.get<bool>("--disable-read-splitting"),
+              !parser.get<bool>("--disable-variable-chunk-sizes"),
+              parser.get<bool>("--estimate-poly-a"), polya_config, model_complex,
+              std::move(barcoding_info), std::move(adapter_info), std::move(sample_sheet));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         utils::clean_temporary_models(downloader.temporary_models());

@@ -62,6 +62,7 @@ public:
     explicit WorkingMemory(int batch_size) : N(batch_size) {}
 
     at::Tensor get_current_NTC_view();
+    void next_N(int N_);
     at::Tensor next_TC(int T_, int C_, TensorLayout layout_);
     at::Tensor temp(torch::IntArrayRef sizes, torch::Dtype dtype);
 
@@ -73,9 +74,9 @@ public:
     at::Tensor current;  // The last tensor view created with `next(_, _, true)`
     TensorLayout layout{TensorLayout::NTC};
     bool is_input_to_rev_lstm{true};
-    const int N;  // batch size
-    int T{0};     // current chunk size (time)
-    int C{0};     // current layer size (channels)
+    int N;     // batch size
+    int T{0};  // current chunk size (time)
+    int C{0};  // current layer size (channels)
 };
 
 }  // namespace dorado::nn

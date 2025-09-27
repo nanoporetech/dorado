@@ -78,7 +78,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
                     params.pipeline_type,
                     params.batch_size_time_penalty,
                     params.run_batchsize_benchmarks,
-                    params.emit_batchsize_benchmarks};
+                    params.emit_batchsize_benchmarks,
+                    params.variable_chunk_sizes};
             futures.push_back(pool.push(create_cuda_caller, per_device_params));
         }
 

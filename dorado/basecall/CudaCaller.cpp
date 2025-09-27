@@ -31,10 +31,11 @@ namespace dorado::basecall {
 namespace {
 
 struct NNTask {
-    NNTask(at::Tensor input_, int num_chunks_, void *caller_)
-            : input(std::move(input_)), num_chunks(num_chunks_), caller(caller_) {}
+    NNTask(at::Tensor input_, int num_chunks_, nn::AuxiliaryData *aux_, void *caller_)
+            : input(std::move(input_)), num_chunks(num_chunks_), aux(aux_), caller(caller_) {}
     at::Tensor input;
     int num_chunks;
+    nn::AuxiliaryData *aux;
     void *caller;
     decode::DecodeData out;
     std::mutex mut;
@@ -94,6 +95,26 @@ c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
     return c10::cuda::getStreamFromPool(false, device.index());
 }
 
+std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
+                                                      const at::TensorOptions &in_options,
+                                                      at::Tensor &workspace,
+                                                      const std::int32_t N,
+                                                      const std::int32_t T,
+                                                      const std::int32_t C,
+                                                      const std::int32_t stride) {
+    in = torch::empty({1, C, N * T}, in_options);
+    auto workspace_options =
+            at::TensorOptions().device(torch::kCPU).pinned_memory(true).dtype(torch::kInt32);
+    // for workspace size see koi/utils_lstm.h
+    workspace = torch::empty({6 * ((T / stride) + 3) * N}, workspace_options);
+    auto aux = std::make_unique<nn::AuxiliaryData>(workspace, N, T, stride,
+                                                   std::vector<std::int32_t>(N, T));
+    aux->create_convolution_auxiliary_data(in_options.device());
+    aux->create_lstm_auxiliary_data(in_options.device());
+    aux->create_decoder_auxiliary_data(in_options.device());
+    return aux;
+}
+
 }  // namespace
 
 // If 5 minutes has passed since the first chunk was added to a batch, we will
@@ -127,7 +148,8 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(params.device)),
           m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(params.pipeline_type),
-          m_stream(get_stream_for_device(m_options.device())) {
+          m_stream(get_stream_for_device(m_options.device())),
+          m_variable_chunk_sizes(params.variable_chunk_sizes) {
     assert(m_options.device().is_cuda());
     assert(params.model_config.has_normalised_basecaller_params());
 
@@ -154,9 +176,17 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
                       (crfmodel_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
         spdlog::debug("{} Decode memory {:.2f}GB", m_device,
                       (decode_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
-        auto input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
-        auto scores = m_module->forward(input);
-        m_decoder->beam_search_part_1({scores, batch_dim.N, m_decoder_options});
+        at::Tensor input;
+        at::Tensor workspace;
+        std::unique_ptr<nn::AuxiliaryData> aux;
+        if (m_variable_chunk_sizes) {
+            aux = create_empty_input(input, m_options, workspace, batch_dim.N, batch_dim.T_in,
+                                     m_num_input_features, m_config.stride);
+        } else {
+            input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
+        }
+        auto scores = m_module->forward(input, aux.get());
+        m_decoder->beam_search_part_1({scores, batch_dim.N, m_decoder_options, aux.get()});
     }
     m_stream.synchronize();
 
@@ -187,14 +217,28 @@ std::pair<int, int> CudaCaller::batch_timeouts_ms() const {
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
                                                           at::Tensor &output,
-                                                          int num_chunks) {
+                                                          int num_chunks,
+                                                          nn::AuxiliaryData *const aux) {
     NVTX3_FUNC_RANGE();
     if (num_chunks == 0) {
         return std::vector<decode::DecodedChunk>();
     }
 
+    if (!aux && m_variable_chunk_sizes) {
+        throw std::logic_error("Missing auxiliary data while calling variable chunks!");
+    }
+    if (aux && !m_variable_chunk_sizes) {
+        throw std::logic_error("Found auxiliary data while calling fixed chunks!");
+    }
+
+    if (aux) {
+        aux->create_convolution_auxiliary_data(m_options.device());
+        aux->create_lstm_auxiliary_data(m_options.device());
+        aux->create_decoder_auxiliary_data(m_options.device());
+    }
+
     auto &task_queue = get_task_queue();
-    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks, this);
+    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks, aux, this);
     {
         std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
         task_queue.m_input_queue.push(task);
@@ -204,6 +248,13 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
     std::unique_lock lock(task->mut);
     while (!task->done) {
         task->cv.wait(lock);
+    }
+
+    if (aux && m_variable_chunk_sizes) {
+        at::Tensor out = output.narrow(0, 0, c10::multiply_integers(task->out.data.sizes()))
+                                 .view(task->out.data.sizes());
+        out.copy_(task->out.data);
+        return m_decoder->beam_search_part_2({out, num_chunks, m_decoder_options, task->aux});
     }
 
     output.copy_(task->out.data);
@@ -226,7 +277,7 @@ void CudaCaller::restart() {
     }
 }
 
-std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
+std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
         size_t batch_dims_idx) const {
     auto opts = at::TensorOptions().device(torch::kCPU).pinned_memory(true);
     int64_t N = m_batch_dims[batch_dims_idx].N;
@@ -239,9 +290,18 @@ std::pair<at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
     int64_t input_bytes = N * C_in * T_in * m_options.dtype().itemsize();
     int64_t output_bytes = 3 * N * T_out;
     auto storage = torch::empty({std::max(input_bytes, output_bytes)}, opts.dtype(torch::kInt8));
+    if (m_variable_chunk_sizes) {
+        at::Tensor input =
+                storage.slice(0, 0, input_bytes).view(scalar_type).view({1, C_in, N * T_in});
+        at::Tensor output = storage.slice(0, 0, output_bytes);
+        // for workspace size see koi/utils_lstm.h
+        const std::int64_t aux_size = 6 * (T_out + 3) * N;
+        at::Tensor aux = torch::empty({aux_size}, opts.dtype(torch::kInt32));
+        return {input, output, aux};
+    }
     auto input = storage.slice(0, 0, input_bytes).view(scalar_type).view({N, C_in, T_in});
     auto output = storage.slice(0, 0, output_bytes).view({3, N, T_out});
-    return {input, output};
+    return {input, output, at::Tensor{}};
 }
 
 stats::NamedStats CudaCaller::sample_stats() const {
@@ -462,7 +522,15 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
                 time = chunk_benchmarks->at(batch_size);
             }
         } else {
-            auto input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
+            at::Tensor input;
+            at::Tensor workspace;
+            std::unique_ptr<nn::AuxiliaryData> aux;
+            if (m_variable_chunk_sizes) {
+                aux = create_empty_input(input, m_options, workspace, batch_size, chunk_size,
+                                         m_config.num_features, stride);
+            } else {
+                input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
+            }
 
             for (int i = 0; i < 2; ++i) {  // run twice to eliminate outliers
                 using utils::handle_cuda_result;
@@ -470,7 +538,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
                 handle_cuda_result(cudaEventCreate(&start));
                 handle_cuda_result(cudaEventCreate(&stop));
                 handle_cuda_result(cudaEventRecord(start));
-                m_module->forward(input);
+                m_module->forward(input, aux.get());
                 handle_cuda_result(cudaEventRecord(stop));
                 handle_cuda_result(cudaEventSynchronize(stop));
                 float ms = 0;
@@ -608,9 +676,9 @@ void CudaCaller::cuda_thread_fn() {
 
         auto run_basecalling = [&]() {
             stats::Timer timer;
-            auto scores = m_module->forward(task->input);
-            task->out =
-                    m_decoder->beam_search_part_1({scores, task->num_chunks, m_decoder_options});
+            auto scores = m_module->forward(task->input, task->aux);
+            task->out = m_decoder->beam_search_part_1(
+                    {scores, task->num_chunks, m_decoder_options, task->aux});
             m_stream.synchronize();
             m_model_decode_ms += timer.GetElapsedMS();
         };

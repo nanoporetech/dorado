@@ -25,6 +25,7 @@ public:
     virtual const config::BasecallModelConfig &config() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
+    virtual bool variable_chunk_sizes() const { return false; }
 
     // Timeout is short for simplex, longer for duplex which gets a subset of reads.
     // Note that these values are overridden for CUDA basecalling.
@@ -47,6 +48,7 @@ struct BasecallerCreationParams {
     float batch_size_time_penalty;
     bool run_batchsize_benchmarks;
     bool emit_batchsize_benchmarks;
+    bool variable_chunk_sizes{false};
 };
 
 }  // namespace dorado::basecall

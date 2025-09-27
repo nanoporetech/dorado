@@ -105,7 +105,11 @@ ConvStackImpl::ConvStackImpl(const std::vector<config::ConvParams> &layer_params
 
 #if DORADO_CUDA_BUILD
 void ConvStackImpl::reserve_working_memory(WorkingMemory &wm,
+                                           const AuxiliaryData *const aux,
                                            std::optional<TensorLayout> output_layout) {
+    if (std::empty(layers)) {
+        throw std::runtime_error("Empty Koi convolution stack.");
+    }
     auto &last = layers.back();
     last.output_layout =
             output_layout.has_value()
@@ -119,13 +123,13 @@ void ConvStackImpl::reserve_working_memory(WorkingMemory &wm,
         layers[layers.size() - 2].output_T_padding = last.params.winlen / 2;
     }
     for (auto &layer : layers) {
-        layer.reserve_working_memory(wm);
+        layer.reserve_working_memory(wm, aux);
     }
 }
 
-void ConvStackImpl::run_koi(WorkingMemory &wm) {
+void ConvStackImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
     for (auto &layer : layers) {
-        layer.run_koi(wm);
+        layer.run_koi(wm, aux);
     }
 }
 #endif  // if DORADO_CUDA_BUILD
@@ -152,15 +156,20 @@ at::Tensor ConvStackImpl::forward(at::Tensor x) {
 ConvStackImpl::ConvLayer::ConvLayer(const config::ConvParams &conv_params) : params(conv_params) {}
 
 #if DORADO_CUDA_BUILD
-void ConvStackImpl::ConvLayer::reserve_working_memory(WorkingMemory &wm) {
+void ConvStackImpl::ConvLayer::reserve_working_memory(WorkingMemory &wm,
+                                                      const AuxiliaryData *const aux) {
     assert(wm.layout == TensorLayout::NTC);
     const int T_in = wm.T;
-    const int T_out = T_in / params.stride;
+    int T_out = T_in / params.stride;
     const int C_in = wm.C;
     const int C_out = params.size;
     if (output_layout == TensorLayout::NTC && C_out > 16) {
         wm.next_TC(T_out, params.winlen * C_in, TensorLayout::NTC);
     } else if (cutlass_conv) {
+        if (aux) {
+            wm.next_N(aux->N());
+            T_out = aux->T_lstm();
+        }
     } else if (output_layout != TensorLayout::NTC) {
         wm.next_TC(T_out, params.winlen * C_in, TensorLayout::TNC);
         if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
@@ -170,7 +179,7 @@ void ConvStackImpl::ConvLayer::reserve_working_memory(WorkingMemory &wm) {
     wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
 }
 
-void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
+void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     utils::ScopedProfileRange spr("conv", 2);
 
@@ -187,6 +196,9 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
         // conv->weight is [C_out, C_in, W], we want [W, C_in, C_out]
         w_device = conv->weight.permute({2, 1, 0}).contiguous().flatten(0, 1).to(opts);
         if (cutlass_conv) {
+            if (aux) {
+                w_t_device = w_device.clone();  // for convolution_postprocess
+            }
             w_device = w_device.transpose(0, 1).contiguous();
         }
         b_device = conv->bias.to(opts);
@@ -204,24 +216,63 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm) {
                     std::string("Koi convolution (host_convolution_f16) failed with in size ") +
                     std::to_string(params.insize));
         }
+        if (aux) {
+            if (host_convolution_postprocess(stream, get_koi_activation(params.activation), KOI_F16,
+                                             aux->chunk_sizes().size(), C_in, C_out,
+                                             aux->device_chunk_intervals.data_ptr(), 1,
+                                             params.winlen, params.stride, in.data_ptr(),
+                                             out.data_ptr(), nullptr, w_device.data_ptr(),
+                                             b_device.data_ptr())) {
+                throw std::runtime_error(
+                        std::string("Koi convolution (host_convolution_postprocess) failed with in "
+                                    "size ") +
+                        std::to_string(params.insize));
+            }
+        }
     } else if (cutlass_conv) {
         utils::ScopedProfileRange spr2("linear conv", 3);
         auto out_type = (output_layout == TensorLayout::CUTLASS_TNC_I8) ? KOI_I8 : KOI_F16;
         in.slice(1, 0, padding) = 0;
         in.slice(1, -padding, torch::indexing::None) = 0;
-        wm.next_TC(T_out, C_out, output_layout);
-        auto out_ntc = wm.get_current_NTC_view();
+        at::Tensor out_ntc;
+        void *out_layout = nullptr;
+        if (aux) {
+            wm.next_N(aux->N());
+            wm.next_TC(aux->T_lstm(), C_out, output_layout);
+            out_ntc = wm.current.narrow(0, 1, wm.T + 1);
+            out_layout = aux->device_in_layout.data_ptr();
+        } else {
+            wm.next_TC(T_out, C_out, output_layout);
+            out_ntc = wm.get_current_NTC_view();
+        }
         auto res = host_linear(stream, KOI_F16, get_koi_activation(params.activation), out_type,
-                               wm.N, T_out, C_in * params.winlen, C_out, int(in.stride(0)),
-                               params.stride * C_in, int(out_ntc.stride(0)), int(out_ntc.stride(1)),
-                               in.data_ptr(), w_device.data_ptr(), out_ntc.data_ptr(), nullptr,
-                               nullptr, b_device.data_ptr());
+                               aux ? 1 : wm.N, T_out, C_in * params.winlen, C_out,
+                               int(in.stride(0)), params.stride * C_in, int(out_ntc.stride(0)),
+                               int(out_ntc.stride(1)), in.data_ptr(), w_device.data_ptr(),
+                               out_ntc.data_ptr(), out_layout, nullptr, b_device.data_ptr());
         if (res != KOI_SUCCESS) {
             throw std::runtime_error(
                     std::string("Koi convolution (host_linear) failed with in size ") +
                     std::to_string(params.insize));
         }
+        if (aux) {
+            res = host_convolution_postprocess(
+                    stream, get_koi_activation(params.activation), out_type,
+                    aux->chunk_sizes().size(), C_in, C_out, aux->device_chunk_intervals.data_ptr(),
+                    1, params.winlen, params.stride, in.narrow(1, padding, T_in).data_ptr(),
+                    out_ntc.data_ptr(), out_layout, w_t_device.data_ptr(), b_device.data_ptr());
+            if (res != KOI_SUCCESS) {
+                throw std::runtime_error(
+                        std::string("Koi convolution (host_convolution_postprocess) failed with in "
+                                    "size ") +
+                        std::to_string(params.insize));
+            }
+        }
     } else {
+        if (aux) {
+            throw std::runtime_error(
+                    "Koi convolution error: unsupported variable chunk sizes code path!");
+        }
         utils::ScopedProfileRange spr2("window conv", 3);
         // The window tensor is either NTC or TNC, depending on whether the first two
         // dimensions of the output layout are NT or TN.

@@ -12,25 +12,45 @@ namespace dorado::basecall {
 
 CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, size_t batch_dims_idx)
         : m_caller(std::move(caller)),
+          m_batch_size(m_caller->batch_size(batch_dims_idx)),
+          m_chunk_size(m_caller->chunk_size(batch_dims_idx)),
           m_stream(c10::cuda::getStreamFromPool(false, m_caller->device().index())) {
-    std::tie(m_input, m_output) = m_caller->create_input_output_tensor(batch_dims_idx);
+    std::tie(m_input, m_output, m_aux) = m_caller->create_input_output_tensor(batch_dims_idx);
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
-    m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
+    if (m_caller->variable_chunk_sizes()) {
+        m_input.index_put_({torch::indexing::Ellipsis,
+                            torch::indexing::Slice(m_chunk_offset, m_chunk_offset + chunk.size(1))},
+                           chunk);
+        m_chunk_sizes.emplace_back(chunk.size(1));
+        m_chunk_offset += m_chunk_sizes.back();
+    } else {
+        m_input.index_put_({chunk_idx, torch::indexing::Ellipsis}, chunk);
+    }
 }
 
 std::vector<decode::DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
     stats::Timer timer;
     c10::cuda::CUDAStreamGuard guard(m_stream);
-    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks);
+    std::unique_ptr<nn::AuxiliaryData> aux;
+    if (m_caller->variable_chunk_sizes()) {
+        aux = std::make_unique<nn::AuxiliaryData>(m_aux, batch_size(), chunk_size(),
+                                                  config().stride, m_chunk_sizes);
+    }
+    auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, aux.get());
+    if (m_caller->variable_chunk_sizes()) {
+        m_chunk_sizes.clear();
+        m_chunk_offset = 0;
+    }
     return decoded_chunks;
 }
 
 const config::BasecallModelConfig &CudaModelRunner::config() const { return m_caller->config(); }
-size_t CudaModelRunner::chunk_size() const { return m_input.size(2); }
-size_t CudaModelRunner::batch_size() const { return m_input.size(0); }
+size_t CudaModelRunner::chunk_size() const { return m_chunk_size; }
+size_t CudaModelRunner::batch_size() const { return m_batch_size; }
+bool CudaModelRunner::variable_chunk_sizes() const { return m_caller->variable_chunk_sizes(); }
 std::pair<int, int> CudaModelRunner::batch_timeouts_ms() const {
     return m_caller->batch_timeouts_ms();
 }
