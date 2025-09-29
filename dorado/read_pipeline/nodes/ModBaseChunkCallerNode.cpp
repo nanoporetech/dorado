@@ -947,11 +947,12 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
     auto& runner = m_runners.at(worker_id);
     auto& chunk_queue = m_chunk_queues.at(model_id);
 
+    using Clock = std::remove_reference_t<decltype(chunk_queue)>::element_type::Clock;
+
     std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
-    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+    auto last_chunk_reserve_time = Clock::now();
 
     int64_t previous_chunk_count = 0;
-
     while (true) {
         nvtx3::scoped_range range{"chunk_caller_thread_fn"};
         // Repeatedly attempt to complete the current batch with one acquisition of the
@@ -967,7 +968,7 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
         }
 
         // Reset timeout.
-        last_chunk_reserve_time = std::chrono::system_clock::now();
+        last_chunk_reserve_time = Clock::now();
 
         create_and_submit_chunks(runner, model_id, previous_chunk_count, batched_chunks);
 

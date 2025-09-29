@@ -261,7 +261,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 #endif
     at::InferenceMode inference_mode_guard;
 
-    auto first_chunk_reserve_time = std::chrono::system_clock::now();
+    using Clock = decltype(m_chunk_in_queues)::value_type::element_type::Clock;
+    auto first_chunk_reserve_time = Clock::now();
     auto last_chunk_reserve_time = first_chunk_reserve_time;
     spdlog::trace("Setting initial value for both chunk reserve times for worker {}.", worker_id);
 
@@ -315,7 +316,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                         "empty batch.",
                         worker_id);
             }
-            first_chunk_reserve_time = std::chrono::system_clock::now();
+            first_chunk_reserve_time = Clock::now();
             last_chunk_reserve_time = first_chunk_reserve_time;
             continue;
         }
@@ -410,9 +411,9 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                         "to "
                         "batch.",
                         worker_id);
-                first_chunk_reserve_time = std::chrono::system_clock::now();
+                first_chunk_reserve_time = Clock::now();
             }
-            last_chunk_reserve_time = std::chrono::system_clock::now();
+            last_chunk_reserve_time = Clock::now();
         }
 
         if (worker_chunks.size() == batch_size) {
@@ -422,7 +423,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             spdlog::trace(
                     "Resetting both chunk reserve times for worker {} after processing full batch.",
                     worker_id);
-            first_chunk_reserve_time = std::chrono::system_clock::now();
+            first_chunk_reserve_time = Clock::now();
             last_chunk_reserve_time = first_chunk_reserve_time;
         }
     }

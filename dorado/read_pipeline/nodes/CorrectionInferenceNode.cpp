@@ -295,8 +295,10 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
         remaining_batch_slots = batch_size;
     };
 
+    using Clock = std::remove_reference_t<decltype(m_features_queue)>::Clock;
+    auto last_chunk_reserve_time = Clock::now();
+
     WindowFeatures item;
-    auto last_chunk_reserve_time = std::chrono::system_clock::now();
     while (true) {
         const auto pop_status = m_features_queue.try_pop_until(
                 item, last_chunk_reserve_time + std::chrono::milliseconds(10000));
@@ -310,7 +312,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
             if (bases_batch.size() > 0) {
                 batch_infer();
             }
-            last_chunk_reserve_time = std::chrono::system_clock::now();
+            last_chunk_reserve_time = Clock::now();
             continue;
         }
 
@@ -331,7 +333,7 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
         sizes.push_back(wf.length);
         indices_batch.push_back(wf.indices);
         remaining_batch_slots -= required_batch_slots;
-        last_chunk_reserve_time = std::chrono::system_clock::now();
+        last_chunk_reserve_time = Clock::now();
     }
 
     if (bases_batch.size() > 0) {

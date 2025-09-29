@@ -87,9 +87,9 @@ class AsyncQueue {
     }
 
     // Same as wait_for_item, but will also time out, returning wait_status accordingly.
-    template <class Clock, class Duration>
+    template <class Duration>
     std::tuple<std::unique_lock<std::mutex>, bool> wait_for_item_or_timeout(
-            const std::chrono::time_point<Clock, Duration>& timeout_time) {
+            const std::chrono::time_point<std::chrono::steady_clock, Duration>& timeout_time) {
         std::unique_lock lock(m_mutex);
         bool wait_status = m_not_empty_cv.wait_until(lock, timeout_time, [this] {
             return !m_items.empty() || m_terminate != Terminate::No;
@@ -98,6 +98,10 @@ class AsyncQueue {
     }
 
 public:
+    // Newer libstdc++ has a fast path for steady_clock, and older libstdc++ has a bug where
+    // changes to the current time can cause delays when not using steady_clock, so use it.
+    using Clock = std::chrono::steady_clock;
+
     // Attempts to push items beyond capacity will block.
     explicit AsyncQueue(size_t capacity) : m_items(capacity) {}
 
@@ -147,7 +151,7 @@ public:
     // If timeout is reached, but we are not terminating, returns AsyncQueueStatus::Timeout.
     // If we are terminating, returns AsyncQueueStatus::Terminate;.
     // Otherwise block until an item is added.
-    template <class Clock, class Duration>
+    template <class Duration>
     AsyncQueueStatus try_pop_until(Item& item,
                                    const std::chrono::time_point<Clock, Duration>& timeout_time) {
         auto [lock, wait_status] = wait_for_item_or_timeout(timeout_time);
@@ -207,7 +211,7 @@ public:
 
     // Like process_and_pop_n, except it also has a timeout.  If the queue is empty
     // and we time out before an item is added, returns AsyncQueueStatus::Timeout.
-    template <class ProcessFn, class Clock, class Duration>
+    template <class ProcessFn, class Duration>
     AsyncQueueStatus process_and_pop_n_with_timeout(
             ProcessFn process_fn,
             size_t max_count,

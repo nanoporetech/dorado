@@ -438,9 +438,10 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
-    std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
-    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+    using Clock = std::remove_reference_t<decltype(chunk_queue)>::element_type::Clock;
+    auto last_chunk_reserve_time = Clock::now();
 
+    std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
     size_t previous_chunk_count = 0;
     while (true) {
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
@@ -457,7 +458,7 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
         }
 
         // Reset timeout.
-        last_chunk_reserve_time = std::chrono::system_clock::now();
+        last_chunk_reserve_time = Clock::now();
 
         // We have just grabbed a number of chunks (0 in the case of timeout) from
         // the chunk queue and added them to batched_chunks.  Insert those chunks
