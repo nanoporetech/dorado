@@ -527,9 +527,12 @@ void ModBaseCallerNode::output_worker_thread() {
     utils::set_thread_name("modbase_out");
     at::InferenceMode inference_mode_guard;
 
+    std::vector<std::shared_ptr<WorkingRead>> completed_reads;
+    std::vector<std::unique_ptr<ModBaseChunk>> processed_chunks;
+    processed_chunks.reserve(m_processed_chunks.capacity());
+
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.
-    std::vector<std::unique_ptr<ModBaseChunk>> processed_chunks;
     auto grab_chunk = [&processed_chunks](std::unique_ptr<ModBaseChunk> chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
@@ -537,10 +540,9 @@ void ModBaseCallerNode::output_worker_thread() {
            utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
-        std::vector<std::shared_ptr<WorkingRead>> completed_reads;
-
+        completed_reads.clear();
         for (const auto& chunk : processed_chunks) {
-            auto working_read = chunk->working_read;
+            auto working_read = std::move(chunk->working_read);
             auto& source_read = working_read->read;
             auto& source_read_common = get_read_common_data(source_read);
 
@@ -570,18 +572,24 @@ void ModBaseCallerNode::output_worker_thread() {
 
         // Remove any completed reads from the working reads set while holding its mutex.
         if (!completed_reads.empty()) {
-            std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-            for (auto& completed_read : completed_reads) {
-                auto read_iter = m_working_reads.find(completed_read);
-                if (read_iter != m_working_reads.end()) {
-                    m_working_reads.erase(read_iter);
-                } else {
-                    auto read_id = get_read_common_data(completed_read->read).read_id;
-                    throw std::runtime_error("Expected to find read id " + read_id +
-                                             " in working reads set but it doesn't exist.");
+            decltype(m_working_reads)::node_type working_read_node;
+            {
+                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+                for (auto& completed_read : completed_reads) {
+                    auto read_iter = m_working_reads.find(completed_read);
+                    if (read_iter != m_working_reads.end()) {
+                        working_read_node = m_working_reads.extract(read_iter);
+                    } else {
+                        auto read_id = get_read_common_data(completed_read->read).read_id;
+                        throw std::runtime_error("Expected to find read id " + read_id +
+                                                 " in working reads set but it doesn't exist.");
+                    }
                 }
+                m_working_reads_size -= completed_reads.size();
             }
-            m_working_reads_size -= completed_reads.size();
+
+            // Destroy the working read outside of the lock.
+            working_read_node = {};
         }
 
         // Send completed reads on to the sink.

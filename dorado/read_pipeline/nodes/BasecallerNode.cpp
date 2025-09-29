@@ -272,6 +272,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
     auto &worker_chunks = m_batched_chunks[worker_id];
     auto &worker_chunks_size = m_batched_chunks_size[worker_id];
+    worker_chunks.reserve(batch_size);
 
     const size_t stride = m_model_runners[worker_id]->config().stride;
     const size_t max_worker_chunks_size = batch_size * ((chunk_size / stride) + 2);
