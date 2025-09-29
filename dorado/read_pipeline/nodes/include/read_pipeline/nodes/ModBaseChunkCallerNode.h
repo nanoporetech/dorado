@@ -22,13 +22,9 @@ class ModBaseChunkCallerNode : public MessageSink {
     struct ModBaseData;
     struct WorkingRead;
     struct ModBaseChunk;
+    struct EncodingData;
 
 public:
-    struct EncodingData {
-        std::vector<uint64_t> seq_to_sig_map;
-        std::vector<int> int_seq;
-    };
-
     ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                            size_t num_threads,
                            size_t canonical_stride,
@@ -126,9 +122,9 @@ private:
     std::atomic<int64_t> m_model_ms{0};
     std::atomic<int64_t> m_sequence_encode_ms{0};
 
-    const bool m_pad_end_align{0};
+    const bool m_pad_end_align;
     // Used to minimise the CPU work to encode CG contexts
-    const bool m_minimal_encode{false};
+    const bool m_minimal_encode;
 
     void validate_runners() const;
 

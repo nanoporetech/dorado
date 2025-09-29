@@ -38,7 +38,13 @@ inline std::vector<std::string_view> split_view(const std::string_view input,
 
 template <typename StringLike>
 inline std::string join(const std::vector<StringLike>& inputs, std::string_view separator) {
+    std::size_t total_size = inputs.empty() ? 0 : (inputs.size() - 1) * separator.size();
+    for (const auto& item : inputs) {
+        total_size += item.size();
+    }
+
     std::string result;
+    result.reserve(total_size);
     for (const auto& item : inputs) {
         if (!result.empty()) {
             result += separator;

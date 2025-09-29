@@ -123,6 +123,11 @@ struct ModBaseChunkCallerNode::ModBaseChunk {
     std::vector<float> scores;
 };
 
+struct ModBaseChunkCallerNode::EncodingData {
+    std::vector<uint64_t> seq_to_sig_map;
+    std::vector<int> int_seq;
+};
+
 ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> model_runners,
                                                size_t modbase_threads,
                                                size_t canonical_stride,
@@ -1086,7 +1091,7 @@ void ModBaseChunkCallerNode::output_thread_fn() {
 
     std::unique_ptr<ModBaseChunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
-        auto working_read = chunk->working_read;
+        auto working_read = std::move(chunk->working_read);
         auto& read = get_read_common_data(working_read->read);
 
         // Extract useful modbase model parameters
@@ -1181,16 +1186,25 @@ void ModBaseChunkCallerNode::output_thread_fn() {
             send_message_to_sink(std::move(working_read->read));
 
             // Remove it from the working read set.
-            std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-            auto read_iter = m_working_reads.find(working_read);
-            if (read_iter != m_working_reads.end()) {
-                m_working_reads.erase(read_iter);
-            } else {
-                auto read_id = get_read_common_data(working_read->read).read_id;
-                throw std::runtime_error("Modbase expected to find read id " + read_id +
-                                         " in working reads set but it doesn't exist.");
+            decltype(m_working_reads)::node_type working_read_node;
+            {
+                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+                auto read_iter = m_working_reads.find(working_read);
+                if (read_iter != m_working_reads.end()) {
+                    working_read_node = m_working_reads.extract(read_iter);
+                } else {
+                    auto read_id = get_read_common_data(working_read->read).read_id;
+                    throw std::runtime_error("Modbase expected to find read id " + read_id +
+                                             " in working reads set but it doesn't exist.");
+                }
             }
+
+            // Destroy the working read now that we don't have the lock held.
+            working_read_node = {};
         }
+
+        // Release the chunk now rather than when it's assigned inside try_pop() (which happens under a lock).
+        chunk.reset();
     }
 }
 

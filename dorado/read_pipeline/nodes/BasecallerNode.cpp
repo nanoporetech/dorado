@@ -38,8 +38,8 @@ struct BasecallerNode::BasecallingChunk : utils::Chunk {
 };
 
 struct BasecallerNode::BasecallingRead {
-    Message read;                                              // The read itself.
-    std::vector<std::unique_ptr<utils::Chunk>> called_chunks;  // Vector of basecalled chunks.
+    Message read;                                                  // The read itself.
+    std::vector<std::unique_ptr<BasecallingChunk>> called_chunks;  // Vector of basecalled chunks.
     std::atomic_size_t num_chunks_called;  // Number of chunks which have been basecalled.
 };
 
@@ -167,11 +167,13 @@ void BasecallerNode::working_reads_manager() {
     utils::set_thread_name("bscl_reads_mgr");
     at::InferenceMode inference_mode_guard;
 
+    std::vector<const utils::Chunk *> chunks_to_stitch;
+
     std::unique_ptr<BasecallingChunk> chunk;
     while (m_processed_chunks.try_pop(chunk) == utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
-        auto working_read = chunk->owning_read;
+        auto working_read = std::move(chunk->owning_read);
         auto idx_in_read = chunk->idx_in_read;
         working_read->called_chunks[idx_in_read] = std::move(chunk);
         auto num_chunks_called = ++working_read->num_chunks_called;
@@ -188,7 +190,12 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.model_q_bias = m_model_runners[0]->config().qbias;
             read_common_data.model_q_scale = m_model_runners[0]->config().qscale;
 
-            utils::stitch_chunks(read_common_data, working_read->called_chunks);
+            chunks_to_stitch.clear();
+            chunks_to_stitch.reserve(working_read->called_chunks.size());
+            for (const auto &called_chunk : working_read->called_chunks) {
+                chunks_to_stitch.emplace_back(called_chunk.get());
+            }
+            utils::stitch_chunks(read_common_data, chunks_to_stitch);
             read_common_data.model_name = m_model_name;
             read_common_data.mean_qscore_start_pos = m_mean_qscore_start_pos;
             read_common_data.pre_trim_seq_length = read_common_data.seq.length();
@@ -213,12 +220,13 @@ void BasecallerNode::working_reads_manager() {
             }
 
             // Cleanup the working read.
+            decltype(m_working_reads)::node_type working_read_node;
             {
                 std::unique_lock<std::mutex> working_reads_lock(m_working_reads_mutex);
                 auto read_iter = m_working_reads.find(working_read);
                 if (read_iter != m_working_reads.end()) {
                     m_working_reads_signal_bytes -= read_common_data.raw_data.nbytes();
-                    m_working_reads.erase(read_iter);
+                    working_read_node = m_working_reads.extract(read_iter);
                     --m_working_reads_size;
                 } else {
                     throw std::runtime_error("Expected to find read id " +
@@ -227,9 +235,15 @@ void BasecallerNode::working_reads_manager() {
                 }
             }
 
+            // Destroy the working read now that we don't have the lock held.
+            working_read_node = {};
+
             // Send the read on its way.
             send_message_to_sink(std::move(source_read));
         }
+
+        // Release the chunk now rather than when it's assigned inside try_pop() (which happens under a lock).
+        chunk.reset();
     }
 }
 
