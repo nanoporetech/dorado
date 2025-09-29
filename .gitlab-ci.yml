@@ -277,7 +277,6 @@ build:linux:x86:noble:
   before_script:
     - !reference [.linux_build_dependencies, before_script]
     - apt-get install -y build-essential
-  artifacts: null
 
 build:linux:x86:focal:debug:
   variables:

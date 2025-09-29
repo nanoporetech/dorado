@@ -17,7 +17,7 @@ TxModelImpl::TxModelImpl(const config::BasecallModelConfig &config,
     crf = register_module("crf", nn::LinearScaledCRF(config.tx->crf));
 }
 
-at::Tensor TxModelImpl::forward(const at::Tensor &chunk_NCT) {
+at::Tensor TxModelImpl::forward(const at::Tensor &chunk_NCT, nn::AuxiliaryData *const) {
     at::Tensor h;
     {
         utils::ScopedProfileRange spr("Conv", 1);

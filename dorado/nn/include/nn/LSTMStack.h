@@ -1,9 +1,11 @@
 #pragma once
 
+#include "AuxiliaryData.h"
 #include "WorkingMemory.h"
 
 #include <torch/nn.h>
 
+#include <memory>
 #include <vector>
 
 namespace dorado::nn {
@@ -13,11 +15,11 @@ struct LSTMStackImpl : torch::nn::Module {
     at::Tensor forward(at::Tensor x);
 #if DORADO_CUDA_BUILD
     void reserve_working_memory(WorkingMemory &wm);
-    void run_koi(WorkingMemory &wm);
+    void run_koi(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
 
 private:
     void forward_cublas(WorkingMemory &wm);
-    void forward_cutlass(WorkingMemory &wm);
+    void forward_cutlass(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
     void forward_quantized(WorkingMemory &wm);
 
     std::vector<at::Tensor> device_weights;

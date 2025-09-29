@@ -2,6 +2,7 @@
 
 #include "basecall/ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
+#include "read_pipeline/base/chunk.h"
 #include "read_pipeline/base/read_utils.h"
 #include "read_pipeline/base/stitch.h"
 #include "utils/stats.h"
@@ -86,31 +87,34 @@ void BasecallerNode::input_thread_fn() {
 
         // Now that we have acquired a read, wait until we can push to chunks_in
         // Chunk up the read and put the chunks into the pending chunk list.
-        size_t raw_size = read_common_data.raw_data.sizes().back();  // Time dimension.
-        size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
-        size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
+        const std::size_t raw_size = read_common_data.raw_data.sizes().back();  // Time dimension.
+        const std::size_t chunk_queue_idx = get_chunk_queue_idx(raw_size);
+        const std::size_t chunk_size = m_chunk_sizes[chunk_queue_idx];
 
-        size_t offset = 0;
-        size_t chunk_in_read_idx = 0;
-        size_t signal_chunk_step = chunk_size - m_overlap;
         auto working_read = std::make_shared<BasecallingRead>();
         std::vector<std::unique_ptr<BasecallingChunk>> read_chunks;
-        read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
-                working_read, offset, chunk_in_read_idx++, chunk_size));
-        size_t num_chunks = 1;
-        auto last_chunk_offset = raw_size > chunk_size ? raw_size - chunk_size : 0;
-        auto misalignment = last_chunk_offset % m_model_stride;
-        if (misalignment != 0) {
-            // move last chunk start to the next stride boundary. we'll zero pad any excess samples required.
-            last_chunk_offset += m_model_stride - misalignment;
+
+        if (m_variable_chunk_sizes) {
+            const std::vector<std::pair<std::size_t, std::size_t>> intervals =
+                    utils::generate_variable_chunks(raw_size, chunk_size, m_model_stride,
+                                                    m_overlap);
+
+            for (std::size_t i = 0; i < std::size(intervals); ++i) {
+                read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
+                        working_read, intervals[i].first, i,
+                        intervals[i].second - intervals[i].first));
+            }
+        } else {
+            const std::vector<std::size_t> offsets =
+                    utils::generate_chunks(raw_size, chunk_size, m_model_stride, m_overlap);
+
+            for (std::size_t i = 0; i < std::size(offsets); ++i) {
+                read_chunks.emplace_back(std::make_unique<BasecallingChunk>(
+                        working_read, offsets[i], i, chunk_size));
+            }
         }
-        while (offset + chunk_size < raw_size) {
-            offset = std::min(offset + signal_chunk_step, last_chunk_offset);
-            read_chunks.push_back(std::make_unique<BasecallingChunk>(
-                    working_read, offset, chunk_in_read_idx++, chunk_size));
-            ++num_chunks;
-        }
-        working_read->called_chunks.resize(num_chunks);
+
+        working_read->called_chunks.resize(std::size(read_chunks));
         working_read->num_chunks_called.store(0);
         working_read->read = std::move(message);
 
@@ -136,6 +140,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     NVTX3_FUNC_RANGE();
     auto &model_runner = m_model_runners[worker_id];
     auto &batched_chunks = m_batched_chunks[worker_id];
+    auto &batched_chunks_size = m_batched_chunks_size[worker_id];
     spdlog::trace("Basecalling batch T={}, N={}, chunks={}, worker={}", model_runner->chunk_size(),
                   model_runner->batch_size(), batched_chunks.size(), worker_id);
 
@@ -161,6 +166,7 @@ void BasecallerNode::basecall_current_batch(int worker_id) {
     }
 
     batched_chunks.clear();
+    batched_chunks_size = 0;
 }
 
 void BasecallerNode::working_reads_manager() {
@@ -264,6 +270,12 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     const bool is_low_latency = m_model_runners[worker_id]->is_low_latency();
     const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
     auto &worker_chunks = m_batched_chunks[worker_id];
+    auto &worker_chunks_size = m_batched_chunks_size[worker_id];
+
+    const size_t stride = m_model_runners[worker_id]->config().stride;
+    const size_t max_worker_chunks_size = batch_size * ((chunk_size / stride) + 2);
+    const size_t max_worker_chunks_size_part = 32 * ((chunk_size / stride) + 2);
+    size_t worker_chunks_size_part = 0;
 
     auto [from_first_timeout, from_last_timeout] = m_model_runners[worker_id]->batch_timeouts_ms();
     if (is_low_latency && m_low_latency_batch_timeout_ms != 0) {
@@ -305,6 +317,60 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             }
             first_chunk_reserve_time = std::chrono::system_clock::now();
             last_chunk_reserve_time = first_chunk_reserve_time;
+            continue;
+        }
+
+        if (m_variable_chunk_sizes) {
+            auto &source_read = chunk->owning_read->read;
+
+            auto &read_common = get_read_common_data(source_read);
+            auto input_slice = read_common.raw_data.index(
+                    {Ellipsis,
+                     Slice(chunk->input_offset, chunk->input_offset + chunk->raw_chunk_size)});
+
+            // Make sure the slice tensor is 2D
+            if (input_slice.ndimension() == 1) {
+                input_slice = input_slice.unsqueeze(0);
+            }
+            if (const size_t overhang = input_slice.size(1) % stride; overhang != 0) {
+                input_slice = input_slice.narrow(1, 0, input_slice.size(1) - overhang);
+            }
+
+            const size_t slice_size = (input_slice.size(1) / stride) + 2;
+            if ((worker_chunks_size_part + slice_size) > max_worker_chunks_size_part) {
+                worker_chunks_size += max_worker_chunks_size_part;
+                worker_chunks_size_part = 0;
+            }
+
+            if (worker_chunks_size == max_worker_chunks_size) {
+                // Input tensor is full, let's get_scores.
+                spdlog::trace("Submitting full batch for worker {}.", worker_id);
+                basecall_current_batch(worker_id);
+                spdlog::trace(
+                        "Resetting both chunk reserve times for worker {} after processing full "
+                        "batch.",
+                        worker_id);
+                first_chunk_reserve_time = std::chrono::system_clock::now();
+                last_chunk_reserve_time = first_chunk_reserve_time;
+            }
+
+            // Insert the chunk in the input tensor
+            m_model_runners[worker_id]->accept_chunk(static_cast<int>(worker_chunks.size()),
+                                                     input_slice);
+
+            worker_chunks.push_back(std::move(chunk));
+            worker_chunks_size_part += slice_size;
+
+            if (worker_chunks.size() == 1) {
+                spdlog::trace(
+                        "Resetting first_chunk_reserve_time for worker {} after adding first chunk "
+                        "to "
+                        "batch.",
+                        worker_id);
+                first_chunk_reserve_time = std::chrono::system_clock::now();
+            }
+            last_chunk_reserve_time = std::chrono::system_clock::now();
+
             continue;
         }
 
@@ -396,13 +462,18 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
           m_is_rna_model(is_rna_model(m_model_runners.front()->config())),
           m_model_name(std::move(model_name)),
           m_mean_qscore_start_pos(read_mean_qscore_start_pos),
+          m_variable_chunk_sizes(m_model_runners.front()->variable_chunk_sizes()),
           m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
           m_node_name(std::move(node_name)) {
     // Setup worker state
     const size_t num_workers = m_model_runners.size();
     m_batched_chunks.resize(num_workers);
+    m_batched_chunks_size.resize(num_workers);
 
     for (auto &runner_ptr : m_model_runners) {
+        if (m_variable_chunk_sizes != runner_ptr->variable_chunk_sizes()) {
+            throw std::logic_error("All model runners must use the same chunking method.");
+        }
         // m_model_runners is effectively a 3D array with dimensions
         // [num_devices][num_gpu_runners][num_chunk_sizes] (see
         // `dorado::api::create_basecall_runners`). This means the chunk sizes are repeated,

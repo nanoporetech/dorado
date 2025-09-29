@@ -72,6 +72,8 @@ at::Tensor WorkingMemory::get_current_NTC_view() {
     }
 }
 
+void WorkingMemory::next_N(const int N_) { N = N_; }
+
 at::Tensor WorkingMemory::next_TC(int T_, int C_, TensorLayout layout_) {
     T = T_;
     C = C_;
@@ -81,9 +83,9 @@ at::Tensor WorkingMemory::next_TC(int T_, int C_, TensorLayout layout_) {
     } else if (layout == TensorLayout::TNC) {
         return next({T, N, C}, torch::kF16, true);
     } else if (layout == TensorLayout::CUTLASS_TNC_F16) {
-        return next({T + 3, N, C}, torch::kF16, true);
+        return next({T + 5, N, C}, torch::kF16, true);
     } else if (layout == TensorLayout::CUTLASS_TNC_I8) {
-        return next({T + 3, N, C}, torch::kI8, true);
+        return next({T + 5, N, C}, torch::kI8, true);
     } else if (layout == TensorLayout::CUBLAS_TN2C) {
         return next({T + 1, N, 2, C}, torch::kF16, true);
     } else {

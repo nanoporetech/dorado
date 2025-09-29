@@ -4,6 +4,7 @@ dorado_add_library(
     PUBLIC_DIR
         nn
     SOURCES_PUBLIC
+        AuxiliaryData.h
         ConvStack.h
         CRFModules.h
         KoiUtils.h
@@ -13,6 +14,7 @@ dorado_add_library(
         TxModules.h
         WorkingMemory.h
     SOURCES_PRIVATE
+        AuxiliaryData.cpp
         ConvStack.cpp
         CRFModules.cpp
         LinearUpsample.cpp

@@ -51,16 +51,24 @@ void LSTMStackImpl::reserve_working_memory(WorkingMemory &wm) {
     }
 }
 
-void LSTMStackImpl::run_koi(WorkingMemory &wm) {
+void LSTMStackImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
     utils::ScopedProfileRange spr("lstm_stack", 2);
 
     if (wm.layout == TensorLayout::NTC) {
+        if (aux) {
+            throw std::runtime_error(
+                    "LSTM layer error: unsupported variable chunk sizes code path!");
+        }
         return forward_quantized(wm);
     } else if (wm.layout == TensorLayout::CUBLAS_TN2C) {
+        if (aux) {
+            throw std::runtime_error(
+                    "LSTM layer error: unsupported variable chunk sizes code path!");
+        }
         return forward_cublas(wm);
     } else if (wm.layout == TensorLayout::CUTLASS_TNC_F16 ||
                wm.layout == TensorLayout::CUTLASS_TNC_I8) {
-        return forward_cutlass(wm);
+        return forward_cutlass(wm, aux);
     } else {
         throw std::runtime_error("Unhandled TensorLayout in LSTMStack.");
     }
@@ -116,12 +124,17 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
     }
 }
 
-void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
+void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *const aux) {
     // Working memory is laid out as [T+3][N][C] in memory, where the reverse LSTM
     // layers (even index) use [1:-2] as input and [2:-1] as output, whereas the
     // forward LSTM layers (odd index) use [2:-1] as input and [1:-2] as output.
     // Note that both inout[0] and inout[-1] remain all zeroes, representing the initial
     // LSTM state h(-1) in either direction.
+    if (aux && !reverse_first) {
+        throw std::runtime_error(
+                "LSTM layer error: unsupported first forward layer with variable chunks.");
+    }
+
     wm.current[0] = 0;
     wm.current[-1] = 0;
 
@@ -134,7 +147,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
         bool reverse = reverse_first ? !(layer_idx & 1) : (layer_idx & 1);
         auto in = wm.current;
         auto type_id = (wm.layout == TensorLayout::CUTLASS_TNC_F16) ? KOI_F16 : KOI_I8;
-        auto state_buf = torch::zeros({wm.N, layer_size}, opts_f16);
+        auto state_buf = torch::zeros({(aux ? 3 : 1) * wm.N, layer_size}, opts_f16);
         auto workspace_buf = torch::empty({1024}, opts_i32);
         constexpr int interleave = 0;
 
@@ -168,16 +181,21 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm) {
             }
             device_weights.push_back(weights_cpu_cutlass.contiguous().to(in.device()));
         }
+        void *const encoding = aux ? (reverse ? aux->device_bwd_encoding.data_ptr()
+                                              : aux->device_fwd_encoding.data_ptr())
+                                   : nullptr;
 
 #if DORADO_ORIN
         int flags = utils::get_dev_opt<int>("koi_lstm_flags", 2);
 #else
         int flags = utils::get_dev_opt<int>("koi_lstm_flags", 0);
 #endif
-        host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size, wm.T, reverse ? -1 : 1,
-                          int(in.stride(1)), in.data_ptr(), device_weights[layer_idx].data_ptr(),
+        host_cutlass_lstm(stream, type_id, int(layer_idx), wm.N, layer_size,
+                          wm.T + (aux && reverse), reverse ? -1 : 1, int(in.stride(1)),
+                          in.data_ptr(), device_weights[layer_idx].data_ptr(),
                           device_bias[layer_idx].data_ptr(), device_scale[layer_idx].data_ptr(),
-                          state_buf.data_ptr(), workspace_buf.data_ptr(), interleave, flags);
+                          state_buf.data_ptr(), workspace_buf.data_ptr(), encoding, interleave,
+                          flags);
 
         if (type_id == KOI_F16) {
             utils::ScopedProfileRange spr_convert("f16_to_int8", 4);

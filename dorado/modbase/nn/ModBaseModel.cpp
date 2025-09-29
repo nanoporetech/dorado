@@ -464,14 +464,14 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
             // Reserve and allocate working memory for the sequence convs
             auto [T, C] = config.chunked_sequence_input_TC();
             wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
-            seq_convs->reserve_working_memory(wm_seq, nn::TensorLayout::NTC);
+            seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
         }
         {
             // Reserve and allocate working memory for everything else
             const auto& params = config.general;
             auto [T, C] = config.chunked_signal_input_TC();
             wm.next_TC(T, C, nn::TensorLayout::NTC);
-            sig_convs->reserve_working_memory(wm, nn::TensorLayout::NTC);
+            sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
             // Buffer for concatenating conv outputs before merge_conv
             const int padding = merge_cv.winlen / 2;
@@ -487,7 +487,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
                               to_string(force_dtype.value()));
             }
 
-            merge_conv->reserve_working_memory(wm, force_dtype);
+            merge_conv->reserve_working_memory(wm, nullptr, force_dtype);
             lstm->reserve_working_memory(wm);
         }
     }
@@ -514,11 +514,11 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             utils::ScopedProfileRange spr2("seq_convs", 2);
-            seq_convs->run_koi(wm_seq);
+            seq_convs->run_koi(wm_seq, nullptr);
         }
         {
             utils::ScopedProfileRange spr2("sig_convs", 2);
-            sig_convs->run_koi(wm);
+            sig_convs->run_koi(wm, nullptr);
         }
 
         if (wm.layout != wm_seq.layout) {
@@ -554,11 +554,11 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         {
             utils::ScopedProfileRange spr2("merge_conv", 2);
             wm.is_input_to_rev_lstm = false;
-            merge_conv->run_koi(wm);
+            merge_conv->run_koi(wm, nullptr);
         }
         {
             utils::ScopedProfileRange spr2("lstms", 2);
-            lstm->run_koi(wm);
+            lstm->run_koi(wm, nullptr);
         }
 
         at::Tensor out;

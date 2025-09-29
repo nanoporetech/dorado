@@ -1,5 +1,6 @@
 #pragma once
 
+#include "nn/AuxiliaryData.h"
 #include "nn/ConvStack.h"
 #include "nn/LinearUpsample.h"
 #include "nn/TxModules.h"
@@ -9,6 +10,7 @@
 #include <c10/core/TensorOptions.h>
 #include <torch/nn.h>
 
+#include <memory>
 #include <vector>
 
 namespace dorado::config {
@@ -25,7 +27,7 @@ struct TxModelImpl : torch::nn::Module {
         utils::load_state_dict(*this, weights);
     }
 
-    at::Tensor forward(const at::Tensor &chunk_NCT);
+    at::Tensor forward(const at::Tensor &chunk_NCT, nn::AuxiliaryData *aux /* = nullptr */);
 
     nn::ConvStack convs{nullptr};
     nn::TxEncoderStack tx_encoder{nullptr};
@@ -33,6 +35,9 @@ struct TxModelImpl : torch::nn::Module {
     nn::LinearScaledCRF crf{nullptr};
 
     const at::TensorOptions m_options;
+
+protected:
+    FORWARD_HAS_DEFAULT_ARGS({1, torch::nn::AnyValue(static_cast<nn::AuxiliaryData *>(nullptr))});
 };
 
 TORCH_MODULE(TxModel);

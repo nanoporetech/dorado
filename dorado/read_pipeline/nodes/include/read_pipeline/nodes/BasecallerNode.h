@@ -66,6 +66,8 @@ private:
     // Mean Q-score start position from model properties.
     uint32_t m_mean_qscore_start_pos;
 
+    bool m_variable_chunk_sizes;
+
     // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
     // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`
     std::vector<size_t> m_chunk_sizes;
@@ -78,6 +80,7 @@ private:
 
     // If we go multi-threaded, there will be one of these batches per thread
     std::vector<std::vector<std::unique_ptr<BasecallingChunk>>> m_batched_chunks;
+    std::vector<std::size_t> m_batched_chunks_size;
 
     utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_processed_chunks;
 

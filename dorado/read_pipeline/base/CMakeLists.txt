@@ -4,6 +4,7 @@ dorado_add_library(
     PUBLIC_DIR
         read_pipeline/base
     SOURCES_PUBLIC
+        chunk.h
         ClientInfo.h
         DefaultClientInfo.h
         terminate_options.h
@@ -14,6 +15,7 @@ dorado_add_library(
         ReadPipeline.h
         stitch.h
     SOURCES_PRIVATE
+        chunk.cpp
         HtsReader.cpp
         messages.cpp
         MessageSink.cpp
