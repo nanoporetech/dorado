@@ -112,7 +112,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     return data;
 }
 
-std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(DecodeData data) const {
+std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data) const {
     nvtx3::scoped_range loop{"cpu_decode"};
 
     auto &moves_sequence_qstring_cpu = data.data;

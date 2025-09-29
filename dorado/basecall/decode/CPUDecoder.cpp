@@ -97,7 +97,7 @@ namespace dorado::basecall::decode {
 
 DecodeData CPUDecoder::beam_search_part_1(DecodeData data) const { return data; }
 
-std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(DecodeData data) const {
+std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(const DecodeData& data) const {
     // Expects data.data(TNC)
     const auto scores_cpu = data.data.to(at::kCPU);
     const auto num_chunks = data.num_chunks;

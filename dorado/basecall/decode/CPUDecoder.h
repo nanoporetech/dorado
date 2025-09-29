@@ -16,7 +16,7 @@ at::Tensor backward_scores(const at::Tensor& scores_TNC, float fixed_stay_score)
 class CPUDecoder final : public Decoder {
 public:
     DecodeData beam_search_part_1(DecodeData data) const override;
-    std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const override;
+    std::vector<DecodedChunk> beam_search_part_2(const DecodeData& data) const override;
 
     at::ScalarType dtype() const override { return at::ScalarType::Float; }
 };

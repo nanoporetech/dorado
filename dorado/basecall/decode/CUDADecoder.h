@@ -14,7 +14,7 @@ public:
     // one on the CPU. While the second part is running we can submit more commands to the GPU
     // on another thread.
     DecodeData beam_search_part_1(DecodeData data) const override;
-    std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const override;
+    std::vector<DecodedChunk> beam_search_part_2(const DecodeData & data) const override;
 
     at::ScalarType dtype() const override { return at::ScalarType::Half; }
 
