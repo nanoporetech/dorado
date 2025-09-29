@@ -54,19 +54,19 @@ private:
     // Override for batch timeout to use for low-latency pipelines. Zero means use the normal timeout.
     int m_low_latency_batch_timeout_ms;
     // Vector of model runners (each with their own GPU access etc)
-    std::vector<basecall::RunnerPtr> m_model_runners;
+    const std::vector<basecall::RunnerPtr> m_model_runners;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
-    size_t m_overlap;
+    const size_t m_overlap;
     // Stride of the model in the runners
-    size_t m_model_stride;
+    const size_t m_model_stride;
     // Whether the model is for rna
-    bool m_is_rna_model;
+    const bool m_is_rna_model;
     // model_name
-    std::string m_model_name;
+    const std::string m_model_name;
     // Mean Q-score start position from model properties.
-    uint32_t m_mean_qscore_start_pos;
+    const uint32_t m_mean_qscore_start_pos;
 
-    bool m_variable_chunk_sizes;
+    const bool m_variable_chunk_sizes;
 
     // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
     // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`

@@ -73,7 +73,11 @@ class AsyncQueue {
         // Inform all waiting threads that the queue is not full, since in general
         // we have removed > 1 item and there can be > 1 thread waiting to push.
         lock.unlock();
-        m_not_full_cv.notify_all();
+        if (num_to_pop == 1) {
+            m_not_full_cv.notify_one();
+        } else {
+            m_not_full_cv.notify_all();
+        }
     }
 
     // Waits until the queue is not empty or we are asked to terminate.
