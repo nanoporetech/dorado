@@ -950,13 +950,15 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
     using Clock = std::remove_reference_t<decltype(chunk_queue)>::element_type::Clock;
 
     std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
+    batched_chunks.reserve(m_batch_size);
     auto last_chunk_reserve_time = Clock::now();
 
-    int64_t previous_chunk_count = 0;
     while (true) {
         nvtx3::scoped_range range{"chunk_caller_thread_fn"};
+
         // Repeatedly attempt to complete the current batch with one acquisition of the
         // chunk queue mutex.
+        const std::size_t previous_chunk_count = batched_chunks.size();
         auto grab_chunk = [&batched_chunks](std::unique_ptr<ModBaseChunk> chunk) {
             batched_chunks.push_back(std::move(chunk));
         };
@@ -985,8 +987,6 @@ void ModBaseChunkCallerNode::chunk_caller_thread_fn(const size_t worker_id, cons
             m_model_ms += timer.GetElapsedMS();
             m_num_chunks += batched_chunks.size();
         }
-
-        previous_chunk_count = batched_chunks.size();
     }
 
     // Basecall any remaining chunks.

@@ -442,16 +442,18 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto last_chunk_reserve_time = Clock::now();
 
     std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
-    size_t previous_chunk_count = 0;
+    batched_chunks.reserve(m_batch_size);
     while (true) {
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
+
         // Repeatedly attempt to complete the current batch with one acquisition of the
         // chunk queue mutex.
+        const std::size_t previous_chunk_count = batched_chunks.size();
         auto grab_chunk = [&batched_chunks](std::unique_ptr<ModBaseChunk> chunk) {
             batched_chunks.push_back(std::move(chunk));
         };
         const auto status = chunk_queue->process_and_pop_n_with_timeout(
-                grab_chunk, m_batch_size - batched_chunks.size(),
+                grab_chunk, m_batch_size - previous_chunk_count,
                 last_chunk_reserve_time + FORCE_TIMEOUT);
         if (status == utils::AsyncQueueStatus::Terminate) {
             break;
@@ -478,8 +480,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             // Input tensor is full, let's get scores.
             call_current_batch(worker_id, caller_id, batched_chunks);
         }
-
-        previous_chunk_count = batched_chunks.size();
     }
 
     // Basecall any remaining chunks.
