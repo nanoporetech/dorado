@@ -1,10 +1,8 @@
 #pragma once
 
-#include "utils/fs_utils.h"
-#include "utils/string_utils.h"
-
 #include <filesystem>
 #include <optional>
+#include <set>
 #include <string>
 #include <vector>
 
@@ -28,8 +26,8 @@ bool download_models(const std::string& target_directory, const std::string& mod
 class ModelDownloader {
 public:
     // Model downloader with optional model search directory
-    ModelDownloader(const std::optional<std::filesystem::path>& model_dir)
-            : m_models_dir(model_dir) {}
+    ModelDownloader(const std::optional<std::filesystem::path>& model_dir, bool verbose)
+            : m_models_dir(model_dir), m_verbose{verbose} {}
 
     // Temporary model downloader
     ModelDownloader() : m_models_dir(std::nullopt) {}
@@ -53,6 +51,7 @@ public:
 
 private:
     const std::optional<std::filesystem::path> m_models_dir;
+    const bool m_verbose{false};
     std::set<std::filesystem::path> m_temp_models;
 };
 

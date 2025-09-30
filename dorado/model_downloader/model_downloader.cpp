@@ -50,7 +50,11 @@ std::filesystem::path ModelDownloader::get(const std::string& model_name,
     /*const*/ fs::path model_dir = parent_dir / model_name;
 
     if (fs::exists(model_dir)) {
-        spdlog::trace("Found existing model at '{}'.", model_dir.string());
+        if (m_verbose) {
+            spdlog::info(" - found existing model '{}' at '{}'.", model_name, model_dir.string());
+        } else {
+            spdlog::trace(" - found existing model '{}' at '{}'.", model_name, model_dir.string());
+        }
         return model_dir;
     }
 
@@ -78,7 +82,11 @@ std::filesystem::path ModelDownloader::get(const std::string& model_name,
         }
     }
 
-    spdlog::trace("Downloaded {} model into: '{}'.", description, model_dir.string());
+    if (m_verbose) {
+        spdlog::info("Downloaded '{}' model into: '{}'.", model_name, model_dir.string());
+    } else {
+        spdlog::trace("Downloaded '{} 'model into: '{}'.", model_name, model_dir.string());
+    }
     return model_dir;
 }
 
