@@ -45,14 +45,10 @@ struct BasecallerNode::BasecallingRead {
 };
 
 struct BasecallerNode::BatchedChunks {
-    BatchedChunks(int id, std::size_t max) : max_chunks(max), worker_id(id) {
-        chunks.reserve(max_chunks);
-        reset();
-    }
+    BatchedChunks(int id) : worker_id(id) { reset(); }
 
     std::vector<std::unique_ptr<BasecallingChunk>> chunks;
     std::size_t chunks_size;
-    const std::size_t max_chunks;
 
     using Clock = std::chrono::steady_clock;
     Clock::time_point first_chunk_reserve_time;
@@ -61,12 +57,10 @@ struct BasecallerNode::BatchedChunks {
     const int worker_id;
 
     [[nodiscard]] bool empty() const { return chunks.empty(); }
-    [[nodiscard]] std::size_t remaining() const { return max_chunks - chunks.size(); }
 
     std::span<std::unique_ptr<BasecallingChunk>> span() { return chunks; }
 
     int add(std::unique_ptr<BasecallingChunk> chunk) {
-        assert(remaining() > 0);
         chunks.emplace_back(std::move(chunk));
         return static_cast<int>(chunks.size() - 1);
     }
@@ -317,10 +311,15 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     static_assert(std::is_same_v<std::remove_reference_t<decltype(chunk_in_queue)>::Clock, Clock>,
                   "AsyncQueue and chunk clocks should match");
 
-    BatchedChunks current_batch(worker_id,
-                                m_variable_chunk_sizes ? batch_size * chunk_size : batch_size);
+    BatchedChunks current_batch(worker_id);
     std::vector<std::unique_ptr<BasecallingChunk>> popped_chunks;
-    popped_chunks.reserve(current_batch.max_chunks);
+
+    // If we're using VCS then we can't put bounds on the number of chunks required to fill a batch,
+    // so reserve twice the space as a guess. When not using VCS we can try to pull a whole batch at
+    // a time, or fill up our current batch, to reduce how often we contend the AsyncQueue.
+    const std::size_t variable_chunk_sizes_pop_size = 64;
+    current_batch.chunks.reserve(m_variable_chunk_sizes ? 2 * batch_size : batch_size);
+    popped_chunks.reserve(m_variable_chunk_sizes ? variable_chunk_sizes_pop_size : batch_size);
 
     while (true) {
 #if DORADO_METAL_BUILD
@@ -333,7 +332,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                               std::chrono::milliseconds(from_last_timeout);
         const auto timeout = std::min(timeout1, timeout2);
 
-        if (current_batch.remaining() == 0) {
+        if (m_variable_chunk_sizes && current_batch.chunks.size() == batch_size) {
             throw std::logic_error("Current batch is already full");
         }
 
@@ -342,8 +341,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         auto grab_chunk = [&popped_chunks](std::unique_ptr<BasecallingChunk> chunk) {
             popped_chunks.push_back(std::move(chunk));
         };
-        const auto pop_status = chunk_in_queue.process_and_pop_n_with_timeout(
-                grab_chunk, current_batch.remaining(), timeout);
+        const auto max_to_pop = m_variable_chunk_sizes ? variable_chunk_sizes_pop_size
+                                                       : (batch_size - current_batch.chunks.size());
+        const auto pop_status =
+                chunk_in_queue.process_and_pop_n_with_timeout(grab_chunk, max_to_pop, timeout);
 
         if (pop_status == utils::AsyncQueueStatus::Terminate) {
             assert(popped_chunks.empty());
@@ -365,6 +366,12 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         } else if (popped_chunks.empty()) {
             // If it's not a timeout or a terminate then we must have added some new chunks.
             throw std::logic_error("No new chunks were added");
+
+        } else if (!m_variable_chunk_sizes &&
+                   current_batch.chunks.size() + popped_chunks.size() > batch_size) {
+            // We shouldn't be taking more chunks than we need, since doing so means that we've
+            // stolen chunks that other workers could be basecalling in parallel.
+            throw std::logic_error("Popped more chunks than we should have");
         }
 
         // Update timings.
@@ -427,7 +434,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             m_model_runners[worker_id]->accept_chunk(chunk_idx, input_slice);
         }
 
-        if (current_batch.remaining() == 0 && !m_variable_chunk_sizes) {
+        if (current_batch.chunks.size() == batch_size && !m_variable_chunk_sizes) {
             // Input tensor is full, let's get_scores.
             basecall_current_batch(current_batch);
         }
