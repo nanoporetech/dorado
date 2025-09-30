@@ -19,10 +19,7 @@
 #include "hts_utils/hts_file.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
-#include "model_downloader/model_downloader.h"
-#include "model_resolution.h"
-#include "models/kits.h"
-#include "models/model_complex.h"
+#include "model_resolver/ModelResolver.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
@@ -35,13 +32,10 @@
 #include "read_pipeline/nodes/TrimmerNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
 #include "resume_loader/ResumeLoader.h"
-#include "torch_utils/auto_detect_device.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
-#include "utils/arg_parse_ext.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
-#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
@@ -96,23 +90,6 @@ public:
     const std::filesystem::path& path() const { return m_data_path; }
     const DataLoader::InputFiles& files() const { return m_pod5_files; }
 };
-
-void set_basecaller_params(const argparse::ArgumentParser& arg,
-                           BasecallModelConfig& model_config,
-                           const std::string& device) {
-    model_config.basecaller.update(BatchParams::Priority::CLI_ARG,
-                                   cli::get_optional_argument<int>("--chunksize", arg),
-                                   cli::get_optional_argument<int>("--overlap", arg),
-                                   cli::get_optional_argument<int>("--batchsize", arg));
-
-    if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
-        // Force the batch size to 128
-        // TODO: This is tuned for LSTM models - investigate Tx
-        model_config.basecaller.set_batch_size(128);
-    }
-
-    model_config.normalise_basecaller_params();
-}
 
 void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity) {
     parser.add_argument("model").help(
@@ -318,9 +295,8 @@ void terminate_runners(std::vector<dorado::basecall::RunnerPtr>& runners,
 }
 
 void setup(const std::vector<std::string>& args,
-           const BasecallModelConfig& model_config,
+           const Models& models,
            const InputPod5FolderInfo& pod5_folder_info,
-           const std::vector<fs::path>& modbase_models,
            const std::string& device,
            const std::string& ref,
            const std::string& bed,
@@ -334,7 +310,6 @@ void setup(const std::vector<std::string>& args,
            size_t min_qscore,
            const std::string& read_list_file_path,
            const alignment::Minimap2Options& aligner_options,
-           bool skip_model_compatibility_check,
            const std::string& dump_stats_file,
            const std::string& dump_stats_filter,
            bool run_batchsize_benchmarks,
@@ -344,14 +319,12 @@ void setup(const std::vector<std::string>& args,
            [[maybe_unused]] bool variable_chunk_sizes,
            bool estimate_poly_a,
            const std::string& polya_config,
-           const ModelComplex& model_complex,
            const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
            const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
            std::shared_ptr<const utils::SampleSheet> sample_sheet) {
+    const BasecallModelConfig& model_config = models.get_simplex_config();
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());
-    const std::string model_name = models::extract_model_name_from_path(model_config.model_path);
-    const std::string modbase_model_names = models::extract_model_names_from_paths(modbase_models);
 
     if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
         std::string err = "No POD5 data found in path: " + pod5_folder_info.path().string();
@@ -368,33 +341,6 @@ void setup(const std::vector<std::string>& args,
 
     ProgressTracker tracker(ProgressTracker::SIMPLEX, num_reads);
 
-    // Sampling rate is checked by ModelComplexSearch when a complex is given, only test for a path
-    if (model_complex.is_path() && !skip_model_compatibility_check) {
-        const auto model_sample_rate = model_config.sample_rate < 0
-                                               ? get_sample_rate_by_model_name(model_name)
-                                               : model_config.sample_rate;
-        bool inspect_ok = true;
-        models::SamplingRate data_sample_rate = 0;
-        try {
-            data_sample_rate = file_info::get_sample_rate(pod5_folder_info.files().get());
-        } catch (const std::exception& e) {
-            inspect_ok = false;
-            spdlog::warn(
-                    "Could not check that model sampling rate and data sampling rate match. "
-                    "Proceed with caution. Reason: {}",
-                    e.what());
-        }
-        if (inspect_ok) {
-            check_sampling_rates_compatible(model_sample_rate, data_sample_rate);
-        }
-    }
-
-    if (is_rna_model(model_config)) {
-        spdlog::info(
-                " - BAM format does not support `U`, so RNA output files will include `T` instead "
-                "of `U` for all file types.");
-    }
-
     const bool enable_aligner = !ref.empty();
 
 #if DORADO_CUDA_BUILD
@@ -403,8 +349,10 @@ void setup(const std::vector<std::string>& args,
 #endif
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto modbase_runners = api::create_modbase_runners(
-            modbase_models, device, modbase_params.runners_per_caller, modbase_params.batchsize);
+    auto modbase_runners = api::create_modbase_runners(models.get_modbase_model_paths(), device,
+                                                       modbase_params.runners_per_caller,
+                                                       modbase_params.batchsize);
+
     std::vector<basecall::RunnerPtr> runners;
     size_t num_devices = 0;
 #if DORADO_CUDA_BUILD
@@ -470,8 +418,9 @@ void setup(const std::vector<std::string>& args,
                 num_runners, 0);
     }
 
-    auto read_groups = file_info::load_read_groups(pod5_folder_info.files().get(), model_name,
-                                                   modbase_model_names);
+    auto read_groups = file_info::load_read_groups(
+            pod5_folder_info.files().get(), models.get_simplex_model_name(),
+            utils::join(models.get_modbase_model_names(), ","));
 
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
@@ -660,22 +609,22 @@ void setup(const std::vector<std::string>& args,
         set_dorado_basecaller_args(resume_parser, verbosity);
         resume_parser.parse_known_args(resume_args_excluding_mm2_opts);
 
-        const std::string model_arg = resume_parser.get<std::string>("model");
-        const ModelComplex resume_model_complex = ModelComplexParser::parse(model_arg);
+        BasecallerModelResolver resume_resolver{
+                resume_parser.get<std::string>("model"),
+                resume_parser.get<std::string>("--modified-bases-models"),
+                resume_parser.get<std::vector<std::string>>("--modified-bases"),
+                get_models_directory(resume_parser.get<std::string>("--models-directory")),
+                resume_parser.get<bool>("--skip-model-compatibility-check"),
+                pod5_folder_info.files().get(),
+        };
 
-        if (resume_model_complex.is_path()) {
-            // If the model selection is a path, check it exists and matches
-            const auto resume_model_name =
-                    models::extract_model_name_from_path(fs::path(model_arg));
-            if (model_name != resume_model_name) {
-                throw std::runtime_error(
-                        "Resume only works if the same model is used. Resume model was " +
-                        resume_model_name + " and current model is " + model_name);
-            }
-        } else if (resume_model_complex != model_complex) {
+        const Models resume_models{resume_resolver.resolve()};
+        if (resume_models != models) {
+            models.print("Current");
+            resume_models.print("Resumed");
             throw std::runtime_error(
-                    "Resume only works if the same model is used. Resume model complex was " +
-                    resume_model_complex.raw + " and current model is " + model_complex.raw);
+                    "Inconsistent models used in this pipeline and those used in the --resume-from "
+                    "file.");
         }
 
         // Resume functionality injects reads directly into the writer node.
@@ -768,15 +717,7 @@ int basecaller(int argc, char* argv[]) {
     }
     const InputPod5FolderInfo pod5_folder_info(data_path, std::move(input_pod5s));
 
-    const auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
-    const auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
-
-    const auto model_arg = parser.get<std::string>("model");
-    const ModelComplex model_complex = parse_model_argument(model_arg);
-
-    if (!mods_model_arguments_valid(model_complex, mod_bases, mod_bases_models)) {
-        return EXIT_FAILURE;
-    }
+    const auto device = cli::parse_device(parser);
 
     if (parser.get<std::string>("--reference").empty() &&
         !parser.get<std::string>("--bed-file").empty()) {
@@ -784,13 +725,17 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto device{parser.get<std::string>("-x")};
-    if (!cli::validate_device_string(device)) {
-        return EXIT_FAILURE;
-    }
-    if (device == cli::AUTO_DETECT_DEVICE) {
-        device = utils::get_auto_detected_device();
-    }
+    BasecallerModelResolver resolver{
+            parser.get<std::string>("model"),
+            parser.get<std::string>("--modified-bases-models"),
+            parser.get<std::vector<std::string>>("--modified-bases"),
+            get_models_directory(parser.get<std::string>("--models-directory")),
+            parser.get<bool>("--skip-model-compatibility-check"),
+            pod5_folder_info.files().get(),
+    };
+
+    Models models(resolver.resolve());
+    models.set_basecaller_batch_params(cli::get_batch_params(parser), device);
 
     bool trim_barcodes = true, trim_primers = true, trim_adapters = true;
     auto trim_options = parser.get<std::string>("--trim");
@@ -878,70 +823,6 @@ int basecaller(int argc, char* argv[]) {
         adapter_info->rna_adapters = kit_info.rna_barcodes;
     }
 
-    fs::path model_path;
-    std::vector<fs::path> mods_model_paths;
-
-    const auto model_directory = model_resolution::get_models_directory(parser);
-    model_downloader::ModelDownloader downloader(model_directory);
-
-    if (model_complex.is_path()) {
-        model_path = fs::weakly_canonical(fs::path(model_arg));
-        if (!check_model_path(model_path)) {
-            return EXIT_FAILURE;
-        }
-        if (is_modbase_model(model_path)) {
-            spdlog::error(
-                    "Specified model `{}` is not a simplex model but a modified bases model. Pass "
-                    "modified bases model paths using `--modified-bases-models`",
-                    model_path.string());
-            return EXIT_FAILURE;
-        }
-
-        try {
-            mods_model_paths = model_resolution::get_non_complex_mods_models(
-                    model_path, mod_bases, mod_bases_models, downloader);
-        } catch (std::runtime_error& e) {
-            spdlog::error(e.what());
-            return EXIT_FAILURE;
-        }
-    } else {
-        try {
-            const auto chemistry =
-                    file_info::get_unique_sequencing_chemistry(pod5_folder_info.files().get());
-            const auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
-            model_path = downloader.get(model_search.simplex(), "simplex");
-            if (!check_model_path(model_path)) {
-                throw std::runtime_error("Downloaded simplex model is invalid.");
-            }
-            if (model_complex.has_mods_variant()) {
-                // Get mods models from complex - we assert above that there's only one method
-                mods_model_paths = downloader.get(model_search.mods(), "mods");
-            } else {
-                // Get mods models from args
-                mods_model_paths = model_resolution::get_non_complex_mods_models(
-                        model_path, mod_bases, mod_bases_models, downloader);
-            }
-            for (const auto& mods_model_path : mods_model_paths) {
-                if (!check_model_path(mods_model_path)) {
-                    throw std::runtime_error("Downloaded modified base model is invalid.");
-                }
-            }
-        } catch (std::exception& e) {
-            spdlog::error(e.what());
-            utils::clean_temporary_models(downloader.temporary_models());
-            return EXIT_FAILURE;
-        }
-    }
-
-    BasecallModelConfig model_config;
-    try {
-        model_config = load_model_config(model_path);
-        set_basecaller_params(parser, model_config, device);
-    } catch (const std::exception& e) {
-        spdlog::error(e.what());
-        return EXIT_FAILURE;
-    }
-
     spdlog::info("> Creating basecall pipeline");
 
     std::string err_msg{};
@@ -960,31 +841,29 @@ int basecaller(int argc, char* argv[]) {
     auto initial_device_info = utils::get_cuda_device_info(device, false);
     device_count = initial_device_info.size();
 #endif
-    const auto modbase_params = validate_modbase_params(mods_model_paths, parser, device_count);
+
+    const auto modbase_params =
+            validate_modbase_params(models.get_modbase_model_paths(), parser, device_count);
 
     try {
-        setup(args, model_config, pod5_folder_info, mods_model_paths, device,
-              parser.get<std::string>("--reference"), parser.get<std::string>("--bed-file"),
-              default_parameters.num_runners, modbase_params, cli::get_output_dir(parser),
-              cli::get_emit_fastq(parser), cli::get_emit_sam(parser),
+        setup(args, models, pod5_folder_info, device, parser.get<std::string>("--reference"),
+              parser.get<std::string>("--bed-file"), default_parameters.num_runners, modbase_params,
+              cli::get_output_dir(parser), cli::get_emit_fastq(parser), cli::get_emit_sam(parser),
               parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
               parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
-              *minimap_options, parser.get<bool>("--skip-model-compatibility-check"),
-              parser.get<std::string>("--dump_stats_file"),
+              *minimap_options, parser.get<std::string>("--dump_stats_file"),
               parser.get<std::string>("--dump_stats_filter"), run_batchsize_benchmarks,
               parser.get<bool>("--emit-batchsize-benchmarks"),
               parser.get<std::string>("--resume-from"),
               !parser.get<bool>("--disable-read-splitting"),
               !parser.get<bool>("--disable-variable-chunk-sizes"),
-              parser.get<bool>("--estimate-poly-a"), polya_config, model_complex,
-              std::move(barcoding_info), std::move(adapter_info), std::move(sample_sheet));
+              parser.get<bool>("--estimate-poly-a"), polya_config, std::move(barcoding_info),
+              std::move(adapter_info), std::move(sample_sheet));
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
-        utils::clean_temporary_models(downloader.temporary_models());
         return EXIT_FAILURE;
     }
 
-    utils::clean_temporary_models(downloader.temporary_models());
     spdlog::info("> Finished");
     return EXIT_SUCCESS;
 }
