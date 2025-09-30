@@ -115,7 +115,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
 std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data) const {
     nvtx3::scoped_range loop{"cpu_decode"};
 
-    at::Tensor &moves_sequence_qstring_cpu = data.data;
+    const at::Tensor &moves_sequence_qstring_cpu = data.data;
     assert(moves_sequence_qstring_cpu.device() == at::kCPU);
     auto moves_cpu = moves_sequence_qstring_cpu[0];
     auto sequence_cpu = moves_sequence_qstring_cpu[1];
