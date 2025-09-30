@@ -59,8 +59,8 @@ struct AlignmentResult {
               sam_string("*"),
               bed_hits(0),
               bed_lines(""),
-              sequence(""),
-              qstring(""),
+              sequence("*"),
+              qstring("*"),
               secondary_alignment(false),
               supplementary_alignment(false),
               mapping_quality(255) {}

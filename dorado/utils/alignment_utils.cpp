@@ -2,53 +2,51 @@
 
 #include <minimap.h>
 
-#include <ostream>
-#include <sstream>
-
 namespace dorado::utils {
 
 std::string alignment_to_str(const char* query,
                              const char* target,
                              const EdlibAlignResult& result) {
-    std::stringstream ss;
-    int tpos = result.startLocations[0];
+    std::string ss;
+    ss.reserve(result.alignmentLength * 3 + 2);
 
     int qpos = 0;
     for (int i = 0; i < result.alignmentLength; i++) {
         if (result.alignment[i] == EDLIB_EDOP_DELETE) {
-            ss << "-";
+            ss += "-";
         } else {
-            ss << query[qpos];
+            ss += query[qpos];
             qpos++;
         }
     }
 
-    ss << '\n';
+    ss += '\n';
 
     for (int i = 0; i < result.alignmentLength; i++) {
         if (result.alignment[i] == EDLIB_EDOP_MATCH) {
-            ss << "|";
+            ss += "|";
         } else if (result.alignment[i] == EDLIB_EDOP_INSERT) {
-            ss << " ";
+            ss += " ";
         } else if (result.alignment[i] == EDLIB_EDOP_DELETE) {
-            ss << " ";
+            ss += " ";
         } else if (result.alignment[i] == EDLIB_EDOP_MISMATCH) {
-            ss << "*";
+            ss += "*";
         }
     }
 
-    ss << '\n';
+    ss += '\n';
 
+    int tpos = result.startLocations[0];
     for (int i = 0; i < result.alignmentLength; i++) {
         if (result.alignment[i] == EDLIB_EDOP_INSERT) {
-            ss << "-";
+            ss += "-";
         } else {
-            ss << target[tpos];
+            ss += target[tpos];
             tpos++;
         }
     }
 
-    return ss.str();
+    return ss;
 }
 
 }  // namespace dorado::utils

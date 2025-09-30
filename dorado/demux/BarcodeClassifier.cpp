@@ -493,7 +493,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
         res.kit = candidate.kit;
         res.barcode_kit = candidate.barcode_kit;
 
-        results.push_back(res);
+        results.emplace_back(std::move(res));
     }
     edlibFreeAlignResult(top_result_v1);
     edlibFreeAlignResult(bottom_result_v1);
@@ -649,7 +649,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         res.bottom_barcode_pos = {bottom_start + bottom_result.startLocations[0],
                                   bottom_start + bottom_result.endLocations[0]};
 
-        results.push_back(res);
+        results.emplace_back(std::move(res));
     }
     edlibFreeAlignResult(top_result);
     edlibFreeAlignResult(bottom_result);
@@ -888,11 +888,19 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     std::sort(results.begin(), results.end(),
               [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
 
-    std::stringstream d;
-    for (auto& s : results) {
-        d << s.barcode_name << " " << s.penalty << ", ";
+#if ENABLE_PER_READ_TRACE
+    {
+        std::string scores;
+        for (const auto& s : results) {
+            scores.append(s.barcode_name)
+                    .append(" ")
+                    .append(std::to_string(s.penalty))
+                    .append(", ");
+        }
+        utils::trace_log("Scores: {}", scores);
     }
-    utils::trace_log("Scores: {}", d.str());
+#endif
+
     auto best_result = results.begin();
     auto are_penalties_acceptable = [this](const auto& proposal) {
         // If barcode penalty is 0, it's a perfect match. Consider it a pass.

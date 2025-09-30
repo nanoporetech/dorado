@@ -90,7 +90,7 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
 // Compute reverse complement of a nucleotide sequence.
 // Bases are specified as capital letters.
 // Undefined output if characters other than A, C, G, T appear.
-std::string reverse_complement(const std::string& sequence);
+std::string reverse_complement(std::string_view sequence);
 
 /**
  * @brief Realigns a move table based on a given query sequence and a target sequence.
