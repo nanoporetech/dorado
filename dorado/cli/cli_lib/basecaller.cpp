@@ -179,7 +179,8 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
     {
         const std::string mods_codes = utils::join(models::modified_model_variants(), ", ");
         parser.add_group("Modified model arguments");
-        parser.add_argument("--modified-bases")
+        auto& modbase_mutex_group = parser.add_mutually_exclusive_group();
+        modbase_mutex_group.add_argument("--modified-bases")
                 .help("A space separated list of modified base codes. Choose from: " + mods_codes +
                       ".")
                 .nargs(argparse::nargs_pattern::at_least_one)
@@ -192,7 +193,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                     }
                     return value;
                 });
-        parser.add_argument("--modified-bases-models")
+        modbase_mutex_group.add_argument("--modified-bases-models")
                 .default_value(std::string{})
                 .help("A comma separated list of modified base model paths.");
         parser.add_argument("--modified-bases-threshold")

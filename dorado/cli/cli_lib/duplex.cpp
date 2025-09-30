@@ -370,7 +370,8 @@ int duplex(int argc, char* argv[]) {
     {
         const std::string options = utils::join(models::modified_model_variants(), ", ");
         parser.add_group("Modified model arguments");
-        parser.add_argument("--modified-bases")
+        auto& modbase_mutex_group = parser.add_mutually_exclusive_group();
+        modbase_mutex_group.add_argument("--modified-bases")
                 .help("A space separated list of modified base codes. Choose from: " + options +
                       ".")
                 .nargs(argparse::nargs_pattern::at_least_one)
@@ -383,7 +384,7 @@ int duplex(int argc, char* argv[]) {
                     }
                     return value;
                 });
-        parser.add_argument("--modified-bases-models")
+        modbase_mutex_group.add_argument("--modified-bases-models")
                 .help("A comma separated list of modified base models")
                 .default_value(std::string());
         parser.add_argument("--modified-bases-threshold")
