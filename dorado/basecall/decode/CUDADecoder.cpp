@@ -115,7 +115,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
 std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data) const {
     nvtx3::scoped_range loop{"cpu_decode"};
 
-    auto &moves_sequence_qstring_cpu = data.data;
+    at::Tensor &moves_sequence_qstring_cpu = data.data;
     assert(moves_sequence_qstring_cpu.device() == at::kCPU);
     auto moves_cpu = moves_sequence_qstring_cpu[0];
     auto sequence_cpu = moves_sequence_qstring_cpu[1];
@@ -136,7 +136,7 @@ std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data
             const std::int32_t T = chunk_sizes[idx];
 
             std::vector<uint8_t> mov(moves_ptr + offset, moves_ptr + offset + T);
-            const auto num_bases = std::reduce(std::cbegin(mov), std::cend(mov), std::size_t{0});
+            const auto num_bases = std::reduce(mov.cbegin(), mov.cend(), std::size_t{0});
             std::string seq(seq_ptr + offset, seq_ptr + offset + num_bases);
             std::string qstr(qstr_ptr + offset, qstr_ptr + offset + num_bases);
 
@@ -146,24 +146,24 @@ std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data
             offset += T;
         }
 
-        return called_chunks;
-    }
+    } else {
+        int N = int(moves_cpu.size(0));
+        int T = int(moves_cpu.size(1));
 
-    int N = int(moves_cpu.size(0));
-    int T = int(moves_cpu.size(1));
+        called_chunks.reserve(N);
+        for (int idx = 0; idx < N; idx++) {
+            auto moves_ptr = static_cast<const uint8_t *>(moves_cpu[idx].const_data_ptr());
+            auto seq_ptr = static_cast<const char *>(sequence_cpu[idx].const_data_ptr());
+            auto qstr_ptr = static_cast<const char *>(qstring_cpu[idx].const_data_ptr());
 
-    called_chunks.reserve(N);
-    for (int idx = 0; idx < N; idx++) {
-        auto moves_ptr = static_cast<const uint8_t *>(moves_cpu[idx].const_data_ptr());
-        auto seq_ptr = static_cast<const char *>(sequence_cpu[idx].const_data_ptr());
-        auto qstr_ptr = static_cast<const char *>(qstring_cpu[idx].const_data_ptr());
+            std::vector<uint8_t> mov(moves_ptr, moves_ptr + T);
+            const auto num_bases = std::reduce(mov.cbegin(), mov.cend(), std::size_t{0});
+            std::string seq(seq_ptr, seq_ptr + num_bases);
+            std::string qstr(qstr_ptr, qstr_ptr + num_bases);
 
-        std::vector<uint8_t> mov(moves_ptr, moves_ptr + T);
-        const auto num_bases = std::reduce(mov.cbegin(), mov.cend(), std::size_t{0});
-        std::string seq(seq_ptr, seq_ptr + num_bases);
-        std::string qstr(qstr_ptr, qstr_ptr + num_bases);
-
-        called_chunks.emplace_back(DecodedChunk{std::move(seq), std::move(qstr), std::move(mov)});
+            called_chunks.emplace_back(
+                    DecodedChunk{std::move(seq), std::move(qstr), std::move(mov)});
+        }
     }
 
     return called_chunks;
