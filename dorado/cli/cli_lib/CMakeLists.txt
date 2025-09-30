@@ -22,7 +22,6 @@ dorado_add_library(
         demux.cpp
         download.cpp
         duplex.cpp
-        model_resolution.h
         polish_progress_tracker.cpp
         polish_progress_tracker.h
         polish.cpp
@@ -50,6 +49,7 @@ dorado_add_library(
         dorado_io_lib
         dorado_lib
         dorado_model_downloader_lib
+        dorado_model_resolver_lib
         dorado_models_lib
         dorado_polish
         dorado_summary
