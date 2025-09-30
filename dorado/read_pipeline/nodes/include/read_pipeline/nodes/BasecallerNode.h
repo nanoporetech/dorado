@@ -21,6 +21,7 @@ using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 class BasecallerNode final : public MessageSink {
     struct BasecallingRead;
     struct BasecallingChunk;
+    struct BatchedChunks;
 
 public:
     // Chunk size and overlap are in raw samples
@@ -45,7 +46,7 @@ private:
     // Basecall reads
     void basecall_worker_thread(int worker_id);
     // Basecall batch of chunks
-    void basecall_current_batch(int worker_id);
+    void basecall_current_batch(BatchedChunks &chunks);
     // Construct complete reads
     void working_reads_manager();
 
@@ -77,10 +78,6 @@ private:
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
     std::unordered_set<std::shared_ptr<BasecallingRead>> m_working_reads;
-
-    // If we go multi-threaded, there will be one of these batches per thread
-    std::vector<std::vector<std::unique_ptr<BasecallingChunk>>> m_batched_chunks;
-    std::vector<std::size_t> m_batched_chunks_size;
 
     utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_processed_chunks;
 
