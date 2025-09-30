@@ -4,7 +4,7 @@
 #include "hts_utils/FastxRandomReader.h"
 #include "hts_utils/fai_utils.h"
 #include "model_downloader/model_downloader.h"
-#include "model_resolution.h"
+#include "model_resolver/ModelResolver.h"
 #include "models/models.h"
 #include "polish/polish_impl.h"
 #include "polish_progress_tracker.h"
@@ -296,7 +296,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.output_dir = parser.get<std::string>("output-dir");
     opt.bacteria = parser.get<bool>("bacteria");
 
-    opt.models_directory = model_resolution::get_models_directory(parser);
+    opt.models_directory = model_resolution::get_models_directory(
+            cli::get_optional_argument<std::string>("--models-directory", parser));
 
     opt.out_format = parser.get<bool>("qualities") ? OutputFormat::FASTQ : OutputFormat::FASTA;
     opt.threads = parser.get<int>("threads");
