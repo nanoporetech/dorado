@@ -8,14 +8,24 @@
 
 namespace dorado::models {
 
+enum class ModelType { SIMPLEX, STEREO, MODBASE, CORRECT, POLISH, VARIANT };
+
+std::string to_string(ModelType model_type);
+
 // Model info identifies models and associates additional metadata for searching for
 // automatic model selection.
 struct ModelInfo {
     std::string name;
     std::string checksum;
     Chemistry chemistry;
+    ModelType model_type;
     ModelVariantPair simplex{};
     ModsVariantPair mods{};
+
+    bool operator==(const ModelInfo& other) const {
+        return name == other.name && checksum == other.checksum && chemistry == other.chemistry &&
+               model_type == other.model_type && simplex == other.simplex && mods == other.mods;
+    };
 };
 
 // Search for a model which is configured for use with the given chemistry and other

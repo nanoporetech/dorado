@@ -91,6 +91,10 @@ struct ModsVariantPair {
     ModelVersion ver = ModelVersion::NONE;
     bool has_variant() const { return variant != ModsVariant::NONE; }
     bool has_ver() const { return ver != ModelVersion::NONE; }
+
+    bool operator==(const ModsVariantPair& other) const {
+        return other.variant == variant && other.ver == ver;
+    }
 };
 
 }  // namespace dorado::models
