@@ -136,7 +136,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *cons
     }
 
     wm.current[0] = 0;
-    wm.current[-1] = 0;
+    wm.current[wm.T + 2] = 0;
 
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     auto opts_f16 = wm.current.options().dtype(torch::kF16);
