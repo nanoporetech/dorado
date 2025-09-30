@@ -7,10 +7,15 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <exception>
 #include <filesystem>
+#include <iterator>
 #include <optional>
+#include <ranges>
 #include <stdexcept>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace fs = std::filesystem;
@@ -186,6 +191,20 @@ std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
         spdlog::trace("- {}", m.name);
     }
     return matches;
+}
+
+ModelInfo get_modbase_model_simplex_parent(const ModelInfo& modbase) {
+    if (modbase.model_type != ModelType::MODBASE) {
+        throw std::logic_error("Expected modbase model got '" + modbase.name + "'");
+    }
+
+    const auto& parent = modbase.simplex;
+    for (const ModelInfo& info : simplex_models()) {
+        if (info.simplex.ver == parent.ver && info.simplex.variant == parent.variant) {
+            return info;
+        }
+    }
+    throw std::logic_error("Failed to find modbase model parent '" + modbase.name + "'");
 }
 
 using CC = Chemistry;
@@ -1702,45 +1721,31 @@ void throw_on_deprecated_model(const std::string& model_name) {
                              "https://github.com/nanoporetech/dorado/releases/tag/v0.9.6");
 }
 
-ModelInfo get_modification_model(const std::filesystem::path& simplex_model_path,
-                                 const std::string& modification) {
-    if (!fs::exists(simplex_model_path)) {
-        throw std::runtime_error{
-                "Cannot find modification model for '" + modification +
-                "' reason: simplex model doesn't exist at: " + simplex_model_path.string()};
-    }
-
-    ModelInfo modification_model;
-    bool model_found = false;
-    auto simplex_name = simplex_model_path.filename().string();
-
+ModelInfo get_modification_model(const std::string& simplex_name,
+                                 const ModsVariantPair& modification) {
     throw_on_deprecated_model(simplex_name);
-
-    if (is_valid_model(simplex_name)) {
-        std::string mods_prefix = simplex_name + "_" + modification + "@v";
-        for (const auto& info : modified_models()) {
-            // There is an assumption that models with multiple versions
-            // are named in a way that picking the last one after lexicographically
-            // sorting them finds the latest version.
-            if (utils::starts_with(info.name, mods_prefix)) {
-                modification_model = info;
-                model_found = true;
-            }
-        }
-    } else {
-        throw std::runtime_error{"Cannot find modification model for '" + modification +
-                                 "' reason: unknown simplex model '" + simplex_name + "'"};
+    if (!is_valid_model(simplex_name)) {
+        throw std::runtime_error{fmt::format(
+                "Cannot find modification model for '{}'. Error: Unknown simplex model '{}'.",
+                to_string(modification.variant), simplex_name)};
     }
 
-    if (!model_found) {
-        throw std::runtime_error{"Cannot find modification model for '" + modification +
-                                 "' matching simplex model: '" + simplex_name + "'"};
+    try {
+        const auto simplex = get_simplex_model_info(simplex_name);
+        return find_model(modified_models(), "modbase", simplex.chemistry, simplex.simplex,
+                          modification, true);
+    } catch (const std::exception& e) {
+        throw std::runtime_error{fmt::format(
+                "Cannot find modification model for '{}' matching simplex model '{}'. Error: "
+                "{}.",
+                to_string(modification.variant), simplex_name, e.what())};
     }
-
-    spdlog::debug("- matching modification model found: {}", modification_model.name);
-
-    return modification_model;
 }
+
+ModelInfo get_stereo_model_info(const ModelInfo& simplex) {
+    return find_model(stereo_models(), "stereo", simplex.chemistry, simplex.simplex,
+                      ModsVariantPair(), false);
+};
 
 ModelInfo get_simplex_model_info(const std::string& model_name) {
     const auto& simplex_model_infos = simplex_models();
@@ -1788,6 +1793,14 @@ ModelInfo get_model_info(const std::string& model_name) {
         throw std::logic_error("Found multiple models with name: " + model_name);
     }
     return matches.back();
+}
+
+std::optional<ModelInfo> try_get_model_info(const std::string& model_name) {
+    try {
+        return get_model_info(model_name);
+    } catch (const std::exception&) {
+    }
+    return std::nullopt;
 }
 
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name) {

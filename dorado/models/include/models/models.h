@@ -67,15 +67,24 @@ std::optional<ModelInfo> get_deprecated_model(const std::string& model_name);
 // Throws std::runtime_error with deprecation message containing the model name.
 void throw_on_deprecated_model(const std::string& model_name);
 
-// Search for a model by name and return the ModelInfo - searches all simplex, mods and stereo models
+// Search for a model by name and return the ModelInfo - searches all models
 ModelInfo get_model_info(const std::string& model_name);
+
+// Search for a model by name and return the ModelInfo - searches all models
+std::optional<ModelInfo> try_get_model_info(const std::string& model_name);
 
 // Search for a simplex model by name and return the ModelInfo
 ModelInfo get_simplex_model_info(const std::string& model_name);
 
 // finds the matching modification model for a given modification i.e. 5mCG and a simplex model
-ModelInfo get_modification_model(const std::filesystem::path& simplex_model,
-                                 const std::string& modification);
+ModelInfo get_modification_model(const std::string& simplex_name,
+                                 const ModsVariantPair& modification);
+
+// Find the simplex model corresponding to a given modbase model.
+ModelInfo get_modbase_model_simplex_parent(const ModelInfo& modbase);
+
+// Find the simplex model corresponding to a given modbase model.
+ModelInfo get_stereo_model_info(const ModelInfo& simplex);
 
 // get the sampling rate that the model is compatible with
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name);
