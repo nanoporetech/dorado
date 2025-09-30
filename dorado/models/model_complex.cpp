@@ -1,76 +1,161 @@
 #include "models/model_complex.h"
 
-#include "models/kits.h"
+#include "models/metadata.h"
 #include "models/models.h"
 #include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 
-#include <filesystem>
+#include <optional>
 #include <stdexcept>
+#include <vector>
 
 namespace dorado::models {
 
-ModelComplex ModelComplexParser::parse(const std::string& arg) {
-    ModelComplex selection{arg};
-    std::vector<std::pair<std::string, ModelVersion>> items;
-    for (const auto& p : utils::split(arg, ',')) {
-        items.push_back(parse_model_arg_part(p));
+ModelComplex::ModelComplex(const std::string& raw,
+                           const ModelInfo& simplex,
+                           const std::vector<ModelInfo>& mods)
+        : m_style(Style::NAMED), m_raw(raw), m_simplex_named(simplex), m_mods_named(mods) {}
+
+ModelComplex::ModelComplex(const std::string& raw,
+                           const ModelVariantPair& simplex,
+                           const std::vector<ModsVariantPair>& mods)
+        : m_style(Style::VARIANT), m_raw(raw), m_simplex_variant(simplex), m_mod_variants(mods) {}
+
+ModelComplex::ModelComplex(const std::string& arg) : m_style(Style::PATH), m_raw(arg) {};
+
+ModelComplex ModelComplex::parse(const std::string& arg) {
+    if (arg.empty()) {
+        throw std::runtime_error("No model argument");
     }
 
-    if (items.empty()) {
-        throw std::runtime_error("No model arguments to parse: '" + arg + "'");
+    const auto named_complex = ModelComplex::parse_names(arg);
+    if (named_complex.has_value()) {
+        return named_complex.value();
+    };
+
+    const auto variant_complex = ModelComplex::parse_variant(arg);
+    if (variant_complex.has_value()) {
+        return variant_complex.value();
+    };
+
+    // Not a NAMED or VARIANT model complex - assume path
+    return ModelComplex(arg);
+}
+
+std::optional<ModelComplex> ModelComplex::parse_names(const std::string& raw) {
+    const auto parts = utils::split(raw, ',');
+    ModelInfo simplex;
+    std::vector<ModelInfo> mods;
+    {
+        // The first part can be either SIMPLEX or MODBASE model
+        const auto maybe_model_info = try_get_model_info(parts.at(0));
+        if (!maybe_model_info.has_value()) {
+            return std::nullopt;
+        }
+
+        const auto& info = maybe_model_info.value();
+        switch (info.model_type) {
+        case ModelType::SIMPLEX:
+            simplex = info;
+            break;
+        case ModelType::MODBASE:
+            simplex = get_modbase_model_simplex_parent(info);
+            mods.push_back(info);
+            break;
+        default:
+            spdlog::error(
+                    "Failed to parse basecaller model complex '{}' - a '{}' model is not valid "
+                    "here.",
+                    raw, to_string(info.model_type));
+            throw std::runtime_error("Invalid model argument");
+        }
     }
 
-    for (size_t idx = 0; idx < items.size(); ++idx) {
-        const auto& [variant_str, version] = items.at(idx);
+    // All remaining parts must be MODBASE model with the same condition, variant and version as the first.
+    for (size_t i = 1; i < parts.size(); ++i) {
+        const auto maybe_modbase_info = try_get_model_info(parts.at(i));
+        if (!maybe_modbase_info.has_value()) {
+            spdlog::error(
+                    "Failed to parse model complex '{}'. '{}' is not a recognised model "
+                    "name.",
+                    raw, parts.at(i));
+            throw std::runtime_error("Invalid model argument");
+        }
+
+        const auto& info = maybe_modbase_info.value();
+        if (info.model_type != ModelType::MODBASE) {
+            spdlog::error(
+                    "Failed to parse model complex '{}' - Additional models must be modbase models "
+                    "but found a '{}' model from '{}'",
+                    raw, to_string(info.model_type), parts.at(i));
+            throw std::runtime_error("Invalid model argument");
+        }
+
+        const bool match_parent = info.chemistry == simplex.chemistry &&
+                                  info.simplex.variant == simplex.simplex.variant &&
+                                  info.simplex.ver == simplex.simplex.ver;
+        if (!match_parent) {
+            spdlog::error(
+                    "Failed to parse model complex '{}' - Additional modbase model '{}' must work "
+                    "with simplex model '{}'.",
+                    raw, parts.at(i), simplex.name);
+            throw std::runtime_error("Invalid model argument");
+        }
+
+        for (const ModelInfo& mod : mods) {
+            if (info.name == mod.name) {
+                spdlog::error("Failed to parse model complex '{}' - Duplicate modbase model '{}'",
+                              raw, parts.at(i));
+                throw std::runtime_error("Invalid model argument");
+            }
+        }
+        mods.push_back(info);
+    }
+
+    return ModelComplex(raw, simplex, mods);
+}
+
+std::optional<ModelComplex> ModelComplex::parse_variant(const std::string& raw) {
+    std::vector<std::pair<std::string, ModelVersion>> parts;
+    for (const auto& p : utils::split(raw, ',')) {
+        parts.push_back(parse_variant_part(p));
+    }
+
+    ModelVariantPair simplex;
+    std::vector<ModsVariantPair> mods;
+
+    for (size_t idx = 0; idx < parts.size(); ++idx) {
+        const auto& [part_str, version] = parts.at(idx);
         // Require simplex basecall model is specified first
         if (idx == 0) {
-            const auto model_variant = get_model_variant(variant_str);
+            const auto model_variant = get_model_variant(part_str);
             if (model_variant == ModelVariant::NONE) {
-                spdlog::trace("Model variant: '{}' unknown - assuming path", variant_str);
-                selection.model = ModelVariantPair{model_variant};
+                return std::nullopt;
             } else {
-                spdlog::trace("Model complex: '{}' found variant: '{}' and version: '{}'",
-                              variant_str, to_string(model_variant), to_string(version));
-                selection.model = ModelVariantPair{model_variant, version};
+                spdlog::trace("Model complex '{}' found variant: '{}' and version: '{}'", part_str,
+                              to_string(model_variant), to_string(version));
+                simplex = ModelVariantPair{model_variant, version};
             }
         } else {
             // Remaining models are modification models
-            const auto mod_variant = get_mods_variant(variant_str);
+            const auto mod_variant = get_mods_variant(part_str);
             if (mod_variant == ModsVariant::NONE) {
-                spdlog::error("Unknown modification variant: '{}' - Choices: {}", variant_str,
-                              utils::join(modified_model_variants(), ", "));
+                spdlog::error(
+                        "Model complex '{}' has unknown modification variant: '{}' "
+                        "- Choices: {}",
+                        raw, part_str, utils::join(modified_model_variants(), ", "));
                 throw std::runtime_error("Failed to parse modified model arguments");
             }
-            selection.mods.push_back({mod_variant, version});
+            mods.push_back({mod_variant, version});
         }
     }
 
-    // If the path doesn't exist then issue a warning. The error is caught and handled downstream.
-    if (selection.is_path()) {
-        // Remove any directory separators from the end
-        while (!selection.raw.empty() &&
-               (selection.raw.back() == '/' || selection.raw.back() == '\\')) {
-            selection.raw.pop_back();
-        }
+    return ModelComplex(raw, simplex, mods);
+};
 
-        if (!std::filesystem::exists(std::filesystem::path(selection.raw))) {
-            spdlog::debug(
-                    "Model argument '{}' did not satisfy the model complex syntax and is assumed "
-                    "to be "
-                    "a path.",
-                    selection.raw);
-        }
-    }
-
-    return selection;
-}
-
-std::pair<std::string, ModelVersion> ModelComplexParser::parse_model_arg_part(
-        const std::string& part) {
+std::pair<std::string, ModelVersion> ModelComplex::parse_variant_part(const std::string& part) {
     std::vector<std::string> sub_parts = utils::split(part, '@');
-
     if (sub_parts.empty()) {
         throw std::runtime_error("Failed to parse model selection part: '" + part + "'");
     }
@@ -89,7 +174,7 @@ std::pair<std::string, ModelVersion> ModelComplexParser::parse_model_arg_part(
     if (sub_parts.at(1) == "latest") {
         return std::pair(variant, ModelVersion::NONE);
     }
-    const auto ver = parse_version(sub_parts.at(1));
+    const auto ver = parse_variant_version(sub_parts.at(1));
     const auto& versions = version_map();
     auto it = versions.find(ver);
     if (it == versions.end()) {
@@ -99,10 +184,7 @@ std::pair<std::string, ModelVersion> ModelComplexParser::parse_model_arg_part(
     return std::pair(variant, it->second);
 }
 
-// Given a potentially truncated version string, returns a well-formatted version
-// string like "v0.0.0" ensuring that there are 3 values, all values are integers,
-// and not empty
-std::string ModelComplexParser::parse_version(const std::string& version) {
+std::string ModelComplex::parse_variant_version(const std::string& version) {
     auto ver = version;
     // to lower
     std::transform(ver.begin(), ver.end(), ver.begin(),
@@ -149,52 +231,25 @@ std::string ModelComplexParser::parse_version(const std::string& version) {
     return "v" + utils::join(nums, ".");
 }
 
-ModelComplexSearch::ModelComplexSearch(const ModelComplex& complex,
-                                       Chemistry chemistry,
-                                       bool suggestions)
-        : m_complex(complex),
-          m_chemistry(chemistry),
-          m_suggestions(suggestions),
-          m_simplex_model_info(resolve_simplex()) {
-    throw_on_deprecated_chemistry(chemistry);
-}
-
-ModelInfo ModelComplexSearch::resolve_simplex() const {
-    if (m_complex.is_path()) {
-        throw std::logic_error(
-                "Cannot use model ModelComplexSearch with a simplex model complex which is a path");
+// Only valid IFF style::NAMED
+const ModelInfo& ModelComplex::get_named_simplex_model() const {
+    if (!m_simplex_named.has_value() || m_style != Style::NAMED) {
+        throw std::logic_error("Invalid call to ModelComplex::get_named_simplex_models");
     }
-    return find_model(simplex_models(), "simplex", m_chemistry, m_complex.model, ModsVariantPair(),
-                      m_suggestions);
+    return m_simplex_named.value();
 }
 
-ModelInfo ModelComplexSearch::simplex() const {
-    if (m_complex.is_path()) {
-        throw std::logic_error(
-                "Cannot use model ModelComplexSearch with a simplex model complex which is a path");
+const std::vector<ModelInfo>& ModelComplex::get_named_mods_models() const { return m_mods_named; }
+
+// Only valid IFF style::VARIANT
+const ModelVariantPair& ModelComplex::get_simplex_model_variant() const {
+    if (!m_simplex_variant.has_value() || m_style != Style::VARIANT) {
+        throw std::logic_error("Invalid call to ModelComplex::get_simplex_model_variant.");
     }
-    return m_simplex_model_info;
+    return m_simplex_variant.value();
 }
 
-ModelInfo ModelComplexSearch::stereo() const {
-    return find_model(stereo_models(), "stereo duplex", m_chemistry, m_simplex_model_info.simplex,
-                      ModsVariantPair(), false);
+const std::vector<ModsVariantPair>& ModelComplex::get_mod_model_variants() const {
+    return m_mod_variants;
 }
-
-std::vector<ModelInfo> ModelComplexSearch::simplex_mods() const {
-    return find_models(modified_models(), m_chemistry, m_simplex_model_info.simplex,
-                       ModsVariantPair());
-}
-
-std::vector<ModelInfo> ModelComplexSearch::mods() const {
-    std::vector<ModelInfo> models;
-    models.reserve(m_complex.mods.size());
-    for (const auto& mod : m_complex.mods) {
-        const auto model_info = find_model(modified_models(), "modification", m_chemistry,
-                                           m_simplex_model_info.simplex, mod, m_suggestions);
-        models.push_back(model_info);
-    }
-    return models;
-}
-
 }  // namespace dorado::models
