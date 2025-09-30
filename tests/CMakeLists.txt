@@ -47,9 +47,9 @@ add_executable(dorado_tests
     ModBaseChunkTest.cpp
     ModBaseConfigTest.cpp
     ModBaseEncoderTest.cpp
+    ModelComplexTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp
-    ModelSearchTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
     multi_queue_thread_pool_test.cpp
@@ -145,6 +145,7 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             dorado_io_lib
             dorado_lib
             dorado_modbase
+            dorado_model_resolver_lib
             dorado_model_downloader_lib
             dorado_models_lib
             dorado_nn
