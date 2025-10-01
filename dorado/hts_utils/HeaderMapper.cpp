@@ -91,7 +91,9 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
             hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
             if (!m_fastq_runtime_warning_issued) {
                 m_fastq_runtime_warning_issued = true;
-                spdlog::warn("Mapping headers from FASTQ files. This might take some time.");
+                spdlog::warn(
+                        "Mapping headers from FASTQ files. This might take some time. Using BAM "
+                        "files as input is recommended as this avoids FASTQ header mapping.");
             }
             process_fastx(input);
         } else {

@@ -151,9 +151,8 @@ int MergeHeaders::check_and_add_rg_data(sam_hdr_t* hdr, const std::string& read_
         std::string read_group_line(ks_str(&line_data));
 
         // Add the RG_line to the LUT or error if it a different record already exists
-        res = add_rg(read_group_id, read_group_line);
-        if (res < 0) {
-            return res;
+        if (!add_rg(read_group_id, read_group_line)) {
+            return -2;
         }
     }
     return 0;
@@ -262,20 +261,20 @@ void MergeHeaders::finalize_merge() {
     }
 }
 
-int MergeHeaders::add_rg(const std::string& read_group_id, std::string read_group_line) {
+bool MergeHeaders::add_rg(const std::string& read_group_id, std::string read_group_line) {
     // Add the RG_line to the LUT or error if it a different record already exists
     auto entry = m_read_group_lut.find(read_group_id);
     if (entry == m_read_group_lut.end()) {
         m_read_group_lut[read_group_id] = std::move(read_group_line);
     } else {
         if (entry->second != read_group_line) {
-            return -2;
+            return false;
         }
     }
-    return 0;
+    return true;
 };
 
-int MergeHeaders::add_rg(const std::string& read_group_id, const ReadGroup& read_group) {
+bool MergeHeaders::add_rg(const std::string& read_group_id, const ReadGroup& read_group) {
     return add_rg(read_group_id,
                   utils::format_read_group_header_line(read_group, read_group_id, {}));
 }
