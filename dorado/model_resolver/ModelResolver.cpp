@@ -216,51 +216,6 @@ ModelResolver::ModelResolver(Mode mode,
           m_reads(reads),
           m_skip_model_compatibility_check(skip_model_compatibility_check) {}
 
-BasecallerModelResolver::BasecallerModelResolver(
-        const std::string& model_complex_arg,
-        const std::string& modbase_models_arg,
-        const std::vector<std::string>& modbases_arg,
-        const std::optional<std::string>& models_directory_arg,
-        bool skip_model_compatibility_check,
-        const std::vector<std::filesystem::directory_entry>& reads)
-        : ModelResolver(Mode::SIMPLEX,
-                        model_complex_arg,
-                        modbase_models_arg,
-                        modbases_arg,
-                        std::nullopt,
-                        models_directory_arg,
-                        skip_model_compatibility_check,
-                        reads) {};
-
-DuplexModelResolver::DuplexModelResolver(const std::string& model_complex_arg,
-                                         const std::string& modbase_models_arg,
-                                         const std::vector<std::string>& modbases_arg,
-                                         const std::optional<std::string>& stereo_arg,
-                                         const std::optional<std::string>& models_directory_arg,
-                                         bool skip_model_compatibility_check,
-                                         const std::vector<std::filesystem::directory_entry>& reads)
-        : ModelResolver(Mode::DUPLEX,
-                        model_complex_arg,
-                        modbase_models_arg,
-                        modbases_arg,
-                        stereo_arg,
-                        models_directory_arg,
-                        skip_model_compatibility_check,
-                        reads) {};
-
-DownloaderModelResolver::DownloaderModelResolver(
-        const std::string& model_complex_arg,
-        const std::optional<std::string>& models_directory_arg,
-        const std::vector<std::filesystem::directory_entry>& reads)
-        : ModelResolver(Mode::DOWNLOADER,
-                        model_complex_arg,
-                        "",
-                        {},
-                        std::nullopt,
-                        models_directory_arg,
-                        true,
-                        reads) {};
-
 ModelSources ModelResolver::resolve() {
     m_models_directory = get_models_directory(m_models_directory_arg);
 
@@ -272,8 +227,8 @@ ModelSources ModelResolver::resolve() {
     resolve_modbase_models(model_sources);
     resolve_stereo_models(model_sources);
 
-    if (m_check_paths_override) {
-        model_sources.check_paths();
+    if (m_check_paths_override && !model_sources.check_paths()) {
+        throw std::runtime_error("Model validity check failed.");
     }
 
     if (!m_skip_model_compatibility_check) {
@@ -426,11 +381,11 @@ void ModelResolver::resolve_stereo_models(ModelSources& model_sources) const {
 
 ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) const {
     // TODO: Review decision to prioritise models-directory
-    if (m_models_directory.has_value()) {
+    if (m_models_directory.has_value() && !m_models_directory->empty()) {
         const auto models_dir_path = fs::path(m_models_directory.value()) / model_info.name;
-        if (check_model_path(models_dir_path, false)) {
+        if (fs::exists(models_dir_path)) {
             // Model exists in models directory
-            spdlog::debug(" - found existing model '{}' at '{}'.", model_info.name,
+            spdlog::trace(" - found model '{}' at '{}'.", model_info.name,
                           models_dir_path.string());
             return ModelSource{models_dir_path, model_info, false};
         }
@@ -441,8 +396,9 @@ ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) c
     }
 
     const auto cwd_path = fs::current_path() / model_info.name;
-    if (check_model_path(cwd_path, false)) {
+    if (fs::exists(cwd_path)) {
         // Model found in current working directory
+        spdlog::trace(" - found model '{}' at '{}'.", model_info.name, cwd_path.string());
         return ModelSource{cwd_path, model_info, false};
     }
 
@@ -521,6 +477,51 @@ void ModelResolver::warn_stereo_fast(const std::optional<ModelSource>& stereo) c
         }
     }
 };
+
+BasecallerModelResolver::BasecallerModelResolver(
+        const std::string& model_complex_arg,
+        const std::string& modbase_models_arg,
+        const std::vector<std::string>& modbases_arg,
+        const std::optional<std::string>& models_directory_arg,
+        bool skip_model_compatibility_check,
+        const std::vector<std::filesystem::directory_entry>& reads)
+        : ModelResolver(Mode::SIMPLEX,
+                        model_complex_arg,
+                        modbase_models_arg,
+                        modbases_arg,
+                        std::nullopt,
+                        models_directory_arg,
+                        skip_model_compatibility_check,
+                        reads) {};
+
+DuplexModelResolver::DuplexModelResolver(const std::string& model_complex_arg,
+                                         const std::string& modbase_models_arg,
+                                         const std::vector<std::string>& modbases_arg,
+                                         const std::optional<std::string>& stereo_arg,
+                                         const std::optional<std::string>& models_directory_arg,
+                                         bool skip_model_compatibility_check,
+                                         const std::vector<std::filesystem::directory_entry>& reads)
+        : ModelResolver(Mode::DUPLEX,
+                        model_complex_arg,
+                        modbase_models_arg,
+                        modbases_arg,
+                        stereo_arg,
+                        models_directory_arg,
+                        skip_model_compatibility_check,
+                        reads) {};
+
+DownloaderModelResolver::DownloaderModelResolver(
+        const std::string& model_complex_arg,
+        const std::optional<std::string>& models_directory_arg,
+        const std::vector<std::filesystem::directory_entry>& reads)
+        : ModelResolver(Mode::DOWNLOADER,
+                        model_complex_arg,
+                        "",
+                        {},
+                        std::nullopt,
+                        models_directory_arg,
+                        true,
+                        reads) {};
 
 void Models::set_basecaller_batch_params(const config::BatchParams& batch_params,
                                          const std::string& device) {

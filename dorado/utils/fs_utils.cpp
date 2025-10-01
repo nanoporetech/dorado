@@ -99,12 +99,13 @@ fs::path get_downloads_path(const std::optional<fs::path>& override) {
 void clean_temporary_models(const std::set<std::filesystem::path>& paths) {
     for (const auto& path : paths) {
         try {
-            spdlog::debug("Deleting temporary model path: {}", path.string());
+            spdlog::debug("Deleting temporary model path: '{}'", path.string());
             fs::remove_all(path);
         } catch (const fs::filesystem_error& e) {
-            spdlog::warn("Failed to clean temporary model: {} - {}", path.string(), e.what());
+            spdlog::warn("Failed to clean temporary model: '{}' - {}", path.string(), e.what());
         } catch (const std::exception& e) {
-            spdlog::warn("Error while cleaning temporary model: {}: - {}", path.string(), e.what());
+            spdlog::warn("Error while cleaning temporary model: '{}': - {}", path.string(),
+                         e.what());
         }
     }
 }

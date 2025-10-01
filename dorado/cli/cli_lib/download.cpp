@@ -1,4 +1,5 @@
 #include "cli/cli.h"
+#include "cli/utils/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
@@ -107,10 +108,9 @@ bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
             }
         }
 
-        DownloaderModelResolver resolver{
-                parser.get<std::string>("--model"),
-                get_models_directory(parser.get<std::string>("--models-directory")),
-                input_files.get()};
+        DownloaderModelResolver resolver{parser.get<std::string>("--model"),
+                                         parser.get<std::string>("--models-directory"),
+                                         input_files.get()};
         const Models models(resolver.resolve());
     } catch (const std::exception& e) {
         spdlog::error(e.what());

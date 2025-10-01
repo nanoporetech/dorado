@@ -294,6 +294,26 @@ void terminate_runners(std::vector<dorado::basecall::RunnerPtr>& runners,
     }
 }
 
+Models load_basecaller_models(const argparse::ArgumentParser& parser,
+                              const InputPod5FolderInfo& pod5_folder_info,
+                              const std::string& context) {
+    try {
+        BasecallerModelResolver resolver{
+                parser.get<std::string>("model"),
+                parser.get<std::string>("--modified-bases-models"),
+                parser.get<std::vector<std::string>>("--modified-bases"),
+                cli::get_optional_argument<std::string>("--models-directory", parser),
+                parser.get<bool>("--skip-model-compatibility-check"),
+                pod5_folder_info.files().get(),
+        };
+
+        return Models(resolver.resolve());
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to resolve {} models: {}", context, e.what());
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 void setup(const std::vector<std::string>& args,
            const Models& models,
            const InputPod5FolderInfo& pod5_folder_info,
@@ -609,22 +629,16 @@ void setup(const std::vector<std::string>& args,
         set_dorado_basecaller_args(resume_parser, verbosity);
         resume_parser.parse_known_args(resume_args_excluding_mm2_opts);
 
-        BasecallerModelResolver resume_resolver{
-                resume_parser.get<std::string>("model"),
-                resume_parser.get<std::string>("--modified-bases-models"),
-                resume_parser.get<std::vector<std::string>>("--modified-bases"),
-                get_models_directory(resume_parser.get<std::string>("--models-directory")),
-                resume_parser.get<bool>("--skip-model-compatibility-check"),
-                pod5_folder_info.files().get(),
-        };
+        const Models resume_models =
+                load_basecaller_models(resume_parser, pod5_folder_info, "--resume-from");
 
-        const Models resume_models{resume_resolver.resolve()};
         if (resume_models != models) {
-            models.print("Current");
-            resume_models.print("Resumed");
-            throw std::runtime_error(
+            spdlog::error(
                     "Inconsistent models used in this pipeline and those used in the --resume-from "
                     "file.");
+            models.print("Current");
+            resume_models.print("Resumed");
+            std::exit(EXIT_FAILURE);
         }
 
         // Resume functionality injects reads directly into the writer node.
@@ -725,16 +739,7 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    BasecallerModelResolver resolver{
-            parser.get<std::string>("model"),
-            parser.get<std::string>("--modified-bases-models"),
-            parser.get<std::vector<std::string>>("--modified-bases"),
-            get_models_directory(parser.get<std::string>("--models-directory")),
-            parser.get<bool>("--skip-model-compatibility-check"),
-            pod5_folder_info.files().get(),
-    };
-
-    Models models(resolver.resolve());
+    Models models = load_basecaller_models(parser, pod5_folder_info, "basecaller");
     models.set_basecaller_batch_params(cli::get_batch_params(parser), device);
 
     bool trim_barcodes = true, trim_primers = true, trim_adapters = true;

@@ -98,6 +98,27 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
     return params;
 }
 
+DuplexModels load_duplex_models(const argparse::ArgumentParser& parser,
+                                const DataLoader::InputFiles& input_pod5_files,
+                                const std::string& context) {
+    try {
+        DuplexModelResolver resolver{
+                parser.get<std::string>("model"),
+                parser.get<std::string>("--modified-bases-models"),
+                parser.get<std::vector<std::string>>("--modified-bases"),
+                cli::get_optional_argument<std::string>("--stereo-model", parser),
+                cli::get_optional_argument<std::string>("--models-directory", parser),
+                parser.get<bool>("--skip-model-compatibility-check"),
+                input_pod5_files.get(),
+        };
+
+        return DuplexModels(resolver.resolve());
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to resolve {} models: {}", context, e.what());
+        std::exit(EXIT_FAILURE);
+    }
+}
+
 }  // namespace
 
 using namespace std::chrono_literals;
@@ -444,17 +465,8 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-            DuplexModelResolver resolver{
-                    parser.get<std::string>("model"),
-                    parser.get<std::string>("--modified-bases-models"),
-                    parser.get<std::vector<std::string>>("--modified-bases"),
-                    cli::get_optional_argument<std::string>("--stereo-model", parser),
-                    get_models_directory(parser.get<std::string>("--models-directory")),
-                    parser.get<bool>("--skip-model-compatibility-check"),
-                    input_pod5_files.get(),
-            };
 
-            DuplexModels models{resolver.resolve()};
+            DuplexModels models = load_duplex_models(parser, input_pod5_files, "duplex");
             models.set_basecaller_batch_params(cli::get_batch_params(parser), device);
 
             size_t device_count = 1;
