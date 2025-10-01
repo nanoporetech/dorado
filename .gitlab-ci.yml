@@ -2,6 +2,7 @@ include:
   - local: .gitlab/sanitizers-ci.yml
   - local: .gitlab/benchmarks-ci.yml
   - local: .gitlab/build-ont_core.yml
+  - local: .gitlab/regression_tests.yml
   - local: .gitlab/mlhub.yml
 
 workflow:
@@ -25,6 +26,7 @@ stages:
   - test
   - deploy
   - regression_test
+  - rebase
 
 variables:
   BUILD_DIR: build
@@ -119,6 +121,7 @@ variables:
 .create_venv:
   # Make a venv and install stuff we need.
   - export KERNEL=$(uname -s)
+<<<<<<< HEAD
   - if [ ! -z ${ONT_PYTHON_URL} ]; then
   -   curl -LfsS ${ONT_PYTHON_URL} > ont_python.tar.gz
   -   tar -xf ont_python.tar.gz
@@ -135,6 +138,9 @@ variables:
   -   curl -LfsS https://bootstrap.pypa.io/get-pip.py | ${PYTHON_VERSION} -
   -   export PYTHON=${PYTHON_VERSION}
   - elif [[ ${KERNEL} =~ "MINGW" ]]; then
+=======
+  - if [[ ${KERNEL} =~ "MINGW" ]]; then
+>>>>>>> DOR-911: Added basic regression testing code.
   -   /c/${PYTHON_VERSION//./}/python --version
   -   export PATH="/c/${PYTHON_VERSION//./}/":${PATH}
   -   echo $(which python)
@@ -145,17 +151,17 @@ variables:
   - ${PYTHON} -m venv build_venv
   - source build_venv/*/activate
   - python --version
+  - export PYTHON=python
   - python -m pip install -U pip
 
 .run_tetra_tests:
   # pysam is not available on all platforms, but the tests can run without it.
-  - |
-    echo Running tetra unit tests
-    pip install pysam --only-binary :all: || true
-    pip install -e tetra
-    cd tetra
-    python -m unittest discover
-    cd -
+  - echo Running tetra unit tests
+  - pip install pysam "--only-binary=:all:" || true
+  - pip install -e tetra
+  - cd tetra
+  - python -m unittest discover
+  - cd -
 
 .run_dorado_cmake_cpack:
   - echo Dorado packaging stage
@@ -178,6 +184,7 @@ variables:
     - !reference [.run_dorado_cmake_build]
     - !reference [.run_dorado_cmake_ctest]
     - !reference [.zip_test_files]
+    - !reference [.enable_ont_python]
     - !reference [.create_venv]
     - !reference [.run_tetra_tests]
   artifacts:
@@ -257,7 +264,11 @@ build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+<<<<<<< HEAD
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
+=======
+    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+>>>>>>> DOR-911: Added basic regression testing code.
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -267,7 +278,11 @@ build:linux:x86:focal_koi_from_source:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+<<<<<<< HEAD
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
+=======
+    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+>>>>>>> DOR-911: Added basic regression testing code.
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -279,6 +294,7 @@ build:linux:x86:noble:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -361,6 +377,7 @@ build:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-aarch64-3.12.1-1.tar.gz
   extends:
     - .linux_build_dependencies
     - .linux_arm64_runner
@@ -529,6 +546,14 @@ build_archive:macos:arm:
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
 
+.extract_archive:
+  script:
+    - tar -xzf archive/dorado-*.gz || unzip archive/dorado-*.zip || exit 1
+    # I'm making the assumption here that there's only 1 archive, that it's prefixed with dorado-, and that
+    # there's no other files/dirs with the same prefix.
+    - export EXTRACTED_PATH=$(ls | grep "^dorado-")
+    - echo "Testing binaries in ${EXTRACTED_PATH}"
+
 .test_archive:
   stage: test
   variables:
@@ -540,16 +565,18 @@ build_archive:macos:arm:
     - mkdir test_archive
     - cd test_archive
     - mv ../archive .
-    - tar -xzf archive/dorado-*.gz || unzip archive/dorado-*.zip
+    - !reference [.extract_archive, script]
     - ldd ./dorado-*/bin/dorado
     - if [ -e ./dorado-*/lib/libdorado_torch_lib.so ]; then ldd ./dorado-*/lib/libdorado_torch_lib.so; fi
     # We just want to check that dorado will run here, so simply display the verbose version info
     - ./dorado-*/bin/dorado -vv
 
 .enable_ont_python:
-    - curl -LfsS ${PYTHON_URL} > ont_python.tar.gz
-    - tar -xf ont_python.tar.gz
-    - export PATH=${PWD}/ont-python/bin:${PWD}/ont-python:${PATH}
+    - if [[ -n ${PYTHON_URL} ]]; then
+    -   curl -LfsS ${PYTHON_URL} > ont_python.tar.gz
+    -   tar -xf ont_python.tar.gz
+    -   export PATH=${PWD}/ont-python/bin:${PWD}/ont-python:${PATH}
+    - fi
 
 # Test stages
 

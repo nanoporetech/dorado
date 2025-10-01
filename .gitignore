@@ -20,9 +20,14 @@ tests/test_output
 temp
 venv
 tests/test_output*
+regression_test/output
 *.t.err
 Makefile
 /models
 
 # Ignore test output directories
 /tests/test_simple_basecaller_output_[0-9]*/
+
+# If running regression tests, the regression_test_data project is downloaded into
+# the dorado folder. We don't want it to be accidentally committed.
+regression_test_data
