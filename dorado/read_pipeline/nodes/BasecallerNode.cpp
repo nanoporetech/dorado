@@ -332,7 +332,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                               std::chrono::milliseconds(from_last_timeout);
         const auto timeout = std::min(timeout1, timeout2);
 
-        if (m_variable_chunk_sizes && current_batch.chunks.size() == batch_size) {
+        if (!m_variable_chunk_sizes && current_batch.chunks.size() == batch_size) {
             throw std::logic_error("Current batch is already full");
         }
 
