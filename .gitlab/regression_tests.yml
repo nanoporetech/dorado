@@ -32,10 +32,16 @@
 
 .osx_arm_regression_runner:
   tags:
-    - osx_arm64
-    # modbase regression results depend on the MPS version which depends on the OS version,
+    - !reference [.macos_arm_runner, tags]
+    # Modbase regression results depend on the MPS version which depends on the OS version,
     # so pin the OS to the one that we have the most runners of.
     - osx-14.4
+
+.linux_regression_runner:
+  tags:
+    - !reference [.linux_runner, tags]
+    # We need to make sure the regression tests always run on the same GPU.
+    - gpu-v100
 
 # We need this to check out the regression_test_data project, which has our test files in git-lfs.
 .prepare_git-lfs:
@@ -136,7 +142,7 @@ regression_test:linux:x86:cuda12:
     PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
   extends:
     - .linux_regression_dependencies
-    - .linux_runner
+    - .linux_regression_runner
     - .regression_test
   needs:
     - build_archive:linux:x86:cuda12
@@ -219,6 +225,7 @@ run_rebase:
 rebase_dorado:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   stage: rebase
+  interuptible: false
   needs:
     - regression_test:linux:x86:cuda12
     - regression_test:linux:arm64:jammy
