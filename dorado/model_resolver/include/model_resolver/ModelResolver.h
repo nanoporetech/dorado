@@ -156,7 +156,7 @@ protected:
     std::vector<std::filesystem::directory_entry> m_reads;
 
     bool m_skip_model_compatibility_check{false};
-    std::optional<std::string> m_models_directory;
+    std::optional<std::filesystem::path> m_models_directory;
 
     // Overrides for testing purposes
     std::optional<models::Chemistry> m_chemistry_override;

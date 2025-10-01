@@ -382,7 +382,7 @@ void ModelResolver::resolve_stereo_models(ModelSources& model_sources) const {
 ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) const {
     // TODO: Review decision to prioritise models-directory
     if (m_models_directory.has_value() && !m_models_directory->empty()) {
-        const auto models_dir_path = fs::path(m_models_directory.value()) / model_info.name;
+        const auto models_dir_path = m_models_directory.value() / model_info.name;
         if (fs::exists(models_dir_path)) {
             // Model exists in models directory
             spdlog::trace(" - found model '{}' at '{}'.", model_info.name,
@@ -451,6 +451,7 @@ void ModelResolver::warn_rna_model(const ModelSource& simplex) const {
         case models::SampleType::RNA002:
         case models::SampleType::RNA004:
             is_rna = true;
+            break;
         case models::SampleType::UNKNOWN:
             throw std::logic_error("Unknown sample_type.");
         default:
