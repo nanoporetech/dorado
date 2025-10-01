@@ -32,14 +32,18 @@
 
 .osx_arm_regression_runner:
   tags:
-    - !reference [.macos_arm_runner, tags]
+    - osx_arm64
+    - xcode-15.3
+    - on-prem
     # Modbase regression results depend on the MPS version which depends on the OS version,
     # so pin the OS to the one that we have the most runners of.
     - osx-14.4
 
 .linux_regression_runner:
   tags:
-    - !reference [.linux_runner, tags]
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
     # We need to make sure the regression tests always run on the same GPU.
     - gpu-v100
 
@@ -225,7 +229,7 @@ run_rebase:
 rebase_dorado:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   stage: rebase
-  interuptible: false
+  interruptible: false
   needs:
     - regression_test:linux:x86:cuda12
     - regression_test:linux:arm64:jammy
