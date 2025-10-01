@@ -43,8 +43,11 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
             ModelComplex parsed_complex = ModelComplex::parse(model_variant_string);
             CATCH_CHECK(parsed_complex.get_raw() == model_variant_string);
             CATCH_CHECK(parsed_complex.is_variant_style());
-            CATCH_CHECK(parsed_complex.get_simplex_model_variant() == simplex_info.simplex);
-            CATCH_CHECK(parsed_complex.get_mod_model_variants().empty());
+            const bool is_variant_equal =
+                    parsed_complex.get_simplex_model_variant() == simplex_info.simplex;
+            CATCH_CHECK(is_variant_equal);
+            const bool is_mods_empty = parsed_complex.get_mod_model_variants().empty();
+            CATCH_CHECK(is_mods_empty);
         }
     }
 
@@ -56,8 +59,10 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
             ModelComplex parsed_complex = ModelComplex::parse(simplex_info.name);
             CATCH_CHECK(parsed_complex.get_raw() == simplex_info.name);
             CATCH_CHECK(parsed_complex.is_named_style());
-            CATCH_CHECK(parsed_complex.get_named_simplex_model() == simplex_info);
-            CATCH_CHECK(parsed_complex.get_named_mods_models().empty());
+            const bool is_name_equal = parsed_complex.get_named_simplex_model() == simplex_info;
+            CATCH_CHECK(is_name_equal);
+            const bool is_mods_empty = parsed_complex.get_named_mods_models().empty();
+            CATCH_CHECK(is_mods_empty);
         }
     }
 
