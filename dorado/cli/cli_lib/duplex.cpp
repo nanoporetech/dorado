@@ -13,6 +13,7 @@
 #include "hts_utils/bam_utils.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
 #include "model_resolver/ModelResolver.h"
+#include "model_resolver/Models.h"
 #include "models/models.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/nodes/AlignerNode.h"

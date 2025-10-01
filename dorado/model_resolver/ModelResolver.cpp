@@ -38,52 +38,6 @@ ModelComplex parse_model_complex(const std::string& model_arg) {
     }
 }
 
-bool check_model_path(const fs::path& model_path, bool verbose) noexcept {
-    try {
-        const auto& p = fs::weakly_canonical(model_path);
-        if (!fs::exists(p)) {
-            if (verbose) {
-                spdlog::error(
-                        "Model does not exist at: '{}' - Please download the model or use a model "
-                        "complex to automatically download a model",
-                        p.string());
-            }
-            return false;
-        }
-        if (!fs::is_directory(p)) {
-            if (verbose) {
-                spdlog::error(
-                        "Model is not a directory at: '{}' - Please check your model argument.",
-                        p.string());
-            }
-            return false;
-        }
-        if (fs::is_empty(p)) {
-            if (verbose) {
-                spdlog::error(
-                        "Model is an empty directory at: '{}' - Please check your model path.",
-                        p.string());
-            }
-            return false;
-        }
-        const auto cfg = p / "config.toml";
-        if (!fs::exists(cfg)) {
-            if (verbose) {
-                spdlog::error(
-                        "Model directory is missing a configuration file at: '{}' - Please check "
-                        "your model path or download your model again.",
-                        cfg.string());
-            }
-            return false;
-        }
-    } catch (std::exception& e) {
-        spdlog::error("Exception while checking model path at: '{}' - {}", model_path.string(),
-                      e.what());
-        return false;
-    }
-    return true;
-}
-
 std::optional<ModelInfo> get_model_info_from_path(const std::filesystem::path& path) {
     const auto& name = path.filename().string();
     try {
@@ -95,18 +49,6 @@ std::optional<ModelInfo> get_model_info_from_path(const std::filesystem::path& p
 }
 
 }  // namespace
-
-bool ModelSources::check_paths() const {
-    bool ok = true;
-    ok &= check_model_path(simplex.path, true);
-    for (const auto& mod : mods) {
-        ok &= check_model_path(mod.path, true);
-    }
-    if (stereo.has_value()) {
-        ok &= check_model_path(stereo->path, true);
-    }
-    return ok;
-};
 
 // Get the model search directory with the command line argument taking priority over the environment variable.
 // Returns std:nullopt if nether are set explicitly
@@ -141,63 +83,6 @@ std::optional<fs::path> get_models_directory(
     }
     return std::nullopt;
 }
-
-Models::Models(const ModelSources& sources) : m_sources(sources) {
-    m_simplex_config = config::load_model_config(m_sources.simplex.path);
-
-    for (const auto& mod : m_sources.mods) {
-        m_modbase_configs.push_back(config::load_modbase_model_config(mod.path));
-    }
-};
-
-const config::BasecallModelConfig& Models::get_simplex_config() const { return m_simplex_config; };
-
-const std::vector<config::ModBaseModelConfig>& Models::get_modbase_configs() const {
-    return m_modbase_configs;
-};
-
-std::string Models::get_simplex_model_name() const {
-    return m_sources.simplex.path.filename().string();
-};
-
-std::vector<std::string> Models::get_modbase_model_names() const {
-    std::vector<std::string> names;
-    names.reserve(m_sources.mods.size());
-    for (const auto& mod : m_sources.mods) {
-        names.push_back(mod.path.filename().string());
-    }
-    return names;
-};
-
-std::filesystem::path Models::get_simplex_model_path() const { return m_sources.simplex.path; };
-
-std::vector<std::filesystem::path> Models::get_modbase_model_paths() const {
-    std::vector<std::filesystem::path> paths;
-    paths.reserve(m_sources.mods.size());
-    for (const auto& mod : m_sources.mods) {
-        paths.push_back(mod.path);
-    }
-    return paths;
-};
-
-DuplexModels::DuplexModels(const ModelSources& sources) : Models(sources) {
-    if (!m_sources.stereo.has_value()) {
-        throw std::logic_error("Missing stereo model source.");
-    }
-    m_stereo_config = config::load_model_config(m_sources.stereo->path);
-};
-
-std::string DuplexModels::get_stereo_model_name() const {
-    return m_sources.stereo->path.filename().string();
-};
-
-const config::BasecallModelConfig& DuplexModels::get_stereo_config() const {
-    return m_stereo_config;
-};
-
-std::filesystem::path DuplexModels::get_stereo_model_path() const {
-    return m_sources.stereo->path;
-};
 
 ModelResolver::ModelResolver(Mode mode,
                              const std::string& model_complex_arg,
@@ -523,64 +408,6 @@ DownloaderModelResolver::DownloaderModelResolver(
                         models_directory_arg,
                         true,
                         reads) {};
-
-void Models::set_basecaller_batch_params(const config::BatchParams& batch_params,
-                                         const std::string& device) {
-    m_simplex_config.basecaller.update(batch_params);
-    m_simplex_config.normalise_basecaller_params();
-
-    if (device == "cpu" && m_simplex_config.basecaller.batch_size() == 0) {
-        // Force the batch size to 128
-        // TODO: This is tuned for LSTM models - investigate Tx
-        m_simplex_config.basecaller.set_batch_size(128);
-    }
-};
-
-void Models::cleanup_temporary_models() const {
-    auto sources = m_sources.mods;
-    sources.insert(sources.cbegin(), m_sources.simplex);
-    if (m_sources.stereo.has_value()) {
-        sources.push_back(m_sources.stereo.value());
-    }
-
-    const auto is_temporary = [](const ModelSource& s) { return s.is_temporary; };
-    for (const auto& src : sources | std::ranges::views::filter(is_temporary)) {
-        utils::clean_temporary_models({src.path});
-    }
-};
-
-void DuplexModels::set_basecaller_batch_params(const config::BatchParams& batch_params,
-                                               const std::string& device) {
-    Models::set_basecaller_batch_params(batch_params, device);
-
-    auto& stereo_config = m_stereo_config;
-    stereo_config.basecaller.update(batch_params);
-    stereo_config.normalise_basecaller_params();
-
-#if DORADO_METAL_BUILD
-    if (device == "metal" && stereo_config.is_lstm_model()) {
-        // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
-        // EXCEPT for on metal
-        // For now, the minimal batch size is used for the duplex model.
-        stereo_config.basecaller.set_batch_size(48);
-    }
-#endif
-    if (device == "cpu" && stereo_config.basecaller.batch_size() == 0) {
-        stereo_config.basecaller.set_batch_size(128);
-    }
-};
-
-void Models::print(const std::string& context) const {
-    spdlog::info("{} simplex model: '{}'", context, get_simplex_model_name());
-    for (const auto& mod : get_modbase_model_names()) {
-        spdlog::info("{} modbase model: '{}'", context, mod);
-    }
-};
-
-void DuplexModels::print(const std::string& context) const {
-    Models::print(context);
-    spdlog::info("{} stereo model : '{}'", context, get_stereo_model_name());
-};
 
 models::Chemistry ModelResolver::get_chemistry() const {
     if (m_chemistry_override.has_value()) {

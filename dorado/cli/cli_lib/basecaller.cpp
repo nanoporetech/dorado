@@ -20,6 +20,7 @@
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
 #include "model_resolver/ModelResolver.h"
+#include "model_resolver/Models.h"
 #include "models/models.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/base/DefaultClientInfo.h"

@@ -4,9 +4,13 @@ dorado_add_library(
     PUBLIC_DIR
         model_resolver
     SOURCES_PUBLIC
+        Models.h
+        ModelSources.h
         ModelResolver.h
     SOURCES_PRIVATE
-       ModelResolver.cpp
+        Models.cpp
+        ModelSources.cpp
+        ModelResolver.cpp
     DEPENDS_PUBLIC
         dorado_config
         dorado_models_lib

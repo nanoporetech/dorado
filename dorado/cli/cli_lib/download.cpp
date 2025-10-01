@@ -4,6 +4,7 @@
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"
 #include "model_resolver/ModelResolver.h"
+#include "model_resolver/Models.h"
 #include "models/model_complex.h"
 #include "models/models.h"
 #include "utils/log_utils.h"
