@@ -112,7 +112,7 @@ regression_test_platforms:linux:x86:cuda12:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_TYPE: Release
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_regression_dependencies
     - .linux_runner
@@ -128,7 +128,7 @@ regression_test:linux:arm64:jammy:
   variables:
     BUILD_TYPE: Release
     BUILD_CUDA: 1
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-aarch64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
   extends:
     - .linux_regression_dependencies
     - .linux_orin_cuda_12_runner
@@ -143,7 +143,7 @@ regression_test:linux:x86:cuda12:
   variables:
     BUILD_TYPE: Release
     BUILD_CUDA: 1
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_regression_dependencies
     - .linux_regression_runner
@@ -200,7 +200,7 @@ run_rebase:
 .perform_rebase:
   variables:
     GIT_SUBMODULE_STRATEGY: normal
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   script:
     - if [ ! -d regression_test/output ]; then echo "Not triggering rebase as no output has been found" && exit 0; fi
     # Use tetra and do the rebase

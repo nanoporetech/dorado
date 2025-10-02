@@ -34,6 +34,7 @@ variables:
   BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
   ONT_PYTHON_FILENAME_LINUX_X86_312: ont-python-Linux-x86_64-3.12.1-1.tar.gz
+  ONT_PYTHON_FILENAME_LINUX_ARM64_312: ont-python-Linux-aarch64-3.12.1-1.tar.gz
   PYTHON_VERSION: "python3.12"
   CUDA: "12.8"
   WIN_CUDA: "12.8"
@@ -121,26 +122,7 @@ variables:
 .create_venv:
   # Make a venv and install stuff we need.
   - export KERNEL=$(uname -s)
-<<<<<<< HEAD
-  - if [ ! -z ${ONT_PYTHON_URL} ]; then
-  -   curl -LfsS ${ONT_PYTHON_URL} > ont_python.tar.gz
-  -   tar -xf ont_python.tar.gz
-  -   export PATH=${PWD}/ont-python/bin:${PWD}/ont-python:${PATH}
-  -   echo Using ont-python from $(which python)
-  -   export PYTHON=$(which python)
-  - elif [[ ${KERNEL} =~ "Linux" ]] && [[ -z $(command -v ${PYTHON_VERSION}) ]]; then
-  -   export DEBIAN_FRONTEND=noninteractive
-  -   export DIST=$(lsb_release -cs)
-  -   echo "deb ${LOCAL_DEADSNAKES_REPO} ${DIST} main" > /etc/apt/sources.list.d/deadsnakes-ubuntu-${DIST}.list
-  -   apt-key adv --keyserver keyserver.ubuntu.com --recv-keys BA6932366A755776
-  -   apt-get update || true
-  -   apt-get install -y --no-install-recommends software-properties-common ${PYTHON_VERSION} ${PYTHON_VERSION}-dev ${PYTHON_VERSION}-venv
-  -   curl -LfsS https://bootstrap.pypa.io/get-pip.py | ${PYTHON_VERSION} -
-  -   export PYTHON=${PYTHON_VERSION}
-  - elif [[ ${KERNEL} =~ "MINGW" ]]; then
-=======
   - if [[ ${KERNEL} =~ "MINGW" ]]; then
->>>>>>> DOR-911: Added basic regression testing code.
   -   /c/${PYTHON_VERSION//./}/python --version
   -   export PATH="/c/${PYTHON_VERSION//./}/":${PATH}
   -   echo $(which python)
@@ -264,11 +246,7 @@ build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-<<<<<<< HEAD
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
-=======
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
->>>>>>> DOR-911: Added basic regression testing code.
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -278,11 +256,7 @@ build:linux:x86:focal_koi_from_source:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
-<<<<<<< HEAD
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
-=======
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
->>>>>>> DOR-911: Added basic regression testing code.
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -294,7 +268,7 @@ build:linux:x86:noble:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -377,7 +351,7 @@ build:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-aarch64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
   extends:
     - .linux_build_dependencies
     - .linux_arm64_runner
@@ -572,8 +546,8 @@ build_archive:macos:arm:
     - ./dorado-*/bin/dorado -vv
 
 .enable_ont_python:
-    - if [[ -n ${PYTHON_URL} ]]; then
-    -   curl -LfsS ${PYTHON_URL} > ont_python.tar.gz
+    - if [[ -n ${ONT_PYTHON_URL} ]]; then
+    -   curl -LfsS ${ONT_PYTHON_URL} > ont_python.tar.gz
     -   tar -xf ont_python.tar.gz
     -   export PATH=${PWD}/ont-python/bin:${PWD}/ont-python:${PATH}
     - fi
@@ -590,7 +564,7 @@ test:windows:
 test:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-x86_64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   script:
     - !reference [.enable_ont_python]
     - !reference [.test_dorado, script]
@@ -604,7 +578,7 @@ test:linux:x86:focal:
 test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   variables:
-    PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/ont-python-Linux-aarch64-3.12.1-1.tar.gz
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
   script:
     - !reference [.enable_ont_python]
     - !reference [.test_dorado, script]
