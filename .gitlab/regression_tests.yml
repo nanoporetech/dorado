@@ -67,7 +67,7 @@
     SPECIFICATION_FILE: "ont_output_spec.zip"
     VALIDATOR_COMMIT: "9241216dd8b7703af9a64af2add65e88620edcbb"
     VALIDATE_SUMMARY_FILES: "OFF"
-    TEST_DATA_COMMIT: "initial_project_commit"
+    TEST_DATA_COMMIT: "version_0.1"
   script:
     - !reference [.extract_archive, script]
     # Update PATH to reflect where these binaries are
