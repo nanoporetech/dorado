@@ -148,6 +148,15 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
 
     const int64_t dtype_featlen = PILEUP_BASES_SIZE * num_dtypes * num_homop;
 
+    // allocate output assuming one insertion per ref position
+    int32_t n_cols = 0;
+    const int64_t buffer_cols = 2 * (end - start);
+    PileupData pileup(n_cols, buffer_cols, num_dtypes, num_homop, 0);
+
+    int64_t *pileup_matrix = std::data(pileup.matrix);
+    int64_t *pileup_major = std::data(pileup.major);
+    int64_t *pileup_minor = std::data(pileup.minor);
+
     // open bam etc.
     // this is all now deferred to the caller
     htsFile *fp = bam_file.fp();
@@ -167,6 +176,10 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
     data->read_group = std::empty(read_group) ? nullptr : read_group.c_str();
+
+    if (!data->iter)
+        return pileup;
+
     bam_mplp_t mplp = bam_mplp_init(1, mpileup_read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;
@@ -174,15 +187,6 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
     int32_t pos = 0;
     int32_t tid = 0;
     int32_t n_plp = 0;
-
-    // allocate output assuming one insertion per ref position
-    int32_t n_cols = 0;
-    const int64_t buffer_cols = 2 * (end - start);
-    PileupData pileup(n_cols, buffer_cols, num_dtypes, num_homop, 0);
-
-    int64_t *pileup_matrix = std::data(pileup.matrix);
-    int64_t *pileup_major = std::data(pileup.major);
-    int64_t *pileup_minor = std::data(pileup.minor);
 
     // get counts
     int64_t major_col = 0;  // index into `pileup` corresponding to pos
