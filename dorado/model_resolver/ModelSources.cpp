@@ -1,7 +1,8 @@
-
 #include "model_resolver/ModelSources.h"
 
 #include <spdlog/spdlog.h>
+
+#include <sstream>
 
 namespace dorado {
 
@@ -101,5 +102,43 @@ bool ModelSources::operator==(const ModelSources& other) const {
 
     return true;
 };
+
+std::ostream& operator<<(std::ostream& oss, const ModelSource& ms) {
+    oss << "ModelSource{path='" << ms.path.string() << "', info=";
+    oss << (ms.info.has_value() ? "known" : "unknown") << ", temporary=";
+    oss << (ms.is_temporary ? "true" : "false") << "}";
+    return oss;
+}
+
+std::string to_string(const ModelSource& ms) {
+    std::ostringstream oss;
+    oss << ms;
+    return oss.str();
+}
+
+std::ostream& operator<<(std::ostream& oss, const ModelSources& mss) {
+    oss << "ModelSources{simplex=" << mss.simplex << ", mods=[";
+    for (std::size_t i = 0; i < mss.mods.size(); ++i) {
+        if (i) {
+            oss << ", ";
+        }
+        oss << mss.mods[i];
+    }
+    oss << "], stereo=";
+    if (mss.stereo.has_value()) {
+        oss << *mss.stereo;
+    } else {
+        oss << "none";
+    }
+    oss << "}";
+    return oss;
+}
+
+std::string to_string(const ModelSources& mss) {
+    std::ostringstream oss;
+    oss << mss;
+    return oss.str();
+}
+
 }  // namespace model_resolution
 }  // namespace dorado

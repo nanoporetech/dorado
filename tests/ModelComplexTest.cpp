@@ -1,5 +1,3 @@
-#include "TestUtils.h"
-#include "catch2/catch_message.hpp"
 #include "model_resolver/ModelResolver.h"
 #include "models/kits.h"
 #include "models/metadata.h"
@@ -11,7 +9,6 @@
 
 #include <iterator>
 #include <optional>
-#include <sstream>
 #include <tuple>
 #include <vector>
 
@@ -32,10 +29,8 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
     CATCH_SECTION(" parse all model simplex variants") {
         // Test we can parse all known simplex model variants
         for (const auto &simplex_info : simplex_models()) {
-            std::ostringstream oss;
-            oss << to_string(simplex_info.simplex.variant) << "@"
-                << to_string(simplex_info.simplex.ver);
-            const auto model_variant_string = oss.str();
+            const auto model_variant_string = to_string(simplex_info.simplex.variant) + "@" +
+                                              to_string(simplex_info.simplex.ver);
 
             CATCH_CAPTURE(simplex_info.name);
             CATCH_CAPTURE(model_variant_string);

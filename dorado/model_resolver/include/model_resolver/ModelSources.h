@@ -33,5 +33,11 @@ struct ModelSources {
     bool check_paths() const;
 };
 
+std::string to_string(const ModelSource& ms);
+std::string to_string(const ModelSources& mss);
+
+std::ostream& operator<<(std::ostream& oss, const ModelSource& ms);
+std::ostream& operator<<(std::ostream& oss, const ModelSources& mss);
+
 }  // namespace model_resolution
 }  // namespace dorado
