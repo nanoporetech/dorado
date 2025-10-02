@@ -31,6 +31,7 @@ variables:
   BUILD_TARGET: install
   BUILD_TYPE: Release
   GIT_SUBMODULE_STRATEGY: recursive
+  ONT_PYTHON_FILENAME_LINUX_X86_312: ont-python-Linux-x86_64-3.12.1-1.tar.gz
   PYTHON_VERSION: "python3.12"
   CUDA: "12.8"
   WIN_CUDA: "12.8"
@@ -118,7 +119,13 @@ variables:
 .create_venv:
   # Make a venv and install stuff we need.
   - export KERNEL=$(uname -s)
-  - if [[ ${KERNEL} =~ "Linux" ]] && [[ -z $(command -v ${PYTHON_VERSION}) ]]; then
+  - if [ ! -z ${ONT_PYTHON_URL} ]; then
+  -   curl -LfsS ${ONT_PYTHON_URL} > ont_python.tar.gz
+  -   tar -xf ont_python.tar.gz
+  -   export PATH=${PWD}/ont-python/bin:${PWD}/ont-python:${PATH}
+  -   echo Using ont-python from $(which python)
+  -   export PYTHON=$(which python)
+  - elif [[ ${KERNEL} =~ "Linux" ]] && [[ -z $(command -v ${PYTHON_VERSION}) ]]; then
   -   export DEBIAN_FRONTEND=noninteractive
   -   export DIST=$(lsb_release -cs)
   -   echo "deb ${LOCAL_DEADSNAKES_REPO} ${DIST} main" > /etc/apt/sources.list.d/deadsnakes-ubuntu-${DIST}.list
@@ -250,6 +257,7 @@ build:linux:x86:focal:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -259,6 +267,7 @@ build:linux:x86:focal_koi_from_source:
   image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -360,6 +369,7 @@ build:linux:arm64:jammy:
 build:linux:x86:focal:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - build:linux:x86:focal
     - .on_nightly_or_manual
