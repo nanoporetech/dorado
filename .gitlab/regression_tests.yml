@@ -47,6 +47,15 @@
     # We need to make sure the regression tests always run on the same GPU.
     - gpu-v100
 
+.windows_regression_runner:
+  tags:
+    - windows-10
+    - VS2019
+    - cuda-${WIN_CUDA}
+    - on-prem
+    # We need to make sure the regression tests always run on the same GPU.
+    - gpu-v100
+
 # We need this to check out the regression_test_data project, which has our test files in git-lfs.
 .prepare_git-lfs:
   - apt update || true
@@ -172,7 +181,7 @@ regression_test:windows:
     BUILD_CUDA: 1
   extends:
     - .windows_regression_dependencies
-    - .windows_runner
+    - .windows_regression_runner
     - .regression_test
   needs:
     - build_archive:windows
