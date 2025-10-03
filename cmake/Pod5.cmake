@@ -1,7 +1,7 @@
 # CMake errors out if we try to create the pod5_libs target twice, which happens in ont_core.
 include_guard(GLOBAL)
 
-set(POD5_VERSION 0.3.33)
+set(POD5_VERSION 0.3.34)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
 
@@ -19,10 +19,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(LIB_DIR "lib64")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
         set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-arm64.tar.gz")
-        set(POD5_HASH "2b997ed4991e65515669fc9c78cc1749c133a078dea365d7a61019a2a28e85a6")
+        set(POD5_HASH "fc0aabe7a7a44e54d41f41f685aed97ff722106404411aeaf9a89e5ebf44ca02")
     else()
         set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-x64.tar.gz")
-        set(POD5_HASH "3a179c703c180fe8dbab38504a56aaf1264088f072b1febbef54517910fe9ba0")
+        set(POD5_HASH "b335a60f540886547d1ab455249fdf9f2f2a4ea15ab9e012a997715169a4b564")
     endif()
     if(POD5_STATIC)
         set(POD5_LIBRARIES
@@ -36,7 +36,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 elseif(APPLE)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-osx-11.0-arm64.tar.gz")
-    set(POD5_HASH "e6155bcf6415c84e1c37ec214034fd9f5b81cbac2a8d2f7746e2af24d7078fe3")
+    set(POD5_HASH "30fd3c58d7b37a23d0e9df06c20b6705656dd8f492b616214ee8e9bdeb54d99b")
     if(POD5_STATIC)
         set(POD5_LIBRARIES
             ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.a
@@ -48,7 +48,7 @@ elseif(APPLE)
     endif()
 elseif(WIN32)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-win-x64.tar.gz")
-    set(POD5_HASH "29099ab7d86689919202bc8b906103d8cf6208356a7565a7c8f1a2edf514f95e")
+    set(POD5_HASH "5042af9e28df9a381e9a28a604130a22f13b734fd6653e9654078db35b29a7b3")
     set(POD5_LIBRARIES
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/arrow_static.lib
