@@ -1,14 +1,15 @@
 import os
 import pathlib
 import subprocess
+import typing
 import unittest
 from copy import deepcopy
 
 from data_paths import (
     PLATFORM,
-    input_folder,
-    output_folder,
-    reference_folder,
+    INPUT_FOLDER,
+    OUTPUT_FOLDER,
+    REFERENCE_FOLDER,
 )
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
@@ -32,8 +33,8 @@ class TestDorado(unittest.TestCase):
         That way the json file can still be written.
         """
         cls.manager = RegressionManager()
-        cls.context = RegressionContext(cls.manager, output_folder)
-        output_folder.mkdir(parents=True, exist_ok=True)
+        cls.context = RegressionContext(cls.manager, OUTPUT_FOLDER)
+        OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -44,10 +45,10 @@ class TestDorado(unittest.TestCase):
         """
         if cls.manager.is_test_open:
             cls.manager.close_test(TestResult.ABORTED)
-        json_summary_file = output_folder / "regression_test_results.json"
+        json_summary_file = OUTPUT_FOLDER / "regression_test_results.json"
         cls.manager.write_to_file(json_summary_file)
         run_update(
-            test_folder=output_folder.parent.parent,
+            test_folder=OUTPUT_FOLDER.parent.parent,
             platform=PLATFORM,
             update_refs=False,
             quiet_mode=True,
@@ -92,32 +93,29 @@ class TestDorado(unittest.TestCase):
 
         test_name = "basecalling"
         with self.context.open_test(self, test_name) as context:
+            # All of these tests should produce a single .bam file and a single .txt summary file.
+            if USE_PYSAM:
+                expected_files = {"bam": 1, "txt": 1}
+            else:
+                expected_files = {"txt": 1}
+            validation_settings = deepcopy(VALIDATION_OPTIONS)
+
             for run in runs:
                 with self.context.open_subtest("test_basecalling", line=run):
                     subfolder = run["folder"]
-                    input_data = input_folder / run["input"]
-                    validation_settings = deepcopy(VALIDATION_OPTIONS)
-
-                    if USE_PYSAM:
-                        expected_files = {"bam": 1, "txt": 1}
-                    else:
-                        expected_files = {"txt": 1}
-
-                    output_path = output_folder / test_name / subfolder
-                    output_file = output_path / "out.bam"
-
+                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
                     dorado_args = self.get_dorado_args(
-                        input_path=input_data,
+                        input_path=INPUT_FOLDER / run["input"],
                         save_path=None,
                         model=run["model"],
                         emit_fastq=False,
                     )
                     errors = None
                     try:
-                        output_path.mkdir(parents=True, exist_ok=True)
-                        with output_file.open("wb") as output_handle:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with output_file.open("wb") as outfile:
                             run_dorado(
-                                dorado_args, DEFAULT_MAX_TIMEOUT, outfile=output_handle
+                                dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
                             )
                         make_summary(output_file, "summary.txt", DEFAULT_MAX_TIMEOUT)
                         errors = self.check_program_output(
@@ -154,7 +152,7 @@ class TestDorado(unittest.TestCase):
             test_files=test_files,
             result=None,
         )
-        checker = DataChecker(str(reference_folder), str(output_folder))
+        checker = DataChecker(str(REFERENCE_FOLDER), str(OUTPUT_FOLDER))
         results = checker.check_test_data(test_data, validation_settings)
         self.manager.add_test_files(test_files)
         errors = DataChecker.make_error_message(results)
@@ -190,7 +188,7 @@ class TestDorado(unittest.TestCase):
         return args
 
 
-def run_dorado(cmd_args: list, timeout: int, outfile=None):
+def run_dorado(cmd_args: list, timeout: int, outfile: typing.IO | None = None):
     print("Dorado command line: ", " ".join(cmd_args))
     out = subprocess.PIPE if outfile is None else outfile
     result = subprocess.run(

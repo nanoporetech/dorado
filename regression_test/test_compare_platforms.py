@@ -1,18 +1,17 @@
 import unittest
 
-from data_paths import ROOT_DIR
+from data_paths import ROOT_DIR, REFERENCE_FOLDER
 from tetra.compare_platforms import PlatformCompare, SpecialCase, compare_platforms
 
 
 class TestCompareData(unittest.TestCase):
     def test_compare_platforms(self):
         """
-        This compares test results from different platforms using the new framework.
-        As more tests are added to the new framework, we may need to populate the
-        `special_cases` and/or `exclude_columns` fields of the `PlatformCompare`
-        objects, similar to what is currently done in the old compare_os code.
+        This compares test results from different platforms. As new tests are
+        added to the project, we may need to add new `special_cases` and/or
+        `exclude_columns` fields of the `PlatformCompare` objects.
         """
-        REF_DIR = ROOT_DIR / "regression_test" / "ref"
+        REF_DIR = REFERENCE_FOLDER.parent
 
         # The default tolerance of 4% addresses the fact that basecalling results
         # differ quite considerably between the Linux, OSX-ARM, and Orin platforms.
