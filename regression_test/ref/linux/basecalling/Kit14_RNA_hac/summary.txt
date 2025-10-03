@@ -1,0 +1,2 @@
+filename	read_id	run_id	channel	mux	start_time	duration	template_start	template_duration	sequence_length_template	mean_qscore_template	barcode
+rna004_pt_50.pod5	00029dcf-f577-49d9-830d-66d2454be1dd	2669e47e-c855-4a82-aa99-0591cd4d901e	2424	2	2054.43	7.88725	2054.84	7.47475	1012	14.6206	unclassified

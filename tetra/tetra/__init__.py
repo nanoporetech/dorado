@@ -25,4 +25,6 @@ class ValidationOptions(object):
 
     @classmethod
     def check_variable(cls, name: str, default: bool) -> bool:
-        return default or name in os.environ
+        if name in os.environ:
+            return os.getenv(name).lower() in ("true", "1", "on")
+        return default

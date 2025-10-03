@@ -1,0 +1,257 @@
+#
+# Regression testing
+#
+
+################
+# Dependencies #
+################
+
+.linux_regression_dependencies:
+  before_script:
+    - !reference [.enable_ont_python]
+    - !reference [.create_venv]
+    - !reference [.prepare_git-lfs]
+    - export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${PWD}/lib
+    - pip install pysam "--only-binary=:all:"
+
+.windows_regression_dependencies:
+  before_script:
+    - export ROOT_DIR=$PWD
+    - !reference [.create_venv]
+    - export CURL_SSL_BACKEND="schannel"
+    - pip install psutil
+
+.osx_regression_dependencies:
+  before_script:
+    - !reference [.create_venv]
+    - export ROOT_DIR=$PWD
+    # We need to add the build:osx:/lib folder to the dylib path for libbasecall_client.dylib
+    - export DYLD_FALLBACK_LIBRARY_PATH=${PWD}/lib
+    - pip install psutil
+    - pip install pysam "--only-binary=:all:"
+
+.osx_arm_regression_runner:
+  tags:
+    - osx_arm64
+    - xcode-15.3
+    - on-prem
+    # Modbase regression results depend on the MPS version which depends on the OS version,
+    # so pin the OS to the one that we have the most runners of.
+    - osx-14.4
+
+.linux_regression_runner:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    # We need to make sure the regression tests always run on the same GPU.
+    - gpu-v100
+
+.windows_regression_runner:
+  tags:
+    - windows-10
+    - VS2019
+    - cuda-${WIN_CUDA}
+    - on-prem
+    # We need to make sure the regression tests always run on the same GPU.
+    - gpu-v100
+
+# We need this to check out the regression_test_data project, which has our test files in git-lfs.
+.prepare_git-lfs:
+  - apt update || true
+  - apt install -y git-lfs
+  - git lfs install || true
+
+
+######################
+# Regression testing #
+######################
+
+.regression_test:
+  stage: regression_test
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+    OUTPUT_SPEC_REF: "8217cf6f9975e179a9de301dc82c1c1b44907a31"
+    OUTPUT_SPEC_REPO_URL: "${ONT_OUTPUT_SPEC_REPO}-/archive/${OUTPUT_SPEC_REF}/ont-output-specification-${OUTPUT_SPEC_REF}.zip"
+    SPECIFICATION_FILE: "ont_output_spec.zip"
+    VALIDATOR_COMMIT: "9241216dd8b7703af9a64af2add65e88620edcbb"
+    VALIDATE_SUMMARY_FILES: "OFF"
+    TEST_DATA_COMMIT: "version_0.1"
+  script:
+    - !reference [.extract_archive, script]
+    # Update PATH to reflect where these binaries are
+    - export PATH=${PWD}/${EXTRACTED_PATH}/bin:${PWD}/${EXTRACTED_PATH}/lib:${PATH}
+    - pip install -e tetra # Need to use -e since data files relative to project
+    - pip install jsonschema
+    # Install output-file specification validator.
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${ONT_OUTPUT_SPEC_VALIDATOR_REPO}
+    - pushd ont-output-specification-validator
+    -   git checkout ${VALIDATOR_COMMIT}
+    - popd
+    - pip install -e ont-output-specification-validator
+    # Grab the regression test data.
+    - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${TEST_DATA_REPO}
+    - pushd regression_test_data
+    -   git checkout ${TEST_DATA_COMMIT}
+    - popd
+    # We need to run all the jobs even if they fail; but then report the error code
+    - cd regression_test
+    - curl -LfsS ${OUTPUT_SPEC_REPO_URL} > ${SPECIFICATION_FILE}
+    - ERROR_CODE=0
+    - $PYTHON -u -m unittest test_dorado || ERROR_CODE=1
+    - cd ../ # We need to be back in the original directory for artifacting correctly
+    - exit ${ERROR_CODE}
+  artifacts:
+    when: always
+    paths:
+      - regression_test/output
+    expire_in: 7 days
+  interruptible: true
+
+.regression_test_platforms:
+  stage: regression_test
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+  script:
+    - pip install -e tetra
+    - cd regression_test
+    - $PYTHON -m unittest test_compare_platforms
+
+regression_test_platforms:linux:x86:cuda12:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  variables:
+    BUILD_TYPE: Release
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
+  extends:
+    - .linux_regression_dependencies
+    - .linux_runner
+    - .regression_test_platforms
+  needs:
+    - build_archive:linux:x86:cuda12
+  except:
+    - tags
+
+# dorado tests
+regression_test:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
+  extends:
+    - .linux_regression_dependencies
+    - .linux_orin_cuda_12_runner
+    - .regression_test
+  needs:
+    - build_archive:linux:arm64:jammy
+  except:
+    - tags
+
+regression_test:linux:x86:cuda12:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
+  extends:
+    - .linux_regression_dependencies
+    - .linux_regression_runner
+    - .regression_test
+  needs:
+    - build_archive:linux:x86:cuda12
+  except:
+    - tags
+
+regression_test:macos:arm:
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+  extends:
+    - .osx_regression_dependencies
+    - .osx_arm_regression_runner
+    - .regression_test
+  needs:
+    - build_archive:macos:arm
+  except:
+    - tags
+
+regression_test:windows:
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+  extends:
+    - .windows_regression_dependencies
+    - .windows_regression_runner
+    - .regression_test
+  needs:
+    - build_archive:windows
+  except:
+    - tags
+
+
+##################
+# Rebase scripts #
+##################
+
+run_rebase:
+  # We place this in pre_build_check so that it appears on the left in the UI, and
+  # so that the rebase jobs can depend on it
+  stage: pre-flight
+  script: echo Will run rebase if required
+  variables:
+    GIT_STRATEGY: none
+  rules:
+    - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
+      when: manual
+      # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
+      allow_failure: true
+
+.perform_rebase:
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
+  script:
+    - if [ ! -d regression_test/output ]; then echo "Not triggering rebase as no output has been found" && exit 0; fi
+    # Use tetra and do the rebase
+    - pip install -e tetra
+    - $PYTHON tetra/tetra/update_reference_data.py regression_test --update_refs
+    - cd regression_test
+    - $PYTHON -m unittest test_compare_platforms
+        || (echo "Can't rebase since platforms do not compare equal" && false)
+    # We need to authenticate the -ci user
+    - eval $(ssh-agent -s)
+    - ssh-add <(echo "$OFAN_TESTER_KEY")
+    - mkdir -p ~/.ssh
+    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
+    - git remote add dorado_remote ${DORADO_GITLAB_REPO}
+        || echo "Attempted to add remote, but it already exists. Continuing ..."
+    # Boilerplate complete; create a new branch if required
+    - git add ref
+    - git ${REBASE_USER_ID} commit -m "Update regression test references" -m "${CI_PIPELINE_URL}" # $USER_ID sets --author from secrets
+    - git push dorado_remote HEAD:${CI_COMMIT_REF_NAME}
+  artifacts:
+    when: always
+    paths:
+      - regression_test/output
+    expire_in: 7 days
+
+rebase_dorado:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  stage: rebase
+  interruptible: false
+  needs:
+    - regression_test:linux:x86:cuda12
+    - regression_test:linux:arm64:jammy
+    - regression_test:macos:arm
+    - regression_test:windows
+    - run_rebase
+  extends:
+    - .linux_runner
+    - .linux_regression_dependencies
+    - .perform_rebase
+  rules:
+    - if: $CI_PIPELINE_SOURCE == 'merge_request_event'
+      when: never
+    - if: $CI_COMMIT_TAG
+      when: never
+    - when: on_failure
