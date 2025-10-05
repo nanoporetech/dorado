@@ -3,6 +3,7 @@
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
+#include "nn/KoiUtils.h"
 
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
@@ -15,9 +16,31 @@
 #include <cxxpool.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <thread>
 
 namespace dorado::api {
+
+bool check_variable_chunk_sizes_supported(
+        [[maybe_unused]] const config::BasecallModelConfig& model_config,
+        [[maybe_unused]] const std::span<const int> device_ids) {
+#if DORADO_CUDA_BUILD
+    if (!model_config.is_lstm_model() || (model_config.lstm_size <= 128) ||
+        (model_config.lstm_size > 1024) || ((model_config.lstm_size % 128) != 0)) {
+        return false;
+    }
+    if (std::empty(device_ids)) {
+        return false;
+    }
+    if (std::any_of(std::cbegin(device_ids), std::cend(device_ids),
+                    [](const int device_id) { return !nn::koi_can_use_cutlass(device_id); })) {
+        return false;
+    }
+    return true;
+#else
+    return false;
+#endif
+}
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::BasecallerCreationParams& params,

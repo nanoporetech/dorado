@@ -714,7 +714,7 @@ int duplex(int argc, char* argv[]) {
                     std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                             api::create_basecall_runners(
                                     {models.model_config, device_id, 0.9f * fraction,
-                                     api::PipelineType::duplex, 0.f, false, false},
+                                     api::PipelineType::duplex, 0.f, false, false, false},
                                     num_runners, 0);
 
                     // The fraction argument for GPU memory allocates the fraction of the
@@ -729,7 +729,7 @@ int duplex(int argc, char* argv[]) {
                     std::tie(basecaller_runners.stereo_runners, std::ignore) =
                             api::create_basecall_runners(
                                     {models.stereo_model_config, device_id, 0.5f * fraction,
-                                     api::PipelineType::duplex, 0.f, false, false},
+                                     api::PipelineType::duplex, 0.f, false, false, false},
                                     num_runners, 0);
 
                     return basecaller_runners;
@@ -756,14 +756,14 @@ int duplex(int argc, char* argv[]) {
             } else
 #endif
             {
-                std::tie(runners, num_devices) =
-                        api::create_basecall_runners({models.model_config, device, 0.9f,
-                                                      api::PipelineType::duplex, 0.f, false, false},
-                                                     num_runners, 0);
-                std::tie(stereo_runners, std::ignore) =
-                        api::create_basecall_runners({models.stereo_model_config, device, 0.5f,
-                                                      api::PipelineType::duplex, 0.f, false, false},
-                                                     num_runners, 0);
+                std::tie(runners, num_devices) = api::create_basecall_runners(
+                        {models.model_config, device, 0.9f, api::PipelineType::duplex, 0.f, false,
+                         false, false},
+                        num_runners, 0);
+                std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
+                        {models.stereo_model_config, device, 0.5f, api::PipelineType::duplex, 0.f,
+                         false, false, false},
+                        num_runners, 0);
             }
 
             spdlog::info("> Starting Stereo Duplex pipeline");

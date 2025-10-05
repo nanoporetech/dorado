@@ -9,6 +9,10 @@ bool koi_can_use_cutlass() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     return (prop->major >= 8);
 }
+bool koi_can_use_cutlass(const int device_id) {
+    const cudaDeviceProp *const prop = at::cuda::getDeviceProperties(device_id);
+    return (prop->major >= 8);
+}
 bool koi_can_use_quantised_lstm() {
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
     // DP4A is supported on Pascal and later, except for TX2 (sm_62).
