@@ -1,15 +1,12 @@
 #include "model_resolver/ModelResolver.h"
 
 #include "config/BasecallModelConfig.h"
-#include "config/BatchParams.h"
-#include "config/ModBaseModelConfig.h"
 #include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
 #include "models/kits.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
 #include "models/models.h"
-#include "utils/fs_utils.h"
 #include "utils/math_utils.h"
 #include "utils/string_utils.h"
 
@@ -17,7 +14,6 @@
 
 #include <filesystem>
 #include <optional>
-#include <ranges>
 #include <stdexcept>
 #include <vector>
 
@@ -263,7 +259,6 @@ void ModelResolver::resolve_stereo_models(ModelSources& model_sources) const {
 }
 
 ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) const {
-    // TODO: Review decision to prioritise models-directory
     if (m_models_directory.has_value() && !m_models_directory->empty()) {
         const auto models_dir_path = m_models_directory.value() / model_info.name;
         if (fs::exists(models_dir_path)) {

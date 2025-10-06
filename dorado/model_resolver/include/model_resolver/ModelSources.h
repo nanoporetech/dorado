@@ -2,8 +2,6 @@
 
 #include "models/models.h"
 
-#include <spdlog/spdlog.h>
-
 #include <filesystem>
 #include <optional>
 #include <vector>

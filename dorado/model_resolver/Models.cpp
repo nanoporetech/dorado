@@ -4,6 +4,8 @@
 #include "config/BatchParams.h"
 #include "utils/fs_utils.h"
 
+#include <spdlog/spdlog.h>
+
 #include <ranges>
 
 namespace dorado::model_resolution {

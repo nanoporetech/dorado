@@ -2,6 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <sstream>
 
 namespace dorado::model_resolution {
@@ -71,6 +72,7 @@ bool ModelSource::operator==(const ModelSource& other) const {
     };
     return path == other.path;
 };
+
 bool ModelSources::operator==(const ModelSources& other) const {
     if (!(simplex == other.simplex)) {
         return false;
