@@ -130,6 +130,103 @@ class TestDorado(unittest.TestCase):
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
 
+    def test_modbase(self):
+        """
+        Test basic basecalling with base modifications.
+        """
+        runs = [
+            {
+                "folder": "HAC_4mC_5mC_6mA",
+                "input": "SQK-LSK114",
+                "model": "hac,4mC_5mC,6mA",
+            },
+            {
+                "folder": "HAC_5mC_5hmC",
+                "input": "SQK-LSK114",
+                "model": "hac,5mC_5hmC",
+            },
+            {
+                "folder": "HAC_5mCG_5hmCG",
+                "input": "SQK-LSK114",
+                "model": "hac,5mCG_5hmCG",
+            },
+            {
+                "folder": "SUP_4mC_5mC_6mA",
+                "input": "SQK-LSK114",
+                "model": "sup,4mC_5mC,6mA",
+            },
+            {
+                "folder": "SUP_5mC_5hmC",
+                "input": "SQK-LSK114",
+                "model": "sup,5mC_5hmC",
+            },
+            {
+                "folder": "SUP_5mCG_5hmCG",
+                "input": "SQK-LSK114",
+                "model": "sup,5mCG_5hmCG",
+            },
+            {
+                "folder": "HAC_inosine_m6A_2OmeA_m5C_20meC_20meG",
+                "input": "SQK-RNA004",
+                "model": "hac,inosine_m6A_2OmeA,m5C_20meC,20meG",
+            },
+            {
+                "folder": "HAC_m6A_DRACH_pseU_2OmeU",
+                "input": "SQK-RNA004",
+                "model": "hac,m6A_DRACH,pseU_20meU",
+            },
+            {
+                "folder": "SUP_inosine_m6A_2OmeA_m5C_20meC_20meG",
+                "input": "SQK-RNA004",
+                "model": "sup,inosine_m6A_2OmeA,m5C_20meC,20meG",
+            },
+            {
+                "folder": "SUP_m6A_DRACH_pseU_2OmeU",
+                "input": "SQK-RNA004",
+                "model": "sup,m6A_DRACH,pseU_20meU",
+            },
+        ]
+
+        test_name = "modified_basecalling"
+        with self.context.open_test(self, test_name) as context:
+            # All of these tests should produce a single .bam file and a single .txt summary file.
+            if USE_PYSAM:
+                expected_files = {"bam": 1, "txt": 1}
+            else:
+                expected_files = {"txt": 1}
+            validation_settings = deepcopy(VALIDATION_OPTIONS)
+            validation_settings["modified_bases_enabled"] = True
+
+            for run in runs:
+                with self.context.open_subtest("test_modified_basecalling", line=run):
+                    subfolder = run["folder"]
+                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
+                    dorado_args = self.get_dorado_args(
+                        input_path=INPUT_FOLDER / run["input"],
+                        save_path=None,
+                        model=run["model"],
+                        emit_fastq=False,
+                    )
+                    errors = None
+                    try:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with output_file.open("wb") as outfile:
+                            run_dorado(
+                                dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                            )
+                        make_summary(output_file, "summary.txt", DEFAULT_MAX_TIMEOUT)
+                        errors = self.check_program_output(
+                            test_name, subfolder, expected_files, validation_settings
+                        )
+                    except Exception as ex:
+                        msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
+                        context.encountered_error()
+                        self.fail(msg)
+                    if errors is not None:
+                        # This indicates regression test failures due to file comparison and/or validation,
+                        # but not due to an exception being thrown or the executable crashing.
+                        self.fail(errors)
+
     def check_program_output(
         self,
         test_name: str,
