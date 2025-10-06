@@ -6,8 +6,7 @@
 
 #include <ranges>
 
-namespace dorado {
-namespace model_resolution {
+namespace dorado::model_resolution {
 
 Models::Models(const ModelSources& sources) : m_sources(sources) {
     m_simplex_config = config::load_model_config(m_sources.simplex.path);
@@ -125,5 +124,4 @@ void DuplexModels::print(const std::string& context) const {
     spdlog::info("{} stereo model : '{}'", context, get_stereo_model_name());
 };
 
-}  // namespace model_resolution
-}  // namespace dorado
+}  // namespace dorado::model_resolution

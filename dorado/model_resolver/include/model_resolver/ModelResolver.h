@@ -11,9 +11,7 @@
 #include <string>
 #include <vector>
 
-namespace dorado {
-
-namespace model_resolution {
+namespace dorado::model_resolution {
 
 std::optional<std::filesystem::path> get_models_directory(
         const std::optional<std::string>& models_directory_arg);
@@ -93,6 +91,4 @@ public:
                             const std::vector<std::filesystem::directory_entry>& reads);
 };
 
-}  // namespace model_resolution
-
-}  // namespace dorado
+}  // namespace dorado::model_resolution

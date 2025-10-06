@@ -4,9 +4,7 @@
 
 #include <sstream>
 
-namespace dorado {
-
-namespace model_resolution {
+namespace dorado::model_resolution {
 namespace fs = std::filesystem;
 
 bool check_model_path(const fs::path& model_path, bool verbose) {
@@ -140,5 +138,4 @@ std::string to_string(const ModelSources& mss) {
     return oss.str();
 }
 
-}  // namespace model_resolution
-}  // namespace dorado
+}  // namespace dorado::model_resolution

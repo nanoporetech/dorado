@@ -4,8 +4,7 @@
 #include "config/ModBaseModelConfig.h"
 #include "model_resolver/ModelSources.h"
 
-namespace dorado {
-namespace model_resolution {
+namespace dorado::model_resolution {
 
 class Models {
 public:
@@ -59,5 +58,4 @@ private:
     config::BasecallModelConfig m_stereo_config;
 };
 
-}  // namespace model_resolution
-}  // namespace dorado
+}  // namespace dorado::model_resolution

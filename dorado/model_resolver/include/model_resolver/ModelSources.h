@@ -8,9 +8,7 @@
 #include <optional>
 #include <vector>
 
-namespace dorado {
-
-namespace model_resolution {
+namespace dorado::model_resolution {
 
 bool check_model_path(const std::filesystem::path& model_path, bool verbose);
 
@@ -39,5 +37,4 @@ std::string to_string(const ModelSources& mss);
 std::ostream& operator<<(std::ostream& oss, const ModelSource& ms);
 std::ostream& operator<<(std::ostream& oss, const ModelSources& mss);
 
-}  // namespace model_resolution
-}  // namespace dorado
+}  // namespace dorado::model_resolution

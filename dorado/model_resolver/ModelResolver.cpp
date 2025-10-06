@@ -21,9 +21,7 @@
 #include <stdexcept>
 #include <vector>
 
-namespace dorado {
-
-namespace model_resolution {
+namespace dorado::model_resolution {
 using namespace models;
 namespace fs = std::filesystem;
 
@@ -429,5 +427,4 @@ std::filesystem::path ModelResolver::download(const models::ModelInfo& model_inf
     return downloader.get(model_info, description);
 };
 
-}  // namespace model_resolution
-}  // namespace dorado
+}  // namespace dorado::model_resolution
