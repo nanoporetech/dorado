@@ -78,20 +78,8 @@ bool ModelSources::operator==(const ModelSources& other) const {
         return false;
     }
 
-    if (mods.size() != other.mods.size()) {
+    if (!std::ranges::is_permutation(mods, other.mods)) {
         return false;
-    }
-
-    for (const auto& m : mods) {
-        bool found_match = false;
-        for (const auto& o : other.mods) {
-            if (m == o) {
-                found_match = true;
-            }
-        }
-        if (!found_match) {
-            return false;
-        }
     }
 
     if (stereo.has_value() && other.stereo.has_value()) {
