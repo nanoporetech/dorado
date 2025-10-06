@@ -194,7 +194,6 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
                 std::make_tuple("v4.1.", "v4.1.0"),
                 std::make_tuple("V0.", "v0.0.0"),
         }));
-        // clang-format on
 
         CATCH_CAPTURE(input);
         CATCH_CHECK(TestVersionParser::parse_version(input) == expected);

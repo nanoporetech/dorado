@@ -15,7 +15,7 @@ dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 
 # Test on a tempdir to shorted filepaths which can cause issues on windows
 TMPDIR="$(mktemp -d 2>/dev/null || mktemp -d -t tmp)"
-# trap 'rm -rf "$TMPDIR"' EXIT
+trap 'rm -rf "$TMPDIR"' EXIT
 
 # Create test output directory
 output_dir_name=test_model_resolution_${RANDOM}

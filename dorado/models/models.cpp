@@ -1657,15 +1657,6 @@ std::vector<std::string> modified_model_variants() {
     return variants;
 };
 
-namespace {
-const std::unordered_map<ModelType, std::string> type_map{
-        {ModelType::SIMPLEX, "SIMPLEX"}, {ModelType::STEREO, "STEREO"},
-        {ModelType::MODBASE, "MODBASE"}, {ModelType::CORRECT, "CORRECT"},
-        {ModelType::POLISH, "POLISH"},   {ModelType::VARIANT, "VARIANT"},
-};
-
-}  // namespace
-
 std::string_view to_string(ModelType model_type) {
     switch (model_type) {
     case ModelType::SIMPLEX:

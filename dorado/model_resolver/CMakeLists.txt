@@ -15,9 +15,9 @@ dorado_add_library(
         dorado_config
         dorado_models_lib
         dorado_utils
-        spdlog::spdlog
     DEPENDS_PRIVATE
         dorado_file_info
         dorado_io_lib
         dorado_model_downloader_lib
+        spdlog::spdlog
 )

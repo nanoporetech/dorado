@@ -101,7 +101,7 @@ std::ostream& operator<<(std::ostream& oss, const ModelSource& ms) {
 std::string to_string(const ModelSource& ms) {
     std::ostringstream oss;
     oss << ms;
-    return oss.str();
+    return std::move(oss).str();
 }
 
 std::ostream& operator<<(std::ostream& oss, const ModelSources& mss) {
@@ -125,7 +125,7 @@ std::ostream& operator<<(std::ostream& oss, const ModelSources& mss) {
 std::string to_string(const ModelSources& mss) {
     std::ostringstream oss;
     oss << mss;
-    return oss.str();
+    return std::move(oss).str();
 }
 
 }  // namespace dorado::model_resolution

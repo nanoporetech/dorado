@@ -5,6 +5,7 @@
 #include "models/models.h"
 
 #include <filesystem>
+#include <functional>
 #include <optional>
 #include <string>
 #include <vector>
@@ -21,11 +22,11 @@ public:
 protected:
     enum class Mode { SIMPLEX, DUPLEX, DOWNLOADER };
     ModelResolver(Mode mode,
-                  const std::string& model_complex_arg,
-                  const std::string& modbase_models_arg,
-                  const std::vector<std::string>& modbases_arg,
-                  const std::optional<std::string>& stereo_arg,
-                  const std::optional<std::string>& models_directory_arg,
+                  std::string model_complex_arg,
+                  std::string modbase_models_arg,
+                  std::vector<std::string> modbases_arg,
+                  std::optional<std::string> stereo_arg,
+                  std::optional<std::string> models_directory_arg,
                   bool skip_model_compatibility_check,
                   const std::vector<std::filesystem::directory_entry>& reads);
 
@@ -38,11 +39,11 @@ protected:
     void warn_stereo_fast(const std::optional<ModelSource>& stereo) const;
 
     const Mode m_mode;
-    std::string m_model_complex_arg;
-    std::string m_modbase_models_arg;
-    std::vector<std::string> m_modbases_arg;
-    std::optional<std::string> m_stereo_arg, m_models_directory_arg;
-    std::vector<std::filesystem::directory_entry> m_reads;
+    std::string m_model_complex;
+    std::string m_modbase_models;
+    std::vector<std::string> m_modbases;
+    std::optional<std::string> m_stereo, m_models_directory_arg;
+    const std::vector<std::filesystem::directory_entry>& m_reads;
 
     bool m_skip_model_compatibility_check{false};
     std::optional<std::filesystem::path> m_models_directory;
@@ -63,29 +64,29 @@ private:
 
 class BasecallerModelResolver : public ModelResolver {
 public:
-    BasecallerModelResolver(const std::string& model_complex_arg,
-                            const std::string& modbase_models_arg,
-                            const std::vector<std::string>& modbases_arg,
-                            const std::optional<std::string>& models_directory_arg,
+    BasecallerModelResolver(std::string model_complex_arg,
+                            std::string modbase_models_arg,
+                            std::vector<std::string> modbases_arg,
+                            std::optional<std::string> models_directory_arg,
                             bool skip_model_compatibility_check,
                             const std::vector<std::filesystem::directory_entry>& reads);
 };
 
 class DuplexModelResolver : public ModelResolver {
 public:
-    DuplexModelResolver(const std::string& model_complex_arg,
-                        const std::string& modbase_models_arg,
-                        const std::vector<std::string>& modbases_arg,
-                        const std::optional<std::string>& stereo_arg,
-                        const std::optional<std::string>& models_directory_arg,
+    DuplexModelResolver(std::string model_complex_arg,
+                        std::string modbase_models_arg,
+                        std::vector<std::string> modbases_arg,
+                        std::optional<std::string> stereo_arg,
+                        std::optional<std::string> models_directory_arg,
                         bool skip_model_compatibility_check,
                         const std::vector<std::filesystem::directory_entry>& reads);
 };
 
 class DownloaderModelResolver : public ModelResolver {
 public:
-    DownloaderModelResolver(const std::string& model_complex_arg,
-                            const std::optional<std::string>& models_directory_arg,
+    DownloaderModelResolver(std::string model_complex_arg,
+                            std::optional<std::string> models_directory_arg,
                             const std::vector<std::filesystem::directory_entry>& reads);
 };
 

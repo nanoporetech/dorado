@@ -23,15 +23,6 @@ namespace fs = std::filesystem;
 
 namespace {
 
-ModelComplex parse_model_complex(const std::string& model_arg) {
-    try {
-        return ModelComplex::parse(model_arg);
-    } catch (std::exception& e) {
-        spdlog::error("Failed to parse model argument '{}'. '{}'", model_arg, e.what());
-        std::exit(EXIT_FAILURE);
-    }
-}
-
 std::optional<ModelInfo> get_model_info_from_path(const std::filesystem::path& path) {
     const auto& name = path.filename().string();
     try {
@@ -53,8 +44,8 @@ std::optional<fs::path> get_models_directory(
     if (models_directory_arg.has_value()) {
         auto path = fs::path(models_directory_arg.value());
         if (!fs::exists(path)) {
-            spdlog::error("--models-directory path does not exist at: '{}'.", path.string());
-            std::exit(EXIT_FAILURE);
+            throw std::runtime_error(
+                    fmt::format("--models-directory path does not exist at: '{}'.", path.string()));
         }
         path = fs::canonical(path);
         spdlog::trace("Set models directory to: '{}'.", path.string());
@@ -79,26 +70,26 @@ std::optional<fs::path> get_models_directory(
 }
 
 ModelResolver::ModelResolver(Mode mode,
-                             const std::string& model_complex_arg,
-                             const std::string& modbase_models_arg,
-                             const std::vector<std::string>& modbases_arg,
-                             const std::optional<std::string>& stereo_arg,
-                             const std::optional<std::string>& models_directory_arg,
+                             std::string model_complex,
+                             std::string modbase_models,
+                             std::vector<std::string> modbases,
+                             std::optional<std::string> stereo,
+                             std::optional<std::string> models_directory,
                              bool skip_model_compatibility_check,
                              const std::vector<std::filesystem::directory_entry>& reads)
         : m_mode(mode),
-          m_model_complex_arg(model_complex_arg),
-          m_modbase_models_arg(modbase_models_arg),
-          m_modbases_arg(modbases_arg),
-          m_stereo_arg(stereo_arg),
-          m_models_directory_arg(models_directory_arg),
+          m_model_complex(std::move(model_complex)),
+          m_modbase_models(std::move(modbase_models)),
+          m_modbases(std::move(modbases)),
+          m_stereo(std::move(stereo)),
+          m_models_directory_arg(std::move(models_directory)),
           m_reads(reads),
           m_skip_model_compatibility_check(skip_model_compatibility_check) {}
 
 ModelSources ModelResolver::resolve() {
     m_models_directory = get_models_directory(m_models_directory_arg);
 
-    if (m_model_complex_arg.empty()) {
+    if (m_model_complex.empty()) {
         throw std::runtime_error("Model argument must not be empty.");
     }
 
@@ -123,7 +114,7 @@ ModelSources ModelResolver::resolve() {
 };
 
 ModelSources ModelResolver::resolve_model_complex() const {
-    const auto model_complex = parse_model_complex(m_model_complex_arg);
+    const auto model_complex = ModelComplex::parse(m_model_complex);
 
     // Downloader only supports named models or variants
     if (model_complex.is_path_style() && m_mode != Mode::DOWNLOADER) {
@@ -165,13 +156,13 @@ ModelSources ModelResolver::resolve_model_complex() const {
         return ModelSources{simplex, std::move(mods), std::nullopt};
     }
 
-    throw std::logic_error("Failed to resolve Model Complex: '" + m_model_complex_arg + "'.");
+    throw std::logic_error("Failed to resolve Model Complex: '" + m_model_complex + "'.");
 }
 
 void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
     const bool used_complex = !model_sources.mods.empty();
-    const bool used_paths = !m_modbase_models_arg.empty();
-    const bool used_modbases = !m_modbases_arg.empty();
+    const bool used_paths = !m_modbase_models.empty();
+    const bool used_modbases = !m_modbases.empty();
 
     if (used_complex && (used_paths || used_modbases)) {
         throw std::logic_error(
@@ -182,8 +173,8 @@ void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
     const auto& simplex = model_sources.simplex;
 
     if (used_modbases) {
-        model_sources.mods.reserve(m_modbases_arg.size());
-        for (const auto& modbase_arg : m_modbases_arg) {
+        model_sources.mods.reserve(m_modbases.size());
+        for (const auto& modbase_arg : m_modbases) {
             const auto modbase_varint = get_mods_variant(modbase_arg);
             const auto simplex_name = simplex.info.has_value() ? simplex.info->name
                                                                : simplex.path.filename().string();
@@ -191,15 +182,15 @@ void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
                     simplex_name, ModsVariantPair{modbase_varint, ModelVersion::NONE});
 
             if (simplex.info.has_value() && (simplex.info->simplex != mods_info.simplex)) {
-                spdlog::error("Modbases model '{}' is incompatible with simplex model: '{}'",
-                              mods_info.name, simplex.info->name);
-                throw std::runtime_error("Incompatible simplex and modbases models.");
+                throw std::runtime_error(
+                        fmt::format("Modbases model '{}' is incompatible with simplex model '{}'",
+                                    mods_info.name, simplex.info->name));
             }
 
             for (const auto& prev : model_sources.mods) {
                 if (prev.info->name == mods_info.name) {
-                    spdlog::error("Duplicate modbases model found: '{}'", prev.info->name);
-                    throw std::runtime_error("Invalid modbases models arguments.");
+                    throw std::runtime_error(
+                            fmt::format("Duplicate modbases model found: '{}'", prev.info->name));
                 }
             }
 
@@ -209,7 +200,7 @@ void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
     }
 
     if (used_paths) {
-        const auto splits = utils::split(m_modbase_models_arg, ',');
+        const auto splits = utils::split(m_modbase_models, ',');
         model_sources.mods.reserve(splits.size());
         for (const auto& part : splits) {
             const auto path = fs::path(part);
@@ -217,8 +208,8 @@ void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
 
             for (const auto& prev : model_sources.mods) {
                 if (prev.path.filename().string() == path.filename().string()) {
-                    spdlog::error("Duplicate modbases model found: '{}'", path.filename().string());
-                    throw std::runtime_error("Invalid modbases models arguments.");
+                    throw std::runtime_error(fmt::format("Duplicate modbases model found: '{}'",
+                                                         path.filename().string()));
                 }
             }
 
@@ -233,12 +224,12 @@ void ModelResolver::resolve_stereo_models(ModelSources& model_sources) const {
         return;
     }
 
-    if (m_stereo_arg.has_value() && !m_stereo_arg->empty()) {
+    if (m_stereo.has_value() && !m_stereo->empty()) {
         // Use the stero model path provided
-        const auto path = fs::path(m_stereo_arg.value());
+        const auto path = fs::path(m_stereo.value());
         if (!fs::exists(path)) {
-            spdlog::error("--stereo-model does not exist at: '{}'.", path.string());
-            throw std::runtime_error("Invalud stereo model.");
+            throw std::runtime_error(
+                    fmt::format("--stereo-model does not exist at: '{}'.", path.string()));
         }
 
         const auto maybe_info = get_model_info_from_path(path);
@@ -285,11 +276,11 @@ ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) c
     return ModelSource{dl_temporary_path, model_info, true};
 }
 
-void ModelResolver::model_compatibility_check(ModelSources& model_soruces) const {
-    const auto simplex_config = config::load_model_config(model_soruces.simplex.path);
+void ModelResolver::model_compatibility_check(ModelSources& model_sources) const {
+    const auto simplex_config = config::load_model_config(model_sources.simplex.path);
     const int simplex_sample_rate =
             simplex_config.sample_rate < 0
-                    ? get_sample_rate_by_model_name(model_soruces.simplex.info->name)
+                    ? get_sample_rate_by_model_name(model_sources.simplex.info->name)
                     : simplex_config.sample_rate;
 
     int data_sample_rate = 0;
@@ -314,27 +305,11 @@ void ModelResolver::model_compatibility_check(ModelSources& model_soruces) const
 void ModelResolver::warn_rna_model(const ModelSource& simplex) const {
     bool is_rna{false};
     if (simplex.info.has_value()) {
-        switch (simplex.info->chemistry) {
-        case models::Chemistry::RNA002_70BPS:
-        case models::Chemistry::RNA004_130BPS:
-            is_rna = true;
-            break;
-        case models::Chemistry::UNKNOWN:
-            throw std::logic_error("Unknown chemistry.");
-        default:
-            return;
-        }
+        const Chemistry c = simplex.info->chemistry;
+        is_rna = c == Chemistry::RNA002_70BPS || c == Chemistry::RNA004_130BPS;
     } else {
-        switch (config::load_model_config(simplex.path).sample_type) {
-        case models::SampleType::RNA002:
-        case models::SampleType::RNA004:
-            is_rna = true;
-            break;
-        case models::SampleType::UNKNOWN:
-            throw std::logic_error("Unknown sample_type.");
-        default:
-            return;
-        };
+        const SampleType s = config::load_model_config(simplex.path).sample_type;
+        is_rna = s == SampleType::RNA002 || s == SampleType::RNA004;
     }
 
     if (is_rna) {
@@ -358,47 +333,47 @@ void ModelResolver::warn_stereo_fast(const std::optional<ModelSource>& stereo) c
 };
 
 BasecallerModelResolver::BasecallerModelResolver(
-        const std::string& model_complex_arg,
-        const std::string& modbase_models_arg,
-        const std::vector<std::string>& modbases_arg,
-        const std::optional<std::string>& models_directory_arg,
+        std::string model_complex,
+        std::string modbase_models,
+        std::vector<std::string> modbases,
+        std::optional<std::string> models_directory,
         bool skip_model_compatibility_check,
         const std::vector<std::filesystem::directory_entry>& reads)
         : ModelResolver(Mode::SIMPLEX,
-                        model_complex_arg,
-                        modbase_models_arg,
-                        modbases_arg,
+                        std::move(model_complex),
+                        std::move(modbase_models),
+                        std::move(modbases),
                         std::nullopt,
-                        models_directory_arg,
+                        std::move(models_directory),
                         skip_model_compatibility_check,
                         reads) {};
 
-DuplexModelResolver::DuplexModelResolver(const std::string& model_complex_arg,
-                                         const std::string& modbase_models_arg,
-                                         const std::vector<std::string>& modbases_arg,
-                                         const std::optional<std::string>& stereo_arg,
-                                         const std::optional<std::string>& models_directory_arg,
+DuplexModelResolver::DuplexModelResolver(std::string model_complex,
+                                         std::string modbase_models,
+                                         std::vector<std::string> modbases,
+                                         std::optional<std::string> stereo,
+                                         std::optional<std::string> models_directory,
                                          bool skip_model_compatibility_check,
                                          const std::vector<std::filesystem::directory_entry>& reads)
         : ModelResolver(Mode::DUPLEX,
-                        model_complex_arg,
-                        modbase_models_arg,
-                        modbases_arg,
-                        stereo_arg,
-                        models_directory_arg,
+                        std::move(model_complex),
+                        std::move(modbase_models),
+                        std::move(modbases),
+                        std::move(stereo),
+                        std::move(models_directory),
                         skip_model_compatibility_check,
                         reads) {};
 
 DownloaderModelResolver::DownloaderModelResolver(
-        const std::string& model_complex_arg,
-        const std::optional<std::string>& models_directory_arg,
+        std::string model_complex,
+        std::optional<std::string> models_directory,
         const std::vector<std::filesystem::directory_entry>& reads)
         : ModelResolver(Mode::DOWNLOADER,
-                        model_complex_arg,
+                        std::move(model_complex),
                         "",
                         {},
                         std::nullopt,
-                        models_directory_arg,
+                        std::move(models_directory),
                         true,
                         reads) {};
 
