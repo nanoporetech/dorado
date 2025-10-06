@@ -46,6 +46,9 @@ public:
     const HtsData::ReadAttributes& get_read_attributes(const bam1_t* record) const;
     const MergeHeaders& get_merged_header(const HtsData::ReadAttributes& attrs) const;
 
+    // Create a shared sam header by merging all dynamic headers.
+    SamHdrPtr get_shared_merged_header(bool strip_alignments) const;
+
 private:
     const bool m_strip_alignment;
     // Store this fallback for when we don't find a read group
@@ -60,6 +63,8 @@ private:
     void process_fastx(const std::filesystem::path& path);
 
     AttributeMap get_read_attrs_by_id(const std::vector<utils::HeaderLineData>& header_lines);
+
+    bool m_fastq_runtime_warning_issued{false};
 };
 
 }  // namespace dorado::utils

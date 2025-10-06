@@ -4,6 +4,7 @@
 #include <spdlog/spdlog.h>
 
 #include <memory>
+#include <sstream>
 
 namespace dorado {
 
@@ -60,5 +61,24 @@ size_t HtsData::ReadAttributesCoreHasher::operator()(
     hash_combine(seed, attr.protocol_start_time_ms);
     return seed;
 };
+
+std::string to_string(const HtsData::ReadAttributes& a) {
+    std::ostringstream oss;
+    oss << "{ ";
+    oss << "kit:'" << a.sequencing_kit << "', ";
+    oss << "exp:'" << a.experiment_id << "', ";
+    oss << "sample:'" << a.sample_id << "', ";
+    oss << "pos:'" << a.position_id << "', ";
+    oss << "fc:'" << a.flowcell_id << "', ";
+    oss << "proto:'" << a.protocol_run_id.substr(0, std::min(a.protocol_run_id.size(), size_t(8)))
+        << "', ";
+    oss << "acq:'" << a.acquisition_id.substr(0, std::min(a.acquisition_id.size(), size_t(8)))
+        << "', ";
+    oss << "st:'" << a.protocol_start_time_ms << "', ";
+    oss << "subread:'" << a.subread_id << "', ";
+    oss << "status:'" << a.is_status_pass << "'";
+    oss << " }";
+    return oss.str();
+}
 
 }  // namespace dorado

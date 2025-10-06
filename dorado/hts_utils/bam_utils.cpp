@@ -43,7 +43,7 @@ void emit_read_group(sam_hdr_t* hdr,
                      const std::string& read_group_line,
                      const std::string& id,
                      const std::string& additional_tags) {
-    auto line = "@RG\tID:" + id + '\t' + read_group_line + additional_tags + '\n';
+    const auto line = format_read_group_header_line(read_group_line, id, additional_tags);
     sam_hdr_add_lines(hdr, line.c_str(), 0);
 }
 
@@ -136,6 +136,18 @@ int remove_fastq_header_tag(bam1_t* record) {
         return 0;  // return success result for bam_aux_del, as we assume it wasn't present.
     }
     return bam_aux_del(record, tag_ptr);
+}
+
+std::string format_read_group_header_line(const std::string& read_group_line,
+                                          const std::string& id,
+                                          const std::string& additional_tags) {
+    return "@RG\tID:" + id + '\t' + read_group_line + additional_tags + '\n';
+}
+
+std::string format_read_group_header_line(const ReadGroup& read_group,
+                                          const std::string& id,
+                                          const std::string& additional_tags) {
+    return format_read_group_header_line(read_group_to_string(read_group), id, additional_tags);
 }
 
 void add_hd_header_line(sam_hdr_t* hdr) {

@@ -28,6 +28,23 @@ void StreamHtsFileWriter::shutdown() {
 
 bool StreamHtsFileWriter::finalise_is_noop() const { return true; };
 
+void StreamHtsFileWriter::set_hts_file_header(utils::HtsFile& hts_file) const {
+    if (m_mode == OutputMode::FASTQ || m_mode == OutputMode::FASTA) {
+        return;
+    }
+
+    if (m_shared_header != nullptr) {
+        hts_file.set_header(m_shared_header.get());
+        return;
+    }
+
+    if (m_dynamic_header != nullptr) {
+        throw std::logic_error("StreamHtsFileWriter - using dynamic header is invalid.");
+    }
+
+    throw std::logic_error("StreamHtsFileWriter - header not set before writing records.");
+};
+
 void StreamHtsFileWriter::handle(const HtsData& data) {
     if (m_has_shutdown) {
         spdlog::debug("HtsFileWriter has shutdown and cannot process more work.");
@@ -35,14 +52,8 @@ void StreamHtsFileWriter::handle(const HtsData& data) {
     }
 
     if (m_hts_file == nullptr) {
-        if (m_dynamic_header != nullptr) {
-            throw std::logic_error("StreamHtsFileWriter - dynamic header not supported.");
-        }
-        if (m_shared_header == nullptr) {
-            throw std::logic_error("StreamHtsFileWriter - header not set before writing records.");
-        }
         m_hts_file = std::make_unique<utils::HtsFile>(m_path, m_mode, m_threads, false);
-        m_hts_file->set_header(m_shared_header.get());
+        set_hts_file_header(*m_hts_file);
     }
     m_hts_file->write(data.bam_ptr.get());
 }

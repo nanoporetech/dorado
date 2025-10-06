@@ -11,7 +11,6 @@
 #include <filesystem>
 #include <functional>
 #include <memory>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_set>
@@ -123,7 +122,7 @@ bool HtsReader::has_tag(const char* tagname) {
 std::size_t HtsReader::read(Pipeline& pipeline,
                             std::size_t max_reads,
                             const bool strip_alignments,
-                            const std::unique_ptr<utils::HeaderMapper> header_mapper,
+                            const utils::HeaderMapper* header_mapper,
                             const bool skip_sec_supp) {
     std::size_t num_reads = 0;
     while (this->read()) {

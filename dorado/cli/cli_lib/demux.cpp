@@ -184,7 +184,7 @@ int demuxer(int argc, char* argv[]) {
     const bool emit_fastq = cli::get_emit_fastq(parser);
     const bool emit_summary = cli::get_emit_summary(parser);
     int threads(parser.get<int>("threads"));
-    const int max_reads(parser.get<int>("max-reads"));
+    std::size_t max_reads(parser.get<int>("max-reads"));
 
     auto strip_alignment = !no_trim;
     std::vector<std::string> args(argv, argv + argc);
@@ -219,10 +219,10 @@ int demuxer(int argc, char* argv[]) {
     }
     auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
 
-    auto header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_alignment);
+    auto header_mapper = utils::HeaderMapper(all_files, strip_alignment);
     auto add_pg_hdr = utils::HeaderMapper::Modifier(
             [&args](sam_hdr_t* hdr) { cli::add_pg_hdr(hdr, "demux", args, "cpu"); });
-    header_mapper->modify_headers(add_pg_hdr);
+    header_mapper.modify_headers(add_pg_hdr);
 
     // All progress reporting is in the post-processing part.
     ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
@@ -305,7 +305,7 @@ int demuxer(int argc, char* argv[]) {
 
     // Set the dynamic header map
     pipeline->get_node_ref<WriterNode>(writer_node)
-            .set_dynamic_header(header_mapper->get_merged_headers_map());
+            .set_dynamic_header(header_mapper.get_merged_headers_map());
 
     // Set up stats counting
     std::vector<dorado::stats::StatsCallable> stats_callables;
@@ -327,7 +327,8 @@ int demuxer(int argc, char* argv[]) {
         reader.set_client_info(client_info);
 
         const auto num_reads_in_file =
-                reader.read(*pipeline, max_reads, strip_alignment, std::move(header_mapper), false);
+                reader.read(*pipeline, max_reads, strip_alignment, &header_mapper, false);
+        max_reads -= num_reads_in_file;
         spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
     }

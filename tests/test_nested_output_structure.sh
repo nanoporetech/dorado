@@ -89,6 +89,15 @@ check_structure() {
 
 TEST_INLINE_DEMUX=1
 TEST_POSTRUN_DEMUX=1
+TEST_ALIGNER=1
+
+if [ $TEST_INLINE_DEMUX -eq 1 ] || [ $TEST_ALIGNER -eq 1 ]; then
+{
+    # Create a fastq "reference" by basecalling some data
+    align_data_ref="${output_dir}/align_data_ref.fq"
+    $dorado_bin basecaller ${model} ${align_data} ${basic_args} --emit-fastq > $align_data_ref
+}
+fi
 
 # Testing for inline demux where we have basecall, barcode and demux at once
 if [ $TEST_INLINE_DEMUX -eq 1 ]; then 
@@ -179,9 +188,8 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
         "${core}/bam_pass/TEST_pass_4524e8b9_test_0.bam"
         "${core}/bam_pass/TEST_pass_4524e8b9_test_0.bam.bai"
     )
-    ref="${output_dir}/ref.fq"
-    $dorado_bin basecaller ${model} ${align_data} ${basic_args} --emit-fastq > $ref
-    $dorado_bin basecaller ${model} ${align_data} ${basic_args} --output-dir ${dest} --reference $ref
+    
+    $dorado_bin basecaller ${model} ${align_data} ${basic_args} --output-dir ${dest} --reference $align_data_ref
     check_structure ${dest} "${expected[@]}"
 }
 fi # TEST_INLINE_DEMUX
@@ -224,5 +232,63 @@ if [ $TEST_POSTRUN_DEMUX -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 fi # TEST_POSTRUN_DEMUX
+
+# Testing for post-run demux where we have untrimmed basecalls and run barcode classification
+if [ $TEST_ALIGNER -eq 1 ]; then 
+{
+    aligner_output_dir="${output_dir}/aligner"
+    mkdir -p $aligner_output_dir    
+
+    calls_bam="${aligner_output_dir}/calls.bam"
+    $dorado_bin basecaller ${model} ${align_data} ${basic_args} > $calls_bam
+
+}
+{
+    dest=${aligner_output_dir}/bam
+    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest}
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    core="./test/20231125_1913_0_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam"
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam.bai"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
+{
+    dest=${aligner_output_dir}/no-sort
+    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --no-sort
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    core="./test/20231125_1913_0_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
+{
+    dest=${aligner_output_dir}/sam
+    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --emit-sam 
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    core="./test/20231125_1913_0_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.sam"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
+{
+    dest=${aligner_output_dir}/fastq
+    # Use the "reference" fastq as original calls
+    $dorado_bin aligner ${align_data_ref} ${align_data_ref} --output-dir ${dest}
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    # Also have no_sample here because the sample id is not added to the FASTQ file spec yet.
+    core="./no_sample/20231125_1913_0_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam"
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam.bai"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
+
+
+fi # TEST_ALIGNER
 
 # rm -rf ${TMPDIR} // Trap will clean-up

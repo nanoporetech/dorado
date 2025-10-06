@@ -2,6 +2,7 @@
 
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -150,13 +151,8 @@ int MergeHeaders::check_and_add_rg_data(sam_hdr_t* hdr, const std::string& read_
         std::string read_group_line(ks_str(&line_data));
 
         // Add the RG_line to the LUT or error if it a different record already exists
-        auto entry = m_read_group_lut.find(read_group_id);
-        if (entry == m_read_group_lut.end()) {
-            m_read_group_lut[read_group_id] = std::move(read_group_line);
-        } else {
-            if (entry->second != read_group_line) {
-                return -2;
-            }
+        if (!add_rg(read_group_id, read_group_line)) {
+            return -2;
         }
     }
     return 0;
@@ -263,6 +259,24 @@ void MergeHeaders::finalize_merge() {
         }
         m_sq_mapping.emplace_back(std::move(hdr_mapping));
     }
+}
+
+bool MergeHeaders::add_rg(const std::string& read_group_id, std::string read_group_line) {
+    // Add the RG_line to the LUT or error if it a different record already exists
+    auto entry = m_read_group_lut.find(read_group_id);
+    if (entry == m_read_group_lut.end()) {
+        m_read_group_lut[read_group_id] = std::move(read_group_line);
+    } else {
+        if (entry->second != read_group_line) {
+            return false;
+        }
+    }
+    return true;
+};
+
+bool MergeHeaders::add_rg(const std::string& read_group_id, const ReadGroup& read_group) {
+    return add_rg(read_group_id,
+                  utils::format_read_group_header_line(read_group, read_group_id, {}));
 }
 
 }  // namespace dorado::utils

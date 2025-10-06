@@ -79,6 +79,13 @@ void ProgressTracker::summarize() const {
         }
     }
 
+    if (m_mode == Mode::ALIGN) {
+        spdlog::info("> total/primary/unmapped {}/{}/{}", m_total_records_written,
+                     m_primary_records_written, m_unmapped_records_written);
+        spdlog::debug("> secondary/supplementary {}/{}", m_secondary_records_written,
+                      m_supplementary_records_written);
+    }
+
     if (m_num_barcodes_demuxed > 0) {
         std::ostringstream rate_str;
         rate_str << std::scientific << m_num_barcodes_demuxed / (duration / 1000.0);
@@ -180,6 +187,16 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     // Adapter/primer trimming
     m_num_untrimmed_short_reads = int(fetch_stat("AdapterDetectorNode.num_untrimmed_short_reads"));
 
+    m_total_records_written = int64_t(fetch_stat("WriterNode.HtsFileWriter.total_records_written"));
+    m_primary_records_written =
+            int64_t(fetch_stat("WriterNode.HtsFileWriter.primary_records_written"));
+    m_unmapped_records_written =
+            int64_t(fetch_stat("WriterNode.HtsFileWriter.unmapped_records_written"));
+    m_secondary_records_written =
+            int64_t(fetch_stat("WriterNode.HtsFileWriter.secondary_records_written"));
+    m_supplementary_records_written =
+            int64_t(fetch_stat("WriterNode.HtsFileWriter.supplementary_records_written"));
+
     // Modbase
     m_num_mods_samples_processed = int64_t(fetch_stat("ModBaseChunkCallerNode.samples_processed"));
     m_num_mods_samples_incl_padding =
@@ -265,5 +282,7 @@ void ProgressTracker::internal_set_progress(float progress, bool post_processing
 }
 
 void ProgressTracker::disable_progress_reporting() { m_is_progress_reporting_disabled = true; }
+
+void ProgressTracker::mark_as_completed() { m_progress_bar.mark_as_completed(); };
 
 }  // namespace dorado

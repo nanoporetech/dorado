@@ -1,23 +1,23 @@
 #include "ProgressTracker.h"
-#include "alignment/IndexFileAccess.h"
 #include "alignment/alignment_info.h"
 #include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
+#include "basecall_output_args.h"
 #include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
-#include "hts_utils/FastxSequentialReader.h"
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/bam_utils.h"
-#include "hts_utils/fastq_tags.h"
+#include "hts_utils/hts_types.h"
+#include "hts_writer/HtsFileWriterBuilder.h"
+#include "hts_writer/interface.h"
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/AlignerNode.h"
-#include "read_pipeline/nodes/HtsWriterNode.h"
+#include "read_pipeline/nodes/WriterNode.h"
 #include "summary/summary.h"
-#include "utils/PostCondition.h"
-#include "utils/arg_parse_ext.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 #include "utils/tty_utils.h"
@@ -26,14 +26,12 @@
 #include <spdlog/spdlog.h>
 #include <utils/string_utils.h>
 
-#include <algorithm>
 #include <chrono>
 #include <filesystem>
 #include <fstream>
 #include <memory>
 #include <string>
 #include <thread>
-#include <unordered_map>
 #include <vector>
 
 #ifndef _WIN32
@@ -43,8 +41,6 @@
 using namespace std::chrono_literals;
 
 namespace {
-
-constexpr size_t BAM_BUFFER_SIZE = 1000000000;  // 1 GB
 
 std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         const std::string& filename,
@@ -82,42 +78,8 @@ std::shared_ptr<dorado::alignment::BedFileAccess> load_bed(const std::string& fi
     return bed_file_access;
 }
 
-bool create_output_folder(const std::filesystem::path& output_folder) {
-    std::error_code creation_error;
-    // N.B. No error code if folder already exists.
-    std::filesystem::create_directories(output_folder, creation_error);
-    if (creation_error) {
-        spdlog::error("Unable to create output folder {}. ErrorCode({}) {}", output_folder.string(),
-                      creation_error.value(), creation_error.message());
-        return false;
-    }
-    return true;
-}
-
 void add_pg_hdr(sam_hdr_t* hdr) {
     sam_hdr_add_pg(hdr, "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION, nullptr);
-}
-
-std::unordered_map<std::string, dorado::ReadGroup> collect_read_groups(
-        const std::filesystem::path& in_path) {
-    spdlog::debug("> collecting headers from: '{}'.", in_path.string());
-
-    dorado::hts_io::FastxSequentialReader reader(in_path);
-
-    std::unordered_map<std::string, dorado::ReadGroup> read_groups;
-
-    dorado::hts_io::FastxRecord record;
-    while (reader.get_next(record)) {
-        // Check if the tags are HTS-style and parse them.
-        dorado::utils::ReadGroupData rg_data =
-                dorado::utils::parse_rg_from_hts_tags(record.comment);
-        if (!rg_data.found || (read_groups.count(rg_data.id) > 0)) {
-            continue;
-        }
-        read_groups[rg_data.id] = std::move(rg_data.data);
-    }
-
-    return read_groups;
 }
 
 }  // namespace
@@ -164,23 +126,16 @@ int aligner(int argc, char* argv[]) {
                       "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
                       "read tag.")
                 .default_value(std::string(""));
-        parser.add_argument("--add-fastq-rg")
-                .help("Adds FASTQ read group information as @RG header lines in the output BAM. "
-                      "Initial parsing over all input FASTQ file(s) may take time.")
-                .flag();
     }
     {
         parser.add_group("Output arguments");
-        parser.add_argument("-o", "--output-dir")
-                .help("If specified output files will be written to the given folder, otherwise "
-                      "output "
-                      "is to stdout. Required if the 'reads' positional argument is a folder.")
-                .default_value(std::string{});
+        cli::add_output_dir_argument(parser);
+        parser.add_argument("--no-sort").help("Disable sorting of output files.").flag();
+        parser.add_argument("--emit-sam").help("Output in SAM format.").flag();
         parser.add_argument("--emit-summary")
                 .help("If specified, a summary file containing the details of the primary "
-                      "alignments "
-                      "for each read will be emitted to the root of the output folder. This option "
-                      "requires that the '--output-dir' option is also set.")
+                      "alignments for each read will be emitted to the root of the output folder. "
+                      "This option requires that the '--output-dir' option is also set.")
                 .flag();
     }
     {
@@ -225,22 +180,22 @@ int aligner(int argc, char* argv[]) {
     auto align_info = std::make_shared<alignment::AlignmentInfo>();
     align_info->reference_file = parser.get<std::string>("index");
     align_info->bed_file = parser.get<std::string>("bed-file");
-    auto reads(parser.get<std::string>("reads"));
-    auto recursive_input = parser.get<bool>("recursive");
-    auto output_folder = parser.get<std::string>("output-dir");
+
+    const auto reads(parser.get<std::string>("reads"));
+    const auto recursive_input = parser.get<bool>("recursive");
+    const auto output_dir = cli::get_output_dir(parser);
     const bool skip_sec_supp = !parser.get<bool>("--allow-sec-supp");
 
-    auto emit_summary = parser.get<bool>("emit-summary");
-    if (emit_summary && output_folder.empty()) {
+    const auto sort_requested = !parser.get<bool>("--no-sort");
+    const auto emit_sam = parser.get<bool>("--emit-sam");
+    const auto emit_summary = parser.get<bool>("emit-summary");
+    if (emit_summary && !output_dir.has_value()) {
         spdlog::error("Cannot specify '--emit-summary' if '--output-dir' is not also specified.");
         return EXIT_FAILURE;
     }
 
     auto threads(parser.get<int>("threads"));
-
-    auto max_reads(parser.get<int>("max-reads"));
-
-    const bool add_fastq_rg = parser.get<bool>("add-fastq-rg");
+    std::size_t max_reads(parser.get<int>("max-reads"));
 
     std::string err_msg{};
     auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
@@ -256,13 +211,12 @@ int aligner(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    alignment::AlignmentProcessingItems processing_items{reads, recursive_input, output_folder,
-                                                         false};
-    if (!processing_items.initialise()) {
-        spdlog::error("Could not initialise for input {}", reads);
+    if (reads.empty() && output_dir.has_value()) {
+        spdlog::error("--output-dir is not valid if input is stdin.");
         return EXIT_FAILURE;
     }
-    const auto& all_files = processing_items.get();
+
+    const auto all_files = alignment::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
         spdlog::info("No input files found");
         return EXIT_SUCCESS;
@@ -303,117 +257,135 @@ int aligner(int argc, char* argv[]) {
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const alignment::AlignmentInfo>(align_info);
 
-    for (const auto& file_info : all_files) {
-        spdlog::info("processing {} -> {}", file_info.input, file_info.output);
-
-        HtsReader reader(file_info.input, std::nullopt);
-        reader.set_client_info(client_info);
-        if (file_info.output != "-" &&
-            !create_output_folder(std::filesystem::path(file_info.output).parent_path())) {
-            return EXIT_FAILURE;
-        }
-
-        spdlog::debug("> input fmt: {} aligned: {}", reader.format(), reader.is_aligned);
-        auto header = SamHdrPtr(sam_hdr_dup(reader.header()));
-        utils::add_hd_header_line(header.get());
-        add_pg_hdr(header.get());
-        dorado::utils::strip_alignment_data_from_header(header.get());
-
-        const hts_io::SequenceFormatType input_fmt = hts_io::parse_sequence_format(file_info.input);
-        if (add_fastq_rg && ((input_fmt == hts_io::SequenceFormatType::FASTA) ||
-                             (input_fmt == hts_io::SequenceFormatType::FASTQ))) {
-            spdlog::debug("> collecting read groups from: {}", file_info.input);
-            const std::unordered_map<std::string, ReadGroup> read_groups =
-                    collect_read_groups(file_info.input);
-            utils::add_rg_headers(header.get(), read_groups);
-            spdlog::debug("> done adding RG headers from input file: {}", file_info.input);
-        }
-
-        const bool sort_bam = (file_info.output_mode == utils::HtsFile::OutputMode::BAM &&
-                               file_info.output != "-");
-        utils::HtsFile hts_file(file_info.output, file_info.output_mode, writer_threads, sort_bam);
-        if (sort_bam) {
-            hts_file.set_buffer_size(BAM_BUFFER_SIZE);
-        }
-        PipelineDescriptor pipeline_desc;
-        auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
-        auto aligner = pipeline_desc.add_node<AlignerNode>(
-                {hts_writer}, index_file_access, bed_file_access, align_info->reference_file,
-                align_info->bed_file, align_info->minimap_options, aligner_threads);
-
-        // Create the Pipeline from our description.
-        std::vector<dorado::stats::StatsReporter> stats_reporters;
-        auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
-        if (pipeline == nullptr) {
-            spdlog::error("Failed to create pipeline");
-            return EXIT_FAILURE;
-        }
-
-        // At present, header output file header writing relies on direct node method calls
-        // rather than the pipeline framework.
-        const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
-        utils::add_sq_hdr(header.get(), aligner_ref.get_sequence_records_for_header());
-        auto& hts_writer_ref = pipeline->get_node_ref<HtsWriterNode>(hts_writer);
-        hts_file.set_header(header.get());
-
-        // All progress reporting is in the post-processing part.
-        ProgressTracker tracker(ProgressTracker::Mode::ALIGN, 0, 1.f);
-        if (progress_stats_frequency > 0) {
-            tracker.disable_progress_reporting();
-        }
-        tracker.set_description("Aligning");
-
-        // Set up stats counting
-        std::vector<dorado::stats::StatsCallable> stats_callables;
-        stats_callables.push_back(
-                [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
-        stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
-            progress_stats.update_stats(stats);
-        });
-        constexpr auto kStatsPeriod = 100ms;
-        auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
-                kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
-
-        spdlog::info("> starting alignment");
-        auto num_reads_in_file = reader.read(*pipeline, max_reads, false, nullptr, skip_sec_supp);
-
-        // Wait for the pipeline to complete.  When it does, we collect
-        // final stats to allow accurate summarisation.
-        auto final_stats = pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
-
-        // Stop the stats sampler thread before tearing down any pipeline objects.
-        stats_sampler->terminate();
-        tracker.update_progress_bar(final_stats);
-        progress_stats.update_reads_per_file_estimate(num_reads_in_file);
-        progress_stats.notify_stats_collector_completed(final_stats);
-
-        spdlog::info("> finished alignment");
-
-        // Report progress during output file finalisation.
-        if (!hts_file.finalise_is_noop()) {
-            spdlog::info("> merging temporary BAM files");
-        }
-        tracker.set_description("Merging temporary BAM files");
-        hts_file.finalise([&](size_t progress) {
-            tracker.update_post_processing_progress(static_cast<float>(progress));
-            progress_stats.update_post_processing_progress(static_cast<float>(progress));
-        });
-
-        progress_stats.notify_post_processing_completed();
-        tracker.summarize();
-
-        spdlog::info("> total/primary/unmapped {}/{}/{}", hts_writer_ref.get_total(),
-                     hts_writer_ref.get_primary(), hts_writer_ref.get_unmapped());
+    // All progress reporting is in the post-processing part.
+    ProgressTracker tracker(ProgressTracker::Mode::ALIGN, 0, 1.f);
+    if (progress_stats_frequency > 0) {
+        tracker.disable_progress_reporting();
     }
 
+    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+    {
+        auto progress_callback =
+                utils::ProgressCallback([&tracker, &progress_stats](size_t progress) {
+                    // Called as part of hts finalize
+                    tracker.update_post_processing_progress(static_cast<float>(progress));
+                    progress_stats.update_post_processing_progress(static_cast<float>(progress));
+                });
+        auto description_callback =
+                utils::DescriptionCallback([&tracker](const std::string& description) {
+                    tracker.set_description(description);
+                });
+
+        auto hts_writer_builder = hts_writer::AlignerHtsFileWriterBuilder(
+                emit_sam, sort_requested, output_dir, writer_threads, progress_callback,
+                description_callback);
+
+        std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
+        if (hts_file_writer == nullptr) {
+            spdlog::error("Failed to create hts file writer");
+            std::exit(EXIT_FAILURE);
+        }
+
+        writers.push_back(std::move(hts_file_writer));
+    }
+
+    PipelineDescriptor pipeline_desc;
+    auto writer_node = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
+    auto aligner_node = pipeline_desc.add_node<AlignerNode>(
+            {writer_node}, index_file_access, bed_file_access, align_info->reference_file,
+            align_info->bed_file, align_info->minimap_options, aligner_threads);
+
+    // Create the Pipeline from our description.
+    std::vector<dorado::stats::StatsReporter> stats_reporters;
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
+    if (pipeline == nullptr) {
+        spdlog::error("Failed to create pipeline");
+        return EXIT_FAILURE;
+    }
+
+    // Set up stats counting
+    std::vector<dorado::stats::StatsCallable> stats_callables;
+    stats_callables.push_back(
+            [&tracker](const stats::NamedStats& stats) { tracker.update_progress_bar(stats); });
+    stats_callables.push_back([&progress_stats](const stats::NamedStats& stats) {
+        progress_stats.update_stats(stats);
+    });
+    constexpr auto kStatsPeriod = 100ms;
+    auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
+            kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
+
+    tracker.set_description("Collecting Headers");
+
+    // Construct the output headers map
+    const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner_node);
+    auto modify_hdr = utils::HeaderMapper::Modifier([&aligner_ref](sam_hdr_t* hdr) {
+        add_pg_hdr(hdr);
+        utils::add_hd_header_line(hdr);
+        utils::add_sq_hdr(hdr, aligner_ref.get_sequence_records_for_header());
+    });
+
+    std::unique_ptr<utils::HeaderMapper> header_mapper;
+    bool strip_input_alignments = true;
+    if (!reads.empty()) {
+        header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
+
+        if (output_dir.has_value()) {
+            header_mapper->modify_headers(modify_hdr);
+            // Set the dynamic header map on the writer
+            pipeline->get_node_ref<WriterNode>(writer_node)
+                    .set_dynamic_header(header_mapper->get_merged_headers_map());
+        } else {
+            // Convert the dynamic header into a single merged sharable header
+            // Strip the alignments and add them back in because merge header finalise
+            // can change the tid / sq line indexing
+            auto shared_merged_header =
+                    header_mapper->get_shared_merged_header(strip_input_alignments);
+            modify_hdr(shared_merged_header.get());
+            pipeline->get_node_ref<WriterNode>(writer_node)
+                    .set_shared_header(std::move(shared_merged_header));
+        }
+    }
+
+    tracker.set_description("Aligning");
+    spdlog::info("> starting alignment");
+
+    for (const auto& file_info : all_files) {
+        spdlog::info("processing '{}'", file_info.string());
+        HtsReader reader(file_info.string(), std::nullopt);
+        reader.set_client_info(client_info);
+        spdlog::debug("> input:'{}' fmt:'{}' aligned:'{}'", file_info.filename().string(),
+                      reader.format(), reader.is_aligned);
+
+        if (header_mapper == nullptr) {
+            SamHdrPtr hdr(sam_hdr_dup(reader.header()));
+            modify_hdr(hdr.get());
+            pipeline->get_node_ref<WriterNode>(writer_node).set_shared_header(std::move(hdr));
+        }
+
+        auto num_reads_in_file = reader.read(*pipeline, max_reads, strip_input_alignments,
+                                             header_mapper.get(), skip_sec_supp);
+        max_reads -= num_reads_in_file;
+        progress_stats.update_reads_per_file_estimate(num_reads_in_file);
+    }
+
+    // Wait for the pipeline to complete.  When it does, we collect
+    // final stats to allow accurate summarisation.
+    auto final_stats = pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
+    stats_sampler->terminate();
+    tracker.update_progress_bar(final_stats);
+    tracker.mark_as_completed();
+    progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();
+
+    spdlog::info("> finished alignment");
+    tracker.summarize();
 
     if (emit_summary) {
         spdlog::info("> generating summary file");
         SummaryData summary(SummaryData::ALIGNMENT_FIELDS);
-        auto summary_file = std::filesystem::path(output_folder) / "alignment_summary.txt";
+        auto summary_file = std::filesystem::path(output_dir.value()) / "alignment_summary.txt";
         std::ofstream summary_out(summary_file.string());
-        summary.process_tree(output_folder, summary_out);
+        summary.process_tree(output_dir.value(), summary_out);
         spdlog::info("> summary file complete.");
     }
 

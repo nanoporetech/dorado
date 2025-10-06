@@ -15,6 +15,7 @@
 #include <optional>
 #include <stdexcept>
 #include <string>
+#include <utility>
 
 namespace dorado {
 namespace hts_writer {
@@ -51,7 +52,10 @@ void HtsFileWriterBuilder::update() {
     const bool to_file = m_output_dir.has_value();
 
     if (m_emit_fastq) {
-        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
+        if (!std::exchange(m_warn_fastq_called, true)) {
+            spdlog::info(
+                    " - Note: FASTQ output is not recommended as not all data can be preserved.");
+        }
         m_output_mode = OutputMode::FASTQ;
         m_sort = false;
     } else if (!to_file && m_is_fd_tty) {
@@ -138,6 +142,23 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
                                std::move(description_callback),
                                std::move(gpu_names),
                                std::move(sample_sheet)) {};
+
+AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
+        bool emit_sam,
+        bool sort_requested,
+        const std::optional<std::string>& output_dir,
+        int writer_threads,
+        utils::ProgressCallback progress_callback,
+        utils::DescriptionCallback description_callback)
+        : HtsFileWriterBuilder(false,
+                               emit_sam,
+                               sort_requested,
+                               output_dir,
+                               writer_threads,
+                               std::move(progress_callback),
+                               std::move(description_callback),
+                               std::string(),
+                               nullptr) {};
 
 }  // namespace hts_writer
 }  // namespace dorado

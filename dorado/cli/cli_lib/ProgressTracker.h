@@ -25,6 +25,7 @@ public:
     void set_total_reads(int num_reads) { m_num_reads_expected = num_reads; }
     void set_post_processing_percentage(float pct) { m_post_processing_percentage = pct; }
 
+    void mark_as_completed();
     void summarize() const;
     void update_progress_bar(const stats::NamedStats& stats);
     void update_post_processing_progress(float progress);
@@ -52,6 +53,13 @@ private:
     int m_num_duplex_reads_written{0};
     int m_num_duplex_reads_filtered{0};
     int m_num_duplex_bases_filtered{0};
+
+    int64_t m_total_records_written{0};
+    int64_t m_primary_records_written{0};
+    int64_t m_unmapped_records_written{0};
+    int64_t m_secondary_records_written{0};
+    int64_t m_supplementary_records_written{0};
+
     int m_num_barcodes_demuxed{0};
     int m_num_poly_a_called{0};
     int m_num_poly_a_not_called{0};

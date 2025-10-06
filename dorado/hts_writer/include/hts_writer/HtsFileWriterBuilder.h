@@ -44,6 +44,8 @@ private:
     bool m_sort{false};
     OutputMode m_output_mode{OutputMode::BAM};
 
+    bool m_warn_fastq_called{false};
+
 protected:
     bool m_is_fd_tty{false}, m_is_fd_pipe{false};
 };
@@ -71,6 +73,16 @@ public:
                               utils::DescriptionCallback description_callback,
                               std::string gpu_names,
                               std::shared_ptr<const utils::SampleSheet> sample_sheet);
+};
+
+class AlignerHtsFileWriterBuilder final : public HtsFileWriterBuilder {
+public:
+    AlignerHtsFileWriterBuilder(bool emit_sam,
+                                bool sort_requested,
+                                const std::optional<std::string>& output_dir,
+                                int writer_threads,
+                                utils::ProgressCallback progress_callback,
+                                utils::DescriptionCallback description_callback);
 };
 
 }  // namespace hts_writer

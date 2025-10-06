@@ -76,6 +76,13 @@ std::unordered_map<std::string, std::vector<fs::path>> get_output_to_input_files
 namespace dorado::alignment {
 
 std::vector<std::filesystem::path> collect_inputs(const std::string& input_folder, bool recursive) {
+    if (input_folder.empty()) {
+        if (recursive) {
+            spdlog::warn("--recursive is not valid if input is stdin. This argument is ignored.");
+        }
+        return {std::filesystem::path("-")};
+    }
+
     const auto all_files = dorado::utils::fetch_directory_entries(input_folder, recursive);
 
     std::vector<std::filesystem::path> inputs;

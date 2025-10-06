@@ -524,15 +524,8 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         fi
     }
 
-    {
-        test_command="$dorado_bin aligner $data_dir/aligner_test/basecall_target.fa $data_dir/aligner_test/example-hts.fastq.gz --output-dir $output_dir/aligned"
-
-        ${test_command} --add-fastq-rg
-        check_add_fastq_rg_header_count 1 $output_dir/aligned/example-hts.bam "with --add-fastq-rg"
-
-        ${test_command}
-        check_add_fastq_rg_header_count 0 $output_dir/aligned/example-hts.bam "without --add-fastq-rg"
-    }
+    $dorado_bin aligner $data_dir/aligner_test/basecall_target.fa $data_dir/aligner_test/example-hts.fastq.gz --output-dir $output_dir/aligned/rg/
+    check_add_fastq_rg_header_count 1 $output_dir/aligned/rg/PCR_zymo/20221018_1018_0_PAM93185_4524e8b9/bam_pass/PAM93185_pass_4524e8b9_00000000_0.bam "includes RG header lines"
 fi
 
 echo dorado demux test stage

@@ -16,7 +16,7 @@ using OutputMode = utils::HtsFile::OutputMode;
 
 class StreamHtsFileWriter : public HtsFileWriter {
 public:
-    StreamHtsFileWriter(const HtsFileWriterConfig& cfg);
+    StreamHtsFileWriter(const HtsFileWriterConfig & cfg);
     void shutdown() override;
     bool finalise_is_noop() const override;
 
@@ -26,7 +26,8 @@ private:
 
     bool m_has_shutdown{false};
 
-    void handle(const HtsData& data) override;
+    void set_hts_file_header(utils::HtsFile & hts_file) const;
+    void handle(const HtsData & data) override;
 };
 
 }  // namespace hts_writer

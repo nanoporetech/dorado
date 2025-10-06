@@ -139,4 +139,7 @@ public:
     std::pair<int, int> adapter_trim_interval{};
     std::pair<int, int> barcode_trim_interval{};
 };
+
+std::string to_string(const HtsData::ReadAttributes& a);
+
 }  // namespace dorado
