@@ -10,7 +10,7 @@ namespace dorado::models {
 
 enum class ModelType { SIMPLEX, STEREO, MODBASE, CORRECT, POLISH, VARIANT };
 
-std::string to_string(ModelType model_type);
+std::string_view to_string(ModelType model_type);
 
 // Model info identifies models and associates additional metadata for searching for
 // automatic model selection.
@@ -59,7 +59,7 @@ std::vector<std::string> stereo_model_names();
 std::vector<std::string> modified_model_names();
 std::vector<std::string> modified_model_variants();
 
-bool is_valid_model(const std::string& selected_model);
+bool is_valid_model(std::string_view selected_model);
 
 // Get ModelInfo if this name matches is a known deprecated model
 std::optional<ModelInfo> get_deprecated_model(const std::string& model_name);

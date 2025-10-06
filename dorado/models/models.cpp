@@ -1666,7 +1666,7 @@ const std::unordered_map<ModelType, std::string> type_map{
 
 }  // namespace
 
-std::string to_string(ModelType model_type) {
+std::string_view to_string(ModelType model_type) {
     switch (model_type) {
     case ModelType::SIMPLEX:
         return "SIMPLEX";
@@ -1685,7 +1685,7 @@ std::string to_string(ModelType model_type) {
 };
 
 // Returns true if model_name matches any configured model
-bool is_valid_model(const std::string& model_name) {
+bool is_valid_model(std::string_view model_name) {
     for (const auto& collection : {simplex::models, stereo::models, modified::models,
                                    correction::models, polisher::models, variant_caller::models}) {
         for (const ModelInfo& model_info : collection) {

@@ -420,7 +420,7 @@ models::Chemistry ModelResolver::get_chemistry() const {
 };
 
 std::filesystem::path ModelResolver::download(const models::ModelInfo& model_info,
-                                              const std::string& description) const {
+                                              std::string_view description) const {
     if (m_download_override.has_value()) {
         return m_download_override.value()(model_info, description);
     }

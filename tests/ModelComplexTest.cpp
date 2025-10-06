@@ -216,7 +216,7 @@ CATCH_TEST_CASE(TEST_TAG " Test BasecallerModelResolver", TEST_TAG) {
                                           {}) {
             m_check_paths_override = false;
             m_chemistry_override = chem;
-            m_download_override = [](const ModelInfo &info, [[maybe_unused]] const std::string &d) {
+            m_download_override = [](const ModelInfo &info, [[maybe_unused]] std::string_view d) {
                 return std::filesystem::path(info.name);
             };
         };
@@ -299,7 +299,7 @@ CATCH_TEST_CASE(TEST_TAG " Test DuplexModelResolver", TEST_TAG) {
                 : DuplexModelResolver(complex, "", {}, std::nullopt, std::nullopt, true, {}) {
             m_check_paths_override = false;
             m_chemistry_override = chem;
-            m_download_override = [](const ModelInfo &info, [[maybe_unused]] const std::string &d) {
+            m_download_override = [](const ModelInfo &info, [[maybe_unused]] std::string_view d) {
                 return std::filesystem::path(info.name);
             };
         };
