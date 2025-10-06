@@ -14,7 +14,10 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <cassert>
+#include <chrono>
 #include <cstdlib>
+#include <stdexcept>
 
 #if DORADO_METAL_BUILD
 #include "torch_utils/metal_utils.h"
@@ -340,7 +343,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
         // Grab as many new chunks as we can.
         popped_chunks.clear();
-        auto grab_chunk = [&popped_chunks](std::unique_ptr<BasecallingChunk> chunk) {
+        const auto grab_chunk = [&popped_chunks](std::unique_ptr<BasecallingChunk> chunk) {
             popped_chunks.push_back(std::move(chunk));
         };
         const auto max_to_pop = m_variable_chunk_sizes ? variable_chunk_sizes_pop_size

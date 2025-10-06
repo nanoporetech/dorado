@@ -147,8 +147,8 @@ std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data
         }
 
     } else {
-        int N = int(moves_cpu.size(0));
-        int T = int(moves_cpu.size(1));
+        const int N = static_cast<int>(moves_cpu.size(0));
+        const int T = static_cast<int>(moves_cpu.size(1));
 
         called_chunks.reserve(N);
         for (int idx = 0; idx < N; idx++) {
