@@ -75,7 +75,6 @@
     OUTPUT_SPEC_REPO_URL: "${ONT_OUTPUT_SPEC_REPO}-/archive/${OUTPUT_SPEC_REF}/ont-output-specification-${OUTPUT_SPEC_REF}.zip"
     SPECIFICATION_FILE: "ont_output_spec.zip"
     VALIDATOR_COMMIT: "9241216dd8b7703af9a64af2add65e88620edcbb"
-    VALIDATE_SUMMARY_FILES: "OFF"
     TEST_DATA_COMMIT: "version_0.1"
   script:
     - !reference [.extract_archive, script]

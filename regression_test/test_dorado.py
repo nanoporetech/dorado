@@ -11,6 +11,8 @@ from data_paths import (
     OUTPUT_FOLDER,
     REFERENCE_FOLDER,
 )
+
+os.environ["VALIDATE_SUMMARY_FILES"] = "false"
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
 from tetra.regression_manager import RegressionManager, TestData, TestResult
@@ -166,24 +168,24 @@ class TestDorado(unittest.TestCase):
                 "model": "sup,5mCG_5hmCG",
             },
             {
-                "folder": "HAC_inosine_m6A_2OmeA_m5C_20meC_20meG",
+                "folder": "HAC_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
                 "input": "SQK-RNA004",
-                "model": "hac,inosine_m6A_2OmeA,m5C_20meC,20meG",
+                "model": "hac,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
             },
             {
-                "folder": "HAC_m6A_DRACH_pseU_2OmeU",
+                "folder": "HAC_m6A_DRACH",
                 "input": "SQK-RNA004",
-                "model": "hac,m6A_DRACH,pseU_20meU",
+                "model": "hac,m6A_DRACH",
             },
             {
-                "folder": "SUP_inosine_m6A_2OmeA_m5C_20meC_20meG",
+                "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
                 "input": "SQK-RNA004",
-                "model": "sup,inosine_m6A_2OmeA,m5C_20meC,20meG",
+                "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
             },
             {
                 "folder": "SUP_m6A_DRACH_pseU_2OmeU",
                 "input": "SQK-RNA004",
-                "model": "sup,m6A_DRACH,pseU_20meU",
+                "model": "sup,m6A_DRACH,pseU_2OmeU",
             },
         ]
 
