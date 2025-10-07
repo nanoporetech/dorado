@@ -168,14 +168,14 @@ class TestDorado(unittest.TestCase):
                 "model": "sup,5mCG_5hmCG",
             },
             {
-                "folder": "HAC_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
+                "folder": "HAC_inosine_m6A_m5C",
                 "input": "SQK-RNA004",
-                "model": "hac,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
+                "model": "hac,inosine_m6A,m5C",
             },
             {
-                "folder": "HAC_m6A_DRACH",
+                "folder": "HAC_m6A_DRACH_pseU",
                 "input": "SQK-RNA004",
-                "model": "hac,m6A_DRACH",
+                "model": "hac,m6A_DRACH,pseU",
             },
             {
                 "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
