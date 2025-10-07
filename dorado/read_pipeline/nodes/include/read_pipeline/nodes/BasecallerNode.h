@@ -21,6 +21,7 @@ using RunnerPtr = std::unique_ptr<ModelRunnerBase>;
 class BasecallerNode final : public MessageSink {
     struct BasecallingRead;
     struct BasecallingChunk;
+    struct BatchedChunks;
 
 public:
     // Chunk size and overlap are in raw samples
@@ -45,7 +46,7 @@ private:
     // Basecall reads
     void basecall_worker_thread(int worker_id);
     // Basecall batch of chunks
-    void basecall_current_batch(int worker_id);
+    void basecall_current_batch(BatchedChunks &chunks);
     // Construct complete reads
     void working_reads_manager();
 
@@ -54,19 +55,19 @@ private:
     // Override for batch timeout to use for low-latency pipelines. Zero means use the normal timeout.
     int m_low_latency_batch_timeout_ms;
     // Vector of model runners (each with their own GPU access etc)
-    std::vector<basecall::RunnerPtr> m_model_runners;
+    const std::vector<basecall::RunnerPtr> m_model_runners;
     // Minimum overlap between two adjacent chunks in a read. Overlap is used to reduce edge effects and improve accuracy.
-    size_t m_overlap;
+    const size_t m_overlap;
     // Stride of the model in the runners
-    size_t m_model_stride;
+    const size_t m_model_stride;
     // Whether the model is for rna
-    bool m_is_rna_model;
+    const bool m_is_rna_model;
     // model_name
-    std::string m_model_name;
+    const std::string m_model_name;
     // Mean Q-score start position from model properties.
-    uint32_t m_mean_qscore_start_pos;
+    const uint32_t m_mean_qscore_start_pos;
 
-    bool m_variable_chunk_sizes;
+    const bool m_variable_chunk_sizes;
 
     // Async queues to keep track of basecalling chunks. Each queue is for a different chunk size.
     // Basecall worker threads map to queue: `m_chunk_in_queues[worker_id % m_chunk_sizes.size()]`
@@ -77,10 +78,6 @@ private:
     std::mutex m_working_reads_mutex;
     // Reads removed from input queue and being basecalled.
     std::unordered_set<std::shared_ptr<BasecallingRead>> m_working_reads;
-
-    // If we go multi-threaded, there will be one of these batches per thread
-    std::vector<std::vector<std::unique_ptr<BasecallingChunk>>> m_batched_chunks;
-    std::vector<std::size_t> m_batched_chunks_size;
 
     utils::AsyncQueue<std::unique_ptr<BasecallingChunk>> m_processed_chunks;
 

@@ -25,7 +25,7 @@ class Decoder {
 public:
     virtual ~Decoder() = default;
     virtual DecodeData beam_search_part_1(DecodeData data) const = 0;
-    virtual std::vector<DecodedChunk> beam_search_part_2(DecodeData data) const = 0;
+    virtual std::vector<DecodedChunk> beam_search_part_2(const DecodeData &data) const = 0;
     // Returns the torch::TensorOptions::dtype to use for input data to models that use this decoder
     virtual at::ScalarType dtype() const = 0;
 };

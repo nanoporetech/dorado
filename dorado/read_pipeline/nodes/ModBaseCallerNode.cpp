@@ -438,26 +438,29 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
     auto& runner = m_runners[worker_id];
     auto& chunk_queue = m_chunk_queues[caller_id];
 
-    std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
-    auto last_chunk_reserve_time = std::chrono::system_clock::now();
+    using Clock = std::remove_reference_t<decltype(chunk_queue)>::element_type::Clock;
+    auto last_chunk_reserve_time = Clock::now();
 
-    size_t previous_chunk_count = 0;
+    std::vector<std::unique_ptr<ModBaseChunk>> batched_chunks;
+    batched_chunks.reserve(m_batch_size);
     while (true) {
         nvtx3::scoped_range range{"modbasecall_worker_thread"};
+
         // Repeatedly attempt to complete the current batch with one acquisition of the
         // chunk queue mutex.
+        const std::size_t previous_chunk_count = batched_chunks.size();
         auto grab_chunk = [&batched_chunks](std::unique_ptr<ModBaseChunk> chunk) {
             batched_chunks.push_back(std::move(chunk));
         };
         const auto status = chunk_queue->process_and_pop_n_with_timeout(
-                grab_chunk, m_batch_size - batched_chunks.size(),
+                grab_chunk, m_batch_size - previous_chunk_count,
                 last_chunk_reserve_time + FORCE_TIMEOUT);
         if (status == utils::AsyncQueueStatus::Terminate) {
             break;
         }
 
         // Reset timeout.
-        last_chunk_reserve_time = std::chrono::system_clock::now();
+        last_chunk_reserve_time = Clock::now();
 
         // We have just grabbed a number of chunks (0 in the case of timeout) from
         // the chunk queue and added them to batched_chunks.  Insert those chunks
@@ -477,8 +480,6 @@ void ModBaseCallerNode::modbasecall_worker_thread(size_t worker_id, size_t calle
             // Input tensor is full, let's get scores.
             call_current_batch(worker_id, caller_id, batched_chunks);
         }
-
-        previous_chunk_count = batched_chunks.size();
     }
 
     // Basecall any remaining chunks.
@@ -526,9 +527,12 @@ void ModBaseCallerNode::output_worker_thread() {
     utils::set_thread_name("modbase_out");
     at::InferenceMode inference_mode_guard;
 
+    std::vector<std::shared_ptr<WorkingRead>> completed_reads;
+    std::vector<std::unique_ptr<ModBaseChunk>> processed_chunks;
+    processed_chunks.reserve(m_processed_chunks.capacity());
+
     // The m_processed_chunks lock is sufficiently contended that it's worth taking all
     // chunks available once we obtain it.
-    std::vector<std::unique_ptr<ModBaseChunk>> processed_chunks;
     auto grab_chunk = [&processed_chunks](std::unique_ptr<ModBaseChunk> chunk) {
         processed_chunks.push_back(std::move(chunk));
     };
@@ -536,10 +540,9 @@ void ModBaseCallerNode::output_worker_thread() {
            utils::AsyncQueueStatus::Success) {
         nvtx3::scoped_range range{"modbase_output_worker_thread"};
 
-        std::vector<std::shared_ptr<WorkingRead>> completed_reads;
-
+        completed_reads.clear();
         for (const auto& chunk : processed_chunks) {
-            auto working_read = chunk->working_read;
+            auto working_read = std::move(chunk->working_read);
             auto& source_read = working_read->read;
             auto& source_read_common = get_read_common_data(source_read);
 

@@ -58,9 +58,9 @@ private:
     // Worker thread, processes chunk results back into the reads
     void output_worker_thread();
 
-    std::vector<modbase::RunnerPtr> m_runners;
-    size_t m_block_stride;
-    size_t m_batch_size;
+    const std::vector<modbase::RunnerPtr> m_runners;
+    const size_t m_block_stride;
+    const size_t m_batch_size;
 
     std::thread m_output_worker;
     std::vector<std::thread> m_runner_workers;
