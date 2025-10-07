@@ -24,7 +24,6 @@
 #include "models/kits.h"
 #include "models/model_complex.h"
 #include "models/models.h"
-#include "nn/KoiUtils.h"
 #include "poly_tail/poly_tail_calculator_selector.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
@@ -402,14 +401,6 @@ void setup(const std::vector<std::string>& args,
     cli::log_requested_cuda_devices(initial_device_info);
 #endif
 
-#if DORADO_CUDA_BUILD
-    variable_chunk_sizes = variable_chunk_sizes && model_config.is_lstm_model() &&
-                           (model_config.lstm_size > 128) && (model_config.lstm_size <= 1024) &&
-                           ((model_config.lstm_size % 128) == 0) && nn::koi_can_use_cutlass();
-#else
-    variable_chunk_sizes = false;
-#endif
-
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
     auto modbase_runners = api::create_modbase_runners(
             modbase_models, device, modbase_params.runners_per_caller, modbase_params.batchsize);
@@ -422,11 +413,18 @@ void setup(const std::vector<std::string>& args,
         // This allows us to set a different memory_limit_fraction in case we have a heterogeneous GPU setup
         auto updated_device_info = utils::get_cuda_device_info(device, false);
         std::vector<std::pair<std::string, float>> gpu_fractions;
+        std::vector<int> device_ids;
         for (size_t i = 0; i < updated_device_info.size(); ++i) {
             auto device_id = "cuda:" + std::to_string(updated_device_info[i].device_id);
             auto fraction = static_cast<float>(updated_device_info[i].free_mem) /
                             static_cast<float>(initial_device_info[i].free_mem);
             gpu_fractions.push_back(std::make_pair(device_id, fraction));
+            device_ids.push_back(updated_device_info[i].device_id);
+        }
+
+        if (variable_chunk_sizes &&
+            !api::check_variable_chunk_sizes_supported(model_config, device_ids)) {
+            variable_chunk_sizes = false;
         }
 
         cxxpool::thread_pool pool{gpu_fractions.size()};
@@ -467,7 +465,7 @@ void setup(const std::vector<std::string>& args,
     {
         std::tie(runners, num_devices) = api::create_basecall_runners(
                 {model_config, device, 1.f, api::PipelineType::simplex, 0.f,
-                 run_batchsize_benchmarks, emit_batchsize_benchmarks},
+                 run_batchsize_benchmarks, emit_batchsize_benchmarks, false},
                 num_runners, 0);
     }
 

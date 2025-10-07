@@ -1,16 +1,20 @@
 #pragma once
 
+#include "api/caller_creation.h"
 #include "basecall/ModelRunnerBase.h"
-#include "caller_creation.h"
 #include "modbase/ModBaseRunner.h"
 
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
 
 namespace dorado::api {
+
+bool check_variable_chunk_sizes_supported(const config::BasecallModelConfig& model_config,
+                                          std::span<const int> device_ids);
 
 std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         const basecall::BasecallerCreationParams& params,

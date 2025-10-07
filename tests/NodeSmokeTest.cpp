@@ -40,6 +40,7 @@
 #include <filesystem>
 #include <functional>
 #include <random>
+#include <string_view>
 
 #ifndef _WIN32
 #include <unistd.h>
@@ -137,15 +138,6 @@ using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamMessage>;
 
 #define DEFINE_TEST(base, name) CATCH_TEST_CASE_METHOD(base, "SmokeTest: " name, "[SmokeTest]")
 
-// Not introduced until catch2 3.3.0
-#ifndef SKIP
-#define SKIP(msg)                                      \
-    do {                                               \
-        std::cerr << "Skipping test: " << msg << '\n'; \
-        return;                                        \
-    } while (false)
-#endif
-
 // Download a model to a temporary directory
 TempDir download_model(const std::string& model) {
     // Create a new directory to download the model to
@@ -181,11 +173,18 @@ DEFINE_TEST(NodeSmokeTestRead, "ScalerNode") {
 }
 
 DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
-    auto gpu = GENERATE(true, false);
-    CATCH_CAPTURE(gpu);
-    auto pipeline_restart = GENERATE(false, true);
-    CATCH_CAPTURE(pipeline_restart);
-    auto model_name = GENERATE("dna_r10.4.1_e8.2_400bps_fast@v4.2.0", "rna004_130bps_fast@v3.0.1");
+    const auto gpu = GENERATE(true, false);
+    const auto pipeline_restart = GENERATE(false, true);
+    const auto model_name =
+            GENERATE("dna_r10.4.1_e8.2_400bps_fast@v4.2.0", "rna004_130bps_fast@v3.0.1",
+                     "dna_r10.4.1_e8.2_400bps_hac@v5.0.0");
+    const auto variable_chunk_sizes = GENERATE(false, true);
+    CATCH_CAPTURE(gpu, pipeline_restart, model_name, variable_chunk_sizes);
+
+    if ((std::string_view{model_name}.find("hac") != std::string::npos) &&
+        (!gpu || !DORADO_CUDA_BUILD)) {
+        CATCH_SKIP("Only running hac model on CUDA devices");
+    }
 
     set_pipeline_restart(pipeline_restart);
 
@@ -203,6 +202,9 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     std::string device;
     if (gpu) {
 #if DORADO_METAL_BUILD
+        if (variable_chunk_sizes) {
+            CATCH_SKIP("Variable chunk sizes are not supported on Metal");
+        }
         device = "metal";
 #elif DORADO_CUDA_BUILD
         device = "cuda:all";
@@ -210,12 +212,24 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
         std::string error_message;
         if (!dorado::utils::try_parse_cuda_device_string(device, devices, error_message) ||
             devices.empty()) {
-            SKIP("No CUDA devices found: " << error_message);
+            CATCH_SKIP("No CUDA devices found: " << error_message);
+        }
+        std::vector<int> device_ids;
+        device_ids.reserve(std::size(devices));
+        for (const std::string& device_str : devices) {
+            device_ids.push_back(std::stoi(device_str.substr(5)));  // skip "cuda:"
+        }
+        if (variable_chunk_sizes &&
+            !dorado::api::check_variable_chunk_sizes_supported(model_config, device_ids)) {
+            CATCH_SKIP("Variable chunk sizes are not supported for chosen model or CUDA devices");
         }
 #else
-        SKIP("Can't test GPU without DORADO_METAL_BUILD or DORADO_CUDA_BUILD");
+        CATCH_SKIP("Can't test GPU without DORADO_METAL_BUILD or DORADO_CUDA_BUILD");
 #endif
     } else {
+        if (variable_chunk_sizes) {
+            CATCH_SKIP("Variable chunk sizes are not supported on CPU");
+        }
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
         set_num_reads(5);
         set_expected_messages(5);
@@ -229,7 +243,16 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
 
     // Create runners
     auto [runners, num_devices] = dorado::api::create_basecall_runners(
-            {model_config, device, 1.f, dorado::api::PipelineType::simplex, 0.f, false, false},
+            {
+                    .model_config = model_config,
+                    .device = device,
+                    .memory_limit_fraction = 1.f,
+                    .pipeline_type = dorado::api::PipelineType::simplex,
+                    .batch_size_time_penalty = 0.f,
+                    .run_batchsize_benchmarks = false,
+                    .emit_batchsize_benchmarks = false,
+                    .variable_chunk_sizes = variable_chunk_sizes,
+            },
             default_params.num_runners, 1);
     CATCH_CHECK(num_devices != 0);
     run_smoke_test<dorado::BasecallerNode>(std::move(runners), model_config.basecaller.overlap(),
@@ -277,10 +300,10 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::string error_message;
         if (!dorado::utils::try_parse_cuda_device_string(device, devices, error_message) ||
             devices.empty()) {
-            SKIP("No CUDA devices found: " << error_message);
+            CATCH_SKIP("No CUDA devices found: " << error_message);
         }
 #else
-        SKIP("Can't test GPU without DORADO_METAL_BUILD or DORADO_CUDA_BUILD");
+        CATCH_SKIP("Can't test GPU without DORADO_METAL_BUILD or DORADO_CUDA_BUILD");
 #endif
     } else {
         // CPU processing is very slow, so reduce the number of test reads we throw at it.
