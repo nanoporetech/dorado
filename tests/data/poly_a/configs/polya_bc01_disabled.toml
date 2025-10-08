@@ -1,0 +1,8 @@
+[anchors]
+front_primer = "CCCCCCCCCCCCCCCCCCCCCCC"
+rear_primer = "GGGGGGGGGGGGGGGGGGGGGGGG"
+
+[[overrides]]
+barcode_id = "SQK-PCB114-24_barcode01"
+[overrides.status]
+enabled = false
