@@ -238,7 +238,7 @@ void SummaryData::write_rows_from_reader(
         if (m_field_flags & POLYA_FIELDS) {
             // get polyA from pt:i tag
             int polya_length = reader.has_tag("pt") ? reader.get_tag<int>("pt")
-                                                    : ReadCommon::POLY_TAIL_NOT_FOUND;
+                                                    : ReadCommon::POLY_TAIL_NOT_ENABLED;
             writer << m_separator << polya_length;
 
             std::array<int, 4> polya_stats;
