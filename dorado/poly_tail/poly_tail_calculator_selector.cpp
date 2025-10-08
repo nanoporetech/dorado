@@ -70,4 +70,16 @@ std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorSelector::get_calcul
                                    : it->second;
 }
 
+bool PolyTailCalculatorSelector::has_enabled_calculator() const {
+    if (m_default && m_default->enabled()) {
+        return true;
+    }
+    for (const auto& barcode_calc : m_lut) {
+        if (barcode_calc.second && barcode_calc.second->enabled()) {
+            return true;
+        }
+    }
+    return false;
+}
+
 }  // namespace dorado::poly_tail

@@ -27,6 +27,8 @@ public:
 
     std::shared_ptr<const PolyTailCalculator> get_calculator(const std::string& name) const;
 
+    bool has_enabled_calculator() const;
+
 private:
     void init(std::istream& config_stream,
               bool is_rna,
