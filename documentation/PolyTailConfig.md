@@ -75,22 +75,45 @@ front_primer = "AACC"
 rear_primer = "GGTT"
 [overrides.tail]
 tail_interrupt_length = 10
+
+[[overrides]]
+barcode_id = "Custom-Kit_barcode03"
+[overrides.status]
+enabled = false
 ```
 
-This creates three configurations:
+This creates four configurations:
 * a default configuration with custom front and rear primers and an interrupt length of 5
 * a configuration to use for `barcode01` from kit `Custom-Kit`  identical to the main custom settings (i.e. with the custom front and rear primers and the interrupt length), with an additional change to the `flank_threshold`.
 * a configuration to use for `barcode02` from kit `Custom-Kit` with different primers and an interrupt length of 10, but with no change to the flank threshold.
+* a configuration that skips polyA/T estimation for reads classified as `barcode03` from `Custom-Kit`.
+
+Note that setting `[status] enabled = false` at the top level will disable polyA/T estimation for all reads classified with a barcode that is not explicitly overridden.
+Overridden barcodes are still enabled by default.
+```
+[status]
+enabled = false
+
+[[overrides]]
+barcode_id = "Custom-Kit_barcode02"
+[overrides.anchors]
+front_primer = "AACC"
+rear_primer = "GGTT"
+[overrides.tail]
+tail_interrupt_length = 10
+```
+This disables polyA estimation for all reads _except_ those classified as `barcode02`.
 
 ### Configuration Options
 
-| Option | Description |
-| -- | -- |
-| front_primer | Front primer sequence for cDNA |
-| rear_primer | Rear primer sequence for cDNA |
-| plasmid_front_flank | Front flanking sequence of poly(A) in plasmid |
-| plasmid_rear_flank | Rear flanking sequence of poly(A) in plasmid |
-| flank_threshold  | Threshold to use for detection of the flank/primer sequences. Equates to `(1 - edit distance / flank_sequence)` (default: 0.6) |
-| primer_window | Window of bases at the front and rear of the rear within which to look for primer sequences (default: 150) |
-| min_primer_separation | Minimum difference in edit distance between the forward and reverse alignments of the primers required in order to proceed with estimation (default: 10) |
-| tail_interrupt_length | Combine tails that are within this distance of each other (default: 0, i.e. don't combine any) |
+| Config Group | Option | Description |
+| -------: | -- | -- |
+| anchors | front_primer | Front primer sequence for cDNA (ignored if `plasmid_*` is set) |
+| anchors | rear_primer | Rear primer sequence for cDNA (ignored if `plasmid_*` is set) |
+| anchors | plasmid_front_flank | Front flanking sequence of poly(A) in plasmid |
+| anchors | plasmid_rear_flank | Rear flanking sequence of poly(A) in plasmid |
+| anchors | primer_window | Window of bases at the front and rear of the rear within which to look for primer sequences |
+| anchors | min_primer_separation | Minimum difference in edit distance required between the forward and reverse alignments of the primers in order to proceed with estimation (default: 10) |
+| threshold | flank_threshold  | Threshold to use for detection of the flank/primer sequences. Equates to `(1 - edit distance / flank_sequence)` |
+| tail | tail_interrupt_length | Combine tails that are within this distance of each other (default is 0, i.e. don't combine any) |
+| status | enabled | Enables polyA/T estimation for the specific barcode (in the case of `overrides`) or for unspecified barcodes (default: true) |
