@@ -3,6 +3,7 @@
 
 #include "types.h"
 
+#include <memory>
 #include <string>
 #include <unordered_map>
 
@@ -11,68 +12,60 @@ struct bam1_t;
 
 namespace kadayashi {
 
-bamfile_t *init_bamfile_t_with_opened_files(samFile *fp_bam,
-                                            hts_idx_t *fp_bai,
-                                            sam_hdr_t *fp_header);
+int natoi(const char *s, const int l);
 
-void destroy_holder_bamfile_t(bamfile_t *h, int include_self);
+uint32_t max_of_u32_array(const uint32_t *a, const int l, int *idx);
 
-int natoi(const char *s, int l);
+phase_return_t kadayashi_local_haptagging_dvr_single_region1(samFile *fp_bam,
+                                                             hts_idx_t *fp_bai,
+                                                             sam_hdr_t *fp_header,
+                                                             const faidx_t *fai,
+                                                             const char *ref_name,
+                                                             const uint32_t ref_start,
+                                                             const uint32_t ref_end,
+                                                             const pileup_pars_t &pp);
 
-uint32_t max_of_u32_array(const uint32_t *a, int l, int *idx);
+phase_return_t kadayashi_local_haptagging_simple_single_region1(samFile *fp_bam,
+                                                                hts_idx_t *fp_bai,
+                                                                sam_hdr_t *fp_header,
+                                                                const faidx_t *fai,
+                                                                const char *ref_name,
+                                                                const uint32_t ref_start,
+                                                                const uint32_t ref_end,
+                                                                const pileup_pars_t &pp);
 
-void *kadayashi_local_haptagging_dvr_single_region1(samFile *fp_bam,
-                                                    hts_idx_t *fp_bai,
-                                                    sam_hdr_t *fp_header,
-                                                    faidx_t *fai,
-                                                    const char *ref_name,
-                                                    uint32_t ref_start,
-                                                    uint32_t ref_end,
-                                                    int disable_interval_expansion,
-                                                    int min_base_quality,
-                                                    int min_varcall_coverage,
-                                                    float min_varcall_fraction,
-                                                    int varcall_indel_mask_flank,
-                                                    int max_clipping,
-                                                    int max_read_per_region);
+bool vg_gen(chunk_t *ck);
 
-vg_t *vg_gen(chunk_t *ck);
+void vg_propogate(chunk_t *ck);
 
-void vg_propogate(vg_t *vg);
+void vg_haptag_reads(chunk_t *ck);
 
-void vg_haptag_reads(vg_t *vg);
+void vg_do_simple_haptag(chunk_t *ck, uint32_t n_iter);
 
-chunk_t *unphased_varcall_a_chunk(bamfile_t *hf,
-                                  ref_vars_t *refvars,
-                                  faidx_t *ref_faidx,
-                                  const char *refname,
-                                  int32_t itvl_start,
-                                  int32_t itvl_end,
-                                  int itvl_disable_expansion,
-                                  int min_base_quality,
-                                  int min_varcall_coverage,
-                                  float min_varcall_coverage_ratio,
-                                  int varcall_indel_mask_flank,
-                                  int disable_info_site_filtering,
-                                  int need_to_collect_compat,
-                                  int max_clipping,
-                                  int max_reads_in_chunk);
+chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
+                                 ref_vars_t *refvars,
+                                 const faidx_t *ref_faidx,
+                                 const char *refname,
+                                 const int32_t itvl_start,
+                                 const int32_t itvl_end,
+                                 const pileup_pars_t &pp,
+                                 const int disable_lowcmp_mask);
 
-std::unordered_map<std::string, int32_t> kadayashi_dvr_single_region_wrapper(
+std::unordered_map<std::string, int> kadayashi_dvr_single_region_wrapper(
         samFile *fp_bam,
         hts_idx_t *fp_bai,
         sam_hdr_t *fp_header,
-        faidx_t *fai,
+        const faidx_t *fai,
         const std::string &ref_name,
-        uint32_t ref_start,
-        uint32_t ref_end,
-        int disable_interval_expansion,
-        int min_base_quality,
-        int min_varcall_coverage,
-        float min_varcall_fraction,
-        int varcall_indel_mask_flank,
-        int max_clipping,
-        int max_read_per_region);
+        const uint32_t ref_start,
+        const uint32_t ref_end,
+        const int disable_interval_expansion,
+        const int min_base_quality,
+        const int min_varcall_coverage,
+        const float min_varcall_fraction,
+        const int varcall_indel_mask_flank,
+        const int max_clipping,
+        const int max_read_per_region);
 
 }  // namespace kadayashi
 
