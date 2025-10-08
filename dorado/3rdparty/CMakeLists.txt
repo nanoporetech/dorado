@@ -104,4 +104,5 @@ add_subdirectory(toml11 EXCLUDE_FROM_ALL)
 
 # kadayashi
 set(BUILD_KADAYASHI_EXE OFF)
+set(BUILD_KADAYASHI_TESTS OFF)
 add_subdirectory(kadayashi EXCLUDE_FROM_ALL)
