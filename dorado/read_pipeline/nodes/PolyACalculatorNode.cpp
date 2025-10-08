@@ -32,19 +32,21 @@ void PolyACalculatorNode::input_thread_fn() {
             continue;
         }
 
+        auto calculator = selector->get_calculator(read->read_common.barcode);
+        if (!calculator || !calculator->enabled()) {
+            // Barcode overrides have been specified and this read is either unclassified
+            // or estimation for this barcode has been explicitly disabled
+            send_message_to_sink(std::move(read));
+            num_not_called++;
+            continue;
+        }
+
         // Poly-tail selection is enabled, so adjust default value of poly-tail length and signal ranges
         read->read_common.rna_poly_tail_length = ReadCommon::POLY_TAIL_NOT_FOUND;
         read->read_common.poly_tail_signal_anchor = ReadCommon::POLY_TAIL_NOT_FOUND;
         read->read_common.poly_tail_signal_boundaries = std::array{
                 std::make_pair(ReadCommon::POLY_TAIL_NOT_FOUND, ReadCommon::POLY_TAIL_NOT_FOUND),
                 std::make_pair(ReadCommon::POLY_TAIL_NOT_FOUND, ReadCommon::POLY_TAIL_NOT_FOUND)};
-
-        auto calculator = selector->get_calculator(read->read_common.barcode);
-        if (!calculator) {
-            send_message_to_sink(std::move(read));
-            num_not_called++;
-            continue;
-        }
 
         auto signal_info = calculator->determine_signal_anchor_and_strand(*read);
         if (!std::empty(signal_info)) {
