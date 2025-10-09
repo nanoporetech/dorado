@@ -37,8 +37,7 @@ variables:
   ONT_PYTHON_FILENAME_LINUX_ARM64_312: ont-python-Linux-aarch64-3.12.1-1.tar.gz
   PYTHON_VERSION: "python3.12"
   CUDA: "12.8"
-  WIN_CUDA: "12.8"
-  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${WIN_CUDA}"
+  WIN_CUDA_TOOLKIT: "/c/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v${CUDA}"
   MTL_DEBUG_LAYER: 1
   FF_TIMESTAMPS: true
 
@@ -74,7 +73,7 @@ variables:
   tags:
     - windows-10
     - VS2019
-    - cuda-${WIN_CUDA}
+    - cuda-${CUDA}
     - on-prem
 
 .linux_build_dependencies:
@@ -372,7 +371,7 @@ build:windows:
     - .build_and_test_dorado
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G \"Visual Studio 16 2019\""
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G \"Visual Studio 16 2019\""
 
 build:windows:debug:
   variables:
@@ -425,38 +424,50 @@ build_archive:linux:arm64:jammy:
     - .build_dorado_archive
     - .on_nightly_or_manual
 
-build_archive:linux:x86:cuda11:
+.build_archive:linux:x86:
   image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.0
+  script:
+    - source /opt/rh/gcc-toolset-11/enable
+    - !reference [.build_dorado_archive, script]
+  extends:
+    - .linux_runner
+    - .build_dorado_archive
+    - .on_nightly_or_manual
+
+build_archive:linux:x86:cuda11:
   variables:
     CUDA: "11.8"
-  script:
-    - source /opt/rh/gcc-toolset-11/enable
-    - !reference [.build_dorado_archive, script]
   extends:
-    - .linux_runner
-    - .build_dorado_archive
-    - .on_nightly_or_manual
+    - .build_archive:linux:x86
 
 build_archive:linux:x86:cuda12:
-  image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.0
-  variables:
-    BUILD_OPTIONS: ""
-  script:
-    - source /opt/rh/gcc-toolset-11/enable
-    - !reference [.build_dorado_archive, script]
   extends:
-    - .linux_runner
-    - .build_dorado_archive
-    - .on_nightly_or_manual
+    - .build_archive:linux:x86
 
-build_archive:windows:
+build_archive:linux:x86:cuda13:
+  variables:
+    CUDA: "13.0"
+  extends:
+    - .build_archive:linux:x86
+
+.build_archive:windows:
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${WIN_CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G \"Visual Studio 16 2019\""
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G \"Visual Studio 16 2019\""
   extends:
     - .windows_runner
     - .build_dorado_archive
     - .on_nightly_or_manual
+
+build_archive:windows:cuda12:
+  extends:
+    - .build_archive:windows
+
+build_archive:windows:cuda13:
+  variables:
+    CUDA: "13.0"
+  extends:
+    - .build_archive:windows
 
 build_archive:macos:arm:
   extends:
@@ -652,7 +663,7 @@ test_archive:windows:cpu:
     - windows-11
     - no-gpu
   needs:
-    - build_archive:windows
+    - build_archive:windows:cuda12
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:focal:

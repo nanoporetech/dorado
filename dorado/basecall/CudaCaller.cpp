@@ -409,11 +409,12 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     bool is_unified_memory_device = (prop->major == 5 && prop->minor == 3) ||  // TX1
                                     (prop->major == 6 && prop->minor == 2) ||  // TX2
                                     (prop->major == 7 && prop->minor == 2) ||  // Xavier
-                                    (prop->major == 8 && prop->minor == 7);    // Orin
+                                    (prop->major == 8 && prop->minor == 7) ||  // Orin
+                                    (prop->major == 11 && prop->minor == 0);   // Thor
     float memory_limit_fraction =
             params.memory_limit_fraction * (is_unified_memory_device ? 0.5f : 1.f);
-    if (is_unified_memory_device && prop->major == 8 && available > (32 * GB)) {
-        // restrict Orin further as there's no benefit to the largest batch sizes
+    if (is_unified_memory_device && prop->major >= 8 && available > (32 * GB)) {
+        // restrict Orin and Thor further as there's no benefit to the largest batch sizes
         // and definite down sides to using all the memory
         memory_limit_fraction *= 0.5f;
     }

@@ -229,7 +229,14 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                                    alignments.quals[overlap.overlap_idx].begin() + qend);
         if (!fwd) {
             qseq = utils::reverse_complement(qseq);
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wstringop-overflow"
+#endif
             std::reverse(qqual.begin(), qqual.end());
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
         }
 
         const int cigar_len_total = static_cast<int>(std::size(cigar));

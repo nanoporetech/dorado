@@ -738,7 +738,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
 
 void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     (void)x_f16;
-#if DORADO_CUDA_BUILD && !DORADO_ORIN
+#if DORADO_CUDA_BUILD && !DORADO_ORIN && (CUDA_VERSION / 1000) < 13
     const int N = static_cast<int>(x_f16.size(0));
     const int T = static_cast<int>(x_f16.size(1)) * 16;
     const int C = params.d_model;
@@ -935,7 +935,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                     (koi_tc_is_available(KOI_F16) == KOI_SUCCESS);
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 
-#if !DORADO_ORIN
+#if !DORADO_ORIN && (CUDA_VERSION / 1000) < 13
     // Custom Volta flag
     use_koi_volta_tiled = is_sup_model && options.device().is_cuda() &&
                           (koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS);
@@ -989,7 +989,7 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x) {
         }
         return untiled_f16;
     }
-#if !DORADO_ORIN
+#if !DORADO_ORIN && (CUDA_VERSION / 1000) < 13
     else if (use_koi_volta_tiled) {
         const int N = static_cast<int>(x.size(0));
         const int T = static_cast<int>(x.size(1));
