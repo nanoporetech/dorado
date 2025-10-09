@@ -13,7 +13,7 @@
 
 namespace dorado::utils {
 
-inline std::vector<std::string> split(std::string_view input, char delimiter) {
+[[nodiscard]] inline std::vector<std::string> split(std::string_view input, char delimiter) {
     std::vector<std::string> result;
     size_t pos;
     while ((pos = input.find(delimiter)) != std::string_view::npos) {
@@ -25,8 +25,8 @@ inline std::vector<std::string> split(std::string_view input, char delimiter) {
     return result;
 }
 
-inline std::vector<std::string_view> split_view(const std::string_view input,
-                                                const char delimiter) {
+[[nodiscard]] inline std::vector<std::string_view> split_view(const std::string_view input,
+                                                              const char delimiter) {
     if (std::empty(input)) {
         return {};
     }
@@ -42,7 +42,8 @@ inline std::vector<std::string_view> split_view(const std::string_view input,
 }
 
 template <typename StringLike>
-inline std::string join(const std::vector<StringLike>& inputs, std::string_view separator) {
+[[nodiscard]] inline std::string join(const std::vector<StringLike>& inputs,
+                                      std::string_view separator) {
     std::size_t total_size = inputs.empty() ? 0 : (inputs.size() - 1) * separator.size();
     for (const auto& item : inputs) {
         total_size += item.size();
@@ -59,18 +60,18 @@ inline std::string join(const std::vector<StringLike>& inputs, std::string_view 
     return result;
 }
 
-inline bool starts_with(std::string_view str, std::string_view prefix) {
+[[nodiscard]] inline bool starts_with(std::string_view str, std::string_view prefix) {
     return str.rfind(prefix, 0) != std::string::npos;
 }
 
-inline bool ends_with(std::string_view str, std::string_view suffix) {
+[[nodiscard]] inline bool ends_with(std::string_view str, std::string_view suffix) {
     if (str.length() < suffix.length()) {
         return false;
     }
     return str.substr(str.length() - suffix.length()) == suffix;
 }
 
-inline bool contains(std::string_view str, std::string_view substr) {
+[[nodiscard]] inline bool contains(std::string_view str, std::string_view substr) {
     return str.find(substr) != str.npos;
 }
 
@@ -79,20 +80,20 @@ inline void rtrim(std::string& s) {
             s.end());
 }
 
-inline std::string_view rtrim_view(const std::string& s) {
+[[nodiscard]] inline std::string_view rtrim_view(const std::string& s) {
     const auto last_char_it =
             std::find_if(s.rbegin(), s.rend(), [](int ch) { return !std::isspace(ch); }).base();
     return std::string_view(s.data(), last_char_it - s.begin());
 }
 
-inline std::string to_uppercase(std::string in) {
+[[nodiscard]] inline std::string to_uppercase(std::string in) {
     std::transform(in.begin(), in.end(), in.begin(),
                    [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
     return in;
 }
 
 template <typename T>
-inline std::optional<T> from_chars(std::string_view str) {
+[[nodiscard]] inline std::optional<T> from_chars(std::string_view str) {
     static_assert(std::is_integral_v<T>,
                   "libc++ (macOS) won't provide floating point support until they're on LLVM 20 "
                   "(_LIBCPP_VERSION >= 200000)");
