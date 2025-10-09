@@ -9,6 +9,7 @@
 
 #include <iterator>
 #include <optional>
+#include <stdexcept>
 #include <tuple>
 #include <vector>
 
@@ -187,16 +188,25 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
                 std::make_tuple("v12.345.678", "v12.345.678"),
                 std::make_tuple("v12.34.56.78", "v12.34.56.78"),
                 std::make_tuple("v0", "v0.0.0"),
-                std::make_tuple("v1.", "v1.0.0"),
-                std::make_tuple("v2..", "v2.0.0"),
-                std::make_tuple("v.", "v0.0.0"),
-                std::make_tuple("v...", "v0.0.0.0"),
-                std::make_tuple("v4.1.", "v4.1.0"),
-                std::make_tuple("V0.", "v0.0.0"),
+                std::make_tuple("v4.1", "v4.1.0"),
         }));
 
         CATCH_CAPTURE(input);
         CATCH_CHECK(TestVersionParser::parse_version(input) == expected);
+    }
+
+    CATCH_SECTION(" catch invalid version strings") {
+        class TestVersionParser final : public ModelComplex {
+        public:
+            static std::string parse_version(const std::string &version) {
+                return ModelComplex::parse_variant_version(version);
+            }
+        };
+        auto [input] = GENERATE(table<std::string>(
+                {"", "v", "v.", "v..0", "v1.", "v2..", "v4.1.", "x0.0.0", "v0.x.0"}));
+
+        CATCH_CAPTURE(input);
+        CATCH_CHECK_THROWS_AS(TestVersionParser::parse_version(input), std::runtime_error);
     }
 }
 

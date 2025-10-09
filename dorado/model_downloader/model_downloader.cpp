@@ -8,6 +8,7 @@
 
 #include <filesystem>
 #include <vector>
+
 namespace fs = std::filesystem;
 
 namespace dorado::model_downloader {
@@ -66,7 +67,7 @@ std::filesystem::path ModelDownloader::get(std::string_view model_name,
 
     if (!download_models(parent_dir.string(), model_name)) {
         throw std::runtime_error(
-                std::format("Failed to download {} model: '{}'.", description, model_name));
+                fmt::format("Failed to download {} model: '{}'.", description, model_name));
     }
 
     if (is_temporary()) {

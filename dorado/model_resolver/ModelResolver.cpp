@@ -160,7 +160,7 @@ ModelSources ModelResolver::resolve_model_complex() const {
     }
     }
 
-    throw std::logic_error(std::format("Model complex: '{}' has unknown style.", m_model_complex));
+    throw std::logic_error(fmt::format("Model complex: '{}' has unknown style.", m_model_complex));
 }
 
 void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {

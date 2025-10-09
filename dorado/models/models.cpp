@@ -1715,7 +1715,7 @@ ModelInfo get_modification_model(const std::string& simplex_name,
                                  const ModsVariantPair& modification) {
     throw_on_deprecated_model(simplex_name);
     if (!is_valid_model(simplex_name)) {
-        throw std::runtime_error{std::format(
+        throw std::runtime_error{fmt::format(
                 "Cannot find modification model for '{}'. Error: Unknown simplex model '{}'.",
                 to_string(modification.variant), simplex_name)};
     }
@@ -1725,7 +1725,7 @@ ModelInfo get_modification_model(const std::string& simplex_name,
         return find_model(modified_models(), "modbase", simplex.chemistry, simplex.simplex,
                           modification, true);
     } catch (const std::exception& e) {
-        throw std::runtime_error{std::format(
+        throw std::runtime_error{fmt::format(
                 "Cannot find modification model for '{}' matching simplex model '{}'. Error: "
                 "{}.",
                 to_string(modification.variant), simplex_name, e.what())};

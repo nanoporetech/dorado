@@ -202,25 +202,25 @@ std::string ModelComplex::parse_variant_version(const std::string& version) {
     for (const std::string& value : split_values) {
         // This will catch trailing .'s and empty parts
         if (value.empty()) {
-            spdlog::debug("model version: {} - empty part interpreted as '0'", version);
-            nums.push_back("0");
-            continue;
+            if (split_values.at(split_values.size() - 1) == ".") {
+                throw std::runtime_error(
+                        fmt::format("Version '{}' has invalid trailing period", version));
+            }
+            throw std::runtime_error(fmt::format("Version '{}' has invalid empty part", version));
         }
 
         // Asserts that values within periods are integers.
         try {
             if (std::any_of(std::begin(value), std::end(value),
                             [](unsigned char c) { return !std::isdigit(c); })) {
-                throw std::runtime_error("Part has non-digit characters");
+                throw std::runtime_error(
+                        fmt::format("Version '{}' has non-digit characters '{}'", version, value));
             }
             nums.push_back(value);
         } catch (const std::exception& e) {
-            throw std::runtime_error(std::string("Failed to parse model version: '")
-                                             .append(version)
-                                             .append(", invalid part: '")
-                                             .append(value)
-                                             .append("' - ")
-                                             .append(e.what()));
+            throw std::runtime_error(
+                    fmt::format("Failed to parse version '{}'. Invalid part '{}' - {}", version,
+                                value, e.what()));
         }
     }
 
