@@ -184,7 +184,7 @@ regression_test:windows:
     - .windows_regression_runner
     - .regression_test
   needs:
-    - build_archive:windows
+    - build_archive:windows:cuda12
   except:
     - tags
 
