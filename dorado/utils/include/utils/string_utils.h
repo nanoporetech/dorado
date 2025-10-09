@@ -3,7 +3,9 @@
 #include <algorithm>
 #include <cctype>
 #include <charconv>
+#include <limits>
 #include <optional>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -101,6 +103,75 @@ inline std::optional<T> from_chars(std::string_view str) {
         return std::nullopt;
     }
     return value;
+}
+
+namespace detail {
+template <typename Int>
+static constexpr std::size_t min_space_required() requires std::is_integral_v<Int> {
+    // 1 for sign, 1 for rounding in numeric_limits, extra for safety.
+    return std::numeric_limits<Int>::digits10 + 1 + 1 + 2;
+}
+template <typename Float>
+static constexpr std::size_t min_space_required() requires std::is_floating_point_v<Float> {
+    // 1 for sign, 1 for decimal point, 1 for rounding in numeric_limits, 5 for e+123, extra for safety.
+    return std::numeric_limits<Float>::max_digits10 + 1 + 1 + 1 + 5 + 2;
+}
+}  // namespace detail
+
+// Write the integer to the buffer, returning a span of the written string.
+template <std::size_t BufferSize, typename Int>
+[[nodiscard]] inline constexpr std::string_view to_chars(Int value, char* buffer)
+        requires std::is_integral_v<Int> {
+    constexpr auto min_size = detail::min_space_required<Int>();
+    static_assert(BufferSize >= min_size);
+    const auto res = std::to_chars(buffer, buffer + BufferSize, value);
+    if (res.ec != std::errc{}) [[unlikely]] {
+        // This shouldn't happen unless the size calculation is wrong.
+        throw std::logic_error("to_chars() failed due to lack of space");
+    }
+    return std::string_view{buffer, res.ptr};
+}
+
+// Write the float to the buffer, returning a span of the written string.
+template <std::size_t BufferSize, typename Float>
+[[nodiscard]] inline constexpr std::string_view to_chars(Float value, char* buffer)
+        requires std::is_floating_point_v<Float> {
+    constexpr auto min_size = detail::min_space_required<Float>();
+    static_assert(BufferSize >= min_size);
+    // Note that this gives different output to std::to_string() but matches the output of
+    // std::ostringstream. For example, this will format 5.5f as "5.5" (shortest representation)
+    // whereas std::to_string() would output "5.500000" (full representation). We rely on this
+    // behaviour in multiple places in ont_core.
+    const auto res = std::to_chars(buffer, buffer + BufferSize, value, std::chars_format::general);
+    if (res.ec != std::errc{}) [[unlikely]] {
+        // This shouldn't happen unless the size calculation is wrong.
+        throw std::logic_error("to_chars() failed due to lack of space");
+    }
+    return std::string_view{buffer, res.ptr};
+}
+
+// Write the value to the fixed size buffer, returning a span of the written string.
+template <typename T, std::size_t BufferSize>
+[[nodiscard]] inline constexpr std::string_view to_chars(T value, char (&buffer)[BufferSize]) {
+    return to_chars<BufferSize>(value, buffer);
+}
+
+// Write the value to a stack buffer and return it.
+template <typename T>
+[[nodiscard]] inline constexpr auto to_chars(T value) {
+    constexpr auto min_size = detail::min_space_required<T>();
+    struct CharBuffer {
+        char data[min_size]{};
+        std::size_t size = 0;
+
+        std::string_view view() const { return {data, size}; }
+        explicit operator std::string_view() const { return view(); }
+    };
+
+    CharBuffer char_buffer;
+    const auto view = to_chars(value, char_buffer.data);
+    char_buffer.size = view.size();
+    return char_buffer;
 }
 
 }  // namespace dorado::utils
