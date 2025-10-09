@@ -59,6 +59,8 @@ public:
 
     static int max_tail_length() { return 750; };
 
+    bool enabled() const { return m_config.enabled; }
+
 protected:
     // calculate the average number of samples per base
     virtual float average_samples_per_base(const std::vector<float>& sizes) const = 0;

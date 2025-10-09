@@ -595,10 +595,22 @@ fi
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools quickcheck -u $output_dir/no_detect_cdna_polya.bam
-    if [[ $? -ne "0" ]]; then
-        echo "PolyA tail estimation with custom config file failed."
+    num_estimated_reads=$(samtools view $output_dir/no_detect_cdna_polya.bam | grep pt:i: | wc -l | awk '{print $1}')
+    if [[ $num_estimated_reads -ne "2" ]]; then
+        echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
         exit 1
-    fi
+    fi    
+fi
+
+$dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --kit-name SQK-PCB114-24 --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya_bc01_disabled.toml > $output_dir/disabled_cdna_polya.bam
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    samtools quickcheck -u $output_dir/disabled_cdna_polya.bam
+    # grep returns 1 if no lines matched, so add the { ... || test } part to stop -o pipefail from aborting
+    num_estimated_reads=$(samtools view $output_dir/disabled_cdna_polya.bam | { grep pt:i: || test $? = 1; } | wc -l | awk '{print $1}')
+     if [[ $num_estimated_reads -ne "0" ]]; then
+         echo "0 poly(A) estimated reads expected. Found ${num_estimated_reads}"
+         exit 1
+     fi   
 fi
 
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_rna004} $data_dir/poly_a/rna004_pod5/ --estimate-poly-a > $output_dir/rna_polya.bam

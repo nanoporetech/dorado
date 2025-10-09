@@ -572,10 +572,12 @@ void setup(const std::vector<std::string>& args,
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
                         polya_config, is_rna_model(model_config), is_rna_adapter, calibration);
-        client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
-                poly_tail_calc_selector);
-        current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
-                {current_sink_node}, std::thread::hardware_concurrency(), 1000);
+        if (poly_tail_calc_selector->has_enabled_calculator()) {
+            client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
+                    poly_tail_calc_selector);
+            current_sink_node = pipeline_desc.add_node<PolyACalculatorNode>(
+                    {current_sink_node}, std::thread::hardware_concurrency(), 1000);
+        }
     }
     if (barcoding_info) {
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);

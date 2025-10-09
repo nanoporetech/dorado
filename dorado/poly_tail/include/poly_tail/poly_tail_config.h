@@ -24,6 +24,7 @@ struct PolyTailConfig {
     int tail_interrupt_length = 0;
     int min_base_count = 10;
     std::string barcode_id;
+    bool enabled = true;
 };
 
 // Prepare the PolyA configurations. If a configuration file is available, parse it to extract parameters.
