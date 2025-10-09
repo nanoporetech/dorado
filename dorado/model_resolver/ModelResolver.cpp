@@ -116,18 +116,22 @@ ModelSources ModelResolver::resolve() {
 ModelSources ModelResolver::resolve_model_complex() const {
     const auto model_complex = ModelComplex::parse(m_model_complex);
 
-    // Downloader only supports named models or variants
-    if (model_complex.is_path_style() && m_mode != Mode::DOWNLOADER) {
+    switch (model_complex.style()) {
+    case models::ModelComplex::Style::PATH: {
+        // Downloader only supports named models or variants
+        if (m_mode == Mode::DOWNLOADER) {
+            throw std::runtime_error(
+                    "ModelResolver Mode::DOWNLOADER is incompatible with style::PATH.");
+        }
         const auto path = fs::weakly_canonical(fs::path(model_complex.get_raw()));
-        if (!check_model_path(path, true)) {
+        if (!check_model_path(path)) {
             throw std::runtime_error("Failed to load model from path.");
         }
 
         const ModelSource simplex{path, get_model_info_from_path(path), false};
         return ModelSources{simplex, {}, std::nullopt};
     }
-
-    if (model_complex.is_named_style()) {
+    case models::ModelComplex::Style::NAMED: {
         const ModelInfo& simplex_info = model_complex.get_named_simplex_model();
         const ModelSource simplex = find_or_download_model(simplex_info);
 
@@ -138,8 +142,7 @@ ModelSources ModelResolver::resolve_model_complex() const {
 
         return ModelSources{simplex, std::move(mods), std::nullopt};
     }
-
-    if (model_complex.is_variant_style()) {
+    case models::ModelComplex::Style::VARIANT: {
         const Chemistry chemistry = get_chemistry();
         const ModelVariantPair simplex_variant = model_complex.get_simplex_model_variant();
         const ModelInfo simplex_info = find_model(simplex_models(), "simplex", chemistry,
@@ -155,8 +158,9 @@ ModelSources ModelResolver::resolve_model_complex() const {
 
         return ModelSources{simplex, std::move(mods), std::nullopt};
     }
+    }
 
-    throw std::logic_error("Failed to resolve Model Complex: '" + m_model_complex + "'.");
+    throw std::logic_error(std::format("Model complex: '{}' has unknown style.", m_model_complex));
 }
 
 void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {

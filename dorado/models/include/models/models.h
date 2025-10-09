@@ -22,9 +22,9 @@ struct ModelInfo {
     ModelVariantPair simplex{};
     ModsVariantPair mods{};
 
-    bool operator==(const ModelInfo& other) const {
-        return name == other.name && checksum == other.checksum && chemistry == other.chemistry &&
-               model_type == other.model_type && simplex == other.simplex && mods == other.mods;
+    bool operator==(const ModelInfo& o) const {
+        return std::tie(name, checksum, chemistry, model_type, simplex, mods) ==
+               std::tie(o.name, o.checksum, o.chemistry, o.model_type, o.simplex, mods);
     };
 };
 

@@ -3,6 +3,7 @@
 #include "utils/string_utils.h"
 
 #include <algorithm>
+#include <ostream>
 #include <stdexcept>
 #include <string>
 
@@ -164,4 +165,13 @@ std::string to_string(const ModelVersion& version) {
     return to_string(version, "model version", version_map());
 }
 
+std::ostream& operator<<(std::ostream& os, const ModelVariantPair& p) {
+    os << "ModelVariantPair{" << to_string(p.variant) << ", " << to_string(p.ver) << '}';
+    return os;
+}
+
+std::ostream& operator<<(std::ostream& os, const ModsVariantPair& p) {
+    os << "ModsVariantPair{" << to_string(p.variant) << ", " << to_string(p.ver) << '}';
+    return os;
+}
 }  // namespace dorado::models

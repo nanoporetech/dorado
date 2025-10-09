@@ -55,8 +55,8 @@ void print_models(bool yaml) {
     }
 }
 
-bool download_named(const models::ModelComplex& complex,
-                    model_downloader::ModelDownloader& downloader) {
+bool download_named_or_path(const models::ModelComplex& complex,
+                            model_downloader::ModelDownloader& downloader) {
     using namespace dorado::models;
 
     if (complex.is_path_style()) {
@@ -194,25 +194,30 @@ int download(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    const auto models_directory =
-            get_models_directory(parser.get<std::string>("--models-directory"));
-    model_downloader::ModelDownloader downloader(models_directory, true);
+    try {
+        const auto models_directory =
+                get_models_directory(parser.get<std::string>("--models-directory"));
+        model_downloader::ModelDownloader downloader(models_directory, true);
 
-    const auto model_arg = parser.get<std::string>("--model");
-    const auto named_model = try_get_model_info(model_arg);
-    if (named_model.has_value()) {
-        downloader.get(named_model.value(), to_string(named_model->model_type));
-    } else {
-        const auto model_complex = ModelComplex::parse(model_arg);
-        if (model_complex.is_variant_style()) {
-            if (!download_variant_via_resolver(parser)) {
-                return EXIT_FAILURE;
-            }
+        const auto model_arg = parser.get<std::string>("--model");
+        const auto named_model = try_get_model_info(model_arg);
+        if (named_model.has_value()) {
+            downloader.get(named_model.value(), to_string(named_model->model_type));
         } else {
-            if (!download_named(model_complex, downloader)) {
-                return EXIT_FAILURE;
+            const auto model_complex = ModelComplex::parse(model_arg);
+            if (model_complex.is_variant_style()) {
+                if (!download_variant_via_resolver(parser)) {
+                    return EXIT_FAILURE;
+                }
+            } else {
+                if (!download_named_or_path(model_complex, downloader)) {
+                    return EXIT_FAILURE;
+                }
             }
         }
+    } catch (const std::exception& e) {
+        spdlog::error(e.what());
+        return EXIT_FAILURE;
     }
 
     spdlog::info("Finished");

@@ -49,12 +49,10 @@ std::filesystem::path ModelDownloader::get(std::string_view model_name,
     // clang-tidy warns about performance-no-automatic-move if |temp_model_dir| is const. It should be treated as such though.
     /*const*/ fs::path model_dir = parent_dir / model_name;
 
+    const auto log_level = m_verbose ? spdlog::level::info : spdlog::level::trace;
     if (fs::exists(model_dir)) {
-        if (m_verbose) {
-            spdlog::info(" - found existing model '{}' at '{}'.", model_name, model_dir.string());
-        } else {
-            spdlog::trace(" - found existing model '{}' at '{}'.", model_name, model_dir.string());
-        }
+        spdlog::log(log_level, " - found existing model '{}' at '{}'.", model_name,
+                    model_dir.string());
         return model_dir;
     }
 
@@ -68,7 +66,7 @@ std::filesystem::path ModelDownloader::get(std::string_view model_name,
 
     if (!download_models(parent_dir.string(), model_name)) {
         throw std::runtime_error(
-                fmt::format("Failed to download {} model: '{}'.", description, model_name));
+                std::format("Failed to download {} model: '{}'.", description, model_name));
     }
 
     if (is_temporary()) {
@@ -82,11 +80,7 @@ std::filesystem::path ModelDownloader::get(std::string_view model_name,
         }
     }
 
-    if (m_verbose) {
-        spdlog::info("Downloaded '{}' model into: '{}'.", model_name, model_dir.string());
-    } else {
-        spdlog::trace("Downloaded '{} 'model into: '{}'.", model_name, model_dir.string());
-    }
+    spdlog::log(log_level, "Downloaded '{}' model into: '{}'.", model_name, model_dir.string());
     return model_dir;
 }
 

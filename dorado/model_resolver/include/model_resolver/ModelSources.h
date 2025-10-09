@@ -3,12 +3,13 @@
 #include "models/models.h"
 
 #include <filesystem>
+#include <iosfwd>
 #include <optional>
 #include <vector>
 
 namespace dorado::model_resolution {
 
-bool check_model_path(const std::filesystem::path& model_path, bool verbose);
+bool check_model_path(const std::filesystem::path& model_path);
 
 struct ModelSource {
     std::filesystem::path path;

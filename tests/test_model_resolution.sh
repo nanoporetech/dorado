@@ -281,7 +281,7 @@ if [ $TEST_BASECALLER_PATH -eq 1 ]; then
     popd
 }
 {
-    # Test we can specify a model by path and auto download a modbase model via --modified-bases
+    # Test we can specify a model by path and --modified-bases-models
     local_dir="${output_dir}/basecaller_path_modified_paths"
     name="dna_r10.4.1_e8.2_400bps_hac@v5.2.0"
     mod="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"

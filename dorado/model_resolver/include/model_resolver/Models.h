@@ -4,6 +4,10 @@
 #include "config/ModBaseModelConfig.h"
 #include "model_resolver/ModelSources.h"
 
+#include <filesystem>
+#include <string>
+#include <vector>
+
 namespace dorado::model_resolution {
 
 class Models {
