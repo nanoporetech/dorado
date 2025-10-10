@@ -49,7 +49,7 @@ variables:
     - xcode-15.3
     - on-prem
   variables:
-    MACOSX_DEPLOYMENT_TARGET: "13.3"
+    MACOSX_DEPLOYMENT_TARGET: "13.0"
 
 .linux_runner:
   tags:
