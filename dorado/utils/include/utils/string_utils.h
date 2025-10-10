@@ -11,6 +11,15 @@
 #include <type_traits>
 #include <vector>
 
+// libcxx doesn't implement to_chars(float) on macOS yet.
+// TODO: this can be removed when we bump minimum macOS to 14.0
+#if !defined(_LIBCPP_VERSION) || (defined(_LIBCPP_AVAILABILITY_HAS_TO_CHARS_FLOATING_POINT) && \
+                                  _LIBCPP_AVAILABILITY_HAS_TO_CHARS_FLOATING_POINT)
+#define DORADO_HAS_TO_CHARS_FLOATING_POINT 1
+#else
+#define DORADO_HAS_TO_CHARS_FLOATING_POINT 0
+#endif
+
 namespace dorado::utils {
 
 [[nodiscard]] inline std::vector<std::string> split(std::string_view input, char delimiter) {
@@ -133,6 +142,7 @@ template <std::size_t BufferSize, typename Int>
     return std::string_view{buffer, res.ptr};
 }
 
+#if DORADO_HAS_TO_CHARS_FLOATING_POINT
 // Write the float to the buffer, returning a span of the written string.
 template <std::size_t BufferSize, typename Float>
 [[nodiscard]] inline constexpr std::string_view to_chars(Float value, char* buffer)
@@ -150,6 +160,7 @@ template <std::size_t BufferSize, typename Float>
     }
     return std::string_view{buffer, res.ptr};
 }
+#endif  // DORADO_HAS_TO_CHARS_FLOATING_POINT
 
 // Write the value to the fixed size buffer, returning a span of the written string.
 template <typename T, std::size_t BufferSize>
