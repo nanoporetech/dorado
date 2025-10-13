@@ -48,7 +48,8 @@ if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
     pushd ont-output-specification-validator
     git checkout ${VALIDATOR_COMMIT}
     popd
-    pip install -e ont-output-specification-validator
+    # Note we use --prefer-binary to avoid issues with h5py 3.15, see DOR-1410
+    pip install --prefer-binary -e ont-output-specification-validator
     curl -LfsS ${SPECIFICATION_URL} > ${SPECIFICATION_FILE}
 fi
 
