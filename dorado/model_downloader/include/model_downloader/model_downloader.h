@@ -1,11 +1,10 @@
 #pragma once
 
-#include "utils/fs_utils.h"
-#include "utils/string_utils.h"
-
 #include <filesystem>
 #include <optional>
+#include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dorado::models {
@@ -20,7 +19,7 @@ namespace dorado::model_downloader {
 
 using namespace models;
 
-bool download_models(const std::string& target_directory, const std::string& model_name);
+bool download_models(const std::string& target_directory, std::string_view model_name);
 
 // A ModelDownloader will download models which do not already exist in the optional `model_dir` directory.
 // If `model_dir` is set then models are downloaded in to new model subdirectories there, otherwise
@@ -28,8 +27,8 @@ bool download_models(const std::string& target_directory, const std::string& mod
 class ModelDownloader {
 public:
     // Model downloader with optional model search directory
-    ModelDownloader(const std::optional<std::filesystem::path>& model_dir)
-            : m_models_dir(model_dir) {}
+    ModelDownloader(const std::optional<std::filesystem::path>& model_dir, bool verbose)
+            : m_models_dir(model_dir), m_verbose{verbose} {}
 
     // Temporary model downloader
     ModelDownloader() : m_models_dir(std::nullopt) {}
@@ -44,15 +43,16 @@ public:
     std::set<std::filesystem::path> temporary_models() const { return m_temp_models; }
 
     // Download a model
-    std::filesystem::path get(const ModelInfo& model, const std::string& description);
+    std::filesystem::path get(const ModelInfo& model, std::string_view description);
     // Download a model
-    std::filesystem::path get(const std::string& model_name, const std::string& description);
+    std::filesystem::path get(std::string_view model_name, std::string_view description);
     // Download multiple models
     std::vector<std::filesystem::path> get(const std::vector<ModelInfo>& models,
-                                           const std::string& description);
+                                           std::string_view description);
 
 private:
     const std::optional<std::filesystem::path> m_models_dir;
+    const bool m_verbose{false};
     std::set<std::filesystem::path> m_temp_models;
 };
 

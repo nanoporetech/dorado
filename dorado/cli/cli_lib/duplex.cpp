@@ -12,26 +12,20 @@
 #include "file_info/file_info.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
-#include "model_downloader/model_downloader.h"
-#include "model_resolution.h"
-#include "models/metadata.h"
-#include "models/model_complex.h"
+#include "model_resolver/ModelResolver.h"
+#include "model_resolver/Models.h"
 #include "models/models.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/BaseSpaceDuplexCallerNode.h"
 #include "read_pipeline/nodes/DuplexReadTaggingNode.h"
-#include "read_pipeline/nodes/HtsWriterNode.h"
 #include "read_pipeline/nodes/ReadFilterNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
-#include "torch_utils/auto_detect_device.h"
 #include "torch_utils/duplex_utils.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/SampleSheet.h"
-#include "utils/arg_parse_ext.h"
 #include "utils/basecaller_utils.h"
-#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
@@ -72,186 +66,6 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-BatchParams get_batch_params(const argparse::ArgumentParser& arg) {
-    BatchParams basecaller{};
-    basecaller.update(BatchParams::Priority::CLI_ARG,
-                      cli::get_optional_argument<int>("--chunksize", arg),
-                      cli::get_optional_argument<int>("--overlap", arg),
-                      cli::get_optional_argument<int>("--batchsize", arg));
-    return basecaller;
-}
-
-struct DuplexModels {
-    std::filesystem::path model_path;
-    std::string model_name;
-    BasecallModelConfig model_config;
-
-    std::filesystem::path stereo_model;
-    BasecallModelConfig stereo_model_config;
-    std::string stereo_model_name;
-
-    std::vector<std::filesystem::path> mods_model_paths;
-
-    std::set<std::filesystem::path> temp_paths{};
-};
-
-// If given a model path, create a ModelComplexSearch by looking up the model info by name and extracting
-// the chemistry, sampling rate etc. Ordinarily this would fail but the user should have provided a known
-// simplex model otherwise there's no way to match a stereo model.
-// Otherwise, the user passed a ModelComplex which is parsed and the data is inspected to find the conditions.
-ModelComplexSearch get_model_search(const std::string& model_arg, const DirEntries& dir_entries) {
-    const ModelComplex model_complex = model_resolution::parse_model_argument(model_arg);
-    if (model_complex.is_path()) {
-        const auto model_path = std::filesystem::weakly_canonical(model_complex.raw);
-
-        if (!check_model_path(model_path)) {
-            std::exit(EXIT_FAILURE);
-        };
-
-        if (is_modbase_model(model_path)) {
-            spdlog::error(
-                    "Specified model `{}` is not a simplex model but a modified bases model. Pass "
-                    "modified bases model paths using `--modified-bases-models`",
-                    model_path.string());
-            std::exit(EXIT_FAILURE);
-        }
-        const auto model_name = model_path.filename().string();
-        // Find the simplex model - it must a known model otherwise we cannot match a stereo model
-        const auto model_info = get_simplex_model_info(model_name);
-        // Pass the model's ModelVariant (e.g. HAC) in here so everything matches
-        // There are no mods variants if model_arg is a path
-        const auto inferred_selection =
-                ModelComplex{to_string(model_info.simplex.variant), model_info.simplex, {}};
-
-        // Return the searcher which hasn't needed to inspect any data
-        return ModelComplexSearch(inferred_selection, model_info.chemistry, false);
-    }
-
-    // Inspect data to find chemistry.
-    const auto chemistry = file_info::get_unique_sequencing_chemistry(dir_entries);
-    return ModelComplexSearch(model_complex, chemistry, true);
-}
-
-DuplexModels load_models(const std::string& model_arg,
-                         const std::vector<std::string>& mod_bases,
-                         const std::string& mod_bases_models,
-                         const std::string& stereo_model_arg,
-                         const std::optional<std::filesystem::path>& model_directory,
-                         const DirEntries& dir_entries,
-                         const BatchParams& batch_params,
-                         const bool skip_model_compatibility_check,
-                         const std::string& device) {
-    ModelComplexSearch model_search = get_model_search(model_arg, dir_entries);
-    const ModelComplex inferred_model_complex = model_search.complex();
-
-    if (!mods_model_arguments_valid(inferred_model_complex, mod_bases, mod_bases_models)) {
-        std::exit(EXIT_FAILURE);
-    }
-
-    if (inferred_model_complex.model.variant == ModelVariant::FAST) {
-        spdlog::warn("Duplex is not supported for fast models.");
-    }
-
-    std::filesystem::path stereo_model_path;
-    if (!stereo_model_arg.empty()) {
-        stereo_model_path = std::filesystem::path(stereo_model_arg);
-        if (!std::filesystem::exists(stereo_model_path)) {
-            spdlog::error("--stereo-model does not exist at: '{}'.",
-                          stereo_model_path.string().c_str());
-            std::exit(EXIT_FAILURE);
-        }
-    }
-
-    std::filesystem::path model_path;
-    std::vector<std::filesystem::path> mods_model_paths;
-
-    model_downloader::ModelDownloader downloader(model_directory);
-
-    // Cannot use inferred_selection as it has the ModelVariant set differently.
-    if (ModelComplexParser::parse(model_arg).is_path()) {
-        model_path = std::filesystem::canonical(std::filesystem::path(model_arg));
-
-        if (stereo_model_path.empty()) {
-            stereo_model_path = model_path.parent_path() / model_search.stereo().name;
-            if (!std::filesystem::exists(stereo_model_path)) {
-                stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
-            }
-        }
-
-        if (!skip_model_compatibility_check) {
-            const auto model_config = load_model_config(model_path);
-            const auto model_name = model_path.filename().string();
-            const auto model_sample_rate = model_config.sample_rate < 0
-                                                   ? get_sample_rate_by_model_name(model_name)
-                                                   : model_config.sample_rate;
-            bool inspect_ok = true;
-            models::SamplingRate data_sample_rate = 0;
-            try {
-                data_sample_rate = file_info::get_sample_rate(dir_entries);
-            } catch (const std::exception& e) {
-                inspect_ok = false;
-                spdlog::warn(
-                        "Could not check that model sampling rate and data sampling rate match. "
-                        "Proceed with caution. Reason: {}",
-                        e.what());
-            }
-            if (inspect_ok) {
-                check_sampling_rates_compatible(model_sample_rate, data_sample_rate);
-            }
-        }
-        mods_model_paths =
-                get_non_complex_mods_models(model_path, mod_bases, mod_bases_models, downloader);
-
-    } else {
-        try {
-            model_path = downloader.get(model_search.simplex(), "simplex");
-            if (stereo_model_path.empty()) {
-                stereo_model_path = downloader.get(model_search.stereo(), "stereo duplex");
-            }
-            // Either get the mods from the model complex or resolve from --modified-bases args
-            mods_model_paths = inferred_model_complex.has_mods_variant()
-                                       ? downloader.get(model_search.mods(), "mods")
-                                       : get_non_complex_mods_models(model_path, mod_bases,
-                                                                     mod_bases_models, downloader);
-        } catch (const std::exception&) {
-            utils::clean_temporary_models(downloader.temporary_models());
-            throw;
-        }
-    }
-
-    const auto model_name = model_path.filename().string();
-    auto model_config = load_model_config(model_path);
-    model_config.basecaller.update(batch_params);
-    model_config.normalise_basecaller_params();
-
-    if (device == "cpu" && model_config.basecaller.batch_size() == 0) {
-        // Force the batch size to 128
-        model_config.basecaller.set_batch_size(128);
-    }
-
-    const auto stereo_model_name = stereo_model_path.filename().string();
-    auto stereo_model_config = load_model_config(stereo_model_path);
-    stereo_model_config.basecaller.update(batch_params);
-    stereo_model_config.normalise_basecaller_params();
-
-#if DORADO_METAL_BUILD
-    if (device == "metal" && stereo_model_config.is_lstm_model()) {
-        // ALWAYS auto tune the duplex batch size (i.e. batch_size passed in is 0.)
-        // EXCEPT for on metal
-        // For now, the minimal batch size is used for the duplex model.
-        stereo_model_config.basecaller.set_batch_size(48);
-    }
-#endif
-    if (device == "cpu" && stereo_model_config.basecaller.batch_size() == 0) {
-        stereo_model_config.basecaller.set_batch_size(128);
-    }
-
-    return DuplexModels{model_path,          model_name,
-                        model_config,        stereo_model_path,
-                        stereo_model_config, stereo_model_name,
-                        mods_model_paths,    downloader.temporary_models()};
-}
-
 ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
                                            argparse::ArgumentParser& parser,
                                            size_t device_count) {
@@ -283,6 +97,27 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
 
     // All looks good.
     return params;
+}
+
+DuplexModels load_duplex_models(const argparse::ArgumentParser& parser,
+                                const DataLoader::InputFiles& input_pod5_files,
+                                const std::string& context) {
+    try {
+        DuplexModelResolver resolver{
+                parser.get<std::string>("model"),
+                parser.get<std::string>("--modified-bases-models"),
+                parser.get<std::vector<std::string>>("--modified-bases"),
+                cli::get_optional_argument<std::string>("--stereo-model", parser),
+                cli::get_optional_argument<std::string>("--models-directory", parser),
+                parser.get<bool>("--skip-model-compatibility-check"),
+                input_pod5_files.get(),
+        };
+
+        return DuplexModels(resolver.resolve());
+    } catch (const std::exception& e) {
+        spdlog::error("Failed to resolve {} models: {}", context, e.what());
+        std::exit(EXIT_FAILURE);
+    }
 }
 
 }  // namespace
@@ -370,7 +205,8 @@ int duplex(int argc, char* argv[]) {
     {
         const std::string options = utils::join(models::modified_model_variants(), ", ");
         parser.add_group("Modified model arguments");
-        parser.add_argument("--modified-bases")
+        auto& modbase_mutex_group = parser.add_mutually_exclusive_group();
+        modbase_mutex_group.add_argument("--modified-bases")
                 .help("A space separated list of modified base codes. Choose from: " + options +
                       ".")
                 .nargs(argparse::nargs_pattern::at_least_one)
@@ -383,7 +219,7 @@ int duplex(int argc, char* argv[]) {
                     }
                     return value;
                 });
-        parser.add_argument("--modified-bases-models")
+        modbase_mutex_group.add_argument("--modified-bases-models")
                 .help("A comma separated list of modified base models")
                 .default_value(std::string());
         parser.add_argument("--modified-bases-threshold")
@@ -424,19 +260,10 @@ int duplex(int argc, char* argv[]) {
     auto mm2_option_string = alignment::mm2::extract_options_string_arg({argv, argv + argc},
                                                                         args_excluding_mm2_opts);
 
-    std::set<fs::path> temp_model_paths;
     try {
         cli::parse(parser, args_excluding_mm2_opts);
 
-        auto device{parser.get<std::string>("-x")};
-        if (!cli::validate_device_string(device)) {
-            return EXIT_FAILURE;
-        }
-        if (device == cli::AUTO_DETECT_DEVICE) {
-            device = utils::get_auto_detected_device();
-        }
-
-        auto model(parser.get<std::string>("model"));
+        const auto device = cli::parse_device(parser);
 
         auto reads(parser.get<std::string>("reads"));
         std::string pairs_file = parser.get<std::string>("--pairs");
@@ -444,14 +271,10 @@ int duplex(int argc, char* argv[]) {
         auto min_qscore(parser.get<int>("--min-qscore"));
         auto ref = parser.get<std::string>("--reference");
         auto bed = parser.get<std::string>("--bed-file");
-        const bool basespace_duplex = (model.compare("basespace") == 0);
         std::vector<std::string> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
             utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
         }
-
-        auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
-        auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
 
         std::map<std::string, std::string> template_complement_map;
         auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
@@ -489,6 +312,8 @@ int duplex(int argc, char* argv[]) {
             spdlog::error("Failed to load pod5 data: '{}'", e.what());
             return EXIT_FAILURE;
         }
+
+        const bool basespace_duplex = parser.get<std::string>("model") == "basespace";
 
         size_t num_reads = 0;
         if (basespace_duplex) {
@@ -607,6 +432,8 @@ int duplex(int argc, char* argv[]) {
                 return EXIT_FAILURE;  // Exit with an error code
             }
 
+            auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
+            auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
             if (!mod_bases.empty() || !mod_bases_models.empty()) {
                 spdlog::error("Basespace duplex does not support modbase models");
                 return EXIT_FAILURE;
@@ -639,17 +466,10 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-            const std::string stereo_model_arg = parser.get<std::string>("--stereo-model");
-            const auto batch_params = get_batch_params(parser);
-            const bool skip_model_compatibility_check =
-                    parser.get<bool>("--skip-model-compatibility-check");
 
-            const auto models_directory = model_resolution::get_models_directory(parser);
-            const DuplexModels models = load_models(
-                    model, mod_bases, mod_bases_models, stereo_model_arg, models_directory,
-                    input_pod5_files.get(), batch_params, skip_model_compatibility_check, device);
+            DuplexModels models = load_duplex_models(parser, input_pod5_files, "duplex");
+            models.set_basecaller_batch_params(cli::get_batch_params(parser), device);
 
-            temp_model_paths = models.temp_paths;
             size_t device_count = 1;
 #if DORADO_CUDA_BUILD
             auto initial_device_info = utils::get_cuda_device_info(device, false);
@@ -658,22 +478,23 @@ int duplex(int argc, char* argv[]) {
 #endif
 
             const auto modbase_params =
-                    validate_modbase_params(models.mods_model_paths, parser, device_count);
+                    validate_modbase_params(models.get_modbase_model_paths(), parser, device_count);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
-            auto mod_base_runners = api::create_modbase_runners(models.mods_model_paths, device,
-                                                                modbase_params.runners_per_caller,
-                                                                modbase_params.batchsize);
+            auto mod_base_runners = api::create_modbase_runners(
+                    models.get_modbase_model_paths(), device, modbase_params.runners_per_caller,
+                    modbase_params.batchsize);
 
             if (!mod_base_runners.empty() && writer_output_mode == OutputMode::FASTQ) {
                 throw std::runtime_error("Modified base models cannot be used with FASTQ output");
             }
 
             // Write read group info to header.
-            auto duplex_rg_name = std::string(models.model_name + "_" + models.stereo_model_name);
+            auto duplex_rg_name = std::string(models.get_simplex_model_name() + "_" +
+                                              models.get_stereo_model_name());
             // TODO: supply modbase model names once duplex modbase is complete
-            auto read_groups =
-                    file_info::load_read_groups(input_pod5_files.get(), models.model_name, "");
+            auto read_groups = file_info::load_read_groups(input_pod5_files.get(),
+                                                           models.get_simplex_model_name(), "");
             read_groups.merge(
                     file_info::load_read_groups(input_pod5_files.get(), duplex_rg_name, ""));
 
@@ -713,7 +534,7 @@ int duplex(int argc, char* argv[]) {
                     DuplexBasecallerRunners basecaller_runners;
                     std::tie(basecaller_runners.runners, basecaller_runners.num_devices) =
                             api::create_basecall_runners(
-                                    {models.model_config, device_id, 0.9f * fraction,
+                                    {models.get_simplex_config(), device_id, 0.9f * fraction,
                                      api::PipelineType::duplex, 0.f, false, false, false},
                                     num_runners, 0);
 
@@ -728,7 +549,7 @@ int duplex(int argc, char* argv[]) {
                     // model.
                     std::tie(basecaller_runners.stereo_runners, std::ignore) =
                             api::create_basecall_runners(
-                                    {models.stereo_model_config, device_id, 0.5f * fraction,
+                                    {models.get_stereo_config(), device_id, 0.5f * fraction,
                                      api::PipelineType::duplex, 0.f, false, false, false},
                                     num_runners, 0);
 
@@ -757,11 +578,11 @@ int duplex(int argc, char* argv[]) {
 #endif
             {
                 std::tie(runners, num_devices) = api::create_basecall_runners(
-                        {models.model_config, device, 0.9f, api::PipelineType::duplex, 0.f, false,
-                         false, false},
+                        {models.get_simplex_config(), device, 0.9f, api::PipelineType::duplex, 0.f,
+                         false, false, false},
                         num_runners, 0);
                 std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
-                        {models.stereo_model_config, device, 0.5f, api::PipelineType::duplex, 0.f,
+                        {models.get_stereo_config(), device, 0.5f, api::PipelineType::duplex, 0.f,
                          false, false, false},
                         num_runners, 0);
             }
@@ -776,7 +597,7 @@ int duplex(int argc, char* argv[]) {
                 pairing_parameters = std::move(template_complement_map);
             }
 
-            auto mean_qscore_start_pos = models.model_config.mean_qscore_start_pos;
+            auto mean_qscore_start_pos = models.get_simplex_config().mean_qscore_start_pos;
 
             api::create_stereo_duplex_pipeline(
                     pipeline_desc, std::move(runners), std::move(stereo_runners),
@@ -815,8 +636,6 @@ int duplex(int argc, char* argv[]) {
             // Run pipeline.
             tracker.reset_initialization_time();
             loader.load_reads(input_pod5_files, ReadOrder::BY_CHANNEL);
-
-            utils::clean_temporary_models(temp_model_paths);
         }
 
         // Wait for the pipeline to complete.  When it does, we collect
@@ -836,7 +655,6 @@ int duplex(int argc, char* argv[]) {
                                               : std::optional<std::regex>(dump_stats_filter));
         }
     } catch (const std::exception& e) {
-        utils::clean_temporary_models(temp_model_paths);
         spdlog::error(e.what());
         return EXIT_FAILURE;
     }

@@ -8,11 +8,12 @@
 
 #include <filesystem>
 #include <vector>
+
 namespace fs = std::filesystem;
 
 namespace dorado::model_downloader {
 
-bool download_models(const std::string& target_directory, const std::string& selected_model) {
+bool download_models(const std::string& target_directory, std::string_view selected_model) {
     if (selected_model != "all" && !models::is_valid_model(selected_model)) {
         spdlog::error("Selected model doesn't exist: {}", selected_model);
         return false;
@@ -41,16 +42,18 @@ bool download_models(const std::string& target_directory, const std::string& sel
     return success;
 }
 
-std::filesystem::path ModelDownloader::get(const std::string& model_name,
-                                           const std::string& description) {
+std::filesystem::path ModelDownloader::get(std::string_view model_name,
+                                           std::string_view description) {
     const fs::path parent_dir =
             m_models_dir.has_value() ? m_models_dir.value() : utils::create_temporary_directory();
 
     // clang-tidy warns about performance-no-automatic-move if |temp_model_dir| is const. It should be treated as such though.
     /*const*/ fs::path model_dir = parent_dir / model_name;
 
+    const auto log_level = m_verbose ? spdlog::level::info : spdlog::level::trace;
     if (fs::exists(model_dir)) {
-        spdlog::trace("Found existing model at '{}'.", model_dir.string());
+        spdlog::log(log_level, " - found existing model '{}' at '{}'.", model_name,
+                    model_dir.string());
         return model_dir;
     }
 
@@ -63,8 +66,8 @@ std::filesystem::path ModelDownloader::get(const std::string& model_name,
     }
 
     if (!download_models(parent_dir.string(), model_name)) {
-        throw std::runtime_error("Failed to download + " + description + " model: '" + model_name +
-                                 "'.");
+        throw std::runtime_error(
+                fmt::format("Failed to download {} model: '{}'.", description, model_name));
     }
 
     if (is_temporary()) {
@@ -78,16 +81,16 @@ std::filesystem::path ModelDownloader::get(const std::string& model_name,
         }
     }
 
-    spdlog::trace("Downloaded {} model into: '{}'.", description, model_dir.string());
+    spdlog::log(log_level, "Downloaded '{}' model into: '{}'.", model_name, model_dir.string());
     return model_dir;
 }
 
-std::filesystem::path ModelDownloader::get(const ModelInfo& model, const std::string& description) {
+std::filesystem::path ModelDownloader::get(const ModelInfo& model, std::string_view description) {
     return get(model.name, description);
 }
 
 std::vector<std::filesystem::path> ModelDownloader::get(const std::vector<ModelInfo>& models,
-                                                        const std::string& description) {
+                                                        std::string_view description) {
     std::vector<std::filesystem::path> paths;
     paths.reserve(models.size());
     for (const auto& info : models) {

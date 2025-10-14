@@ -1,28 +1,31 @@
 #include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
+#include "data_loader/DataLoader.h"
 #include "dorado_version.h"
-#include "file_info/file_info.h"
 #include "model_downloader/model_downloader.h"
-#include "model_resolution.h"
-#include "models/kits.h"
+#include "model_resolver/ModelResolver.h"
+#include "model_resolver/Models.h"
+#include "models/model_complex.h"
 #include "models/models.h"
-#include "utils/fs_utils.h"
 #include "utils/log_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <cstdlib>
 #include <exception>
 #include <filesystem>
-#include <fstream>
 #include <iostream>
+#include <iterator>
 #include <sstream>
+#include <stdexcept>
 #include <vector>
 
 namespace fs = std::filesystem;
 
 namespace dorado {
+using namespace dorado::model_resolution;
 
 namespace {
 
@@ -52,18 +55,13 @@ void print_models(bool yaml) {
     }
 }
 
-using namespace dorado::models;
+bool download_named_or_path(const models::ModelComplex& complex,
+                            model_downloader::ModelDownloader& downloader) {
+    using namespace dorado::models;
 
-std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
-                                       const fs::path& data,
-                                       bool recursive) {
-    std::vector<ModelInfo> models;
-
-    const auto model_arg = model_complex.raw;
-    throw_on_deprecated_model(model_complex.raw);
-
-    if (model_complex.is_path()) {
-        if (model_arg == "all") {
+    if (complex.is_path_style()) {
+        if (complex.get_raw() == "all") {
+            std::vector<ModelInfo> models;
             const auto& all_groups = {simplex_models(),    modified_models(), stereo_models(),
                                       correction_models(), polish_models(),   variant_models()};
             for (const auto& group : all_groups) {
@@ -71,49 +69,57 @@ std::vector<ModelInfo> get_model_infos(const ModelComplex& model_complex,
                     models.push_back(info);
                 }
             }
-            return models;
+
+            downloader.get(models, "your");
+            return true;
         }
 
-        if (!is_valid_model(model_complex.raw)) {
-            spdlog::error("'{}' is not a valid model", model_complex.raw);
-            print_models(false);
-            std::exit(EXIT_FAILURE);
-        }
-
-        models.push_back(models::get_model_info(model_arg));
-        return models;
+        print_models(false);
+        spdlog::error("'{}' is not a valid model name.", complex.get_raw());
+        return false;
     }
 
-    if (data.empty() && model_complex.has_model_variant()) {
-        spdlog::error("Must set --data when using automatic model detection");
-        std::exit(EXIT_FAILURE);
+    if (complex.is_named_style()) {
+        std::vector<ModelInfo> models;
+        models.push_back(complex.get_named_simplex_model());
+        const auto& mods = complex.get_named_mods_models();
+        std::copy(mods.cbegin(), mods.cend(), std::back_inserter(models));
+        downloader.get(models, "your");
+        return true;
     }
 
-    if (!data.empty()) {
-        const auto folder_entries = utils::fetch_directory_entries(data.string(), recursive);
-        const auto chemistry = file_info::get_unique_sequencing_chemistry(folder_entries);
-        auto model_search = models::ModelComplexSearch(model_complex, chemistry, true);
+    if (complex.is_variant_style()) {
+        throw std::logic_error("Cannot use download_named with variant model complex.");
+    }
 
-        try {
-            if (model_complex.has_model_variant()) {
-                models.push_back(model_search.simplex());
+    return false;
+}
+
+bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
+    const auto data = parser.get<std::string>("--data");
+    const auto recursive = parser.get<bool>("--recursive");
+
+    try {
+        DataLoader::InputFiles input_files;
+        if (!data.empty()) {
+            input_files = DataLoader::InputFiles::search_pod5s(data, recursive);
+            if (input_files.get().empty()) {
+                spdlog::error("No POD5 files found in '{}' recursive:'{}'.", data, recursive);
+                return false;
             }
-            // If user made a mods selection get it, otherwise get all mods
-            const auto mm = model_complex.has_mods_variant() ? model_search.mods()
-                                                             : model_search.simplex_mods();
-            models.insert(models.end(), mm.begin(), mm.end());
-        } catch (std::exception& e) {
-            spdlog::error(e.what());
-            std::exit(EXIT_FAILURE);
         }
 
-        try {
-            models.push_back(model_search.stereo());
-        } catch (std::exception& e) {
-            spdlog::debug(e.what());
-        }
+        DownloaderModelResolver resolver{parser.get<std::string>("--model"),
+                                         parser.get<std::string>("--models-directory"),
+                                         input_files.get()};
+        const Models models(resolver.resolve());
+    } catch (const std::exception& e) {
+        spdlog::error(e.what());
+        spdlog::info("Show all available models with the `--list` argument.");
+        return false;
     }
-    return models;
+
+    return true;
 }
 
 }  // namespace
@@ -122,44 +128,44 @@ using namespace models;
 
 int download(int argc, char* argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-
-    parser.add_argument("--model").default_value(std::string("all")).help("the model to download");
-
-    auto& models_dir_arg = parser.add_argument("--models-directory")
-                                   .default_value(std::string("."))
-                                   .help("the directory to download the models into");
-    parser.add_hidden_alias_for(models_dir_arg, "--directory");
-
-    parser.add_argument("--list").default_value(false).implicit_value(true).help(
-            "list the available models for download");
-    parser.add_argument("--list-yaml")
-            .help("list the available models for download, as yaml, to stdout")
-            .default_value(false)
-            .implicit_value(true);
-    parser.add_argument("--list-structured")
-            .help("list the available models in a structured format, as yaml, to stdout")
-            .default_value(false)
-            .implicit_value(true);
-
-    parser.add_argument("--data")
-            .default_value(std::string())
-            .help("path to POD5 data used to automatically select models");
-    parser.add_argument("-r", "--recursive")
-            .default_value(false)
-            .implicit_value(true)
-            .help("recursively scan through directories to load POD5 files");
-    parser.add_argument("--overwrite")
-            .default_value(false)
-            .implicit_value(true)
-            .help("overwrite existing models if they already exist");
-
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
+            .flag()
             .action([&](const auto&) { ++verbosity; })
             .append();
+
+    {
+        parser.add_group("model selection");
+        parser.add_argument("--model")
+                .default_value(std::string("all"))
+                .help("the model to download");
+
+        auto& models_dir_arg = parser.add_argument("--models-directory")
+                                       .default_value(std::string("."))
+                                       .help("the directory to download the models into");
+        parser.add_hidden_alias_for(models_dir_arg, "--directory");
+
+        parser.add_argument("--data")
+                .default_value(std::string())
+                .help("path to POD5 data used to automatically select models");
+        parser.add_argument("-r", "--recursive")
+                .default_value(false)
+                .implicit_value(true)
+                .help("recursively scan through directories to load POD5 files");
+    }
+    {
+        parser.add_group("model lists");
+        parser.add_argument("--list").default_value(false).implicit_value(true).help(
+                "list the available models for download");
+        parser.add_argument("--list-yaml")
+                .help("list the available models for download, as yaml, to stdout")
+                .default_value(false)
+                .implicit_value(true);
+        parser.add_argument("--list-structured")
+                .help("list the available models in a structured format, as yaml, to stdout")
+                .default_value(false)
+                .implicit_value(true);
+    }
 
     try {
         parser.parse_args(argc, argv);
@@ -188,53 +194,33 @@ int download(int argc, char* argv[]) {
         return EXIT_SUCCESS;
     }
 
-    const auto model_arg = parser.get<std::string>("--model");
-    const auto data = parser.get<std::string>("--data");
-    const auto recursive = parser.get<bool>("--recursive");
-
-    std::vector<ModelInfo> model_infos;
     try {
-        const auto model_complex = model_resolution::parse_model_argument(model_arg);
-        model_infos = get_model_infos(model_complex, data, recursive);
+        const auto models_directory =
+                get_models_directory(parser.get<std::string>("--models-directory"));
+        model_downloader::ModelDownloader downloader(models_directory, true);
+
+        const auto model_arg = parser.get<std::string>("--model");
+        const auto named_model = try_get_model_info(model_arg);
+        if (named_model.has_value()) {
+            downloader.get(named_model.value(), to_string(named_model->model_type));
+        } else {
+            const auto model_complex = ModelComplex::parse(model_arg);
+            if (model_complex.is_variant_style()) {
+                if (!download_variant_via_resolver(parser)) {
+                    return EXIT_FAILURE;
+                }
+            } else {
+                if (!download_named_or_path(model_complex, downloader)) {
+                    return EXIT_FAILURE;
+                }
+            }
+        }
     } catch (const std::exception& e) {
         spdlog::error(e.what());
         return EXIT_FAILURE;
     }
 
-    std::filesystem::path models_directory;
-    auto models_directory_opt = model_resolution::get_models_directory(parser);
-    if (!models_directory_opt.has_value()) {
-        models_directory = std::filesystem::path(parser.get<std::string>("--models-directory"));
-    } else {
-        models_directory = models_directory_opt.value();
-    }
-
-    auto downloader = model_downloader::ModelDownloader(models_directory);
-
-    const auto overwrite = parser.get<bool>("--overwrite");
-    for (auto& info : model_infos) {
-        auto new_model_path = models_directory / info.name;
-        if (fs::exists(new_model_path)) {
-            if (!overwrite) {
-                spdlog::info(" - found existing model: '{}'", info.name);
-                spdlog::debug(" - model found at: '{}'", fs::canonical(new_model_path).string());
-                continue;
-            }
-            spdlog::debug(" - deleting existing model: {} at: '{}'", info.name,
-                          fs::canonical(new_model_path).string());
-            fs::remove_all(new_model_path);
-        }
-        try {
-            const auto actual_path = downloader.get(info, "your");
-            spdlog::info("Downloaded model: '{}' into '{}'", info.name,
-                         fs::canonical((actual_path)).string());
-        } catch (const std::exception& e) {
-            spdlog::debug("downloader exception: {}", e.what());
-            spdlog::error("Failed to download model: {}", info.name);
-            return EXIT_FAILURE;
-        }
-    }
-
+    spdlog::info("Finished");
     return EXIT_SUCCESS;
 }
 

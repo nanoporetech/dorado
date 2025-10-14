@@ -1,8 +1,10 @@
 // Add some utilities for CLI.
 #pragma once
 
+#include "config/BatchParams.h"
 #include "dorado_version.h"
 #include "hts_utils/bam_utils.h"
+#include "torch_utils/auto_detect_device.h"
 
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
@@ -180,6 +182,29 @@ inline void log_requested_cuda_devices(const std::string& device_string) {
 }
 
 #endif
+
+inline config::BatchParams get_batch_params(const argparse::ArgumentParser& parser) {
+    config::BatchParams p;
+    p.update(config::BatchParams::Priority::CLI_ARG,
+             cli::get_optional_argument<int>("--chunksize", parser),
+             cli::get_optional_argument<int>("--overlap", parser),
+             cli::get_optional_argument<int>("--batchsize", parser));
+    return p;
+}
+
+inline std::string parse_device(const argparse::ArgumentParser& parser) {
+    auto device{parser.get<std::string>("-x")};
+    if (!cli::validate_device_string(device)) {
+        throw std::runtime_error("Failed to parse --device string.");
+    }
+
+    if (device == cli::AUTO_DETECT_DEVICE) {
+        return utils::get_auto_detected_device();
+    }
+
+    return device;
+}
+
 }  // namespace cli
 
 }  // namespace dorado

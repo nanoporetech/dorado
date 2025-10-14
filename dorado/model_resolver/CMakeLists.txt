@@ -1,0 +1,23 @@
+dorado_add_library(
+    NAME
+        dorado_model_resolver_lib
+    PUBLIC_DIR
+        model_resolver
+    SOURCES_PUBLIC
+        Models.h
+        ModelSources.h
+        ModelResolver.h
+    SOURCES_PRIVATE
+        Models.cpp
+        ModelSources.cpp
+        ModelResolver.cpp
+    DEPENDS_PUBLIC
+        dorado_config
+        dorado_models_lib
+        dorado_utils
+    DEPENDS_PRIVATE
+        dorado_file_info
+        dorado_io_lib
+        dorado_model_downloader_lib
+        spdlog::spdlog
+)

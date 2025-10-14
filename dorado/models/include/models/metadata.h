@@ -2,6 +2,7 @@
 
 #include "kits.h"
 
+#include <iosfwd>
 #include <set>
 
 namespace dorado::models {
@@ -86,11 +87,19 @@ struct ModelVariantPair {
     }
 };
 
+std::ostream& operator<<(std::ostream& os, const ModelVariantPair& p);
+
 struct ModsVariantPair {
     ModsVariant variant = ModsVariant::NONE;
     ModelVersion ver = ModelVersion::NONE;
     bool has_variant() const { return variant != ModsVariant::NONE; }
     bool has_ver() const { return ver != ModelVersion::NONE; }
+
+    bool operator==(const ModsVariantPair& other) const {
+        return other.variant == variant && other.ver == ver;
+    }
 };
+
+std::ostream& operator<<(std::ostream& os, const ModsVariantPair& p);
 
 }  // namespace dorado::models

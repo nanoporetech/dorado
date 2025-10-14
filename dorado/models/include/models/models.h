@@ -8,14 +8,24 @@
 
 namespace dorado::models {
 
+enum class ModelType { SIMPLEX, STEREO, MODBASE, CORRECT, POLISH, VARIANT };
+
+std::string_view to_string(ModelType model_type);
+
 // Model info identifies models and associates additional metadata for searching for
 // automatic model selection.
 struct ModelInfo {
     std::string name;
     std::string checksum;
     Chemistry chemistry;
+    ModelType model_type;
     ModelVariantPair simplex{};
     ModsVariantPair mods{};
+
+    bool operator==(const ModelInfo& o) const {
+        return std::tie(name, checksum, chemistry, model_type, simplex, mods) ==
+               std::tie(o.name, o.checksum, o.chemistry, o.model_type, o.simplex, mods);
+    };
 };
 
 // Search for a model which is configured for use with the given chemistry and other
@@ -49,7 +59,7 @@ std::vector<std::string> stereo_model_names();
 std::vector<std::string> modified_model_names();
 std::vector<std::string> modified_model_variants();
 
-bool is_valid_model(const std::string& selected_model);
+bool is_valid_model(std::string_view selected_model);
 
 // Get ModelInfo if this name matches is a known deprecated model
 std::optional<ModelInfo> get_deprecated_model(const std::string& model_name);
@@ -57,15 +67,24 @@ std::optional<ModelInfo> get_deprecated_model(const std::string& model_name);
 // Throws std::runtime_error with deprecation message containing the model name.
 void throw_on_deprecated_model(const std::string& model_name);
 
-// Search for a model by name and return the ModelInfo - searches all simplex, mods and stereo models
+// Search for a model by name and return the ModelInfo - searches all models
 ModelInfo get_model_info(const std::string& model_name);
+
+// Search for a model by name and return the ModelInfo - searches all models
+std::optional<ModelInfo> try_get_model_info(const std::string& model_name);
 
 // Search for a simplex model by name and return the ModelInfo
 ModelInfo get_simplex_model_info(const std::string& model_name);
 
 // finds the matching modification model for a given modification i.e. 5mCG and a simplex model
-ModelInfo get_modification_model(const std::filesystem::path& simplex_model,
-                                 const std::string& modification);
+ModelInfo get_modification_model(const std::string& simplex_name,
+                                 const ModsVariantPair& modification);
+
+// Find the simplex model corresponding to a given modbase model.
+ModelInfo get_modbase_model_simplex_parent(const ModelInfo& modbase);
+
+// Find the simplex model corresponding to a given modbase model.
+ModelInfo get_stereo_model_info(const ModelInfo& simplex);
 
 // get the sampling rate that the model is compatible with
 SamplingRate get_sample_rate_by_model_name(const std::string& model_name);
