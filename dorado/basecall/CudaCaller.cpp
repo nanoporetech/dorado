@@ -109,9 +109,9 @@ std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
     workspace = torch::empty({6 * ((T / stride) + 3) * N}, workspace_options);
     auto aux = std::make_unique<nn::AuxiliaryData>(workspace, N, T, stride,
                                                    std::vector<std::int32_t>(N, T));
-    aux->create_convolution_auxiliary_data(in_options.device());
-    aux->create_lstm_auxiliary_data(in_options.device());
-    aux->create_decoder_auxiliary_data(in_options.device());
+    aux->create_lstm_auxiliary_data(in_options.device());         // CPU work + async copy
+    aux->create_convolution_auxiliary_data(in_options.device());  // sync copy
+    aux->create_decoder_auxiliary_data(in_options.device());      // sync copy
     return aux;
 }
 
@@ -231,14 +231,16 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
         throw std::logic_error("Found auxiliary data while calling fixed chunks!");
     }
 
+    at::Tensor device_input = input.to(m_options.device());  // async copy
+
     if (aux) {
-        aux->create_convolution_auxiliary_data(m_options.device());
-        aux->create_lstm_auxiliary_data(m_options.device());
-        aux->create_decoder_auxiliary_data(m_options.device());
+        aux->create_lstm_auxiliary_data(m_options.device());         // CPU work + async copy
+        aux->create_convolution_auxiliary_data(m_options.device());  // sync copy
+        aux->create_decoder_auxiliary_data(m_options.device());      // sync copy
     }
 
     auto &task_queue = get_task_queue();
-    auto task = std::make_shared<NNTask>(input.to(m_options.device()), num_chunks, aux, this);
+    auto task = std::make_shared<NNTask>(device_input, num_chunks, aux, this);
     {
         std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
         task_queue.m_input_queue.push(task);
