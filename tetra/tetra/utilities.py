@@ -1,9 +1,17 @@
+import os
 import pathlib
 import platform
 import subprocess
 from datetime import datetime
 
 ROOT_DIR = pathlib.Path(__file__).parent.parent
+
+
+def get_env_or_raise(name: str) -> str:
+    val = os.getenv(name)
+    if val is None:
+        raise Exception(f"Couldn't find environment variable {name}")
+    return val
 
 
 def get_platform() -> str:
