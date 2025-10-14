@@ -24,7 +24,7 @@ namespace dorado::api {
 bool check_variable_chunk_sizes_supported(
         [[maybe_unused]] const config::BasecallModelConfig& model_config,
         [[maybe_unused]] const std::span<const int> device_ids) {
-#if DORADO_CUDA_BUILD
+#if DORADO_CUDA_BUILD && !DORADO_ORIN
     if (!model_config.is_lstm_model() || (model_config.lstm_size <= 128) ||
         (model_config.lstm_size > 1024) || ((model_config.lstm_size % 128) != 0)) {
         return false;
