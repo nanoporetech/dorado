@@ -313,7 +313,7 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
     for (size_t i = 0; i < read.seq.size(); ++i) {
         // Initialize for what corresponds to 100% canonical base for each position.
         // This is like one-hot encoding the canonical bases
-        int base_id = utils::BaseInfo::BASE_IDS.at(read.seq[i]);
+        const int base_id = utils::BaseInfo::BASE_IDS.at(static_cast<std::uint8_t>(read.seq[i]));
         if (base_id < 0) {
             spdlog::error("Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
                           read.seq[i], read.read_id);

@@ -57,7 +57,15 @@ void reverse_seq_to_sig_map(std::vector<uint64_t>& seq_to_sig_map, size_t signal
 class BaseInfo {
 public:
     static constexpr int NUM_BASES = 4;
-    static const std::vector<int> BASE_IDS;
+    inline static constexpr auto BASE_IDS = [] {
+        std::array<std::int8_t, 256> base_ids;
+        base_ids.fill(-1);
+        base_ids['A'] = 0;
+        base_ids['C'] = 1;
+        base_ids['G'] = 2;
+        base_ids['T'] = 3;
+        return base_ids;
+    }();
 };
 
 size_t count_trailing_chars(const std::string_view seq, char c);
@@ -120,7 +128,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
                                                          const std::vector<uint8_t>& moves);
 
 // Compile-time constant lookup table.
-static constexpr auto complement_table = [] {
+inline static constexpr auto complement_table = [] {
     std::array<char, 256> a{};
     // Valid input will only touch the entries set here.
     a['A'] = 'T';
