@@ -23,6 +23,7 @@ namespace fs = std::filesystem;
 using MC = ModelComplex;
 using MVP = ModelVariantPair;
 using ModVP = ModsVariantPair;
+using ModV = ModsVariant;
 using MV = ModelVariant;
 using VV = ModelVersion;
 
@@ -207,6 +208,105 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
 
         CATCH_CAPTURE(input);
         CATCH_CHECK_THROWS_AS(TestVersionParser::parse_version(input), std::runtime_error);
+    }
+}
+
+CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ", TEST_TAG) {
+    CATCH_SECTION("ModelComplexSearch parse variant ") {
+        struct In {
+            const std::string complex;
+            const std::optional<Chemistry> chemistry{std::nullopt};
+        };
+
+        struct Ex {
+            const ModelVariantPair simplex;
+            const std::vector<ModsVariantPair> mods{};
+        };
+
+        const Chemistry DNA = Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ;
+        const Chemistry RNA = Chemistry::RNA004_130BPS;
+        auto [input, expected] = GENERATE_COPY(table<In, Ex>({
+                // No version
+                std::make_tuple(In{"auto"}, Ex{{MV::AUTO}}),
+                std::make_tuple(In{"fast", DNA}, Ex{{MV::FAST}, {}}),
+                std::make_tuple(In{"hac", DNA}, Ex{{MV::HAC}, {}}),
+                std::make_tuple(In{"sup", DNA}, Ex{{MV::SUP}, {}}),
+
+                // specific version
+                std::make_tuple(In{"auto@v4.2.0", DNA}, Ex{{MV::AUTO, VV::v4_2_0}, {}}),
+                std::make_tuple(In{"fast@v5.0.0", DNA}, Ex{{MV::FAST, VV::v5_0_0}, {}}),
+                std::make_tuple(In{"hac@v4.2.0", DNA}, Ex{{MV::HAC, VV::v4_2_0}, {}}),
+                std::make_tuple(In{"sup@v5.2.0", DNA}, Ex{{MV::SUP, VV::v5_2_0}, {}}),
+
+                // latest version
+                std::make_tuple(In{"auto@latest", RNA}, Ex{{MV::AUTO}, {}}),
+                std::make_tuple(In{"fast@latest", RNA}, Ex{{MV::FAST}, {}}),
+                std::make_tuple(In{"hac@latest", RNA}, Ex{{MV::HAC}, {}}),
+                std::make_tuple(In{"sup@latest", RNA}, Ex{{MV::SUP}, {}}),
+
+                // with single mods
+                std::make_tuple(In{"auto,5mC"}, Ex{{MV::AUTO}, {{ModV::M_5mC}}}),
+                std::make_tuple(In{"hac,4mC_5mC"}, Ex{{MV::HAC}, {{ModV::M_4mC_5mC}}}),
+                std::make_tuple(In{"fast,5mC_5hmC"}, Ex{{MV::FAST}, {{ModV::M_5mC_5hmC}}}),
+                std::make_tuple(In{"auto,5mCG"}, Ex{{MV::AUTO}, {{ModV::M_5mCG}}}),
+                std::make_tuple(In{"hac,5mCG_5hmCG", DNA}, Ex{{MV::HAC}, {{ModV::M_5mCG_5hmCG}}}),
+
+                std::make_tuple(In{"auto@v5.0.0,6mA"}, Ex{{MV::AUTO, VV::v5_0_0}, {{ModV::M_6mA}}}),
+                std::make_tuple(In{"auto,m6A_DRACH", RNA}, Ex{{MV::AUTO}, {{ModV::M_m6A_DRACH}}}),
+                std::make_tuple(In{"auto,inosine_m6A", RNA},
+                                Ex{{MV::AUTO}, {{ModV::M_inosine_m6A}}}),
+                std::make_tuple(In{"sup,pseU_2OmeU", RNA}, Ex{{MV::SUP}, {{ModV::M_pseU_2OmeU}}}),
+                std::make_tuple(In{"sup,pseU_2OmeU,m5C_2OmeC", RNA},
+                                Ex{{MV::SUP}, {{ModV::M_pseU_2OmeU}, {ModV::M_m5C_2OmeC}}}),
+                // with single mods and version
+                std::make_tuple(In{"sup@v4.1.0,5mC@v2"},
+                                Ex{{MV::SUP, VV::v4_1_0}, {{ModV::M_5mC, VV::v2_0_0}}}),
+                std::make_tuple(In{"fast@latest,5mC_5hmC@v4.0.0"},
+                                Ex{{MV::FAST}, {{ModV::M_5mC_5hmC, VV::v4_0_0}}}),
+
+                // Multi-mods
+                std::make_tuple(In{"auto,5mC,6mA"}, Ex{{MV::AUTO}, {{ModV::M_5mC}, {ModV::M_6mA}}}),
+                std::make_tuple(
+                        In{"fast@latest,m6A_DRACH@v1,5mC_5hmC@v4.0.0"},
+                        Ex{{MV::FAST},
+                           {{ModV::M_m6A_DRACH, VV::v1_0_0}, {ModV::M_5mC_5hmC, VV::v4_0_0}}}),
+        }));
+
+        CATCH_CAPTURE(input.complex);
+        const ModelComplex mc = ModelComplex::parse(input.complex);
+        CATCH_REQUIRE(mc.is_variant_style());
+        CATCH_CHECK(mc.get_simplex_model_variant() == expected.simplex);
+        if (!expected.mods.empty()) {
+            CATCH_CHECK(mc.get_mod_model_variants() == expected.mods);
+        }
+        if (input.chemistry.has_value()) {
+            ModelComplexSearch search(mc, input.chemistry.value(), false);
+            CATCH_CHECK(search.chemistry() == input.chemistry);
+            CATCH_CHECK(search.simplex().model_type == ModelType::SIMPLEX);
+
+            if (expected.simplex.variant != MV::AUTO) {
+                CATCH_CHECK(to_string(search.simplex().simplex.variant) ==
+                            to_string(expected.simplex.variant));
+            } else {
+                CATCH_CHECK(search.simplex().simplex.is_auto);
+            }
+
+            CATCH_CHECK(search.mods().size() == expected.mods.size());
+            for (const auto &mod : search.mods()) {
+                if (expected.simplex.variant != MV::AUTO) {
+                    CATCH_CHECK(to_string(mod.simplex.variant) ==
+                                to_string(expected.simplex.variant));
+                }
+
+                int count_mod_matches = 0;
+                for (const auto &ex_mod : expected.mods) {
+                    if (ex_mod.variant == mod.mods.variant) {
+                        ++count_mod_matches;
+                    }
+                }
+                CATCH_CHECK(count_mod_matches == 1);
+            }
+        }
     }
 }
 
