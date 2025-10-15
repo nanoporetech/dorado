@@ -350,10 +350,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         auto signal = read->read_common.raw_data;
         if (params.context.reverse) {
             signal = at::flip(signal, 0);
-            std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
-            std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
-                           std::begin(seq_to_sig_map),
-                           [signal_len](auto signal_pos) { return signal_len - signal_pos; });
+            utils::reverse_seq_to_sig_map(seq_to_sig_map, signal_len);
         }
 
         // scale signal based on model parameters
