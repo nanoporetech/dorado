@@ -588,7 +588,8 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
 
     // Complement modbase data is stored in the template direction so there's no need for
     // any indexing gymnastics in chunk creation
-    auto modbase_data = is_template ? working_read->template_data : working_read->complement_data;
+    const auto& modbase_data =
+            is_template ? working_read->template_data : working_read->complement_data;
 
     const int64_t signal_len = modbase_data.signal.size(0);
 
