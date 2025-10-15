@@ -313,13 +313,15 @@ secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_nam
 
     at::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
 
-    secondary::Sample sample{seq_id,
-                             std::move(tensors.counts),
-                             std::move(tensors.positions_major),
-                             std::move(tensors.positions_minor),
-                             std::move(depth),
-                             std::move(tensors.read_ids_left),
-                             std::move(tensors.read_ids_right)};
+    secondary::Sample sample{
+            .seq_id = seq_id,
+            .features = std::move(tensors.counts),
+            .positions_major = std::move(tensors.positions_major),
+            .positions_minor = std::move(tensors.positions_minor),
+            .depth = std::move(depth),
+            .read_ids_left = std::move(tensors.read_ids_left),
+            .read_ids_right = std::move(tensors.read_ids_right),
+    };
 
     if (m_clip_to_zero) {
         sample.features = torch::clamp_min(sample.features, 0);

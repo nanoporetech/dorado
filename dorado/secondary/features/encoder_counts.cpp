@@ -170,13 +170,15 @@ secondary::Sample counts_to_features(CountsResult& pileup,
         feature_array = feature_array.to(FeatureTensorType);
     }
 
-    secondary::Sample sample{seq_id,
-                             std::move(feature_array),
-                             std::move(pileup.positions_major),
-                             std::move(pileup.positions_minor),
-                             std::move(depth),
-                             {},
-                             {}};
+    secondary::Sample sample{
+            .seq_id = seq_id,
+            .features = std::move(feature_array),
+            .positions_major = std::move(pileup.positions_major),
+            .positions_minor = std::move(pileup.positions_minor),
+            .depth = std::move(depth),
+            .read_ids_left = {},
+            .read_ids_right = {},
+    };
 
     return sample;
 }

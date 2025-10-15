@@ -32,7 +32,10 @@ void Sample::validate() const {
     }
 }
 
-Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end) {
+Sample slice_sample(const Sample& sample,
+                    const int64_t idx_start,
+                    const int64_t idx_end,
+                    const bool clone) {
     sample.validate();
 
     // Validate idx.
@@ -46,33 +49,28 @@ Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t
     }
 
     // Create the sliced Sample.
-    Sample sliced_sample;
+    Sample ret{
+            .seq_id = sample.seq_id,
+            .features = sample.features.index({at::indexing::Slice(idx_start, idx_end)}),
+            .positions_major = std::vector<int64_t>(std::begin(sample.positions_major) + idx_start,
+                                                    std::begin(sample.positions_major) + idx_end),
+            .positions_minor = std::vector<int64_t>(std::begin(sample.positions_minor) + idx_start,
+                                                    std::begin(sample.positions_minor) + idx_end),
+            .depth = sample.depth.index({at::indexing::Slice(idx_start, idx_end)}),
+            .read_ids_left = {},
+            .read_ids_right = {},
+    };
 
-    // Features.
-    sliced_sample.features =
-            sample.features.index({at::indexing::Slice(idx_start, idx_end)}).clone();
+    if (clone) {
+        ret.features = ret.features.clone();
+        ret.depth = ret.depth.clone();
+    }
 
-    // Depth.
-    sliced_sample.depth = sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone();
+    return ret;
+}
 
-    // Major positions.
-    sliced_sample.positions_major =
-            std::vector<int64_t>(std::begin(sample.positions_major) + idx_start,
-                                 std::begin(sample.positions_major) + idx_end);
-
-    // Minor positions.
-    sliced_sample.positions_minor =
-            std::vector<int64_t>(std::begin(sample.positions_minor) + idx_start,
-                                 std::begin(sample.positions_minor) + idx_end);
-
-    // Meta information.
-    sliced_sample.seq_id = sample.seq_id;
-
-    // Not needed, but stating for clarity. Slicing will not produce these.
-    sliced_sample.read_ids_left.clear();
-    sliced_sample.read_ids_right.clear();
-
-    return sliced_sample;
+Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end) {
+    return slice_sample(sample, idx_start, idx_end, true);
 }
 
 void debug_print_sample(std::ostream& os,
