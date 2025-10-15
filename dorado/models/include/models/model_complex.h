@@ -1,5 +1,6 @@
 #pragma once
 
+#include "kits.h"
 #include "metadata.h"
 #include "models.h"
 
@@ -76,6 +77,42 @@ protected:
 
     // ModelComplex constructor for PATH style;
     ModelComplex(const std::string& path);
+};
+
+// The ModelComplexSearch takes the sequencing chemistry, and the user's ModelComplex input which
+// could be a actual model complex tries to find the ModelInfo from the models lib.
+// Note:
+//  This is used in the ont_core_cpp CLIENT-side model discovery
+class ModelComplexSearch {
+public:
+    ModelComplexSearch(const ModelComplex& complex, Chemistry chemistry, bool suggestions);
+
+    // Return the model complex
+    ModelComplex complex() { return m_complex; }
+
+    // Return the chemistry
+    Chemistry chemistry() { return m_chemistry; }
+    // Return the simplex model found during initialisation
+    ModelInfo simplex() const { return m_simplex_model_info; }
+    // Find a stereo model which matches the chemistry
+    ModelInfo stereo() const;
+    // Find modification models which match the user's mods selections and chemistry
+    std::vector<ModelInfo> mods() const;
+    // Find all modification models which matches the simplex model and chemistry
+    std::vector<ModelInfo> simplex_mods() const;
+
+private:
+    // Resolve the simplex model which matches the user's command and chemistry
+    ModelInfo resolve_simplex() const;
+    // The user's model complex input
+    const ModelComplex m_complex;
+    // If a ModelVariant was set, the chemistry (e.g. R10.4.1 / RNA004) is deduced from the
+    // sequencing data otherwise it is meaningless
+    const Chemistry m_chemistry;
+    // If true, show suggestions if no models were found given some settings.
+    const bool m_suggestions;
+    // Store the result of the simplex model search
+    const ModelInfo m_simplex_model_info;
 };
 
 }  // namespace dorado::models

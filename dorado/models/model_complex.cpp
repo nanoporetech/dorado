@@ -252,4 +252,56 @@ const ModelVariantPair& ModelComplex::get_simplex_model_variant() const {
 const std::vector<ModsVariantPair>& ModelComplex::get_mod_model_variants() const {
     return m_mod_variants;
 }
+
+ModelComplexSearch::ModelComplexSearch(const ModelComplex& complex,
+                                       Chemistry chemistry,
+                                       bool suggestions)
+        : m_complex(complex),
+          m_chemistry(chemistry),
+          m_suggestions(suggestions),
+          m_simplex_model_info(resolve_simplex()) {};
+
+ModelInfo ModelComplexSearch::resolve_simplex() const {
+    switch (m_complex.style()) {
+    case ModelComplex::Style::PATH:
+        throw std::logic_error(
+                "Cannot use model ModelComplexSearch with a simplex model complex which is a path");
+    case ModelComplex::Style::NAMED:
+        return m_complex.get_named_simplex_model();
+    case ModelComplex::Style::VARIANT:
+        return find_model(simplex_models(), "simplex", m_chemistry,
+                          m_complex.get_simplex_model_variant(), ModsVariantPair(), m_suggestions);
+    }
+    throw std::logic_error("Unknown model complex style");
+}
+
+ModelInfo ModelComplexSearch::stereo() const {
+    return find_model(stereo_models(), "stereo duplex", m_chemistry, m_simplex_model_info.simplex,
+                      ModsVariantPair(), false);
+}
+
+std::vector<ModelInfo> ModelComplexSearch::mods() const {
+    switch (m_complex.style()) {
+    case ModelComplex::Style::PATH:
+        return {};
+    case ModelComplex::Style::NAMED:
+        return m_complex.get_named_mods_models();
+    case ModelComplex::Style::VARIANT:
+        std::vector<ModelInfo> models;
+        models.reserve(m_complex.get_mod_model_variants().size());
+        for (const auto& mod : m_complex.get_mod_model_variants()) {
+            const auto model_info = find_model(modified_models(), "modification", m_chemistry,
+                                               m_simplex_model_info.simplex, mod, m_suggestions);
+            models.push_back(model_info);
+        }
+        return models;
+    }
+    throw std::logic_error("Unknown model complex style");
+};
+
+std::vector<ModelInfo> ModelComplexSearch::simplex_mods() const {
+    return find_models(modified_models(), m_chemistry, m_simplex_model_info.simplex,
+                       ModsVariantPair());
+}
+
 }  // namespace dorado::models
