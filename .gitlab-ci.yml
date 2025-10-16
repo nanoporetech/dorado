@@ -242,18 +242,8 @@ pre-commit:
 
 # Build stages
 
-build:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
-  extends:
-    - .linux_build_dependencies
-    - .linux_runner
-    - .build_and_test_dorado
-
-build:linux:x86:focal_koi_from_source:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+build:linux:x86:noble_koi_from_source:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
@@ -277,18 +267,18 @@ build:linux:x86:noble:
     - !reference [.linux_build_dependencies, before_script]
     - apt-get install -y build-essential
 
-build:linux:x86:focal:debug:
+build:linux:x86:noble:debug:
   variables:
     BUILD_TYPE: "Debug"
   extends:
-    - build:linux:x86:focal
+    - build:linux:x86:noble
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
   artifacts: null
 
 build:linux:x86:coverage:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
@@ -318,7 +308,7 @@ build:linux:x86:clang_tidy:
 
 .build:linux:x86:valgrind:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     # valgrind can't cope with huge executables, so we have to go dynamic.
     BUILD_OPTIONS: "-D TRY_USING_STATIC_TORCH_LIB=NO"
@@ -357,12 +347,12 @@ build:linux:arm64:jammy:
     - .linux_arm64_runner
     - .build_and_test_dorado
 
-build:linux:x86:focal:no_ccache:
+build:linux:x86:noble:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
-    - build:linux:x86:focal
+    - build:linux:x86:noble
     - .on_nightly_or_manual
   artifacts: null
 
@@ -575,8 +565,8 @@ test:windows:
   needs:
     - build:windows
 
-test:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+test:linux:x86:noble:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   variables:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   script:
@@ -587,7 +577,7 @@ test:linux:x86:focal:
     - .linux_runner
     - .test_dorado
   needs:
-    - build:linux:x86:focal
+    - build:linux:x86:noble
 
 test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
@@ -669,15 +659,15 @@ test_archive:windows:cpu:
     - build_archive:windows:cuda12
 
 # Test that models can be downloaded and run.
-test:model_download:linux:x86:focal:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+test:model_download:linux:x86:noble:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
   extends:
     - .linux_test_dependencies
     - .linux_runner
     - .on_nightly_or_manual
   stage: test
   needs:
-    - build:linux:x86:focal
+    - build:linux:x86:noble
   script:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 64
 
