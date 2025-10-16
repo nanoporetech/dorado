@@ -287,6 +287,7 @@ build:linux:x86:coverage:
     - .linux_runner
     - .on_nightly_or_manual
   script:
+    - !reference [.create_venv]
     - pip install gcovr
     - !reference [.run_dorado_cmake_build]
   artifacts:
