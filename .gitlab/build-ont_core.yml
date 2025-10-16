@@ -3,6 +3,13 @@
 .test_ont_core_compatibility:
   stage: build
   script:
+    # The ont_core build expects to be using conan 1.x, so install it
+    # into a venv.
+    - python3 -m venv build_venv
+    - source build_venv/*/activate
+    - python --version
+    - pip install -U "conan<2"
+    - conan --version
     # Clone the repo
     - time git clone --depth 1 https://gitlab-ci-token:${CI_JOB_TOKEN}@${ONT_CORE_REPO_URL} ont_core_cpp
     - pushd ont_core_cpp
@@ -36,12 +43,3 @@ build:macos:arm:ont_core:
     - .macos_arm_runner
     - .test_ont_core_compatibility
     - .on_nightly_or_manual
-  script:
-    # The ont_core build expects to be using conan 1.x, so install it
-    # into a venv.
-    - python3 -m venv build_venv
-    - source build_venv/*/activate
-    - python --version
-    - pip install -U "conan<2"
-    - conan --version
-    - !reference [.test_ont_core_compatibility, script]
