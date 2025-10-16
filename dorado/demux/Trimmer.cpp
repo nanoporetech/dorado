@@ -142,7 +142,7 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
 
     // Actually trim components.
     auto trimmed_seq = utils::trim_sequence(seq, trim_interval);
-    auto trimmed_qual = utils::trim_quality(qual, trim_interval);
+    auto trimmed_qual = utils::trim_vector(qual, trim_interval);
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
 
     if (move_vals.empty()) {
@@ -230,13 +230,13 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
     read.read_common.moves = std::move(trimmed_moves);
 
     if (read.read_common.mod_base_info) {
-        int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
+        const int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
         // The modbase probs table consists of the probability per channel per base. So when
         // trimming, we just shift everything by skipped bases * number of channels.
-        std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
-                                                trim_interval.second * num_modbase_channels};
+        const std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
+                                                      trim_interval.second * num_modbase_channels};
         read.read_common.base_mod_probs =
-                utils::trim_quality(read.read_common.base_mod_probs, modbase_interval);
+                utils::trim_vector(read.read_common.base_mod_probs, modbase_interval);
     }
 }
 

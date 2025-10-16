@@ -8,6 +8,16 @@
 
 namespace dorado::utils {
 
+namespace detail {
+
+// Out of line to avoid pulling exception handling and string formatting into the header.
+[[noreturn]] void trim_throw(std::size_t size, const std::pair<int, int>& interval) {
+    throw std::invalid_argument(fmt::format("Trim interval {}-{} is invalid for length {}",
+                                            interval.first, interval.second, size));
+}
+
+}  // namespace detail
+
 int trim(const at::Tensor& signal, float threshold, int window_size, int min_elements) {
     const int min_trim = 10;
     const int num_samples = static_cast<int>(signal.size(0)) - min_trim;
@@ -53,15 +63,6 @@ std::string trim_sequence(const std::string& seq, const std::pair<int, int>& tri
                                     " is invalid for sequence " + seq);
     }
     return std::string(seq.begin() + trim_interval.first, seq.begin() + trim_interval.second);
-}
-
-std::vector<uint8_t> trim_quality(const std::vector<uint8_t>& qual,
-                                  const std::pair<int, int>& trim_interval) {
-    if (!qual.empty()) {
-        return std::vector<uint8_t>(qual.begin() + trim_interval.first,
-                                    qual.begin() + trim_interval.second);
-    }
-    return {};
 }
 
 std::tuple<int, std::vector<uint8_t>> trim_move_table(const std::vector<uint8_t>& move_vals,
