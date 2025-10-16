@@ -5,9 +5,7 @@
   script:
     # The ont_core build expects to be using conan 1.x, so install it
     # into a venv.
-    - python3 -m venv build_venv
-    - source build_venv/*/activate
-    - python --version
+    - !reference [.create_venv]
     - pip install -U "conan<2"
     - conan --version
     # Clone the repo
