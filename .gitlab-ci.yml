@@ -243,7 +243,7 @@ pre-commit:
 # Build stages
 
 build:linux:x86:noble_koi_from_source:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DBUILD_KOI_FROM_SOURCE=ON -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
@@ -255,7 +255,7 @@ build:linux:x86:noble_koi_from_source:
   artifacts: null
 
 build:linux:x86:noble:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
@@ -278,7 +278,7 @@ build:linux:x86:noble:debug:
 
 build:linux:x86:coverage:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
@@ -295,7 +295,7 @@ build:linux:x86:coverage:
 
 build:linux:x86:clang_tidy:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -308,7 +308,7 @@ build:linux:x86:clang_tidy:
 
 .build:linux:x86:valgrind:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     # valgrind can't cope with huge executables, so we have to go dynamic.
     BUILD_OPTIONS: "-D TRY_USING_STATIC_TORCH_LIB=NO"
@@ -566,7 +566,7 @@ test:windows:
     - build:windows
 
 test:linux:x86:noble:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   script:
@@ -660,7 +660,7 @@ test_archive:windows:cpu:
 
 # Test that models can be downloaded and run.
 test:model_download:linux:x86:noble:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_test_dependencies
     - .linux_runner
