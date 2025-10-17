@@ -508,15 +508,23 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar) {
     return cigar_str;
 }
 
-BamPtr new_unmapped_record(bam1_t* input_record, std::string seq, std::vector<uint8_t> qual) {
+BamPtr new_unmapped_record(bam1_t* input_record,
+                           std::string_view seq,
+                           std::span<const uint8_t> qual) {
+    std::string extracted_seq;
+    std::vector<uint8_t> extracted_qual;
     if (seq.empty()) {
-        seq = extract_sequence(input_record);
-        qual = extract_quality(input_record);
+        extracted_seq = extract_sequence(input_record);
+        extracted_qual = extract_quality(input_record);
         if (bam_is_rev(input_record)) {
-            seq = utils::reverse_complement(seq);
-            std::reverse(qual.begin(), qual.end());
+            extracted_seq = utils::reverse_complement(extracted_seq);
+            std::reverse(extracted_qual.begin(), extracted_qual.end());
         }
+        seq = extracted_seq;
+        qual = extracted_qual;
     }
+
+    assert(seq.size() == qual.size());
 
     bam1_t* out_record = bam_init1();
     bam_set1(out_record, input_record->core.l_qname - input_record->core.l_extranul - 1,
