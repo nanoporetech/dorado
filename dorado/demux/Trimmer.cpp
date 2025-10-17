@@ -237,6 +237,8 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
                                                       trim_interval.second * num_modbase_channels};
         read.read_common.base_mod_probs =
                 utils::trim_vector(read.read_common.base_mod_probs, modbase_interval);
+        read.read_common.base_mod_simplex_motif_hits =
+                utils::trim_vector(read.read_common.base_mod_simplex_motif_hits, trim_interval);
     }
 }
 

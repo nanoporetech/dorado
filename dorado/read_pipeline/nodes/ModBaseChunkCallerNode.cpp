@@ -322,6 +322,7 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
         read.base_mod_probs[i * m_num_states + m_base_prob_offsets.at(base_id)] = 1;
     }
     read.mod_base_info = m_mod_base_info;
+    read.base_mod_simplex_motif_hits.resize(read.seq.size(), false);
 }
 
 // Get the index of the next context hit in `hit_sig_idxs` with a signal index
@@ -731,6 +732,13 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     if (!encoding_data) {
         send_message_to_sink(std::move(read_ptr));
         return;
+    }
+
+    // Build the sequence hit mask from the data.
+    for (const auto& per_base_hits : modbase_data.per_base_hits_seq) {
+        for (std::size_t hit : per_base_hits) {
+            read.base_mod_simplex_motif_hits.at(hit) = true;
+        }
     }
 
     constexpr bool kIsTemplate = true;

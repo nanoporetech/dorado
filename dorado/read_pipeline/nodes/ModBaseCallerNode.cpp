@@ -328,6 +328,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         }
     }
     read->read_common.mod_base_info = m_mod_base_info;
+    read->read_common.base_mod_simplex_motif_hits.resize(read->read_common.seq.size(), false);
 
     auto working_read = std::make_shared<WorkingRead>();
     working_read->num_modbase_chunks = 0;
@@ -382,6 +383,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
                     working_read, input_signal, std::move(slice.data), context_hit, true));
 
             ++working_read->num_modbase_chunks;
+
+            read->read_common.base_mod_simplex_motif_hits.at(context_hit) = true;
         }
     }
     m_chunk_generation_ms += timer.GetElapsedMS();

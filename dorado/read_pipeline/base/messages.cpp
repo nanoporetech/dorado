@@ -191,7 +191,11 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
             }
         }
     }
-    auto modbase_mask = context_handler.get_sequence_mask(seq);
+    auto modbase_mask = base_mod_simplex_motif_hits;
+    if (is_duplex || modbase_mask.empty()) {
+        // Duplex doesn't retain the mask, and tests may not have it set.
+        modbase_mask = context_handler.get_sequence_mask(seq);
+    }
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
                                 *threshold);
 
