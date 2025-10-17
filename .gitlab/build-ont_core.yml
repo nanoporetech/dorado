@@ -3,6 +3,11 @@
 .test_ont_core_compatibility:
   stage: build
   script:
+    # The ont_core build expects to be using conan 1.x, so install it
+    # into a venv.
+    - !reference [.create_venv]
+    - pip install -U "conan<2"
+    - conan --version
     # Clone the repo
     - time git clone --depth 1 https://gitlab-ci-token:${CI_JOB_TOKEN}@${ONT_CORE_REPO_URL} ont_core_cpp
     - pushd ont_core_cpp
@@ -20,10 +25,10 @@
     # Run the tests
     - ctest --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
-build:linux:x86:focal:ont_core:
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.1
+build:linux:x86:noble:ont_core:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
-    BUILD_PRESET: "linux-x64-conan_gcc11-dorado-release"
+    BUILD_PRESET: "linux-x64-conan_gcc13-dorado-release"
   extends:
     - .linux_runner
     - .test_ont_core_compatibility
@@ -36,12 +41,3 @@ build:macos:arm:ont_core:
     - .macos_arm_runner
     - .test_ont_core_compatibility
     - .on_nightly_or_manual
-  script:
-    # The ont_core build expects to be using conan 1.x, so install it
-    # into a venv.
-    - python3 -m venv build_venv
-    - source build_venv/*/activate
-    - python --version
-    - pip install -U "conan<2"
-    - conan --version
-    - !reference [.test_ont_core_compatibility, script]

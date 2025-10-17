@@ -13,7 +13,7 @@
   extends:
     - .mlhub
   needs:
-    - job: build:linux:x86:focal
+    - job: build:linux:x86:noble
       artifacts: false
   script:
     - echo ${MODELS}
@@ -71,7 +71,7 @@ mlhub:sre_5k_400bps_duplex:
   extends:
     - .mlhub
   needs:
-    - job: build:linux:x86:focal
+    - job: build:linux:x86:noble
       artifacts: false
   script:
     - set -x

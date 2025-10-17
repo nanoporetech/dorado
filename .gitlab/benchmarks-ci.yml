@@ -39,7 +39,7 @@
       allow_failure: true
   interruptible: true
 
-regression_test:linux:x86:focal:v100:
+regression_test:linux:x86:noble:v100:
   parallel:
     matrix:
       - REGRESSION_TEST_NAME:
@@ -51,7 +51,7 @@ regression_test:linux:x86:focal:v100:
         - dna_kit14_400bps_5khz_simplex_sup_cudaall_nomods_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cuda0_5mCG-5hmCG_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cudaall_5mCG-5hmCG_noaln_nobarcode
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     GPU_TYPE: "v100"
     PLATFORM: "linux"
@@ -60,9 +60,9 @@ regression_test:linux:x86:focal:v100:
     - .linux_v100_benchmark_runner
     - .run_dorado_benchmark
   needs:
-    - build:linux:x86:focal
+    - build:linux:x86:noble
 
-regression_test:linux:x86:focal:a100:
+regression_test:linux:x86:noble:a100:
   parallel:
     matrix:
       - REGRESSION_TEST_NAME:
@@ -74,7 +74,7 @@ regression_test:linux:x86:focal:a100:
         - dna_kit14_400bps_5khz_simplex_sup_cudaall_nomods_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cuda0_5mCG-5hmCG_noaln_nobarcode
         - dna_kit14_400bps_5khz_simplex_hac_cudaall_5mCG-5hmCG_noaln_nobarcode
-  image: ${DORADO_DOCKER_ROOT}/dorado-20.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     GPU_TYPE: "a100"
     PLATFORM: "linux"
@@ -83,7 +83,7 @@ regression_test:linux:x86:focal:a100:
     - .linux_a100_benchmark_runner
     - .run_dorado_benchmark
   needs:
-    - build:linux:x86:focal
+    - build:linux:x86:noble
 
 regression_test:macos:m1:
   parallel:

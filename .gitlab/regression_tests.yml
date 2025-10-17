@@ -118,7 +118,7 @@
     - $PYTHON -m unittest test_compare_platforms
 
 regression_test_platforms:linux:x86:cuda12:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_TYPE: Release
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
@@ -148,7 +148,7 @@ regression_test:linux:arm64:jammy:
     - tags
 
 regression_test:linux:x86:cuda12:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_TYPE: Release
     BUILD_CUDA: 1
@@ -236,7 +236,7 @@ run_rebase:
     expire_in: 7 days
 
 rebase_dorado:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   stage: rebase
   interruptible: false
   needs:
