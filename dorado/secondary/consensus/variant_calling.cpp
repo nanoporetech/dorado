@@ -885,29 +885,29 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     //
     // it is possible that the input variant.pos was set to the pos_major of the beginning of the variant
     // (in this case, on a minor position which does not contain a reference base).
-    // While actually, the variant.pos should have been set to the first major position after rstart.
-    if (!std::empty(ret.ref)) {
-#ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[normalize_variant] Initial heuristic. Before: " << ret << "\n";
-#endif
-        for (int32_t r = ret.rstart; r < ret.rend; ++r) {
-#ifdef DEBUG_NORMALIZE_VARIANT
-            std::cerr << "[r = " << r << "] positions_major[r] = " << positions_major[r]
-                      << ", positions_minor[r] = " << positions_minor[r]
-                      << ", ret.pos = " << ret.pos << "\n";
-#endif
-            if ((positions_major[r] >= ret.pos) && (positions_minor[r] == 0)) {
-                ret.pos = positions_major[r];
-#ifdef DEBUG_NORMALIZE_VARIANT
-                std::cerr << "[normalize_variant]    -> Found major position: r = " << r
-                          << ", ret.pos = " << ret.pos << "\n";
-#endif
-                break;
-            }
+    //
+    // Here we try to move the start position to the first major base left, then right.
+    int32_t new_rstart = ret.rstart;
+    while ((new_rstart > 0) && (positions_minor[new_rstart] != 0)) {
+        --new_rstart;
+    }
+    if (positions_minor[new_rstart] != 0) {
+        new_rstart = ret.rstart + 1;
+        while ((new_rstart < ret.rend) && (positions_minor[new_rstart] != 0)) {
+            ++new_rstart;
         }
-#ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[normalize_variant] Initial heuristic. After: " << ret << "\n";
-#endif
+    }
+    if (new_rstart >= ret.rend) {
+        return {};
+    }
+    if (new_rstart != ret.rstart) {
+        ret.rstart = new_rstart;
+        ret.pos = positions_major[ret.rstart];
+        ret.ref = remove_gaps(ref_with_gaps.substr(ret.rstart, ret.rend - ret.rstart));
+        ret.alts = {};
+        for (const auto& s : cons_seqs_with_gaps) {
+            ret.alts.emplace_back(remove_gaps(s.substr(ret.rstart, ret.rend - ret.rstart)));
+        }
     }
 
 #ifdef DEBUG_NORMALIZE_VARIANT
@@ -983,14 +983,6 @@ std::vector<Variant> general_decode_variants(
 
     // No work to do.
     if (std::empty(positions_major)) {
-        return {};
-    }
-
-    if (positions_minor[0] != 0) {
-        spdlog::warn(
-                "The first position of a sample must be a major position. Region: {}:{}-{}. "
-                "Returning zero variants for this sample.",
-                seq_id, positions_major.front() + 1, positions_major.back());
         return {};
     }
 
