@@ -1038,8 +1038,8 @@ void run_polishing(const Options& opt,
                                     resources, bam_regions, draft_lens, std::nullopt, opt.threads,
                                     opt.batch_size, opt.encoding_batch_size, opt.window_len,
                                     opt.window_overlap, 0, opt.bam_subchunk, usable_mem,
-                                    opt.continue_on_error, batch_queue, worker_terminate,
-                                    wrs_sample_producer);
+                                    opt.continue_on_error, false, false, 0, 0, 0.25, batch_queue,
+                                    worker_terminate, wrs_sample_producer);
                         });
 
                 // Create a thread for the sample decoder.
