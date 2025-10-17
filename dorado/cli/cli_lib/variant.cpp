@@ -722,6 +722,12 @@ void run_variant_calling(const Options& opt,
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer;
 
+    std::ofstream ofs_regions;
+    if (!std::empty(opt.output_dir)) {
+        const std::filesystem::path out_regions_fn = opt.output_dir / "processed_regions.bed";
+        ofs_regions = std::ofstream(out_regions_fn);
+    }
+
     // Initialize the header of the output VCF file.
     {
         // These are the only available FILTER options.
@@ -914,6 +920,14 @@ void run_variant_calling(const Options& opt,
             // Write the VCF file.
             for (const secondary::Variant& variant : variants) {
                 vcf_writer->write_variant(variant);
+            }
+
+            if (ofs_regions.is_open()) {
+                for (const auto& vc_sample : vc_input_data) {
+                    const std::string_view seq_name = draft_lens[vc_sample.seq_id].first;
+                    ofs_regions << seq_name << '\t' << vc_sample.start() << '\t' << vc_sample.end()
+                                << '\n';
+                }
             }
 
             // We approximate the progress by expecting 2x bases to be processed
