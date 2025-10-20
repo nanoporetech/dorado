@@ -278,7 +278,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
             spdlog::trace("Sorted channel {}", channel);
         }
         for (const auto& entry : files) {
-            if (m_loaded_read_count == m_max_reads) {
+            if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
                 break;
             }
 
@@ -301,7 +301,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
 void DataLoader::load_reads_unrestricted(
         const std::vector<std::filesystem::directory_entry>& files) {
     for (const auto& entry : files) {
-        if (m_loaded_read_count == m_max_reads) {
+        if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
             break;
         }
         spdlog::debug("Load reads from file {}", entry.path().string());
@@ -467,7 +467,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
     uint32_t row_offset = 0;
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-        if (m_loaded_read_count == m_max_reads) {
+        if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
             break;
         }
         Pod5ReadRecordBatch_t* batch = nullptr;
@@ -502,6 +502,10 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             }
             initialise_read(read->read_common);
             check_read(read);
+            if (!m_pipeline.is_running()) {
+                m_stop_loading.store(true);
+                break;
+            }
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }
@@ -530,7 +534,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     }
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-        if (m_loaded_read_count == m_max_reads) {
+        if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
             break;
         }
         Pod5ReadRecordBatch_t* batch = nullptr;
@@ -571,6 +575,10 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             }
             initialise_read(read->read_common);
             check_read(read);
+            if (!m_pipeline.is_running()) {
+                m_stop_loading.store(true);
+                break;
+            }
             m_pipeline.push_message(std::move(read));
             m_loaded_read_count++;
         }

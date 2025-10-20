@@ -9,6 +9,7 @@ dorado_add_library(
         AsyncQueue.h
         barcode_kits.h
         basecaller_utils.h
+        benchmark_timer.h
         cigar.h
         concurrency/async_task_executor.h
         concurrency/detail/priority_task_queue.h
@@ -53,6 +54,7 @@ dorado_add_library(
         alignment_utils.cpp
         barcode_kits.cpp
         basecaller_utils.cpp
+        benchmark_timer.cpp
         cigar.cpp
         concurrency/async_task_executor.cpp
         concurrency/detail/priority_task_queue.cpp

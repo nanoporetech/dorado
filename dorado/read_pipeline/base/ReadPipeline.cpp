@@ -100,6 +100,7 @@ Pipeline::Pipeline(PipelineDescriptor &&descriptor,
         // Start the node.
         node->restart();
     }
+    m_is_running.store(true);
 }
 
 void Pipeline::push_message(Message &&message) {
@@ -110,6 +111,11 @@ void Pipeline::push_message(Message &&message) {
 
 stats::NamedStats Pipeline::terminate(const TerminateOptions &terminate_options) {
     stats::NamedStats final_stats;
+    const auto is_running = m_is_running.exchange(false);
+    if (!is_running) {
+        // If we've already terminated, do nothing.
+        return final_stats;
+    }
     if (terminate_options.fast == utils::AsyncQueueTerminateFast::Yes) {
         // Fast terminate means that we don't need to preserve the reads, so traverse
         // sink to source order so that we unblock sources trying to push reads into
@@ -142,6 +148,7 @@ void Pipeline::restart() {
     for (auto handle : m_source_to_sink_order) {
         m_nodes.at(handle)->restart();
     }
+    m_is_running.store(true);
 }
 
 Pipeline::~Pipeline() {

@@ -84,7 +84,7 @@ private:
     int m_max_channel{0};
 
     std::vector<ReadInitialiserF> m_read_initialisers;
-
+    std::atomic<bool> m_stop_loading{false};
     // Issue warnings if read is potentially problematic
     void check_read(const SimplexReadPtr& read);
     // A flag to warn only once if the data chemsitry is known

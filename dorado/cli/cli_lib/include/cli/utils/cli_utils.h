@@ -106,6 +106,12 @@ inline void add_internal_arguments(argparse::ArgumentParser& parser) {
             .help("Write out a CSV and CPP file to the working directory with the auto batchsize "
                   "selection performance stats. Implies --run-batchsize-benchmarks")
             .flag();
+    parser.add_argument("--run-for")
+            .hidden()
+            .help("For performance benchmarking. Run for the specified number of seconds, then "
+                  "output performance statistics, and terminate the application.")
+            .default_value(0)
+            .scan<'i', int>();
 }
 
 inline std::vector<std::string> extract_token_from_cli(const std::string& cmd) {
