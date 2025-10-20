@@ -46,6 +46,7 @@ add_executable(dorado_tests
     Minimap2IndexTest.cpp
     ModBaseChunkTest.cpp
     ModBaseConfigTest.cpp
+    ModBaseContextTest.cpp
     ModBaseEncoderTest.cpp
     ModelComplexTest.cpp
     ModelKitsTest.cpp
