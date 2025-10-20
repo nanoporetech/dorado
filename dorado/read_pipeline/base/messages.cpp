@@ -177,11 +177,14 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
     std::string modbase_string = "";
     std::vector<uint8_t> modbase_prob;
 
+    // Duplex doesn't retain the mask, and tests may not have it set.
+    const bool need_to_generate_mask = is_duplex || base_mod_simplex_motif_hits.empty();
+
     // Create a mask indicating which bases are modified.
     std::bitset<256> base_has_context{};
     modbase::ModBaseContext context_handler;
     if (!mod_base_info->context.empty()) {
-        if (!context_handler.decode(mod_base_info->context)) {
+        if (!context_handler.decode(mod_base_info->context, need_to_generate_mask)) {
             throw std::runtime_error("Invalid base modification context string.");
         }
         for (auto base : cardinal_bases) {
@@ -191,11 +194,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
             }
         }
     }
-    auto modbase_mask = base_mod_simplex_motif_hits;
-    if (is_duplex || modbase_mask.empty()) {
-        // Duplex doesn't retain the mask, and tests may not have it set.
-        modbase_mask = context_handler.get_sequence_mask(seq);
-    }
+    auto modbase_mask = need_to_generate_mask ? context_handler.get_sequence_mask(seq)
+                                              : base_mod_simplex_motif_hits;
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
                                 *threshold);
 

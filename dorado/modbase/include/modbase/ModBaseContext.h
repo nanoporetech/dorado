@@ -53,9 +53,12 @@ public:
      *  This will initialize the object based on a string representation of the context
      *  information.
      * 
+     *  @param create_matchers Can be disabled to avoid constructing expensive regex
+     *  objects if get_sequence_mask() isn't going to be used.
+     *
      *  @return true if the context_string was successfully decoded, otherwise false.
      */
-    bool decode(const std::string& context_string);
+    bool decode(const std::string& context_string, bool create_matchers);
 
     /** Encode the object as a string representation.
      *  
