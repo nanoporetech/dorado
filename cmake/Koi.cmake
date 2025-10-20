@@ -20,13 +20,13 @@ endfunction()
 
 function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
-    set(hash__libkoi__0_6_4__Linux__aarch64__cuda__12_6 "d160d5ae41326dca1680bc6de5b27781cf34128e7e7b821c623342aa6101e1f6")
-    set(hash__libkoi__0_6_4__Linux__aarch64__cuda__13_0 "9273f19419f99d9363ccc557801bbfea0c88c164a527d15847a00ea87acddfc2")
-    set(hash__libkoi__0_6_4__Linux__x86_64__cuda__11_8 "1d31a51da1067f440872ad3a89bd516b7273eaaa213939bbc0f7149bda784750")
-    set(hash__libkoi__0_6_4__Linux__x86_64__cuda__12_8 "d9b5422778f0465f2f564796db09c1163c4ce694271812904234c840ba124055")
-    set(hash__libkoi__0_6_4__Linux__x86_64__cuda__13_0 "cfa368f46c73cc24778355bfcb2469353cee3fcf82cf50cb4c8ee5df0cac1efa")
-    set(hash__libkoi__0_6_4__Windows__AMD64__cuda__12_8 "15398a8a8d9320a0a44f673b0b4ad84be76f76eaf2fc69a652207f1c87bbb30b")
-    set(hash__libkoi__0_6_4__Windows__AMD64__cuda__13_0 "ff9719a7a7f33b08ca2d2cfb3fb86c88e03ac688bb1a5b9cc805ab5384a72b13")
+    set(hash__libkoi__0_6_5__Linux__aarch64__cuda__12_6 "52d11f322c2e9f90a61080c56800b6d07ba5aef5737564ab6122d8a8c8dfeded")
+    set(hash__libkoi__0_6_5__Linux__aarch64__cuda__13_0 "9a8433da64b063285146f1d51151036c4cba66e3cc2cfc6885898def4eee425d")
+    set(hash__libkoi__0_6_5__Linux__x86_64__cuda__11_8 "e43c4370b87ae72b380441de05858d5b15c51db9e01e987a0ddfd2a9bb7e02c3")
+    set(hash__libkoi__0_6_5__Linux__x86_64__cuda__12_8 "f2426d0912632dfecec61a7cc380452467a7beb2fa52e34a1defd0d154af8bb0")
+    set(hash__libkoi__0_6_5__Linux__x86_64__cuda__13_0 "712a620a24020529dd77fd91349f6bcb5d78de6e4cd2977703b9ac6362dd36d4")
+    set(hash__libkoi__0_6_5__Windows__AMD64__cuda__12_8 "23c025de2838c793a818a3b49830f6fb474fe55986e5fdc3c6bcd3441b8f33b9")
+    set(hash__libkoi__0_6_5__Windows__AMD64__cuda__13_0 "b7bf9a7b9b6b2793993c820e1ea44b7de8521cffb6845da564c79332012ce0a2")
 
     # Do the lookup.
     string(REPLACE "." "_" hash_key ${KOI_DIR})
@@ -40,7 +40,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.6.4)
+    set(KOI_VERSION 0.6.5)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})
@@ -74,7 +74,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
                 COMMAND_ERROR_IS_FATAL ANY
             )
         endif()
-        add_subdirectory(${KOI_DIR}/koi)
+        add_subdirectory(${KOI_DIR})
 
     else()
         find_package(CUDAToolkit REQUIRED)
