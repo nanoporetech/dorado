@@ -70,8 +70,8 @@ public:
     Pipeline(const Pipeline&) = delete;
     Pipeline& operator=(const Pipeline&) = delete;
 
-    Pipeline(Pipeline&&) = default;
-    Pipeline& operator=(Pipeline&&) = default;
+    Pipeline(Pipeline&&) = delete;
+    Pipeline& operator=(Pipeline&&) = delete;
 
     // Factory method that creates a Pipeline from a PipelineDescriptor, which is
     // consumed during creation.
