@@ -488,15 +488,6 @@ std::string reverse_complement(std::string_view sequence) {
     return reverse_complement_impl(sequence);
 }
 
-const std::vector<int> BaseInfo::BASE_IDS = []() {
-    std::vector<int> base_ids(256, -1);
-    base_ids['A'] = 0;
-    base_ids['C'] = 1;
-    base_ids['G'] = 2;
-    base_ids['T'] = 3;
-    return base_ids;
-}();
-
 // Utility function for counting number of trailing bases of a particular type
 // in a given read.
 size_t count_trailing_chars(const std::string_view seq, char c) {

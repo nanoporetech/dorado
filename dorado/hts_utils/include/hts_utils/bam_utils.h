@@ -3,6 +3,7 @@
 #include "hts_utils/hts_types.h"
 
 #include <map>
+#include <span>
 #include <string>
 #include <unordered_map>
 #include <utility>
@@ -228,7 +229,7 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
  * quality field. If seq and qual are both non-empty, then of course they must be the same
  * length.
  */
-BamPtr new_unmapped_record(bam1_t* record, std::string seq, std::vector<uint8_t> qual);
+BamPtr new_unmapped_record(bam1_t* record, std::string_view seq, std::span<const uint8_t> qual);
 
 /*
  * Remove any alignment related tags from a BAM record.

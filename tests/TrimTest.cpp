@@ -112,20 +112,20 @@ CATCH_TEST_CASE("Test trim quality vector", TEST_GROUP) {
     const std::vector<uint8_t> qual = {30, 30, 56, 60, 72, 10};
 
     CATCH_SECTION("Test empty sequence") {
-        CATCH_CHECK(utils::trim_quality({}, {0, 20}).size() == 0);
+        CATCH_CHECK(utils::trim_vector(std::vector<uint8_t>{}, {0, 20}).size() == 0);
     }
 
     CATCH_SECTION("Trim nothing") {
-        CATCH_CHECK(utils::trim_quality(qual, {0, int(qual.size())}) == qual);
+        CATCH_CHECK(utils::trim_vector(qual, {0, int(qual.size())}) == qual);
     }
 
     CATCH_SECTION("Trim part of the sequence") {
         const std::vector<uint8_t> expected = {10};
-        CATCH_CHECK(utils::trim_quality(qual, {5, int(qual.size())}) == expected);
+        CATCH_CHECK(utils::trim_vector(qual, {5, int(qual.size())}) == expected);
     }
 
     CATCH_SECTION("Trim whole sequence") {
-        CATCH_CHECK(utils::trim_quality(qual, {0, 0}).size() == 0);
+        CATCH_CHECK(utils::trim_vector(qual, {0, 0}).size() == 0);
     }
 }
 

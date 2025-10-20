@@ -2,7 +2,6 @@
 
 #include "torch_utils/trim.h"
 #include "utils/log_utils.h"
-#include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
@@ -11,11 +10,11 @@
 #include <cmath>
 #include <cstdint>
 #include <optional>
-#include <string_view>
 
 using Slice = at::indexing::Slice;
 
 namespace dorado::utils {
+
 SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     auto copy = std::make_unique<SimplexRead>();
     copy->read_common.raw_data = read.read_common.raw_data;
@@ -50,6 +49,7 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
 
     copy->read_common.base_mod_probs = read.read_common.base_mod_probs;
     copy->read_common.mod_base_info = read.read_common.mod_base_info;
+    copy->read_common.base_mod_simplex_motif_hits = read.read_common.base_mod_simplex_motif_hits;
 
     copy->read_common.num_trimmed_samples = read.read_common.num_trimmed_samples;
 

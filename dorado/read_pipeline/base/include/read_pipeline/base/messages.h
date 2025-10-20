@@ -51,13 +51,14 @@ public:
     /*
     Note: Update read_utils shallow_copy_read to ensure split reads copy all fields
     */
-    std::string read_id;                  // Unique read ID (UUID4)
-    std::string seq;                      // Read basecall
-    std::string qstring;                  // Read Qstring (Phred)
-    std::vector<uint8_t> moves;           // Move table
-    std::vector<uint8_t> base_mod_probs;  // Modified base probabilities
-    std::string run_id;                   // Run ID - used in read group
-    std::string flow_cell_product_code;   // Flowcell product code
+    std::string read_id;                            // Unique read ID (UUID4)
+    std::string seq;                                // Read basecall
+    std::string qstring;                            // Read Qstring (Phred)
+    std::vector<uint8_t> moves;                     // Move table
+    std::vector<uint8_t> base_mod_probs;            // Modified base probabilities
+    std::vector<bool> base_mod_simplex_motif_hits;  // Modbase motif hits, simplex only
+    std::string run_id;                             // Run ID - used in read group
+    std::string flow_cell_product_code;             // Flowcell product code
     std::string sequencing_kit;  // Sequencing kit - Used in primer detection/classification
     std::string flowcell_id;     // Flowcell ID - used in read group and for sample sheet aliasing
     std::string position_id;     // Position ID - used for sample sheet aliasing

@@ -9,6 +9,8 @@
 
 #include <htslib/sam.h>
 
+#include <bitset>
+
 namespace dorado {
 
 bool is_read_message(const Message &message) {
@@ -165,8 +167,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
     }
 
     const size_t num_channels = mod_base_info->alphabet.size();
-    const std::string cardinal_bases = "ACGT";
-    char current_cardinal = 0;
+    constexpr std::string_view cardinal_bases = "ACGT";
     if (seq.length() * num_channels != base_mod_probs.size()) {
         throw std::runtime_error(
                 "Mismatch between base_mod_probs size and sequence length * num channels in "
@@ -176,12 +177,14 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
     std::string modbase_string = "";
     std::vector<uint8_t> modbase_prob;
 
+    // Duplex doesn't retain the mask, and tests may not have it set.
+    const bool need_to_generate_mask = is_duplex || base_mod_simplex_motif_hits.empty();
+
     // Create a mask indicating which bases are modified.
-    std::unordered_map<char, bool> base_has_context = {
-            {'A', false}, {'C', false}, {'G', false}, {'T', false}};
+    std::bitset<256> base_has_context{};
     modbase::ModBaseContext context_handler;
     if (!mod_base_info->context.empty()) {
-        if (!context_handler.decode(mod_base_info->context)) {
+        if (!context_handler.decode(mod_base_info->context, need_to_generate_mask)) {
             throw std::runtime_error("Invalid base modification context string.");
         }
         for (auto base : cardinal_bases) {
@@ -191,7 +194,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
             }
         }
     }
-    auto modbase_mask = context_handler.get_sequence_mask(seq);
+    auto modbase_mask = need_to_generate_mask ? context_handler.get_sequence_mask(seq)
+                                              : base_mod_simplex_motif_hits;
     context_handler.update_mask(modbase_mask, seq, mod_base_info->alphabet, base_mod_probs,
                                 *threshold);
 
@@ -232,6 +236,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
     }
 
     // Iterate over the provided alphabet and find all the channels we need to write out
+    char current_cardinal = 0;
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(mod_base_info->alphabet[channel_idx]) != std::string::npos) {
             // A cardinal base
@@ -245,7 +250,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
 
             // Write out the results we found
             modbase_string += std::string(1, current_cardinal) + "+" + bam_name;
-            modbase_string += base_has_context[current_cardinal] ? "?" : ".";
+            modbase_string +=
+                    base_has_context.test(static_cast<uint8_t>(current_cardinal)) ? "?" : ".";
             int skipped_bases = 0;
             for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
                 if (seq[base_idx] == current_cardinal) {
@@ -272,7 +278,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
                 // A cardinal base
                 current_cardinal = mod_base_info->alphabet[channel_idx][0];
             } else {
-                auto cardinal_complement = utils::complement_table[current_cardinal];
+                auto cardinal_complement =
+                        utils::complement_table.at(static_cast<uint8_t>(current_cardinal));
                 // A modification on the previous cardinal base
                 std::string bam_name = mod_base_info->alphabet[channel_idx];
                 if (!utils::validate_bam_tag_code(bam_name)) {
@@ -280,7 +287,8 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
                 }
 
                 modbase_string += std::string(1, cardinal_complement) + "-" + bam_name;
-                modbase_string += base_has_context[current_cardinal] ? "?" : ".";
+                modbase_string +=
+                        base_has_context.test(static_cast<uint8_t>(current_cardinal)) ? "?" : ".";
                 int skipped_bases = 0;
                 for (size_t base_idx = 0; base_idx < seq.size(); base_idx++) {
                     if (seq[base_idx] == cardinal_complement) {  // complement

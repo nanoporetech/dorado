@@ -1,6 +1,5 @@
 #include "splitter_utils.h"
 
-#include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/base/read_utils.h"
 #include "utils/time_utils.h"
 
@@ -29,9 +28,8 @@ SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
                        std::pair<uint64_t, uint64_t> signal_range) {
     //TODO support mods
-    //NB: currently doesn't support mods
-    //assert(read.mod_base_info == nullptr && read.base_mod_probs.empty());
-    if (read.read_common.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty()) {
+    if (read.read_common.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty() ||
+        !read.read_common.base_mod_simplex_motif_hits.empty()) {
         throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
     }
 

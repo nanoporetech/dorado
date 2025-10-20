@@ -8,6 +8,8 @@
 #include <pod5_format/c_api.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
+#include <iterator>
 #include <set>
 #include <stdexcept>
 

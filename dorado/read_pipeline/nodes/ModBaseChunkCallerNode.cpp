@@ -313,7 +313,7 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
     for (size_t i = 0; i < read.seq.size(); ++i) {
         // Initialize for what corresponds to 100% canonical base for each position.
         // This is like one-hot encoding the canonical bases
-        int base_id = utils::BaseInfo::BASE_IDS.at(read.seq[i]);
+        const int base_id = utils::BaseInfo::BASE_IDS.at(static_cast<std::uint8_t>(read.seq[i]));
         if (base_id < 0) {
             spdlog::error("Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
                           read.seq[i], read.read_id);
@@ -322,6 +322,7 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
         read.base_mod_probs[i * m_num_states + m_base_prob_offsets.at(base_id)] = 1;
     }
     read.mod_base_info = m_mod_base_info;
+    read.base_mod_simplex_motif_hits.resize(read.seq.size(), false);
 }
 
 // Get the index of the next context hit in `hit_sig_idxs` with a signal index
@@ -588,7 +589,8 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
 
     // Complement modbase data is stored in the template direction so there's no need for
     // any indexing gymnastics in chunk creation
-    auto modbase_data = is_template ? working_read->template_data : working_read->complement_data;
+    const auto& modbase_data =
+            is_template ? working_read->template_data : working_read->complement_data;
 
     const int64_t signal_len = modbase_data.signal.size(0);
 
@@ -730,6 +732,13 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     if (!encoding_data) {
         send_message_to_sink(std::move(read_ptr));
         return;
+    }
+
+    // Build the sequence hit mask from the data.
+    for (const auto& per_base_hits : modbase_data.per_base_hits_seq) {
+        for (std::size_t hit : per_base_hits) {
+            read.base_mod_simplex_motif_hits.at(hit) = true;
+        }
     }
 
     constexpr bool kIsTemplate = true;

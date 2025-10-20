@@ -162,7 +162,8 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
         read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
         for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
             // Initialize for what corresponds to 100% canonical base for each position.
-            int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
+            const int base_id = utils::BaseInfo::BASE_IDS.at(
+                    static_cast<std::uint8_t>(read->read_common.seq[i]));
             if (base_id < 0) {
                 throw std::runtime_error("Invalid character in sequence.");
             }
@@ -318,7 +319,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
         for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
             // Initialize for what corresponds to 100% canonical base for each position.
-            int base_id = utils::BaseInfo::BASE_IDS[read->read_common.seq[i]];
+            const int base_id = utils::BaseInfo::BASE_IDS.at(
+                    static_cast<std::uint8_t>(read->read_common.seq[i]));
             if (base_id < 0) {
                 throw std::runtime_error("Invalid character in sequence.");
             }
@@ -326,6 +328,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         }
     }
     read->read_common.mod_base_info = m_mod_base_info;
+    read->read_common.base_mod_simplex_motif_hits.resize(read->read_common.seq.size(), false);
 
     auto working_read = std::make_shared<WorkingRead>();
     working_read->num_modbase_chunks = 0;
@@ -350,10 +353,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         auto signal = read->read_common.raw_data;
         if (params.context.reverse) {
             signal = at::flip(signal, 0);
-            std::reverse(std::begin(seq_to_sig_map), std::end(seq_to_sig_map));
-            std::transform(std::begin(seq_to_sig_map), std::end(seq_to_sig_map),
-                           std::begin(seq_to_sig_map),
-                           [signal_len](auto signal_pos) { return signal_len - signal_pos; });
+            utils::reverse_seq_to_sig_map(seq_to_sig_map, signal_len);
         }
 
         // scale signal based on model parameters
@@ -383,6 +383,8 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
                     working_read, input_signal, std::move(slice.data), context_hit, true));
 
             ++working_read->num_modbase_chunks;
+
+            read->read_common.base_mod_simplex_motif_hits.at(context_hit) = true;
         }
     }
     m_chunk_generation_ms += timer.GetElapsedMS();
@@ -548,15 +550,14 @@ void ModBaseCallerNode::output_worker_thread() {
 
             int64_t result_pos = chunk->context_hit;
 
-            int64_t offset;
             const auto& baseIds = utils::BaseInfo::BASE_IDS;
-            const auto& seq = source_read_common.seq[result_pos];
+            const std::uint8_t seq = source_read_common.seq[result_pos];
+            const int64_t offset =
+                    chunk->is_template_direction
+                            ? m_base_prob_offsets[baseIds.at(seq)]
+                            : m_base_prob_offsets[baseIds.at(dorado::utils::complement_table[seq])];
 
-            offset = chunk->is_template_direction
-                             ? m_base_prob_offsets[baseIds[seq]]
-                             : m_base_prob_offsets[baseIds[dorado::utils::complement_table[seq]]];
-
-            auto num_chunk_scores = chunk->scores.size();
+            const auto num_chunk_scores = chunk->scores.size();
             for (size_t i = 0; i < num_chunk_scores; ++i) {
                 source_read_common.base_mod_probs[m_num_states * result_pos + offset + i] =
                         static_cast<uint8_t>(std::min(std::floor(chunk->scores[i] * 256), 255.0f));

@@ -14,6 +14,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <htslib/sam.h>
 
+#include <algorithm>
 #include <filesystem>
 #include <memory>
 #include <numeric>

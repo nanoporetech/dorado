@@ -28,7 +28,7 @@ void ModBaseContext::set_context(std::string motif, size_t offset) {
     m_offsets[index] = offset;
 }
 
-bool ModBaseContext::decode(const std::string& context_string) {
+bool ModBaseContext::decode(const std::string& context_string, bool create_matchers) {
     std::vector<std::string> tokens;
     std::istringstream context_stream(context_string);
     std::string token;
@@ -52,7 +52,11 @@ bool ModBaseContext::decode(const std::string& context_string) {
             m_motifs[i] = tokens[i];
             m_motifs[i][x] = canonical[i];
             m_offsets[i] = x;
-            m_motif_matchers[i] = std::make_unique<MotifMatcher>(m_motifs[i], m_offsets[i]);
+            if (create_matchers) {
+                m_motif_matchers[i] = std::make_unique<MotifMatcher>(m_motifs[i], m_offsets[i]);
+            } else {
+                m_motif_matchers[i].reset();
+            }
         }
     }
     return true;
