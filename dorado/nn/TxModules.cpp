@@ -494,7 +494,8 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &
     bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
                   utils::get_dev_opt<bool>("koi_use_f8", true);
 #if !DORADO_ORIN
-    bool use_hopper = use_f8 && utils::get_dev_opt<bool>("koi_use_hopper", true) &&
+    // Off by default until DOR-1400 is fixed
+    bool use_hopper = use_f8 && utils::get_dev_opt<bool>("koi_use_hopper", false) &&
                       (koi_hopper_tc_is_available(KOI_E4M3) == KOI_SUCCESS);
 #else
     constexpr bool use_hopper = false;
