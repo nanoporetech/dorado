@@ -2,6 +2,36 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.2.0] (21 October 2025)
+
+This release of Dorado delivers major improvements to short-read (<500 bp) basecalling speed with the HAC model, bringing performance in line with that for long reads. The Dorado basecaller now more closely follows the [Oxford Nanopore Output Specifications](https://nanoporetech.github.io/ont-output-specifications/latest/). CPU performance enhancements improve basecalling speed in cases where Dorado is not GPU-bound, such as on multi-GPU systems or when using faster models. The release also includes several other improvements and minor alignment-related bug fixes.
+
+
+* a04542e27b79cfbce80ca3797400c2b8f6157ef6 - Significant improvements to short read basecalling speed
+* 194b4fd030f2a1c8ebb43fcbb395a3be165f2d2f - Better CPU performance in situations where Dorado is not GPU-bound
+* 237dad430ad11c0cd223a5d7658011afafb21e99 - Match MinKNOW output structure from Dorado `aligner` or `demux` if output path defined
+* 50c06da6e18b54c2ecc063c83501906a9a76aac9 - Replace `acquisition_start_time_ms` with `protocol_start_time_ms` to match Oxford Nanopore Output Specification
+* abe6190b4c118f90aea4b1c793ca329f827f343c - BAM tags now conform to Oxford Nanopore Output Specification
+* 97c9ac3f3d2dd08fed360ee6246be70593de70a6 - FASTQ files now conform to Oxford Nanopore Output Specification
+* a2d0c2e3f4c5703a5d9dbb19aa675288f344a2bf - Update interpretation of `alias` in structured file outputs
+* a9e7ced46f30056b80a023fd29f44af2335251d7 - Allow BED files with empty non-required columns to be loaded
+* 74946b4bc72e27881dcfcc3cd47643f825ac330c - Allow per-barcode disabling of poly(A) estimation
+* 27736fc5b836b7d0946b0628233c17d1ff2bf8af - Add support for SQK-HTB114-96 sequencing and barcoding kit
+* 58ff2e3591e0f9f9bbbd2219fc6b6e0d22763241 - Move table is now emitted to FASTQ if `--emit-moves` is set
+* 9a26d8ffb6fee46f5f4a8d0ddf0aad12105a4ba2 - Skip secondary/supplementary records from input aligned BAM in Dorado `aligner`
+* ac36219bc779254b05de7f34622d21109e1f9096 - Dorado `basecaller` will scale input data based on `open_pore_level` if present in POD5 files
+* 9342836a39251283a943c651c9169101022fe48f - Support Dorado `basecaller` model discovery from `--models-directory` if a full model name is specified
+* 86c52bd4aad578413ff25041d659270feb0789fb - Enable automatic batch size selection in Dorado `variant` and `polish`
+* 8f7b016ade2d8570cd6a910ba339d2731b8c9a12 - Update to Torch 2.7.1 and switch to using shared Torch libraries
+* 25077dcc663c28ba78bdcf4fdb11aaad4682d97d - Update POD5 library to 0.3.34
+* 08070f34100bc40c3abb74115ce246586b2e5a77 - Fix handling of BAM files with duplicate identical primary alignments in Dorado `polish` and `variant`
+* ef1a032b738e37ddd1c06df789f0216f62cefe0d - Fix emission of BAM tags when realigning reads in Dorado `aligner`
+* 3357b0effc0a91816ab5d5d021c01563bc5ac1e8 - Fix crash when failing to open an output file in Dorado `demux`
+* d2df140aa40893f8dfdc2754fbde437afcf08978 - Clarify error when minimap2 fails due to memory allocation failure
+* 4804278e7a0ef8da3938f2e18c7fafce05cb1a01 - Improve error message in Dorado `correct`
+* d226adb15375c11ba0431bb20fb3e43599ed2fca - Fix overloading of `-v` argument in all subcommands
+
+
 # [1.1.1] (13 August 2025)
 
 This Dorado release includes improved DNA modified base 5mC_5hmC models, fixes for basecalling on Hopper devices and improvements to the format of output files.
