@@ -3,10 +3,6 @@
 #include <atomic>
 #include <chrono>
 #include <functional>
-#include <iosfwd>
-#include <optional>
-#include <regex>
-#include <string>
 #include <thread>
 
 namespace dorado {
