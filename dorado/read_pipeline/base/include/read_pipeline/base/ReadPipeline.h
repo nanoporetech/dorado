@@ -70,8 +70,8 @@ public:
     Pipeline(const Pipeline&) = delete;
     Pipeline& operator=(const Pipeline&) = delete;
 
-    Pipeline(Pipeline&&) = default;
-    Pipeline& operator=(Pipeline&&) = default;
+    Pipeline(Pipeline&&) = delete;
+    Pipeline& operator=(Pipeline&&) = delete;
 
     // Factory method that creates a Pipeline from a PipelineDescriptor, which is
     // consumed during creation.
@@ -92,6 +92,9 @@ public:
     // Restarts pipeline after a call to terminate.
     void restart();
 
+    // Indicates whether the pipeline is running.
+    bool is_running() const { return m_is_running.load(); }
+
     // Returns a reference to the node associated with the given handle.
     // Exists to accommodate situations where client code avoids using the pipeline framework.
     template <typename NodeType>
@@ -110,6 +113,7 @@ private:
 
     std::vector<std::unique_ptr<MessageSink>> m_nodes;
     std::vector<NodeHandle> m_source_to_sink_order;
+    std::atomic<bool> m_is_running{false};
 
     enum class DFSState { Unvisited, Visiting, Visited };
 

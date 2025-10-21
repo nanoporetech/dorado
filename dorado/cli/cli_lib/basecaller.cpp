@@ -37,6 +37,7 @@
 #include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
 #include "utils/basecaller_utils.h"
+#include "utils/benchmark_timer.h"
 #include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/stats.h"
@@ -342,7 +343,8 @@ void setup(const std::vector<std::string>& args,
            const std::string& polya_config,
            const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
            const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
-           std::shared_ptr<const utils::SampleSheet> sample_sheet) {
+           std::shared_ptr<const utils::SampleSheet> sample_sheet,
+           const int run_for_arg) {
     const BasecallModelConfig& model_config = models.get_simplex_config();
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());
@@ -660,6 +662,18 @@ void setup(const std::vector<std::string>& args,
     auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
             kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
 
+    // If we are doing benchmarking, set the time-limit and register a handler to deal with
+    // stats reporting.
+    std::unique_ptr<BenchmarkTimer> benchmark_timer_ptr{};
+    if (run_for_arg > 0) {
+        ShutdownCallback shutdown_callback = [&pipeline]() {
+            pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::Yes});
+            spdlog::info("Benchmarking time-limit reached. Shutting down.");
+        };
+        benchmark_timer_ptr =
+                std::make_unique<BenchmarkTimer>(run_for_arg * 1000, std::move(shutdown_callback));
+    }
+
     DataLoader loader(*pipeline, "cpu", thread_allocations.loader_threads, max_reads, read_list,
                       reads_already_processed);
 
@@ -669,16 +683,18 @@ void setup(const std::vector<std::string>& args,
     // This is blocking on all reads
     loader.load_reads(pod5_folder_info.files(), ReadOrder::UNRESTRICTED);
 
-    // Wait for the pipeline to complete.  When it does, we collect
-    // final stats to allow accurate summarisation.
+    // Wait for the pipeline to complete.  When it does, we collect final stats to allow accurate summarisation.
+    // Note that if the pipeline was already terminated by the ShutdownCallback, this does nothing, and final_stats
+    // will be empty.
     auto final_stats = pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
     // Stop the stats sampler thread before tearing down any pipeline objects.
     // Then update progress tracking one more time from this thread, to
     // allow accurate summarisation.
     stats_sampler->terminate();
-    tracker.update_progress_bar(final_stats);
-
+    if (!final_stats.empty()) {
+        tracker.update_progress_bar(final_stats);
+    }
     // Give the user a nice summary.
     tracker.summarize();
     if (!dump_stats_file.empty()) {
@@ -851,6 +867,12 @@ int basecaller(int argc, char* argv[]) {
     const auto modbase_params =
             validate_modbase_params(models.get_modbase_model_paths(), parser, device_count);
 
+    auto run_for_arg = parser.get<int>("--run-for");
+    if (run_for_arg < 0) {
+        spdlog::error("Invalid value for --run-for: {}", run_for_arg);
+        return EXIT_FAILURE;
+    }
+
     try {
         setup(args, models, pod5_folder_info, device, parser.get<std::string>("--reference"),
               parser.get<std::string>("--bed-file"), default_parameters.num_runners, modbase_params,
@@ -864,7 +886,7 @@ int basecaller(int argc, char* argv[]) {
               !parser.get<bool>("--disable-read-splitting"),
               !parser.get<bool>("--disable-variable-chunk-sizes"),
               parser.get<bool>("--estimate-poly-a"), polya_config, std::move(barcoding_info),
-              std::move(adapter_info), std::move(sample_sheet));
+              std::move(adapter_info), std::move(sample_sheet), run_for_arg);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return EXIT_FAILURE;
