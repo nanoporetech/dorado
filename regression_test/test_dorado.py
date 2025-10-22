@@ -139,32 +139,32 @@ class TestDorado(unittest.TestCase):
         runs = [
             {
                 "folder": "HAC_4mC_5mC_6mA",
-                "input": "SQK-LSK114",
+                "input": "modbase_DNA",
                 "model": "hac,4mC_5mC,6mA",
             },
             {
                 "folder": "HAC_5mC_5hmC",
-                "input": "SQK-LSK114",
+                "input": "modbase_DNA",
                 "model": "hac,5mC_5hmC",
             },
             {
                 "folder": "HAC_5mCG_5hmCG",
-                "input": "SQK-LSK114",
+                "input": "modbase_DNA",
                 "model": "hac,5mCG_5hmCG",
             },
             {
                 "folder": "SUP_4mC_5mC_6mA",
-                "input": "SQK-LSK114",
+                "input": "modbase_DNA",
                 "model": "sup,4mC_5mC,6mA",
             },
             {
                 "folder": "SUP_5mC_5hmC",
-                "input": "SQK-LSK114",
+                "input": "modbase_DNA",
                 "model": "sup,5mC_5hmC",
             },
             {
                 "folder": "SUP_5mCG_5hmCG",
-                "input": "SQK-LSK114",
+                "input": "modbase_DNA",
                 "model": "sup,5mCG_5hmCG",
             },
             {
