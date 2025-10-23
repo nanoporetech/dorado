@@ -30,7 +30,7 @@ AuxiliaryData::AuxiliaryData(at::Tensor workspace,
           chunk_sizes_(std::cbegin(chunk_sizes), std::cend(chunk_sizes)) {
     T_lstm_ += T_lstm_ & 1;  // needs to be even for easier LUT creation
 
-    for (std::int32_t & cs : chunk_sizes_) {
+    for (std::int32_t& cs : chunk_sizes_) {
         cs /= stride;
     }
 
@@ -47,7 +47,8 @@ AuxiliaryData::AuxiliaryData(at::Tensor workspace,
                      std::begin(chunk_intervals_));
 }
 
-void AuxiliaryData::create_convolution_auxiliary_data([[maybe_unused]] const torch::Device device) {
+void AuxiliaryData::create_convolution_auxiliary_data(
+        [[maybe_unused]] const torch::Device& device) {
 #if DORADO_CUDA_BUILD
     if (device_chunk_intervals.defined()) {
         return;
@@ -64,8 +65,8 @@ void AuxiliaryData::create_convolution_auxiliary_data([[maybe_unused]] const tor
 #endif
 }
 
-void AuxiliaryData::create_lstm_auxiliary_data([[maybe_unused]] const torch::Device device,
-                                               [[maybe_unused]] KoiThreads & thread_pool) {
+void AuxiliaryData::create_lstm_auxiliary_data([[maybe_unused]] const torch::Device& device,
+                                               [[maybe_unused]] KoiThreads& thread_pool) {
 #if DORADO_CUDA_BUILD
     if (device_in_layout.defined()) {
         return;
@@ -99,7 +100,7 @@ void AuxiliaryData::create_lstm_auxiliary_data([[maybe_unused]] const torch::Dev
 #endif
 }
 
-void AuxiliaryData::create_decoder_auxiliary_data([[maybe_unused]] const torch::Device device) {
+void AuxiliaryData::create_decoder_auxiliary_data([[maybe_unused]] const torch::Device& device) {
 #if DORADO_CUDA_BUILD
     if (device_chunk_sizes.defined()) {
         return;

@@ -18,9 +18,11 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <condition_variable>
 #include <fstream>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <queue>
 #include <set>
 

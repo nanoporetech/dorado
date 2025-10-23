@@ -6,8 +6,7 @@
 #include <span>
 #include <vector>
 
-namespace dorado {
-namespace nn {
+namespace dorado::nn {
 
 class KoiThreads;
 
@@ -28,18 +27,18 @@ public:
     std::int32_t NT_in_max() const { return N_ * T_in_; }
     std::int32_t NT_out_max() const { return NT_in_max() / stride_; }
 
-    void create_convolution_auxiliary_data(torch::Device device);
+    void create_convolution_auxiliary_data(const torch::Device &device);
 
     at::Tensor device_chunk_intervals;
 
-    void create_lstm_auxiliary_data(torch::Device device, KoiThreads &thread_pool);
+    void create_lstm_auxiliary_data(const torch::Device &device, KoiThreads &thread_pool);
 
     at::Tensor device_in_layout;
     at::Tensor device_out_layout;
     at::Tensor device_fwd_encoding;
     at::Tensor device_bwd_encoding;
 
-    void create_decoder_auxiliary_data(torch::Device device);
+    void create_decoder_auxiliary_data(const torch::Device &device);
 
     std::span<const std::int32_t> chunk_sizes() const { return chunk_sizes_; }
 
@@ -58,5 +57,4 @@ private:
     std::vector<std::int32_t> chunk_intervals_;
 };
 
-}  // namespace nn
-}  // namespace dorado
+}  // namespace dorado::nn

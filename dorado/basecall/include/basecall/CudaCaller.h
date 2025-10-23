@@ -12,10 +12,7 @@
 #include <torch/nn.h>
 
 #include <atomic>
-#include <condition_variable>
-#include <deque>
 #include <memory>
-#include <mutex>
 #include <string>
 #include <thread>
 #include <tuple>
@@ -98,7 +95,7 @@ private:
     std::atomic<int64_t> m_num_batches_called{0};
     std::atomic<int64_t> m_model_decode_ms{0};
 
-    bool m_variable_chunk_sizes{false};
+    const bool m_variable_chunk_sizes;
 
     nn::KoiThreads m_thread_pool;
 };
