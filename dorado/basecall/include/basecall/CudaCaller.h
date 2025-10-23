@@ -5,6 +5,7 @@
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
 #include "nn/AuxiliaryData.h"
+#include "nn/KoiUtils.h"
 #include "utils/stats.h"
 
 #include <c10/cuda/CUDAStream.h>
@@ -98,6 +99,8 @@ private:
     std::atomic<int64_t> m_model_decode_ms{0};
 
     bool m_variable_chunk_sizes{false};
+
+    nn::KoiThreads m_thread_pool;
 };
 
 }  // namespace dorado::basecall

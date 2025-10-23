@@ -1,5 +1,10 @@
 #include "nn/AuxiliaryData.h"
 
+#include "nn/KoiUtils.h"
+
+#include <exception>
+#include <numeric>
+
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
 
@@ -7,9 +12,6 @@ extern "C" {
 #include "koi.h"
 }
 #endif
-
-#include <exception>
-#include <numeric>
 
 namespace dorado {
 namespace nn {
@@ -28,7 +30,7 @@ AuxiliaryData::AuxiliaryData(at::Tensor workspace,
           chunk_sizes_(std::cbegin(chunk_sizes), std::cend(chunk_sizes)) {
     T_lstm_ += T_lstm_ & 1;  // needs to be even for easier LUT creation
 
-    for (std::int32_t& cs : chunk_sizes_) {
+    for (std::int32_t & cs : chunk_sizes_) {
         cs /= stride;
     }
 
@@ -62,7 +64,8 @@ void AuxiliaryData::create_convolution_auxiliary_data([[maybe_unused]] const tor
 #endif
 }
 
-void AuxiliaryData::create_lstm_auxiliary_data([[maybe_unused]] const torch::Device device) {
+void AuxiliaryData::create_lstm_auxiliary_data([[maybe_unused]] const torch::Device device,
+                                               [[maybe_unused]] KoiThreads & thread_pool) {
 #if DORADO_CUDA_BUILD
     if (device_in_layout.defined()) {
         return;
@@ -80,12 +83,11 @@ void AuxiliaryData::create_lstm_auxiliary_data([[maybe_unused]] const torch::Dev
     device_bwd_encoding = at::empty({N_ * (T_lstm_ + 1)}, options.dtype(torch::kInt32));
 
     constexpr std::int32_t SUBBATCH_SIZE{32};
-    constexpr std::int32_t NUM_THREADS{6};
 
     const int status = host_lstm_preprocess(
             stream.stream(), N_, std::data(chunk_sizes_), std::size(chunk_sizes_), SUBBATCH_SIZE,
-            T_lstm_, workspace_.data_ptr<std::int32_t>(), workspace_.size(0), NUM_THREADS, nullptr,
-            device_out_layout.data_ptr<std::int32_t>(),
+            T_lstm_, workspace_.data_ptr<std::int32_t>(), workspace_.size(0), thread_pool.get(),
+            nullptr, device_out_layout.data_ptr<std::int32_t>(),
             device_fwd_encoding.data_ptr<std::int32_t>(), device_in_layout.data_ptr<std::int32_t>(),
             nullptr, device_bwd_encoding.data_ptr<std::int32_t>());
 

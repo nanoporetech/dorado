@@ -9,6 +9,8 @@
 namespace dorado {
 namespace nn {
 
+class KoiThreads;
+
 class AuxiliaryData {
 public:
     AuxiliaryData(at::Tensor workspace,
@@ -30,7 +32,7 @@ public:
 
     at::Tensor device_chunk_intervals;
 
-    void create_lstm_auxiliary_data(torch::Device device);
+    void create_lstm_auxiliary_data(torch::Device device, KoiThreads &thread_pool);
 
     at::Tensor device_in_layout;
     at::Tensor device_out_layout;
