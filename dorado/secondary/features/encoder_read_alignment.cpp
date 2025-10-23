@@ -251,6 +251,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
                                            const std::string& read_group,
                                            const int32_t min_mapq,
                                            const int32_t max_reads,
+                                           const double min_snp_accuracy,
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool clip_to_zero,
@@ -268,6 +269,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
           m_read_group{read_group},
           m_min_mapq{min_mapq},
           m_max_reads{max_reads},
+          m_min_snp_accuracy{min_snp_accuracy},
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
           m_include_haplotype_column{include_haplotype_column},
@@ -292,7 +294,8 @@ secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_nam
                 m_bam_file, m_fastx_reader.get_raw_faidx_ptr(), ref_name, ref_start, ref_end,
                 m_num_dtypes, m_dtypes, m_tag_name, m_tag_value, m_tag_keep_missing, m_read_group,
                 m_min_mapq, m_row_per_read, m_include_dwells, m_include_haplotype_column,
-                m_hap_source, phasing_bin_fn_str, m_max_reads, m_right_align_insertions);
+                m_hap_source, phasing_bin_fn_str, m_max_reads, m_right_align_insertions,
+                m_min_snp_accuracy);
 
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);

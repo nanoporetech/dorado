@@ -28,6 +28,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::string& tag_name,
         const int32_t tag_value,
         const bool clip_to_zero,
+        const double min_snp_accuracy,
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
         const std::optional<HaplotagSource>& hap_source,

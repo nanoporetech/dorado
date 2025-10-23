@@ -1266,7 +1266,7 @@ int polish(int argc, char* argv[]) {
         polisher::PolisherResources resources = polisher::create_resources(
                 model_config, opt.in_draft_fastx_fn, opt.in_aln_bam_fn, opt.device_str, opt.threads,
                 opt.infer_threads, opt.full_precision, opt.read_group, opt.tag_name, opt.tag_value,
-                opt.tag_keep_missing, opt.min_mapq, std::nullopt, std::nullopt);
+                0.0, opt.tag_keep_missing, opt.min_mapq, std::nullopt, std::nullopt);
 
         // Progress bar.
         secondary::Stats stats;

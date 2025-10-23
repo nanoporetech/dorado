@@ -37,6 +37,7 @@ public:
                          const std::string& read_group,
                          const int32_t min_mapq,
                          const int32_t max_reads,
+                         const double min_snp_accuracy,
                          const bool row_per_read,
                          const bool include_dwells,
                          const bool clip_to_zero,
@@ -68,6 +69,7 @@ private:
     std::string m_read_group;
     int32_t m_min_mapq = 1;
     int32_t m_max_reads = 100;
+    double m_min_snp_accuracy = 0.0;
     bool m_row_per_read = false;
     bool m_include_dwells = true;
     bool m_include_haplotype_column = false;

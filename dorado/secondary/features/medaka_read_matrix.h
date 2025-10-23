@@ -89,6 +89,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const secondary::HaplotagSource hap_source,
                                            const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,
-                                           const bool right_align_insertions);
+                                           const bool right_align_insertions,
+                                           const double min_snp_accuracy);
 
 }  // namespace dorado::secondary

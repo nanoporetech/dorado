@@ -172,6 +172,7 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
     data->read_group = std::empty(read_group) ? nullptr : read_group.c_str();
+    data->min_snp_accuracy = 0.0;
 
     if (!data->iter) {
         return pileup;

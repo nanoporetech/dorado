@@ -259,7 +259,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const secondary::HaplotagSource hap_source,
                                            const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,
-                                           const bool right_align_insertions) {
+                                           const bool right_align_insertions,
+                                           const double min_snp_accuracy) {
     if ((num_dtypes == 1) && !std::empty(dtypes)) {
         throw std::runtime_error(
                 "Received invalid num_dtypes and dtypes args. num_dtypes == 1 but size(dtypes) = " +
@@ -357,6 +358,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     data->tag_value = tag_value;
     data->keep_missing = keep_missing;
     data->read_group = std::empty(read_group) ? nullptr : read_group.c_str();
+    data->min_snp_accuracy = min_snp_accuracy;
     bam_mplp_t mplp = bam_mplp_init(1, mpileup_read_bam, reinterpret_cast<void **>(&raw_data_ptr));
 
     std::array<bam_pileup1_t *, 1> plp;

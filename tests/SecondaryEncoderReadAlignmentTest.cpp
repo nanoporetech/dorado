@@ -262,7 +262,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         // UUT.
         EncoderReadAlignment encoder(
                 in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
                 right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -289,7 +289,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         // UUT.
         EncoderReadAlignment encoder(
                 in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
                 right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -490,7 +490,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Run UUT.
         EncoderReadAlignment encoder(
                 temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
                 right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -518,7 +518,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Run UUT.
         EncoderReadAlignment encoder(
                 temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
                 right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -540,7 +540,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Run UUT.
         EncoderReadAlignment encoder(
                 temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
                 right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -594,7 +594,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Run UUT.
         EncoderReadAlignment encoder(
                 temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, row_per_read, include_dwells, clip_to_zero,
+                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
                 right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -740,8 +740,8 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
 
     // Run UUT.
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads, row_per_read,
-                                 include_dwells, clip_to_zero, right_align_insertions,
+                                 tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                 row_per_read, include_dwells, clip_to_zero, right_align_insertions,
                                  include_haplotype_column, hap_source, phasing_bin);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -900,8 +900,8 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
 
     // Run UUT.
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads, row_per_read,
-                                 include_dwells, clip_to_zero, right_align_insertions,
+                                 tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                 row_per_read, include_dwells, clip_to_zero, right_align_insertions,
                                  include_haplotype_column, hap_source, phasing_bin);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -1041,8 +1041,8 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
 
     // Run UUT.
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads, row_per_read,
-                                 include_dwells, clip_to_zero, right_align_insertions,
+                                 tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                 row_per_read, include_dwells, clip_to_zero, right_align_insertions,
                                  include_haplotype_column, hap_source, phasing_bin);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
