@@ -296,6 +296,8 @@ build:linux:x86:coverage:
     - !reference [.on_nightly_or_manual, rules]
   coverage: '/lines: \d+(?:\.\d+)?/'
   artifacts:
+    paths: 
+      - build/dorado_test_coverage.xml
     reports:
       coverage_report:
         coverage_format: cobertura
