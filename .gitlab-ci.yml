@@ -290,6 +290,11 @@ build:linux:x86:coverage:
     - !reference [.create_venv]
     - pip install gcovr
     - !reference [.run_dorado_cmake_build]
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - !reference [.on_nightly_or_manual, rules]
+  coverage: '/lines: \d+(?:\.\d+)?/'
   artifacts:
     paths:
       - build/dorado_test_coverage/*
