@@ -282,6 +282,7 @@ build:linux:x86:coverage:
   variables:
     BUILD_OPTIONS: "-DGENERATE_TEST_COVERAGE=1"
     BUILD_TARGET: "dorado_test_coverage"
+    BUILD_TYPE: "Debug"
   extends:
     - .linux_build_dependencies
     - .linux_runner
@@ -290,9 +291,18 @@ build:linux:x86:coverage:
     - !reference [.create_venv]
     - pip install gcovr
     - !reference [.run_dorado_cmake_build]
+  rules:
+    - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+    - !reference [.on_nightly_or_manual, rules]
+  coverage: '/lines: \d+(?:\.\d+)?/'
   artifacts:
-    paths:
-      - build/dorado_test_coverage/*
+    paths: 
+      - build/dorado_test_coverage.xml
+    reports:
+      coverage_report:
+        coverage_format: cobertura
+        path: build/dorado_test_coverage.xml
 
 build:linux:x86:clang_tidy:
   stage: build
