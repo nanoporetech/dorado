@@ -169,22 +169,22 @@ class TestDorado(unittest.TestCase):
             },
             {
                 "folder": "HAC_inosine_m6A_m5C",
-                "input": "SQK-RNA004",
+                "input": "modbase_RNA",
                 "model": "hac,inosine_m6A,m5C",
             },
             {
                 "folder": "HAC_m6A_DRACH_pseU",
-                "input": "SQK-RNA004",
+                "input": "modbase_RNA",
                 "model": "hac,m6A_DRACH,pseU",
             },
             {
                 "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
-                "input": "SQK-RNA004",
+                "input": "modbase_RNA",
                 "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
             },
             {
                 "folder": "SUP_m6A_DRACH_pseU_2OmeU",
-                "input": "SQK-RNA004",
+                "input": "modbase_RNA",
                 "model": "sup,m6A_DRACH,pseU_2OmeU",
             },
         ]
@@ -208,6 +208,7 @@ class TestDorado(unittest.TestCase):
                         save_path=None,
                         model=run["model"],
                         emit_fastq=False,
+                        recursive=True,
                     )
                     errors = None
                     try:
@@ -263,6 +264,7 @@ class TestDorado(unittest.TestCase):
         save_path: pathlib.Path | None,
         model: str,
         emit_fastq: bool,
+        recursive: bool = False,
     ) -> list:
         device = "metal" if PLATFORM == "osx_arm" else "cuda:0"
         args = ["doradod"] if DEBUG else ["dorado"]
@@ -284,6 +286,8 @@ class TestDorado(unittest.TestCase):
             )
         if emit_fastq:
             args.append("--emit-fastq")
+        if recursive:
+            args.append("--recursive")
         return args
 
 

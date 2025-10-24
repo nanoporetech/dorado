@@ -74,8 +74,8 @@
     OUTPUT_SPEC_REF: "3ab7ca21ce882428c4e4be74b7276bc8bdfc34a0"
     OUTPUT_SPEC_REPO_URL: "${ONT_OUTPUT_SPEC_REPO}-/archive/${OUTPUT_SPEC_REF}/ont-output-specification-${OUTPUT_SPEC_REF}.zip"
     SPECIFICATION_FILE: "ont_output_spec.zip"
-    VALIDATOR_COMMIT: "9241216dd8b7703af9a64af2add65e88620edcbb"
-    TEST_DATA_COMMIT: "version_0.1"
+    VALIDATOR_COMMIT: "fb80ac5354580708aa1da4b65c0fb941ce4c3f37"
+    TEST_DATA_COMMIT: "version_0.2"
   script:
     - !reference [.extract_archive, script]
     # Update PATH to reflect where these binaries are
