@@ -113,9 +113,8 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
             }
             for (size_t base_idx = 0; base_idx < sequence.size(); base_idx++) {
                 if (sequence[base_idx] == current_cardinal) {
-                    if (modbase_probs[base_idx * num_channels + channel_idx] >= threshold) {
-                        mask[base_idx] = true;
-                    }
+                    mask[base_idx] =
+                            (modbase_probs[base_idx * num_channels + channel_idx] >= threshold);
                 }
             }
         }
