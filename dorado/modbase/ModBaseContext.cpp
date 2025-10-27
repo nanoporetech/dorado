@@ -97,9 +97,60 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
                                  const std::vector<std::string>& modbase_alphabet,
                                  const std::vector<uint8_t>& modbase_probs,
                                  uint8_t threshold) const {
-    // Iterate over the provided alphabet and find all the bases that may be modified.
+    // First decide which elements of modbase_alphabet are modifications.
+    struct ModifiedBase {
+        char cardinal_base;
+        std::vector<size_t> modified_channels;
+    };
     size_t num_channels = modbase_alphabet.size();
     const std::string cardinal_bases = "ACGT";
+    std::vector<ModifiedBase> adjustments;
+    ModifiedBase current_adjustment;
+    for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
+        if (cardinal_bases.find(modbase_alphabet[channel_idx]) != std::string::npos) {
+            if (!current_adjustment.modified_channels.empty()) {
+                adjustments.emplace_back(std::move(current_adjustment));
+            }
+            current_adjustment = {modbase_alphabet[channel_idx][0], {}};
+        } else {
+            if (!m_motifs[utils::base_to_int(current_adjustment.cardinal_base)].empty()) {
+                // This cardinal base has a context associated with modifications, so the mask should
+                // not be updated, regardless of the threshold.
+                continue;
+            }
+            current_adjustment.modified_channels.push_back(channel_idx);
+        }
+    }
+    if (!current_adjustment.modified_channels.empty()) {
+        adjustments.emplace_back(std::move(current_adjustment));
+    }
+
+    if (adjustments.empty()) {
+        // No bases to adjust, so nothing to do.
+        return;
+    }
+
+    // Update the mask only for canonical bases we have determined require an update.
+    for (size_t base_idx = 0; base_idx < sequence.size(); ++base_idx) {
+        bool requires_update = false;
+        bool flag = false;
+        for (const auto& adjustment : adjustments) {
+            if (adjustment.cardinal_base == sequence[base_idx]) {
+                requires_update = true;
+                for (const auto channel_idx : adjustment.modified_channels) {
+                    // We use |= here so that if there are multiple modifications possible for
+                    // a canonical base, and any of them exceed the threshold, then we will have
+                    // set the flag to true.
+                    flag |= (modbase_probs[base_idx * num_channels + channel_idx] >= threshold);
+                }
+            }
+        }
+        if (requires_update) {
+            // Replace the flag if we need to, otherwise leave it unchanged.
+            mask[base_idx] = flag;
+        }
+    }
+
     char current_cardinal = 0;
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
         if (cardinal_bases.find(modbase_alphabet[channel_idx]) != std::string::npos) {
