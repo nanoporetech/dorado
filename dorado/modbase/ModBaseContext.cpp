@@ -150,26 +150,6 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
             mask[base_idx] = flag;
         }
     }
-
-    char current_cardinal = 0;
-    for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
-        if (cardinal_bases.find(modbase_alphabet[channel_idx]) != std::string::npos) {
-            // A cardinal base.
-            current_cardinal = modbase_alphabet[channel_idx][0];
-        } else {
-            if (!m_motifs[utils::base_to_int(current_cardinal)].empty()) {
-                // This cardinal base has a context associated with modifications, so the mask should
-                // not be updated, regardless of the threshold.
-                continue;
-            }
-            for (size_t base_idx = 0; base_idx < sequence.size(); base_idx++) {
-                if (sequence[base_idx] == current_cardinal) {
-                    mask[base_idx] =
-                            (modbase_probs[base_idx * num_channels + channel_idx] >= threshold);
-                }
-            }
-        }
-    }
 }
 
 }  // namespace dorado::modbase
