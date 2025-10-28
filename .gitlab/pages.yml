@@ -1,0 +1,23 @@
+#
+# Gitlab pages (internal)
+#
+# Upload URL is https://<group>.<gitlab base URL>/<project>
+#
+
+# This has to be called pages to do the right thing since the pages: property
+# isn't available in our version of gitlab.
+pages:
+  image: ${DORADO_PRECOMMIT}
+  # We place this in pre_build_check so that it appears on the left in the UI
+  stage: pre-flight
+  script:
+    - mkdir public
+    - cp tetra/visualiser.html public/index.html
+  artifacts:
+    paths:
+      - public
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: manual
+      # See https://forum.gitlab.com/t/specifying-a-pipeline-step-as-manual-causes-its-status-to-always-be-blocked/58333/3
+      allow_failure: true

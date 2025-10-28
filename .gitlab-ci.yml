@@ -4,6 +4,7 @@ include:
   - local: .gitlab/build-ont_core.yml
   - local: .gitlab/regression_tests.yml
   - local: .gitlab/mlhub.yml
+  - local: .gitlab/pages.yml
 
 workflow:
   rules:
