@@ -99,15 +99,15 @@ void ModBaseContext::update_mask(std::vector<bool>& mask,
                                  uint8_t threshold) const {
     // First decide which elements of modbase_alphabet are modifications.
     struct ModifiedBase {
-        char cardinal_base;
+        char cardinal_base{0};
         std::vector<size_t> modified_channels;
     };
-    size_t num_channels = modbase_alphabet.size();
-    const std::string cardinal_bases = "ACGT";
+    const size_t num_channels = modbase_alphabet.size();
+    constexpr std::string_view CARDINAL_BASES{"ACGT"};
     std::vector<ModifiedBase> adjustments;
     ModifiedBase current_adjustment;
     for (size_t channel_idx = 0; channel_idx < num_channels; channel_idx++) {
-        if (cardinal_bases.find(modbase_alphabet[channel_idx]) != std::string::npos) {
+        if (CARDINAL_BASES.find(modbase_alphabet[channel_idx]) != std::string::npos) {
             if (!current_adjustment.modified_channels.empty()) {
                 adjustments.emplace_back(std::move(current_adjustment));
             }

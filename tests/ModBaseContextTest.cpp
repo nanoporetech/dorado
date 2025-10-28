@@ -68,4 +68,14 @@ CATCH_TEST_CASE("basemod context helper", "[bam]") {
     std::vector<bool> full_mask = {0, 0, 0, 1, 0, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0};
     context_handler.update_mask(mask, sequence, alphabet, modbase_probs, threshold);
     CATCH_REQUIRE(mask == full_mask);
+
+    // Test again with a mask where the contextless Gx modification is set to true for all Gs.
+    mask = context_handler.get_sequence_mask(sequence);
+    for (size_t seq_pos = 0; seq_pos < sequence.size(); ++seq_pos) {
+        if (sequence[seq_pos] == 'G') {
+            mask[seq_pos] = true;
+        }
+    }
+    context_handler.update_mask(mask, sequence, alphabet, modbase_probs, threshold);
+    CATCH_REQUIRE(mask == full_mask);
 }
