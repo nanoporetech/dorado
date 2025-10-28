@@ -685,8 +685,13 @@ test_barcoding_read_groups() (
     # check that we correctly barcode and demux a basecalled bam file
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
     $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
-
     for bam in $(find "$output_dir/${output_name}-demux/" -type f -iname "*.bam" ); do
+        check_barcodes $bam
+    done
+
+    # check that we correctly demux a basecalled and barcoded bam file
+    $dorado_bin demux --no-classify --output-dir $output_dir/${output_name}-demux-no-classify $output_dir/${output_name}.bam
+    for bam in $(find "$output_dir/${output_name}-demux-no-classify/" -type f -iname "*.bam" ); do
         check_barcodes $bam
     done
 )
