@@ -600,11 +600,12 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     }));
 
     auto [barcode_name, alias, description] =
-            GENERATE_COPY(table<std::string, std::string, std::string>(
-                    {{"", "", "test without barcode or alias"},
-                     {"barcode99", "barcode99", "test with barcode but without alias"},
-                     {"unclassified", "unclassified", "test unclassified read"},
-                     {"barcode01", "patient_id_5", "test with barcode and alias"}}));
+            GENERATE_COPY(table<std::string, std::string, std::string>({
+                    {"", "", "test without barcode or alias"},
+                    {"barcode99", "barcode99", "test with barcode but without alias"},
+                    {"unclassified", "unclassified", "test unclassified read"},
+                    {"barcode01", "patient_id_5", "test with barcode and alias"},
+            }));
 
     auto barcode_score_result = std::make_shared<BarcodeScoreResult>();
     barcode_score_result->barcode_name = barcode_name;
@@ -613,7 +614,6 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     auto single_barcode_filename = fs::path(get_data_dir("sample_sheets")) / "single_barcode.csv";
     CATCH_REQUIRE_NOTHROW(loaded_sample_sheet.load(single_barcode_filename.string()));
 
-    // FIXME: Sample sheet isn't working - maybe because the barcode data is incomplete?
     const auto sample_sheet = std::make_shared<utils::SampleSheet>(loaded_sample_sheet);
 
     const HtsData::ReadAttributes attrs{
@@ -637,6 +637,81 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
 
     hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet, false);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
+
+    CATCH_SECTION(description) {
+        CATCH_CAPTURE(root, path, output_mode, barcode_name);
+        // Check root is the parent of the output
+        CATCH_CHECK(path.string().substr(0, root.size()) == root);
+        // Check the filename
+        CATCH_CHECK(path.stem() == expected_fname);
+        // Check the file type / extension
+        const std::string extension = get_suffix(output_mode);
+        CATCH_CHECK(path.extension() == extension);
+
+        // Expect an additional subdir for the classification if the barcode is set
+        const auto base =
+                barcode_name.empty() ? path.parent_path() : path.parent_path().parent_path();
+        // Check the folder base structure (excluding the classification)
+        const auto relative_base_folder = fs::relative(base, root);
+        CATCH_CHECK(relative_base_folder == fs::path(expected_base));
+
+        // Check the classification subdir should be the alias name
+        const auto classification_folder = fs::relative(path, base).parent_path();
+        CATCH_CHECK(classification_folder == fs::path(alias));
+    }
+}
+
+CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", TEST_GROUP) {
+    using namespace hts_writer;
+    namespace fs = std::filesystem;
+
+    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
+    const auto root = tmp_dir.m_path.string();
+
+    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+            {OutputMode::FASTQ, "fastq"},
+            {OutputMode::BAM, "bam"},
+    }));
+
+    auto [barcode_name, alias, description] =
+            GENERATE_COPY(table<std::string, std::string, std::string>({
+                    {"", "", "test without barcode or alias"},
+                    {"barcode99", "barcode99", "test with barcode but without alias"},
+                    {"unclassified", "unclassified", "test unclassified read"},
+                    {"barcode01", "patient_id_5", "test with barcode and alias"},
+            }));
+
+    dorado::utils::SampleSheet loaded_sample_sheet;
+    auto single_barcode_filename = fs::path(get_data_dir("sample_sheets")) / "single_barcode.csv";
+    CATCH_REQUIRE_NOTHROW(loaded_sample_sheet.load(single_barcode_filename.string()));
+
+    const auto sample_sheet = std::make_shared<utils::SampleSheet>(loaded_sample_sheet);
+
+    const HtsData::ReadAttributes attrs{
+            "SQK-RBK114-96",
+            "",
+            "barcoding_run",
+            "fc-pos",
+            "PAO25751",
+            "proto-id",
+            "acq-id",
+            946782245000 /* 2000/01/02 03:04:05 */,
+            0,
+    };
+
+    const std::string expected_base =
+            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
+
+    std::ostringstream oss;
+    oss << "PAO25751" << "_pass_" << alias << (alias.empty() ? "" : "_") << "proto-id_acq-id_0";
+    const std::string expected_fname = oss.str();
+
+    hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet, true);
+    BamPtr bam_record(bam_init1());
+    bam_aux_append(bam_record.get(), "BC", 'Z', alias.length() + 1,
+                   reinterpret_cast<const uint8_t*>(alias.c_str()));
+
+    const auto path = fs::path(structure.get_path(HtsData{std::move(bam_record), attrs, nullptr}));
 
     CATCH_SECTION(description) {
         CATCH_CAPTURE(root, path, output_mode, barcode_name);
