@@ -37,10 +37,12 @@ class NestedFileStructure : public IStructure {
 public:
     NestedFileStructure(const std::string &output_dir,
                         OutputMode mode,
-                        std::shared_ptr<const utils::SampleSheet> sample_sheet)
+                        std::shared_ptr<const utils::SampleSheet> sample_sheet,
+                        bool assume_barcodes)
             : m_output_dir(std::filesystem::weakly_canonical(std::filesystem::path(output_dir))),
               m_mode(mode),
-              m_sample_sheet(std::move(sample_sheet)) {};
+              m_sample_sheet(std::move(sample_sheet)),
+              m_assume_barcodes(assume_barcodes) {};
 
     std::string get_path(const HtsData &hts_data) override;
 
@@ -49,6 +51,7 @@ private:
     const OutputMode m_mode;
 
     const std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
+    const bool m_assume_barcodes;
 
     std::unordered_map<HtsData::ReadAttributes,
                        std::filesystem::path,

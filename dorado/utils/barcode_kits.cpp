@@ -1111,7 +1111,7 @@ std::string barcode_kits_list_str() {
                            });
 }
 
-std::string normalize_barcode_name(const std::string& barcode_name) {
+std::string normalize_barcode_name(std::string_view barcode_name) {
     std::string digits = "";
     // Normalize using only the digits at the end of the barcode name.
     bool found_digits = false;

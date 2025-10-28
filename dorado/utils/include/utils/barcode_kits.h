@@ -1,6 +1,7 @@
 #pragma once
 
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
@@ -50,7 +51,7 @@ bool is_valid_barcode_kit(const std::string& kit_name);
 
 std::string barcode_kits_list_str();
 
-std::string normalize_barcode_name(const std::string& barcode_name);
+std::string normalize_barcode_name(std::string_view barcode_name);
 std::string generate_standard_barcode_name(const std::string& kit_name,
                                            const std::string& barcode_name);
 }  // namespace dorado::barcode_kits

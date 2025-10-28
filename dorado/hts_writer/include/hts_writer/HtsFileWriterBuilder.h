@@ -24,7 +24,8 @@ protected:
                          utils::ProgressCallback progress_callback,
                          utils::DescriptionCallback description_callback,
                          std::string gpu_names,
-                         std::shared_ptr<const utils::SampleSheet> sample_sheet);
+                         std::shared_ptr<const utils::SampleSheet> sample_sheet,
+                         bool assume_barcodes);
 
 public:
     OutputMode get_output_mode();
@@ -45,6 +46,7 @@ private:
     OutputMode m_output_mode{OutputMode::BAM};
 
     bool m_warn_fastq_called{false};
+    const bool m_assume_barcodes{false};
 
 protected:
     bool m_is_fd_tty{false}, m_is_fd_pipe{false};

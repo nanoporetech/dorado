@@ -393,7 +393,8 @@ public:
                                    std::move(progress_callback),
                                    std::move(description_callback),
                                    std::move(gpu_names),
-                                   nullptr) {
+                                   nullptr,
+                                   false) {
         m_is_fd_tty = is_fd_tty;
         m_is_fd_pipe = is_fd_pipe;
     };
@@ -571,7 +572,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                      "fc_pass_proto_acq_0",
              }}));
 
-    hts_writer::NestedFileStructure structure(root, output_mode, nullptr);
+    hts_writer::NestedFileStructure structure(root, output_mode, nullptr, false);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs}));
     CATCH_CAPTURE(root, path, output_mode, attrs.experiment_id);
 
@@ -634,7 +635,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     oss << "PAO25751" << "_pass_" << alias << (alias.empty() ? "" : "_") << "proto-id_acq-id_0";
     const std::string expected_fname = oss.str();
 
-    hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet);
+    hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet, false);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
     CATCH_SECTION(description) {
