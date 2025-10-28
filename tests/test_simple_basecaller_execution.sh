@@ -638,34 +638,24 @@ test_barcoding_read_groups() (
 
     samtools quickcheck -u $output_dir/${output_name}.bam
 
-    split_dir=$output_dir/${output_name}
-    mkdir $split_dir
-    samtools split -u $split_dir/unknown.bam -f "$split_dir/rg_%!.bam" $output_dir/${output_name}.bam
-
-    # There shouldn't be any unknown groups.
-    num_read_groups=$(samtools view -c $split_dir/unknown.bam)
-    if [[ $num_read_groups -ne "0" ]]; then
-        echo "Reads with unknown read groups found."
-        exit 1
-    fi
-
     check_barcodes() (
         bam=$1
         echo "Checking file: $bam"
-        if [[ $bam =~ "_SQK-RBK114-96_" ]]; then
-            # Arrangement is |<kit>_<barcode>|, so trim the kit from the prefix and the .bam from the suffix.
-            barcode=${bam#*_SQK-RBK114-96_}
-            barcode=${barcode%.bam*}
-        elif [[ $bam =~ "_${model_name_5k}_" ]]; then
-            # Arrangement is |<barcode_alias>|, so trim the model from the prefix and the .bam from the suffix.
-            barcode=${bam#*_${model_name_5k}_}
-            barcode=${barcode%.bam*}
-        elif [[ $bam =~ "/0d85015e-6a4e-400c-a80f-c187c65a6d03_" ]]; then
-            # Demuxed file, so trim the run_id from the prefix and the .bam from the suffix.
-            barcode=${bam#*0d85015e-6a4e-400c-a80f-c187c65a6d03_}
-            barcode=${barcode%.bam*}
-        else
+        if [[ $bam =~ _SQK-RBK114-96_(.+)\.bam ]]; then
+            # Arrangement is |<kit>_<barcode>|, so find the barcode between the kit and the extension
+            barcode=${BASH_REMATCH[1]}
+        elif [[ $bam =~ _${model_name_5k}_(.+)\.bam ]]; then
+            # Arrangement is |<barcode_alias>|, so find the barcode between the model name and the extension
+            barcode=${BASH_REMATCH[1]}
+        elif [[ $bam =~ rg_.*\.bam ]]; then
+            # Split bam file that doesn't contain a barcode, therefore unclassified
             barcode="unclassified"
+        elif [[ $bam =~ bam_pass/(.+)/PAO25751 ]]; then
+            # Demuxed file, grab the barcode from the path
+            barcode=${BASH_REMATCH[1]}
+        else
+            echo "Unexpected filename structure: $bam"
+            exit 1
         fi
         # Lookup expected count, defaulting to 0 if not set.
         expected=expected_read_groups_${barcode}
@@ -677,15 +667,26 @@ test_barcoding_read_groups() (
         fi
         exit 0
     )
-    for bam in $(find -s "$split_dir" -type f -iname "rg_*.bam" ); do
+
+    split_dir=$output_dir/${output_name}
+    mkdir $split_dir
+    samtools split -u $split_dir/unknown.bam -f "$split_dir/rg_%!.bam" $output_dir/${output_name}.bam
+
+    # There shouldn't be any unknown groups.
+    num_read_groups=$(samtools view -c $split_dir/unknown.bam)
+    if [[ $num_read_groups -ne "0" ]]; then
+        echo "Reads with unknown read groups found."
+        exit 1
+    fi
+    for bam in $(find "$split_dir" -type f -iname "rg_*.bam" ); do
         check_barcodes $bam
     done
 
+    # check that we correctly barcode and demux a basecalled bam file
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
     $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
 
-    # for bam in $output_dir/${output_name}-demux/*.bam; do
-    for bam in $(find -s "$output_dir/${output_name}-demux/" -type f -iname "rg_*.bam" ); do
+    for bam in $(find "$output_dir/${output_name}-demux/" -type f -iname "*.bam" ); do
         check_barcodes $bam
     done
 )
