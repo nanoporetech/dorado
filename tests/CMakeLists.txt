@@ -19,7 +19,6 @@ add_executable(dorado_tests
     BamWriterTest.cpp
     BarcodeClassifierSelectorTest.cpp
     BarcodeClassifierTest.cpp
-    BarcodeDemuxerNodeTest.cpp
     BasecallModelConfigTest.cpp
     BatchParamsTest.cpp
     bed_file_test.cpp

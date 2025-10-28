@@ -165,10 +165,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         return std::make_pair(simplex_reads_written, duplex_reads_written);
     };
 
-    auto [simplex_reads_written, duplex_reads_written] = fetch_reads_written();
-
-    m_num_simplex_reads_written =
-            int(simplex_reads_written + fetch_stat("BarcodeDemuxerNode.demuxed_reads_written"));
+    std::tie(m_num_simplex_reads_written, m_num_duplex_reads_written) = fetch_reads_written();
 
     m_num_simplex_reads_filtered = int(fetch_stat("ReadFilterNode.simplex_reads_filtered"));
     m_num_simplex_bases_filtered = int(fetch_stat("ReadFilterNode.simplex_bases_filtered"));
@@ -180,7 +177,6 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
         m_num_duplex_bases_processed = int64_t(fetch_stat("StereoBasecallerNode.bases_processed"));
         m_num_bases_processed += m_num_duplex_bases_processed;
     }
-    m_num_duplex_reads_written = int(duplex_reads_written);
     m_num_duplex_reads_filtered = int(fetch_stat("ReadFilterNode.duplex_reads_filtered"));
     m_num_duplex_bases_filtered = int(fetch_stat("ReadFilterNode.duplex_bases_filtered"));
 
