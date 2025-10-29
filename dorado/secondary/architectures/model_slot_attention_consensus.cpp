@@ -11,6 +11,9 @@
 
 namespace dorado::secondary {
 
+// Keeping the old quick_phase approach for now.
+constexpr bool USE_BATCH_ADJACENCY_PHASE = true;
+
 SlotAttentionImpl::SlotAttentionImpl(const int32_t num_slots,
                                      const int32_t dim,
                                      const int32_t iters,
@@ -207,11 +210,89 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
     register_module("slot_classifier", m_slot_classifier);
 }
 
+namespace {
+at::Tensor batch_adjacency_phase(const at::Tensor& hap_probs_unphased,
+                                 const torch::Tensor& features,
+                                 const int32_t lookback) {
+    // Dimensions: (n_batch, n_pos, n_reads, n_feats, n_class).
+    const int64_t n_pos = features.size(1);
+
+    at::Tensor basecalls = features.index({torch::indexing::Ellipsis, 0})
+                                   .clone();     // Shape (n_batch, n_pos, n_reads)
+    basecalls.masked_fill_(basecalls == 0, -1);  // Remap padding bases.
+    basecalls.masked_fill_(basecalls == 5, 0);   // Remap deletions to 0 as above.
+
+    const at::Tensor adj_basecalls = basecalls.unfold(
+            1, lookback + 1, 1);  // Shape (n_batch, n_pos-lookback, n_reads, lookback+1)
+    at::Tensor hap_probs_phased = hap_probs_unphased.clone();
+    at::Tensor hap_preds = hap_probs_phased.argmax(-1);  // (batch, pos, hap)
+    const at::Tensor rolling_preds = hap_preds.unfold(
+            1, lookback + 1,
+            1);  // View into hap_preds, shape (batch, n_pos-lookback, lookback+1, n_haps)
+
+    const at::Tensor swap_idx =
+            torch::tensor({1, 0}, torch::TensorOptions().device(hap_probs_unphased.device()));
+
+    using namespace torch::indexing;
+
+    for (int64_t pos = lookback; pos < n_pos; ++pos) {
+        const at::Tensor window_preds = rolling_preds.index(
+                {torch::indexing::Slice(), pos - lookback});  // (batch, lookback+1, n_haps)
+        const at::Tensor window_basecalls =
+                adj_basecalls.index({torch::indexing::Slice(), pos - lookback});
+
+        at::Tensor preds_flipped = window_preds.clone();
+        preds_flipped.index_put_({torch::indexing::Ellipsis, -1},
+                                 preds_flipped.index({torch::indexing::Slice(), swap_idx, -1}));
+
+        const at::Tensor unflip_support = (window_preds.index({Slice(), 0})
+                                                   .unsqueeze(-2)
+                                                   .eq(window_basecalls)
+                                                   .all(-1)
+                                                   .sum(-1)) +
+                                          (window_preds.index({Slice(), 1})
+                                                   .unsqueeze(-2)
+                                                   .eq(window_basecalls)
+                                                   .all(-1)
+                                                   .sum(-1));
+
+        const at::Tensor flip_support = (preds_flipped.index({Slice(), 0})
+                                                 .unsqueeze(-2)
+                                                 .eq(window_basecalls)
+                                                 .all(-1)
+                                                 .sum(-1)) +
+                                        (preds_flipped.index({Slice(), 1})
+                                                 .unsqueeze(-2)
+                                                 .eq(window_basecalls)
+                                                 .all(-1)
+                                                 .sum(-1));
+
+        const at::Tensor flip_better = flip_support > unflip_support;
+
+        if (flip_better.any().item<bool>()) {
+            const at::Tensor idx = torch::nonzero(flip_better).squeeze(1);
+
+            hap_probs_phased.index_put_(
+                    {idx, pos}, hap_probs_phased.index({idx, pos}).index({Slice(), swap_idx}));
+
+            hap_preds.index_put_({idx, pos},
+                                 hap_preds.index({idx, pos}).index({Slice(), swap_idx}));
+        }
+    }
+
+    return hap_probs_phased;
+}
+}  // namespace
+
 at::Tensor ModelSlotAttentionConsensus::forward(torch::Tensor x) {
     auto [out, attn] = forward_impl(x);
 
-    for (int64_t i = 0; i < x.size(0); ++i) {
-        out[i] = quick_phase(out[i], attn[i], x[i]).first;
+    if constexpr (USE_BATCH_ADJACENCY_PHASE) {
+        out = batch_adjacency_phase(out, x, 4);
+    } else {
+        for (int64_t i = 0; i < x.size(0); ++i) {
+            out[i] = quick_phase(out[i], attn[i], x[i]).first;
+        }
     }
 
     return out;
