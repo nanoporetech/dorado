@@ -206,7 +206,7 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
     }
 
     // Return the alias if found otherwise fall back to the barcode name
-    const auto norm_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+    auto norm_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
     if (m_sample_sheet) {
         const auto& attrs = hts_data.read_attrs;
         const auto bc_alias = m_sample_sheet->get_alias(attrs.flowcell_id, attrs.position_id,
