@@ -30,7 +30,8 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            utils::ProgressCallback progress_callback,
                                            utils::DescriptionCallback description_callback,
                                            std::string gpu_names,
-                                           std::shared_ptr<const utils::SampleSheet> sample_sheet)
+                                           std::shared_ptr<const utils::SampleSheet> sample_sheet,
+                                           bool assume_barcodes)
         : m_emit_fastq(emit_fastq),
           m_emit_sam(emit_sam),
           m_sort_requested(sort_requested),
@@ -40,6 +41,7 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_description_callback(std::move(description_callback)),
           m_gpu_names(gpu_names.empty() ? "" : ("gpu:" + std::move(gpu_names))),
           m_sample_sheet(std::move(sample_sheet)),
+          m_assume_barcodes(assume_barcodes),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {
     if (m_emit_fastq && m_emit_sam) {
@@ -86,8 +88,8 @@ std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
         return std::make_unique<StreamHtsFileWriter>(cfg);
     }
 
-    auto nested_structure = std::make_unique<NestedFileStructure>(m_output_dir.value(),
-                                                                  m_output_mode, m_sample_sheet);
+    auto nested_structure = std::make_unique<NestedFileStructure>(
+            m_output_dir.value(), m_output_mode, m_sample_sheet, m_assume_barcodes);
 
     return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(nested_structure), m_sort);
 }
@@ -115,7 +117,8 @@ BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::move(gpu_names),
-                               std::move(sample_sheet)) {
+                               std::move(sample_sheet),
+                               false) {
     if (emit_fastq && reference_requested) {
         spdlog::error(
                 "--emit-fastq cannot be used with --reference as FASTQ cannot store "
@@ -141,7 +144,8 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::move(gpu_names),
-                               std::move(sample_sheet)) {};
+                               std::move(sample_sheet),
+                               true) {};
 
 AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
         bool emit_sam,
@@ -158,7 +162,8 @@ AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::string(),
-                               nullptr) {};
+                               nullptr,
+                               false) {};
 
 }  // namespace hts_writer
 }  // namespace dorado

@@ -15,7 +15,6 @@
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
-#include "read_pipeline/nodes/BarcodeDemuxerNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
 #include "summary/summary.h"

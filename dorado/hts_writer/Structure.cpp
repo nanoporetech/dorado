@@ -6,6 +6,7 @@
 #include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
+#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
@@ -13,6 +14,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <string_view>
 
 namespace dorado {
 namespace hts_writer {
@@ -168,27 +170,51 @@ std::string NestedFileStructure::filetype() const {
 };
 
 std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
-    // No barcoding - return empty
-    if (!hts_data.barcoding_result || hts_data.barcoding_result->barcode_name.empty()) {
-        return "";
+    std::string_view barcode_name;
+    if (hts_data.barcoding_result && !hts_data.barcoding_result->barcode_name.empty()) {
+        barcode_name = hts_data.barcoding_result->barcode_name;
+    } else if (hts_data.bam_ptr) {
+        // No barcoding result - check the BC tag in case this is a barcoded read we've read in from file
+        const auto bc_tag = bam_aux_get(hts_data.bam_ptr.get(), "BC");
+        if (bc_tag) {
+            barcode_name = bam_aux2Z(bc_tag);
+            for (const auto& [kit_name, kit_info] : barcode_kits::get_kit_infos()) {
+                if (barcode_name.starts_with(kit_name) &&
+                    barcode_name.size() > kit_name.size() + 1) {
+                    // strip the kit name from the barcode
+                    barcode_name = barcode_name.substr(kit_name.size() + 1);
+                    break;
+                }
+            }
+            return std::string(barcode_name);
+        }
+        // Unclassified reads read from file won't have a BC tag. If we've been told this is a demux operation,
+        // ensure these reads are correctly placed in the unclassified folder
+        if (m_assume_barcodes) {
+            return UNCLASSIFIED_STR;
+        }
+    }
+
+    // No barcode
+    if (barcode_name.empty()) {
+        return {};
     }
 
     // Always return "unclassified" as there's no alias
-    if (hts_data.barcoding_result->barcode_name == UNCLASSIFIED_STR) {
+    if (barcode_name == UNCLASSIFIED_STR) {
         return UNCLASSIFIED_STR;
     }
 
     // Return the alias if found otherwise fall back to the barcode name
-    auto barcode_name =
-            barcode_kits::normalize_barcode_name(hts_data.barcoding_result->barcode_name);
+    auto norm_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
     if (m_sample_sheet) {
         const auto& attrs = hts_data.read_attrs;
         const auto bc_alias = m_sample_sheet->get_alias(attrs.flowcell_id, attrs.position_id,
-                                                        attrs.experiment_id, barcode_name);
-        return !bc_alias.empty() ? bc_alias : barcode_name;
+                                                        attrs.experiment_id, norm_barcode_name);
+        return !bc_alias.empty() ? bc_alias : norm_barcode_name;
     }
 
-    return barcode_name;
+    return norm_barcode_name;
 };
 
 std::string NestedFileStructure::batch_number() const { return "0"; };

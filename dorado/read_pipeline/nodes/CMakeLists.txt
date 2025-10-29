@@ -7,7 +7,6 @@ dorado_add_library(
         AdapterDetectorNode.h
         AlignerNode.h
         BarcodeClassifierNode.h
-        BarcodeDemuxerNode.h
         BasecallerNode.h
         BaseSpaceDuplexCallerNode.h
         CorrectionInferenceNode.h
@@ -32,7 +31,6 @@ dorado_add_library(
         AdapterDetectorNode.cpp
         AlignerNode.cpp
         BarcodeClassifierNode.cpp
-        BarcodeDemuxerNode.cpp
         BasecallerNode.cpp
         BaseSpaceDuplexCallerNode.cpp
         CMakeLists.txt
