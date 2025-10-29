@@ -713,6 +713,11 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
 
     hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet, true);
     BamPtr bam_record(bam_init1());
+    const std::string qname = "test_record";
+    // fill read record with minimal information
+    bam_set1(bam_record.get(), qname.length(), qname.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0,
+             1, "*", "*", 0);
+
     if (!alias.empty() && alias != "unclassified") {
         const auto barcode = add_kit_name ? "SQK-RBK114-96_" + alias : alias;
         bam_aux_append(bam_record.get(), "BC", 'Z', barcode.length() + 1,
