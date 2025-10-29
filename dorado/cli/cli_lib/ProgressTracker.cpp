@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <sstream>
+#include <tuple>
 #include <utility>
 
 namespace dorado {

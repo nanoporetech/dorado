@@ -175,7 +175,7 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
         barcode_name = hts_data.barcoding_result->barcode_name;
     } else if (hts_data.bam_ptr) {
         // No barcoding result - check the BC tag in case this is a barcoded read we've read in from file
-        auto bc_tag = bam_aux_get(hts_data.bam_ptr.get(), "BC");
+        const auto bc_tag = bam_aux_get(hts_data.bam_ptr.get(), "BC");
         if (bc_tag) {
             barcode_name = bam_aux2Z(bc_tag);
             for (const auto& [kit_name, kit_info] : barcode_kits::get_kit_infos()) {
@@ -206,7 +206,7 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
     }
 
     // Return the alias if found otherwise fall back to the barcode name
-    auto norm_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+    const auto norm_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
     if (m_sample_sheet) {
         const auto& attrs = hts_data.read_attrs;
         const auto bc_alias = m_sample_sheet->get_alias(attrs.flowcell_id, attrs.position_id,
