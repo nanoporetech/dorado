@@ -20,13 +20,13 @@ endfunction()
 
 function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
-    set(hash__libkoi__0_6_5__Linux__aarch64__cuda__12_6 "52d11f322c2e9f90a61080c56800b6d07ba5aef5737564ab6122d8a8c8dfeded")
-    set(hash__libkoi__0_6_5__Linux__aarch64__cuda__13_0 "9a8433da64b063285146f1d51151036c4cba66e3cc2cfc6885898def4eee425d")
-    set(hash__libkoi__0_6_5__Linux__x86_64__cuda__11_8 "e43c4370b87ae72b380441de05858d5b15c51db9e01e987a0ddfd2a9bb7e02c3")
-    set(hash__libkoi__0_6_5__Linux__x86_64__cuda__12_8 "f2426d0912632dfecec61a7cc380452467a7beb2fa52e34a1defd0d154af8bb0")
-    set(hash__libkoi__0_6_5__Linux__x86_64__cuda__13_0 "712a620a24020529dd77fd91349f6bcb5d78de6e4cd2977703b9ac6362dd36d4")
-    set(hash__libkoi__0_6_5__Windows__AMD64__cuda__12_8 "23c025de2838c793a818a3b49830f6fb474fe55986e5fdc3c6bcd3441b8f33b9")
-    set(hash__libkoi__0_6_5__Windows__AMD64__cuda__13_0 "b7bf9a7b9b6b2793993c820e1ea44b7de8521cffb6845da564c79332012ce0a2")
+    set(hash__libkoi__0_6_6__Linux__aarch64__cuda__12_6 "39ebffbdebcf8e3bd2a1e87c1f80ee45f1fcb2006eecd2ac2fe3d09f464f2e98")
+    set(hash__libkoi__0_6_6__Linux__aarch64__cuda__13_0 "7779e7c2f6cadf470ec5a44cd99b0c176e07aca0de8b8dbe7aa68444522d61fa")
+    set(hash__libkoi__0_6_6__Linux__x86_64__cuda__11_8 "32d002f7e020ed164abe9115ae03e96a0f4ac550e6535220c0658c7c52040849")
+    set(hash__libkoi__0_6_6__Linux__x86_64__cuda__12_8 "4422dc04205d5e8766cb1b2842c990d0eb360b6037c055018918105fc0d4b8d7")
+    set(hash__libkoi__0_6_6__Linux__x86_64__cuda__13_0 "abf5b45d158821f4e4a0beb81e93ffd5aa22a35fa7598c0dd69369a458cfb474")
+    set(hash__libkoi__0_6_6__Windows__AMD64__cuda__12_8 "cde31f9467f967f1f47e213c3af662c18c16d5e7a0c459dd77d0730d5222331c")
+    set(hash__libkoi__0_6_6__Windows__AMD64__cuda__13_0 "748fdcd80a659b43fb054ef63d807753160b0f5f89a491484b004b65d572e462")
 
     # Do the lookup.
     string(REPLACE "." "_" hash_key ${KOI_DIR})
@@ -40,7 +40,7 @@ endfunction()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
 
-    set(KOI_VERSION 0.6.5)
+    set(KOI_VERSION 0.6.6)
     if(BUILD_KOI_FROM_SOURCE)
         set(KOI_DIR "${DORADO_3RD_PARTY_SOURCE}/koi")
         if(NOT EXISTS ${KOI_DIR})
