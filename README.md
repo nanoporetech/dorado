@@ -209,4 +209,4 @@ Click here for the [dorado troubleshooting documentation](https://software-docs.
 
 (c) 2025 Oxford Nanopore Technologies PLC.
 
-Dorado is distributed under the terms of the Oxford Nanopore Technologies PLC.  Public License, v. 1.0.  If a copy of the License was not distributed with this file, You can obtain one at <http://nanoporetech.com>
+Dorado is distributed under the terms of the Oxford Nanopore Technologies PLC.  Public License, v. 1.0.  If a copy of the License was not distributed with this file, You can obtain one at https://nanoporetech.com
