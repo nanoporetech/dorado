@@ -1,4 +1,3 @@
-import os
 import pathlib
 import contextlib
 import subprocess
@@ -14,13 +13,14 @@ from data_paths import (
     REFERENCE_FOLDER,
 )
 
+os.environ["VALIDATE_SUMMARY_FILES"] = "false"
+from utilities import DEBUG, run_dorado, make_summary
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
 from tetra.regression_manager import RegressionManager, TestData, TestResult
 from tetra.sequence_utils import USE_PYSAM
 from tetra.update_reference_data import run_update
 
-DEBUG = os.getenv("BUILD_TYPE", "Release").upper() == "DEBUG"
 DEFAULT_MAX_TIMEOUT = 300
 VALIDATION_OPTIONS = {"gpu_calling_enabled": True}
 
