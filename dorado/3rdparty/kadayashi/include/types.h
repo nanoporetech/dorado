@@ -80,13 +80,13 @@ struct read_t {
     uint32_t start_pos = std::numeric_limits<uint32_t>::max();
     uint32_t end_pos = std::numeric_limits<uint32_t>::max();
     uint32_t ID = std::numeric_limits<uint32_t>::max();  // ID is local to a chunk
-    std::vector<qa_t> vars;                              // variants owned by read
+    std::vector<qa_t> vars{};                            // variants owned by read
     int hp = HAPTAG_UNPHASED;                            // stores the haplotagging result
-    int votes_diploid[2] = {0, 0};
+    int votes_diploid[2]{0, 0};
     uint8_t strand = std::numeric_limits<uint8_t>::max();
     float de = {0.0f};  // gap-compressed seq div
-    uint32_t left_clip_len = {0};
-    uint32_t right_clip_len = {0};
+    uint32_t left_clip_len{0};
+    uint32_t right_clip_len{0};
 };
 
 struct ta_t {

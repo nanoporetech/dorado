@@ -42,6 +42,12 @@ constexpr bool DEBUG_LOCAL_HAPLOTAGGING = false;
 
 namespace {
 
+inline std::string create_region_string(const std::string &ref_name,
+                                        const uint32_t start,
+                                        const uint32_t end) {
+    return ref_name + ":" + std::to_string(start) + "-" + std::to_string(end);
+}
+
 void vg_update_varhp_given_read(const chunk_t *ck,
                                 std::vector<std::array<float, 3>> &varhps,
                                 const int readID,
@@ -96,7 +102,7 @@ infer_readhp_t vg_infer_readhp_given_vars(const chunk_t *ck,
 }
 
 std::vector<uint8_t> vg_do_simple_haptag1(chunk_t *ck, const uint32_t seedreadID) {
-    // Randomly pick a read, haptag as hap0 and assign haptag 0
+    // Pick a read, haptag as hap0 and assign haptag 0
     // to its variants. Then for each iteration, haptag one read
     // with best score, and accumulate new phased variants
     // & discount known phased variants when there are conflicts.
@@ -193,12 +199,10 @@ std::pair<int, int> normalize_readtaggings1(const std::vector<uint8_t> &d1,
     return std::make_pair(score_raw, score_flip);
 }
 
-int normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
-    // return 0 if alright, 1 when error
-
+bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
     constexpr int DEBUG_PRINT = 0;
     if (data.size() <= 1) {
-        return 1;
+        return false;
     }
     for (int64_t i = 0; i < std::ssize(data) - 1; i++) {
         if (data[i].size() != data[i + 1].size()) {
@@ -207,8 +211,8 @@ int normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
                         "[E::%s] data entries have at least 1 pair of unequal lengths, should not "
                         "happen.\n",
                         __func__);
-                return 1;
             }
+            return false;
         }
     }
 
@@ -252,7 +256,7 @@ int normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
             fprintf(stderr, "\n");
         }
     }
-    return 0;
+    return true;
 }
 
 int sort_qa_v(std::vector<qa_t> &h) {
@@ -272,12 +276,6 @@ std::unique_ptr<bamfile_t> init_bamfile_t_with_opened_files(samFile *fp_bam,
         return nullptr;
     }
     std::unique_ptr<bamfile_t> h = std::make_unique<bamfile_t>();
-    if (!h) {
-        if (DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[E::%s] could not allocate a bamfile_t\n", __func__);
-        }
-        return nullptr;
-    }
     h->fp = fp_bam;
     h->bai = fp_bai;
     h->header = fp_header;
@@ -548,13 +546,6 @@ static int get_allele_index(const ta_t *h, const std::vector<uint8_t> &nt4seq) {
     return -1;
 }
 
-static void push_read_chunk_t(chunk_t &h, const read_t &read, const std::string &qname) {
-    // get a slot for incoming read
-    h.reads.emplace_back(std::move(read));
-    assert(!h.reads.empty());
-    h.qnames.push_back(qname);
-}
-
 static inline unsigned char filter_base_by_qv(const char raw, const int min_qv) {
     return (int)raw - 33 >= min_qv ? raw : 'N';
 }
@@ -579,7 +570,6 @@ static int parse_variants_for_one_read(const bam1_t *aln,
     const uint32_t *cigar = bam_get_cigar(aln);
     const uint8_t *seqi = bam_get_seq(aln);
     uint32_t op, op_l;
-    std::string seq(16, '\0');
     uint32_t ref_pos = ref_start;
     uint32_t self_pos = 0;
     if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
@@ -607,11 +597,10 @@ static int parse_variants_for_one_read(const bam1_t *aln,
             ref_pos += op_l;
             self_pos += op_l;
         } else if (op == BAM_CINS) {
-            seq.resize(op_l + 1);
+            std::string seq(op_l, '\0');
             for (uint32_t j = 0; j < op_l; j++) {
                 seq[j] = filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, self_pos + j)], min_base_qv);
             }
-            seq[op_l] = '\0';
             if (!SNPonly) {
                 add_allele_qa_v(vars, ref_pos, seq.c_str(), op_l, VAR_OP_I);  // push_to_vvar_t()
             }
@@ -746,9 +735,9 @@ static void push_to_pg_t(std::vector<pg_t> &pg,
         return;
     }
     uint64_t key = ((uint64_t)pos) << 32 | ((uint64_t)op) << 28 | ((uint64_t)op) << 27 | i_read;
-    pg.push_back(pg_t{});
-    pg.back().key = key;
-    pg.back().varID = i_var;
+    auto &last = pg.emplace_back(pg_t{});
+    last.key = key;
+    last.varID = i_var;
 }
 
 static int sort_qa_v_for_all(chunk_t *ck) {
@@ -982,8 +971,7 @@ static std::vector<uint64_t> TRF_heuristic(const char *seq, const int seq_l, con
         std::vector<uint8_t> used(idx_l);
         int buf[3] = {0, 0, 0};
         int failed = 0;
-        for (size_t i_d = 0; i_d < ds.size(); i_d++) {
-            uint32_t d = ds[i_d];
+        for (const uint32_t d : ds) {
             for (uint32_t i_mer = 0; i_mer < idx_l; i_mer++) {
                 if (!idx_good[i_mer]) {
                     continue;
@@ -1179,22 +1167,21 @@ static std::vector<uint64_t> TRF_heuristic(const char *seq, const int seq_l, con
 }
 
 static std::vector<uint64_t> get_lowcmp_mask(const faidx_t *fai,
-                                             const char *refname,
+                                             const char *ref_name,
                                              const int ref_start,
                                              const int ref_end) {
-    char *refseq_s = 0;
+    const std::string span_str = create_region_string(ref_name, ref_start + 1, ref_end);
 
+    char *refseq_s = 0;
     int refseq_l = -1;
-    std::ostringstream span_s;
-    span_s << refname << ":" << (ref_start + 1) << "-" << ref_end;
-    refseq_s = fai_fetch(fai, span_s.str().c_str(), &refseq_l);
+    refseq_s = fai_fetch(fai, span_str.c_str(), &refseq_l);
 
     if (refseq_l <= 0 || !refseq_s) {
         if (DEBUG_LOCAL_HAPLOTAGGING) {
             fprintf(stderr,
-                    "[W::%s] failed to fetch reference sequence (refname=%s, start=%d, end=%d; err "
+                    "[W::%s] failed to fetch reference sequence (name=%s, start=%d, end=%d; err "
                     "code %d)\n",
-                    __func__, refname, ref_start, ref_end, refseq_l);
+                    __func__, ref_name, ref_start, ref_end, refseq_l);
         }
         if (refseq_s) {
             hts_free(refseq_s);
@@ -1248,10 +1235,9 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
             .vg = {},
     };
 
-    std::ostringstream itvl;
-    itvl << refname << ":" << itvl_start << "-" << itvl_end;
+    const std::string itvl = create_region_string(refname, itvl_start, itvl_end);
     HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl.str().c_str()), HtsItrDestructor());
+            HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl.c_str()), HtsItrDestructor());
     BamPtr aln = BamPtr(bam_init1(), BamDestructor());
 
     // Adjust region start and end: if there happens to be no
@@ -1268,10 +1254,8 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
         int offset_right = 0;
 
         // left
-        itvl.str("");
-        itvl.clear();
-        itvl << refname << ":" << itvl_start << "-" << (itvl_start + 1);
-        bamitr = HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl.str().c_str()),
+        const std::string itvl_left = create_region_string(refname, itvl_start, (itvl_start + 1));
+        bamitr = HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl_left.c_str()),
                            HtsItrDestructor());
         while (sam_itr_next(hf->fp, bamitr.get(), aln.get()) >= 0) {
             if (itvl_start - aln->core.pos < offset_default) {
@@ -1281,10 +1265,8 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
         }
 
         //right
-        itvl.str("");
-        itvl.clear();
-        itvl << refname << ":" << itvl_end << "-" << (itvl_end + 1);
-        bamitr = HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl.str().c_str()),
+        const std::string itvl_right = create_region_string(refname, itvl_end, (itvl_end + 1));
+        bamitr = HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl_right.c_str()),
                            HtsItrDestructor());
         while (sam_itr_next(hf->fp, bamitr.get(), aln.get()) >= 0) {
             int end_pos = (int)bam_endpos(aln.get());
@@ -1300,19 +1282,16 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
         // update itr
         abs_start = itvl_start - offset_left < 0 ? 0 : itvl_start - offset_left;
         abs_end = itvl_end + offset_right;
-        itvl.str("");
-        itvl.clear();
-        itvl << refname << ":" << abs_start << "-" << abs_end;
-        bamitr = HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl.str().c_str()),
+        const std::string itvl_abs = create_region_string(refname, abs_start, abs_end);
+        bamitr = HtsItrPtr(sam_itr_querys(hf->bai, hf->header, itvl_abs.c_str()),
                            HtsItrDestructor());
         if (DEBUG_LOCAL_HAPLOTAGGING) {
             fprintf(stderr, "[M::%s] interval expansion: now using %s (-%d, +%d)\n", __func__,
-                    itvl.str().c_str(), offset_left, offset_right);
+                    itvl_abs.c_str(), offset_left, offset_right);
         }
     }
 
     uint32_t n_reads = 0;
-    uint32_t readID = 0;
     std::vector<qa_t> tmp_qav;
     while (sam_itr_next(hf->fp, bamitr.get(), aln.get()) >= 0) {
         n_reads++;
@@ -1351,23 +1330,21 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
             continue;
         }
 
-        // the buffer
-        push_read_chunk_t(ck, {}, qn);
-
         // collect variants of the read
-        read_t &r = ck.reads[readID];
-        r.ID = readID;
-        r.start_pos = static_cast<uint32_t>(aln->core.pos);
-        r.end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
-        r.strand = !!(flag & 16);
-        r.de = de;
+        read_t new_read{
+                .start_pos = static_cast<uint32_t>(aln->core.pos),
+                .end_pos = static_cast<uint32_t>(bam_endpos(aln.get())),
+                .ID = static_cast<uint32_t>(std::size(ck.reads)),
+                .strand = !!(flag & 16),
+                .de = de,
+        };
+
         if (!refvars) {
-            const int parse_failed = parse_variants_for_one_read(
-                    aln.get(), r.vars, base_q_min, &r.left_clip_len, &r.right_clip_len);
-            if (parse_failed) {
-                // and do not increment readID; we want to pretend this read doesn't exit
-            } else {
-                sort_qa_v(r.vars);
+            const int parse_failed =
+                    parse_variants_for_one_read(aln.get(), new_read.vars, base_q_min,
+                                                &new_read.left_clip_len, &new_read.right_clip_len);
+            if (!parse_failed) {
+                sort_qa_v(new_read.vars);
 
                 // read info
                 if (ck.qname2ID.find(qn) != ck.qname2ID.end()) {
@@ -1375,20 +1352,19 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
                         fprintf(stderr, "[W::%s] dup read name? qn=%s\n", __func__, qn.c_str());
                     }
                 } else {
-                    ck.qname2ID[qn] = readID;
+                    ck.reads.emplace_back(std::move(new_read));
+                    ck.qnames.emplace_back(qn);
+                    ck.qname2ID[qn] = new_read.ID;
                 }
-
-                readID++;
             }
         } else {
             tmp_qav.clear();
-            const int parse_failed = parse_variants_for_one_read(
-                    aln.get(), tmp_qav, base_q_min, &r.left_clip_len, &r.right_clip_len);
-            if (parse_failed) {
-                // and do not increment readID; we want to pretend this read doesn't exit
-            } else {
+            const int parse_failed =
+                    parse_variants_for_one_read(aln.get(), tmp_qav, base_q_min,
+                                                &new_read.left_clip_len, &new_read.right_clip_len);
+            if (!parse_failed) {
                 sort_qa_v(tmp_qav);
-                filter_lift_qa_v_given_conf_list(tmp_qav, r.vars, refvars);
+                filter_lift_qa_v_given_conf_list(tmp_qav, new_read.vars, refvars);
 
                 // read info
                 if (ck.qname2ID.find(qn) != ck.qname2ID.end()) {
@@ -1396,10 +1372,10 @@ chunk_t unphased_varcall_a_chunk(bamfile_t *hf,
                         fprintf(stderr, "[W::%s] dup read name? qn=%s\n", __func__, qn.c_str());
                     }
                 } else {
-                    ck.qname2ID[qn] = readID;
+                    ck.reads.emplace_back(std::move(new_read));
+                    ck.qnames.emplace_back(qn);
+                    ck.qname2ID[qn] = new_read.ID;
                 }
-
-                readID++;
             }
         }
         if (ck.reads.size() > pp.max_read_per_region) {  // the user-imposed limit
@@ -1762,24 +1738,23 @@ static void vg_get_edge_values1(const chunk_t *ck,
         counter[i] = 0;
     }
     assert(varID1 < varID2);
-    for (size_t i_read = 0; i_read < ck->reads.size(); i_read++) {
-        const read_t *r = &ck->reads[i_read];
-        if (!r->vars.empty()) {
+    for (const read_t &r : ck->reads) {
+        if (!r.vars.empty()) {
             int i1 = -1;
             int i2 = -1;
-            for (int i = 0; i < (static_cast<int>(r->vars.size()) - 1); i++) {
-                assert(r->vars[i].is_used);
-                if (r->vars[i].var_idx == varID1) {
+            for (int i = 0; i < (static_cast<int>(r.vars.size()) - 1); i++) {
+                assert(r.vars[i].is_used);
+                if (r.vars[i].var_idx == varID1) {
                     i1 = i;
                 }
-                if (r->vars[i].var_idx == varID2) {
+                if (r.vars[i].var_idx == varID2) {
                     i2 = i;
                     break;
                 }
             }
             if (i1 != -1 && i2 != -1) {
-                i1 = r->vars[i1].allele_idx;
-                i2 = r->vars[i2].allele_idx;
+                i1 = r.vars[i1].allele_idx;
+                i2 = r.vars[i2].allele_idx;
                 if ((i1 != 0 && i1 != 1) || (i2 != 0 && i2 != 1)) {
                     fprintf(stderr,
                             "[E::%s] 2-allele diploid sancheck failed, impossible, check code. "
@@ -1912,19 +1887,18 @@ static int vg_init_scores_for_a_location(chunk_t *ck, const uint32_t var_idx, in
         for (int i = 0; i < 4; i++) {
             counter[i] = 0;
         }
-        for (size_t i_read = 0; i_read < ck->reads.size(); i_read++) {
-            read_t *r = &ck->reads[i_read];
-            if (r->start_pos > pos) {
+        for (const read_t &r : ck->reads) {
+            if (r.start_pos > pos) {
                 break;
             }  // reads are loaded from sorted bam, safe to break here
-            if (r->end_pos <= pos) {
+            if (r.end_pos <= pos) {
                 continue;
             }
-            for (size_t i = 0; i < r->vars.size(); i++) {
-                if (r->vars[i].var_idx == var_idx) {
-                    if (r->vars[i].allele_idx == 0) {
+            for (const qa_t &var : r.vars) {
+                if (var.var_idx == var_idx) {
+                    if (var.allele_idx == 0) {
                         counter[0]++;
-                    } else if (r->vars[i].allele_idx == 1) {
+                    } else if (var.allele_idx == 1) {
                         counter[3]++;
                     }
                     break;
@@ -2290,12 +2264,15 @@ void vg_haptag_reads(chunk_t *ck) {
 void vg_do_simple_haptag(chunk_t *ck, const uint32_t n_iter_requested) {
     constexpr int DEBUG_PRINT = 0;
 
-    std::vector<std::vector<uint8_t>> results;
     uint32_t n_iter = n_iter_requested;
     if (n_iter == 0 || n_iter >= ck->reads.size()) {
         n_iter = static_cast<int>(ck->reads.size());
     }
     const uint32_t stride = static_cast<int>(ck->reads.size()) / n_iter;
+
+    std::vector<std::vector<uint8_t>> results;
+    results.reserve(n_iter);
+
     for (uint32_t i_iter = 0; i_iter < n_iter; i_iter++) {
         // used the read with the most number of phasing variants within
         // the current bin
@@ -2328,7 +2305,7 @@ void vg_do_simple_haptag(chunk_t *ck, const uint32_t n_iter_requested) {
         }
     }
 
-    const int norm_ok = normalize_readtaggings(results);
+    const bool norm_ok = normalize_readtaggings(results);
     if (!norm_ok) {
         if constexpr (DEBUG_PRINT) {
             fprintf(stderr, "[E::%s] normalization of read haptags failed\n", __func__);
@@ -2336,11 +2313,11 @@ void vg_do_simple_haptag(chunk_t *ck, const uint32_t n_iter_requested) {
     } else {
         for (uint32_t i_read = 0; i_read < ck->reads.size(); i_read++) {
             float cnt[3] = {0, 0, 0};
-            for (uint32_t i_iter = 0; i_iter < results.size(); i_iter++) {
-                if (results[i_iter][i_read] == HAPTAG_UNPHASED) {
+            for (const auto &result : results) {
+                if (result[i_read] == HAPTAG_UNPHASED) {
                     cnt[2] += 1;
                 } else {
-                    cnt[results[i_iter][i_read]] += 1;
+                    cnt[result[i_read]] += 1;
                 }
             }
 
