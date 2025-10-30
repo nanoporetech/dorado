@@ -187,16 +187,22 @@ def send_email(graph_dir: pathlib.Path, outlier_msgs: typing.List[str]):
     from email.message import EmailMessage
     from email.utils import make_msgid
 
-    # Fill out basic message details.
     EMAIL_LIST = get_env_or_raise("PERF_GRAPH_EMAIL_LIST").split(",")
+    PAGE_URL = get_env_or_raise("PERF_PAGE_URL")
     EMAIL_SENDER = get_env_or_raise("OFAN_TESTER_EMAIL")
     EMAIL_PASSWORD = get_env_or_raise("OFAN_TESTER_PW")
 
+    # Fill out basic message details.
     msg = EmailMessage()
     msg["To"] = ", ".join([name + "@nanoporetech.com" for name in EMAIL_LIST])
     msg["From"] = EMAIL_SENDER
     msg["Subject"] = "Performance benchmark graphs"
-    content = "<html><body><h1>Graphs!</h1><br/>Also attached is a JSON of the raw data for all plots.<br/>"
+    content = (
+        "<html><body>"
+        + "<h1>Graphs!</h1><br/>"
+        + "Also attached is a JSON of the raw data for all plots, which can "
+        + f'be interactively visualised <a href="{PAGE_URL}">here</a><br/>'
+    )
 
     # Report any outliers first.
     if len(outlier_msgs) > 0:

@@ -1,0 +1,178 @@
+<html>
+
+<head>
+    <title>Nightly visualiser</title>
+
+    <script src="https://www.gstatic.com/charts/loader.js"></script>
+
+    <script>
+        google.charts.load('current', { 'packages': ['corechart'] });
+
+        function update_graph() {
+            // Grab the selected checkboxes.
+            const selected_checkboxes = [];
+            {
+                const data_series_checkboxes = document.getElementsByClassName("data_series_checkbox");
+                for (var idx = 0; idx < data_series_checkboxes.length; idx++) {
+                    const checkbox = data_series_checkboxes[idx];
+                    if (checkbox.checked) {
+                        selected_checkboxes.push(checkbox);
+                    }
+                }
+            }
+            const num_checkboxes = selected_checkboxes.length;
+
+            if (num_checkboxes > 50) {
+                alert("Too many series selected. Graph generation will lag out the browser.")
+                return;
+            } else if (num_checkboxes == 0) {
+                chart_div.innerHTML = "";
+                return;
+            }
+
+            // Convert to a DataTable.
+            const data = new google.visualization.DataTable();
+            data.addColumn('date', 'date'); // x
+            for (var idx = 0; idx < num_checkboxes; idx++) {
+                const name = selected_checkboxes[idx]._selection_name;
+                // Add a column for the series and a custom tooltip.
+                data.addColumn('number', name); // y
+                data.addColumn({ type: 'string', role: 'tooltip', p: { html: true } });
+            }
+            for (var idx = 0; idx < num_checkboxes; idx++) {
+                const name = selected_checkboxes[idx]._selection_name;
+                const values = selected_checkboxes[idx]._selection_data;
+                const xs = values["x"];
+                const ys = values["y"];
+                const job_ids = values["job_id"];
+                // Add each data point.
+                for (var i = 0; i < xs.length; i++) {
+                    const x = new Date(xs[i]);
+                    const y = ys[i];
+                    const job_id = job_ids[i];
+                    const tooltip =
+                        `<b>series</b>: ${name}<br>` +
+                        `<b>x</b>: ${x}<br>` +
+                        `<b>y</b>: ${y}<br>` +
+                        `<b>job_id</b>: ${job_id}`;
+                    // Row elements are only non-null for the current series, ie:
+                    // [<x>, null, null, ... , <y>, <tooltip>, ... ]
+                    const entry = new Array(1 + 2 * num_checkboxes).fill(null);
+                    entry[0] = x;
+                    entry[1 + 2 * idx] = y;
+                    entry[1 + 2 * idx + 1] = tooltip;
+                    data.addRow(entry);
+                }
+            }
+
+            // Draw the graph.
+            const width = window.screen.width * 0.9;
+            const options = {
+                'width': width,
+                'height': width * 3 / 4,
+                vAxis: { minValue: 0 },     // 0 the y axis.
+                tooltip: { isHtml: true },  // Allow HTML in tooltips.
+                lineWidth: 1,               // Draw a line between points.
+                pointSize: 4,               // Shrink point sizes (default is 7).
+            };
+            const chart = new google.visualization.ScatterChart(chart_div);
+            chart.draw(data, options);
+        }
+
+        // Hide series that don't match the given regex.
+        function filter_series() {
+            const filterable_divs = document.getElementsByClassName("filterable_div");
+            for (var idx = 0; idx < filterable_divs.length; idx++) {
+                const div = filterable_divs[idx];
+                const visible = div._filter_name.match(filter_text.value) !== null;
+                div.hidden = !visible;
+            }
+        }
+
+        // Set on/off the currently filtered series.
+        function toggle_filtered(set) {
+            const data_series_checkboxes = document.getElementsByClassName("data_series_checkbox");
+            for (var idx = 0; idx < data_series_checkboxes.length; idx++) {
+                const checkbox = data_series_checkboxes[idx];
+                const parent_div = checkbox.parentNode;
+                if (!parent_div.hidden) {
+                    checkbox.checked = set;
+                }
+            }
+            update_graph();
+        }
+
+        // Add a new data series checkbox to the parent element.
+        function add_series(parent, name, data) {
+            const entry = document.createElement("div");
+            entry.className = "filterable_div";
+            entry._filter_name = name;
+            {
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.className = "data_series_checkbox";
+                checkbox._selection_name = name;
+                checkbox._selection_data = data;
+                checkbox.addEventListener("change", (e) => {
+                    update_graph();
+                });
+                entry.appendChild(checkbox);
+            }
+            {
+                const text = document.createElement("tt");
+                text.innerHTML = name;
+                entry.appendChild(text);
+            }
+            parent.appendChild(entry);
+        }
+
+        async function process_file() {
+            if (json_file.files.length != 1) {
+                alert(`Needed 1 file, ${json_file.files.length} provided`);
+                return;
+            }
+            const contents = await json_file.files[0].text();
+            const series = JSON.parse(contents);
+
+            // Reset the series options.
+            series_selections.innerHTML = "";
+
+            // Add new series.
+            const keys = Object.keys(series);
+            keys.sort();
+            keys.forEach((key) => {
+                add_series(series_selections, key, series[key]);
+            });
+        }
+
+        document.addEventListener("dragover", (e) => {
+            e.preventDefault();
+        });
+        document.addEventListener("drop", (e) => {
+            json_file.files = e.dataTransfer.files;
+            e.preventDefault();
+            process_file();
+        });
+    </script>
+</head>
+
+<body>
+    Drag and drop a <b>series.json</b> from a nightly email onto this page, or select it here:
+    <input type="file" id="json_file" onChange="process_file()">
+
+    <br><br>
+
+    <div id="chart_div"></div>
+
+    <br><br>
+
+    Filter regex (e.g. <tt>kit14_.*hac.*5.2.0-grid</tt>):
+    <input type="text" id="filter_text" oninput="filter_series()">
+    <br>
+    <input type="button" onclick="toggle_filtered(true)" value="Enable filtered">
+    <input type="button" onclick="toggle_filtered(false)" value="Disable filtered">
+    <div id="series_selections">
+    </div>
+</body>
+
+</html>
