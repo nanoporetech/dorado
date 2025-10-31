@@ -7,6 +7,7 @@ dorado_add_library(
         AuxiliaryData.h
         ConvStack.h
         CRFModules.h
+        KoiThreads.h
         KoiUtils.h
         LinearUpsample.h
         LSTMStack.h
@@ -34,7 +35,7 @@ dorado_add_library(
 if (APPLE)
     target_sources(dorado_nn PRIVATE MetalModules.cpp)
 else()
-    target_sources(dorado_nn PRIVATE KoiUtils.cpp)
+    target_sources(dorado_nn PRIVATE KoiUtils.cpp KoiThreads.cpp)
 endif()
 
 if (TARGET koi)

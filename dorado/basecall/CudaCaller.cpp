@@ -18,9 +18,11 @@
 #include <algorithm>
 #include <cassert>
 #include <chrono>
+#include <condition_variable>
 #include <fstream>
 #include <limits>
 #include <map>
+#include <mutex>
 #include <queue>
 #include <set>
 
@@ -101,7 +103,8 @@ std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
                                                       const std::int32_t N,
                                                       const std::int32_t T,
                                                       const std::int32_t C,
-                                                      const std::int32_t stride) {
+                                                      const std::int32_t stride,
+                                                      nn::KoiThreads &thread_pool) {
     in = torch::empty({1, C, N * T}, in_options);
     auto workspace_options =
             at::TensorOptions().device(torch::kCPU).pinned_memory(true).dtype(torch::kInt32);
@@ -109,9 +112,9 @@ std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
     workspace = torch::empty({6 * ((T / stride) + 3) * N}, workspace_options);
     auto aux = std::make_unique<nn::AuxiliaryData>(workspace, N, T, stride,
                                                    std::vector<std::int32_t>(N, T));
-    aux->create_lstm_auxiliary_data(in_options.device());         // CPU work + async copy
-    aux->create_convolution_auxiliary_data(in_options.device());  // sync copy
-    aux->create_decoder_auxiliary_data(in_options.device());      // sync copy
+    aux->create_lstm_auxiliary_data(in_options.device(), thread_pool);  // CPU work + async copy
+    aux->create_convolution_auxiliary_data(in_options.device());        // sync copy
+    aux->create_decoder_auxiliary_data(in_options.device());            // sync copy
     return aux;
 }
 
@@ -134,6 +137,8 @@ static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
 // chunk was added to the batch.
 static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
 
+static constexpr int NUM_KOI_THREADS = 6;
+
 struct CudaCaller::GPUTaskQueue {
 public:
     std::queue<std::shared_ptr<NNTask>> m_input_queue;
@@ -149,7 +154,8 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
           m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(params.pipeline_type),
           m_stream(get_stream_for_device(m_options.device())),
-          m_variable_chunk_sizes(params.variable_chunk_sizes) {
+          m_variable_chunk_sizes(params.variable_chunk_sizes),
+          m_thread_pool(NUM_KOI_THREADS) {
     assert(m_options.device().is_cuda());
     assert(params.model_config.has_normalised_basecaller_params());
 
@@ -181,7 +187,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         std::unique_ptr<nn::AuxiliaryData> aux;
         if (m_variable_chunk_sizes) {
             aux = create_empty_input(input, m_options, workspace, batch_dim.N, batch_dim.T_in,
-                                     m_num_input_features, m_config.stride);
+                                     m_num_input_features, m_config.stride, m_thread_pool);
         } else {
             input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
         }
@@ -234,7 +240,8 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
     at::Tensor device_input = input.to(m_options.device());  // async copy
 
     if (aux) {
-        aux->create_lstm_auxiliary_data(m_options.device());         // CPU work + async copy
+        aux->create_lstm_auxiliary_data(m_options.device(),
+                                        m_thread_pool);              // CPU work + async copy
         aux->create_convolution_auxiliary_data(m_options.device());  // sync copy
         aux->create_decoder_auxiliary_data(m_options.device());      // sync copy
     }
@@ -530,7 +537,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
             std::unique_ptr<nn::AuxiliaryData> aux;
             if (m_variable_chunk_sizes) {
                 aux = create_empty_input(input, m_options, workspace, batch_size, chunk_size,
-                                         m_config.num_features, stride);
+                                         m_config.num_features, stride, m_thread_pool);
             } else {
                 input = torch::empty({batch_size, m_config.num_features, chunk_size}, m_options);
             }
