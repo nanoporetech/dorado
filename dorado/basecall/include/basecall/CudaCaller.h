@@ -1,11 +1,10 @@
-
 #pragma once
 
 #include "DecodedChunk.h"
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
 #include "nn/AuxiliaryData.h"
-#include "nn/KoiUtils.h"
+#include "nn/KoiThreads.h"
 #include "utils/stats.h"
 
 #include <c10/cuda/CUDAStream.h>

@@ -1,9 +1,9 @@
 #include "nn/AuxiliaryData.h"
 
-#include "nn/KoiUtils.h"
+#include "nn/KoiThreads.h"
 
-#include <exception>
 #include <numeric>
+#include <stdexcept>
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
