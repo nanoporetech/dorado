@@ -20,7 +20,7 @@ class Benchmarker(object):
     basecall_model: str
     binary_path: str | None
     modified_bases: str | None
-    kit_names: str | None
+    kit_name: str | None
     reference: str | None
     models_directory: str | None
 
@@ -51,8 +51,8 @@ class Benchmarker(object):
         ]
         if self.modified_bases is not None:
             args.extend(["--modified-bases", self.modified_bases])
-        if self.kit_names is not None:
-            args.extend(["--kit-names", self.kit_names])
+        if self.kit_name is not None:
+            args.extend(["--kit-name", self.kit_name])
         if self.reference is not None:
             args.extend(["--reference", self.reference])
         if self.models_directory is not None:
@@ -155,7 +155,7 @@ if __name__ == "__main__":
         help="Optional reference index to use for alignment.",
     )
     parser.add_argument(
-        "--kit_names",
+        "--kit_name",
         default=None,
         type=str,
         help="Optional barcode kit to use for barcoding.",
@@ -168,7 +168,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--run_for",
-        default=None,
+        default=120,
         type=int,
         help="Number of seconds to run each benchmarking iteration for.",
     )
@@ -188,7 +188,7 @@ if __name__ == "__main__":
         basecall_model=args.basecall_model,
         binary_path=args.dorado_bin_dir,
         modified_bases=args.modified_bases,
-        kit_names=args.kit_names,
+        kit_name=args.kit_name,
         reference=args.reference,
         models_directory=args.models_directory,
     )
