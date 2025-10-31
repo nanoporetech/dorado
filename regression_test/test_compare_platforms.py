@@ -37,7 +37,7 @@ class TestCompareData(unittest.TestCase):
 
         # Modified basecalling tests give differing results on different platforms, so
         # we can only really compare linux_cuda and windows.
-        exclude_modbase = SpecialCase(pattern="modified_bases", tolerance=None)
+        exclude_modbase = SpecialCase(pattern="modified_basecalling", tolerance=None)
 
         platforms_to_compare = [
             PlatformCompare(
