@@ -11,6 +11,8 @@ from data_paths import (
     OUTPUT_FOLDER,
     REFERENCE_FOLDER,
 )
+
+os.environ["VALIDATE_SUMMARY_FILES"] = "false"
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
 from tetra.regression_manager import RegressionManager, TestData, TestResult
@@ -130,6 +132,107 @@ class TestDorado(unittest.TestCase):
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
 
+    def test_modbase(self):
+        """
+        Test basic basecalling with base modifications.
+
+        See Jira ticket DOR-1405 for details on validation process before committing updated
+        regression test data.
+        """
+        runs = [
+            {
+                "folder": "HAC_4mC_5mC_6mA",
+                "input": "modbase_DNA",
+                "model": "hac,4mC_5mC,6mA",
+            },
+            {
+                "folder": "HAC_5mC_5hmC",
+                "input": "modbase_DNA",
+                "model": "hac,5mC_5hmC",
+            },
+            {
+                "folder": "HAC_5mCG_5hmCG",
+                "input": "modbase_DNA",
+                "model": "hac,5mCG_5hmCG",
+            },
+            {
+                "folder": "SUP_4mC_5mC_6mA",
+                "input": "modbase_DNA",
+                "model": "sup,4mC_5mC,6mA",
+            },
+            {
+                "folder": "SUP_5mC_5hmC",
+                "input": "modbase_DNA",
+                "model": "sup,5mC_5hmC",
+            },
+            {
+                "folder": "SUP_5mCG_5hmCG",
+                "input": "modbase_DNA",
+                "model": "sup,5mCG_5hmCG",
+            },
+            {
+                "folder": "HAC_inosine_m6A_m5C",
+                "input": "modbase_RNA",
+                "model": "hac,inosine_m6A,m5C",
+            },
+            {
+                "folder": "HAC_m6A_DRACH_pseU",
+                "input": "modbase_RNA",
+                "model": "hac,m6A_DRACH,pseU",
+            },
+            {
+                "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
+                "input": "modbase_RNA",
+                "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
+            },
+            {
+                "folder": "SUP_m6A_DRACH_pseU_2OmeU",
+                "input": "modbase_RNA",
+                "model": "sup,m6A_DRACH,pseU_2OmeU",
+            },
+        ]
+
+        test_name = "modified_basecalling"
+        with self.context.open_test(self, test_name) as context:
+            # All of these tests should produce a single .bam file and a single .txt summary file.
+            if USE_PYSAM:
+                expected_files = {"bam": 1, "txt": 1}
+            else:
+                expected_files = {"txt": 1}
+            validation_settings = deepcopy(VALIDATION_OPTIONS)
+            validation_settings["modified_bases_enabled"] = True
+
+            for run in runs:
+                with self.context.open_subtest("test_modified_basecalling", line=run):
+                    subfolder = run["folder"]
+                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
+                    dorado_args = self.get_dorado_args(
+                        input_path=INPUT_FOLDER / run["input"],
+                        save_path=None,
+                        model=run["model"],
+                        emit_fastq=False,
+                        recursive=True,
+                    )
+                    errors = None
+                    try:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with output_file.open("wb") as outfile:
+                            run_dorado(
+                                dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                            )
+                        make_summary(output_file, "summary.txt", DEFAULT_MAX_TIMEOUT)
+                        errors = self.check_program_output(
+                            test_name, subfolder, expected_files, validation_settings
+                        )
+                    except Exception as ex:
+                        msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
+                        context.encountered_error()
+                        self.fail(msg)
+                    if errors is not None:
+                        # This indicates regression test failures due to file comparison and/or validation,
+                        # but not due to an exception being thrown or the executable crashing.
+                        self.fail(errors)
+
     def check_program_output(
         self,
         test_name: str,
@@ -164,6 +267,7 @@ class TestDorado(unittest.TestCase):
         save_path: pathlib.Path | None,
         model: str,
         emit_fastq: bool,
+        recursive: bool = False,
     ) -> list:
         device = "metal" if PLATFORM == "osx_arm" else "cuda:0"
         args = ["doradod"] if DEBUG else ["dorado"]
@@ -185,6 +289,8 @@ class TestDorado(unittest.TestCase):
             )
         if emit_fastq:
             args.append("--emit-fastq")
+        if recursive:
+            args.append("--recursive")
         return args
 
 
