@@ -135,6 +135,11 @@ class TestDorado(unittest.TestCase):
     def test_modbase(self):
         """
         Test basic basecalling with base modifications.
+
+        Note that one or more of these tests are likely to fail when any modbase models change.
+        It can be very difficult to manually work out whether the changes to the output files
+        are consistent with what should be expected based on the model changes. See Jira ticket
+        DOR-1405 for details on tools to help with the validation process.
         """
         runs = [
             {
