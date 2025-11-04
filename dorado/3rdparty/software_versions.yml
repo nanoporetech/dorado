@@ -150,7 +150,7 @@ pthread-win32:
 pytorch:
     description: >
         Tensor computation (like NumPy) with strong GPU acceleration and Deep neural networks.
-    version: "v2.7.1"
+    version: "v2.9.0"
     url: https://github.com/pytorch/pytorch
     license: PATH_NOT_AVAILABLE
     files:
