@@ -343,7 +343,6 @@ void setup(const std::vector<std::string>& args,
            const std::string& polya_config,
            const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
            const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
-           std::shared_ptr<const utils::SampleSheet> sample_sheet,
            const int run_for_arg) {
     const BasecallModelConfig& model_config = models.get_simplex_config();
     spdlog::trace(model_config.to_string());
@@ -459,7 +458,9 @@ void setup(const std::vector<std::string>& args,
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
+    std::shared_ptr<const utils::SampleSheet> sample_sheet;
     if (barcoding_info) {
+        sample_sheet = barcoding_info->sample_sheet;
         utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
                                                sample_sheet.get());
     } else {
@@ -797,7 +798,6 @@ int basecaller(int argc, char* argv[]) {
     }
 
     std::shared_ptr<demux::BarcodingInfo> barcoding_info{};
-    std::shared_ptr<const utils::SampleSheet> sample_sheet{};
     if (parser.is_used("--kit-name")) {
         barcoding_info = std::make_shared<demux::BarcodingInfo>();
         barcoding_info->kit_name = parser.get<std::string>("--kit-name");
@@ -816,8 +816,9 @@ int basecaller(int argc, char* argv[]) {
 
         auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
         if (!barcode_sample_sheet.empty()) {
-            sample_sheet = std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, false);
-            barcoding_info->allowed_barcodes = sample_sheet->get_barcode_values();
+            barcoding_info->sample_sheet =
+                    std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, false);
+            barcoding_info->allowed_barcodes = barcoding_info->sample_sheet->get_barcode_values();
         }
 
         if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
@@ -886,7 +887,7 @@ int basecaller(int argc, char* argv[]) {
               !parser.get<bool>("--disable-read-splitting"),
               !parser.get<bool>("--disable-variable-chunk-sizes"),
               parser.get<bool>("--estimate-poly-a"), polya_config, std::move(barcoding_info),
-              std::move(adapter_info), std::move(sample_sheet), run_for_arg);
+              std::move(adapter_info), run_for_arg);
     } catch (const std::exception& e) {
         spdlog::error("{}", e.what());
         return EXIT_FAILURE;
