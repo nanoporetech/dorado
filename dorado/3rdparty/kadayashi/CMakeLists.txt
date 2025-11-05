@@ -4,19 +4,36 @@ project(kadayashi CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+option(BUILD_KADAYASHI_TESTS "Build the kadayashi unit test executable" ON)
 option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" ON)
+option(BUILD_KADAYASHI_AS_SUBPROJECT "If ON, custom compiler options will not be set" OFF)
+
+# If no prefix is provided we install next to the binary directory.
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+    set(CMAKE_INSTALL_PREFIX ${CMAKE_BINARY_DIR}/../dist CACHE PATH "" FORCE)
+endif()
+
+message(STATUS "Build type: " ${CMAKE_BUILD_TYPE})
 
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
+
+# Set custom compiler options only if not inherited from a top level project.
+if (NOT BUILD_KADAYASHI_AS_SUBPROJECT)
+    include(cmake/Warnings.cmake)
+endif()
 
 find_package(htslib REQUIRED)
 find_package(ZLIB REQUIRED)
 
+################################
+### Create the haplotag_lib. ###
+################################
 # Create a static library from the source files
 add_library(haplotag_lib STATIC
     src/haplotag_lib/local_haplotagging.cpp
-    src/haplotag_lib/types.cpp
-    include/kvec.h
+    src/haplotag_lib/hts_types.cpp
     include/local_haplotagging.h
+    include/hts_types.h
     include/types.h
 )
 
@@ -52,17 +69,39 @@ install(EXPORT kadayashi_targets
     DESTINATION lib/cmake/kadayashi
 )
 
+###########################################
+### Create the lib for everything else. ###
+###########################################
+if (BUILD_KADAYASHI_EXE OR BUILD_KADAYASHI_TESTS)
+    add_library(kadayashi_main_lib STATIC
+            src/bam_tagging.cpp
+            src/kthread.cpp
+            src/cli.cpp
+            src/kadayashi_utils.cpp
+            src/pipeline.cpp
+            src/resources.cpp
+            src/hts_utils/BamFile.cpp
+            src/hts_utils/FastxRandomReader.cpp
+    )
+    target_link_libraries(kadayashi_main_lib
+        PRIVATE
+            haplotag_lib
+            Threads::Threads
+            ${HTSLIB_LIBRARIES}
+            ${ZLIB_LIBRARIES}
+    )
+endif()
+###########################################
+
+if (BUILD_KADAYASHI_TESTS)
+    add_subdirectory(tests)
+endif()
+
 # Add the main executable
 if (BUILD_KADAYASHI_EXE)
     find_package(Threads REQUIRED)
 
     add_executable(kadayashi
-        src/bam_tagging.cpp
-        src/kthread.cpp
-        src/cli.cpp
-        src/kadayashi_utils.cpp
-        src/pipeline.cpp
-        src/resources.cpp
         src/main.cpp
     )
 
@@ -71,8 +110,11 @@ if (BUILD_KADAYASHI_EXE)
     target_link_libraries(kadayashi
         PRIVATE
             haplotag_lib
-            Threads::Threads
+            kadayashi_main_lib
             ${HTSLIB_LIBRARIES}
             ${ZLIB_LIBRARIES}
     )
+
+    install(TARGETS kadayashi DESTINATION bin)
+
 endif()

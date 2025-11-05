@@ -479,10 +479,26 @@ PairingNode::~PairingNode() {
 std::string PairingNode::get_name() const { return "PairingNode"; }
 
 void PairingNode::start_threads() {
+    // Explanation: the line `m_workers.emplace_back([this, i] { (this->*m_pairing_func)(i); });` results
+    //              in a warning which sometimes gets propagated to an error (depending on the CMake settings).
+    //              The error is:
+    //                  error: '<anonymous>' may be used uninitialized [-Werror=maybe-uninitialized]
+    //                    485 |         m_workers.emplace_back([this, i] { (this->*m_pairing_func)(i); });
+    //                        |                                                    ^~~~~~~~~~~~~~
+    //              This is likely due to a GCC bug because the source of the error does not come
+    //              from an uninitialized `m_pairing_func` (it is definitely initialized in the constructor)
+    //              but from the lambda.
     m_tbufs.reserve(m_num_worker_threads);
     for (int i = 0; i < m_num_worker_threads; i++) {
         m_tbufs.push_back(MmTbufPtr(mm_tbuf_init()));
+#if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
         m_workers.emplace_back([this, i] { (this->*m_pairing_func)(i); });
+#if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
+#pragma GCC diagnostic pop
+#endif
     }
 }
 
