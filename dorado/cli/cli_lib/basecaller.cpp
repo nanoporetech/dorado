@@ -458,11 +458,9 @@ void setup(const std::vector<std::string>& args,
     SamHdrPtr hdr(sam_hdr_init());
     cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
 
-    std::shared_ptr<const utils::SampleSheet> sample_sheet;
     if (barcoding_info) {
-        sample_sheet = barcoding_info->sample_sheet;
         utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
-                                               sample_sheet.get());
+                                               barcoding_info->sample_sheet.get());
     } else {
         utils::add_rg_headers(hdr.get(), read_groups);
     }
@@ -477,7 +475,7 @@ void setup(const std::vector<std::string>& args,
                 });
         auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                 emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
-                progress_callback, description_callback, gpu_names, sample_sheet);
+                progress_callback, description_callback, gpu_names);
 
         if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
             spdlog::error(

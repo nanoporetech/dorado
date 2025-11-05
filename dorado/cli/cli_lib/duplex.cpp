@@ -352,7 +352,7 @@ int duplex(int argc, char* argv[]) {
             auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                     cli::get_emit_fastq(parser), cli::get_emit_sam(parser), !ref.empty(),
                     cli::get_output_dir(parser), WRITER_THREADS, progress_callback,
-                    description_callback, gpu_names, nullptr);
+                    description_callback, gpu_names);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             if (hts_file_writer == nullptr) {

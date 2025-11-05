@@ -7,7 +7,6 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "utils/PostCondition.h"
-#include "utils/SampleSheet.h"
 
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -311,7 +310,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP)
                   out_dir.has_value());
 
     auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
-                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr);
+                                                       threads, p_cb, d_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -330,7 +329,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ throws given reference", 
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
     CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
-                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr),
+                                                       threads, p_cb, d_cb, GPU_NAMES),
                           std::runtime_error);
 }
 
@@ -346,7 +345,7 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusiv
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
     CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
-                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr),
+                                                       threads, p_cb, d_cb, GPU_NAMES),
                           std::runtime_error);
 }
 
@@ -366,7 +365,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
                   out_dir.has_value());
 
     auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
-                                                       threads, p_cb, d_cb, GPU_NAMES, nullptr);
+                                                       threads, p_cb, d_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
@@ -393,7 +392,6 @@ public:
                                    std::move(progress_callback),
                                    std::move(description_callback),
                                    std::move(gpu_names),
-                                   nullptr,
                                    false) {
         m_is_fd_tty = is_fd_tty;
         m_is_fd_pipe = is_fd_pipe;
@@ -466,7 +464,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
             [&description_res](const std::string& value) { description_res = value; });
     auto writer_builder =
             BasecallHtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
-                                         progress_cb, description_cb, GPU_NAMES, nullptr);
+                                         progress_cb, description_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
     auto& writer_ref = *writer;
@@ -572,7 +570,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                      "fc_pass_proto_acq_0",
              }}));
 
-    hts_writer::NestedFileStructure structure(root, output_mode, nullptr, false);
+    hts_writer::NestedFileStructure structure(root, output_mode, false);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs}));
     CATCH_CAPTURE(root, path, output_mode, attrs.experiment_id);
 
@@ -615,12 +613,6 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
         barcode_score_result->alias = alias;
     }
 
-    dorado::utils::SampleSheet loaded_sample_sheet;
-    auto single_barcode_filename = fs::path(get_data_dir("sample_sheets")) / "single_barcode.csv";
-    CATCH_REQUIRE_NOTHROW(loaded_sample_sheet.load(single_barcode_filename.string()));
-
-    const auto sample_sheet = std::make_shared<utils::SampleSheet>(loaded_sample_sheet);
-
     const HtsData::ReadAttributes attrs{
             "SQK-RBK114-96",
             "",
@@ -640,7 +632,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     oss << "PAO25751" << "_pass_" << alias << (alias.empty() ? "" : "_") << "proto-id_acq-id_0";
     const std::string expected_fname = oss.str();
 
-    hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet, false);
+    hts_writer::NestedFileStructure structure(root, output_mode, false);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
     CATCH_SECTION(description) {
@@ -687,12 +679,6 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
             }));
     auto add_kit_name = GENERATE(false, true);
 
-    dorado::utils::SampleSheet loaded_sample_sheet;
-    auto single_barcode_filename = fs::path(get_data_dir("sample_sheets")) / "single_barcode.csv";
-    CATCH_REQUIRE_NOTHROW(loaded_sample_sheet.load(single_barcode_filename.string()));
-
-    const auto sample_sheet = std::make_shared<utils::SampleSheet>(loaded_sample_sheet);
-
     const HtsData::ReadAttributes attrs{
             "SQK-RBK114-96",
             "",
@@ -716,7 +702,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
         << "proto-id_acq-id_0";
     const std::string expected_fname = oss.str();
 
-    hts_writer::NestedFileStructure structure(root, output_mode, sample_sheet, true);
+    hts_writer::NestedFileStructure structure(root, output_mode, true);
     BamPtr bam_record(bam_init1());
     const std::string qname = "test_record";
     // fill read record with minimal information

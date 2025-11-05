@@ -246,13 +246,9 @@ int demuxer(int argc, char* argv[]) {
                     tracker.set_description(description);
                 });
 
-        std::shared_ptr<const utils::SampleSheet> sample_sheet;
-        if (barcoding_info) {
-            sample_sheet = barcoding_info->sample_sheet;
-        }
         auto hts_writer_builder = hts_writer::DemuxHtsFileWriterBuilder(
                 emit_fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
-                description_callback, "", std::move(sample_sheet));
+                description_callback, "");
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {

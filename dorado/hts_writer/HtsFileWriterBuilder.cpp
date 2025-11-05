@@ -5,7 +5,6 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "hts_writer/StructuredHtsFileWriter.h"
-#include "utils/SampleSheet.h"
 #include "utils/tty_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -30,7 +29,6 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            utils::ProgressCallback progress_callback,
                                            utils::DescriptionCallback description_callback,
                                            std::string gpu_names,
-                                           std::shared_ptr<const utils::SampleSheet> sample_sheet,
                                            bool assume_barcodes)
         : m_emit_fastq(emit_fastq),
           m_emit_sam(emit_sam),
@@ -40,7 +38,6 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_progress_callback(std::move(progress_callback)),
           m_description_callback(std::move(description_callback)),
           m_gpu_names(gpu_names.empty() ? "" : ("gpu:" + std::move(gpu_names))),
-          m_sample_sheet(std::move(sample_sheet)),
           m_assume_barcodes(assume_barcodes),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {
@@ -88,8 +85,8 @@ std::unique_ptr<HtsFileWriter> HtsFileWriterBuilder::build() {
         return std::make_unique<StreamHtsFileWriter>(cfg);
     }
 
-    auto nested_structure = std::make_unique<NestedFileStructure>(
-            m_output_dir.value(), m_output_mode, m_sample_sheet, m_assume_barcodes);
+    auto nested_structure = std::make_unique<NestedFileStructure>(m_output_dir.value(),
+                                                                  m_output_mode, m_assume_barcodes);
 
     return std::make_unique<StructuredHtsFileWriter>(cfg, std::move(nested_structure), m_sort);
 }
@@ -107,8 +104,7 @@ BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
         int writer_threads,
         utils::ProgressCallback progress_callback,
         utils::DescriptionCallback description_callback,
-        std::string gpu_names,
-        std::shared_ptr<const utils::SampleSheet> sample_sheet)
+        std::string gpu_names)
         : HtsFileWriterBuilder(emit_fastq,
                                emit_sam,
                                reference_requested,
@@ -117,7 +113,6 @@ BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::move(gpu_names),
-                               std::move(sample_sheet),
                                false) {
     if (emit_fastq && reference_requested) {
         spdlog::error(
@@ -134,8 +129,7 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
         int writer_threads,
         utils::ProgressCallback progress_callback,
         utils::DescriptionCallback description_callback,
-        std::string gpu_names,
-        std::shared_ptr<const utils::SampleSheet> sample_sheet)
+        std::string gpu_names)
         : HtsFileWriterBuilder(emit_fastq,
                                false,
                                sort_requested,
@@ -144,7 +138,6 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::move(gpu_names),
-                               std::move(sample_sheet),
                                true) {};
 
 AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
@@ -162,7 +155,6 @@ AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::string(),
-                               nullptr,
                                false) {};
 
 }  // namespace hts_writer
