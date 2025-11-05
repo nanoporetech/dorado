@@ -87,6 +87,8 @@ struct BarcodeScoreResult {
     std::string kit = UNCLASSIFIED_STR;
     std::string barcode_kit = UNCLASSIFIED_STR;
     std::string variant = "n/a";
+    std::string alias = {};
+    std::string type = "na";
     std::pair<int, int> top_barcode_pos = {-1, -1};
     std::pair<int, int> bottom_barcode_pos = {-1, -1};
     bool found_midstrand = false;

@@ -103,6 +103,11 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     auto bc = generate_barcode_string(bc_res);
+    if (barcoding_info->sample_sheet) {
+        bc_res.alias = barcoding_info->sample_sheet->get_alias(bc);
+        bc_res.type = barcoding_info->sample_sheet->get_sample_type(bc);
+        bc = bc_res.alias;
+    }
 
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
@@ -132,6 +137,21 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
     utils::trace_log("Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);
+    {
+        std::lock_guard lock(m_barcode_count_mutex);
+        m_barcode_count[read.read_common.barcode]++;
+    }
+
+    if (barcoding_info->sample_sheet) {
+        bc_res.alias = barcoding_info->sample_sheet->get_alias(
+                read.read_common.flowcell_id, read.read_common.position_id,
+                read.read_common.experiment_id, read.read_common.barcode);
+        bc_res.type = barcoding_info->sample_sheet->get_sample_type(
+                read.read_common.flowcell_id, read.read_common.position_id,
+                read.read_common.experiment_id, read.read_common.barcode);
+        read.read_common.barcode = bc_res.alias;
+    }
+
     read.read_common.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     int seqlen = int(read.read_common.seq.length());
     if (barcoding_info->trim) {
@@ -139,10 +159,6 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
                 Trimmer::determine_trim_interval(*read.read_common.barcoding_result, seqlen);
     }
     m_num_records++;
-    {
-        std::lock_guard lock(m_barcode_count_mutex);
-        m_barcode_count[read.read_common.barcode]++;
-    }
 }
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {
