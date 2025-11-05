@@ -517,7 +517,7 @@ void setup(const std::vector<std::string>& args,
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
             {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
-            modbase_params.threshold, std::move(sample_sheet), 1000, min_qscore);
+            modbase_params.threshold, 1000, min_qscore);
 
     {
         // When writing to output, write reads below min_qscore to "fail"

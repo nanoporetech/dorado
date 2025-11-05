@@ -396,7 +396,7 @@ int duplex(int argc, char* argv[]) {
         }
 
         const auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, std::nullopt, nullptr, 1000, min_qscore);
+                {converted_reads_sink}, emit_moves, 2, std::nullopt, 1000, min_qscore);
         const auto duplex_read_tagger =
                 pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.

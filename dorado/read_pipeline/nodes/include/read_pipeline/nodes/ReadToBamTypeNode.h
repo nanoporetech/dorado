@@ -10,16 +10,11 @@
 
 namespace dorado {
 
-namespace utils {
-class SampleSheet;
-}
-
 class ReadToBamTypeNode : public MessageSink {
 public:
     ReadToBamTypeNode(bool emit_moves,
                       size_t num_worker_threads,
                       std::optional<float> modbase_threshold_frac,
-                      std::shared_ptr<const utils::SampleSheet> sample_sheet,
                       size_t max_reads,
                       size_t min_qscore);
     ~ReadToBamTypeNode();
@@ -36,7 +31,6 @@ private:
 
     bool m_emit_moves;
     std::optional<uint8_t> m_modbase_threshold;
-    std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
     size_t m_min_qscore;
 };
 
