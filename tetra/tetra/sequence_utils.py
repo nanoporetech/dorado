@@ -1,4 +1,5 @@
 import pathlib
+import typing
 from collections import defaultdict
 
 from Bio import SeqIO
@@ -196,6 +197,10 @@ def _compare_line_type(
         # The HD field contains the single line as a dict, rather than a list of lines (each as a dict).
         lines_a = [lines_a]
         lines_b = [lines_b]
+    if line_type == "RG":
+        # RG lines need to be sorted by ID before comparing them.
+        lines_a = _sort_rg_lines(lines_a)
+        lines_b = _sort_rg_lines(lines_b)
     errors = []
     if len(lines_a) == len(lines_b):
         for line_a, line_b in zip(lines_a, lines_b):
@@ -209,6 +214,22 @@ def _compare_line_type(
             f"SAM header mismatch: Found {len(lines_a)} {line_type} lines, expected {len(lines_b)}"
         )
     return errors
+
+
+def _sort_rg_lines(lines: typing.List[typing.Dict]) -> typing.List[typing.Dict]:
+    lines_by_id = {}
+    lines_with_no_id = []
+    for line in lines:
+        if "ID" in line:
+            lines_by_id[line["ID"]] = line
+        else:
+            lines_with_no_id.append(line)
+    sorted_ids = list(lines_by_id.keys()).sort()
+    if sorted_ids is None:
+        return lines_with_no_id
+    new_lines = [lines_by_id[id] for id in sorted_ids]
+    new_lines.extend(lines_with_no_id)
+    return new_lines
 
 
 def _compare_header_line(line_a: dict, line_b: dict, skip_fields: list[str]) -> bool:
