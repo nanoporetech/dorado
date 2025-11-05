@@ -32,6 +32,9 @@ CATCH_TEST_CASE(CUT_TAG " load valid no-barcode sample sheet", CUT_TAG) {
     std::string alias;
     CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "pos_id", "", "barcode10"));
     CATCH_CHECK(alias == "");
+
+    CATCH_REQUIRE_THROWS_AS(sample_sheet.get_alias("barcode10"), std::logic_error);
+    CATCH_REQUIRE_THROWS_AS(sample_sheet.get_sample_type("barcode10"), std::logic_error);
 }
 
 CATCH_TEST_CASE(CUT_TAG " load valid single barcode sample sheet", CUT_TAG) {
@@ -40,26 +43,25 @@ CATCH_TEST_CASE(CUT_TAG " load valid single barcode sample sheet", CUT_TAG) {
     CATCH_REQUIRE_NOTHROW(sample_sheet.load(single_barcode_filename.string()));
     CATCH_CHECK(sample_sheet.get_type() == dorado::utils::SampleSheet::Type::barcode);
 
-    // Test first entry loads correctly
+    auto [barcode, flow_cell_id, pos_id, expected_alias, expected_sample_type] =
+            GENERATE(table<std::string, std::string, std::string, std::string, std::string>({
+                    std::make_tuple("barcode01", "PAO25751", "", "patient_id_5", "test_sample"),
+                    std::make_tuple("barcode08", "PAO25751", "", "patient_id_4", "test_sample"),
+                    std::make_tuple("barcode01", "PAO25751", "pos_id", "patient_id_5",
+                                    "test_sample"),
+                    std::make_tuple("barcode01", "", "", "", ""),
+                    std::make_tuple("barcode10", "PAO25751", "", "", ""),
+            }));
+
+    CATCH_CAPTURE(barcode, flow_cell_id, pos_id);
+
     std::string alias;
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode01"));
-    CATCH_CHECK(alias == "patient_id_5");
+    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias(flow_cell_id, pos_id, "", barcode));
+    CATCH_CHECK(alias == expected_alias);
 
-    // Test last entry loads correctly
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode08"));
-    CATCH_CHECK(alias == "patient_id_4");
-
-    // Test that providing position_id when it's not in the sample sheet doesn't stop you getting an alias
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "pos_id", "", "barcode01"));
-    CATCH_CHECK(alias == "patient_id_5");
-
-    // Test that asking for neither position_id or flowcell_id stops you getting an alias
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("", "", "", "barcode01"));
-    CATCH_CHECK(alias == "");
-
-    // Test non-existent entry
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("PAO25751", "", "", "barcode10"));
-    CATCH_CHECK(alias == "");
+    std::string type;
+    CATCH_REQUIRE_NOTHROW(type = sample_sheet.get_sample_type(flow_cell_id, pos_id, "", barcode));
+    CATCH_CHECK(type == expected_sample_type);
 }
 
 CATCH_TEST_CASE(CUT_TAG " load valid single barcode sample sheet with unique mapping", CUT_TAG) {
@@ -70,20 +72,23 @@ CATCH_TEST_CASE(CUT_TAG " load valid single barcode sample sheet with unique map
     CATCH_REQUIRE_NOTHROW(sample_sheet.load(single_barcode_filename.string()));
     CATCH_REQUIRE(sample_sheet.get_type() == dorado::utils::SampleSheet::Type::barcode);
 
+    auto [barcode, expected_alias, expected_sample_type] =
+            GENERATE(table<std::string, std::string, std::string>({
+                    std::make_tuple("barcode01", "patient_id_5", "test_sample"),
+                    std::make_tuple("barcode08", "patient_id_4", "test_sample"),
+                    std::make_tuple("barcode10", "", ""),
+            }));
+
+    CATCH_CAPTURE(barcode);
+
     // Test entries load correctly without flow_cell_id or experiment_id info
-
-    // Test first entry loads correctly
     std::string alias;
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("", "", "", "barcode01"));
-    CATCH_CHECK(alias == "patient_id_5");
+    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias(barcode));
+    CATCH_CHECK(alias == expected_alias);
 
-    // Test last entry loads correctly
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("", "", "", "barcode08"));
-    CATCH_CHECK(alias == "patient_id_4");
-
-    // Test non-existent entry
-    CATCH_REQUIRE_NOTHROW(alias = sample_sheet.get_alias("", "", "", "barcode10"));
-    CATCH_CHECK(alias == "");
+    std::string type;
+    CATCH_REQUIRE_NOTHROW(type = sample_sheet.get_sample_type(barcode));
+    CATCH_CHECK(type == expected_sample_type);
 }
 
 CATCH_TEST_CASE(CUT_TAG " load sample sheet cross platform (parameterised)", CUT_TAG) {

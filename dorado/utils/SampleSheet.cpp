@@ -198,10 +198,11 @@ bool SampleSheet::is_barcode_mapping_unique() const {
     return barcodes.size() == m_rows.size();
 }
 
-std::string SampleSheet::get_alias(const std::string& flow_cell_id,
-                                   const std::string& position_id,
-                                   const std::string& experiment_id,
-                                   const std::string& barcode) const {
+std::string SampleSheet::get_value_from_column(const std::string& column_name,
+                                               const std::string& flow_cell_id,
+                                               const std::string& position_id,
+                                               const std::string& experiment_id,
+                                               const std::string& barcode) const {
     if (m_type != Type::barcode) {
         return "";
     }
@@ -219,12 +220,44 @@ std::string SampleSheet::get_alias(const std::string& flow_cell_id,
     for (const auto& row : m_rows) {
         if (match_index(row, flow_cell_id, position_id, experiment_id) &&
             get(row, "barcode") == barcode_only) {
-            return get(row, "alias");
+            return get(row, column_name);
         }
     }
 
-    // Didn't find an alias
+    // Didn't find matching row
     return "";
+}
+
+std::string SampleSheet::get_alias(const std::string& flow_cell_id,
+                                   const std::string& position_id,
+                                   const std::string& experiment_id,
+                                   const std::string& barcode) const {
+    return get_value_from_column("alias", flow_cell_id, position_id, experiment_id, barcode);
+}
+
+std::string SampleSheet::get_alias(const std::string& barcode) const {
+    if (!m_skip_index_matching) {
+        throw std::logic_error(
+                "SampleSheet::get_alias can only be called on SampleSheets where the barcode "
+                "lookup is unique.");
+    }
+    return get_alias("", "", "", barcode);
+}
+
+std::string SampleSheet::get_sample_type(const std::string& flow_cell_id,
+                                         const std::string& position_id,
+                                         const std::string& experiment_id,
+                                         const std::string& barcode) const {
+    return get_value_from_column("type", flow_cell_id, position_id, experiment_id, barcode);
+}
+
+std::string SampleSheet::get_sample_type(const std::string& barcode) const {
+    if (!m_skip_index_matching) {
+        throw std::logic_error(
+                "SampleSheet::get_sample_type can only be called on SampleSheets where the barcode "
+                "lookup is unique.");
+    }
+    return get_sample_type("", "", "", barcode);
 }
 
 BarcodeFilterSet SampleSheet::get_barcode_values() const { return m_allowed_barcodes; }
