@@ -180,17 +180,23 @@ class TestDorado(unittest.TestCase):
                 "input": "modbase_RNA",
                 "model": "hac,m6A_DRACH,pseU",
             },
-            {
-                "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
-                "input": "modbase_RNA",
-                "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
-            },
-            {
-                "folder": "SUP_m6A_DRACH_pseU_2OmeU",
-                "input": "modbase_RNA",
-                "model": "sup,m6A_DRACH,pseU_2OmeU",
-            },
         ]
+        # Temporarily skip these tests on Orin, until we fix the non-determinism issue (see DOR-1428).
+        if PLATFORM != "orin":
+            runs.extend(
+                [
+                    {
+                        "folder": "SUP_m6A_DRACH_pseU_2OmeU",
+                        "input": "modbase_RNA",
+                        "model": "sup,m6A_DRACH,pseU_2OmeU",
+                    },
+                    {
+                        "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
+                        "input": "modbase_RNA",
+                        "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
+                    },
+                ]
+            )
 
         test_name = "modified_basecalling"
         with self.context.open_test(self, test_name) as context:
