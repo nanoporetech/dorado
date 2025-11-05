@@ -171,7 +171,9 @@ std::string NestedFileStructure::filetype() const {
 
 std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
     std::string_view barcode_name;
-    if (hts_data.barcoding_result && !hts_data.barcoding_result->barcode_name.empty()) {
+    if (hts_data.barcoding_result && !hts_data.barcoding_result->alias.empty()) {
+        return hts_data.barcoding_result->alias;
+    } else if (hts_data.barcoding_result && !hts_data.barcoding_result->barcode_name.empty()) {
         barcode_name = hts_data.barcoding_result->barcode_name;
     } else if (hts_data.bam_ptr) {
         // No barcoding result - check the BC tag in case this is a barcoded read we've read in from file
@@ -206,15 +208,7 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
     }
 
     // Return the alias if found otherwise fall back to the barcode name
-    auto norm_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
-    if (m_sample_sheet) {
-        const auto& attrs = hts_data.read_attrs;
-        const auto bc_alias = m_sample_sheet->get_alias(attrs.flowcell_id, attrs.position_id,
-                                                        attrs.experiment_id, norm_barcode_name);
-        return !bc_alias.empty() ? bc_alias : norm_barcode_name;
-    }
-
-    return norm_barcode_name;
+    return barcode_kits::normalize_barcode_name(barcode_name);
 };
 
 std::string NestedFileStructure::batch_number() const { return "0"; };

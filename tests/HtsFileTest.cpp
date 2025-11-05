@@ -602,13 +602,18 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     auto [barcode_name, alias, description] =
             GENERATE_COPY(table<std::string, std::string, std::string>({
                     {"", "", "test without barcode or alias"},
-                    {"barcode99", "barcode99", "test with barcode but without alias"},
-                    {"unclassified", "unclassified", "test unclassified read"},
+                    {"barcode99", "", "test with barcode but without alias"},
+                    {"unclassified", "", "test unclassified read"},
                     {"barcode01", "patient_id_5", "test with barcode and alias"},
             }));
 
     auto barcode_score_result = std::make_shared<BarcodeScoreResult>();
     barcode_score_result->barcode_name = barcode_name;
+    if (alias.empty()) {
+        alias = barcode_name;
+    } else {
+        barcode_score_result->alias = alias;
+    }
 
     dorado::utils::SampleSheet loaded_sample_sheet;
     auto single_barcode_filename = fs::path(get_data_dir("sample_sheets")) / "single_barcode.csv";
