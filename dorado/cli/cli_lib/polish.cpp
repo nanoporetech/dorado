@@ -87,7 +87,7 @@ struct Options {
     std::string device_str;
     int32_t batch_size = 16;
     int64_t draft_batch_size = 200'000'000;
-    int32_t encoding_batch_size = 1;
+    int32_t encoding_batch_size = 0;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
@@ -190,7 +190,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .default_value(std::string{"200M"});
         parser.add_argument("--encoding-batchsize")
                 .help("Approximate batch size of windows for encoding. (0=number of threads)")
-                .default_value(1)
+                .default_value(0)
                 .scan<'i', int>();
         parser.add_argument("--window-len")
                 .help("Window size for calling consensus.")
@@ -328,7 +328,10 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.window_overlap = parser.get<int>("window-overlap");
     opt.bam_chunk = parser.get<int>("bam-chunk");
     opt.bam_subchunk = parser.get<int>("bam-subchunk");
-    opt.encoding_batch_size = std::max<int>(parser.get<int>("encoding-batchsize"), opt.threads);
+
+    const int32_t encoding_batch_size = parser.get<int>("encoding-batchsize");
+    opt.encoding_batch_size = (encoding_batch_size == 0) ? opt.threads : encoding_batch_size;
+
     opt.verbosity = verbosity;
     opt.regions_str = parser.present<std::string>("regions");
     if (opt.regions_str) {
