@@ -115,7 +115,7 @@ class TestDorado(unittest.TestCase):
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
                     # prevent non-deterministic results.
-                    _orin_sup_batchsize_check(run["model"], dorado_args)
+                    _orin_sup_batchsize_args(run["model"], dorado_args)
 
                     errors = None
                     try:
@@ -221,7 +221,7 @@ class TestDorado(unittest.TestCase):
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
                     # prevent non-deterministic results.
-                    _orin_sup_batchsize_check(run["model"], dorado_args)
+                    _orin_sup_batchsize_args(run["model"], dorado_args)
 
                     errors = None
                     try:
@@ -336,7 +336,7 @@ def make_summary(input_file: pathlib.Path, save_filename: str, timeout: int):
         )
 
 
-def _orin_sup_batchsize_check(model: str, dorado_args: typing.List[str]):
+def _orin_sup_batchsize_args(model: str, dorado_args: typing.List[str]):
     if PLATFORM == "orin" and model.startswith("sup"):
         dorado_args.extend(["--batchsize", "32"])
 
