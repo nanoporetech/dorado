@@ -89,9 +89,9 @@ private:
     torch::nn::Embedding m_strand_embedder;
     ReadLevelConv m_read_level_conv;
     torch::nn::Linear m_pre_pool_expansion_layer;
-    MeanPooler m_pooler{nullptr};
+    MeanPooler m_pooler;
     torch::nn::LSTM m_lstm_bidir;
-    torch::nn::Sequential m_lstm_unidir{nullptr};
+    torch::nn::Sequential m_lstm_unidir;
     torch::nn::Linear m_linear;
 };
 

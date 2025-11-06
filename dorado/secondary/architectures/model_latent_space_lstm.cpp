@@ -135,7 +135,6 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
           m_bases_alphabet_size{bases_alphabet_size},
           m_bases_embedding_size{bases_embedding_size},
           m_bidirectional{bidirectional},
-
           m_base_embedder(
                   torch::nn::EmbeddingOptions(m_bases_alphabet_size, m_bases_embedding_size)),
           m_strand_embedder(torch::nn::EmbeddingOptions(3, m_bases_embedding_size)),
@@ -147,11 +146,8 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
                             true),
           m_pre_pool_expansion_layer(m_cnn_size, m_lstm_size),
           m_pooler(MeanPooler()),
-          m_lstm_bidir(torch::nn::LSTMOptions(m_lstm_size, m_lstm_size)
-                               .num_layers(2)
-                               .batch_first(true)
-                               .bidirectional(m_bidirectional)),
-          m_lstm_unidir(),
+          m_lstm_bidir(nullptr),
+          m_lstm_unidir(nullptr),
           m_linear((1 + m_bidirectional) * m_lstm_size, m_num_classes) {
     if (m_bidirectional) {
         m_lstm_bidir = torch::nn::LSTM(torch::nn::LSTMOptions(m_lstm_size, m_lstm_size)
@@ -159,6 +155,7 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
                                                .batch_first(true)
                                                .bidirectional(m_bidirectional));
     } else {
+        m_lstm_unidir = torch::nn::Sequential();
         for (int32_t i = 0; i < 4; ++i) {
             m_lstm_unidir->push_back(ReversibleLSTM(m_lstm_size, m_lstm_size, true, !(i % 2)));
         }
