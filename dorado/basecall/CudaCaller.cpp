@@ -415,11 +415,12 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params) {
     // the available memory for GPU tasks. This way we leave at least half for the CPU,
     // though it's not clear what the ideal split would be.
     cudaDeviceProp *prop = at::cuda::getCurrentDeviceProperties();
-    bool is_unified_memory_device = (prop->major == 5 && prop->minor == 3) ||  // TX1
-                                    (prop->major == 6 && prop->minor == 2) ||  // TX2
-                                    (prop->major == 7 && prop->minor == 2) ||  // Xavier
-                                    (prop->major == 8 && prop->minor == 7) ||  // Orin
-                                    (prop->major == 11 && prop->minor == 0);   // Thor
+    bool is_unified_memory_device = (prop->major == 5 && prop->minor == 3) ||   // TX1
+                                    (prop->major == 6 && prop->minor == 2) ||   // TX2
+                                    (prop->major == 7 && prop->minor == 2) ||   // Xavier
+                                    (prop->major == 8 && prop->minor == 7) ||   // Orin
+                                    (prop->major == 11 && prop->minor == 0) ||  // Thor
+                                    (prop->major == 12 && prop->minor == 1);    // DGX Spark
     float memory_limit_fraction =
             params.memory_limit_fraction * (is_unified_memory_device ? 0.5f : 1.f);
     if (is_unified_memory_device && prop->major >= 8 && available > (32 * GB)) {
