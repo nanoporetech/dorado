@@ -200,8 +200,6 @@ regression_test:windows:
   variables:
     GIT_SUBMODULE_STRATEGY: normal
   script:
-    - !reference [.prepare_git-lfs, script]
-    - git lfs pull
     - !reference [.extract_archive, script]
     # Update PATH to reflect where these binaries are
     - export PATH=${PWD}/${EXTRACTED_PATH}/bin:${PWD}/${EXTRACTED_PATH}/lib:${PATH}
