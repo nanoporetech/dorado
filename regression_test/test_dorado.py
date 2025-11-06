@@ -112,6 +112,11 @@ class TestDorado(unittest.TestCase):
                         model=run["model"],
                         emit_fastq=False,
                     )
+
+                    # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
+                    # prevent non-deterministic results.
+                    _orin_sup_batchsize_args(run["model"], dorado_args)
+
                     errors = None
                     try:
                         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -180,23 +185,17 @@ class TestDorado(unittest.TestCase):
                 "input": "modbase_RNA",
                 "model": "hac,m6A_DRACH,pseU",
             },
+            {
+                "folder": "SUP_m6A_DRACH_pseU_2OmeU",
+                "input": "modbase_RNA",
+                "model": "sup,m6A_DRACH,pseU_2OmeU",
+            },
+            {
+                "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
+                "input": "modbase_RNA",
+                "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
+            },
         ]
-        # Temporarily skip these tests on Orin, until we fix the non-determinism issue (see DOR-1428).
-        if PLATFORM != "orin":
-            runs.extend(
-                [
-                    {
-                        "folder": "SUP_m6A_DRACH_pseU_2OmeU",
-                        "input": "modbase_RNA",
-                        "model": "sup,m6A_DRACH,pseU_2OmeU",
-                    },
-                    {
-                        "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
-                        "input": "modbase_RNA",
-                        "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
-                    },
-                ]
-            )
 
         test_name = "modified_basecalling"
         with self.context.open_test(self, test_name) as context:
@@ -219,6 +218,11 @@ class TestDorado(unittest.TestCase):
                         emit_fastq=False,
                         recursive=True,
                     )
+
+                    # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
+                    # prevent non-deterministic results.
+                    _orin_sup_batchsize_args(run["model"], dorado_args)
+
                     errors = None
                     try:
                         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -330,6 +334,11 @@ def make_summary(input_file: pathlib.Path, save_filename: str, timeout: int):
         raise Exception(
             f"Error running {args}: returncode={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
         )
+
+
+def _orin_sup_batchsize_args(model: str, dorado_args: typing.List[str]):
+    if PLATFORM == "orin" and model.startswith("sup"):
+        dorado_args.extend(["--batchsize", "32"])
 
 
 if __name__ == "__main__":
