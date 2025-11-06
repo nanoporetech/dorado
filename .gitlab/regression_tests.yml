@@ -206,10 +206,17 @@ regression_test:windows:
     # Update PATH to reflect where these binaries are
     - export PATH=${PWD}/${EXTRACTED_PATH}/bin:${PWD}/${EXTRACTED_PATH}/lib:${PATH}
     - pip install -e tetra # Need to use -e since data files relative to project
-    - development_scripts/run_perf_regression_test.sh ${REGRESSION_TEST_NAME} ${PYGUPPY_WHEEL}
+    # Download the benchmarking data.
+    - mkdir regression_test_data
+    - cd regression_test_data
+    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/r10.4.1_5khz_200bp.pod5 > r10.4.1_5khz_200bp.pod5
+    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/r10.4.1_5khz_30kbp.pod5 > r10.4.1_5khz_30kbp.pod5
+    - export INPUT_FOLDER=${PWD}
+    - cd -
+    # Run the benchmarking test script.
+    - python -m unittest run_benchmarking_tests.${REGRESSION_TEST_NAME}
   after_script:
     # Upload any results to artifactory, even if the tests failed.
-    - source perf_venv/*/activate
     - python -m pip install python-dateutil psycopg2-binary
     - python tetra/tetra/upload_perf_results.py --dorado --output_dir regression_test/output
   rules:
@@ -233,14 +240,10 @@ regression_tests:speed:linux:arm64:jammy:
             - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_200bp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_200bp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
   variables:
     BUILD_TYPE: Release
@@ -273,14 +276,10 @@ regression_tests:speed:linux:x86:V100:
             - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_200bp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_200bp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
   variables:
     GPU_DEVICE_NAME: "V100"
@@ -298,14 +297,10 @@ regression_tests:speed:linux:x86:A100:
             - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_200bp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_200bp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
   variables:
     GPU_DEVICE_NAME: "A100"
@@ -323,14 +318,10 @@ regression_tests:speed:windows:A6000:
             - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_200bp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_200bp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
   variables:
     BUILD_TYPE: Release
@@ -352,14 +343,10 @@ regression_tests:speed:macos:arm:
             - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_30kbp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
             - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
-            - TestBasecallingSpeeds_kit14_200bp.test_server_barcoding_speeds_96_kit
-            - TestBasecallingSpeeds_kit14_200bp.test_server_alignment_speeds
             - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
   variables:
     BUILD_TYPE: Release

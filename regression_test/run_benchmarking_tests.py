@@ -1,10 +1,9 @@
 import abc
 import os
-import pathlib
+import typing
 import unittest
 from dataclasses import dataclass, field
 from functools import cache
-from typing import Dict, List
 
 from data_paths import INPUT_FOLDER, OUTPUT_FOLDER, ROOT_DIR
 from tetra.timestamped_context import TimestampedContext
@@ -73,9 +72,11 @@ class kit14:
 
     suffix: str = "_kit14"
 
-    test_conditions: Dict[str, List[str]] = field(init=False)
-    test_conditions_modbase: Dict[str, List[str]] = field(init=False)
-    test_conditions_modbase_v100_prom: Dict[str, List[str]] = field(init=False)
+    test_conditions: typing.Dict[str, typing.List[str]] = field(init=False)
+    test_conditions_modbase: typing.Dict[str, typing.List[str]] = field(init=False)
+    test_conditions_modbase_v100_prom: typing.Dict[str, typing.List[str]] = field(
+        init=False
+    )
 
     def __post_init__(self):
         # modelsets should be the model complex sections for the basecalling model, comma-separated mods and "duplex"
@@ -254,9 +255,9 @@ class BasecallingSpeedTestCases(abc.ABC):
         """Runs a set of speed benchmarks.
 
         :param input_read_filename: the base filename of a pod5 file to use when
-            benchmarking. This file should be in a folder called "benchmarking_data"
+            benchmarking. This file should be in a folder called "regression_test_data"
             in the root directory of the project. The location can be overridden with
-            the `BENCHMARKING_DATA` environment variable.
+            the `INPUT_FOLDER` environment variable.
         :param test_folder: The name of a test folder to store these benchmark
             results in, e.g. "benchmarking_standard". This folder will be
             automatically created in the appropriate regression test location by
