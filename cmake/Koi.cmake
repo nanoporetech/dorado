@@ -21,7 +21,7 @@ endfunction()
 function(get_koi_download_hash KOI_DIR KOI_HASH)
     # List of valid hashes.
     set(hash__libkoi__0_6_6__Linux__aarch64__cuda__12_6 "39ebffbdebcf8e3bd2a1e87c1f80ee45f1fcb2006eecd2ac2fe3d09f464f2e98")
-    set(hash__libkoi__0_6_6__Linux__aarch64__cuda__13_0 "7779e7c2f6cadf470ec5a44cd99b0c176e07aca0de8b8dbe7aa68444522d61fa")
+    set(hash__libkoi__0_6_6__Linux__aarch64__cuda__13_0 "51026cbc070c48c39ab4bae1f9f6e459e27b4ce480a7b1df2561f59bec0ed0af")
     set(hash__libkoi__0_6_6__Linux__x86_64__cuda__11_8 "32d002f7e020ed164abe9115ae03e96a0f4ac550e6535220c0658c7c52040849")
     set(hash__libkoi__0_6_6__Linux__x86_64__cuda__12_8 "4422dc04205d5e8766cb1b2842c990d0eb360b6037c055018918105fc0d4b8d7")
     set(hash__libkoi__0_6_6__Linux__x86_64__cuda__13_0 "abf5b45d158821f4e4a0beb81e93ffd5aa22a35fa7598c0dd69369a458cfb474")
