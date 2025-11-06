@@ -96,17 +96,17 @@ torch::Tensor MeanPoolerImpl::forward(const torch::Tensor& x,
     return (x * mask).sum(1) / read_depths;
 }
 
-ReversibleLSTM::ReversibleLSTM(const int32_t input_size,
-                               const int32_t hidden_size,
-                               const bool batch_first,
-                               const bool reverse)
+ReversibleLSTMImpl::ReversibleLSTMImpl(const int32_t input_size,
+                                       const int32_t hidden_size,
+                                       const bool batch_first,
+                                       const bool reverse)
         : m_lstm(torch::nn::LSTMOptions(input_size, hidden_size).batch_first(batch_first)),
           m_batch_first{batch_first},
           m_reverse(reverse) {
     register_module("lstm", m_lstm);
 }
 
-torch::Tensor ReversibleLSTM::forward(const torch::Tensor& x) {
+torch::Tensor ReversibleLSTMImpl::forward(const torch::Tensor& x) {
     const int32_t flip_dim = m_batch_first ? 1 : 0;
     torch::Tensor output;
     if (m_reverse) {

@@ -40,12 +40,12 @@ public:
 };
 TORCH_MODULE(MeanPooler);
 
-class ReversibleLSTM : public torch::nn::Module {
+class ReversibleLSTMImpl : public torch::nn::Module {
 public:
-    ReversibleLSTM(const int32_t input_size,
-                   const int32_t hidden_size,
-                   const bool batch_first,
-                   const bool reverse);
+    ReversibleLSTMImpl(const int32_t input_size,
+                       const int32_t hidden_size,
+                       const bool batch_first,
+                       const bool reverse);
 
     at::Tensor forward(const at::Tensor& x);
 
@@ -54,6 +54,7 @@ private:
     bool m_batch_first = false;
     bool m_reverse = false;
 };
+TORCH_MODULE(ReversibleLSTM);
 
 class ModelLatentSpaceLSTM : public ModelTorchBase {
 public:
