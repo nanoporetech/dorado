@@ -7,13 +7,7 @@
 #include <memory>
 #include <unordered_map>
 
-namespace dorado {
-
-namespace utils {
-class SampleSheet;
-}
-
-namespace hts_writer {
+namespace dorado::hts_writer {
 
 class IStructure {
 public:
@@ -35,13 +29,9 @@ private:
 
 class NestedFileStructure : public IStructure {
 public:
-    NestedFileStructure(const std::string &output_dir,
-                        OutputMode mode,
-                        std::shared_ptr<const utils::SampleSheet> sample_sheet,
-                        bool assume_barcodes)
+    NestedFileStructure(const std::string &output_dir, OutputMode mode, bool assume_barcodes)
             : m_output_dir(std::filesystem::weakly_canonical(std::filesystem::path(output_dir))),
               m_mode(mode),
-              m_sample_sheet(std::move(sample_sheet)),
               m_assume_barcodes(assume_barcodes) {};
 
     std::string get_path(const HtsData &hts_data) override;
@@ -50,7 +40,6 @@ private:
     const std::filesystem::path m_output_dir;
     const OutputMode m_mode;
 
-    const std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
     const bool m_assume_barcodes;
 
     std::unordered_map<HtsData::ReadAttributes,
@@ -91,8 +80,7 @@ private:
     std::string format_filetype_status(const HtsData::ReadAttributes &attrs) const;
     /* Format the barcode alias
         Returns - Empty string if no barcoding done
-        Returns - Samplesheet barcode alias if samplesheet is set and barcode alias is found;
-        Returns - Barcode name otherwise including `unclassified`
+        Returns - Alias if set, else barcode name otherwise including `unclassified`
     */
     std::string format_alias(const HtsData &hts_data) const;
 
@@ -106,5 +94,4 @@ private:
     std::string_view truncate(std::string_view field) const;
 };
 
-}  // namespace hts_writer
-}  // namespace dorado
+}  // namespace dorado::hts_writer

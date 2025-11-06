@@ -51,6 +51,20 @@ public:
                           const std::string& experiment_id,
                           const std::string& barcode) const;
 
+    // For a given barcode, return the named alias. Requires m_skip_index_matching and is_barcode_mapping_unique are true
+    std::string get_alias(const std::string& barcode) const;
+
+    // For a given flow_cell_id, position_id, experiment_id and barcode, get the sample type.
+    //  Returns an empty string if one does not exist in the loaded sample sheet, or if the sample
+    //  sheet is not of type "barcode".
+    std::string get_sample_type(const std::string& flow_cell_id,
+                                const std::string& position_id,
+                                const std::string& experiment_id,
+                                const std::string& barcode) const;
+
+    // For a given barcode, return the sample type. Requires m_skip_index_matching and is_barcode_mapping_unique are true
+    std::string get_sample_type(const std::string& barcode) const;
+
     /**
      * Get all of the barcodes that are present in the sample sheet.
      * @return All of the barcodes that are present, or std::nullopt if the sample sheet is not loaded.
@@ -71,6 +85,12 @@ private:
     std::vector<Row> m_rows;
     bool m_skip_index_matching;
     BarcodeFilterSet m_allowed_barcodes;
+
+    std::string get_value_from_column(const std::string& column_name,
+                                      const std::string& flow_cell_id,
+                                      const std::string& position_id,
+                                      const std::string& experiment_id,
+                                      const std::string& barcode) const;
 
     void validate_headers(const std::vector<std::string>& col_names, const std::string& filename);
     bool check_index(const std::string& flow_cell_id, const std::string& position_id) const;

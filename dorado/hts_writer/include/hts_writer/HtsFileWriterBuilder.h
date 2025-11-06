@@ -4,13 +4,7 @@
 
 #include <memory>
 
-namespace dorado {
-
-namespace utils {
-class SampleSheet;
-}
-
-namespace hts_writer {
+namespace dorado::hts_writer {
 
 class HtsFileWriter;
 
@@ -24,7 +18,6 @@ protected:
                          utils::ProgressCallback progress_callback,
                          utils::DescriptionCallback description_callback,
                          std::string gpu_names,
-                         std::shared_ptr<const utils::SampleSheet> sample_sheet,
                          bool assume_barcodes);
 
 public:
@@ -40,7 +33,6 @@ private:
     const utils::ProgressCallback m_progress_callback;
     const utils::DescriptionCallback m_description_callback;
     const std::string m_gpu_names;
-    const std::shared_ptr<const utils::SampleSheet> m_sample_sheet;
 
     bool m_sort{false};
     OutputMode m_output_mode{OutputMode::BAM};
@@ -61,8 +53,7 @@ public:
                                  int writer_threads,
                                  utils::ProgressCallback progress_callback,
                                  utils::DescriptionCallback description_callback,
-                                 std::string gpu_names,
-                                 std::shared_ptr<const utils::SampleSheet> sample_sheet);
+                                 std::string gpu_names);
 };
 
 class DemuxHtsFileWriterBuilder final : public HtsFileWriterBuilder {
@@ -73,8 +64,7 @@ public:
                               int writer_threads,
                               utils::ProgressCallback progress_callback,
                               utils::DescriptionCallback description_callback,
-                              std::string gpu_names,
-                              std::shared_ptr<const utils::SampleSheet> sample_sheet);
+                              std::string gpu_names);
 };
 
 class AlignerHtsFileWriterBuilder final : public HtsFileWriterBuilder {
@@ -87,5 +77,4 @@ public:
                                 utils::DescriptionCallback description_callback);
 };
 
-}  // namespace hts_writer
-}  // namespace dorado
+}  // namespace dorado::hts_writer

@@ -42,7 +42,7 @@ std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
     }
 
     auto result = demux::BarcodingInfo{kit_name, barcode_both_ends, trim_barcode,
-                                       std::move(allowed_barcodes)};
+                                       std::move(allowed_barcodes), nullptr};
     return std::make_shared<demux::BarcodingInfo>(std::move(result));
 }
 

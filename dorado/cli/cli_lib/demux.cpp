@@ -46,8 +46,7 @@ using namespace std::chrono_literals;
 namespace {
 
 std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
-        argparse::ArgumentParser& parser,
-        const dorado::utils::SampleSheet* sample_sheet) {
+        argparse::ArgumentParser& parser) {
     auto result = std::make_shared<dorado::demux::BarcodingInfo>();
     result->kit_name = parser.present<std::string>("--kit-name").value_or("");
     if (result->kit_name.empty()) {
@@ -55,8 +54,11 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
     }
     result->barcode_both_ends = parser.get<bool>("--barcode-both-ends");
     result->trim = !parser.get<bool>("--no-trim");
-    if (sample_sheet) {
-        result->allowed_barcodes = sample_sheet->get_barcode_values();
+    auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
+    if (!barcode_sample_sheet.empty()) {
+        result->sample_sheet =
+                std::make_shared<const dorado::utils::SampleSheet>(barcode_sample_sheet, true);
+        result->allowed_barcodes = result->sample_sheet->get_barcode_values();
     }
 
     return result;
@@ -211,12 +213,7 @@ int demuxer(int argc, char* argv[]) {
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
-    auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
-    std::shared_ptr<const utils::SampleSheet> sample_sheet;
-    if (!barcode_sample_sheet.empty()) {
-        sample_sheet = std::make_shared<const utils::SampleSheet>(barcode_sample_sheet, true);
-    }
-    auto barcoding_info = get_barcoding_info(parser, sample_sheet.get());
+    auto barcoding_info = get_barcoding_info(parser);
 
     auto header_mapper = utils::HeaderMapper(all_files, strip_alignment);
     auto add_pg_hdr = utils::HeaderMapper::Modifier(
@@ -251,7 +248,7 @@ int demuxer(int argc, char* argv[]) {
 
         auto hts_writer_builder = hts_writer::DemuxHtsFileWriterBuilder(
                 emit_fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
-                description_callback, "", sample_sheet);
+                description_callback, "");
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {

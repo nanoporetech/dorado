@@ -100,7 +100,7 @@ protected:
 
             auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                     emit_fastq, emit_sam, false, out_dir, num_threads, progress_cb, description_cb,
-                    GPU_NAMES, nullptr);
+                    GPU_NAMES);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             CATCH_CHECK_FALSE(hts_file_writer == nullptr);
@@ -199,7 +199,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
         std::optional<std::string> out_dir = tmp_dir.m_path.string();
 
         auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
-                true, false, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES, nullptr);
+                true, false, false, out_dir, 1, progress_cb, description_cb, GPU_NAMES);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         CATCH_CHECK_FALSE(hts_file_writer == nullptr);

@@ -352,7 +352,7 @@ int duplex(int argc, char* argv[]) {
             auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
                     cli::get_emit_fastq(parser), cli::get_emit_sam(parser), !ref.empty(),
                     cli::get_output_dir(parser), WRITER_THREADS, progress_callback,
-                    description_callback, gpu_names, nullptr);
+                    description_callback, gpu_names);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             if (hts_file_writer == nullptr) {
@@ -396,7 +396,7 @@ int duplex(int argc, char* argv[]) {
         }
 
         const auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, std::nullopt, nullptr, 1000, min_qscore);
+                {converted_reads_sink}, emit_moves, 2, std::nullopt, 1000, min_qscore);
         const auto duplex_read_tagger =
                 pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.

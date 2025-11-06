@@ -1,7 +1,5 @@
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 
-#include "utils/SampleSheet.h"
-
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -24,16 +22,6 @@ void ReadToBamTypeNode::input_thread_fn() {
         bool is_duplex_parent = false;
         if (!read_common_data.is_duplex) {
             is_duplex_parent = std::get<SimplexReadPtr>(message)->is_duplex_parent;
-        }
-
-        // alias barcode if present
-        if (m_sample_sheet && !read_common_data.barcode.empty()) {
-            auto alias = m_sample_sheet->get_alias(
-                    read_common_data.flowcell_id, read_common_data.position_id,
-                    read_common_data.experiment_id, read_common_data.barcode);
-            if (!alias.empty()) {
-                read_common_data.barcode = alias;
-            }
         }
 
         const bool is_status_pass =
@@ -62,12 +50,10 @@ void ReadToBamTypeNode::input_thread_fn() {
 ReadToBamTypeNode::ReadToBamTypeNode(bool emit_moves,
                                      size_t num_worker_threads,
                                      std::optional<float> modbase_threshold_frac,
-                                     std::shared_ptr<const utils::SampleSheet> sample_sheet,
                                      size_t max_reads,
                                      size_t min_qscore)
         : MessageSink(max_reads, static_cast<int>(num_worker_threads)),
           m_emit_moves(emit_moves),
-          m_sample_sheet(std::move(sample_sheet)),
           m_min_qscore(min_qscore) {
     if (modbase_threshold_frac) {
         set_modbase_threshold(*modbase_threshold_frac);
