@@ -19,8 +19,6 @@ public:
 
     void to_half() override;
 
-    void set_normalise(const bool val) override;
-
     void set_eval() override;
 
     void to_device(torch::Device device) override;

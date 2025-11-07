@@ -42,7 +42,7 @@ public:
     /**
      * \brief Changes the state of normalisation.
      */
-    virtual void set_normalise(const bool val);
+    void set_normalise(const bool val);
 
     /**
      * \brief Runs the eval() function, but also allows to abstract the functionality

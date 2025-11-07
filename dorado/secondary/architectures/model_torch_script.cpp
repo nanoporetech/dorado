@@ -55,20 +55,17 @@ torch::Tensor ModelTorchScript::forward(torch::Tensor x) {
 }
 
 void ModelTorchScript::to_half() {
-    this->to(torch::kHalf);
+    ModelTorchBase::to_half();
     m_module.to(torch::kHalf);
-    m_half_precision = true;
 }
 
-void ModelTorchScript::set_normalise(const bool val) { m_normalise = val; }
-
 void ModelTorchScript::set_eval() {
-    this->eval();
+    ModelTorchBase::set_eval();
     m_module.eval();
 }
 
 void ModelTorchScript::to_device(torch::Device device) {
-    this->to(device);
+    ModelTorchBase::to_device(device);
     m_module.to(device);
 }
 
