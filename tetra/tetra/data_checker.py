@@ -140,7 +140,9 @@ class DataChecker(object):
         return None
 
     @classmethod
-    def validate_file(cls, output_file: pathlib.Path, validator, options) -> str | None:
+    def validate_file(
+        cls, output_file: pathlib.Path, validator, options
+    ) -> tuple[bool | None, str | None]:
         ext_map = defaultdict(bool)
         ext_map.update(
             {

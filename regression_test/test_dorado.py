@@ -248,7 +248,7 @@ class TestDorado(unittest.TestCase):
         test_name: str,
         subfolder: str,
         expected_files: dict,
-        validation_settings: dict,
+        validation_settings: dict | None,
     ) -> str | None:
         """
         This functionality should be common to most, if not all, tests. It will gather the
