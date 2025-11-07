@@ -33,7 +33,8 @@ struct Attributes {
     bool is_end_reason_mux_change{false};
     std::string end_reason{"unknown"};
     std::string pore_type{"not_set"};
-
+    // Loaded from source file.
+    uint64_t sample_rate{0};
     // Only used by tests, and only valid for POD5 data.
     uint64_t num_samples{};
 };
@@ -101,9 +102,6 @@ public:
 
     // Barcode.
     std::string barcode{};
-
-    // Loaded from source file.
-    uint64_t sample_rate = 0;
 
     float shift = 0;             // To be set by scaler
     float scale = 0;             // To be set by scaler

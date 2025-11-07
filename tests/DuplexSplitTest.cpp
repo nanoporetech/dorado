@@ -26,7 +26,6 @@ std::filesystem::path DataPath(std::string_view filename) {
 auto make_read() {
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 4000;
     read->offset = -287;
     read->scaling = 0.14620706f;
     read->read_common.shift = 94.717316f;
@@ -39,6 +38,7 @@ auto make_read() {
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
     read->read_common.attributes.num_samples = 256790;
+    read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
     read->run_acquisition_start_time_ms = 1676976119670;
@@ -160,7 +160,6 @@ CATCH_TEST_CASE("No split output read properties", TEST_GROUP) {
     const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 4000;
     read->offset = -287;
     read->scaling = 0.14620706f;
     read->read_common.shift = 94.717316f;
@@ -173,6 +172,7 @@ CATCH_TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
     read->read_common.attributes.num_samples = 256790;
+    read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
     read->run_acquisition_start_time_ms = 1676976119670;
@@ -210,7 +210,6 @@ CATCH_TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
 
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 5000;
     read->offset = -260;
     read->scaling = 0.18707f;
     read->read_common.shift = 94.7565f;
@@ -223,6 +222,7 @@ CATCH_TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->read_common.attributes.mux = 4;
     read->read_common.attributes.start_time = "2023-04-30T02:01:37.616+00:00";
     read->read_common.attributes.num_samples = 332541;
+    read->read_common.attributes.sample_rate = 5000;
     read->start_sample = 178487546;
     read->end_sample = 178820087;
     read->run_acquisition_start_time_ms = 1682784400107;

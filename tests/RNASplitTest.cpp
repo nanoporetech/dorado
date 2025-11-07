@@ -15,7 +15,6 @@
 CATCH_TEST_CASE("2 subread split", TEST_GROUP) {
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 4000;
     read->read_common.read_id = "1ebbe001-d735-4191-af79-bee5a2fca7dd";
     read->read_common.num_trimmed_samples = 0;
     read->read_common.attributes.read_number = 57296;
@@ -23,6 +22,7 @@ CATCH_TEST_CASE("2 subread split", TEST_GROUP) {
     read->read_common.attributes.mux = 4;
     read->read_common.attributes.start_time = "2023-08-11T02:56:14.296+00:00";
     read->read_common.attributes.num_samples = 10494;
+    read->read_common.attributes.sample_rate = 4000;
     read->read_common.scaling_method = "test";
 
     const auto signal_path = std::filesystem::path(get_data_dir("rna_split")) / "signal.tensor";

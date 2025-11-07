@@ -122,6 +122,7 @@ public:
         uint64_t num_minknow_events{0};
         std::string end_reason{"unknown"};
         std::string pore_type{"not_set"};
+        uint64_t sample_rate{0};
     };
 
     struct ReadAttributesCoreComparator {

@@ -50,9 +50,10 @@ SimplexReadPtr subread(const SimplexRead& read,
             read.start_sample + read.read_common.num_trimmed_samples + signal_range.first;
     subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
 
-    auto start_time_ms = read.run_acquisition_start_time_ms +
-                         static_cast<uint64_t>(std::round(subread->start_sample * 1000. /
-                                                          subread->read_common.sample_rate));
+    auto start_time_ms =
+            read.run_acquisition_start_time_ms +
+            static_cast<uint64_t>(std::round(subread->start_sample * 1000. /
+                                             subread->read_common.attributes.sample_rate));
     subread->read_common.attributes.start_time =
             utils::get_string_timestamp_from_unix_time_ms(start_time_ms);
     subread->read_common.start_time_ms = start_time_ms;

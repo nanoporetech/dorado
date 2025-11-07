@@ -73,7 +73,6 @@ protected:
     auto make_test_read(std::string read_id) {
         auto read = std::make_unique<dorado::SimplexRead>();
         read->read_common.raw_data = at::rand(size_t(random_between(100, 200)));
-        read->read_common.sample_rate = 5000;
         read->read_common.shift = random_between(100, 200);
         read->read_common.scale = random_between(5, 10);
         read->read_common.read_id = std::move(read_id);
@@ -85,6 +84,7 @@ protected:
         read->read_common.attributes.channel_number = 5;
         read->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read->read_common.attributes.filename = "test.pod5";
+        read->read_common.attributes.sample_rate = 5000;
         read->read_common.client_info = client_info;
         return read;
     }

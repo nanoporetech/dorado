@@ -22,7 +22,6 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.raw_data = at::empty(4000);
     read_common.seq = "ACGT";
     read_common.qstring = "////";
-    read_common.sample_rate = 4000;
     read_common.shift = 128.3842f;
     read_common.scale = 8.258f;
     read_common.scaling_method = "quantile";
@@ -32,6 +31,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     read_common.attributes.channel_number = 5;
     read_common.attributes.start_time = "2017-04-29T09:10:04Z";
     read_common.attributes.filename = "batch_0.fast5";
+    read_common.attributes.sample_rate = 4000;
     read_common.run_id = "xyz";
     read_common.model_name = "test_model";
     read_common.is_duplex = false;
@@ -185,7 +185,6 @@ CATCH_TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
 
     CATCH_SECTION("Generated sam record for unaligned read is correct") {
         test_read.read_common.raw_data = at::empty(4000);
-        test_read.read_common.sample_rate = 4000;
         test_read.read_common.shift = 128.3842f;
         test_read.read_common.scale = 8.258f;
         test_read.read_common.read_id = "test_read";
@@ -197,6 +196,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test sam record generation", TEST_GROUP) {
         test_read.read_common.attributes.channel_number = 5;
         test_read.read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         test_read.read_common.attributes.filename = "batch_0.fast5";
+        test_read.read_common.attributes.sample_rate = 4000;
 
         auto lines = test_read.read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(!lines.empty());
@@ -367,7 +367,6 @@ CATCH_TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     read_common.raw_data = at::empty(4000);
     read_common.seq = "AAAAAAAAAA";
     read_common.qstring = "$$////////";
-    read_common.sample_rate = 4000;
     read_common.shift = 128.3842f;
     read_common.scale = 8.258f;
     read_common.num_trimmed_samples = 132;
@@ -376,6 +375,7 @@ CATCH_TEST_CASE(TEST_GROUP ": Test mean q-score generation", TEST_GROUP) {
     read_common.attributes.channel_number = 5;
     read_common.attributes.start_time = "2017-04-29T09:10:04Z";
     read_common.attributes.filename = "batch_0.fast5";
+    read_common.attributes.sample_rate = 4000;
     read_common.run_id = "xyz";
     read_common.model_name = "test_model";
     read_common.is_duplex = false;

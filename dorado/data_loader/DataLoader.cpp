@@ -171,7 +171,7 @@ SimplexReadPtr process_pod5_thread_fn(
 
     auto new_read = std::make_unique<SimplexRead>();
     new_read->read_common.raw_data = samples;
-    new_read->read_common.sample_rate = run_sample_rate;
+    new_read->read_common.attributes.sample_rate = run_sample_rate;
 
     auto start_time_ms =
             run_acquisition_start_time_ms + ((read_data.start_sample * 1000) / run_sample_rate);
