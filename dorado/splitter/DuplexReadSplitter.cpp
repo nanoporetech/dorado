@@ -611,8 +611,17 @@ void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
         if (spacers.empty()) {
             split_round_result.push_back(std::move(read));
         } else {
+            bool is_end_reason_mux_change =
+                    read.read->read_common.attributes.is_end_reason_mux_change;
+            std::string end_reason = read.read->read_common.attributes.end_reason;
             for (auto& sr : subreads(std::move(read.read), spacers)) {
                 split_round_result.push_back(create_ext_read(std::move(sr)));
+            }
+            if (!split_round_result.empty()) {
+                auto& last_result = split_round_result.back();
+                last_result.read->read_common.attributes.is_end_reason_mux_change =
+                        is_end_reason_mux_change;
+                last_result.read->read_common.attributes.end_reason = end_reason;
             }
         }
     }

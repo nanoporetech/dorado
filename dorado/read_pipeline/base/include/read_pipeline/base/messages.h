@@ -31,6 +31,8 @@ struct Attributes {
     std::string filename{};
     // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
     bool is_end_reason_mux_change{false};
+    std::string end_reason{"unknown"};
+    std::string pore_type{"not_set"};
 
     // Only used by tests, and only valid for POD5 data.
     uint64_t num_samples{};

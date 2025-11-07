@@ -213,16 +213,30 @@ SimplexReadPtr process_pod5_thread_fn(
     pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
     char end_reason_string_value[200]{};
     size_t end_reason_string_value_size = sizeof(end_reason_string_value);
+    {
+        pod5_error_t pod5_ret =
+                pod5_get_end_reason(batch, read_data.end_reason, &end_reason_value,
+                                    end_reason_string_value, &end_reason_string_value_size);
+        if (pod5_ret != POD5_OK) {
+            issue_pod5_error("Failed to get end_reason", filename, read_id_str);
+            return nullptr;
+        } else if (end_reason_value == POD5_END_REASON_UNBLOCK_MUX_CHANGE ||
+                   end_reason_value == POD5_END_REASON_MUX_CHANGE) {
+            new_read->read_common.attributes.is_end_reason_mux_change = true;
+        }
+        new_read->read_common.attributes.end_reason = end_reason_string_value;
+    }
 
-    pod5_error_t pod5_ret =
-            pod5_get_end_reason(batch, read_data.end_reason, &end_reason_value,
-                                end_reason_string_value, &end_reason_string_value_size);
-    if (pod5_ret != POD5_OK) {
-        issue_pod5_error("Failed to get end_reason", filename, read_id_str);
-        return nullptr;
-    } else if (end_reason_value == POD5_END_REASON_UNBLOCK_MUX_CHANGE ||
-               end_reason_value == POD5_END_REASON_MUX_CHANGE) {
-        new_read->read_common.attributes.is_end_reason_mux_change = true;
+    char pore_type_string_value[200]{};
+    size_t pore_type_string_value_size = sizeof(pore_type_string_value);
+    {
+        pod5_error_t pod5_ret = pod5_get_pore_type(
+                batch, read_data.pore_type, pore_type_string_value, &pore_type_string_value_size);
+        if (pod5_ret != POD5_OK) {
+            issue_pod5_error("Failed to get pore_type", filename, read_id_str);
+            return nullptr;
+        }
+        new_read->read_common.attributes.pore_type = pore_type_string_value;
     }
 
     // Determine the time sorted predecessor of the read

@@ -228,10 +228,10 @@ void SummaryFileWriter::handle(const HtsData& data) {
         }
     }
     if (m_field_flags & EXPERIMENT_FIELDS) {
-        m_summary_stream << separator << "not_set";  // pore_type
+        m_summary_stream << separator << data.read_attrs.pore_type;
         m_summary_stream << separator << data.read_attrs.experiment_id;
         m_summary_stream << separator << data.read_attrs.sample_id;
-        m_summary_stream << separator << "unknown";  // end_reason
+        m_summary_stream << separator << data.read_attrs.end_reason;
     }
     if (m_field_flags & BARCODING_FIELDS) {
         std::string alias = "unknown";

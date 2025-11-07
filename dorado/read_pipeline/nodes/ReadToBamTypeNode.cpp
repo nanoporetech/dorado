@@ -32,12 +32,20 @@ void ReadToBamTypeNode::input_thread_fn() {
                                                        is_duplex_parent);
 
         const HtsData::ReadAttributes read_attrs{
-                read_common_data.sequencing_kit,    read_common_data.experiment_id,
-                read_common_data.sample_id,         read_common_data.position_id,
-                read_common_data.flowcell_id,       read_common_data.run_id,
-                read_common_data.acquisition_id,    read_common_data.protocol_start_time_ms,
-                read_common_data.subread_id,        is_status_pass,
-                read_common_data.num_minknow_events};
+                read_common_data.sequencing_kit,
+                read_common_data.experiment_id,
+                read_common_data.sample_id,
+                read_common_data.position_id,
+                read_common_data.flowcell_id,
+                read_common_data.run_id,
+                read_common_data.acquisition_id,
+                read_common_data.protocol_start_time_ms,
+                read_common_data.subread_id,
+                is_status_pass,
+                read_common_data.num_minknow_events,
+                read_common_data.attributes.end_reason,
+                read_common_data.attributes.pore_type,
+        };
 
         for (auto& aln : alns) {
             auto hts_data = std::make_unique<HtsData>(

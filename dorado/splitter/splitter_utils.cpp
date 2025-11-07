@@ -15,7 +15,7 @@ namespace {
 #if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
 __attribute__((optimize("O0")))
 #endif
- void assign_subread_parent_id(const SimplexRead& read, SimplexReadPtr & subread) {
+void assign_subread_parent_id(const SimplexRead& read, SimplexReadPtr& subread) {
     if (!read.read_common.parent_read_id.empty()) {
         subread->read_common.parent_read_id = read.read_common.parent_read_id;
     } else {
@@ -56,6 +56,9 @@ SimplexReadPtr subread(const SimplexRead& read,
     subread->read_common.attributes.start_time =
             utils::get_string_timestamp_from_unix_time_ms(start_time_ms);
     subread->read_common.start_time_ms = start_time_ms;
+    subread->read_common.attributes.end_reason =
+            "unknown";  // TODO: do we know the reason for split reads? signal_positive?
+    subread->read_common.attributes.is_end_reason_mux_change = false;
 
     if (seq_range) {
         const int stride = read.read_common.model_stride;

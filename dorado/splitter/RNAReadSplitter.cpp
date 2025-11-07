@@ -83,8 +83,17 @@ std::vector<SimplexReadPtr> RNAReadSplitter::split(SimplexReadPtr init_read) con
             if (spacers.empty()) {
                 split_round_result.push_back(std::move(r));
             } else {
+                bool is_end_reason_mux_change =
+                        r.read->read_common.attributes.is_end_reason_mux_change;
+                std::string end_reason = r.read->read_common.attributes.end_reason;
                 for (auto& sr : subreads(std::move(r.read), spacers)) {
                     split_round_result.push_back(create_ext_read(std::move(sr)));
+                }
+                if (!split_round_result.empty()) {
+                    auto& last_result = split_round_result.back();
+                    last_result.read->read_common.attributes.is_end_reason_mux_change =
+                            is_end_reason_mux_change;
+                    last_result.read->read_common.attributes.end_reason = end_reason;
                 }
             }
         }

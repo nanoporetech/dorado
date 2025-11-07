@@ -120,6 +120,8 @@ public:
         std::size_t subread_id{0};
         bool is_status_pass{true};
         uint64_t num_minknow_events{0};
+        std::string end_reason{"unknown"};
+        std::string pore_type{"not_set"};
     };
 
     struct ReadAttributesCoreComparator {
