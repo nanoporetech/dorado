@@ -37,6 +37,7 @@ struct Attributes {
     uint64_t sample_rate{0};
     // Only used by tests, and only valid for POD5 data.
     uint64_t num_samples{};
+    int model_stride{-1};  // The down sampling factor of the model
 };
 
 }  // namespace details
@@ -48,8 +49,6 @@ public:
     static constexpr int POLY_TAIL_NOT_FOUND = -1;
     static constexpr int POLY_TAIL_NOT_ENABLED = -2;
     at::Tensor raw_data;  // Loaded from source file
-
-    int model_stride{-1};  // The down sampling factor of the model
 
     /*
     Note: Update read_utils shallow_copy_read to ensure split reads copy all fields

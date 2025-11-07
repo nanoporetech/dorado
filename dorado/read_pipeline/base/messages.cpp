@@ -108,7 +108,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
 
     if (emit_moves) {
         std::vector<uint8_t> m(moves.size() + 1, 0);
-        m[0] = uint8_t(model_stride);
+        m[0] = uint8_t(attributes.model_stride);
 
         for (size_t idx = 0; idx < moves.size(); idx++) {
             m[idx + 1] = static_cast<uint8_t>(moves[idx]);

@@ -29,8 +29,6 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
 
     copy->scaling = read.scaling;
 
-    copy->read_common.model_stride = read.read_common.model_stride;
-
     copy->read_common.read_id = read.read_common.read_id;
     copy->read_common.seq = read.read_common.seq;
     copy->read_common.qstring = read.read_common.qstring;
@@ -157,7 +155,7 @@ void mux_change_trim_read(ReadCommon& read_common) {
     read_common.pre_trim_seq_length = read_common.seq.length();
 
     // Trim the signal
-    const size_t trim_signal_idx = read_common.moves.size() * read_common.model_stride;
+    const size_t trim_signal_idx = read_common.moves.size() * read_common.attributes.model_stride;
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
     read_common.attributes.num_samples = read_common.get_raw_data_samples();
 

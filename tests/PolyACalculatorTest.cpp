@@ -52,7 +52,7 @@ CATCH_TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     read->read_common.seq = ReadFileIntoString(seq_file.string());
     read->read_common.qstring = std::string(read->read_common.seq.length(), '~');
     read->read_common.moves = ReadFileIntoVector(moves_file.string());
-    read->read_common.model_stride = 5;
+    read->read_common.attributes.model_stride = 5;
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();
@@ -90,7 +90,7 @@ CATCH_TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config"
     read->read_common.seq = ReadFileIntoString(seq_file.string());
     read->read_common.qstring = std::string(read->read_common.seq.length(), '~');
     read->read_common.moves = ReadFileIntoVector(moves_file.string());
-    read->read_common.model_stride = 5;
+    read->read_common.attributes.model_stride = 5;
     torch::load(read->read_common.raw_data, signal_file.string());
     read->read_common.read_id = "read_id";
     read->read_common.client_info = std::make_shared<dorado::DefaultClientInfo>();

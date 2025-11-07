@@ -317,7 +317,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     set_read_mutator([this, model_stride](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(torch::kHalf);
 
-        read->read_common.model_stride = int(model_stride);
+        read->read_common.attributes.model_stride = int(model_stride);
         // The move table size needs rounding up.
         const size_t move_table_size =
                 (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;
@@ -473,7 +473,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
                     "", is_rna, is_rna_adapter, calibration));
 
     set_read_mutator([](dorado::SimplexReadPtr& read) {
-        read->read_common.model_stride = 2;
+        read->read_common.attributes.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
     });

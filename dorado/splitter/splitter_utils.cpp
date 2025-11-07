@@ -60,7 +60,7 @@ SimplexReadPtr subread(const SimplexRead& read,
     subread->read_common.attributes.is_end_reason_mux_change = false;
 
     if (seq_range) {
-        const int stride = read.read_common.model_stride;
+        const int stride = read.read_common.attributes.model_stride;
         assert(signal_range.first <= signal_range.second);
         assert(signal_range.first / stride <= read.read_common.moves.size());
         assert(signal_range.second / stride <= read.read_common.moves.size());

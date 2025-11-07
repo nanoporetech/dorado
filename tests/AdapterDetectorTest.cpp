@@ -534,7 +534,7 @@ CATCH_TEST_CASE(
             front_adapter + front_primer + umi_partial + nonbc_seq + rear_primer + rear_adapter;
     read->read_common.qstring = std::string(read->read_common.seq.length(), '!');
     read->read_common.read_id = "read_id";
-    read->read_common.model_stride = stride;
+    read->read_common.attributes.model_stride = stride;
     read->read_common.sequencing_kit = TEST_KIT2;
 
     std::vector<uint8_t> moves;

@@ -66,7 +66,7 @@ CATCH_TEST_CASE("Test stitch_chunks", TEST_GROUP) {
     }
 
     dorado::ReadCommon read_common;
-    read_common.model_stride = static_cast<int>(dorado::utils::div_round_closest(
+    read_common.attributes.model_stride = static_cast<int>(dorado::utils::div_round_closest(
             called_chunks[0]->raw_chunk_size, called_chunks[0]->moves.size()));
 
     std::vector<const dorado::utils::Chunk *> chunks;
