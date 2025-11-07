@@ -9,6 +9,7 @@ dorado_add_library(
         StreamHtsFileWriter.h
         StructuredHtsFileWriter.h
         Structure.h
+        SummaryFileWriter.h
         interface.h
     SOURCES_PRIVATE
         HtsFileWriter.cpp
@@ -16,6 +17,7 @@ dorado_add_library(
         StreamHtsFileWriter.cpp
         StructuredHtsFileWriter.cpp
         Structure.cpp
+        SummaryFileWriter.cpp
     DEPENDS_PUBLIC
         # nothing
     DEPENDS_PRIVATE
