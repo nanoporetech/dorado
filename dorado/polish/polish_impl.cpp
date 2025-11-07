@@ -748,29 +748,26 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
         }
     };
 
-    const std::size_t thread_chunks =
-            std::max(num_threads, static_cast<int32_t>(std::size(encoders)));
-
     auto shared_window_queue = std::make_shared<utils::AsyncQueue<std::size_t>>(std::size(windows));
     for (std::size_t i = 0; i < std::size(windows); ++i) {
         shared_window_queue->try_push(std::move(i));
     }
     shared_window_queue->terminate(utils::AsyncQueueTerminateFast::No);
 
-    spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
-                  thread_chunks);
-
     // Create the thread pool, futures and results.
-    cxxpool::thread_pool pool{thread_chunks};
+    const std::size_t actual_threads =
+            std::min(num_threads, static_cast<int32_t>(std::size(encoders)));
+    cxxpool::thread_pool pool{actual_threads};
     std::vector<std::future<void>> futures;
-    futures.reserve(thread_chunks);
-
+    futures.reserve(actual_threads);
     std::vector<secondary::Sample> results(std::size(windows));
+    std::vector<WorkerReturnStatus> worker_return_vals(actual_threads);
 
-    std::vector<WorkerReturnStatus> worker_return_vals(thread_chunks);
+    spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
+                  actual_threads);
 
     // Add jobs to the pool.
-    for (int32_t tid = 0; tid < static_cast<int32_t>(thread_chunks); ++tid) {
+    for (int32_t tid = 0; tid < static_cast<int32_t>(actual_threads); ++tid) {
         futures.emplace_back(pool.push(worker, tid, shared_window_queue, std::ref(results),
                                        std::ref(worker_return_vals[tid])));
     }
