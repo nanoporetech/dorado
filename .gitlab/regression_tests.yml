@@ -44,8 +44,6 @@
     - ubuntu-20.04
     - nvidia-docker
     - on-prem
-    # We need to make sure the regression tests always run on the same GPU.
-    - gpu-v100
 
 .windows_regression_runner:
   tags:
@@ -53,8 +51,6 @@
     - VS2019
     - cuda-${CUDA}
     - on-prem
-    # We need to make sure the regression tests always run on the same GPU.
-    - gpu-v100
 
 # We need this to check out the regression_test_data project, which has our test files in git-lfs.
 .prepare_git-lfs:
@@ -161,6 +157,9 @@ regression_test:linux:x86:cuda12:
     - .regression_test
   needs:
     - build_archive:linux:x86:cuda12
+  tags:
+    # We need to make sure the regression tests always run on the same GPU.
+    - gpu-v100
   except:
     - tags
 
@@ -187,6 +186,9 @@ regression_test:windows:
     - .regression_test
   needs:
     - build_archive:windows:cuda12
+  tags:
+    # We need to make sure the regression tests always run on the same GPU.
+    - gpu-v100
   except:
     - tags
 
@@ -229,7 +231,7 @@ regression_test:windows:
     when: always
     paths:
       - regression_test/output/**/*.log
-      - regression_test/output/**/*.trace
+      - regression_test/output/**/*.txt
     expire_in: 90 days
   timeout: 1h 30m
 
@@ -256,6 +258,8 @@ regression_tests:speed:linux:arm64:jammy:
     - .linux_regression_dependencies
     - .linux_orin_cuda_12_runner
     - .speed_regression_test
+  except:
+    - tags
 
 .regression_tests:speed:linux:x86:cuda12:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
@@ -269,6 +273,8 @@ regression_tests:speed:linux:arm64:jammy:
     - .linux_regression_dependencies
     - .linux_regression_runner
     - .speed_regression_test
+  except:
+    - tags
 
 regression_tests:speed:linux:x86:V100:
   parallel:
@@ -289,7 +295,9 @@ regression_tests:speed:linux:x86:V100:
   extends:
     - .regression_tests:speed:linux:x86:cuda12
   tags:
-    - gpu-v100
+    - benchmark-p48
+  except:
+    - tags
 
 regression_tests:speed:linux:x86:A100:
   parallel:
@@ -310,7 +318,9 @@ regression_tests:speed:linux:x86:A100:
   extends:
     - .regression_tests:speed:linux:x86:cuda12
   tags:
-    - gpu-a100
+    - benchmark-a100
+  except:
+    - tags
 
 regression_tests:speed:windows:A6000:
   parallel:
@@ -336,6 +346,8 @@ regression_tests:speed:windows:A6000:
     - build_archive:windows:cuda12
   tags:
     - gpu-a6000
+  except:
+    - tags
 
 regression_tests:speed:macos:arm:
   parallel:
@@ -358,6 +370,8 @@ regression_tests:speed:macos:arm:
     - .speed_regression_test
   needs:
     - build_archive:macos:arm
+  except:
+    - tags
 
 regression_tests:speed:email:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0

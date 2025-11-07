@@ -39,18 +39,19 @@ class Benchmarker(object):
             dorado_exe = "dorado"
         else:
             dorado_exe = str(pathlib.Path(self.binary_path) / "dorado")
+        model = self.basecall_model
+        if self.modified_bases is not None:
+            model = ",".join([model, self.modified_bases])
         args = [
             dorado_exe,
             "basecaller",
-            self.basecall_model,
+            model,
             self.input_file,
             "--device",
             self.device,
             "--run-for",
             str(self.run_for),
         ]
-        if self.modified_bases is not None:
-            args.extend(["--modified-bases", self.modified_bases])
         if self.kit_name is not None:
             args.extend(["--kit-name", self.kit_name])
         if self.reference is not None:
@@ -77,8 +78,9 @@ class Benchmarker(object):
     def run_iteration(
         self, dorado_args: list[str], iteration: int, summary_file: pathlib.Path
     ) -> int:
-        bam_file = summary_file.parent / f"out_{iteration}.bam"
-        log_file = summary_file.parent / f"benchmarking_{iteration}.log"
+        file_stem = summary_file.stem()
+        bam_file = summary_file.parent / f"{file_stem}_{iteration}.bam"
+        log_file = summary_file.parent / f"{file_stem}_{iteration}.log"
         timeout = self.run_for + 120  # Provide ample time for file-loading etc...
         with bam_file.open("wb") as outfile, log_file.open("w") as errfile:
             run_dorado(dorado_args, timeout, outfile=outfile, errfile=errfile)

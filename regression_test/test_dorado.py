@@ -140,13 +140,13 @@ class TestDorado(unittest.TestCase):
                         output_file.parent.mkdir(parents=True, exist_ok=True)
                         with (
                             output_file.open("wb") as outfile,
-                            log_file.open("w") as logfile,
+                            log_file.open("w") as errfile,
                         ):
                             run_dorado(
                                 dorado_args,
                                 DEFAULT_MAX_TIMEOUT,
                                 outfile=outfile,
-                                errfile=logfile,
+                                errfile=errfile,
                             )
                     except Exception as ex:
                         msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
@@ -269,13 +269,13 @@ class TestDorado(unittest.TestCase):
                         output_file.parent.mkdir(parents=True, exist_ok=True)
                         with (
                             output_file.open("wb") as outfile,
-                            log_file.open("w") as logfile,
+                            log_file.open("w") as errfile,
                         ):
                             run_dorado(
                                 dorado_args,
                                 DEFAULT_MAX_TIMEOUT,
                                 outfile=outfile,
-                                errfile=logfile,
+                                errfile=errfile,
                             )
                     except Exception as ex:
                         msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
