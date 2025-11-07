@@ -173,9 +173,9 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.raw_data = samples;
     new_read->read_common.attributes.sample_rate = run_sample_rate;
 
-    auto start_time_ms =
-            run_acquisition_start_time_ms + ((read_data.start_sample * 1000) / run_sample_rate);
-    auto start_time = utils::get_string_timestamp_from_unix_time_ms(start_time_ms);
+    auto start_time_ms = ((read_data.start_sample * 1000) / run_sample_rate);
+    auto start_time = utils::get_string_timestamp_from_unix_time_ms(run_acquisition_start_time_ms +
+                                                                    start_time_ms);
     new_read->run_acquisition_start_time_ms = run_acquisition_start_time_ms;
     new_read->read_common.start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;

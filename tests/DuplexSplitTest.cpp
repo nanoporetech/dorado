@@ -81,10 +81,10 @@ CATCH_TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CATCH_CHECK(split_res[3]->read_common.attributes.start_time ==
                 "2023-02-21T12:46:53.105000+00:00");
 
-    CATCH_CHECK(split_res[0]->read_common.start_time_ms == 1676983561529);
-    CATCH_CHECK(split_res[1]->read_common.start_time_ms == 1676983585837);
-    CATCH_CHECK(split_res[2]->read_common.start_time_ms == 1676983599607);
-    CATCH_CHECK(split_res[3]->read_common.start_time_ms == 1676983613105);
+    CATCH_CHECK(split_res[0]->read_common.start_time_ms == 7441859);
+    CATCH_CHECK(split_res[1]->read_common.start_time_ms == 7466167);
+    CATCH_CHECK(split_res[2]->read_common.start_time_ms == 7479937);
+    CATCH_CHECK(split_res[3]->read_common.start_time_ms == 7493435);
 
     CATCH_CHECK(split_res[0]->read_common.attributes.num_samples == 97125);
     CATCH_CHECK(split_res[1]->read_common.attributes.num_samples == 55055);
