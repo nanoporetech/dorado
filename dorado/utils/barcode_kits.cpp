@@ -9,6 +9,8 @@ namespace dorado::barcode_kits {
 
 namespace {
 
+inline const std::string UNCLASSIFIED = "unclassified";
+
 // Flank sequences per barcode kit.
 // There are 2 types of kits described here -
 // 1. Double ended kits that have a different flanking region for the top and bottom barcodes.
@@ -1112,6 +1114,10 @@ std::string barcode_kits_list_str() {
 }
 
 std::string normalize_barcode_name(std::string_view barcode_name) {
+    if (barcode_name == UNCLASSIFIED) {
+        return UNCLASSIFIED;
+    }
+
     std::string digits = "";
     // Normalize using only the digits at the end of the barcode name.
     bool found_digits = false;

@@ -253,11 +253,12 @@ void SummaryFileWriter::handle(const HtsData& data) {
 
         if (data.barcoding_result) {
             // retrieve data from barcoding result
-            alias = data.barcoding_result->alias.empty() ? data.barcoding_result->barcode_name
+            barcode_arrangement =
+                    barcode_kits::normalize_barcode_name(data.barcoding_result->barcode_name);
+            alias = data.barcoding_result->alias.empty() ? barcode_arrangement
                                                          : data.barcoding_result->alias;
             type = data.barcoding_result->type.empty() ? "na" : data.barcoding_result->type;
-            barcode_arrangement = data.barcoding_result->barcode_name;
-            barcode_kit = data.barcoding_result->barcode_kit;
+            barcode_kit = data.barcoding_result->kit;
             barcode_variant = data.barcoding_result->variant;
             barcode_score = data.barcoding_result->barcode_score;
             barcode_front_score = data.barcoding_result->top_barcode_score;

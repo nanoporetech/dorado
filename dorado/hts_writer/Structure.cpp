@@ -201,11 +201,6 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
         return {};
     }
 
-    // Always return "unclassified" as there's no alias
-    if (barcode_name == UNCLASSIFIED_STR) {
-        return UNCLASSIFIED_STR;
-    }
-
     // Return the alias if found otherwise fall back to the barcode name
     return barcode_kits::normalize_barcode_name(barcode_name);
 };

@@ -368,8 +368,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
              (char *)qscore.data(), 0);
 
     if (!barcode.empty() && barcode != UNCLASSIFIED) {
-        bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1),
-                       reinterpret_cast<const uint8_t *>(barcode.c_str()));
+        bam_aux_update_str(aln, "BC", int(barcode.length() + 1), barcode.c_str());
     }
 
     if (is_duplex) {
