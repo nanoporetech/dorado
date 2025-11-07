@@ -78,7 +78,7 @@ class Benchmarker(object):
     def run_iteration(
         self, dorado_args: list[str], iteration: int, summary_file: pathlib.Path
     ) -> int:
-        file_stem = summary_file.stem()
+        file_stem = summary_file.stem
         bam_file = summary_file.parent / f"{file_stem}_{iteration}.bam"
         log_file = summary_file.parent / f"{file_stem}_{iteration}.log"
         timeout = self.run_for + 120  # Provide ample time for file-loading etc...
