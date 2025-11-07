@@ -123,6 +123,7 @@ public:
         std::string end_reason{"unknown"};
         std::string pore_type{"not_set"};
         uint64_t sample_rate{0};
+        uint64_t start_time_ms{0};
     };
 
     struct ReadAttributesCoreComparator {

@@ -202,7 +202,7 @@ void SummaryFileWriter::handle(const HtsData& data) {
     m_summary_stream << separator << get_tag(record, "ch", 0);
     m_summary_stream << separator << get_tag(record, "mx", 0);
     m_summary_stream << separator << data.read_attrs.num_minknow_events;
-    m_summary_stream << separator << 0;  // start time seconds - calculate?
+    m_summary_stream << separator << (data.read_attrs.start_time_ms / 1000.f);
     m_summary_stream << separator << get_tag(record, "du", 0.f);
 
     if (m_field_flags & BASECALLING_FIELDS) {
