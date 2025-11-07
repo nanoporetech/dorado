@@ -12,6 +12,16 @@ constexpr double MEMORY_ESTIMATE_UPPER_CAP = std::numeric_limits<double>::infini
 
 class ModelTorchBase : public torch::nn::Module {
 public:
+    /**
+     * \brief Factory function to construct derived types.
+     * This enforces that the way they're constructed is compatible with torch::nn::Module.
+     */
+    template <typename T, typename... Args>
+    static std::shared_ptr<T> make(Args &&...args) {
+        MustConstructWithFactory ctor_tag{0};
+        return std::make_shared<T>(ctor_tag, std::forward<Args>(args)...);
+    }
+
     virtual ~ModelTorchBase() = default;
 
     /**
@@ -55,9 +65,16 @@ public:
      * \brief Approximate memory consumption estimate given an input batch tensor shape.
      *          This is model specific, and facilitates auto batch size computation
      */
-    virtual double estimate_batch_memory(const std::vector<int64_t>& batch_tensor_shape) const = 0;
+    virtual double estimate_batch_memory(const std::vector<int64_t> &batch_tensor_shape) const = 0;
 
 protected:
+    // Hidden tag to enforce construction via the factory function.
+    class MustConstructWithFactory {
+        explicit MustConstructWithFactory(int) {}
+        friend class ModelTorchBase;
+    };
+    explicit ModelTorchBase(const MustConstructWithFactory &) {}
+
     bool m_normalise = true;
     bool m_half_precision = false;
 };

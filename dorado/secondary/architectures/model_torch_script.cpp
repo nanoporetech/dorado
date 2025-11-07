@@ -7,7 +7,9 @@
 
 namespace dorado::secondary {
 
-ModelTorchScript::ModelTorchScript(const std::filesystem::path& model_path) {
+ModelTorchScript::ModelTorchScript(const MustConstructWithFactory& ctor_tag,
+                                   const std::filesystem::path& model_path)
+        : ModelTorchBase(ctor_tag) {
     try {
         spdlog::debug("Loading model from file: {}", model_path.string());
         m_module = torch::jit::load(model_path.string());

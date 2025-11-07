@@ -12,7 +12,8 @@ namespace dorado::secondary {
 
 class ModelGRU : public ModelTorchBase {
 public:
-    ModelGRU(const int32_t num_features,
+    ModelGRU(const MustConstructWithFactory& ctor_tag,
+             const int32_t num_features,
              const int32_t num_classes,
              const int32_t gru_size,
              const int32_t num_layers,

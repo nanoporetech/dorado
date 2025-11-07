@@ -117,7 +117,8 @@ torch::Tensor ReversibleLSTMImpl::forward(const torch::Tensor& x) {
     return output;
 }
 
-ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
+ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_tag,
+                                           const int32_t num_classes,
                                            const int32_t lstm_size,
                                            const int32_t cnn_size,
                                            const std::vector<int32_t>& kernel_sizes,
@@ -126,7 +127,8 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const int32_t num_classes,
                                            const int32_t bases_alphabet_size,
                                            const int32_t bases_embedding_size,
                                            const bool bidirectional)
-        : m_num_classes{num_classes},
+        : ModelTorchBase(ctor_tag),
+          m_num_classes{num_classes},
           m_lstm_size{lstm_size},
           m_cnn_size{cnn_size},
           m_kernel_sizes{kernel_sizes},

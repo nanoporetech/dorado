@@ -143,6 +143,7 @@ std::pair<at::Tensor, at::Tensor> SlotAttentionImpl::forward(at::Tensor x,
 }
 
 ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
+        const MustConstructWithFactory& ctor_tag,
         const int32_t num_slots,
         const int32_t classes_per_slot,
         const int32_t read_embedding_size,
@@ -157,7 +158,8 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
         const int32_t bases_embedding_size,
         const bool add_lstm,
         const bool use_reference)
-        : m_num_slots{num_slots},
+        : ModelTorchBase(ctor_tag),
+          m_num_slots{num_slots},
           m_classes_per_slot{classes_per_slot},
           m_read_embedding_size{read_embedding_size},
           m_cnn_size{cnn_size},

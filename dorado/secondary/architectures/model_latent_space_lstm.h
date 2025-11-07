@@ -58,7 +58,8 @@ TORCH_MODULE(ReversibleLSTM);
 
 class ModelLatentSpaceLSTM : public ModelTorchBase {
 public:
-    ModelLatentSpaceLSTM(const int32_t num_classes,
+    ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_tag,
+                         const int32_t num_classes,
                          const int32_t lstm_size,
                          const int32_t cnn_size,
                          const std::vector<int32_t>& kernel_sizes,
