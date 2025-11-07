@@ -125,6 +125,9 @@ public:
         uint64_t sample_rate{0};
         uint64_t start_time_ms{0};
         int model_stride{-1};
+        int num_alignments{0};
+        int num_secondary_alignments{0};
+        int num_supplementary_alignments{0};
     };
 
     struct ReadAttributesCoreComparator {

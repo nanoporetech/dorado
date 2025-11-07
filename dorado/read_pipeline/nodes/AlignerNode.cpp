@@ -191,6 +191,15 @@ void AlignerNode::align_bam_message(BamMessage&& bam_message) {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
         auto records = alignment::Minimap2Aligner(m_index_for_bam_messages)
                                .align(bam_message_.data->bam_ptr.get(), tbuf.get());
+
+        bam_message_.data->read_attrs.num_alignments = records.size();
+        bam_message_.data->read_attrs.num_secondary_alignments =
+                std::count_if(std::begin(records), std::end(records),
+                              [](const auto& aln) { return aln->core.flag & BAM_FSECONDARY; });
+        bam_message_.data->read_attrs.num_supplementary_alignments =
+                std::count_if(std::begin(records), std::end(records),
+                              [](const auto& aln) { return aln->core.flag & BAM_FSUPPLEMENTARY; });
+
         for (auto& record : records) {
             if (m_bedfile_for_bam_messages && !(record->core.flag & BAM_FUNMAP)) {
                 auto ref_id = record->core.tid;

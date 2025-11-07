@@ -329,9 +329,9 @@ void SummaryFileWriter::handle(const HtsData& data) {
                                  static_cast<float>(record->core.l_qseq);
             alignment_bed_hits = get_tag(record, "bh", 0);
             alignment_mapping_quality = record->core.qual;
-            alignment_num_alignments = 0;                // set in read attributes
-            alignment_num_secondary_alignments = 0;      // set in read attributes
-            alignment_num_supplementary_alignments = 0;  // set in read attributes
+            alignment_num_alignments = data.read_attrs.num_alignments;
+            alignment_num_secondary_alignments = data.read_attrs.num_secondary_alignments;
+            alignment_num_supplementary_alignments = data.read_attrs.num_supplementary_alignments;
         }
         m_summary_stream << separator << alignment_genome;
         m_summary_stream << separator << alignment_direction;
