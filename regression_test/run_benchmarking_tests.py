@@ -29,8 +29,6 @@ def _get_benchmarking_script_args(
 
     args += [
         _get_benchmark_script_location(),
-        "--dorado_bin_dir",
-        _get_dorado_bin_dir(),
         "--device",
         gpu_devices[preset],
         "--basecall_model",
@@ -54,10 +52,6 @@ def _get_benchmarking_script_args(
 
 def _get_benchmark_script_location():
     return str(ROOT_DIR / "regression_test" / "benchmarking.py")
-
-
-def _get_dorado_bin_dir():
-    return str(ROOT_DIR / "dist" / "bin")
 
 
 @dataclass
