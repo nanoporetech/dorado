@@ -253,8 +253,9 @@ void SummaryFileWriter::handle(const HtsData& data) {
 
         if (data.barcoding_result) {
             // retrieve data from barcoding result
-            // alias = ???
-            // type = ???
+            alias = data.barcoding_result->alias.empty() ? data.barcoding_result->barcode_name
+                                                         : data.barcoding_result->alias;
+            type = data.barcoding_result->type.empty() ? "na" : data.barcoding_result->type;
             barcode_arrangement = data.barcoding_result->barcode_name;
             barcode_kit = data.barcoding_result->barcode_kit;
             barcode_variant = data.barcoding_result->variant;
