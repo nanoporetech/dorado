@@ -212,9 +212,12 @@ regression_test:windows:
     - export INPUT_FOLDER=${PWD}
     - cd -
     # Run the benchmarking test script.
+    - cd regression_test
     - python -m unittest run_benchmarking_tests.${REGRESSION_TEST_NAME}
+    - cd -
   after_script:
     # Upload any results to artifactory, even if the tests failed.
+    - source build_venv/*/activate
     - python -m pip install python-dateutil psycopg2-binary
     - python tetra/tetra/upload_perf_results.py --dorado --output_dir regression_test/output
   rules:
