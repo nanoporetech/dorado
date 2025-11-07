@@ -206,10 +206,15 @@ void SummaryFileWriter::handle(const HtsData& data) {
     m_summary_stream << separator << get_tag(record, "du", 0.f);
 
     if (m_field_flags & BASECALLING_FIELDS) {
+        auto trimmed_duration = (data.read_attrs.start_time_ms / 1000.f) +
+                                (get_tag(record, "ts", 0) / float(data.read_attrs.sample_rate));
+        auto template_duration = float(get_tag(record, "ns", 0) - get_tag(record, "ts", 0)) /
+                                 data.read_attrs.sample_rate;
+
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
-        m_summary_stream << separator << 0;    // template_start - calculate?
-        m_summary_stream << separator << 0;    // num_events_template
-        m_summary_stream << separator << 0.f;  // template_duration
+        m_summary_stream << separator << trimmed_duration;
+        m_summary_stream << separator << 0;  // num_events_template
+        m_summary_stream << separator << template_duration;
         m_summary_stream << separator << record->core.l_qseq;
         m_summary_stream << separator << get_tag(record, "qs", 0.f);
     }
