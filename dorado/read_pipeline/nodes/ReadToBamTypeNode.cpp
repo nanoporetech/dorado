@@ -47,6 +47,7 @@ void ReadToBamTypeNode::input_thread_fn() {
                 std::move(read_common_data.attributes.pore_type),
                 read_common_data.attributes.sample_rate,
                 read_common_data.start_time_ms,
+                read_common_data.attributes.model_stride,
         };
 
         for (auto& aln : alns) {
