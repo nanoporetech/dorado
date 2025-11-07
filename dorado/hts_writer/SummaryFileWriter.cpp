@@ -1,7 +1,6 @@
 #include "hts_writer/SummaryFileWriter.h"
 
 #include "hts_utils/bam_utils.h"
-#include "hts_utils/hts_types.h"
 #include "utils/barcode_kits.h"
 #include "utils/string_utils.h"
 
@@ -306,7 +305,7 @@ void SummaryFileWriter::handle(const HtsData& data) {
         int alignment_num_supplementary_alignments = 0;
 
         if (!(record->core.flag & BAM_FUNMAP)) {
-            // alignment_genome = get genome from header
+            alignment_genome = sam_hdr_tid2name(m_shared_header.get(), record->core.tid);
             alignment_direction = bam_is_rev(record) ? "-" : "+";
             alignment_genome_start = int32_t(record->core.pos);
             alignment_genome_end = int32_t(bam_endpos(record));

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "hts_utils/hts_types.h"
 #include "interface.h"
 
 #include <filesystem>
@@ -30,9 +31,13 @@ public:
     std::string get_name() const override { return "SummaryFileWriter"; }
     stats::NamedStats sample_stats() const override { return {}; }
 
+    void set_header(SamHdrSharedPtr header) { m_shared_header = std::move(header); }
+
 private:
     void init();
     void handle(const HtsData& item);
+
+    SamHdrSharedPtr m_shared_header{nullptr};
 
     const FieldFlags m_field_flags;
     std::ofstream m_summary_file;
