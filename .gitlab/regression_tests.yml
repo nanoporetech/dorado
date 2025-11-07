@@ -153,12 +153,11 @@ regression_test:linux:x86:cuda12:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_regression_dependencies
-    - .linux_regression_runner
     - .regression_test
   needs:
     - build_archive:linux:x86:cuda12
   tags:
-    # We need to make sure the regression tests always run on the same GPU.
+    - !reference [.linux_regression_runner, tags]
     - gpu-v100
   except:
     - tags
@@ -182,12 +181,11 @@ regression_test:windows:
     BUILD_CUDA: 1
   extends:
     - .windows_regression_dependencies
-    - .windows_regression_runner
     - .regression_test
   needs:
     - build_archive:windows:cuda12
   tags:
-    # We need to make sure the regression tests always run on the same GPU.
+    - !reference [.windows_regression_runner, tags]
     - gpu-v100
   except:
     - tags
@@ -269,7 +267,6 @@ regression_tests:speed:linux:arm64:jammy:
     - build_archive:linux:x86:cuda12
   extends:
     - .linux_regression_dependencies
-    - .linux_regression_runner
     - .speed_regression_test
 
 regression_tests:speed:linux:x86:V100:
@@ -291,6 +288,7 @@ regression_tests:speed:linux:x86:V100:
   extends:
     - .regression_tests:speed:linux:x86:cuda12
   tags:
+    - !reference [.linux_regression_runner, tags]
     - benchmark-p48
 
 regression_tests:speed:linux:x86:A100:
@@ -312,6 +310,7 @@ regression_tests:speed:linux:x86:A100:
   extends:
     - .regression_tests:speed:linux:x86:cuda12
   tags:
+    - !reference [.linux_regression_runner, tags]
     - benchmark-a100
 
 regression_tests:speed:windows:A6000:
@@ -332,11 +331,11 @@ regression_tests:speed:windows:A6000:
     GPU_DEVICE_NAME: "A6000"
   extends:
     - .windows_regression_dependencies
-    - .windows_regression_runner
     - .speed_regression_test
   needs:
     - build_archive:windows:cuda12
   tags:
+    - !reference [.windows_regression_runner, tags]
     - gpu-a6000
 
 regression_tests:speed:macos:arm:
