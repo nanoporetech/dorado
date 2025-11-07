@@ -87,6 +87,7 @@ add_executable(dorado_tests
     StereoDuplexTest.cpp
     StitchTest.cpp
     StringUtilsTest.cpp
+    SummaryFileWriterTest.cpp
     synchronisation_test.cpp
     TensorUtilsTest.cpp
     TimeUtilsTest.cpp
