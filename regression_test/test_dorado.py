@@ -2,6 +2,7 @@ import os
 import pathlib
 import contextlib
 import subprocess
+import shutil
 import typing
 import unittest
 from copy import deepcopy
@@ -36,7 +37,9 @@ class TestDorado(unittest.TestCase):
         """
         cls.manager = RegressionManager()
         cls.context = RegressionContext(cls.manager, OUTPUT_FOLDER)
-        OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+        if os.path.exists(OUTPUT_FOLDER):
+            shutil.rmtree(OUTPUT_FOLDER)
+        OUTPUT_FOLDER.mkdir(parents=True)
 
     @classmethod
     def tearDownClass(cls):
