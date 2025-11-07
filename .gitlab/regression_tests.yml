@@ -332,7 +332,7 @@ regression_tests:speed:windows:A6000:
   needs:
     - build_archive:windows:cuda12
   tags:
-    - gpi-a6000
+    - gpu-a6000
 
 regression_tests:speed:macos:arm:
   parallel:
