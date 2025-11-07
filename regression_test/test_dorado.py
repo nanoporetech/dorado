@@ -40,6 +40,8 @@ class TestDorado(unittest.TestCase):
         if os.path.exists(OUTPUT_FOLDER):
             shutil.rmtree(OUTPUT_FOLDER)
         OUTPUT_FOLDER.mkdir(parents=True)
+        cls.models_directory = OUTPUT_FOLDER / "models"
+        cls.models_directory.mkdir(parents=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -58,6 +60,7 @@ class TestDorado(unittest.TestCase):
             update_refs=False,
             quiet_mode=True,
         )
+        shutil.rmtree(cls.models_directory)
 
     def test_basecalling(self):
         """
@@ -320,6 +323,8 @@ class TestDorado(unittest.TestCase):
                 str(input_path),
                 "--device",
                 device,
+                "--models-directory",
+                str(self.models_directory),
             ]
         )
         if save_path is not None:
