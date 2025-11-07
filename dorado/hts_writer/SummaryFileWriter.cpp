@@ -201,7 +201,7 @@ void SummaryFileWriter::handle(const HtsData& data) {
     m_summary_stream << separator << data.read_attrs.protocol_run_id;
     m_summary_stream << separator << get_tag(record, "ch", 0);
     m_summary_stream << separator << get_tag(record, "mx", 0);
-    m_summary_stream << separator << 0;  // minknow events, need to fetch from file
+    m_summary_stream << separator << data.read_attrs.num_minknow_events;
     m_summary_stream << separator << 0;  // start time seconds - calculate?
     m_summary_stream << separator << get_tag(record, "du", 0.f);
 

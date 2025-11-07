@@ -202,6 +202,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.is_duplex = false;
 
     new_read->read_common.experiment_id = run_info_data->experiment_name;
+    new_read->read_common.num_minknow_events = read_data.num_minknow_events;
 
     // Get the condition_info from the run_info_data to determine if the sequencing kit
     // used has a rapid adapter and which one.

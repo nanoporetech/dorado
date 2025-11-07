@@ -63,6 +63,7 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
 
     copy->read_common.read_tag = read.read_common.read_tag;
     copy->read_common.client_info = read.read_common.client_info;
+    copy->read_common.num_minknow_events = read.read_common.num_minknow_events;
 
     return copy;
 }
@@ -160,6 +161,8 @@ void mux_change_trim_read(ReadCommon& read_common) {
     const size_t trim_signal_idx = read_common.moves.size() * read_common.model_stride;
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
     read_common.attributes.num_samples = read_common.get_raw_data_samples();
+
+    read_common.num_minknow_events = 0;  // No way to know how the events were distributed, zero out
 
     trace_log("mux_change_trimming {} - seq(before:{} after:{} net:-{})", read_common.read_id,
               sequence_size, trim_seq_idx + 1, sequence_size - trim_seq_idx - 1);

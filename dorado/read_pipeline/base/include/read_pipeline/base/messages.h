@@ -26,8 +26,8 @@ namespace details {
 struct Attributes {
     uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
     int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
-    int32_t channel_number{-1};  //Channel ID
-    std::string start_time{};    //Read acquisition start time
+    int32_t channel_number{-1};  // Channel ID
+    std::string start_time{};    // Read acquisition start time
     std::string filename{};
     // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
     bool is_end_reason_mux_change{false};
@@ -67,6 +67,7 @@ public:
     std::string model_name;      // Read group
     std::string sample_id;       // User-supplied name for the sample being analysed.
     int64_t protocol_start_time_ms;  // Start time of the protocol
+    uint64_t num_minknow_events{0};  // Number of minknow events or zero if unknown
 
     dorado::details::Attributes attributes;
 
