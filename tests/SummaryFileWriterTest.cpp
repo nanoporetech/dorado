@@ -12,5 +12,5 @@ using namespace dorado;
 
 CATCH_TEST_CASE(TEST_GROUP " constructor no throw", TEST_GROUP) {
     std::ostringstream stream;
-    CATCH_CHECK_NOTHROW(hts_writer::SummaryFileWriter(stream));
+    CATCH_CHECK_NOTHROW(hts_writer::SummaryFileWriter(stream, 0));
 }

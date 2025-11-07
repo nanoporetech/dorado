@@ -10,10 +10,19 @@ namespace dorado {
 class HtsData;
 
 namespace hts_writer {
+
 class SummaryFileWriter : public IWriter {
 public:
-    SummaryFileWriter(const std::filesystem::path& output_directory);
-    SummaryFileWriter(std::ostream& stream);
+    using FieldFlags = uint32_t;
+    static constexpr FieldFlags BASECALLING_FIELDS = 1 << 1;
+    static constexpr FieldFlags POLYA_FIELDS = 1 << 2;
+    static constexpr FieldFlags EXPERIMENT_FIELDS = 1 << 3;
+    static constexpr FieldFlags BARCODING_FIELDS = 1 << 4;
+    static constexpr FieldFlags ALIGNMENT_FIELDS = 1 << 5;
+    static constexpr FieldFlags DUPLEX_FIELDS = 1 << 6;
+
+    SummaryFileWriter(const std::filesystem::path& output_directory, FieldFlags flags);
+    SummaryFileWriter(std::ostream& stream, FieldFlags flags);
 
     void process(const Processable item) override;
     void shutdown() override;
@@ -25,6 +34,7 @@ private:
     void init();
     void handle(const HtsData& item);
 
+    const FieldFlags m_field_flags;
     std::ofstream m_summary_file;
     std::ostream& m_summary_stream;
 };
