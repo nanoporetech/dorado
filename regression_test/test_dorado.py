@@ -125,7 +125,6 @@ class TestDorado(unittest.TestCase):
                     # prevent non-deterministic results.
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
-                    errors = None
                     try:
                         output_folder.mkdir(parents=True, exist_ok=True)
                         with contextlib.chdir(output_folder):
@@ -154,7 +153,7 @@ class TestDorado(unittest.TestCase):
                     )
 
                     errors = "\n".join(filter(None, (dorado_errors, summary_errors)))
-                    if errors is not None:
+                    if errors:
                         # This indicates regression test failures due to file comparison and/or validation,
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
@@ -247,7 +246,6 @@ class TestDorado(unittest.TestCase):
                     # prevent non-deterministic results.
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
-                    errors = None
                     try:
                         output_folder.mkdir(parents=True, exist_ok=True)
                         with contextlib.chdir(output_folder):
@@ -272,7 +270,7 @@ class TestDorado(unittest.TestCase):
                     )
 
                     errors = "\n".join(filter(None, (dorado_errors, summary_errors)))
-                    if errors is not None:
+                    if errors:
                         # This indicates regression test failures due to file comparison and/or validation,
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
