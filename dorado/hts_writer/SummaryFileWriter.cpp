@@ -7,6 +7,7 @@
 #include <htslib/sam.h>
 
 #include <array>
+#include <iomanip>
 #include <string_view>
 #include <vector>
 
@@ -139,6 +140,8 @@ SummaryFileWriter::SummaryFileWriter(std::ostream& stream, FieldFlags flags)
 }
 
 void SummaryFileWriter::init() {
+    m_summary_stream << std::fixed << std::setprecision(6);
+
     // Write column headers
     for (size_t i = 0; i < s_general_fields.size(); ++i) {
         if (i > 0) {
@@ -212,7 +215,8 @@ void SummaryFileWriter::handle(const HtsData& data) {
 
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
         m_summary_stream << separator << trimmed_duration;
-        m_summary_stream << separator << trimmed_duration / data.read_attrs.model_stride;
+        m_summary_stream << separator
+                         << static_cast<uint64_t>(trimmed_duration / data.read_attrs.model_stride);
         m_summary_stream << separator << template_duration;
         m_summary_stream << separator << record->core.l_qseq;
         m_summary_stream << separator << get_tag(record, "qs", 0.f);
