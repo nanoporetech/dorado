@@ -354,10 +354,10 @@ regression_tests:speed:windows:A6000:
     GPU_DEVICE_NAME: "A6000"
   extends:
     - .windows_regression_dependencies
+    - .windows_benchmark_runner_a6000
     - .speed_regression_test
   needs:
     - build_archive:windows:cuda12
-    - windows_benchmark_runner_a6000
 
 regression_tests:speed:macos:arm:
   parallel:
