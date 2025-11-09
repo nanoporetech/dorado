@@ -25,10 +25,11 @@ def download_results(project: str, graph_history: int):
         results["speed"].append(entry)
     results["speed"].sort(key=lambda x: x["date"])
 
-    results["latency"] = []
-    for entry in db_wrapper.get_latency_entries(oldest):
-        results["latency"].append(entry)
-    results["latency"].sort(key=lambda x: x["date"])
+    if project == "ont_core":
+        results["latency"] = []
+        for entry in db_wrapper.get_latency_entries(oldest):
+            results["latency"].append(entry)
+        results["latency"].sort(key=lambda x: x["date"])
 
     return results
 
@@ -116,11 +117,11 @@ def generate_graphs(
                     device_suffix = "_a6000"
                 else:
                     device_suffix = ""
-                if "fast@" in config:
+                if "fast" in config:
                     add_to_group(f"{preset}_fast{device_suffix}")
-                if "hac@" in config:
+                if "hac" in config:
                     add_to_group(f"{preset}_hac{device_suffix}")
-                if "sup@" in config:
+                if "sup" in config:
                     add_to_group(f"{preset}_sup{device_suffix}")
             # TODO: other groups?
 
