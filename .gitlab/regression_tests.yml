@@ -385,7 +385,7 @@ regression_tests:speed:email:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   extends:
     - .linux_regression_dependencies
-    - .linux_regression_runner
+    - .linux_runner
   stage: notify
   when: always
   dependencies: []
