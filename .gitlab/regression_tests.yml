@@ -39,18 +39,49 @@
     # so pin the OS to the one that we have the most runners of.
     - osx-14.4
 
-.linux_regression_runner:
+.linux_regression_runner_v100:
   tags:
     - ubuntu-20.04
     - nvidia-docker
     - on-prem
+    - gpu-v100
 
-.windows_regression_runner:
+.linux_regression_runner_a100:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    - gpu-a100
+
+.windows_regression_runner_v100:
   tags:
     - windows-10
     - VS2019
     - cuda-${CUDA}
     - on-prem
+    - gpu-v100
+
+.linux_benchmark_runner_p48:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    - benchmark-p48
+
+.linux_benchmark_runner_a100:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    - benchmark-a100
+
+.windows_benchmark_runner_a6000:
+  tags:
+    - windows-10
+    - VS2019
+    - cuda-${CUDA}
+    - on-prem
+    - gpu-a6000
 
 # We need this to check out the regression_test_data project, which has our test files in git-lfs.
 .prepare_git-lfs:
@@ -153,12 +184,10 @@ regression_test:linux:x86:cuda12:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_regression_dependencies
+    - .linux_regression_runner_v100
     - .regression_test
   needs:
     - build_archive:linux:x86:cuda12
-  tags:
-    - !reference [.linux_regression_runner, tags]
-    - gpu-v100
   except:
     - tags
 
@@ -181,12 +210,10 @@ regression_test:windows:
     BUILD_CUDA: 1
   extends:
     - .windows_regression_dependencies
+    - .windows_regression_runner_v100
     - .regression_test
   needs:
     - build_archive:windows:cuda12
-  tags:
-    - !reference [.windows_regression_runner, tags]
-    - gpu-v100
   except:
     - tags
 
@@ -287,9 +314,7 @@ regression_tests:speed:linux:x86:V100:
     - build_archive:linux:x86:cuda12
   extends:
     - .regression_tests:speed:linux:x86:cuda12
-  tags:
-    - !reference [.linux_regression_runner, tags]
-    - benchmark-p48
+    - .linux_benchmark_runner_p48
 
 regression_tests:speed:linux:x86:A100:
   parallel:
@@ -309,9 +334,7 @@ regression_tests:speed:linux:x86:A100:
     - build_archive:linux:x86:cuda12
   extends:
     - .regression_tests:speed:linux:x86:cuda12
-  tags:
-    - !reference [.linux_regression_runner, tags]
-    - benchmark-a100
+    - .linux_benchmark_runner_a100
 
 regression_tests:speed:windows:A6000:
   parallel:
@@ -334,9 +357,7 @@ regression_tests:speed:windows:A6000:
     - .speed_regression_test
   needs:
     - build_archive:windows:cuda12
-  tags:
-    - !reference [.windows_regression_runner, tags]
-    - gpu-a6000
+    - windows_benchmark_runner_a6000
 
 regression_tests:speed:macos:arm:
   parallel:
