@@ -25,6 +25,7 @@
 
 // #define DEBUG_VC_DATA_DUMP
 // #define DEBUG_VARIANT_REGIONS
+// #define DEBUG_NORMALIZE_VARIANT
 
 namespace dorado::secondary {
 
@@ -333,8 +334,14 @@ Variant construct_variant(const std::string_view draft,
 
     if (is_var && std::all_of(std::cbegin(var_preds), std::cend(var_preds),
                               [&var_ref](const std::string_view val) { return val == var_ref; })) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[construct_variant] Returning empty variant, case 1!\n";
+#endif
         return {};
     } else if (!ambig_ref && !is_subset_of_symbols(symbol_set, var_ref)) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[construct_variant] Returning empty variant, case 2!\n";
+#endif
         return {};
     }
 
@@ -345,6 +352,9 @@ Variant construct_variant(const std::string_view draft,
 
     // Check if variant starts on insert, prepend previous ref base.
     if (positions_minor[var.rstart] != 0) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[construct_variant] Running prepend_major_ref_base.\n";
+#endif
         prepend_major_ref_base(var);
     }
 
@@ -355,8 +365,14 @@ Variant construct_variant(const std::string_view draft,
         for (const ConsensusResult& val : cons_seqs_with_gaps) {
             cons_view.emplace_back(val.seq);
         }
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[construct_variant] Before normalization. var = " << var << '\n';
+#endif
         var = normalize_variant(ref_seq_with_gaps, cons_view, positions_major, positions_minor,
                                 symbol_set, var, ambig_ref);
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[construct_variant] After normalization.  var = " << var << '\n';
+#endif
     }
 
     // If the ALT field is still is empty, set it to a '.'. This can happen when a deletion is
@@ -399,20 +415,44 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
     int64_t furthest_rend = variants[0].rend;
     int64_t prev_i = 0;
     for (int64_t i = 1; i < dorado::ssize(variants); ++i) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[merge_sorted_variants] ----------------------------------\n";
+#endif
+
         const Variant& v1 = variants[prev_i];
         const Variant& v2 = variants[i];
         const bool is_overlapping = (v2.rstart < furthest_rend) && (v2.rend >= v1.rstart);
         const bool is_adjacent = (v2.rstart == furthest_rend);
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[merge_sorted_variants] prev_i = " << prev_i << ", i = " << i
+                  << ", is_overlapping = " << is_overlapping << ", is_adjacent = " << is_adjacent
+                  << '\n';
+        std::cerr << "[merge_sorted_variants] v1 = " << v1 << '\n';
+        std::cerr << "[merge_sorted_variants] v2 = " << v2 << '\n';
+#endif
+
         if ((merge_overlapping && is_overlapping) || (merge_adjacent && is_adjacent)) {
             furthest_rend = v2.rend;
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[merge_sorted_variants]   -> will merge, furthest_rend = "
+                      << furthest_rend << '\n';
+#endif
             continue;
         }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[merge_sorted_variants] Constructing new_var.\n";
+#endif
 
         Variant new_var = construct_variant(
                 draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                 variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
                 probs_3D, symbol_set, symbol_lookup);
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[merge_sorted_variants] new_var = " << new_var << '\n';
+#endif
 
         if (is_valid(new_var)) {
             filtered.emplace_back(std::move(new_var));
@@ -421,6 +461,9 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
         furthest_rend = v2.rend;
         prev_i = i;
     }
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[merge_sorted_variants] ----------------------------------\n";
+#endif
     {  // Remaining.
         Variant new_var = construct_variant(
                 draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
@@ -431,6 +474,9 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             filtered.emplace_back(std::move(new_var));
         }
     }
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[merge_sorted_variants] ==================================\n";
+#endif
 
     return filtered;
 }
@@ -581,12 +627,18 @@ bool append_ref_base(Variant& var,
     // Only the var.rstart should be considered valid.
     const int64_t next_ref_pos = var.pos + dorado::ssize(var.ref);
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[append_ref_base] On entry: var = " << var << '\n';
+#endif
     // Search for the major position which matches the next_ref_pos,
     // starting from var.rstart.
     const auto [can_go_right, new_rend_inclusive, new_ref_pos] =
             find_ref_pos(positions_major, positions_minor, var.rstart, next_ref_pos);
 
     if (!can_go_right) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[append_ref_base] On return false 1: var = " << var << '\n';
+#endif
         return false;
     }
 
@@ -600,6 +652,9 @@ bool append_ref_base(Variant& var,
     }
 
     if (!bases_valid) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[append_ref_base] On return false 2: var = " << var << '\n';
+#endif
         return false;
     }
 
@@ -615,6 +670,9 @@ bool append_ref_base(Variant& var,
 
     // Check if there is more than 1 unique suffix - this is a variant then, stop extension.
     if (std::size(suffix_set) > 1) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[append_ref_base] On return false 3: var = " << var << '\n';
+#endif
         return false;
     }
 
@@ -625,6 +683,10 @@ bool append_ref_base(Variant& var,
         var.alts[i] = remove_gaps(cons_seqs_with_gaps[i].substr(var.rstart, total_span));
     }
     var.rend = new_rend_inclusive + 1;
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[append_ref_base] On return true: var = " << var << '\n';
+#endif
 
     return true;
 }
@@ -705,6 +767,9 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
                                      &positions_minor, &symbol_set, &ambig_ref](Variant& var) {
         const auto reset_var = [](const Variant& v) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant]    [trim_end_and_align] Resetting var.\n";
+#endif
             std::vector<std::string> seqs{v.ref};
             seqs.insert(std::end(seqs), std::cbegin(v.alts), std::cend(v.alts));
             return std::make_pair(v, seqs);
@@ -715,6 +780,11 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 
         bool changed = true;
         while (changed) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant]    [trim_end_and_align] while (changed). var = "
+                      << var << '\n';
+#endif
+
             changed = false;
 
             // Keep a copy if we need to bail.
@@ -746,6 +816,12 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
                 }
             }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant]    [trim_end_and_align]    -> After all_non_empty. "
+                         "var = "
+                      << var << '\n';
+#endif
 
             const bool any_empty =
                     std::any_of(std::cbegin(seqs), std::cend(seqs),
@@ -781,9 +857,19 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                     break;
                 }
             }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant]    [trim_end_and_align]    -> After any_empty. var = "
+                      << var << '\n';
+#endif
         }
         var.ref = seqs[0];
         var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant]    [trim_end_and_align] After while. var = " << var
+                  << '\n';
+#endif
     };
 
     Variant ret = variant;
@@ -801,21 +887,54 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     // (in this case, on a minor position which does not contain a reference base).
     // While actually, the variant.pos should have been set to the first major position after rstart.
     if (!std::empty(ret.ref)) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Initial heuristic. Before: " << ret << "\n";
+#endif
         for (int32_t r = ret.rstart; r < ret.rend; ++r) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[r = " << r << "] positions_major[r] = " << positions_major[r]
+                      << ", positions_minor[r] = " << positions_minor[r]
+                      << ", ret.pos = " << ret.pos << "\n";
+#endif
             if ((positions_major[r] >= ret.pos) && (positions_minor[r] == 0)) {
                 ret.pos = positions_major[r];
+#ifdef DEBUG_NORMALIZE_VARIANT
+                std::cerr << "[normalize_variant]    -> Found major position: r = " << r
+                          << ", ret.pos = " << ret.pos << "\n";
+#endif
                 break;
             }
         }
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Initial heuristic. After: " << ret << "\n";
+#endif
     }
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[normalize_variant] Entry variant: " << variant << '\n';
+#endif
+
     if (std::empty(ref_with_gaps)) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Before trim_start 1: " << ret << '\n';
+#endif
         trim_start(ret, true);
     } else {
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Before trim_end_and_align: " << ret << '\n';
+#endif
         trim_end_and_align(ret);
     }
 
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[normalize_variant] Before trim_start 2:" << ret << '\n';
+#endif
+
     trim_start(ret, false);
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "[normalize_variant] Final variant: " << ret << '\n';
+#endif
 
     return ret;
 }
@@ -934,7 +1053,8 @@ std::vector<Variant> general_decode_variants(
         for (const ConsensusResult& val : cons_seqs_with_gaps) {
             cons_view2.emplace_back(val.seq);
         }
-        std::cerr << "[general_decode_variants] seq_id = " << seq_id << '\n';
+        std::cerr << "[general_decode_variants] seq_id = " << seq_id
+                  << ", columns = " << std::size(positions_major) << '\n';
         print_slice(std::cerr, ref_seq_with_gaps, cons_view2, positions_major, positions_minor,
                     is_variant, 0, -1, 0, -1);
     }
@@ -948,6 +1068,12 @@ std::vector<Variant> general_decode_variants(
             continue;
         }
 
+#ifdef DEBUG_VARIANT_REGIONS
+        {
+            std::cerr << "[general_decode_variants] ---------------------------------------\n";
+        }
+#endif
+
         Variant var = construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
                                         cons_seqs_with_gaps, seq_id, rstart, rend, is_var,
                                         ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
@@ -955,8 +1081,8 @@ std::vector<Variant> general_decode_variants(
 #ifdef DEBUG_VARIANT_REGIONS
         {
             std::cerr << "[general_decode_variants] region: rstart = " << rstart
-                      << ", rend = " << rend << ", is_var = " << is_var << "\n";
-            std::cerr << "[variant slice] var = " << var << '\n';
+                      << ", rend = " << rend << ", is_var = " << is_var << '\n';
+            std::cerr << "[general_decode_variants slice] var = " << var << '\n';
             const int64_t s = std::max<int64_t>(0, var.rstart - 5);
             const int64_t e = std::min(dorado::ssize(positions_major), var.rend + 5);
             print_slice(std::cerr, ref_seq_with_gaps, cons_view, positions_major, positions_minor,
@@ -971,6 +1097,19 @@ std::vector<Variant> general_decode_variants(
 
         variants.emplace_back(std::move(var));
     }
+#ifdef DEBUG_VARIANT_REGIONS
+    {
+        std::cerr << "[general_decode_variants] =======================================\n";
+    }
+#endif
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "Collected variants (" << std::size(variants) << "):\n";
+    for (size_t i = 0; i < std::size(variants); ++i) {
+        std::cerr << "    [i = " << i << "] var: " << variants[i] << '\n';
+    }
+    std::cerr << '\n';
+#endif
 
     if (merge_overlapping || merge_adjacent) {
         std::sort(std::begin(variants), std::end(variants), [](const Variant& a, const Variant& b) {
@@ -982,6 +1121,14 @@ std::vector<Variant> general_decode_variants(
                                          cons_seqs_with_gaps, ambig_ref, normalize, probs_3D,
                                          symbol_set, symbol_lookup);
     }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+    std::cerr << "Merged variants (" << std::size(variants) << "):\n";
+    for (size_t i = 0; i < std::size(variants); ++i) {
+        std::cerr << "    [i = " << i << "] var: " << variants[i] << '\n';
+    }
+    std::cerr << '\n';
+#endif
 
     if (return_all) {
         for (int64_t i = 0; i < dorado::ssize(positions_major); ++i) {
