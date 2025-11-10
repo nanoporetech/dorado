@@ -13,8 +13,11 @@
 #include <spdlog/spdlog.h>
 
 #include <filesystem>
+#include <iterator>
 #include <optional>
 #include <stdexcept>
+#include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::model_resolution {
@@ -149,10 +152,25 @@ ModelSources ModelResolver::resolve_model_complex() const {
                                                   simplex_variant, ModsVariantPair(), true);
         const ModelSource simplex = find_or_download_model(simplex_info);
 
-        std::vector<ModelSource> mods;
+        std::vector<ModelInfo> modbase_infos;
         for (const ModsVariantPair& mod_variant : model_complex.get_mod_model_variants()) {
             const ModelInfo modbase_info = find_model(modified_models(), "modbase", chemistry,
                                                       simplex_variant, mod_variant, true);
+            modbase_infos.push_back(modbase_info);
+        }
+
+        std::unordered_set<std::string> modbase_names;
+        for (const auto& modbase_info : modbase_infos) {
+            const auto [_, inserted] = modbase_names.emplace(modbase_info.name);
+            if (!inserted) {
+                throw std::runtime_error(
+                        fmt::format("Duplicate modbases model found: '{}'", modbase_info.name));
+            }
+        }
+
+        std::vector<ModelSource> mods;
+        mods.reserve(modbase_infos.size());
+        for (const auto& modbase_info : modbase_infos) {
             mods.push_back(find_or_download_model(modbase_info));
         }
 
@@ -165,16 +183,24 @@ ModelSources ModelResolver::resolve_model_complex() const {
 
 void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
     const bool used_complex = !model_sources.mods.empty();
-    const bool used_paths = !m_modbase_models.empty();
+    const bool used_paths_or_names = !m_modbase_models.empty();
     const bool used_modbases = !m_modbases.empty();
 
-    if (used_complex && (used_paths || used_modbases)) {
+    if (used_complex && (used_paths_or_names || used_modbases)) {
         throw std::logic_error(
                 "Modbase models set via model complex, --modified-bases and "
                 "--modified-bases-models are mutually exclusive.");
     }
 
     const auto& simplex = model_sources.simplex;
+    std::unordered_set<std::string> model_names;
+
+    auto check_duplicate = [&model_names](const std::string& name) {
+        const auto& [_, inserted] = model_names.emplace(name);
+        if (!inserted) {
+            throw std::runtime_error(fmt::format("Duplicate modbases model found: '{}'", name));
+        }
+    };
 
     if (used_modbases) {
         model_sources.mods.reserve(m_modbases.size());
@@ -191,33 +217,40 @@ void ModelResolver::resolve_modbase_models(ModelSources& model_sources) const {
                                     mods_info.name, simplex.info->name));
             }
 
-            for (const auto& prev : model_sources.mods) {
-                if (prev.info->name == mods_info.name) {
-                    throw std::runtime_error(
-                            fmt::format("Duplicate modbases model found: '{}'", prev.info->name));
-                }
-            }
+            check_duplicate(mods_info.name);
 
             const auto mods_source = find_or_download_model(mods_info);
             model_sources.mods.push_back(mods_source);
         }
     }
 
-    if (used_paths) {
+    if (used_paths_or_names) {
         const auto splits = utils::split(m_modbase_models, ',');
         model_sources.mods.reserve(splits.size());
         for (const auto& part : splits) {
             const auto path = fs::path(part);
-            const auto maybe_info = get_model_info_from_path(path);
-
-            for (const auto& prev : model_sources.mods) {
-                if (prev.path.filename().string() == path.filename().string()) {
-                    throw std::runtime_error(fmt::format("Duplicate modbases model found: '{}'",
-                                                         path.filename().string()));
+            if (fs::exists(path)) {
+                const auto maybe_info = get_model_info_from_path(path);
+                if (maybe_info.has_value()) {
+                    check_duplicate(maybe_info.value().name);
+                } else {
+                    check_duplicate(path.filename().string());
                 }
-            }
+                model_sources.mods.push_back(ModelSource{path, maybe_info, false});
+            } else {
+                const auto mods_info = get_model_info(part);
+                if (mods_info.model_type != ModelType::MODBASE) {
+                    throw std::runtime_error(fmt::format(
+                            "Invalid --modified-bases-models model argument '{}' is not a "
+                            "modified base model but a '{}' model.",
+                            part, to_string(mods_info.model_type)));
+                }
 
-            model_sources.mods.push_back(ModelSource{path, maybe_info, false});
+                check_duplicate(mods_info.name);
+
+                const auto mods_source = find_or_download_model(mods_info);
+                model_sources.mods.push_back(mods_source);
+            }
         }
     }
 }

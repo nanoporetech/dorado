@@ -220,7 +220,7 @@ int duplex(int argc, char* argv[]) {
                     return value;
                 });
         modbase_mutex_group.add_argument("--modified-bases-models")
-                .help("A comma separated list of modified base models")
+                .help("A comma separated list of modified base model names or paths.")
                 .default_value(std::string());
         parser.add_argument("--modified-bases-threshold")
                 .help("The minimum predicted methylation probability for a modified base to be "

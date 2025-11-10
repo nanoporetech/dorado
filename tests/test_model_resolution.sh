@@ -27,7 +27,7 @@ data_dir=$(realpath ${test_dir}/data)
 example_data=${data_dir}/pod5/dna_r10.4.1_e8.2_400bps_5khz
 
 # Common arguments
-common_args="-v"
+common_args=" --recursive --max-reads 1 -b 128 -v "
 models_directory_arg="--models-directory ${models_directory}"
 
 TEST_DOWNLOADER_NAMED=1
@@ -57,10 +57,20 @@ check_exists() {
     return 0
 }
 
+title() {
+    set +x 
+    echo ""
+    echo ""
+    echo "====================================================================="
+    echo $1
+    echo "====================================================================="
+    set -x
+}
+
 # Testing dorado downloader
 if [ $TEST_DOWNLOADER_NAMED -eq 1 ]; then 
 {
-    # Test we can download a named model
+    title "Test we can download a named model"
     simplex_name="rna004_130bps_fast@v5.2.0"
     local_dir="${output_dir}/download_simplex"
     mkdir -p ${local_dir}
@@ -70,7 +80,7 @@ if [ $TEST_DOWNLOADER_NAMED -eq 1 ]; then
     popd
 }
 {
-    # Test we can download a named modbase model
+    title "Test we can download a named modbase model"
     modbase_name="rna004_130bps_hac@v5.2.0_m5C@v1"
     local_dir="${output_dir}/download_modbase"
     mkdir -p ${local_dir}
@@ -80,7 +90,7 @@ if [ $TEST_DOWNLOADER_NAMED -eq 1 ]; then
     popd
 }
 {
-    # Test we can download a named stereo model
+    title "Test we can download a named stereo model"
     stereo_name="dna_r10.4.1_e8.2_5khz_stereo@v1.4"
     local_dir="${output_dir}/download_stereo"
     mkdir -p ${local_dir}
@@ -90,15 +100,17 @@ if [ $TEST_DOWNLOADER_NAMED -eq 1 ]; then
     popd
 }
 {
-    # Test we do not re-download a named model
+    title "Test we do not re-download a named model"
     model_name="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
     local_dir="${output_dir}/download_repeat"
     mkdir -p ${local_dir}
     pushd ${local_dir}
-        ${dorado_bin} download --model ${model_name} 2> first_download.stderr.txt
-        ${dorado_bin} download --model ${model_name} 2> repeat_download.stderr.txt
+        ${dorado_bin} download --model ${model_name} -vv 2> first_download.stderr.txt
+        cat first_download.stderr.txt >&2
+        ${dorado_bin} download --model ${model_name} -vv 2> repeat_download.stderr.txt
+        cat repeat_download.stderr.txt >&2
         if ! grep -q "found existing model '${model_name}'" repeat_download.stderr.txt; then
-            cat stderr.txt
+            cat repeat_download.stderr.txt
             echo "Model download was not skipped"
             exit 1
         fi
@@ -108,7 +120,7 @@ fi # TEST_DOWNLOADER_NAMED
 
 if [ $TEST_DOWNLOADER_VARIANT -eq 1 ]; then 
 {
-    # Test we can download using a model complex
+    title "Test we can download using a model complex"
     local_dir="${output_dir}/download_complex"
     complex="fast@v5.2"
     expected="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
@@ -119,7 +131,7 @@ if [ $TEST_DOWNLOADER_VARIANT -eq 1 ]; then
     popd
 }
 {
-    # Test we can download using a model complex with modbases
+    title "Test we can download using a model complex with modbases"
     local_dir="${output_dir}/download_modbase_complex2"
     complex="hac@v5.2,5mC_5hmC@v2,6mA@v1"
     expected=(
@@ -138,13 +150,14 @@ fi # TEST_DOWNLOADER_VARIANT
 
 if [ $TEST_BASECALLER -eq 1 ]; then 
 {
-    # Test we can auto download using a model complex which is then cleaned up
+    title "Test we can auto download using a model complex which is then cleaned up"
     local_dir="${output_dir}/basecaller_variant_complex_temporary"
     complex="fast@v5.2"
     expected="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
     mkdir -p ${local_dir}
     pushd ${local_dir}
-        ${dorado_bin} basecaller ${complex} ${example_data} --recursive --max-reads 1 -b 128 -v > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ${complex} ${example_data} ${common_args} > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
 
         # Check log for confirmation that expected model was downloaded
         if ! grep -q "downloading ${expected}" basecaller.stderr.txt; then
@@ -161,13 +174,14 @@ if [ $TEST_BASECALLER -eq 1 ]; then
     popd
 }
 {
-    # Test we can auto download using a model complex into models-directory
+    title "Test we can auto download using a model complex into models-directory"
     local_dir="${output_dir}/basecaller_variant_complex_persistent"
     complex="fast@v5.2"
     expected="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
     mkdir -p ${local_dir}
     pushd ${local_dir}
-        ${dorado_bin} basecaller ${complex} ${example_data} --recursive --max-reads 1 -b 128 --models-directory . -v > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ${complex} ${example_data} ${common_args} --models-directory . > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
 
         # Check log for confirmation that expected model was downloaded
         if ! grep -q "downloading ${expected}" basecaller.stderr.txt; then
@@ -181,13 +195,14 @@ if [ $TEST_BASECALLER -eq 1 ]; then
     popd
 }
 {
-    # Test we can auto download model by name
+    title "Test we can auto download model by name"
     local_dir="${output_dir}/basecaller_named_complex_persistent"
     complex="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
     expected="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
     mkdir -p ${local_dir}
     pushd ${local_dir}
-        ${dorado_bin} basecaller ${complex} ${example_data} --recursive --max-reads 1 -b 128 --models-directory . -v > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ${complex} ${example_data} ${common_args} --models-directory . > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
 
         # Check log for confirmation that expected model was downloaded
         if ! grep -q "downloading ${expected}" basecaller.stderr.txt; then
@@ -200,27 +215,29 @@ if [ $TEST_BASECALLER -eq 1 ]; then
     popd
 }
 {
-    # Test we can auto download a modbase model and it's parent simplex model modbase model name
+    title "Test we can auto download a modbase model and it's parent simplex model modbase model name"
     local_dir="${output_dir}/basecaller_named_modbase"
     complex="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"
     expected=("dna_r10.4.1_e8.2_400bps_hac@v5.2.0" "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2")
     mkdir -p ${local_dir}
     pushd ${local_dir}
-        ${dorado_bin} basecaller ${complex} ${example_data} --recursive --max-reads 1 -b 128 --models-directory . -v > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ${complex} ${example_data} ${common_args} --models-directory . > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
 
         check_exists ${local_dir} "${expected[@]}"
     popd
 }
 {
-    # Test we can reuse named modbase model and specify modbasecalling via complex
+    title "Test we can reuse named modbase model and specify modbasecalling via complex"
     local_dir="${output_dir}/basecaller_named_modbase_reuse"
     complex="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"
     expected=("dna_r10.4.1_e8.2_400bps_hac@v5.2.0" "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2")
     mkdir -p ${local_dir}
     pushd ${local_dir}
         mkdir -p models
-        ${dorado_bin} download --model hac@v5.2.0,5mC_5hmC@v2 --data ${example_data} --recursive --models-directory models
-        ${dorado_bin} basecaller ${complex} ${example_data} --recursive --max-reads 1 -b 128 --models-directory models -vv > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} download --model hac@v5.2.0,5mC_5hmC@v2 --data ${example_data} --models-directory models
+        ${dorado_bin} basecaller ${complex} ${example_data} ${common_args} -vv --models-directory models  > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
 
         # Check log for confirmation that expected models were found
         for ex in "${expected[@]}"; do
@@ -236,41 +253,44 @@ if [ $TEST_BASECALLER -eq 1 ]; then
     popd
 }
 {
-    # Check mixing named modbase is not permitted with other arguments
+    title "Check mixing named modbase is not permitted with other arguments"
     local_dir="${output_dir}/basecaller_named_modbase"
     complex="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"
-    expected=("dna_r10.4.1_e8.2_400bps_hac@v5.2.0" "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2")
     mkdir -p ${local_dir}
     pushd ${local_dir}
-        if ${dorado_bin} basecaller ${complex} ${example_data} --recursive -n 1 -b 128 -v --modified-bases 5mC_5hmC > /dev/null 2> basecaller.stderr.txt ; then
+        if ${dorado_bin} basecaller ${complex} ${example_data} ${common_args} --modified-bases 5mC_5hmC > /dev/null 2> basecaller.stderr.txt; then
+            cat basecaller.stderr.txt >&2
             echo "Expected dorado to error"
             exit 1
         fi
+        cat basecaller.stderr.txt >&2
     popd
 }
 fi # TEST_BASECALLER
 
 if [ $TEST_BASECALLER_PATH -eq 1 ]; then 
 {
-    # Test we can use a model by path
+    title "Test we can use a model by path"
     local_dir="${output_dir}/basecaller_path"
     name="dna_r10.4.1_e8.2_400bps_fast@v5.2.0"
     mkdir -p ${local_dir}
     pushd ${local_dir}
         mkdir -p models
         ${dorado_bin} download --model ${name} --models-directory models
-        ${dorado_bin} basecaller ./models/${name} ${example_data} --recursive --max-reads 1 -b 128 -v > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ./models/${name} ${example_data} ${common_args} > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
     popd
 }
 {
-    # Test we can specify a model by path and auto download a modbase model via --modified-bases
+    title "Test we can specify a model by path and auto download a modbase model via --modified-bases"
     local_dir="${output_dir}/basecaller_path_modified_bases"
     name="dna_r10.4.1_e8.2_400bps_hac@v5.2.0"
     mkdir -p ${local_dir}
     pushd ${local_dir}
         mkdir -p models
         ${dorado_bin} download --model ${name} --models-directory models
-        ${dorado_bin} basecaller ./models/${name} ${example_data} --recursive --max-reads 1 -b 128 -v --modified-bases "5mC_5hmC" > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ./models/${name} ${example_data} ${common_args} --modified-bases "5mC_5hmC" > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
 
         # Check log for confirmation that expected model was downloaded
         if ! grep -q "downloading dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2" basecaller.stderr.txt; then
@@ -281,7 +301,7 @@ if [ $TEST_BASECALLER_PATH -eq 1 ]; then
     popd
 }
 {
-    # Test we can specify a model by path and --modified-bases-models
+    title "Test we can specify a model by path and --modified-bases-models by path"
     local_dir="${output_dir}/basecaller_path_modified_paths"
     name="dna_r10.4.1_e8.2_400bps_hac@v5.2.0"
     mod="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"
@@ -290,9 +310,31 @@ if [ $TEST_BASECALLER_PATH -eq 1 ]; then
         mkdir -p models
         ${dorado_bin} download --model ${name} --models-directory models
         ${dorado_bin} download --model ${mod}  --models-directory models
-        ${dorado_bin} basecaller ./models/${name} ${example_data} --recursive --max-reads 1 -b 128 -vv --modified-bases-models ./models/${mod} > /dev/null 2> basecaller.stderr.txt
+        ${dorado_bin} basecaller ./models/${name} ${example_data} ${common_args} -vv --modified-bases-models ./models/${mod} > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
+    popd
+}
+{
+    title "Test we can specify a model by path and --modified-bases-models by name"
+    local_dir="${output_dir}/basecaller_path_modified_name"
+    name="dna_r10.4.1_e8.2_400bps_hac@v5.2.0"
+    mod="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"
+    mkdir -p ${local_dir}
+    pushd ${local_dir}
+        mkdir -p models
+        ${dorado_bin} download --model ${name} --models-directory models
+        ${dorado_bin} download --model ${mod}  --models-directory models
+        ${dorado_bin} basecaller ./models/${name} ${example_data} ${common_args} -vv --modified-bases-models ${mod} > /dev/null 2> basecaller.stderr.txt
+        cat basecaller.stderr.txt >&2
+        # Check log for confirmation that expected model was downloaded
+        if ! grep -q "downloading dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2" basecaller.stderr.txt; then
+            echo "Model download error"
+            exit 1
+        fi
     popd
 }
 fi
+
+title "DONE"
 
 # rm -rf ${TMPDIR} // Trap will clean-up
