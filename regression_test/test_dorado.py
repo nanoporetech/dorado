@@ -14,7 +14,6 @@ from data_paths import (
     REFERENCE_FOLDER,
 )
 
-os.environ["VALIDATE_SUMMARY_FILES"] = "false"
 from utilities import DEBUG, run_dorado, make_summary
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
@@ -127,26 +126,22 @@ class TestDorado(unittest.TestCase):
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
                     try:
-                        output_folder.mkdir(parents=True, exist_ok=True)
-                        with contextlib.chdir(output_folder):
-                            with output_file.open("wb") as outfile:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with contextlib.chdir(outfile.parent):
+                            with (
+                                output_file.open("wb") as outfile,
+                                log_file.open("w") as errfile,
+                            ):
                                 run_dorado(
-                                    dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                                    dorado_args,
+                                    DEFAULT_MAX_TIMEOUT,
+                                    outfile=outfile,
+                                    errfile=errfile,
                                 )
                             # Now generate a post-run summary file, which we check for regressions but don't validate against the spec.
                             # Specifically make this a ".tsv" file so we don't mix it up with the inline summary
                             make_summary(
                                 output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
-                        output_file.parent.mkdir(parents=True, exist_ok=True)
-                        with (
-                            output_file.open("wb") as outfile,
-                            log_file.open("w") as errfile,
-                        ):
-                            run_dorado(
-                                dorado_args,
-                                DEFAULT_MAX_TIMEOUT,
-                                outfile=outfile,
-                                errfile=errfile,
                             )
                     except Exception as ex:
                         msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
@@ -258,24 +253,20 @@ class TestDorado(unittest.TestCase):
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
                     try:
-                        output_folder.mkdir(parents=True, exist_ok=True)
-                        with contextlib.chdir(output_folder):
-                            with output_file.open("wb") as outfile:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with contextlib.chdir(output_file.parent):
+                            with (
+                                output_file.open("wb") as outfile,
+                                log_file.open("w") as errfile,
+                            ):
                                 run_dorado(
-                                    dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                                    dorado_args,
+                                    DEFAULT_MAX_TIMEOUT,
+                                    outfile=outfile,
+                                    errfile=errfile,
                                 )
                             make_summary(
                                 output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
-                        output_file.parent.mkdir(parents=True, exist_ok=True)
-                        with (
-                            output_file.open("wb") as outfile,
-                            log_file.open("w") as errfile,
-                        ):
-                            run_dorado(
-                                dorado_args,
-                                DEFAULT_MAX_TIMEOUT,
-                                outfile=outfile,
-                                errfile=errfile,
                             )
                     except Exception as ex:
                         msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
