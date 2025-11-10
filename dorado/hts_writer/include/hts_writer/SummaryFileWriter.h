@@ -15,12 +15,12 @@ namespace hts_writer {
 class SummaryFileWriter : public IWriter {
 public:
     using FieldFlags = uint32_t;
-    static constexpr FieldFlags BASECALLING_FIELDS = 1 << 1;
-    static constexpr FieldFlags POLYA_FIELDS = 1 << 2;
-    static constexpr FieldFlags EXPERIMENT_FIELDS = 1 << 3;
-    static constexpr FieldFlags BARCODING_FIELDS = 1 << 4;
-    static constexpr FieldFlags ALIGNMENT_FIELDS = 1 << 5;
-    static constexpr FieldFlags DUPLEX_FIELDS = 1 << 6;
+    static constexpr FieldFlags BASECALLING_FIELDS = 1 << 0;
+    static constexpr FieldFlags POLYA_FIELDS = 1 << 1;
+    static constexpr FieldFlags EXPERIMENT_FIELDS = 1 << 2;
+    static constexpr FieldFlags BARCODING_FIELDS = 1 << 3;
+    static constexpr FieldFlags ALIGNMENT_FIELDS = 1 << 4;
+    static constexpr FieldFlags DUPLEX_FIELDS = 1 << 5;
 
     SummaryFileWriter(const std::filesystem::path& output_directory, FieldFlags flags);
     SummaryFileWriter(std::ostream& stream, FieldFlags flags);
