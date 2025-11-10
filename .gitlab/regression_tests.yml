@@ -226,6 +226,7 @@ regression_test:windows:
   stage: regression_test
   variables:
     GIT_SUBMODULE_STRATEGY: normal
+    MTL_DEBUG_LAYER: 0
   script:
     - !reference [.extract_archive, script]
     # Update PATH to reflect where these binaries are
