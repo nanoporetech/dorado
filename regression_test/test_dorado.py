@@ -127,7 +127,7 @@ class TestDorado(unittest.TestCase):
 
                     try:
                         output_file.parent.mkdir(parents=True, exist_ok=True)
-                        with contextlib.chdir(outfile.parent):
+                        with contextlib.chdir(output_file.parent):
                             with (
                                 output_file.open("wb") as outfile,
                                 log_file.open("w") as errfile,
