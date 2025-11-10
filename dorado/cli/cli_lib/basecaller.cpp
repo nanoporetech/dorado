@@ -19,6 +19,7 @@
 #include "hts_utils/hts_file.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
+#include "hts_writer/SummaryFileWriter.h"
 #include "model_resolver/ModelResolver.h"
 #include "model_resolver/Models.h"
 #include "models/models.h"
@@ -141,6 +142,10 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 .default_value(0)
                 .scan<'i', int>();
         parser.add_argument("--emit-moves").help("Write the move table to the 'mv' tag.").flag();
+        parser.add_argument("--emit-summary")
+                .help("Generate a summary file in the --output-dir (or the current working "
+                      "directory if not set).")
+                .flag();
         cli::add_basecaller_output_arguments(parser);
     }
     {
@@ -328,6 +333,7 @@ void setup(const std::vector<std::string>& args,
            bool emit_fastq,
            bool emit_sam,
            bool emit_moves,
+           bool emit_summary,
            size_t max_reads,
            size_t min_qscore,
            const std::string& read_list_file_path,
@@ -494,6 +500,27 @@ void setup(const std::vector<std::string>& args,
 
         tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);
         writers.push_back(std::move(hts_file_writer));
+    }
+
+    if (emit_summary) {
+        using namespace hts_writer;
+        auto summary_output = output_dir.has_value() ? std::filesystem::path(output_dir.value())
+                                                     : std::filesystem::current_path();
+
+        SummaryFileWriter::FieldFlags flags =
+                SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
+        if (enable_aligner) {
+            flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
+        }
+        if (estimate_poly_a) {
+            flags |= SummaryFileWriter::POLYA_FIELDS;
+        }
+        if (barcoding_info) {
+            flags |= SummaryFileWriter::BARCODING_FIELDS;
+        }
+        auto summary_writer =
+                std::make_unique<hts_writer::SummaryFileWriter>(summary_output, flags);
+        writers.push_back(std::move(summary_writer));
     }
 
     PipelineDescriptor pipeline_desc;
@@ -876,9 +903,10 @@ int basecaller(int argc, char* argv[]) {
         setup(args, models, pod5_folder_info, device, parser.get<std::string>("--reference"),
               parser.get<std::string>("--bed-file"), default_parameters.num_runners, modbase_params,
               cli::get_output_dir(parser), cli::get_emit_fastq(parser), cli::get_emit_sam(parser),
-              parser.get<bool>("--emit-moves"), parser.get<int>("--max-reads"),
-              parser.get<int>("--min-qscore"), parser.get<std::string>("--read-ids"),
-              *minimap_options, parser.get<std::string>("--dump_stats_file"),
+              parser.get<bool>("--emit-moves"), parser.get<bool>("--emit-summary"),
+              parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
+              parser.get<std::string>("--read-ids"), *minimap_options,
+              parser.get<std::string>("--dump_stats_file"),
               parser.get<std::string>("--dump_stats_filter"), run_batchsize_benchmarks,
               parser.get<bool>("--emit-batchsize-benchmarks"),
               parser.get<std::string>("--resume-from"),

@@ -45,7 +45,7 @@ std::pair<float, float> PolyTailCalculator::estimate_samples_per_base(
         const dorado::SimplexRead& read) const {
     const size_t num_bases = read.read_common.seq.length();
     const auto num_samples = read.read_common.get_raw_data_samples();
-    const auto stride = read.read_common.model_stride;
+    const auto stride = read.read_common.attributes.model_stride;
     const auto seq_to_sig_map =
             dorado::utils::moves_to_map(read.read_common.moves, stride, num_samples, num_bases + 1);
     // Store the samples per base in float to use the quantile calcuation function.

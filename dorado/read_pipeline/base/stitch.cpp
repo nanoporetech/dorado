@@ -12,7 +12,7 @@ namespace dorado::utils {
 void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunks) {
     assert(static_cast<int>(div_round_closest(called_chunks[0]->raw_chunk_size,
                                               called_chunks[0]->moves.size())) ==
-           read_common.model_stride);
+           read_common.attributes.model_stride);
 
     int start_pos = 0;
     int mid_point_front = 0;
@@ -28,8 +28,8 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
         auto& next_chunk = called_chunks[i + 1];
         const int overlap_size = int((current_chunk->raw_chunk_size + current_chunk->input_offset) -
                                      (next_chunk->input_offset));
-        assert(overlap_size % read_common.model_stride == 0);
-        const int overlap_down_sampled = overlap_size / read_common.model_stride;
+        assert(overlap_size % read_common.attributes.model_stride == 0);
+        const int overlap_down_sampled = overlap_size / read_common.attributes.model_stride;
         const int mid_point_rear = overlap_down_sampled / 2;
 
         const int current_chunk_bases_to_trim =
@@ -65,7 +65,7 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
     if (called_chunks.size() == 1) {
         // shorten the sequence, qstring & moves where the read is shorter than chunksize
         const int last_index_in_moves_to_keep =
-                int(read_common.get_raw_data_samples() / read_common.model_stride);
+                int(read_common.get_raw_data_samples() / read_common.attributes.model_stride);
         moves = std::vector<uint8_t>(moves.begin(), moves.begin() + last_index_in_moves_to_keep);
         const int end = std::reduce(moves.begin(), moves.end(), 0);
         sequences.push_back(last_seq.substr(start_pos, end));
@@ -83,7 +83,8 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
 
     // remove partial stride overhang
     if (static_cast<int>(read_common.moves.size()) >
-        static_cast<int>(read_common.get_raw_data_samples() / read_common.model_stride)) {
+        static_cast<int>(read_common.get_raw_data_samples() /
+                         read_common.attributes.model_stride)) {
         if (read_common.moves.back() == 1) {
             read_common.seq.pop_back();
             read_common.qstring.pop_back();

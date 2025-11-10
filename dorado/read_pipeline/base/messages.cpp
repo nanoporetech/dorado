@@ -21,7 +21,7 @@ bool is_read_message(const Message &message) {
 uint64_t SimplexRead::get_end_time_ms() const {
     return read_common.start_time_ms +
            ((end_sample - start_sample) * 1000) /
-                   read_common.sample_rate;  //TODO get rid of the trimmed thing?
+                   read_common.attributes.sample_rate;  //TODO get rid of the trimmed thing?
 }
 
 std::string ReadCommon::generate_read_group() const {
@@ -44,7 +44,8 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     float qs = calculate_mean_qscore();
     bam_aux_append(aln, "qs", 'f', sizeof(qs), (uint8_t *)&qs);
 
-    float du = (float)(get_raw_data_samples() + num_trimmed_samples) / (float)sample_rate;
+    float du =
+            (float)(get_raw_data_samples() + num_trimmed_samples) / (float)attributes.sample_rate;
     bam_aux_append(aln, "du", 'f', sizeof(du), (uint8_t *)&du);
 
     int ns = int(get_raw_data_samples() + num_trimmed_samples);
@@ -107,7 +108,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
 
     if (emit_moves) {
         std::vector<uint8_t> m(moves.size() + 1, 0);
-        m[0] = uint8_t(model_stride);
+        m[0] = uint8_t(attributes.model_stride);
 
         for (size_t idx = 0; idx < moves.size(); idx++) {
             m[idx + 1] = static_cast<uint8_t>(moves[idx]);
@@ -367,8 +368,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
              (char *)qscore.data(), 0);
 
     if (!barcode.empty() && barcode != UNCLASSIFIED) {
-        bam_aux_append(aln, "BC", 'Z', int(barcode.length() + 1),
-                       reinterpret_cast<const uint8_t *>(barcode.c_str()));
+        bam_aux_update_str(aln, "BC", int(barcode.length() + 1), barcode.c_str());
     }
 
     if (is_duplex) {

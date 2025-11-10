@@ -22,15 +22,12 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     copy->range = read.range;
     copy->offset = read.offset;
     copy->open_pore_level = read.open_pore_level;
-    copy->read_common.sample_rate = read.read_common.sample_rate;
 
     copy->read_common.scaling_method = read.read_common.scaling_method;
     copy->read_common.shift = read.read_common.shift;
     copy->read_common.scale = read.read_common.scale;
 
     copy->scaling = read.scaling;
-
-    copy->read_common.model_stride = read.read_common.model_stride;
 
     copy->read_common.read_id = read.read_common.read_id;
     copy->read_common.seq = read.read_common.seq;
@@ -63,6 +60,7 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
 
     copy->read_common.read_tag = read.read_common.read_tag;
     copy->read_common.client_info = read.read_common.client_info;
+    copy->read_common.num_minknow_events = read.read_common.num_minknow_events;
 
     return copy;
 }
@@ -157,9 +155,11 @@ void mux_change_trim_read(ReadCommon& read_common) {
     read_common.pre_trim_seq_length = read_common.seq.length();
 
     // Trim the signal
-    const size_t trim_signal_idx = read_common.moves.size() * read_common.model_stride;
+    const size_t trim_signal_idx = read_common.moves.size() * read_common.attributes.model_stride;
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
     read_common.attributes.num_samples = read_common.get_raw_data_samples();
+
+    read_common.num_minknow_events = 0;  // No way to know how the events were distributed, zero out
 
     trace_log("mux_change_trimming {} - seq(before:{} after:{} net:-{})", read_common.read_id,
               sequence_size, trim_seq_idx + 1, sequence_size - trim_seq_idx - 1);

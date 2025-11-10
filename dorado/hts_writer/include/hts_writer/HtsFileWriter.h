@@ -3,7 +3,6 @@
 #include "hts_utils/HeaderMapper.h"
 #include "hts_utils/hts_file.h"
 #include "interface.h"
-#include "utils/stats.h"
 
 #include <memory>
 #include <string>

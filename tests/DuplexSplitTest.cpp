@@ -26,19 +26,19 @@ std::filesystem::path DataPath(std::string_view filename) {
 auto make_read() {
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 4000;
     read->offset = -287;
     read->scaling = 0.14620706f;
     read->read_common.shift = 94.717316f;
     read->read_common.scale = 26.888939f;
-    read->read_common.model_stride = 5;
     read->read_common.read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     read->read_common.num_trimmed_samples = 10;
+    read->read_common.attributes.model_stride = 5;
     read->read_common.attributes.read_number = 321;
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
     read->read_common.attributes.num_samples = 256790;
+    read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
     read->run_acquisition_start_time_ms = 1676976119670;
@@ -81,10 +81,10 @@ CATCH_TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CATCH_CHECK(split_res[3]->read_common.attributes.start_time ==
                 "2023-02-21T12:46:53.105000+00:00");
 
-    CATCH_CHECK(split_res[0]->read_common.start_time_ms == 1676983561529);
-    CATCH_CHECK(split_res[1]->read_common.start_time_ms == 1676983585837);
-    CATCH_CHECK(split_res[2]->read_common.start_time_ms == 1676983599607);
-    CATCH_CHECK(split_res[3]->read_common.start_time_ms == 1676983613105);
+    CATCH_CHECK(split_res[0]->read_common.start_time_ms == 7441859);
+    CATCH_CHECK(split_res[1]->read_common.start_time_ms == 7466167);
+    CATCH_CHECK(split_res[2]->read_common.start_time_ms == 7479937);
+    CATCH_CHECK(split_res[3]->read_common.start_time_ms == 7493435);
 
     CATCH_CHECK(split_res[0]->read_common.attributes.num_samples == 97125);
     CATCH_CHECK(split_res[1]->read_common.attributes.num_samples == 55055);
@@ -118,7 +118,7 @@ CATCH_TEST_CASE("4 subread split tagging", TEST_GROUP) {
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 3, messages);
     auto tag_node = pipeline_desc.add_node<dorado::SubreadTaggerNode>({sink}, 1, 1000);
     auto stereo_node = pipeline_desc.add_node<dorado::StereoDuplexEncoderNode>(
-            {tag_node}, read->read_common.model_stride);
+            {tag_node}, read->read_common.attributes.model_stride);
     auto pairing_node = pipeline_desc.add_node<dorado::PairingNode>(
             {stereo_node},
             dorado::DuplexPairingParameters{dorado::ReadOrder::BY_CHANNEL,
@@ -160,19 +160,19 @@ CATCH_TEST_CASE("No split output read properties", TEST_GROUP) {
     const std::string init_read_id = "00a2dd45-f6a9-49ba-86ee-5d2a37b861cb";
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 4000;
     read->offset = -287;
     read->scaling = 0.14620706f;
     read->read_common.shift = 94.717316f;
     read->read_common.scale = 26.888939f;
-    read->read_common.model_stride = 5;
     read->read_common.read_id = init_read_id;
     read->read_common.num_trimmed_samples = 10;
+    read->read_common.attributes.model_stride = 5;
     read->read_common.attributes.read_number = 321;
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
     read->read_common.attributes.num_samples = 256790;
+    read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
     read->run_acquisition_start_time_ms = 1676976119670;
@@ -210,19 +210,19 @@ CATCH_TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
 
     auto read = std::make_unique<dorado::SimplexRead>();
     read->range = 0;
-    read->read_common.sample_rate = 5000;
     read->offset = -260;
     read->scaling = 0.18707f;
     read->read_common.shift = 94.7565f;
     read->read_common.scale = 29.4467f;
-    read->read_common.model_stride = 6;
     read->read_common.read_id = "6571a1d9-5dff-44f4-a526-558584ccea82";
     read->read_common.num_trimmed_samples = 4010;
+    read->read_common.attributes.model_stride = 6;
     read->read_common.attributes.read_number = 10577;
     read->read_common.attributes.channel_number = 105;
     read->read_common.attributes.mux = 4;
     read->read_common.attributes.start_time = "2023-04-30T02:01:37.616+00:00";
     read->read_common.attributes.num_samples = 332541;
+    read->read_common.attributes.sample_rate = 5000;
     read->start_sample = 178487546;
     read->end_sample = 178820087;
     read->run_acquisition_start_time_ms = 1682784400107;

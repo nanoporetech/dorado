@@ -1,6 +1,7 @@
 #include "read_pipeline/nodes/WriterNode.h"
 
 #include "hts_writer/HtsFileWriter.h"
+#include "hts_writer/SummaryFileWriter.h"
 #include "hts_writer/interface.h"
 #include "read_pipeline/base/messages.h"
 #include "utils/stats.h"
@@ -50,8 +51,10 @@ void WriterNode::terminate(const TerminateOptions &terminate_options) {
 void WriterNode::set_shared_header(SamHdrPtr hdr) const {
     SamHdrSharedPtr shared_header(std::move(hdr));
     for (const auto &writer : m_writers) {
-        if (auto w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
-            w->set_shared_header(shared_header);
+        if (auto hts_w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
+            hts_w->set_shared_header(shared_header);
+        } else if (auto sum_w = dynamic_cast<hts_writer::SummaryFileWriter *>(writer.get())) {
+            sum_w->set_header(shared_header);
         }
     }
 }

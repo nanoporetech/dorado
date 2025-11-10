@@ -113,7 +113,7 @@ class DataChecker(object):
         extension = ref_file.suffix
         if output_file.suffix != extension:
             regression_diffs = "File extensions do not match."
-        elif extension == ".txt":
+        elif extension in [".txt", ".tsv"]:
             try:
                 actual_df = load_sorted_data_frame(output_file)
                 expected_df = load_sorted_data_frame(ref_file)
@@ -140,7 +140,9 @@ class DataChecker(object):
         return None
 
     @classmethod
-    def validate_file(cls, output_file: pathlib.Path, validator, options) -> str | None:
+    def validate_file(
+        cls, output_file: pathlib.Path, validator, options
+    ) -> tuple[bool | None, str | None]:
         ext_map = defaultdict(bool)
         ext_map.update(
             {

@@ -75,7 +75,7 @@ std::vector<SignalAnchorInfo> PlasmidPolyTailCalculator::determine_signal_anchor
     bool split_tail = (front_result_score >= threshold) && (rear_result_score >= threshold) &&
                       (rear_result.end < front_result.start);
 
-    const auto stride = read.read_common.model_stride;
+    const auto stride = read.read_common.attributes.model_stride;
     const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
                                                             read.read_common.get_raw_data_samples(),
                                                             read.read_common.seq.size() + 1);

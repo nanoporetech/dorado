@@ -146,9 +146,12 @@ PosRanges DuplexReadSplitter::possible_pore_regions(const DuplexReadSplitter::Ex
 
     std::vector<std::pair<float, PosRange>> candidate_regions;
     for (auto pore_sample_range : pore_sample_ranges) {
-        auto move_start = pore_sample_range.start_sample / read.read->read_common.model_stride;
-        auto move_end = pore_sample_range.end_sample / read.read->read_common.model_stride;
-        auto move_argmax = pore_sample_range.argmax_sample / read.read->read_common.model_stride;
+        auto move_start =
+                pore_sample_range.start_sample / read.read->read_common.attributes.model_stride;
+        auto move_end =
+                pore_sample_range.end_sample / read.read->read_common.attributes.model_stride;
+        auto move_argmax =
+                pore_sample_range.argmax_sample / read.read->read_common.attributes.model_stride;
         assert(move_end >= move_argmax && move_argmax >= move_start);
         if (move_end >= read.move_sums.size() || read.move_sums[move_start] == 0) {
             //either at very end of the signal or basecalls have not started yet
@@ -303,10 +306,11 @@ PosRanges DuplexReadSplitter::find_muA_adapter_spikes(const ExtRead& read) const
         // Helpers to map to/from basespace.
         auto from_basespace = [&](std::size_t idx) {
             const auto it = std::lower_bound(read.move_sums.begin(), read.move_sums.end(), idx);
-            return std::distance(read.move_sums.begin(), it) * read.read->read_common.model_stride;
+            return std::distance(read.move_sums.begin(), it) *
+                   read.read->read_common.attributes.model_stride;
         };
         auto to_basespace = [&](std::size_t idx) {
-            idx /= read.read->read_common.model_stride;
+            idx /= read.read->read_common.attributes.model_stride;
             // The range we're querying is valid and any found indices should lie in that range.
             assert(idx < read.move_sums.size());
             return read.move_sums[idx];
@@ -500,7 +504,7 @@ std::vector<SimplexReadPtr> DuplexReadSplitter::subreads(SimplexReadPtr read,
         return subreads;
     }
 
-    const auto stride = read->read_common.model_stride;
+    const auto stride = read->read_common.attributes.model_stride;
     const auto seq_to_sig_map = utils::moves_to_map(read->read_common.moves, stride,
                                                     read->read_common.get_raw_data_samples(),
                                                     read->read_common.seq.size() + 1);
@@ -611,8 +615,17 @@ void DuplexReadSplitter::apply_split_finder(std::vector<ExtRead>& to_split,
         if (spacers.empty()) {
             split_round_result.push_back(std::move(read));
         } else {
+            bool is_end_reason_mux_change =
+                    read.read->read_common.attributes.is_end_reason_mux_change;
+            std::string end_reason = read.read->read_common.attributes.end_reason;
             for (auto& sr : subreads(std::move(read.read), spacers)) {
                 split_round_result.push_back(create_ext_read(std::move(sr)));
+            }
+            if (!split_round_result.empty()) {
+                auto& last_result = split_round_result.back();
+                last_result.read->read_common.attributes.is_end_reason_mux_change =
+                        is_end_reason_mux_change;
+                last_result.read->read_common.attributes.end_reason = end_reason;
             }
         }
     }

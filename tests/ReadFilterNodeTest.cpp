@@ -27,7 +27,6 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
 
         auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.raw_data = at::empty(100);
-        read_1->read_common.sample_rate = 4000;
         read_1->read_common.shift = 128.3842f;
         read_1->read_common.scale = 8.258f;
         read_1->read_common.read_id = "read_1";
@@ -39,10 +38,10 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.filename = "batch_0.fast5";
+        read_1->read_common.attributes.sample_rate = 4000;
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = at::empty(100);
-        read_2->read_common.sample_rate = 4000;
         read_2->read_common.shift = 128.3842f;
         read_2->read_common.scale = 8.258f;
         read_2->read_common.read_id = "read_2";
@@ -54,6 +53,7 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on qscore", TEST_GROUP) {
         read_2->read_common.attributes.channel_number = 5;
         read_2->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->read_common.attributes.filename = "batch_0.fast5";
+        read_1->read_common.attributes.sample_rate = 4000;
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
@@ -73,7 +73,6 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
 
         auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.raw_data = at::empty(100);
-        read_1->read_common.sample_rate = 4000;
         read_1->read_common.shift = 128.3842f;
         read_1->read_common.scale = 8.258f;
         read_1->read_common.read_id = "read_1";
@@ -85,10 +84,10 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.filename = "batch_0.fast5";
+        read_1->read_common.attributes.sample_rate = 4000;
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = at::empty(100);
-        read_2->read_common.sample_rate = 4000;
         read_2->read_common.shift = 128.3842f;
         read_2->read_common.scale = 8.258f;
         read_2->read_common.read_id = "read_2";
@@ -100,6 +99,7 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read name", TEST_GROUP) {
         read_2->read_common.attributes.channel_number = 5;
         read_2->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->read_common.attributes.filename = "batch_0.fast5";
+        read_1->read_common.attributes.sample_rate = 4000;
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));
@@ -119,7 +119,6 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) 
 
         auto read_1 = std::make_unique<dorado::SimplexRead>();
         read_1->read_common.raw_data = at::empty(100);
-        read_1->read_common.sample_rate = 4000;
         read_1->read_common.shift = 128.3842f;
         read_1->read_common.scale = 8.258f;
         read_1->read_common.read_id = "read_1";
@@ -131,10 +130,10 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) 
         read_1->read_common.attributes.channel_number = 5;
         read_1->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_1->read_common.attributes.filename = "batch_0.fast5";
+        read_1->read_common.attributes.sample_rate = 4000;
 
         auto read_2 = std::make_unique<dorado::SimplexRead>();
         read_2->read_common.raw_data = at::empty(100);
-        read_2->read_common.sample_rate = 4000;
         read_2->read_common.shift = 128.3842f;
         read_2->read_common.scale = 8.258f;
         read_2->read_common.read_id = "read_2";
@@ -146,6 +145,7 @@ CATCH_TEST_CASE("ReadFilterNode: Filter read based on read length", TEST_GROUP) 
         read_2->read_common.attributes.channel_number = 5;
         read_2->read_common.attributes.start_time = "2017-04-29T09:10:04Z";
         read_2->read_common.attributes.filename = "batch_0.fast5";
+        read_1->read_common.attributes.sample_rate = 4000;
 
         pipeline->push_message(std::move(read_1));
         pipeline->push_message(std::move(read_2));

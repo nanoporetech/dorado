@@ -1,6 +1,8 @@
 import os
 import pathlib
+import contextlib
 import subprocess
+import shutil
 import typing
 import unittest
 from copy import deepcopy
@@ -12,7 +14,6 @@ from data_paths import (
     REFERENCE_FOLDER,
 )
 
-os.environ["VALIDATE_SUMMARY_FILES"] = "false"
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
 from tetra.regression_manager import RegressionManager, TestData, TestResult
@@ -36,7 +37,11 @@ class TestDorado(unittest.TestCase):
         """
         cls.manager = RegressionManager()
         cls.context = RegressionContext(cls.manager, OUTPUT_FOLDER)
-        OUTPUT_FOLDER.mkdir(parents=True, exist_ok=True)
+        if os.path.exists(OUTPUT_FOLDER):
+            shutil.rmtree(OUTPUT_FOLDER)
+        OUTPUT_FOLDER.mkdir(parents=True)
+        cls.models_directory = OUTPUT_FOLDER / "models"
+        cls.models_directory.mkdir(parents=True)
 
     @classmethod
     def tearDownClass(cls):
@@ -55,6 +60,7 @@ class TestDorado(unittest.TestCase):
             update_refs=False,
             quiet_mode=True,
         )
+        shutil.rmtree(cls.models_directory)
 
     def test_basecalling(self):
         """
@@ -105,34 +111,49 @@ class TestDorado(unittest.TestCase):
             for run in runs:
                 with self.context.open_subtest("test_basecalling", line=run):
                     subfolder = run["folder"]
-                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
+                    output_folder = OUTPUT_FOLDER / test_name / subfolder
+                    output_file = pathlib.Path("out.bam")
                     dorado_args = self.get_dorado_args(
                         input_path=INPUT_FOLDER / run["input"],
                         save_path=None,
                         model=run["model"],
                         emit_fastq=False,
+                        emit_summary=True,
                     )
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
                     # prevent non-deterministic results.
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
-                    errors = None
                     try:
-                        output_file.parent.mkdir(parents=True, exist_ok=True)
-                        with output_file.open("wb") as outfile:
-                            run_dorado(
-                                dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                        output_folder.mkdir(parents=True, exist_ok=True)
+                        with contextlib.chdir(output_folder):
+                            with output_file.open("wb") as outfile:
+                                run_dorado(
+                                    dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                                )
+                            # Now generate a post-run summary file, which we check for regressions but don't validate against the spec.
+                            # Specifically make this a ".tsv" file so we don't mix it up with the inline summary
+                            make_summary(
+                                output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
                             )
-                        make_summary(output_file, "summary.txt", DEFAULT_MAX_TIMEOUT)
-                        errors = self.check_program_output(
-                            test_name, subfolder, expected_files, validation_settings
-                        )
                     except Exception as ex:
                         msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
                         context.encountered_error()
                         self.fail(msg)
-                    if errors is not None:
+
+                    dorado_errors = self.check_program_output(
+                        test_name,
+                        subfolder,
+                        expected_files,
+                        validation_settings,
+                    )
+                    summary_errors = self.check_program_output(
+                        test_name, subfolder, {"tsv": 1}, None
+                    )
+
+                    errors = "\n".join(filter(None, (dorado_errors, summary_errors)))
+                    if errors:
                         # This indicates regression test failures due to file comparison and/or validation,
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
@@ -210,12 +231,14 @@ class TestDorado(unittest.TestCase):
             for run in runs:
                 with self.context.open_subtest("test_modified_basecalling", line=run):
                     subfolder = run["folder"]
-                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
+                    output_folder = OUTPUT_FOLDER / test_name / subfolder
+                    output_file = pathlib.Path("out.bam")
                     dorado_args = self.get_dorado_args(
                         input_path=INPUT_FOLDER / run["input"],
                         save_path=None,
                         model=run["model"],
                         emit_fastq=False,
+                        emit_summary=True,
                         recursive=True,
                     )
 
@@ -223,22 +246,31 @@ class TestDorado(unittest.TestCase):
                     # prevent non-deterministic results.
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
-                    errors = None
                     try:
-                        output_file.parent.mkdir(parents=True, exist_ok=True)
-                        with output_file.open("wb") as outfile:
-                            run_dorado(
-                                dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                        output_folder.mkdir(parents=True, exist_ok=True)
+                        with contextlib.chdir(output_folder):
+                            with output_file.open("wb") as outfile:
+                                run_dorado(
+                                    dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                                )
+                            make_summary(
+                                output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
                             )
-                        make_summary(output_file, "summary.txt", DEFAULT_MAX_TIMEOUT)
-                        errors = self.check_program_output(
-                            test_name, subfolder, expected_files, validation_settings
-                        )
                     except Exception as ex:
                         msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
                         context.encountered_error()
                         self.fail(msg)
-                    if errors is not None:
+
+                    dorado_errors = self.check_program_output(
+                        test_name, subfolder, expected_files, validation_settings
+                    )
+
+                    summary_errors = self.check_program_output(
+                        test_name, subfolder, {"tsv": 1}, None
+                    )
+
+                    errors = "\n".join(filter(None, (dorado_errors, summary_errors)))
+                    if errors:
                         # This indicates regression test failures due to file comparison and/or validation,
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
@@ -248,7 +280,7 @@ class TestDorado(unittest.TestCase):
         test_name: str,
         subfolder: str,
         expected_files: dict,
-        validation_settings: dict,
+        validation_settings: dict | None,
     ) -> str | None:
         """
         This functionality should be common to most, if not all, tests. It will gather the
@@ -277,6 +309,7 @@ class TestDorado(unittest.TestCase):
         save_path: pathlib.Path | None,
         model: str,
         emit_fastq: bool,
+        emit_summary: bool,
         recursive: bool = False,
     ) -> list:
         device = "metal" if PLATFORM == "osx_arm" else "cuda:0"
@@ -288,6 +321,8 @@ class TestDorado(unittest.TestCase):
                 str(input_path),
                 "--device",
                 device,
+                "--models-directory",
+                str(self.models_directory),
             ]
         )
         if save_path is not None:
@@ -299,6 +334,8 @@ class TestDorado(unittest.TestCase):
             )
         if emit_fastq:
             args.append("--emit-fastq")
+        if emit_summary:
+            args.append("--emit-summary")
         if recursive:
             args.append("--recursive")
         return args

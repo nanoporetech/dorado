@@ -81,7 +81,7 @@ std::vector<SignalAnchorInfo> RNAPolyTailCalculator::determine_signal_anchor_and
         return {};
     }
 
-    const auto stride = read.read_common.model_stride;
+    const auto stride = read.read_common.attributes.model_stride;
     const auto seq_to_sig_map = dorado::utils::moves_to_map(read.read_common.moves, stride,
                                                             read.read_common.get_raw_data_samples(),
                                                             read.read_common.seq.size() + 1);

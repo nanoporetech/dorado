@@ -215,12 +215,14 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
 
     // Number of samples trimmed is the number of move positions trimmed from the front
     // of the read times the stride.
-    auto num_leading_samples_trimmed = read.read_common.model_stride * leading_mv_positions_trimmed;
+    auto num_leading_samples_trimmed =
+            read.read_common.attributes.model_stride * leading_mv_positions_trimmed;
     // This gets added to the number of samples previously trimmed, such as from signal scaling, etc.
     read.read_common.num_trimmed_samples += num_leading_samples_trimmed;
     // The move table can be trimmed from both ends, so determine the new signal length corresponding
     // to the trimmed sequence by looking at new move table size.
-    auto num_samples_from_mv_table = trimmed_moves.size() * read.read_common.model_stride;
+    auto num_samples_from_mv_table =
+            trimmed_moves.size() * read.read_common.attributes.model_stride;
     // The final signal should only correspond to the moves from the trimmed move table, so
     // the corresponding signal needs to be extracted from the original signal.
     trim_torch_tensor(

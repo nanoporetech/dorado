@@ -15,7 +15,7 @@ namespace {
 #if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
 __attribute__((optimize("O0")))
 #endif
- void assign_subread_parent_id(const SimplexRead& read, SimplexReadPtr & subread) {
+void assign_subread_parent_id(const SimplexRead& read, SimplexReadPtr& subread) {
     if (!read.read_common.parent_read_id.empty()) {
         subread->read_common.parent_read_id = read.read_common.parent_read_id;
     } else {
@@ -35,6 +35,9 @@ SimplexReadPtr subread(const SimplexRead& read,
 
     auto subread = utils::shallow_copy_read(read);
 
+    // Unable to determine how the events were distributed, so zero out
+    subread->read_common.num_minknow_events = 0;
+
     subread->read_common.raw_data = subread->read_common.raw_data.index(
             {at::indexing::Slice(signal_range.first, signal_range.second)});
     subread->read_common.attributes.read_number = -1;
@@ -47,15 +50,17 @@ SimplexReadPtr subread(const SimplexRead& read,
             read.start_sample + read.read_common.num_trimmed_samples + signal_range.first;
     subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
 
-    auto start_time_ms = read.run_acquisition_start_time_ms +
-                         static_cast<uint64_t>(std::round(subread->start_sample * 1000. /
-                                                          subread->read_common.sample_rate));
-    subread->read_common.attributes.start_time =
-            utils::get_string_timestamp_from_unix_time_ms(start_time_ms);
+    auto start_time_ms = static_cast<uint64_t>(std::round(
+            subread->start_sample * 1000. / subread->read_common.attributes.sample_rate));
+    subread->read_common.attributes.start_time = utils::get_string_timestamp_from_unix_time_ms(
+            read.run_acquisition_start_time_ms + start_time_ms);
     subread->read_common.start_time_ms = start_time_ms;
+    subread->read_common.attributes.end_reason =
+            "unknown";  // TODO: do we know the reason for split reads? signal_positive?
+    subread->read_common.attributes.is_end_reason_mux_change = false;
 
     if (seq_range) {
-        const int stride = read.read_common.model_stride;
+        const int stride = read.read_common.attributes.model_stride;
         assert(signal_range.first <= signal_range.second);
         assert(signal_range.first / stride <= read.read_common.moves.size());
         assert(signal_range.second / stride <= read.read_common.moves.size());

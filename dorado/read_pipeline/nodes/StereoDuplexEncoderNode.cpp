@@ -82,6 +82,10 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
     read->read_common.flowcell_id = std::move(template_read.read_common.flowcell_id);
     read->read_common.position_id = std::move(template_read.read_common.position_id);
     read->read_common.experiment_id = std::move(template_read.read_common.experiment_id);
+    read->read_common.attributes.pore_type =
+            std::move(template_read.read_common.attributes.pore_type);
+    // No way to know the events corresponding to this read, set to zero
+    read->read_common.num_minknow_events = 0;
 
     ++m_num_encoded_pairs;
 

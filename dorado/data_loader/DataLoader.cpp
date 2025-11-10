@@ -171,11 +171,11 @@ SimplexReadPtr process_pod5_thread_fn(
 
     auto new_read = std::make_unique<SimplexRead>();
     new_read->read_common.raw_data = samples;
-    new_read->read_common.sample_rate = run_sample_rate;
+    new_read->read_common.attributes.sample_rate = run_sample_rate;
 
-    auto start_time_ms =
-            run_acquisition_start_time_ms + ((read_data.start_sample * 1000) / run_sample_rate);
-    auto start_time = utils::get_string_timestamp_from_unix_time_ms(start_time_ms);
+    auto start_time_ms = ((read_data.start_sample * 1000) / run_sample_rate);
+    auto start_time = utils::get_string_timestamp_from_unix_time_ms(run_acquisition_start_time_ms +
+                                                                    start_time_ms);
     new_read->run_acquisition_start_time_ms = run_acquisition_start_time_ms;
     new_read->read_common.start_time_ms = start_time_ms;
     new_read->scaling = read_data.calibration_scale;
@@ -202,6 +202,7 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.is_duplex = false;
 
     new_read->read_common.experiment_id = run_info_data->experiment_name;
+    new_read->read_common.num_minknow_events = read_data.num_minknow_events;
 
     // Get the condition_info from the run_info_data to determine if the sequencing kit
     // used has a rapid adapter and which one.
@@ -212,16 +213,30 @@ SimplexReadPtr process_pod5_thread_fn(
     pod5_end_reason_t end_reason_value{POD5_END_REASON_UNKNOWN};
     char end_reason_string_value[200]{};
     size_t end_reason_string_value_size = sizeof(end_reason_string_value);
+    {
+        pod5_error_t pod5_ret =
+                pod5_get_end_reason(batch, read_data.end_reason, &end_reason_value,
+                                    end_reason_string_value, &end_reason_string_value_size);
+        if (pod5_ret != POD5_OK) {
+            issue_pod5_error("Failed to get end_reason", filename, read_id_str);
+            return nullptr;
+        } else if (end_reason_value == POD5_END_REASON_UNBLOCK_MUX_CHANGE ||
+                   end_reason_value == POD5_END_REASON_MUX_CHANGE) {
+            new_read->read_common.attributes.is_end_reason_mux_change = true;
+        }
+        new_read->read_common.attributes.end_reason = end_reason_string_value;
+    }
 
-    pod5_error_t pod5_ret =
-            pod5_get_end_reason(batch, read_data.end_reason, &end_reason_value,
-                                end_reason_string_value, &end_reason_string_value_size);
-    if (pod5_ret != POD5_OK) {
-        issue_pod5_error("Failed to get end_reason", filename, read_id_str);
-        return nullptr;
-    } else if (end_reason_value == POD5_END_REASON_UNBLOCK_MUX_CHANGE ||
-               end_reason_value == POD5_END_REASON_MUX_CHANGE) {
-        new_read->read_common.attributes.is_end_reason_mux_change = true;
+    char pore_type_string_value[200]{};
+    size_t pore_type_string_value_size = sizeof(pore_type_string_value);
+    {
+        pod5_error_t pod5_ret = pod5_get_pore_type(
+                batch, read_data.pore_type, pore_type_string_value, &pore_type_string_value_size);
+        if (pod5_ret != POD5_OK) {
+            issue_pod5_error("Failed to get pore_type", filename, read_id_str);
+            return nullptr;
+        }
+        new_read->read_common.attributes.pore_type = pore_type_string_value;
     }
 
     // Determine the time sorted predecessor of the read

@@ -26,14 +26,18 @@ namespace details {
 struct Attributes {
     uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
     int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
-    int32_t channel_number{-1};  //Channel ID
-    std::string start_time{};    //Read acquisition start time
+    int32_t channel_number{-1};  // Channel ID
+    std::string start_time{};    // Read acquisition start time
     std::string filename{};
     // Indicates if this read had end reason `mux_change` or `unblock_mux_change`
     bool is_end_reason_mux_change{false};
-
+    std::string end_reason{"unknown"};
+    std::string pore_type{"not_set"};
+    // Loaded from source file.
+    uint64_t sample_rate{0};
     // Only used by tests, and only valid for POD5 data.
     uint64_t num_samples{};
+    int model_stride{-1};  // The down sampling factor of the model
 };
 
 }  // namespace details
@@ -45,8 +49,6 @@ public:
     static constexpr int POLY_TAIL_NOT_FOUND = -1;
     static constexpr int POLY_TAIL_NOT_ENABLED = -2;
     at::Tensor raw_data;  // Loaded from source file
-
-    int model_stride{-1};  // The down sampling factor of the model
 
     /*
     Note: Update read_utils shallow_copy_read to ensure split reads copy all fields
@@ -67,6 +69,7 @@ public:
     std::string model_name;      // Read group
     std::string sample_id;       // User-supplied name for the sample being analysed.
     int64_t protocol_start_time_ms;  // Start time of the protocol
+    uint64_t num_minknow_events{0};  // Number of minknow events or zero if unknown
 
     dorado::details::Attributes attributes;
 
@@ -98,9 +101,6 @@ public:
 
     // Barcode.
     std::string barcode{};
-
-    // Loaded from source file.
-    uint64_t sample_rate = 0;
 
     float shift = 0;             // To be set by scaler
     float scale = 0;             // To be set by scaler

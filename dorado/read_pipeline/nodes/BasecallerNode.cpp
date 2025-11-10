@@ -223,7 +223,7 @@ void BasecallerNode::working_reads_manager() {
             ReadCommon &read_common_data = get_read_common_data(source_read);
 
             // model_stride is needed by the basecall server and stitch_chunks.
-            read_common_data.model_stride = m_model_runners[0]->config().stride;
+            read_common_data.attributes.model_stride = m_model_runners[0]->config().stride;
 
             // qbias/qscale are expected by the basecall server.
             read_common_data.model_q_bias = m_model_runners[0]->config().qbias;
