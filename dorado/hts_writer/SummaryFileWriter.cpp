@@ -215,8 +215,11 @@ void SummaryFileWriter::handle(const HtsData& data) {
 
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
         m_summary_stream << separator << trimmed_duration;
-        m_summary_stream << separator
-                         << static_cast<uint64_t>(trimmed_duration / data.read_attrs.model_stride);
+        auto template_events =
+                data.read_attrs.model_stride > 0
+                        ? static_cast<uint64_t>(trimmed_duration / data.read_attrs.model_stride)
+                        : 0;
+        m_summary_stream << separator << template_events;
         m_summary_stream << separator << template_duration;
         m_summary_stream << separator << record->core.l_qseq;
         m_summary_stream << separator << get_tag(record, "qs", 0.f);
