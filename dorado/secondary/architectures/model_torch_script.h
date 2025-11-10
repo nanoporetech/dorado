@@ -10,15 +10,14 @@ namespace dorado::secondary {
 
 class ModelTorchScript : public ModelTorchBase {
 public:
-    ModelTorchScript(const std::filesystem::path& model_path);
+    ModelTorchScript(const MustConstructWithFactory& ctor_tag,
+                     const std::filesystem::path& model_path);
 
     torch::Device get_device() const override;
 
     at::Tensor forward(at::Tensor x) override;
 
     void to_half() override;
-
-    void set_normalise(const bool val) override;
 
     void set_eval() override;
 

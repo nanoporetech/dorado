@@ -51,7 +51,8 @@ TORCH_MODULE(SlotAttention);
 
 class ModelSlotAttentionConsensus : public ModelTorchBase {
 public:
-    ModelSlotAttentionConsensus(int32_t num_slots,
+    ModelSlotAttentionConsensus(const MustConstructWithFactory& ctor_tag,
+                                int32_t num_slots,
                                 int32_t classes_per_slot,
                                 int32_t read_embedding_size,
                                 int32_t cnn_size,

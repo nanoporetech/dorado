@@ -40,12 +40,12 @@ public:
 };
 TORCH_MODULE(MeanPooler);
 
-class ReversibleLSTM : public torch::nn::Module {
+class ReversibleLSTMImpl : public torch::nn::Module {
 public:
-    ReversibleLSTM(const int32_t input_size,
-                   const int32_t hidden_size,
-                   const bool batch_first,
-                   const bool reverse);
+    ReversibleLSTMImpl(const int32_t input_size,
+                       const int32_t hidden_size,
+                       const bool batch_first,
+                       const bool reverse);
 
     at::Tensor forward(const at::Tensor& x);
 
@@ -54,10 +54,12 @@ private:
     bool m_batch_first = false;
     bool m_reverse = false;
 };
+TORCH_MODULE(ReversibleLSTM);
 
 class ModelLatentSpaceLSTM : public ModelTorchBase {
 public:
-    ModelLatentSpaceLSTM(const int32_t num_classes,
+    ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_tag,
+                         const int32_t num_classes,
                          const int32_t lstm_size,
                          const int32_t cnn_size,
                          const std::vector<int32_t>& kernel_sizes,
@@ -88,9 +90,9 @@ private:
     torch::nn::Embedding m_strand_embedder;
     ReadLevelConv m_read_level_conv;
     torch::nn::Linear m_pre_pool_expansion_layer;
-    MeanPooler m_pooler{nullptr};
+    MeanPooler m_pooler;
     torch::nn::LSTM m_lstm_bidir;
-    torch::nn::Sequential m_lstm_unidir{nullptr};
+    torch::nn::Sequential m_lstm_unidir;
     torch::nn::Linear m_linear;
 };
 

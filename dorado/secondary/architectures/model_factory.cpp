@@ -183,7 +183,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
                     "TorchScript model cannot be loaded without loading the model.pt file.");
         }
 
-        model = std::make_unique<ModelTorchScript>(config.model_dir / config.model_file);
+        model = ModelTorchScript::make<ModelTorchScript>(config.model_dir / config.model_file);
         model->set_normalise(false);
 
         return model;
@@ -199,8 +199,8 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         const bool bidirectional =
                 (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
 
-        model = std::make_unique<ModelGRU>(num_features, num_classes, gru_size, n_layers,
-                                           bidirectional);
+        model = ModelGRU::make<ModelGRU>(num_features, num_classes, gru_size, n_layers,
+                                         bidirectional);
 
     } else if (model_type == ModelType::LATENT_SPACE_LSTM) {
         spdlog::debug("Constructing a LATENT_SPACE_LSTM model.");
@@ -225,7 +225,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
                     (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
         }
 
-        model = std::make_unique<ModelLatentSpaceLSTM>(
+        model = ModelLatentSpaceLSTM::make<ModelLatentSpaceLSTM>(
                 num_classes, lstm_size, cnn_size, kernel_sizes, pooler_type, use_dwells,
                 bases_alphabet_size, bases_embedding_size, bidirectional);
 
@@ -257,7 +257,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
 
         const std::unordered_map<std::string, std::string> pooler_args;
 
-        model = std::make_unique<ModelSlotAttentionConsensus>(
+        model = ModelSlotAttentionConsensus::make<ModelSlotAttentionConsensus>(
                 num_slots, classes_per_slot, read_embedding_size, cnn_size, kernel_sizes,
                 pooler_type, pooler_args, use_mapqc, use_dwells, use_haplotags, bases_alphabet_size,
                 bases_embedding_size, add_lstm, use_reference);
