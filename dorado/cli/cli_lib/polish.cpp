@@ -87,6 +87,7 @@ struct Options {
     std::string device_str;
     int32_t batch_size = 16;
     int64_t draft_batch_size = 200'000'000;
+    int32_t encoding_batch_size = 0;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
     int32_t bam_chunk = 1'000'000;
@@ -187,6 +188,10 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
         parser.add_argument("--draft-batchsize")
                 .help("Approximate batch size for processing input draft sequences.")
                 .default_value(std::string{"200M"});
+        parser.add_argument("--encoding-batchsize")
+                .help("Approximate batch size of windows for encoding. (0=number of threads)")
+                .default_value(0)
+                .scan<'i', int>();
         parser.add_argument("--window-len")
                 .help("Window size for calling consensus.")
                 .default_value(10000)
@@ -323,6 +328,10 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.window_overlap = parser.get<int>("window-overlap");
     opt.bam_chunk = parser.get<int>("bam-chunk");
     opt.bam_subchunk = parser.get<int>("bam-subchunk");
+
+    const int32_t encoding_batch_size = parser.get<int>("encoding-batchsize");
+    opt.encoding_batch_size = (encoding_batch_size == 0) ? opt.threads : encoding_batch_size;
+
     opt.verbosity = verbosity;
     opt.regions_str = parser.present<std::string>("regions");
     if (opt.regions_str) {
@@ -1020,9 +1029,9 @@ void run_polishing(const Options& opt,
                             utils::set_thread_name("polish_produce");
                             polisher::sample_producer(
                                     resources, bam_regions, draft_lens, opt.threads, opt.batch_size,
-                                    opt.window_len, opt.window_overlap, opt.bam_subchunk,
-                                    usable_mem, opt.continue_on_error, batch_queue,
-                                    worker_terminate, wrs_sample_producer);
+                                    opt.encoding_batch_size, opt.window_len, opt.window_overlap,
+                                    opt.bam_subchunk, usable_mem, opt.continue_on_error,
+                                    batch_queue, worker_terminate, wrs_sample_producer);
                         });
 
                 // Create a thread for the sample decoder.

@@ -715,26 +715,32 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
     utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
 
     // Worker function, each thread computes tensors for a set of windows assigned to it.
-    const auto worker = [&](const int32_t thread_id, const int32_t start, const int32_t end,
+    const auto worker = [&](const int32_t thread_id, utils::AsyncQueue<std::size_t>& window_queue,
                             std::vector<secondary::Sample>& results, WorkerReturnStatus& ret_val) {
         utils::ScopedProfileRange spr2("encode_windows_in_parallel-worker", 4);
 
-        for (int32_t i = start; i < end; ++i) {
+        const std::size_t n_windows = std::size(windows);
+        std::size_t window_id = 0;
+        while (window_queue.try_pop(window_id) != utils::AsyncQueueStatus::Terminate) {
             if (worker_terminate) {
+                window_queue.terminate(dorado::utils::AsyncQueueTerminateFast::Yes);
                 return;
             }
+
             try {
-                const auto& window = windows[i];
+                const auto& window = windows[window_id];
                 const std::string& name = draft_lens[window.seq_id].first;
+
                 if (thread_id == 0) {
                     spdlog::trace(
-                            "[start = {}, end = {}] Encoding i = {}, region = "
+                            "[encoder {}] encoding window_id = {}, region = "
                             "{}:{}-{} ({} %).",
-                            start, end, i, name, window.start, window.end,
-                            100.0 * static_cast<double>(i - start) / (end - start));
+                            thread_id, window_id, name, window.start, window.end,
+                            100.0 * static_cast<double>(window_id) / n_windows);
                 }
-                results[i] = encoders[thread_id]->encode_region(name, window.start, window.end,
-                                                                window.seq_id);
+
+                results[window_id] = encoders[thread_id]->encode_region(name, window.start,
+                                                                        window.end, window.seq_id);
 
             } catch (const std::exception& e) {
                 if (continue_on_exception) {
@@ -748,27 +754,29 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
         }
     };
 
-    const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
-            static_cast<int32_t>(std::size(windows)),
-            std::min(num_threads, static_cast<int32_t>(std::size(encoders))));
-
-    spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
-                  std::size(thread_chunks));
+    // Initialize a shared async queue with window IDs which threads can pop.
+    utils::AsyncQueue<std::size_t> shared_window_queue(std::size(windows));
+    for (std::size_t i = 0; i < std::size(windows); ++i) {
+        shared_window_queue.try_push(std::move(i));
+    }
+    shared_window_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     // Create the thread pool, futures and results.
-    cxxpool::thread_pool pool{std::size(thread_chunks)};
+    const std::size_t actual_threads =
+            std::min(num_threads, static_cast<int32_t>(std::size(encoders)));
+    cxxpool::thread_pool pool{actual_threads};
     std::vector<std::future<void>> futures;
-    futures.reserve(std::size(thread_chunks));
-
+    futures.reserve(actual_threads);
     std::vector<secondary::Sample> results(std::size(windows));
+    std::vector<WorkerReturnStatus> worker_return_vals(actual_threads);
 
-    std::vector<WorkerReturnStatus> worker_return_vals(std::size(thread_chunks));
+    spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
+                  actual_threads);
 
     // Add jobs to the pool.
-    for (int32_t tid = 0; tid < dorado::ssize(thread_chunks); ++tid) {
-        const auto [chunk_start, chunk_end] = thread_chunks[tid];
-        futures.emplace_back(pool.push(worker, tid, chunk_start, chunk_end, std::ref(results),
-                                       std::ref(worker_return_vals[tid])));
+    for (int32_t tid = 0; tid < static_cast<int32_t>(actual_threads); ++tid) {
+        futures.emplace_back(pool.push(worker, tid, std::ref(shared_window_queue),
+                                       std::ref(results), std::ref(worker_return_vals[tid])));
     }
 
     for (auto& f : futures) {
@@ -841,6 +849,7 @@ void sample_producer(PolisherResources& resources,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                      const int32_t num_threads,
                      const int32_t batch_size,
+                     const int32_t encoding_batch_size,
                      const int32_t window_len,
                      const int32_t window_overlap,
                      const int32_t bam_subchunk_len,
@@ -912,7 +921,7 @@ void sample_producer(PolisherResources& resources,
 
     // Divide draft sequences into groups of specified size, as sort of a barrier.
     const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
-            bam_region_intervals, num_threads,
+            bam_region_intervals, encoding_batch_size,
             [](const secondary::Interval& val) { return val.end - val.start; });
 
     InferenceData buffer;
