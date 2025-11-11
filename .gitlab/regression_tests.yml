@@ -39,22 +39,49 @@
     # so pin the OS to the one that we have the most runners of.
     - osx-14.4
 
-.linux_regression_runner:
+.linux_regression_runner_v100:
   tags:
     - ubuntu-20.04
     - nvidia-docker
     - on-prem
-    # We need to make sure the regression tests always run on the same GPU.
     - gpu-v100
 
-.windows_regression_runner:
+.linux_regression_runner_a100:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    - gpu-a100
+
+.windows_regression_runner_v100:
   tags:
     - windows-10
     - VS2019
     - cuda-${CUDA}
     - on-prem
-    # We need to make sure the regression tests always run on the same GPU.
     - gpu-v100
+
+.linux_benchmark_runner_p48:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    - benchmark-p48
+
+.linux_benchmark_runner_a100:
+  tags:
+    - ubuntu-20.04
+    - nvidia-docker
+    - on-prem
+    - benchmark-a100
+
+.windows_benchmark_runner_a6000:
+  tags:
+    - windows-10
+    - VS2019
+    - cuda-${CUDA}
+    - on-prem
+    - gpu-a6000
 
 # We need this to check out the regression_test_data project, which has our test files in git-lfs.
 .prepare_git-lfs:
@@ -64,7 +91,7 @@
 
 
 ######################
-# Regression testing #
+# Regression Testing #
 ######################
 
 .regression_test:
@@ -130,7 +157,10 @@ regression_test_platforms:linux:x86:cuda12:
   except:
     - tags
 
-# dorado tests
+####################
+# Regression Tests #
+####################
+
 regression_test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   variables:
@@ -154,7 +184,7 @@ regression_test:linux:x86:cuda12:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
   extends:
     - .linux_regression_dependencies
-    - .linux_regression_runner
+    - .linux_regression_runner_v100
     - .regression_test
   needs:
     - build_archive:linux:x86:cuda12
@@ -180,7 +210,7 @@ regression_test:windows:
     BUILD_CUDA: 1
   extends:
     - .windows_regression_dependencies
-    - .windows_regression_runner
+    - .windows_regression_runner_v100
     - .regression_test
   needs:
     - build_archive:windows:cuda12
@@ -188,8 +218,195 @@ regression_test:windows:
     - tags
 
 
+################
+# Benchmarking #
+################
+
+.speed_regression_test:
+  stage: regression_test
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+    MTL_DEBUG_LAYER: 0
+  script:
+    - !reference [.extract_archive, script]
+    # Update PATH to reflect where these binaries are
+    - export PATH=${PWD}/${EXTRACTED_PATH}/bin:${PWD}/${EXTRACTED_PATH}/lib:${PATH}
+    - pip install -e tetra # Need to use -e since data files relative to project
+    # Download the benchmarking data.
+    - mkdir regression_test_data
+    - cd regression_test_data
+    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/r10.4.1_5khz_200bp.pod5 > r10.4.1_5khz_200bp.pod5
+    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/r10.4.1_5khz_30kbp.pod5 > r10.4.1_5khz_30kbp.pod5
+    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/humanGRCh38.mmi > humanGRCh38.mmi
+    - export INPUT_FOLDER=${PWD}
+    - cd -
+    # Run the benchmarking test script.
+    - cd regression_test
+    - python -m unittest run_benchmarking_tests.${REGRESSION_TEST_NAME}
+    - cd -
+  after_script:
+    # Upload any results to artifactory, even if the tests failed.
+    - source build_venv/*/activate
+    - python -m pip install python-dateutil psycopg2-binary
+    - python tetra/tetra/upload_perf_results.py --dorado --output_dir regression_test/output
+  rules:
+    - if: "$NIGHTLY_BUILD"
+    - if: $CI_PIPELINE_SOURCE != 'merge_request_event'
+      when: manual
+      allow_failure: true
+  artifacts:
+    when: always
+    paths:
+      - regression_test/output/**/*.log
+      - regression_test/output/**/*.txt
+    expire_in: 90 days
+  timeout: 1h 30m
+
+regression_tests:speed:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  parallel:
+      matrix:
+          - REGRESSION_TEST_NAME:
+            - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
+  needs:
+    - build_archive:linux:arm64:jammy
+  extends:
+    - .linux_regression_dependencies
+    - .linux_orin_cuda_12_runner
+    - .speed_regression_test
+
+.regression_tests:speed:linux:x86:cuda12:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_312}
+  needs:
+    - build_archive:linux:x86:cuda12
+  extends:
+    - .linux_regression_dependencies
+    - .speed_regression_test
+
+regression_tests:speed:linux:x86:V100:
+  parallel:
+      matrix:
+          - REGRESSION_TEST_NAME:
+            - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
+  variables:
+    GPU_DEVICE_NAME: "V100"
+  needs:
+    - build_archive:linux:x86:cuda12
+  extends:
+    - .regression_tests:speed:linux:x86:cuda12
+    - .linux_benchmark_runner_p48
+
+regression_tests:speed:linux:x86:A100:
+  parallel:
+      matrix:
+          - REGRESSION_TEST_NAME:
+            - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
+  variables:
+    GPU_DEVICE_NAME: "A100"
+  needs:
+    - build_archive:linux:x86:cuda12
+  extends:
+    - .regression_tests:speed:linux:x86:cuda12
+    - .linux_benchmark_runner_a100
+
+regression_tests:speed:windows:A6000:
+  parallel:
+      matrix:
+          - REGRESSION_TEST_NAME:
+            - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+    GPU_DEVICE_NAME: "A6000"
+  extends:
+    - .windows_regression_dependencies
+    - .windows_benchmark_runner_a6000
+    - .speed_regression_test
+  needs:
+    - build_archive:windows:cuda12
+
+regression_tests:speed:macos:arm:
+  parallel:
+      matrix:
+          - REGRESSION_TEST_NAME:
+            - TestBasecallingSpeeds_kit14_30kbp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_30kbp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_30kbp.test_precise_condition_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_standard_basecalling_speeds
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_hac
+            - TestBasecallingSpeeds_kit14_200bp.test_modbase_basecalling_speeds_sup
+            - TestBasecallingSpeeds_kit14_200bp.test_precise_condition_speeds
+  variables:
+    BUILD_TYPE: Release
+    BUILD_CUDA: 1
+  extends:
+    - .osx_regression_dependencies
+    - .osx_arm_regression_runner
+    - .speed_regression_test
+  needs:
+    - build_archive:macos:arm
+
+regression_tests:speed:email:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  extends:
+    - .linux_regression_dependencies
+    - .linux_runner
+  stage: notify
+  when: always
+  dependencies: []
+  variables:
+    GIT_SUBMODULE_STRATEGY: normal
+  rules:
+    - if: "$NIGHTLY_BUILD"
+  script:
+    # Only run this once a week.
+    - if [[ $(date +%u) -ne 5 ]]; then echo "No email today"; exit 0; fi
+    # Install deps.
+    - python -m pip install -e tetra
+    - python -m pip install matplotlib python-dateutil psycopg2-binary
+    # Generate graphs and send email.
+    - python tetra/tetra/graph_perf_results.py --dorado --output_dir graphs --send_email
+
+
 ##################
-# Rebase scripts #
+# Rebase Scripts #
 ##################
 
 run_rebase:

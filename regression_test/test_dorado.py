@@ -14,13 +14,13 @@ from data_paths import (
     REFERENCE_FOLDER,
 )
 
+from utilities import DEBUG, run_dorado, make_summary
 from tetra.data_checker import DataChecker
 from tetra.regression_context import RegressionContext
 from tetra.regression_manager import RegressionManager, TestData, TestResult
 from tetra.sequence_utils import USE_PYSAM
 from tetra.update_reference_data import run_update
 
-DEBUG = os.getenv("BUILD_TYPE", "Release").upper() == "DEBUG"
 DEFAULT_MAX_TIMEOUT = 300
 VALIDATION_OPTIONS = {"gpu_calling_enabled": True}
 
@@ -111,8 +111,8 @@ class TestDorado(unittest.TestCase):
             for run in runs:
                 with self.context.open_subtest("test_basecalling", line=run):
                     subfolder = run["folder"]
-                    output_folder = OUTPUT_FOLDER / test_name / subfolder
-                    output_file = pathlib.Path("out.bam")
+                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
+                    log_file = OUTPUT_FOLDER / test_name / subfolder / "dorado.log"
                     dorado_args = self.get_dorado_args(
                         input_path=INPUT_FOLDER / run["input"],
                         save_path=None,
@@ -126,11 +126,17 @@ class TestDorado(unittest.TestCase):
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
                     try:
-                        output_folder.mkdir(parents=True, exist_ok=True)
-                        with contextlib.chdir(output_folder):
-                            with output_file.open("wb") as outfile:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with contextlib.chdir(output_file.parent):
+                            with (
+                                output_file.open("wb") as outfile,
+                                log_file.open("w") as errfile,
+                            ):
                                 run_dorado(
-                                    dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                                    dorado_args,
+                                    DEFAULT_MAX_TIMEOUT,
+                                    outfile=outfile,
+                                    errfile=errfile,
                                 )
                             # Now generate a post-run summary file, which we check for regressions but don't validate against the spec.
                             # Specifically make this a ".tsv" file so we don't mix it up with the inline summary
@@ -231,8 +237,8 @@ class TestDorado(unittest.TestCase):
             for run in runs:
                 with self.context.open_subtest("test_modified_basecalling", line=run):
                     subfolder = run["folder"]
-                    output_folder = OUTPUT_FOLDER / test_name / subfolder
-                    output_file = pathlib.Path("out.bam")
+                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
+                    log_file = OUTPUT_FOLDER / test_name / subfolder / "dorado.log"
                     dorado_args = self.get_dorado_args(
                         input_path=INPUT_FOLDER / run["input"],
                         save_path=None,
@@ -247,11 +253,17 @@ class TestDorado(unittest.TestCase):
                     _orin_sup_batchsize_args(run["model"], dorado_args)
 
                     try:
-                        output_folder.mkdir(parents=True, exist_ok=True)
-                        with contextlib.chdir(output_folder):
-                            with output_file.open("wb") as outfile:
+                        output_file.parent.mkdir(parents=True, exist_ok=True)
+                        with contextlib.chdir(output_file.parent):
+                            with (
+                                output_file.open("wb") as outfile,
+                                log_file.open("w") as errfile,
+                            ):
                                 run_dorado(
-                                    dorado_args, DEFAULT_MAX_TIMEOUT, outfile=outfile
+                                    dorado_args,
+                                    DEFAULT_MAX_TIMEOUT,
+                                    outfile=outfile,
+                                    errfile=errfile,
                                 )
                             make_summary(
                                 output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
@@ -339,38 +351,6 @@ class TestDorado(unittest.TestCase):
         if recursive:
             args.append("--recursive")
         return args
-
-
-def run_dorado(cmd_args: list, timeout: int, outfile: typing.IO | None = None):
-    print("Dorado command line: ", " ".join(cmd_args))
-    out = subprocess.PIPE if outfile is None else outfile
-    result = subprocess.run(
-        cmd_args, timeout=timeout, text=True, stdout=out, stderr=subprocess.PIPE
-    )
-    if result.returncode != 0:
-        raise Exception(
-            f"Error running {cmd_args}: returncode={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
-
-
-def make_summary(input_file: pathlib.Path, save_filename: str, timeout: int):
-    save_file = input_file.parent / save_filename
-    args = ["doradod"] if DEBUG else ["dorado"]
-    args.extend(
-        [
-            "summary",
-            str(input_file),
-        ]
-    )
-    print("Summary command line: ", " ".join(args))
-    with save_file.open("w") as summary_out:
-        result = subprocess.run(
-            args, timeout=timeout, text=True, stdout=summary_out, stderr=subprocess.PIPE
-        )
-    if result.returncode != 0:
-        raise Exception(
-            f"Error running {args}: returncode={result.returncode}\nstdout:\n{result.stdout}\nstderr:\n{result.stderr}"
-        )
 
 
 def _orin_sup_batchsize_args(model: str, dorado_args: typing.List[str]):

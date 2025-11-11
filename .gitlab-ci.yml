@@ -28,6 +28,7 @@ stages:
   - deploy
   - regression_test
   - rebase
+  - notify
 
 variables:
   BUILD_DIR: build
