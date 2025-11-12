@@ -62,7 +62,7 @@ std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_in
         return {false, false, {0, 0}};
     }
 
-    return {trim_barcodes, trim_adapter, trim_interval};
+    return {trim_adapter, trim_barcodes, trim_interval};
 }
 }  // namespace
 
