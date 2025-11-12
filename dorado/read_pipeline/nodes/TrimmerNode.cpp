@@ -62,7 +62,7 @@ std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_in
         return {false, false, {0, 0}};
     }
 
-    return {trim_barcodes, trim_adapter, trim_interval};
+    return {trim_adapter, trim_barcodes, trim_interval};
 }
 }  // namespace
 
@@ -130,6 +130,8 @@ void TrimmerNode::process_read(BamMessage& bam_message) {
         // Even if we don't trim this read, we need to strip any alignment details, since the BAM header
         // will not contain any alignment information anymore.
         read.bam_ptr = utils::new_unmapped_record(irecord, {}, {});
+        read.adapter_trim_interval = {0, 0};
+        read.barcode_trim_interval = {0, 0};
         return;
     }
 }
@@ -147,6 +149,9 @@ void TrimmerNode::process_read(SimplexRead& read) {
     if (trim_adapter || trim_barcodes) {
         Trimmer::trim_sequence(read, trim_interval);
         Trimmer::check_and_update_barcoding(read);
+    } else {
+        read.read_common.adapter_trim_interval = {0, 0};
+        read.read_common.barcode_trim_interval = {0, 0};
     }
 }
 
