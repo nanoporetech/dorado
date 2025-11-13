@@ -135,6 +135,4 @@ int main(int argc, char* argv[]) {
         usage(subcommands);
         return EXIT_FAILURE;
     }
-
-    return EXIT_SUCCESS;
 }
