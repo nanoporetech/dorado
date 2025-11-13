@@ -90,6 +90,7 @@ include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
 include(cmake/DoradoCheckDeps.cmake)
+include(cmake/DoradoLicences.cmake)
 
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
