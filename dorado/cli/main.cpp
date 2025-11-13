@@ -47,14 +47,14 @@ using entry_ptr = int (*)(int, char**);
 namespace {
 
 void usage(const std::map<std::string_view, entry_ptr>& commands) {
-    std::cerr << "Usage: dorado [options] subcommand\n\n"
+    std::cout << "Usage: dorado [options] subcommand\n\n"
               << "Positional arguments:\n";
 
     for (const auto& command : commands) {
-        std::cerr << command.first << '\n';
+        std::cout << command.first << '\n';
     }
 
-    std::cerr << "\nOptional arguments:\n"
+    std::cout << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
               << "-l --licences           prints third party licences and exits\n"
               << "-v --version            prints version information and exits\n"
@@ -113,15 +113,15 @@ int main(int argc, char* argv[]) {
     const auto& subcommand = arguments[0];
 
     if (subcommand == "-v" || subcommand == "--version") {
-        std::cerr << DORADO_VERSION << '\n';
+        std::cout << DORADO_VERSION << '\n';
     } else if (subcommand == "-vv") {
 #ifdef __APPLE__
-        std::cerr << "dorado:   " << DORADO_VERSION << '\n';
+        std::cout << "dorado:   " << DORADO_VERSION << '\n';
 #else
-        std::cerr << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << '\n';
+        std::cout << "dorado:   " << DORADO_VERSION << "+cu" << CUDA_VERSION << '\n';
 #endif
-        std::cerr << "libtorch: " << TORCH_VERSION << '\n';
-        std::cerr << "minimap2: " << MM_VERSION << '\n';
+        std::cout << "libtorch: " << TORCH_VERSION << '\n';
+        std::cout << "minimap2: " << MM_VERSION << '\n';
 
     } else if (subcommand == "-l" || subcommand == "--licences" || subcommand == "--licenses") {
         print_licences();
