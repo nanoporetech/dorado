@@ -176,6 +176,17 @@ ${test_dir}/test_nested_output_structure.sh ${dorado_bin} ${model_speed} ${batch
 
 echo dorado summary test stage
 $dorado_bin summary $output_dir/calls.bam
+$dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} | $dorado_bin summary
+set +e
+if $dorado_bin summary $output_dir/not_a_real_file.txt; then
+    echo "Error: dorado sumary should fail when called on a non-existent file!"
+    exit 1
+fi
+if $dorado_bin summary $output_dir; then
+    echo "Error: dorado summary should fail when called on a directory."
+    exit 1
+fi
+set -e
 
 echo redirecting stderr to stdout: check output is still valid
 # The debug layer prints to stderr to say that it's enabled, so disable it for this test.

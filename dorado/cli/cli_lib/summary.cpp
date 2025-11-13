@@ -2,9 +2,8 @@
 
 #include "cli/cli.h"
 #include "dorado_version.h"
-#include "hts_utils/bam_utils.h"
 #include "utils/log_utils.h"
-#include "utils/time_utils.h"
+#include "utils/tty_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
@@ -19,13 +18,14 @@ volatile sig_atomic_t interrupt = 0;
 
 int summary(int argc, char *argv[]) {
     argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
-    parser.add_argument("reads").help("SAM/BAM file produced by dorado basecaller.");
+    parser.add_argument("reads")
+            .help("SAM/BAM file produced by dorado basecaller.")
+            .nargs(argparse::nargs_pattern::optional)
+            .default_value(std::string{});
     parser.add_argument("-s", "--separator").default_value(std::string("\t"));
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
+            .flag()
             .action([&](const auto &) { ++verbosity; })
             .append();
 
@@ -44,6 +44,24 @@ int summary(int argc, char *argv[]) {
 
     auto reads(parser.get<std::string>("reads"));
     auto separator(parser.get<std::string>("separator"));
+
+    if (!reads.empty()) {
+        if (!std::filesystem::exists(reads)) {
+            spdlog::error("Unable to open file '{}', no such file.", reads);
+            return EXIT_FAILURE;
+        }
+
+        if (std::filesystem::is_directory(reads)) {
+            spdlog::error("Failed to open file '{}', found a directory instead.", reads);
+            return EXIT_FAILURE;
+        }
+    } else if (utils::is_fd_tty(stdin)) {
+        // Only allow `reads` to be empty if we're accepting input from a pipe
+        std::cout << parser << '\n';
+        return EXIT_FAILURE;
+    } else {
+        reads = "-";
+    }
 
     SummaryData summary;
     summary.set_separator(separator[0]);
