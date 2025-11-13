@@ -560,16 +560,11 @@ void ModBaseChunkCallerNode::populate_signal(at::Tensor& signal,
         const int64_t len = raw_data.size(0);
         const int64_t padding = utils::pad_to(len, m_canonical_stride) - len;
 
-#if TORCH_VERSION_MAJOR < 2
-        at::Tensor sig =
-                at::concat({raw_data.slice(0, len - padding, len), at::flip(raw_data, 0)}, 0);
-#else
         at::Tensor sig = at::empty({len + padding}, raw_data.options());
         at::Tensor body = sig.slice(0, padding, len + padding);
         at::flip_out(body, raw_data, 0);
 
         sig.slice(0, 0, padding) = raw_data.slice(0, len - padding, len);
-#endif
 
         signal = runner->scale_signal(0, sig, int_seq, seq_to_sig_map);
         return;
