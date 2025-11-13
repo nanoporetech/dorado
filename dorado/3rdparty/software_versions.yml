@@ -20,7 +20,7 @@ CxxUrl:
       C++ URL handling class with a simple API, and with lazy URL parsing and building
     version: "v0.3"
     url: https://github.com/chmike/CxxUrl
-    license: CxxUrl/LICENCE
+    license: CxxUrl/LICENSE
     files:
         - CxxUrl
 cuda-toolkit:
