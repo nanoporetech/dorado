@@ -72,15 +72,6 @@ elzip:
     license: elzip/LICENSE
     files:
         - elzip
-GSL Lite:
-    description: >
-        Functions and types suggested for use by the C++ Core Guidelines
-        <https://github.com/isocpp/CppCoreGuidelines>.
-    version: "0.38.1"
-    url: https://github.com/gsl-lite/gsl-lite
-    license: PATH_NOT_AVAILABLE
-    files:
-        - hdf_plugins/third_party/gsl
 htslib:
     description: >
         C library for accessing common file formats, such as SAM, CRAM and VCF
@@ -147,14 +138,6 @@ spdlog:
     license: spdlog/LICENSE
     files:
         - spdlog
-streamvbyte:
-    description: >
-          integer compression technique that applies SIMD instructions (vectorization) to Google's Group Varint approach.
-    version: "v2.0.0.862c2e7"
-    url: https://github.com/fast-pack/streamvbyte
-    license: hdf_plugins/third_party/streamvbyte/LICENSE
-    files:
-        - hdf_plugins/third_party/streamvbyte
 toml11:
     description: >
         TOML for Modern C++
