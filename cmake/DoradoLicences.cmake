@@ -73,7 +73,7 @@ function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
 
     # Check that it exists.
     set(licence_path "${arg_PATH}/${LICENCE}")
-    if (NOT IS_READABLE "${licence_path}")
+    if (NOT EXISTS "${licence_path}")
         message(FATAL_ERROR "Missing licence file for ${NAME} in ${yaml_file}: ${licence_path}")
     endif()
 
