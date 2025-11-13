@@ -1,4 +1,6 @@
 #include "cli/cli.h"
+#include "dorado_licences/licences.h"
+#include "dorado_licences_pod5/licences.h"
 #include "dorado_version.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/crash_handlers.h"
@@ -12,6 +14,7 @@
 #include <torch/version.h>
 
 #include <iostream>
+#include <iterator>
 #include <map>
 #include <string_view>
 #include <vector>
@@ -53,8 +56,23 @@ void usage(const std::map<std::string_view, entry_ptr>& commands) {
 
     std::cerr << "\nOptional arguments:\n"
               << "-h --help               shows help message and exits\n"
+              << "-l --licences           prints third party licences and exits\n"
               << "-v --version            prints version information and exits\n"
               << "-vv                     prints verbose version information and exits\n";
+}
+
+void print_licences() {
+    std::cout << "Third party licences:\n";
+    auto print = [](const auto& licences) {
+        for (const auto [name, licence] : licences) {
+            std::fill_n(std::ostream_iterator<char>(std::cout), name.size(), '-');
+            std::cout << '\n' << name << '\n';
+            std::fill_n(std::ostream_iterator<char>(std::cout), name.size(), '-');
+            std::cout << '\n' << licence << '\n';
+        }
+    };
+    print(dorado_licences::licences);
+    print(dorado_licences_pod5::licences);
 }
 
 }  // namespace
@@ -105,6 +123,9 @@ int main(int argc, char* argv[]) {
         std::cerr << "libtorch: " << TORCH_VERSION << '\n';
         std::cerr << "minimap2: " << MM_VERSION << '\n';
 
+    } else if (subcommand == "-l" || subcommand == "--licences" || subcommand == "--licenses") {
+        print_licences();
+        return EXIT_SUCCESS;
     } else if (subcommand == "-h" || subcommand == "--help") {
         usage(subcommands);
         return EXIT_SUCCESS;

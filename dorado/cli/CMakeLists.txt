@@ -18,6 +18,8 @@ check_linked_libs(dorado)
 
 target_link_libraries(dorado
     dorado_cli
+    dorado_licences
+    dorado_licences_pod5
     dorado_utils
     dorado_version
     minimap2
