@@ -21,9 +21,7 @@ int summary(int argc, char *argv[]) {
     parser.add_argument("-s", "--separator").default_value(std::string("\t"));
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
-            .default_value(false)
-            .implicit_value(true)
-            .nargs(0)
+            .flag()
             .action([&](const auto &) { ++verbosity; })
             .append();
 
