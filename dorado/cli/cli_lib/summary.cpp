@@ -2,9 +2,7 @@
 
 #include "cli/cli.h"
 #include "dorado_version.h"
-#include "hts_utils/bam_utils.h"
 #include "utils/log_utils.h"
-#include "utils/time_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
