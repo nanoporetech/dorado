@@ -221,7 +221,7 @@ int demuxer(int argc, char* argv[]) {
     header_mapper.modify_headers(add_pg_hdr);
 
     // All progress reporting is in the post-processing part.
-    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
+    ProgressTracker tracker(ProgressTracker::Mode::DEMUX, 0, 1.f);
     if (progress_stats_frequency > 0) {
         tracker.disable_progress_reporting();
     }

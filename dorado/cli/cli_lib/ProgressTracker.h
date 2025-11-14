@@ -15,7 +15,7 @@ namespace dorado {
 // overall performance.
 class ProgressTracker {
 public:
-    enum Mode : uint8_t { SIMPLEX, DUPLEX, TRIM, ALIGN };
+    enum Mode : uint8_t { SIMPLEX, DUPLEX, DEMUX, TRIM, ALIGN };
 
     ProgressTracker(Mode mode, int total_reads);
     ProgressTracker(Mode mode, int total_reads, float post_processing_percentage);
