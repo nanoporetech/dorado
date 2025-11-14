@@ -62,25 +62,27 @@ inline void add_pg_hdr(sam_hdr_t* hdr,
                        const std::vector<std::string>& args,
                        const std::string& device) {
     utils::add_hd_header_line(hdr);
-    auto safe_id = sam_hdr_pg_id(hdr, pg_id.c_str());
 
-    std::stringstream pg;
-    pg << "@PG\tID:" << safe_id << "\tPN:dorado\tVN:" << DORADO_VERSION << "\tCL:dorado";
+    std::ostringstream cl;
+    cl << "dorado";
     for (const auto& arg : args) {
-        pg << " " << std::quoted(arg);
+        cl << " " << std::quoted(arg);
     }
 
+    std::ostringstream ds;
 #if DORADO_CUDA_BUILD
     auto gpu_string = utils::get_cuda_gpu_names(device);
     if (!gpu_string.empty()) {
-        pg << "\tDS:gpu:" << gpu_string;
+        ds << "gpu:" << gpu_string;
     }
 #else
     (void)device;
 #endif
 
-    pg << '\n';
-    sam_hdr_add_lines(hdr, pg.str().c_str(), 0);
+    auto ds_str = ds.str();
+    sam_hdr_add_pg(hdr, pg_id.c_str(), "PN", "dorado", "VN", DORADO_VERSION, "CL", cl.str().c_str(),
+                   ds_str.empty() ? nullptr : "DS", ds_str.empty() ? nullptr : ds_str.c_str(),
+                   nullptr);
 }
 
 inline void add_internal_arguments(argparse::ArgumentParser& parser) {
