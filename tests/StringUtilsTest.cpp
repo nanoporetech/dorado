@@ -216,10 +216,8 @@ DEFINE_TEST("to_chars") {
     CATCH_CHECK_NOTHROW(test_to_chars_for_type<std::uint16_t>());
     CATCH_CHECK_NOTHROW(test_to_chars_for_type<std::uint32_t>());
     CATCH_CHECK_NOTHROW(test_to_chars_for_type<std::uint64_t>());
-#if DORADO_HAS_TO_CHARS_FLOATING_POINT
     CATCH_CHECK_NOTHROW(test_to_chars_for_type<float>());
     CATCH_CHECK_NOTHROW(test_to_chars_for_type<double>());
-#endif  // DORADO_HAS_TO_CHARS_FLOATING_POINT
 }
 
 }  // namespace dorado::utils::string_view

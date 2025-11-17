@@ -7,11 +7,7 @@
 #include <torch/version.h>
 
 #if DORADO_CUDA_BUILD
-#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 2
 #include <c10/cuda/CUDAAllocatorConfig.h>
-#else  // >=2.2
-#include <c10/cuda/CUDACachingAllocator.h>
-#endif  // >=2.2
 #endif  // DORADO_CUDA_BUILD
 
 namespace dorado::utils {
@@ -23,10 +19,8 @@ void initialise_torch() {
     // on one of our 44 core CI machine from ~4mins to ~20sec.
     torch::set_num_threads(1);
 
-#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR > 0
     // We don't want empty tensors to be initialised with data since we always overwrite them.
     torch::globalContext().setDeterministicFillUninitializedMemory(false);
-#endif
 }
 
 void make_torch_deterministic() {
@@ -36,15 +30,11 @@ void make_torch_deterministic() {
     torch::globalContext().setBenchmarkCuDNN(false);
 #endif
 
-#if TORCH_VERSION_MAJOR > 1 || TORCH_VERSION_MINOR >= 11
     torch::globalContext().setDeterministicAlgorithms(true, false);
-#else
-    torch::globalContext().setDeterministicAlgorithms(true);
-#endif
 }
 
 void set_torch_allocator_max_split_size() {
-#if DORADO_CUDA_BUILD && TORCH_VERSION_MAJOR >= 2
+#if DORADO_CUDA_BUILD
 
     // Do not re-use smaller chunks of large buffers
     // This prevents small allocations from reusing large sections of cached allocated memory

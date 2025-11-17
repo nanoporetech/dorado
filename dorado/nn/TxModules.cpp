@@ -8,6 +8,7 @@
 
 #include <ATen/Functions.h>
 #include <ATen/TensorIndexing.h>
+#include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/core/ScalarType.h>
 #include <c10/core/TensorOptions.h>
 #include <spdlog/spdlog.h>
@@ -19,9 +20,6 @@
 #include <torch/version.h>
 
 #include <cmath>
-#if TORCH_VERSION_MAJOR >= 2
-#include <ATen/ops/scaled_dot_product_attention.h>
-#endif
 
 #if DORADO_CUDA_BUILD
 extern "C" {
@@ -422,7 +420,6 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
             const auto k = qkv[1].slice(-2, kvb, kve);
             const auto v = qkv[2].slice(-2, kvb, kve);
             const auto mask = attn_window_mask.index({Slice(qb, qe), Slice(kvb, kve)});
-#if TORCH_VERSION_MAJOR >= 2
             c10::optional<at::Tensor> opt_mask;
             // Not using the mask gets us significantly better performance, at the cost of some
             // accuracy. Accuracy loss is minimised by larger num_splits.
@@ -430,9 +427,6 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
                 opt_mask = mask;
             }
             attn_output.slice(-2, qb, qe) = at::scaled_dot_product_attention(q, k, v, opt_mask);
-#else
-            attn_output.slice(-2, qb, qe) = scaled_dot_product_attention_naive(q, k, v, mask);
-#endif
         }
     }
     {

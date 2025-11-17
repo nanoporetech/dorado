@@ -265,11 +265,7 @@ bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count
 static NS::SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : at::Allocator {
-    at::DataPtr allocate(size_t n)
-#if !(TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 3)
-            const
-#endif  // < 2.3
-            override {
+    at::DataPtr allocate(size_t n) override {
         if (n == 0) {
             return at::DataPtr(nullptr, at::DeviceType::CPU);
         } else if (n >= (size_t(1) << 32)) {
@@ -281,11 +277,9 @@ struct MTLAllocator : at::Allocator {
 
     static void deleter(void *ptr) { ((MTL::Buffer *)ptr)->release(); }
 
-#if TORCH_VERSION_MAJOR >= 2 && TORCH_VERSION_MINOR >= 3
     void copy_data(void *dest, const void *src, std::size_t count) const override {
         default_copy_data(dest, src, count);
     }
-#endif  // < 2.3
 };
 static MTLAllocator mtl_allocator;
 

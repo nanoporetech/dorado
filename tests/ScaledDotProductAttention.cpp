@@ -1,29 +1,21 @@
 #include "nn/TxModules.h"
 
+#include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/core/DeviceType.h>
 #include <c10/core/TensorOptions.h>
+#include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators_range.hpp>
 #include <spdlog/spdlog.h>
 #include <torch/nn.h>
 #include <torch/version.h>
 
 #include <vector>
 
-#if TORCH_VERSION_MAJOR >= 2
-#include <ATen/ops/scaled_dot_product_attention.h>
-#endif
-
-#include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators_range.hpp>
-
 #define TEST_TAG "[SDPA]"
 
 using namespace dorado::nn;
 
 CATCH_TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
-#if TORCH_VERSION_MAJOR < 2
-    spdlog::warn("Test skipped - Scaled Dot Product Attention");
-
-#else
     static constexpr c10::DeviceType valid_devices[] = {
 #if DORADO_CUDA_BUILD
             c10::kCUDA,
@@ -65,5 +57,4 @@ CATCH_TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
         const auto torch_res = at::scaled_dot_product_attention(qkv[0], qkv[1], qkv[2], mask);
         CATCH_CHECK(at::allclose(naive_res, torch_res));
     }
-#endif  // #if TORCH_VERSION_MAJOR < 2
 }
