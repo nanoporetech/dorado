@@ -106,12 +106,25 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     if (barcoding_info->sample_sheet) {
         bc_res.alias = barcoding_info->sample_sheet->get_alias(bc);
         bc_res.type = barcoding_info->sample_sheet->get_sample_type(bc);
-        bc = bc_res.alias;
+        if (!bc_res.alias.empty()) {
+            bc = bc_res.alias;
+        }
     }
 
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
     bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
+    auto rg_tag = bam_aux_get(irecord, "RG");
+    if (rg_tag) {
+        std::string rg_tag_value = bam_aux2Z(rg_tag);
+        if (!rg_tag_value.ends_with(bc)) {
+            if (!rg_tag_value.empty()) {
+                rg_tag_value.append("_");
+            }
+            rg_tag_value.append(bc);
+            bam_aux_update_str(irecord, "RG", int(rg_tag_value.length() + 1), rg_tag_value.c_str());
+        }
+    }
     m_num_records++;
     {
         std::lock_guard lock(m_barcode_count_mutex);

@@ -4,6 +4,7 @@
 #include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 
 #include <edlib.h>
 #include <htslib/sam.h>
@@ -43,8 +44,10 @@ void emit_read_group(sam_hdr_t* hdr,
                      const std::string& read_group_line,
                      const std::string& id,
                      const std::string& additional_tags) {
-    const auto line = format_read_group_header_line(read_group_line, id, additional_tags);
-    sam_hdr_add_lines(hdr, line.c_str(), 0);
+    if (KString ks(100000); sam_hdr_find_line_id(hdr, "RG", "ID", id.c_str(), &ks.get()) == -1) {
+        const auto line = format_read_group_header_line(read_group_line, id, additional_tags);
+        sam_hdr_add_lines(hdr, line.c_str(), 0);
+    }
 }
 
 std::string read_group_to_string(const dorado::ReadGroup& read_group) {
@@ -117,6 +120,59 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
 }
 
 }  // namespace
+
+std::unordered_map<std::string, dorado::ReadGroup> parse_read_groups(sam_hdr_t* hdr) {
+    std::unordered_map<std::string, dorado::ReadGroup> read_groups;
+    {
+        auto rg_info = utils::get_read_group_info(hdr, "PU");
+        for (const auto& [rg_id, key_info] : rg_info) {
+            auto& read_group = read_groups[rg_id];
+            read_group.flowcell_id = key_info;
+        }
+    }
+    {
+        auto rg_info = utils::get_read_group_info(hdr, "PM");
+        for (const auto& [rg_id, key_info] : rg_info) {
+            auto& read_group = read_groups[rg_id];
+            read_group.device_id = key_info;
+        }
+    }
+    {
+        auto rg_info = utils::get_read_group_info(hdr, "DT");
+        for (const auto& [rg_id, key_info] : rg_info) {
+            auto& read_group = read_groups[rg_id];
+            read_group.exp_start_time = key_info;
+        }
+    }
+    {
+        auto rg_info = utils::get_read_group_info(hdr, "LB");
+        for (const auto& [rg_id, key_info] : rg_info) {
+            auto& read_group = read_groups[rg_id];
+            read_group.sample_id = key_info;
+        }
+    }
+    {
+        auto rg_info = utils::get_read_group_info(hdr, "DS");
+        for (const auto& [rg_id, key_info] : rg_info) {
+            auto& read_group = read_groups[rg_id];
+            auto tokens = utils::split(key_info, ' ');
+            for (const auto& token : tokens) {
+                auto kv = utils::split(token, '=');
+                if (kv.size() == 2) {
+                    if (kv[0] == "runid") {
+                        read_group.run_id = kv[1];
+                    } else if (kv[0] == "basecall_model") {
+                        read_group.basecalling_model = kv[1];
+                    } else if (kv[0] == "modbase_models") {
+                        read_group.modbase_models = kv[1];
+                    }
+                }
+            }
+        }
+    }
+
+    return read_groups;
+}
 
 bool try_add_fastq_header_tag(bam1_t* record, const std::string& header) {
     // validate the fastq header contains only printable characters including SPACE
@@ -204,7 +260,7 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
     }
 
     KString rg_wrapper(1000000);
-    auto rg = rg_wrapper.get();
+    auto& rg = rg_wrapper.get();
     std::map<std::string, std::string> read_group_info;
 
     for (int i = 0; i < num_read_groups; ++i) {

@@ -215,13 +215,8 @@ int demuxer(int argc, char* argv[]) {
 
     auto barcoding_info = get_barcoding_info(parser);
 
-    auto header_mapper = utils::HeaderMapper(all_files, strip_alignment);
-    auto add_pg_hdr = utils::HeaderMapper::Modifier(
-            [&args](sam_hdr_t* hdr) { cli::add_pg_hdr(hdr, "demux", args, "cpu"); });
-    header_mapper.modify_headers(add_pg_hdr);
-
     // All progress reporting is in the post-processing part.
-    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, 0, 1.f);
+    ProgressTracker tracker(ProgressTracker::Mode::DEMUX, 0, 1.f);
     if (progress_stats_frequency > 0) {
         tracker.disable_progress_reporting();
     }
@@ -298,6 +293,21 @@ int demuxer(int argc, char* argv[]) {
         spdlog::error("Failed to create pipeline");
         return EXIT_FAILURE;
     }
+
+    auto header_mapper = utils::HeaderMapper(all_files, strip_alignment);
+    auto add_pg_hdr = utils::HeaderMapper::Modifier(
+            [&args](sam_hdr_t* hdr) { cli::add_pg_hdr(hdr, "demux", args, "cpu"); });
+    auto update_barcode_rg_groups = utils::HeaderMapper::Modifier([&](sam_hdr_t* hdr) {
+        if (!barcoding_info) {
+            return;
+        }
+
+        auto found_read_groups = utils::parse_read_groups(hdr);
+        utils::add_rg_headers_with_barcode_kit(hdr, found_read_groups, barcoding_info->kit_name,
+                                               barcoding_info->sample_sheet.get());
+    });
+    header_mapper.modify_headers(add_pg_hdr);
+    header_mapper.modify_headers(update_barcode_rg_groups);
 
     // Set the dynamic header map
     pipeline->get_node_ref<WriterNode>(writer_node)
