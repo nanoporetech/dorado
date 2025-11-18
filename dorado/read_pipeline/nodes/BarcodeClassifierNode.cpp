@@ -106,7 +106,9 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     if (barcoding_info->sample_sheet) {
         bc_res.alias = barcoding_info->sample_sheet->get_alias(bc);
         bc_res.type = barcoding_info->sample_sheet->get_sample_type(bc);
-        bc = bc_res.alias;
+        if (!bc_res.alias.empty()) {
+            bc = bc_res.alias;
+        }
     }
 
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
