@@ -44,8 +44,10 @@ void emit_read_group(sam_hdr_t* hdr,
                      const std::string& read_group_line,
                      const std::string& id,
                      const std::string& additional_tags) {
-    const auto line = format_read_group_header_line(read_group_line, id, additional_tags);
-    sam_hdr_add_lines(hdr, line.c_str(), 0);
+    if (KString ks(100000); sam_hdr_find_line_id(hdr, "RG", "ID", id.c_str(), &ks.get()) == -1) {
+        const auto line = format_read_group_header_line(read_group_line, id, additional_tags);
+        sam_hdr_add_lines(hdr, line.c_str(), 0);
+    }
 }
 
 std::string read_group_to_string(const dorado::ReadGroup& read_group) {
