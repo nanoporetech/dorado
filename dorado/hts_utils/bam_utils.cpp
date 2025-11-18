@@ -204,7 +204,7 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
     }
 
     KString rg_wrapper(1000000);
-    auto rg = rg_wrapper.get();
+    auto& rg = rg_wrapper.get();
     std::map<std::string, std::string> read_group_info;
 
     for (int i = 0; i < num_read_groups; ++i) {
