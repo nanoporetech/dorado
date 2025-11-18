@@ -12,13 +12,11 @@ bool BatchParams::set_value(Value &self, const Value &other) {
     if (other.priority != Priority::FORCE && other.priority <= self.priority) {
         return false;
     }
-    if (self.val == other.val) {
-        return false;
-    }
     if (other.val < 0) {
         throw std::runtime_error("BatchParams::set_value value must be positive integer");
     }
 
+    // allow update even if the values are the same so that the priority is set correctly
     self.val = other.val;
     self.priority = other.priority;
     return true;
