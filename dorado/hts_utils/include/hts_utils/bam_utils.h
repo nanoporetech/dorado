@@ -61,6 +61,9 @@ void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
 /// Remove SO tag and any SQ lines from the header.
 void strip_alignment_data_from_header(sam_hdr_t* hdr);
 
+// Parse a sam_hdr_t and return populated read group information by id
+std::unordered_map<std::string, dorado::ReadGroup> parse_read_groups(sam_hdr_t* hdr);
+
 /**
  * @brief Get the read group tag content from a SAM/BAM/CRAM record
  *
