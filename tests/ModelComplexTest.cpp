@@ -1,8 +1,10 @@
+#include "TestUtils.h"
 #include "model_resolver/ModelResolver.h"
 #include "models/kits.h"
 #include "models/metadata.h"
 #include "models/model_complex.h"
 #include "models/models.h"
+#include "utils/fs_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -398,6 +400,38 @@ CATCH_TEST_CASE(TEST_TAG " Test BasecallerModelResolver", TEST_TAG) {
         CATCH_CHECK(sources.simplex.info == expected.simplex.info);
         CATCH_CHECK(sources.mods == expected.mods);
         CATCH_CHECK(sources.stereo == expected.stereo);
+    }
+}
+
+CATCH_TEST_CASE(TEST_TAG " Test modbase model resolution", TEST_TAG) {
+    const auto reads_path = fs::path(get_data_dir("pod5")) / "dna_r10.4.1_e8.2_400bps_5khz";
+    const auto reads = dorado::utils::fetch_directory_entries(reads_path, false);
+
+    CATCH_SECTION(" test no duplicate modbase models") {
+        BasecallerModelResolver resolver{"hac",
+                                         "",
+                                         {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2",
+                                          "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
+                                         std::nullopt,
+                                         false,
+                                         reads};
+
+        CATCH_CHECK_THROWS_AS(resolver.resolve(), std::runtime_error);
+    }
+
+    CATCH_SECTION(" test no duplicate modbase model variants") {
+        BasecallerModelResolver resolver{
+                "hac,5mC_5hmC,5mC_5hmC", "", {}, std::nullopt, false, reads};
+
+        CATCH_CHECK_THROWS_AS(resolver.resolve(), std::runtime_error);
+    }
+
+    CATCH_SECTION(" test no duplicate modbase model mixed") {
+        BasecallerModelResolver resolver{
+                "hac,5mC_5hmC@v2", "",    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
+                std::nullopt,      false, reads};
+
+        CATCH_CHECK_THROWS_AS(resolver.resolve(), std::logic_error);
     }
 }
 

@@ -179,7 +179,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 });
         modbase_mutex_group.add_argument("--modified-bases-models")
                 .default_value(std::string{})
-                .help("A comma separated list of modified base model paths.");
+                .help("A comma separated list of modified base model names or paths.");
         parser.add_argument("--modified-bases-threshold")
                 .scan<'f', float>()
                 .help("The minimum predicted methylation probability for a modified base to be "

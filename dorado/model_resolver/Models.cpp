@@ -70,7 +70,12 @@ void Models::cleanup_temporary_models() const {
 
     const auto is_temporary = [](const ModelSource& s) { return s.is_temporary; };
     for (const auto& src : sources | std::ranges::views::filter(is_temporary)) {
-        utils::clean_temporary_models({src.path});
+        const auto parent_filename = src.path.parent_path().filename().string();
+        if (parent_filename.starts_with(utils::TEMP_MODELS_DIR_PREFIX)) {
+            utils::clean_temporary_models({src.path.parent_path()});
+        } else {
+            utils::clean_temporary_models({src.path});
+        }
     }
 };
 
