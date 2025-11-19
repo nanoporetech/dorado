@@ -12,13 +12,11 @@ bool BatchParams::set_value(Value &self, const Value &other) {
     if (other.priority != Priority::FORCE && other.priority <= self.priority) {
         return false;
     }
-    if (self.val == other.val) {
-        return false;
-    }
     if (other.val < 0) {
         throw std::runtime_error("BatchParams::set_value value must be positive integer");
     }
 
+    // allow update even if the values are the same so that the priority is set correctly
     self.val = other.val;
     self.priority = other.priority;
     return true;
@@ -93,7 +91,7 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     const int old_overlap = m_overlap.val;
     const int new_overlap = std::max(1, old_overlap / stride) * stride;
     if (set_value(m_overlap, Value{new_overlap, Priority::FORCE})) {
-        spdlog::debug("Normalised: overlap {} -> {}", old_overlap, new_overlap);
+        spdlog::trace("Normalised: overlap {} -> {}", old_overlap, new_overlap);
     }
 
     // Make sure chunk size is a multiple of `chunk_size_granularity`, and greater than `overlap`
@@ -102,7 +100,7 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     const int new_chunk_size = (std::max(min_chunk_size, old_chunk_size) / chunk_size_granularity) *
                                chunk_size_granularity;
     if (set_value(m_chunk_size, Value{new_chunk_size, Priority::FORCE})) {
-        spdlog::debug("Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
+        spdlog::trace("Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
     }
 }
 
