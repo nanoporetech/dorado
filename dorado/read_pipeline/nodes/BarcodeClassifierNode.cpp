@@ -113,16 +113,24 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
 
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
-    bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
-    auto rg_tag = bam_aux_get(irecord, "RG");
-    if (rg_tag) {
-        std::string rg_tag_value = bam_aux2Z(rg_tag);
-        if (!rg_tag_value.ends_with(bc)) {
-            if (!rg_tag_value.empty()) {
-                rg_tag_value.append("_");
+    if (bc != UNCLASSIFIED_BARCODE) {
+        bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
+        auto rg_tag = bam_aux_get(irecord, "RG");
+        if (rg_tag) {
+            std::string rg_tag_value = bam_aux2Z(rg_tag);
+            if (!rg_tag_value.ends_with(bc)) {
+                if (!rg_tag_value.empty()) {
+                    rg_tag_value.append("_");
+                }
+                rg_tag_value.append(bc);
+                bam_aux_update_str(irecord, "RG", int(rg_tag_value.length() + 1),
+                                   rg_tag_value.c_str());
             }
-            rg_tag_value.append(bc);
-            bam_aux_update_str(irecord, "RG", int(rg_tag_value.length() + 1), rg_tag_value.c_str());
+        }
+    } else {
+        auto bc_tag = bam_aux_get(irecord, "BC");
+        if (bc_tag) {
+            bam_aux_del(irecord, bc_tag);
         }
     }
     m_num_records++;
