@@ -311,31 +311,9 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
         }
     }
 
-    uint8_t* md_ptr = bam_aux_get(record, "MD");
-
-    if (md_ptr) {
-        int i = 0;
-        int md_length = 0;
-        char* md = bam_aux2Z(md_ptr);
-
-        while (md[i]) {
-            if (std::isdigit(md[i])) {
-                md_length = md_length * 10 + (md[i] - '0');
-            } else {
-                if (md[i] == '^') {
-                    // Skip deletions
-                    i++;
-                    while (md[i] && !std::isdigit(md[i])) {
-                        i++;
-                    }
-                } else {
-                    // Substitution found
-                    counts.substitutions++;
-                    md_length++;
-                }
-            }
-            i++;
-        }
+    uint8_t* nm_ptr = bam_aux_get(record, "NM");
+    if (nm_ptr) {
+        counts.substitutions = bam_aux2i(nm_ptr) - counts.deletions - counts.insertions;
     }
 
     return counts;
