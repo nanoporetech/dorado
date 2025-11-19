@@ -7,7 +7,7 @@ arrow:
         The universal columnar format.
     version: "18.0.0"
     url: https://arrow.apache.org/
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/arrow/licenses/LICENSE.txt
     files:
         - PATH_NOT_AVAILABLE
 flatbuffers:
@@ -15,7 +15,7 @@ flatbuffers:
         Efficient cross platform serialization library.
     version: "2.0.0"
     url: http://google.github.io/flatbuffers
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/flatbuffers/licenses/LICENSE.txt
     files:
         - PATH_NOT_AVAILABLE
 GSL Lite:
@@ -24,7 +24,7 @@ GSL Lite:
         <https://github.com/isocpp/CppCoreGuidelines>.
     version: "0.38.1"
     url: https://github.com/martinmoene/gsl-lite
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/gsl-lite.txt
     files:
         - PATH_NOT_AVAILABLE
 jemalloc:
@@ -48,7 +48,7 @@ xsimd:
         A unified means for using SIMD features for library authors.
     version: "9.0.1"
     url: https://github.com/xtensor-stack/xsimd
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/xsimd/licenses/LICENSE
     files:
         - PATH_NOT_AVAILABLE
 zstd:
@@ -56,7 +56,7 @@ zstd:
         Fast lossless compression algorithm.
     version: "1.5.5"
     url: https://github.com/facebook/zstd
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/zstd/licenses/LICENSE
     files:
         - PATH_NOT_AVAILABLE
 zlib:
@@ -64,6 +64,6 @@ zlib:
         zlib data compression library.
     version: "1.2.13"
     url: https://github.com/madler/zlib
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/zlib/licenses/LICENSE
     files:
         - PATH_NOT_AVAILABLE

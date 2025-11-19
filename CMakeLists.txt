@@ -90,7 +90,6 @@ include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
 include(cmake/DoradoCheckDeps.cmake)
-include(cmake/DoradoLicences.cmake)
 
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
@@ -249,6 +248,7 @@ include(cmake/InstallRedistLibs.cmake)
 if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)
 endif()
+include(cmake/DoradoLicences.cmake)
 
 if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )
     find_library(

@@ -71,8 +71,19 @@ function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
         return()
     endif()
 
+    # Look for special cases prefixes.
+    set(prefix_pod5 "${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}")
+    if (LICENCE MATCHES "^<(.*)>(.*)$")
+        set(prefix prefix_${CMAKE_MATCH_1})
+        if (NOT DEFINED ${prefix})
+            message(FATAL_ERROR "Unknown prefix: '${CMAKE_MATCH_1}'")
+        endif()
+        set(licence_path "${${prefix}}/${CMAKE_MATCH_2}")
+    else()
+        set(licence_path "${arg_PATH}/${LICENCE}")
+    endif()
+
     # Check that it exists.
-    set(licence_path "${arg_PATH}/${LICENCE}")
     if (NOT EXISTS "${licence_path}")
         message(FATAL_ERROR "Missing licence file for ${NAME} in ${yaml_file}: ${licence_path}")
     endif()
