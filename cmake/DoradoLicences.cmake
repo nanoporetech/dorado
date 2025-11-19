@@ -90,7 +90,15 @@ function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
 
     # Add the licence to the header.
     file(READ "${licence_path}" licence_data)
-    file(APPEND "${OUTPUT}" "{ \"${NAME}\", R\"licence_delim(${licence_data})licence_delim\" },\n")
+    file(APPEND "${OUTPUT}" "{ \"${NAME}\", ")
+    # MSVC can't handle literals longer than ~16K so we split up the strings. See error C2026.
+    set(substr_length 16000)
+    string(LENGTH "${licence_data}" licence_length)
+    foreach(substr_start RANGE 0 ${licence_length} ${substr_length})
+        string(SUBSTRING "${licence_data}" ${substr_start} ${substr_length} licence_substr)
+        file(APPEND "${OUTPUT}" "R\"licence_delim(${licence_substr})licence_delim\" ")
+    endforeach()
+    file(APPEND "${OUTPUT}" " },\n")
 endfunction()
 
 
