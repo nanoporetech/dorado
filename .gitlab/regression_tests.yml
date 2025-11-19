@@ -384,7 +384,7 @@ regression_tests:speed:macos:arm:
     - build_archive:macos:arm
 
 regression_tests:speed:email:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   extends:
     - .linux_regression_dependencies
     - .linux_runner
