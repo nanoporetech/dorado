@@ -263,6 +263,7 @@ int aligner(int argc, char* argv[]) {
         tracker.disable_progress_reporting();
     }
 
+    bool has_barcoding = false;
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
         auto progress_callback =
@@ -278,7 +279,7 @@ int aligner(int argc, char* argv[]) {
 
         auto hts_writer_builder = hts_writer::AlignerHtsFileWriterBuilder(
                 emit_sam, sort_requested, output_dir, writer_threads, progress_callback,
-                description_callback);
+                description_callback, has_barcoding);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {

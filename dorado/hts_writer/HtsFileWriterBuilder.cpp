@@ -146,7 +146,8 @@ AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
         const std::optional<std::string>& output_dir,
         int writer_threads,
         utils::ProgressCallback progress_callback,
-        utils::DescriptionCallback description_callback)
+        utils::DescriptionCallback description_callback,
+        bool assume_barcodes)
         : HtsFileWriterBuilder(false,
                                emit_sam,
                                sort_requested,
@@ -155,7 +156,7 @@ AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
                                std::move(progress_callback),
                                std::move(description_callback),
                                std::string(),
-                               false) {};
+                               assume_barcodes) {};
 
 }  // namespace hts_writer
 }  // namespace dorado
