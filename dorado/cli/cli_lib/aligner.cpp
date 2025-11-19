@@ -7,6 +7,7 @@
 #include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
 #include "hts_utils/HeaderMapper.h"
+#include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
@@ -263,6 +264,23 @@ int aligner(int argc, char* argv[]) {
         tracker.disable_progress_reporting();
     }
 
+    bool has_barcoding = false;
+    bool strip_input_alignments = true;
+    std::unique_ptr<utils::HeaderMapper> header_mapper;
+    if (!reads.empty()) {
+        header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
+        auto hdr = header_mapper->get_shared_merged_header(strip_input_alignments);
+        int num_rg_lines = sam_hdr_count_lines(hdr.get(), "RG");
+        KString tag_wrapper(100000);
+        auto& tag_value = tag_wrapper.get();
+        for (int i = 0; i < num_rg_lines; ++i) {
+            if (sam_hdr_find_tag_pos(hdr.get(), "RG", i, "SM", &tag_value) == 0) {
+                has_barcoding = true;
+                break;
+            }
+        }
+    }
+
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
         auto progress_callback =
@@ -278,7 +296,7 @@ int aligner(int argc, char* argv[]) {
 
         auto hts_writer_builder = hts_writer::AlignerHtsFileWriterBuilder(
                 emit_sam, sort_requested, output_dir, writer_threads, progress_callback,
-                description_callback);
+                description_callback, has_barcoding);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {
@@ -324,11 +342,7 @@ int aligner(int argc, char* argv[]) {
         utils::add_sq_hdr(hdr, aligner_ref.get_sequence_records_for_header());
     });
 
-    std::unique_ptr<utils::HeaderMapper> header_mapper;
-    bool strip_input_alignments = true;
-    if (!reads.empty()) {
-        header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
-
+    if (header_mapper) {
         if (output_dir.has_value()) {
             header_mapper->modify_headers(modify_hdr);
             // Set the dynamic header map on the writer

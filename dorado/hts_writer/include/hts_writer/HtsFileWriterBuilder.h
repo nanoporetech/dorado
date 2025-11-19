@@ -74,7 +74,8 @@ public:
                                 const std::optional<std::string>& output_dir,
                                 int writer_threads,
                                 utils::ProgressCallback progress_callback,
-                                utils::DescriptionCallback description_callback);
+                                utils::DescriptionCallback description_callback,
+                                bool assume_barcodes);
 };
 
 }  // namespace dorado::hts_writer

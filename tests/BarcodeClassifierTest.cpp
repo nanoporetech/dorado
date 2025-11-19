@@ -446,7 +446,7 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     // First read should be unclassified and untrimmed.
     auto seq1 = dorado::utils::extract_sequence(read1.get());
     CATCH_CHECK(seq1 == orig_seq1);
-    CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(read1.get(), "BC")), Equals(dorado::UNCLASSIFIED));
+    CATCH_CHECK(bam_aux_get(read1.get(), "BC") == nullptr);
 
     // Second read should be classified and trimmed.
     auto seq2 = dorado::utils::extract_sequence(read2.get());
