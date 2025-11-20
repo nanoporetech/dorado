@@ -22,18 +22,6 @@
 
 namespace kadayashi::tests {
 
-CATCH_TEST_CASE("kadayashi_natoi", TEST_GROUP) {
-    CATCH_CHECK(natoi("4215M", 2) == 42);
-    CATCH_CHECK(natoi("4215M", 4) == 4215);
-    CATCH_CHECK(natoi("-3M", 2) == -1);
-    CATCH_CHECK(natoi("1.5M", 3) == -1);
-    CATCH_CHECK(natoi("111\0M", 4) == -1);
-    CATCH_CHECK(natoi("2147483647M", 10) == 2147483647);
-    CATCH_CHECK(natoi("2147483648M", 10) == -1);
-    CATCH_CHECK(natoi("2147483649M", 10) == -1);
-    CATCH_CHECK(natoi("11147483649M", 11) == -1);
-}
-
 CATCH_TEST_CASE("kadayashi_dvr_1 normal case", TEST_GROUP) {
     // Input data.
     const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-02-supertiny";
@@ -72,12 +60,22 @@ CATCH_TEST_CASE("kadayashi_dvr_1 normal case", TEST_GROUP) {
     CATCH_REQUIRE(bam_reader.hdr());
     CATCH_REQUIRE(fastx_reader.get_raw_faidx_ptr());
 
+    constexpr bool DISABLE_INTERVAL_EXPANSION = false;
+    constexpr int32_t MIN_BASE_QUALITY = 5;
+    constexpr int32_t MIN_VARCALL_COVERAGE = 5;
+    constexpr float MIN_VARCALL_FRACTION = 0.2f;
+    constexpr int32_t MAX_CLIPPING = 100000;
+    constexpr int32_t MIN_STRAND_COV = 3;
+    constexpr float MIN_STRAND_COV_FRAC = 0.03f;
+    constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
+
     // UUT.
     const std::unordered_map<std::string, int32_t> result =
             kadayashi::kadayashi_dvr_single_region_wrapper(
                     bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                    fastx_reader.get_raw_faidx_ptr(), "chr20", 1, 10000, 0, 5, 5, 0.2f, 10, 100000,
-                    1 << 27);
+                    fastx_reader.get_raw_faidx_ptr(), "chr20", 1, 10000, DISABLE_INTERVAL_EXPANSION,
+                    MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE, MIN_VARCALL_FRACTION, MAX_CLIPPING,
+                    MIN_STRAND_COV, MIN_STRAND_COV_FRAC, MAX_GAPCOMPRESSED_SEQDIV);
 
     CATCH_CHECK(result == expected);
 }
@@ -99,12 +97,23 @@ CATCH_TEST_CASE("kadayashi_dvr_1 empty region", TEST_GROUP) {
     CATCH_REQUIRE(bam_reader.hdr());
     CATCH_REQUIRE(fastx_reader.get_raw_faidx_ptr());
 
+    constexpr bool DISABLE_INTERVAL_EXPANSION = false;
+    constexpr int32_t MIN_BASE_QUALITY = 5;
+    constexpr int32_t MIN_VARCALL_COVERAGE = 5;
+    constexpr float MIN_VARCALL_FRACTION = 0.2f;
+    constexpr int32_t MAX_CLIPPING = 100000;
+    constexpr int32_t MIN_STRAND_COV = 3;
+    constexpr float MIN_STRAND_COV_FRAC = 0.03f;
+    constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
+
     // UUT.
     const std::unordered_map<std::string, int32_t> result =
             kadayashi::kadayashi_dvr_single_region_wrapper(
                     bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                    fastx_reader.get_raw_faidx_ptr(), "chr20", 200000, 200001, 0, 5, 5, 0.2f, 10,
-                    100000, 1 << 27);
+                    fastx_reader.get_raw_faidx_ptr(), "chr20", 200000, 200001,
+                    DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
+                    MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
+                    MAX_GAPCOMPRESSED_SEQDIV);
 
     CATCH_CHECK(result == expected);
 }
@@ -126,12 +135,23 @@ CATCH_TEST_CASE("kadayashi_dvr_1 nonexistent chromosome", TEST_GROUP) {
     CATCH_REQUIRE(bam_reader.hdr());
     CATCH_REQUIRE(fastx_reader.get_raw_faidx_ptr());
 
+    constexpr bool DISABLE_INTERVAL_EXPANSION = false;
+    constexpr int32_t MIN_BASE_QUALITY = 5;
+    constexpr int32_t MIN_VARCALL_COVERAGE = 5;
+    constexpr float MIN_VARCALL_FRACTION = 0.2f;
+    constexpr int32_t MAX_CLIPPING = 100000;
+    constexpr int32_t MIN_STRAND_COV = 3;
+    constexpr float MIN_STRAND_COV_FRAC = 0.03f;
+    constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
+
     // UUT.
     const std::unordered_map<std::string, int32_t> result =
             kadayashi::kadayashi_dvr_single_region_wrapper(
                     bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                    fastx_reader.get_raw_faidx_ptr(), "Nonexistent", 200000, 200001, 0, 5, 5, 0.2f,
-                    10, 100000, 1 << 27);
+                    fastx_reader.get_raw_faidx_ptr(), "Nonexistent", 200000, 200001,
+                    DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
+                    MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
+                    MAX_GAPCOMPRESSED_SEQDIV);
 
     CATCH_CHECK(result == expected);
 }

@@ -308,11 +308,21 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 } else if (hap_source == secondary::HaplotagSource::COMPUTE) {
                     LOG_TRACE("Running Kadayashi on region: {}:{}-{}", chr_name, (start + 1), end);
 
+                    constexpr bool DISABLE_INTERVAL_EXPANSION = false;
+                    constexpr int32_t MIN_BASE_QUALITY = 5;
+                    constexpr int32_t MIN_VARCALL_COVERAGE = 5;
+                    constexpr float MIN_VARCALL_FRACTION = 0.2f;
+                    constexpr int32_t MAX_CLIPPING = 200;
+                    constexpr int32_t MIN_STRAND_COV = 3;
+                    constexpr float MIN_STRAND_COV_FRAC = 0.03f;
+                    constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
+
                     std::unordered_map<std::string, int32_t> ret =
                             kadayashi::kadayashi_dvr_single_region_wrapper(
                                     fp, idx, hdr, fai_ptr, chr_name.c_str(), start, end,
-                                    !KDYS_DISABLE_REGION_EXPANSION, 5, 5, 0.2f, 10, 200,
-                                    KDYS_DISABLE_MAX_READ_CAP);
+                                    DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY,
+                                    MIN_VARCALL_COVERAGE, MIN_VARCALL_FRACTION, MAX_CLIPPING,
+                                    MIN_STRAND_COV, MIN_STRAND_COV_FRAC, MAX_GAPCOMPRESSED_SEQDIV);
                     LOG_TRACE("Kadayashi done on region: {}:{}-{}", chr_name, (start + 1), end);
 
                     return ret;
