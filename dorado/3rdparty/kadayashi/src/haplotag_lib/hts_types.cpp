@@ -13,11 +13,7 @@ void HtsIdxDestructor::operator()(hts_idx_t* bam) const noexcept { hts_idx_destr
 
 void SamHdrDestructor::operator()(sam_hdr_t* bam) const noexcept { sam_hdr_destroy(bam); }
 
-void HtsFileDestructor::operator()(htsFile* hts_file) const noexcept {
-    if (hts_file) {
-        hts_close(hts_file);
-    }
-}
+void HtsFileDestructor::operator()(htsFile* hts_file) const noexcept { hts_close(hts_file); }
 
 void BamDestructor::operator()(bam1_t* bam) const noexcept { bam_destroy1(bam); }
 

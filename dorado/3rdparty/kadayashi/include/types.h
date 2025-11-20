@@ -1,8 +1,8 @@
-#ifndef KADAYASHI_TYPES_H
-#define KADAYASHI_TYPES_H
+#pragma once
 
 #include "hts_types.h"
 
+#include <array>
 #include <cassert>
 #include <cstdint>
 #include <limits>
@@ -11,33 +11,20 @@
 #include <unordered_map>
 #include <vector>
 
-#define KDYS_DISABLE_MAX_READ_CAP (1 << 27)
-#define KDYS_DISABLE_REGION_EXPANSION 1
-
 namespace kadayashi {
 
-#define VAR_OP_INVALID 0
-#define VAR_OP_M 1
-#define VAR_OP_X 2
-#define VAR_OP_I 4
-#define VAR_OP_D 8
-#define HAPTAG_UNPHASED 254
-#define HAPTAG_AMBPHASED 99
-
-#define CMPT0_COMPAT 1
-#define CMPT0_INCOMPAT (1 << 1)
-#define CMPT0_AWAY (1 << 2)  // aligned ranges do not overlap
-#define CMPT0_CONTAINED (1 << 7)
-#define CMPT0_DEL (1 << 6)
-#define CMPT0_F (CMPT0_INCOMPAT | CMPT0_CONTAINED | CMPT0_DEL)
-
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-#define MIN(a, b) ((a) <= (b) ? (a) : (b))
-
-#define READLINE_BUF_LEN 1024
+constexpr bool DEBUG_LOCAL_HAPLOTAGGING = false;
+constexpr uint8_t VAR_OP_INVALID = 0;
+constexpr uint8_t VAR_OP_M = 1;
+constexpr uint8_t VAR_OP_X = 2;
+constexpr uint8_t VAR_OP_I = 4;
+constexpr uint8_t VAR_OP_D = 8;
+constexpr uint8_t HAPTAG_UNPHASED = 254;
+constexpr uint8_t HAPTAG_AMBPHASED = 99;
 
 // clang-format off
-static const unsigned char kdy_seq_nt4_table[256] = {
+constexpr uint8_t SENTINEL_REF_ALLELE_INT = 5;  // kdy_seq_nt4_table
+constexpr unsigned char kdy_seq_nt4_table[256] = {
         // translate ACG{T,U} to 0123 case insensitive
         4, 4,       4, 4,       4,       4,       4, 4,       4, 4, 4, 4, 4, 4,       4,       4,
         4, 4,       4, 4,       4,       4,       4, 4,       4, 4, 4, 4, 4, 4,       4,       4,
@@ -58,12 +45,6 @@ static const unsigned char kdy_seq_nt4_table[256] = {
 };
 // clang-format on
 
-struct bamfile_t {
-    samFile *fp;
-    hts_idx_t *bai;
-    bam_hdr_t *header;
-};
-
 struct qa_t {
     uint32_t pos;
     std::vector<uint8_t> allele;  // as in kdy_seq_nt4_table;
@@ -75,20 +56,28 @@ struct qa_t {
     uint8_t is_used;
     uint8_t hp;
 };  // query allele
+inline bool operator<(const qa_t& a, const qa_t& b) { return a.pos < b.pos; }
 
 struct read_t {
-    uint32_t start_pos = std::numeric_limits<uint32_t>::max();
-    uint32_t end_pos = std::numeric_limits<uint32_t>::max();
-    uint32_t ID = std::numeric_limits<uint32_t>::max();  // ID is local to a chunk
-    std::vector<qa_t> vars{};                            // variants owned by read
-    int hp = HAPTAG_UNPHASED;                            // stores the haplotagging result
+    uint32_t start_pos{std::numeric_limits<uint32_t>::max()};
+    uint32_t end_pos{std::numeric_limits<uint32_t>::max()};
+    uint32_t ID{std::numeric_limits<uint32_t>::max()};  // ID is local to a chunk
+    std::vector<qa_t> vars{};                           // variants owned by read
+    uint8_t hp{HAPTAG_UNPHASED};                        // stores the haplotagging result
     int votes_diploid[2]{0, 0};
-    uint8_t strand = std::numeric_limits<uint8_t>::max();
-    float de = {0.0f};  // gap-compressed seq div
-    uint32_t left_clip_len{0};
-    uint32_t right_clip_len{0};
+    uint8_t strand{std::numeric_limits<uint8_t>::max()};
+    float de{0.0f};  // gap-compressed seq div
+    int left_clip_len{0};
+    int right_clip_len{0};
 };
 
+constexpr uint8_t TA_STAT_UNCALLED = 0;
+constexpr uint8_t TA_STAT_ACCEPTED = 1;
+constexpr uint8_t TA_STAT_UNSURE = 2;
+constexpr uint8_t TA_TYPE_HOM = 0;
+constexpr uint8_t TA_TYPE_HET = 1;
+constexpr uint8_t TA_TYPE_HETMULTI = 2;
+constexpr uint8_t TA_TYPE_UNKNOWN = 4;
 struct ta_t {
     uint32_t pos;
     std::vector<std::vector<uint8_t>> alleles;  // Sequences, use 0123 (as in kdy_seq_nt4_table)
@@ -97,14 +86,23 @@ struct ta_t {
     std::vector<std::vector<uint32_t>> allele2readIDs;  // Inverse index: in what reads did we see
                                                         // a given allele at pos. Needed for
                                                         // variant graph construction.
-    uint8_t is_used;                                    // Whether this position is used
+    uint8_t is_used : 4, type : 4;
+    std::array<char, 4> genotype{'.', '/', '.', '\0'};
 };  // possible alleles at a reference position
 
-struct ref_vars_t {
-    int bucket_l;
-    std::vector<uint32_t> poss;
-    std::vector<int> start_indices;
-};
+struct variant_t {
+    uint8_t op;              // VAR_OP_{M,X,I,D} as in cigar operation
+    std::string alt_allele;  // not storing ref allele, we assume that
+                             // we will have access to the original vcf or its data
+                             // when writing the output vcf.
+};  // for global phasing; variant is load from file or memory, and will not change
+typedef std::unordered_map<uint32_t, variant_t> variants_t;
+typedef std::unordered_map<std::string, variants_t> reference_variants_t;
+
+typedef std::unordered_map<uint32_t, uint8_t> var2hap_t;  // haptag of reference alllel
+typedef std::unordered_map<std::string, var2hap_t> varhaps_t;
+
+typedef std::unordered_map<std::string, int> str2int_t;
 
 struct vgedge_t {
     uint32_t counts[4];  // 2-allele diploid,
@@ -113,8 +111,6 @@ struct vgedge_t {
                          //   <i>[hap1] - <i+1>[hap0]
                          //   <i>[hap1] - <i+1>[hap1]
 };  // connection of position i => position i+1
-#define GET_VGE_VAL(vg, i, H1, H2) ((vg).edges[(i)].counts[(H1) << 1 | (H2)])
-#define GET_VGE_VAL2(vg, i, comb) ((vg).edges[(i)].counts[(comb)])
 
 struct vgnode_t {
     uint32_t ID{0};                  // self's index
@@ -125,10 +121,8 @@ struct vgnode_t {
     int best_score_i{-1};  // note: backtracing does not need to know about
                            // the previous node.
 };  // one position; 2-allele diploid
-#define GET_VGN_VAL(vg, i, A1, A2) ((vg).nodes[(i)].scores[(A1) << 1 | (A2)])
-#define GET_VGN_VAL2(vg, i, comb) ((vg).nodes[(i)].scores[(comb)])
 
-struct vg_t {
+struct variant_graph_t {
     uint32_t n_vars{0};
     std::vector<vgedge_t> edges{};
     std::vector<vgnode_t> nodes{};
@@ -137,33 +131,49 @@ struct vg_t {
 };  // 2-allele diploid graph used by dvr method
 
 struct chunk_t {
-    int is_valid;
+    bool is_valid;
     std::vector<read_t> reads;
     std::vector<ta_t> varcalls;
     std::vector<std::string> qnames;
     std::unordered_map<std::string, int> qname2ID;
     uint32_t abs_start;
     uint32_t abs_end;
-    vg_t vg;
+    std::string refname;
+    variant_graph_t vg;
 };
 
 struct phase_return_t {
-    std::unordered_map<std::string, int> qname2hp = {};
-    chunk_t ck = {};
+    std::unordered_map<std::string, int> qname2hp{};
+    chunk_t ck{};
+    std::unordered_map<uint32_t, uint8_t> phasing_breakpoints{};
 };
 
 struct pileup_pars_t {
-    bool disable_region_expansion = false;
-    bool allow_any_candidate =
-            false;  // we only want this to be true when input has a trusted vcf; otherwise, we want to filter by base quality, coverage, etc
-    int min_base_quality = 5;
-    int min_varcall_coverage = 5;
-    float min_varcall_fraction = 0.2f;
-    int varcall_indel_mask_flank = 10;
-    int max_clipping = 200;
-    uint64_t max_read_per_region = 1ULL << 27;
+    bool allow_any_candidate{
+            false};  // don't use; only set this for experimenting with global phasing
+    int min_base_quality{5};
+    int min_varcall_coverage{5};
+    float min_varcall_fraction{0.2f};
+    int max_clipping{200};
+    int min_mapq{10};
+    int min_strand_cov{1};
+    float min_strand_cov_frac{0.033f};
+
+    float max_gapcompressed_seqdiv{0.1f};
+
+    bool retain_het_only{true};
+    bool retain_SNP_only{true};
+    bool use_bloomfilter{false};
+    bool disable_low_complexity_masking{false};
+    bool disable_region_expansion{false};
 };
 
-}  // namespace kadayashi
+typedef std::unordered_map<std::string, std::vector<std::pair<uint32_t, uint32_t>>> intervals_t;
+struct query_region_t {
+    std::string chrom{};
+    uint32_t start{0};
+    uint32_t end{0};
+};
+typedef std::unordered_map<std::string, std::vector<query_region_t>> query_regions_t;
 
-#endif  //KADAYASHI_TYPES_H
+}  // namespace kadayashi
