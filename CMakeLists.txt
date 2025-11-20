@@ -248,6 +248,7 @@ include(cmake/InstallRedistLibs.cmake)
 if(NOT DORADO_DISABLE_PACKAGING)
     include(cmake/DoradoPackaging.cmake)
 endif()
+include(cmake/DoradoLicences.cmake)
 
 if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )
     find_library(
