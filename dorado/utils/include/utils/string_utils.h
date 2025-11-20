@@ -108,12 +108,16 @@ template <typename T>
 
 namespace detail {
 template <typename Int>
-static constexpr std::size_t min_space_required() requires std::is_integral_v<Int> {
+static constexpr std::size_t min_space_required()
+    requires std::is_integral_v<Int>
+{
     // 1 for sign, 1 for rounding in numeric_limits, extra for safety.
     return std::numeric_limits<Int>::digits10 + 1 + 1 + 2;
 }
 template <typename Float>
-static constexpr std::size_t min_space_required() requires std::is_floating_point_v<Float> {
+static constexpr std::size_t min_space_required()
+    requires std::is_floating_point_v<Float>
+{
     // 1 for sign, 1 for decimal point, 1 for rounding in numeric_limits, 5 for e+123, extra for safety.
     return std::numeric_limits<Float>::max_digits10 + 1 + 1 + 1 + 5 + 2;
 }
@@ -122,7 +126,8 @@ static constexpr std::size_t min_space_required() requires std::is_floating_poin
 // Write the integer to the buffer, returning a span of the written string.
 template <std::size_t BufferSize, typename Int>
 [[nodiscard]] inline constexpr std::string_view to_chars(Int value, char* buffer)
-        requires std::is_integral_v<Int> {
+    requires std::is_integral_v<Int>
+{
     constexpr auto min_size = detail::min_space_required<Int>();
     static_assert(BufferSize >= min_size);
     const auto res = std::to_chars(buffer, buffer + BufferSize, value);
@@ -136,7 +141,8 @@ template <std::size_t BufferSize, typename Int>
 // Write the float to the buffer, returning a span of the written string.
 template <std::size_t BufferSize, typename Float>
 [[nodiscard]] inline constexpr std::string_view to_chars(Float value, char* buffer)
-        requires std::is_floating_point_v<Float> {
+    requires std::is_floating_point_v<Float>
+{
     constexpr auto min_size = detail::min_space_required<Float>();
     static_assert(BufferSize >= min_size);
     // Note that this gives different output to std::to_string() but matches the output of

@@ -22,13 +22,16 @@ class SamLineStream {
     utils::TabSeparatedStream m_stream;
 
     template <typename T>
-    static T default_value() requires std::is_integral_v<T> {
+    static T default_value()
+        requires std::is_integral_v<T>
+    {
         return 0;
     }
 
     template <typename T>
     static T default_value()
-            requires(std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>) {
+        requires(std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>)
+    {
         return "*";
     }
 

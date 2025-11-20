@@ -40,7 +40,8 @@ public:
     // Push an item onto the queue.
     // Requires that the queue isn't full.
     template <typename ItemLike>
-    requires std::is_constructible_v<Item, ItemLike> void push(ItemLike &&item) {
+        requires std::is_constructible_v<Item, ItemLike>
+    void push(ItemLike &&item) {
         assert(!full());
 
         // Construct the new item in-place.
