@@ -24,10 +24,11 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
-* [dorado-1.2.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.2.0-linux-x64.tar.gz)
-* [dorado-1.2.0-linux-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.2.0-linux-arm64.tar.gz)
-* [dorado-1.2.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.2.0-osx-arm64.zip)
-* [dorado-1.2.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.2.0-win64.zip)
+ - [dorado-1.3.0-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-linux-x64.tar.gz)
+ - [dorado-1.3.0-linux-arm64-cuda12 - Orin only](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-linux-arm64.tar.gz)
+ - [dorado-1.3.0-linux-arm64-cuda13 - Jetson Thor / DGX Spark](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-linux-arm64-cuda-13.0.tar.gz)
+ - [dorado-1.3.0-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-osx-arm64.zip)
+ - [dorado-1.3.0-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.0-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
@@ -56,9 +57,11 @@ Dorado has been tested extensively and supported on the following systems:
 | Platform | GPU/CPU | Minimum Software Requirements |
 | --- |---------|--------------|
 | Linux x86_64  | (G)V100, A100, H100 | CUDA Driver ≥525.105 |
-| Linux arm64 | Jetson Orin | Linux for Tegra ≥36.4.3 (JetPack ≥6.2) |
+| Linux arm64 | Jetson Orin, Jetson Thor, DGX Spark* | Linux for Tegra ≥36.4.3 (JetPack ≥6.2) |
 | Windows x86_64 | (G)V100, A100, H100 | CUDA Driver ≥529.19 |
 | Apple | Apple Silicon (M series) | macOS ≥14 |
+
+**DGX Spark supports all Dorado commands **except** Dorado `correct`. Support for Dorado `correct` will be added in a future release.*
 
 Linux x64 or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 
@@ -120,7 +123,7 @@ To run Duplex basecalling, run the command:
 dorado duplex sup pod5s/ > duplex.bam
 ```
 
-For more details please head to the the [dorado duplex basecalling documentation](https://software-docs.nanoporetech.com/dorado/latest/basecaller/duplex/).
+For more details please head to the [Dorado `duplex` basecalling documentation](https://software-docs.nanoporetech.com/dorado/latest/basecaller/duplex/).
 
 ### Alignment
 
@@ -140,11 +143,11 @@ To basecall with alignment with duplex or simplex, run with the `--reference` op
 dorado basecaller <model> <reads> --reference <index> > calls.bam
 ```
 
-For more details please check out the [dorado aligner documentation](https://software-docs.nanoporetech.com/dorado/latest/basecaller/alignment/).
+For more details please check out the [Dorado `aligner` documentation](https://software-docs.nanoporetech.com/dorado/latest/basecaller/alignment/).
 
 ### Sequencing Summary
 
-The `dorado summary` command outputs a tab-separated file with read level sequencing information from the BAM file generated during basecalling. To create a summary, run:
+The Dorado `summary` command outputs a tab-separated file with read level sequencing information from the BAM file generated during basecalling. To create a summary, run:
 
 ```bash
 dorado summary <bam> > summary.tsv
@@ -152,7 +155,7 @@ dorado summary <bam> > summary.tsv
 
 ### Barcode Classification
 
-Dorado supports barcode classification for existing basecalls as well as producing classified basecalls directly. Further details can be found at the [dorado barcoding documentation](https://software-docs.nanoporetech.com/dorado/latest/barcoding/barcoding/).
+Dorado supports barcode classification for existing basecalls as well as producing classified basecalls directly. Further details can be found at the [Dorado `barcoding` documentation](https://software-docs.nanoporetech.com/dorado/latest/barcoding/barcoding/).
 
 ### Poly(A) tail estimation
 
@@ -162,13 +165,15 @@ Dorado has initial support for estimating poly(A) tail lengths for cDNA (PCS and
 
 Dorado supports single-read error correction with the integration of the [HERRO](https://github.com/lbcb-sci/herro) algorithm. HERRO uses all-vs-all alignment followed by haplotype-aware correction using a deep learning model to achieve higher single-read accuracies. The corrected reads are primarily useful for generating _de novo_ assemblies of diploid organisms.
 
+Dorado `correct` is available on all supported platforms *except* DGX Spark. Support for Dorado `correct` on DGX Spark will be added in a future release.
+
 To correct reads, run:
 
 ```bash
 dorado correct reads.fastq > corrected_reads.fasta
 ```
 
-Checkout the [doroado correct documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/correct/) for all the details.
+Checkout the [Dorado `correct` documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/correct/) for all the details.
 
 ### Polishing
 
@@ -180,12 +185,12 @@ Additionally, Dorado `polish` can output a VCF file containing records for all v
 
 Note that Dorado `polish` is a **haploid** polishing tool and does _not_ implement any sort of phasing internally. It will take input alignment data _as is_ and run it through the polishing model to produce the consensus sequences. For more information, please take a look at [this section](https://software-docs.nanoporetech.com/dorado/latest/assembly/polish/#polishing-diploidpolyploid-assemblies) of Dorado Docs.
 
-For more information on how to get started head to the [dorado polish documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/polish/).
+For more information on how to get started, head to the [Dorado `polish` documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/polish/).
 
 ### Variant Calling - Alpha preview release
 
 Dorado `variant` is an early-stage diploid small variant caller, released for experimental use and evaluation purposes.
-This version is intended for feedback and should not yet be considered production-ready. For more information check out the [dorado variant documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/variant/).
+This version is intended for feedback and should not yet be considered production-ready. For more information check out the [Dorado `variant` documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/variant/).
 
 ## Available basecalling models
 
@@ -199,11 +204,11 @@ To download all models instead of using the automatic download, run:
 dorado download --model all
 ```
 
-Click here for more information on [dorado downloader](https://software-docs.nanoporetech.com/dorado/latest/models/downloader/) and [dorado model selection](https://software-docs.nanoporetech.com/dorado/latest/models/selection/).
+Click here for more information on [Dorado `download`](https://software-docs.nanoporetech.com/dorado/latest/models/downloader/) and [Dorado model selection](https://software-docs.nanoporetech.com/dorado/latest/models/selection/).
 
 ## Troubleshooting Guide
 
-Click here for the [dorado troubleshooting documentation](https://software-docs.nanoporetech.com/dorado/latest/troubleshooting/troubleshooting/).
+Click here for the [Dorado troubleshooting documentation](https://software-docs.nanoporetech.com/dorado/latest/troubleshooting/troubleshooting/).
 
 ## Licence and Copyright
 

@@ -2,6 +2,28 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.3.0] (21 November 2025)
+
+This release of Dorado expands GPU compatibility with support for Nvidia DGX Spark* and Jetson Thor, and updates to Torch 2.9.0. Dorado 1.3.0 introduces an `--emit-summary` option in the basecaller and improved handling of modified base models, as well as several fixes to `summary`, `demux`, and `basecaller` and performance improvements to `polish` and `variant`.
+
+*Please note that in this release, Dorado `correct` is not yet compatible with DGX Spark. This will be addressed in a future release. 
+
+* 2f55740726ffbf20761a7780f212973e1bcc0934 - Add support for DGX Spark and Jetson Thor
+* bc4b95cf3c5907a9a81e8f825de6d319783e7d63 - Update Torch to 2.9.0 for CUDA 12 onwards
+* a65f9df4fc5dab4ea87de6a049e250d2ae9faf84 - Add `--emit-summary` option to Dorado `basecaller`
+* 47ccd2e00dec6c9e8365bd7db280351139b654f5 - Enable `--modified-bases-models` to use modified base model names in addition to paths; clean up .temp model directories
+* c91a872a705579ba8d1989afe7e9ce487cd5747d - Fix bug where Dorado `demux` with `--no-classify` fails to generate separate barcode files
+* 92758963942227353952d14aa67e85f43cc6bcf7 - Regenerate `RG` headers when running Dorado `demux` and fix `PG` header generation
+* a9d7d20cdf23bbe0bf8e5d81c3d18307ad3d4078 - Reinstate masking of modified base probabilities which fall below a minimum threshold of 5%
+* 13d47221985dbf38fd9f7b63f1983f5c4765148a - Ensure Dorado `summary` correctly calculates number of substitutions in the absence of an `MD` tag
+* 46be4fb19172e81f8c0e41a9a0d1500b49c80152 - Validate the input to Dorado `summary` and allow streaming input to match other commands
+* a52c1a0e255746f0b5a79cc68924aa1ef75649e0 - Fix bug causing `--chunksize` in Dorado `basecaller` to be set incorrectly when `--chunksize=10000` is passed at command line
+* 0c9f832d35c3d6613fe1039823293ce41e3866ef - Encoding parallelisation improvement for Dorado `polish` and `variant` from [pull request #1504](https://github.com/nanoporetech/dorado/pull/1504)
+* be473b1d2a4b80f59472c2a2e2b44f8a3cfc2b55 - Refactor local haplotagging in Dorado `variant`
+* 816bae64b1a5cf064194ec675fc1028c90424498 - Add RTX PRO 6000 Blackwell auto batch size benchmarks
+* 261a5b92892edc1fb1148b3e9bcd4eefc58edbd1 - Remove duplicated material from README.md and link to [Dorado Documentation](https://software-docs.nanoporetech.com/dorado/latest/)
+
+
 # [1.2.0] (21 October 2025)
 
 This release of Dorado delivers major improvements to short-read (<500 bp) basecalling speed with the HAC model, bringing performance in line with that for long reads. The Dorado basecaller now more closely follows the [Oxford Nanopore Output Specifications](https://nanoporetech.github.io/ont-output-specifications/latest/). CPU performance enhancements improve basecalling speed in cases where Dorado is not GPU-bound, such as on multi-GPU systems or when using faster models. The release also includes several other improvements and minor alignment-related bug fixes.
