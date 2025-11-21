@@ -14,7 +14,9 @@ class SeparatedStream {
     bool m_eof = false;
 
     template <typename T>
-    static void parse_value(std::string_view in, T& out) requires std::is_integral_v<T> {
+    static void parse_value(std::string_view in, T& out)
+        requires std::is_integral_v<T>
+    {
         auto parsed = utils::from_chars<T>(in);
         if (parsed.has_value()) {
             out = parsed.value();
@@ -25,7 +27,8 @@ class SeparatedStream {
 
     template <typename T>
     static void parse_value(std::string_view in, T& out)
-            requires(std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>) {
+        requires(std::is_same_v<T, std::string_view> || std::is_same_v<T, std::string>)
+    {
         out = in;
     }
 

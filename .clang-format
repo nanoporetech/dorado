@@ -29,7 +29,7 @@ PointerAlignment: Middle
 ReflowComments: false
 SortIncludes: true
 SortUsingDeclarations: true
-Standard: c++17
+Standard: c++20
 QualifierAlignment: Left # const west
 
 ...
