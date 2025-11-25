@@ -192,12 +192,13 @@ def send_email(graph_dir: pathlib.Path, outlier_msgs: typing.List[str]):
     PAGE_URL = get_env_or_raise("PERF_PAGE_URL")
     EMAIL_SENDER = get_env_or_raise("OFAN_TESTER_EMAIL")
     EMAIL_PASSWORD = get_env_or_raise("OFAN_TESTER_PW")
+    CI_PROJECT_NAME = get_env_or_raise("CI_PROJECT_NAME")
 
     # Fill out basic message details.
     msg = EmailMessage()
     msg["To"] = ", ".join([name + "@nanoporetech.com" for name in EMAIL_LIST])
     msg["From"] = EMAIL_SENDER
-    msg["Subject"] = "Performance benchmark graphs"
+    msg["Subject"] = f"Performance benchmark graphs ({CI_PROJECT_NAME})"
     content = (
         "<html><body>"
         + "<h1>Graphs!</h1><br/>"
