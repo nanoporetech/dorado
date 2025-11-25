@@ -32,12 +32,20 @@ std::vector<torch::Tensor> load_lstm_model_weights(const BasecallModelConfig &cf
     const bool linear_layer_bias = cfg.bias;
 
     const std::vector<std::string> conv_names{".conv.weight.tensor", ".conv.bias.tensor"};
-    const std::vector<std::string> lstm_names{
-            ".rnn.weight_ih_l0.tensor",
-            ".rnn.weight_hh_l0.tensor",
-            ".rnn.bias_ih_l0.tensor",
-            ".rnn.bias_hh_l0.tensor",
-    };
+    std::vector<std::string> lstm_names;
+    if (cfg.is_flstm_model()) {
+        lstm_names = {
+                ".rnn.dn_weight_ih.tensor", ".rnn.dn_weight_hh.tensor", ".rnn.up_weight_ih.tensor",
+                ".rnn.up_weight_hh.tensor", ".rnn.up_bias_ih.tensor",   ".rnn.up_bias_hh.tensor",
+        };
+    } else {
+        lstm_names = {
+                ".rnn.weight_ih_l0.tensor",
+                ".rnn.weight_hh_l0.tensor",
+                ".rnn.bias_ih_l0.tensor",
+                ".rnn.bias_hh_l0.tensor",
+        };
+    }
 
     const size_t num_conv_weights = cfg.convs.size() * conv_names.size();
     const size_t num_rnn_weights = cfg.lstm_layers * lstm_names.size();

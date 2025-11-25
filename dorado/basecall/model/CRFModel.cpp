@@ -1,6 +1,8 @@
 #include "CRFModel.h"
 
 #include "config/BasecallModelConfig.h"
+#include "nn/FLSTMStack.h"
+#include "nn/LSTMStack.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 
@@ -27,20 +29,29 @@ using namespace dorado::config;
 CRFModelImpl::CRFModelImpl(const BasecallModelConfig &config) {
     const auto cv = config.convs;
     const auto lstm_size = config.lstm_size;
+    const bool tanh_x5 = config.scale == 5.f;
     convs = register_module("convs", ConvStack(cv));
-    rnns = register_module("rnns", LSTMStack(config.lstm_layers, lstm_size, true));
+    if (config.is_flstm_model()) {
+        rnns = std::static_pointer_cast<RNNStackImpl>(register_module(
+                "rnns",
+                FLSTMStack(config.lstm_layers, lstm_size, config.lstm_inner_dim.value(), true)));
+    } else {
+        rnns = std::static_pointer_cast<RNNStackImpl>(
+                register_module("rnns", LSTMStack(config.lstm_layers, lstm_size, true)));
+    }
 
     if (config.out_features.has_value()) {
         // The linear layer is decomposed into 2 matmuls.
         const int decomposition = config.out_features.value();
-        linear1 = register_module("linear1", LinearCRF(lstm_size, decomposition, true, false));
-        linear2 =
-                register_module("linear2", LinearCRF(decomposition, config.outsize, false, false));
+        linear1 =
+                register_module("linear1", LinearCRF(lstm_size, decomposition, config.bias, false));
+        linear2 = register_module("linear2",
+                                  LinearCRF(decomposition, config.outsize, false, tanh_x5));
         clamp1 = Clamp(-5.0, 5.0, config.clamp);
         encoder = Sequential(convs, rnns, linear1, linear2, clamp1);
     } else if ((config.convs[0].size > 4) && (config.num_features == 1)) {
         // v4.x model without linear decomposition
-        linear1 = register_module("linear1", LinearCRF(lstm_size, config.outsize, false, false));
+        linear1 = register_module("linear1", LinearCRF(lstm_size, config.outsize, false, tanh_x5));
         clamp1 = Clamp(-5.0, 5.0, config.clamp);
         encoder = Sequential(convs, rnns, linear1, clamp1);
     } else {

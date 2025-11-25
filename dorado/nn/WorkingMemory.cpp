@@ -18,6 +18,8 @@ std::string to_string(const TensorLayout &layout) {
         return std::string("CUTLASS_TNC_I8");
     case TensorLayout::CUBLAS_TN2C:
         return std::string("CUBLAS_TN2C");
+    case TensorLayout::CUBLAS_TNC:
+        return std::string("CUBLAS_TNC");
     }
     throw std::logic_error("TensorLayout unknown");
 }
@@ -67,6 +69,8 @@ at::Tensor WorkingMemory::get_current_NTC_view() {
         return current.narrow(0, is_input_to_rev_lstm ? 1 : 0, T)
                 .transpose(1, 0)
                 .select(2, is_input_to_rev_lstm ? 1 : 0);
+    case TensorLayout::CUBLAS_TNC:
+        return current.narrow(0, is_input_to_rev_lstm ? 1 : 2, T).transpose(1, 0);
     default:
         throw std::logic_error("Unhandled TensorLayout");
     }
@@ -88,6 +92,8 @@ at::Tensor WorkingMemory::next_TC(int T_, int C_, TensorLayout layout_) {
         return next({T + 5, N, C}, torch::kI8, true);
     } else if (layout == TensorLayout::CUBLAS_TN2C) {
         return next({T + 1, N, 2, C}, torch::kF16, true);
+    } else if (layout == TensorLayout::CUBLAS_TNC) {
+        return next({T + 3, N, C}, torch::kF16, true);
     } else {
         throw std::logic_error("Unhandled TensorLayout");
     }

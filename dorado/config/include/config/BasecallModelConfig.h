@@ -100,6 +100,7 @@ struct BasecallModelConfig {
     float qscale = 1.0f;
     float qbias = 0.0f;
     int lstm_size = 0;
+    std::optional<int> lstm_inner_dim = std::nullopt;  // factorised LSTM
     int lstm_layers = 5;
     int stride = 1;
     bool bias = true;
@@ -140,6 +141,8 @@ struct BasecallModelConfig {
 
     // True if this model config describes a LSTM model
     bool is_lstm_model() const { return !is_tx_model(); }
+    // True if this model config describes a factorised LSTM model
+    bool is_flstm_model() const { return is_lstm_model() && lstm_inner_dim.has_value(); }
     // True if this model config describes a transformer model
     bool is_tx_model() const { return tx.has_value(); };
 
