@@ -132,10 +132,10 @@ static constexpr int DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 300000;
 static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
 
 // Default value for timeout of incomplete batches for low-latency pipelines. The
-// value of 350 ms has been found to give good adaptive-sampling performance on all
+// value of 50 ms has been found to give good adaptive-sampling performance on all
 // platforms. For low-latency pipelines the timeout is always from when the first
 // chunk was added to the batch.
-static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
+static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 50;
 
 static constexpr int NUM_KOI_THREADS = 6;
 
