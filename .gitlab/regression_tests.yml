@@ -63,14 +63,10 @@
 
 .linux_benchmark_runner_p48:
   tags:
-    - nvidia-docker
-    - on-prem
     - benchmark-p48
 
 .linux_benchmark_runner_a100:
   tags:
-    - nvidia-docker
-    - on-prem
     - benchmark-a100
 
 .windows_benchmark_runner_a6000:
