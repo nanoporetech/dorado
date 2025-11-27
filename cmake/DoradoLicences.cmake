@@ -101,17 +101,3 @@ function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
     file(APPEND "${OUTPUT}" " },\n")
 endfunction()
 
-
-# Third party licences.
-dorado_generate_licence_header_from_yaml(
-    TARGET dorado_licences
-    PATH ${PROJECT_SOURCE_DIR}/dorado/3rdparty
-    SBOM software_versions.yml
-)
-
-# POD5 licences.
-dorado_generate_licence_header_from_yaml(
-    TARGET dorado_licences_pod5
-    PATH ${PROJECT_SOURCE_DIR}/dorado/3rdparty
-    SBOM software_versions_pod5.yml
-)
