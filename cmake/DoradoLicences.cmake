@@ -21,9 +21,26 @@ function(dorado_generate_licence_header_from_yaml)
     # Create the header.
     dorado_emit_licence_header_start_(${arg_TARGET} output_file)
 
-    # Read the yaml.
+    # Parse the SBOM.
+    function(callback_ NAME LICENCE OMIT)
+        dorado_emit_licence_for_dependency_("${output_file}" "${arg_PATH}" "${NAME}" "${LICENCE}" "${OMIT}")
+    endfunction()
     set(yaml_file "${arg_PATH}/${arg_SBOM}")
-    file(STRINGS "${yaml_file}" yaml_lines NO_HEX_CONVERSION)
+    dorado_parse_sbom_yaml_("${yaml_file}" callback_)
+
+    # Finish off the header.
+    dorado_emit_licence_header_end_(${arg_TARGET} "${output_file}")
+endfunction()
+
+
+#
+# Implementation details
+#
+
+# Rudimentary YAML parser, intended for the SBOM files.
+function(dorado_parse_sbom_yaml_ FILE CALLBACK)
+    # Read the yaml.
+    file(STRINGS "${FILE}" yaml_lines NO_HEX_CONVERSION)
 
     # Parse the YAML line by line, assuming that licence is a single line.
     set(dep_name "<not set>")
@@ -32,7 +49,7 @@ function(dorado_generate_licence_header_from_yaml)
     foreach(line IN LISTS yaml_lines)
         if (line MATCHES "^([a-zA-Z].*):$") # new dependency
             set (_dep "${CMAKE_MATCH_1}")
-            dorado_emit_licence_for_dependency_("${output_file}" "${arg_PATH}" "${dep_name}" "${dep_license}" "${dep_omit}")
+            cmake_language(CALL ${CALLBACK} "${dep_name}" "${dep_license}" "${dep_omit}")
 
             # Setup next dependency.
             set(dep_name "${_dep}")
@@ -43,17 +60,10 @@ function(dorado_generate_licence_header_from_yaml)
             set("dep_${CMAKE_MATCH_1}" "${CMAKE_MATCH_2}")
         endif()
     endforeach()
+
     # Emit the final one.
-    dorado_emit_licence_for_dependency_("${output_file}" "${arg_PATH}" "${dep_name}" "${dep_license}" "${dep_omit}")
-
-    # Finish off the header.
-    dorado_emit_licence_header_end_(${arg_TARGET} "${output_file}")
+    cmake_language(CALL ${CALLBACK} "${dep_name}" "${dep_license}" "${dep_omit}")
 endfunction()
-
-
-#
-# Implementation details
-#
 
 # Emit a licence for a dependency in the YAML.
 function(dorado_emit_licence_for_dependency_ OUTPUT ROOT NAME LICENCE OMIT)
