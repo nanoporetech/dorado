@@ -4,7 +4,7 @@
 
 namespace dorado::nn {
 
-enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C };
+enum class TensorLayout { NTC, TNC, CUTLASS_TNC_F16, CUTLASS_TNC_I8, CUBLAS_TN2C, CUBLAS_TNC };
 std::string to_string(const TensorLayout & layout);
 
 // `WorkingMemory` encapsulates a backing tensor from which we create tensor views which map to

@@ -241,18 +241,41 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
         }
         config.lstm_size = config.convs.back().size;
         config.lstm_layers = 0;  // Count the number of lstm sublayers
+        int flstm_layers = 0;
         for (const auto &segment : sublayers) {
             const auto type = sublayer_type(segment);
             if (type == SublayerType::LINEAR) {
                 // Specifying out_features implies a decomposition of the linear layer matrix
                 // multiply with a bottleneck before the final feature size.
                 config.out_features = toml::find<int>(segment, "out_features");
-                config.bias = config.lstm_size > 128;
+                config.bias = toml::find_or<bool>(segment, "bias", config.lstm_size > 128);
             } else if (type == SublayerType::LINEAR_CRF_ENCODER) {
                 config.blank_score = toml::find<float>(segment, "blank_score");
+                config.scale = toml::find_or<float>(segment, "scale", 1.f);
             } else if (type == SublayerType::LSTM) {
                 config.lstm_layers++;
+            } else if (type == SublayerType::FLSTM) {
+                ++flstm_layers;
+                const int inner_dim = toml::find<int>(segment, "inner_dim");
+                if (config.lstm_inner_dim.has_value()) {
+                    if (config.lstm_inner_dim.value() != inner_dim) {
+                        throw std::runtime_error("Mismatch in inner dimension of FLSTM, found  " +
+                                                 std::to_string(config.lstm_inner_dim.value()) +
+                                                 " and " + std::to_string(inner_dim));
+                    }
+                } else {
+                    config.lstm_inner_dim = inner_dim;
+                }
             }
+        }
+        if (flstm_layers > 0) {
+            if (config.lstm_layers > 0) {
+                throw std::runtime_error("Cannot mix LSTM and FLSTM layers, found " +
+                                         std::to_string(config.lstm_layers) + " and " +
+                                         std::to_string(flstm_layers));
+            }
+            config.lstm_layers = flstm_layers;
+            config.convs.back().flstm = true;
         }
     } else {
         // pre-v4 model

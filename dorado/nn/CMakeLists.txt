@@ -7,17 +7,20 @@ dorado_add_library(
         AuxiliaryData.h
         ConvStack.h
         CRFModules.h
+        FLSTMStack.h
         KoiThreads.h
         KoiUtils.h
         LinearUpsample.h
         LSTMStack.h
         MetalModules.h
+        RNNStack.h
         TxModules.h
         WorkingMemory.h
     SOURCES_PRIVATE
         AuxiliaryData.cpp
         ConvStack.cpp
         CRFModules.cpp
+        FLSTMStack.cpp
         LinearUpsample.cpp
         LSTMStack.cpp
         TxModules.cpp

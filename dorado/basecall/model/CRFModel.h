@@ -3,7 +3,7 @@
 #include "nn/AuxiliaryData.h"
 #include "nn/CRFModules.h"
 #include "nn/ConvStack.h"
-#include "nn/LSTMStack.h"
+#include "nn/RNNStack.h"
 
 #include <torch/nn.h>
 
@@ -25,7 +25,7 @@ struct CRFModelImpl : torch::nn::Module {
 
     at::Tensor forward(const at::Tensor &x, nn::AuxiliaryData *aux /* = nullptr */);
     nn::ConvStack convs{nullptr};
-    nn::LSTMStack rnns{nullptr};
+    nn::RNNStack rnns{nullptr};
     nn::LinearCRF linear1{nullptr}, linear2{nullptr};
     nn::Clamp clamp1{nullptr};
     torch::nn::Sequential encoder{nullptr};

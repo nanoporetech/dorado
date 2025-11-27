@@ -1,6 +1,7 @@
 #pragma once
 
 #include "AuxiliaryData.h"
+#include "RNNStack.h"
 #include "WorkingMemory.h"
 
 #include <torch/nn.h>
@@ -10,12 +11,12 @@
 
 namespace dorado::nn {
 
-struct LSTMStackImpl : torch::nn::Module {
+struct LSTMStackImpl : RNNStackImpl {
     LSTMStackImpl(int num_layers, int size, bool reverse_first);
-    at::Tensor forward(at::Tensor x);
+    at::Tensor forward(at::Tensor x) override;
 #if DORADO_CUDA_BUILD
-    void reserve_working_memory(WorkingMemory &wm);
-    void run_koi(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */);
+    void reserve_working_memory(WorkingMemory &wm) override;
+    void run_koi(WorkingMemory &wm, const AuxiliaryData *aux /* = nullptr */) override;
 
 private:
     void forward_cublas(WorkingMemory &wm);

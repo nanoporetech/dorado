@@ -325,7 +325,13 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements() const {
     // These values have been determined by running dorado with different models and
     // reporting the actual allocation size per chunk-timestep.
     int64_t crfmodel_bytes_per_chunk_timestep;
-    if (m_config.out_features.has_value()) {
+    if (m_config.is_flstm_model()) {
+        if (m_config.lstm_size > 1024) {
+            spdlog::warn("Unexpected model insize {}. Estimating GPU memory requirements.",
+                         m_config.lstm_size);
+        }
+        crfmodel_bytes_per_chunk_timestep = 4096;
+    } else if (m_config.out_features.has_value()) {
         auto out_features = m_config.out_features.value();
         const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}, {4096, 34848}};
         auto it = out_features_map.upper_bound(out_features - 1);

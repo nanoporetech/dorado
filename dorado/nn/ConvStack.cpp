@@ -60,9 +60,10 @@ KoiActivation get_koi_activation(config::Activation act) {
 // - CUTLASS_TNC_F16: a contiguous tensor of size [T + 3, N, C], dtype torch::kF16
 // - CUTLASS_TNC_I8: a contiguous tensor of size [T + 3, N, C], dtype torch::kI8
 // - CUBLAS_TN2C: a contiguous tensor of size [T + 1, N, 2, C], dtype torch::kF16
+// - CUBLAS_TNC: a contiguous tensor of size [T + 3, N, C], dtype torch::kF16
 //
 
-TensorLayout get_koi_lstm_input_layout(int layer_size, config::Activation activation) {
+TensorLayout get_koi_lstm_input_layout(int layer_size, bool flstm, config::Activation activation) {
     TensorLayout layout = TensorLayout::CUBLAS_TN2C;
     if (koi_can_use_quantised_lstm() && (layer_size == 96 || layer_size == 128)) {
         layout = TensorLayout::NTC;
@@ -82,6 +83,14 @@ TensorLayout get_koi_lstm_input_layout(int layer_size, config::Activation activa
             layout = TensorLayout::CUTLASS_TNC_I8;
         } else if (lstm_mode_str == "CUTLASS_TNC_F16" && layout == TensorLayout::CUTLASS_TNC_I8) {
             layout = TensorLayout::CUTLASS_TNC_F16;
+        }
+    }
+
+    if (flstm) {  // cannot be overriden
+        if (koi_can_use_cutlass() && ((layer_size % 128) == 0)) {
+            layout = TensorLayout::CUTLASS_TNC_F16;
+        } else {
+            layout = TensorLayout::CUBLAS_TNC;
         }
     }
 
@@ -111,10 +120,10 @@ void ConvStackImpl::reserve_working_memory(WorkingMemory &wm,
         throw std::runtime_error("Empty Koi convolution stack.");
     }
     auto &last = layers.back();
-    last.output_layout =
-            output_layout.has_value()
-                    ? output_layout.value()
-                    : get_koi_lstm_input_layout(last.params.size, last.params.activation);
+    last.output_layout = output_layout.has_value()
+                                 ? output_layout.value()
+                                 : get_koi_lstm_input_layout(last.params.size, last.params.flstm,
+                                                             last.params.activation);
 
     last.cutlass_conv = utils::get_dev_opt<bool>("cutlass_conv", true) &&
                         (last.output_layout == TensorLayout::CUTLASS_TNC_I8 ||
