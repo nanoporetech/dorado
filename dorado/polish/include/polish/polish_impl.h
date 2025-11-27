@@ -162,7 +162,7 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                                bool continue_on_exception);
 
-std::vector<std::unordered_map<std::string, int32_t>> haplotag_regions_in_parallel(
+std::vector<kadayashi::varcall_result_t> haplotag_regions_in_parallel(
         const std::vector<secondary::Window>& regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,

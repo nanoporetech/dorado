@@ -1,6 +1,7 @@
 #include "polish/polish_impl.h"
 
 #include "hts_utils/FastxRandomReader.h"
+#include "local_haplotagging.h"
 #include "secondary/architectures/model_factory.h"
 #include "secondary/common/batching.h"
 #include "secondary/common/region.h"
@@ -1225,7 +1226,7 @@ std::vector<secondary::Window> create_windows_from_regions(
     return windows;
 }
 
-std::vector<std::unordered_map<std::string, int32_t>> haplotag_regions_in_parallel(
+std::vector<kadayashi::varcall_result_t> haplotag_regions_in_parallel(
         const std::vector<secondary::Window>& regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
@@ -1234,33 +1235,32 @@ std::vector<std::unordered_map<std::string, int32_t>> haplotag_regions_in_parall
         return {};
     }
 
+    // Result data.
+    std::vector<kadayashi::varcall_result_t> region_haplotags(std::size(regions));
+
+    // Counters to process the queue.
     const int64_t num_regions = std::ssize(regions);
     std::atomic<int64_t> num_processed{0};
 
-    const auto worker =
-            [&](const int32_t thread_id,
-                std::vector<std::unordered_map<std::string, int32_t>>& region_haplotags) {
-                auto& encoder = *encoders[thread_id];
+    const auto worker = [&](const int32_t thread_id) {
+        auto& encoder = *encoders[thread_id];
 
-                while (true) {
-                    // Fetch next job.
-                    const int64_t region_id = num_processed.fetch_add(1, std::memory_order_relaxed);
-                    if (region_id >= num_regions) {
-                        break;
-                    }
+        while (true) {
+            // Fetch next job.
+            const int64_t region_id = num_processed.fetch_add(1, std::memory_order_relaxed);
+            if (region_id >= num_regions) {
+                break;
+            }
 
-                    // Get the region info.
-                    const secondary::Window& region = regions[region_id];
-                    const std::string& ref_name = draft_lens[region.seq_id].first;
+            // Get the region info.
+            const secondary::Window& region = regions[region_id];
+            const std::string& ref_name = draft_lens[region.seq_id].first;
 
-                    // Haplotag.
-                    region_haplotags[region_id] =
-                            (encoder.produce_haplotags(ref_name, region.start, region.end));
-                }
-            };
-
-    // Return data.
-    std::vector<std::unordered_map<std::string, int32_t>> region_haplotags(std::size(regions));
+            // Haplotag.
+            region_haplotags[region_id] =
+                    (encoder.produce_haplotags(ref_name, region.start, region.end));
+        }
+    };
 
     // Thread pool.
     const size_t final_num_threads =
@@ -1269,7 +1269,7 @@ std::vector<std::unordered_map<std::string, int32_t>> haplotag_regions_in_parall
     std::vector<std::future<void>> futures;
     futures.reserve(num_threads);
     for (int32_t tid = 0; tid < static_cast<int32_t>(final_num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid, std::ref(region_haplotags)));
+        futures.emplace_back(pool.push(worker, tid));
     }
     for (auto& f : futures) {
         f.get();
@@ -1345,8 +1345,17 @@ void sample_producer(PolisherResources& resources,
     std::vector<std::unordered_map<std::string, int32_t>> bam_region_haplotags;
     if ((haplotag_source == secondary::HaplotagSource::COMPUTE) ||
         (haplotag_source == secondary::HaplotagSource::BIN_FILE)) {
-        bam_region_haplotags = haplotag_regions_in_parallel(bam_regions, draft_lens,
-                                                            resources.encoders, num_threads);
+        std::vector<kadayashi::varcall_result_t> varcalls = haplotag_regions_in_parallel(
+                bam_regions, draft_lens, resources.encoders, num_threads);
+
+        bam_region_haplotags.resize(std::size(varcalls));
+        for (int64_t i = 0; i < std::ssize(varcalls); ++i) {
+            bam_region_haplotags[i] = std::move(varcalls[i].qname2hp);
+            // Increment the haplotag from 0/1 -> 1/2 because the model was trained on that.
+            for (auto& [key, val] : bam_region_haplotags[i]) {
+                ++val;
+            }
+        }
     }
 
     // Split large BAM regions into non-overlapping windows for parallel encoding.
