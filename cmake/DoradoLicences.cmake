@@ -18,18 +18,8 @@ function(dorado_generate_licence_header_from_yaml)
     set(multiValueArgs)
     cmake_parse_arguments(arg "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-    set(generated_path "${CMAKE_BINARY_DIR}/generated_licences")
-
-    # Create a target that other libs can link to to find the generated header.
-    add_library(${arg_TARGET} INTERFACE)
-    target_include_directories(${arg_TARGET} INTERFACE "${generated_path}")
-
-    # Start writing the output.
-    set(output_file "${generated_path}/${arg_TARGET}/licences.h")
-    file(WRITE "${output_file}" "#pragma once\n")
-    file(APPEND "${output_file}" "#include <string_view>\n")
-    file(APPEND "${output_file}" "namespace ${arg_TARGET} {\n")
-    file(APPEND "${output_file}" "inline constexpr struct { std::string_view name, licence; } licences[] = {\n")
+    # Create the header.
+    dorado_emit_licence_header_start_(${arg_TARGET} output_file)
 
     # Read the yaml.
     set(yaml_file "${arg_PATH}/${arg_SBOM}")
@@ -42,7 +32,7 @@ function(dorado_generate_licence_header_from_yaml)
     foreach(line IN LISTS yaml_lines)
         if (line MATCHES "^([a-zA-Z].*):$") # new dependency
             set (_dep "${CMAKE_MATCH_1}")
-            dorado_emit_licence_for_dependency_("${output_file}" "${dep_name}" "${dep_license}" "${dep_omit}")
+            dorado_emit_licence_for_dependency_("${output_file}" "${arg_PATH}" "${dep_name}" "${dep_license}" "${dep_omit}")
 
             # Setup next dependency.
             set(dep_name "${_dep}")
@@ -54,14 +44,19 @@ function(dorado_generate_licence_header_from_yaml)
         endif()
     endforeach()
     # Emit the final one.
-    dorado_emit_licence_for_dependency_("${output_file}" "${dep_name}" "${dep_license}" "${dep_omit}")
+    dorado_emit_licence_for_dependency_("${output_file}" "${arg_PATH}" "${dep_name}" "${dep_license}" "${dep_omit}")
 
-    # Finish off the output.
-    file(APPEND "${output_file}" "};\n")
-    file(APPEND "${output_file}" "} // namespace ${arg_TARGET}\n")
+    # Finish off the header.
+    dorado_emit_licence_header_end_(${arg_TARGET} "${output_file}")
 endfunction()
 
-function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
+
+#
+# Implementation details
+#
+
+# Emit a licence for a dependency in the YAML.
+function(dorado_emit_licence_for_dependency_ OUTPUT ROOT NAME LICENCE OMIT)
     if (OMIT)
         return()
     endif()
@@ -80,16 +75,40 @@ function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
         endif()
         set(licence_path "${${prefix}}/${CMAKE_MATCH_2}")
     else()
-        set(licence_path "${arg_PATH}/${LICENCE}")
+        set(licence_path "${ROOT}/${LICENCE}")
     endif()
 
+    dorado_emit_licence_header_entry_("${OUTPUT}" "${NAME}" "${licence_path}")
+endfunction()
+
+# Create a new licence header and a cmake target.
+function(dorado_emit_licence_header_start_ TARGET OUTPUT)
+    set(generated_path "${CMAKE_BINARY_DIR}/generated_licences")
+
+    # Create a target that other libs can link to to find the generated header.
+    add_library(${TARGET} INTERFACE)
+    target_include_directories(${TARGET} INTERFACE "${generated_path}")
+
+    # Start writing the output.
+    set(output_file "${generated_path}/${TARGET}/licences.h")
+    file(WRITE "${output_file}" "#pragma once\n")
+    file(APPEND "${output_file}" "#include <string_view>\n")
+    file(APPEND "${output_file}" "namespace ${TARGET} {\n")
+    file(APPEND "${output_file}" "inline constexpr struct { std::string_view name, licence; } licences[] = {\n")
+
+    # Return the output file to the caller.
+    set(${OUTPUT} "${output_file}" PARENT_SCOPE)
+endfunction()
+
+# Emit a licence to an existing header.
+function(dorado_emit_licence_header_entry_ OUTPUT NAME LICENCE)
     # Check that it exists.
-    if (NOT EXISTS "${licence_path}")
-        message(FATAL_ERROR "Missing licence file for ${NAME} in ${yaml_file}: ${licence_path}")
+    if (NOT EXISTS "${LICENCE}")
+        message(FATAL_ERROR "Missing licence file for ${NAME}: ${LICENCE}")
     endif()
 
     # Add the licence to the header.
-    file(READ "${licence_path}" licence_data)
+    file(READ "${LICENCE}" licence_data)
     file(APPEND "${OUTPUT}" "{ \"${NAME}\", ")
     # MSVC can't handle literals longer than ~16K so we split up the strings. See error C2026.
     set(substr_length 16000)
@@ -101,3 +120,9 @@ function(dorado_emit_licence_for_dependency_ OUTPUT NAME LICENCE OMIT)
     file(APPEND "${OUTPUT}" " },\n")
 endfunction()
 
+# Finish off a licence header.
+function(dorado_emit_licence_header_end_ TARGET OUTPUT)
+    # Finish off the output.
+    file(APPEND "${OUTPUT}" "};\n")
+    file(APPEND "${OUTPUT}" "} // namespace ${TARGET}\n")
+endfunction()
