@@ -4,26 +4,26 @@
 ##contig=<ID=chr20,length=10000>
 ##FILTER=<ID=LowQual,Description="Variant quality is below threshold">
 ##FILTER=<ID=.,Description="Non-variant position">
-##dorado_version=0.0.0+698ac5b51+dirty
+##dorado_version=0.0.0+edb82531d
 ##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality score">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-chr20	94	.	C	T	27.918	PASS	.	GT:GQ	0/1:28
+chr20	94	.	C	T	27.919	PASS	.	GT:GQ	0/1:28
 chr20	306	.	G	A	17.362	PASS	.	GT:GQ	0/1:17
 chr20	1472	.	T	G	2.806	LowQual	.	GT:GQ	0/1:3
 chr20	1959	.	T	G	15.165	PASS	.	GT:GQ	0/1:15
 chr20	2102	.	A	G	11.799	PASS	.	GT:GQ	0/1:12
 chr20	2126	.	C	G	14.163	PASS	.	GT:GQ	0/1:14
-chr20	2438	.	T	C	28.939	PASS	.	GT:GQ	0/1:29
+chr20	2438	.	T	C	28.94	PASS	.	GT:GQ	0/1:29
 chr20	2446	.	G	A	18.851	PASS	.	GT:GQ	0/1:19
-chr20	2967	.	G	C	56.227	PASS	.	GT:GQ	1/1:56
+chr20	2967	.	G	C	56.449	PASS	.	GT:GQ	1/1:56
 chr20	3176	.	G	T	19.552	PASS	.	GT:GQ	0/1:20
 chr20	3515	.	C	CT	1.898	LowQual	.	GT:GQ	0/1:2
-chr20	3735	.	G	C	51.913	PASS	.	GT:GQ	1/1:52
+chr20	3735	.	G	C	52.077	PASS	.	GT:GQ	1/1:52
 chr20	4696	.	A	T	17.685	PASS	.	GT:GQ	0/1:18
-chr20	5001	.	AAAT	AAAAAA,TT	10.875	PASS	.	GT:GQ	1/2:11
+chr20	5000	.	AAAAT	A,AAAATAAAT	10.875	PASS	.	GT:GQ	1/2:11
 chr20	5387	.	C	G	21.056	PASS	.	GT:GQ	0/1:21
-chr20	6949	.	GTGT	GTGG,TT	2.189	LowQual	.	GT:GQ	1/2:2
-chr20	7430	.	C	T	28.019	PASS	.	GT:GQ	0/1:28
+chr20	6948	.	CGTGT	C,CGTGTGT	2.189	LowQual	.	GT:GQ	1/2:2
+chr20	7430	.	C	T	28.018	PASS	.	GT:GQ	0/1:28
 chr20	7913	.	C	CT	1.374	LowQual	.	GT:GQ	0/1:1
