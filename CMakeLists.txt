@@ -250,6 +250,20 @@ if(NOT DORADO_DISABLE_PACKAGING)
 endif()
 include(cmake/DoradoLicences.cmake)
 
+# Third party licences.
+dorado_generate_licence_header_from_yaml(
+    TARGET dorado_licences
+    PATH ${PROJECT_SOURCE_DIR}/dorado/3rdparty
+    SBOM software_versions.yml
+)
+
+# POD5 licences.
+dorado_generate_licence_header_from_yaml(
+    TARGET dorado_licences_pod5
+    PATH ${PROJECT_SOURCE_DIR}/dorado/3rdparty
+    SBOM software_versions_pod5.yml
+)
+
 if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11.0") )
     find_library(
         LIBSTDCPP_LINK_LOCATION

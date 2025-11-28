@@ -10,18 +10,18 @@ function(check_no_dependency_for_target TARGET CHECKER DEPENDENCY_PATH)
     # Grab all the dependencies and apply the CHECKER function.
     get_target_property(all_deps "${TARGET}" LINK_LIBRARIES)
     foreach(lib_name IN LISTS all_deps)
-        CHECKER("${lib_name}" "${DEPENDENCY_PATH}")
+        cmake_language(CALL ${CHECKER} "${lib_name}" "${DEPENDENCY_PATH}")
 
         # Check dependencies.
         if (TARGET "${lib_name}")
-            check_no_dependency_for_target("${lib_name}" CHECKER "${DEPENDENCY_PATH}")
+            check_no_dependency_for_target("${lib_name}" ${CHECKER} "${DEPENDENCY_PATH}")
         endif()
     endforeach()
 endfunction()
 
 # Check that we don't link to torch.
 function(check_no_dependency_on_torch TARGET)
-    function(checker LIB_NAME DEPENDENCY_PATH)
+    function(checker_ LIB_NAME DEPENDENCY_PATH)
         # If it has torch in the name then it's likely going to be or link to torch.
         string(TOLOWER "${LIB_NAME}" lib_lower)
         if (lib_lower MATCHES "torch")
@@ -31,5 +31,5 @@ function(check_no_dependency_on_torch TARGET)
         endif()
     endfunction()
 
-    check_no_dependency_for_target("${TARGET}" checker "")
+    check_no_dependency_for_target("${TARGET}" checker_ "")
 endfunction()
