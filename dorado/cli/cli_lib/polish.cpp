@@ -1053,9 +1053,9 @@ void run_polishing(const Options& opt,
                                         &batch_queue, &worker_terminate, &wrs_sample_producer] {
                             utils::set_thread_name("polish_produce");
                             polisher::sample_producer(
-                                    resources, bam_regions, draft_lens, std::nullopt, opt.threads,
-                                    opt.batch_size, opt.encoding_batch_size, opt.window_len,
-                                    opt.window_overlap, 0, opt.bam_subchunk, opt.haplotag_source,
+                                    resources, bam_regions, draft_lens, {}, std::nullopt,
+                                    opt.threads, opt.batch_size, opt.encoding_batch_size,
+                                    opt.window_len, opt.window_overlap, 0, opt.bam_subchunk,
                                     usable_mem, opt.continue_on_error, false, false, 0, 0, 0.25,
                                     batch_queue, worker_terminate, wrs_sample_producer);
                         });

@@ -1,7 +1,6 @@
 #include "polish/polish_impl.h"
 
 #include "hts_utils/FastxRandomReader.h"
-#include "local_haplotagging.h"
 #include "secondary/architectures/model_factory.h"
 #include "secondary/common/batching.h"
 #include "secondary/common/region.h"
@@ -1097,6 +1096,7 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
 
         const std::size_t n_windows = std::size(windows);
         std::size_t window_id = 0;
+
         while (window_queue.try_pop(window_id) != utils::AsyncQueueStatus::Terminate) {
             if (worker_terminate) {
                 window_queue.terminate(dorado::utils::AsyncQueueTerminateFast::Yes);
@@ -1279,28 +1279,29 @@ std::vector<kadayashi::varcall_result_t> haplotag_regions_in_parallel(
     return region_haplotags;
 }
 
-void sample_producer(PolisherResources& resources,
-                     const std::vector<secondary::Window>& bam_regions,
-                     const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                     const std::optional<IntervalTreesInt64Map>& candidate_trees,
-                     const int32_t num_threads,
-                     const int32_t batch_size,
-                     const int32_t encoding_batch_size,
-                     const int32_t window_len,
-                     const int32_t window_overlap,
-                     const int32_t variant_flanking_bases,
-                     const int32_t bam_subchunk_len,
-                     const secondary::HaplotagSource haplotag_source,
-                     const double max_available_mem,
-                     const bool continue_on_exception,
-                     const bool tiled_regions,
-                     const bool tiled_ext_flanks,
-                     const int64_t tiled_ext_major,
-                     const int64_t tiled_ext_min_cov,
-                     const float tiled_ext_cov_fract,
-                     utils::AsyncQueue<InferenceData>& infer_data,
-                     std::atomic<bool>& worker_terminate,
-                     WorkerReturnStatus& ret_status) {
+void sample_producer(
+        PolisherResources& resources,
+        const std::vector<secondary::Window>& bam_regions,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const std::vector<std::unordered_map<std::string, int32_t>>& bam_region_haplotags,
+        const std::optional<IntervalTreesInt64Map>& candidate_trees,
+        const int32_t num_threads,
+        const int32_t batch_size,
+        const int32_t encoding_batch_size,
+        const int32_t window_len,
+        const int32_t window_overlap,
+        const int32_t variant_flanking_bases,
+        const int32_t bam_subchunk_len,
+        const double max_available_mem,
+        const bool continue_on_exception,
+        const bool tiled_regions,
+        const bool tiled_ext_flanks,
+        const int64_t tiled_ext_major,
+        const int64_t tiled_ext_min_cov,
+        const float tiled_ext_cov_fract,
+        utils::AsyncQueue<InferenceData>& infer_data,
+        std::atomic<bool>& worker_terminate,
+        WorkerReturnStatus& ret_status) {
     utils::ScopedProfileRange spr1("sample_producer", 2);
 
     spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
@@ -1341,23 +1342,6 @@ void sample_producer(PolisherResources& resources,
         buffer.samples = std::move(remainder.samples);
         buffer.trims = std::move(remainder.trims);
     };
-
-    // Haplotag the BAM regions.
-    std::vector<std::unordered_map<std::string, int32_t>> bam_region_haplotags;
-    if ((haplotag_source == secondary::HaplotagSource::COMPUTE) ||
-        (haplotag_source == secondary::HaplotagSource::BIN_FILE)) {
-        std::vector<kadayashi::varcall_result_t> varcalls = haplotag_regions_in_parallel(
-                bam_regions, draft_lens, resources.encoders, num_threads);
-
-        bam_region_haplotags.resize(std::size(varcalls));
-        for (int64_t i = 0; i < std::ssize(varcalls); ++i) {
-            bam_region_haplotags[i] = std::move(varcalls[i].qname2hp);
-            // Increment the haplotag from 0/1 -> 1/2 because the model was trained on that.
-            for (auto& [key, val] : bam_region_haplotags[i]) {
-                ++val;
-            }
-        }
-    }
 
     // Split large BAM regions into non-overlapping windows for parallel encoding.
     // The non-overlapping windows will be merged after samples are constructed.
