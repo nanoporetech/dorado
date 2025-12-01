@@ -215,78 +215,6 @@ float compute_consensus_quality(
     return total;
 }
 
-/**
- * \brief Utility function to normalize the genotype information of a variant.
- *          For a given variant, it deduplicates and enumerates alt alleles, creates the
- *          GT and GQ tags and sets the filter tag.
- * \param var Input variant for normalization.
- * \param ploidy The ploidy of the dataset, needed to sanity check the number of alts.
- * \param min_qual Minimum variant quality to mark the variant as PASS.
- * \returns New variant with normalized genotyping information.
- */
-Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual) {
-    Variant ret = var;
-
-    if (dorado::ssize(var.alts) > ploidy) {
-        spdlog::warn(
-                "Number of alts ({}) is larger than ploidy ({})! Marking this variant for removal.",
-                std::size(var.alts), ploidy);
-        ret.alts.clear();
-        return ret;
-    }
-
-    const int32_t gq = static_cast<int32_t>(std::round(var.qual));
-
-    // This is a gVCF record.
-    if (std::empty(var.alts) || (var.filter == ".") ||
-        (var.alts == std::vector<std::string>{"."})) {
-        ret.alts = {"."};
-        ret.genotype = {{"GT", "0"}, {"GQ", std::to_string(gq)}};
-        ret.filter = ".";
-        return ret;
-    }
-
-    // Create unique and sorted alts for the return variant.
-    std::unordered_set<std::string> unique_alts;
-    for (const std::string_view alt : var.alts) {
-        if (alt != var.ref) {
-            unique_alts.emplace(alt);
-        }
-    }
-    ret.alts = std::vector<std::string>(std::cbegin(unique_alts), std::cend(unique_alts));
-    std::stable_sort(std::begin(ret.alts), std::end(ret.alts));
-
-    // Look-up table: alt -> numeric ID. +1 is because ref is the zeroth allele.
-    std::unordered_map<std::string, int64_t> alt_dict;
-    for (int64_t i = 0; i < dorado::ssize(ret.alts); ++i) {
-        alt_dict[ret.alts[i]] = i + 1;
-    }
-    alt_dict[var.ref] = 0;
-
-    std::vector<int32_t> alleles(std::size(var.alts));
-    for (int64_t i = 0; i < dorado::ssize(var.alts); ++i) {
-        const auto it = alt_dict.find(var.alts[i]);
-        if (it == std::cend(alt_dict)) {
-            continue;
-        }
-        alleles[i] = it->second;
-    }
-    std::sort(std::begin(alleles), std::end(alleles));
-
-    std::ostringstream oss_gt;
-    for (int64_t i = 0; i < dorado::ssize(alleles); ++i) {
-        if (i > 0) {
-            oss_gt << '/';
-        }
-        oss_gt << alleles[i];
-    }
-
-    ret.genotype = {{"GT", oss_gt.str()}, {"GQ", std::to_string(gq)}};
-    ret.filter = (var.qual >= min_qual) ? "PASS" : "LowQual";
-
-    return ret;
-}
-
 Variant construct_variant(const std::string_view draft,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
@@ -688,6 +616,69 @@ bool append_ref_base(Variant& var,
 }
 
 }  // namespace
+
+Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual) {
+    Variant ret = var;
+
+    if (dorado::ssize(var.alts) > ploidy) {
+        spdlog::warn(
+                "Number of alts ({}) is larger than ploidy ({})! Marking this variant for removal.",
+                std::size(var.alts), ploidy);
+        ret.alts.clear();
+        return ret;
+    }
+
+    const int32_t gq = static_cast<int32_t>(std::round(var.qual));
+
+    // This is a gVCF record.
+    if (std::empty(var.alts) || (var.filter == ".") ||
+        (var.alts == std::vector<std::string>{"."})) {
+        ret.alts = {"."};
+        ret.genotype = {{"GT", "0"}, {"GQ", std::to_string(gq)}};
+        ret.filter = ".";
+        return ret;
+    }
+
+    // Create unique and sorted alts for the return variant.
+    std::unordered_set<std::string> unique_alts;
+    for (const std::string_view alt : var.alts) {
+        if (alt != var.ref) {
+            unique_alts.emplace(alt);
+        }
+    }
+    ret.alts = std::vector<std::string>(std::cbegin(unique_alts), std::cend(unique_alts));
+    std::stable_sort(std::begin(ret.alts), std::end(ret.alts));
+
+    // Look-up table: alt -> numeric ID. +1 is because ref is the zeroth allele.
+    std::unordered_map<std::string, int64_t> alt_dict;
+    for (int64_t i = 0; i < dorado::ssize(ret.alts); ++i) {
+        alt_dict[ret.alts[i]] = i + 1;
+    }
+    alt_dict[var.ref] = 0;
+
+    std::vector<int32_t> alleles(std::size(var.alts));
+    for (int64_t i = 0; i < dorado::ssize(var.alts); ++i) {
+        const auto it = alt_dict.find(var.alts[i]);
+        if (it == std::cend(alt_dict)) {
+            continue;
+        }
+        alleles[i] = it->second;
+    }
+    std::sort(std::begin(alleles), std::end(alleles));
+
+    std::ostringstream oss_gt;
+    for (int64_t i = 0; i < dorado::ssize(alleles); ++i) {
+        if (i > 0) {
+            oss_gt << '/';
+        }
+        oss_gt << alleles[i];
+    }
+
+    ret.genotype = {{"GT", oss_gt.str()}, {"GQ", std::to_string(gq)}};
+    ret.filter = (var.qual >= min_qual) ? "PASS" : "LowQual";
+
+    return ret;
+}
 
 Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::vector<std::string_view>& cons_seqs_with_gaps,
