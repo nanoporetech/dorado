@@ -29,6 +29,17 @@ LabelSchemeType parse_label_scheme_type(const std::string& type) {
     throw std::runtime_error{"Unknown label scheme type: '" + type + "'!"};
 }
 
+int32_t label_scheme_type_to_ploidy(const LabelSchemeType label_scheme_type) {
+    switch (label_scheme_type) {
+    case LabelSchemeType::HAPLOID:
+        return 1;
+    case LabelSchemeType::DIPLOID:
+        return 2;
+    default:
+        return 0;
+    }
+}
+
 std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
         const std::string& symbols,
         const std::span<const float> logits,
