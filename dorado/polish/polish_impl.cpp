@@ -1710,6 +1710,7 @@ std::vector<secondary::Variant> call_variants(
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const secondary::DecoderBase& decoder,
+        const float pass_min_qual,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
@@ -1778,8 +1779,8 @@ std::vector<secondary::Variant> call_variants(
                 for (const auto& vc_sample : joined_samples) {
                     std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                             decoder, vc_sample.seq_id, vc_sample.positions_major,
-                            vc_sample.positions_minor, vc_sample.logits, draft, ambig_ref, gvcf,
-                            true, true, true);
+                            vc_sample.positions_minor, vc_sample.logits, draft, pass_min_qual,
+                            ambig_ref, gvcf, true, true, true);
 
                     ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
 

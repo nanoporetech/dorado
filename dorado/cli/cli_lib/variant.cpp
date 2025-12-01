@@ -888,7 +888,7 @@ void run_variant_calling(const Options& opt,
 
             std::vector<secondary::Variant> variants = polisher::call_variants(
                     worker_terminate, stats, batch_interval, vc_input_data, draft_readers,
-                    draft_lens, *resources.decoder, opt.ambig_ref,
+                    draft_lens, *resources.decoder, opt.pass_min_qual, opt.ambig_ref,
                     opt.out_format == VariantCallingFormatEnum::GVCF, opt.threads,
                     opt.continue_on_error);
 

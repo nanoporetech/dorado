@@ -827,13 +827,12 @@ std::vector<Variant> general_decode_variants(
         const std::vector<int64_t>& positions_minor,
         const at::Tensor& probs,  // Probabilities for a single sample (not batch).
         const std::string_view draft,
+        const float pass_min_qual,
         const bool ambig_ref,
         const bool return_all,
         const bool normalize,
         const bool merge_overlapping,
         const bool merge_adjacent) {
-    constexpr float MIN_QUAL = 3.0f;
-
     const int64_t num_columns = dorado::ssize(positions_major);
 
     // Validate inputs.
@@ -1014,7 +1013,7 @@ std::vector<Variant> general_decode_variants(
     std::vector<Variant> normalized_variants;
     normalized_variants.reserve(std::size(variants));
     for (const Variant& var : variants) {
-        Variant new_var = normalize_genotype(var, num_haplotypes, MIN_QUAL);
+        Variant new_var = normalize_genotype(var, num_haplotypes, pass_min_qual);
 
         // Sanity check.
         if (is_valid(new_var)) {
