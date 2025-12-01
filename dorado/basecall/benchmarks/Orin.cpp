@@ -110,9 +110,9 @@ void AddOrinBenchmarks(std::map<std::pair<std::string, std::string>,
             {1088, 0.374436f}, {1152, 0.374162f}, {1216, 0.373404f}, {1344, 0.373079f},
             {1408, 0.372891f}, {1472, 0.372387f}, {1600, 0.371677f}, {1664, 0.371674f},
     };
+    // Manually deleted batch_size 96 entry for stable basecalling. See DOR-1432
     chunk_benchmarks[{"Orin", "rna004_130bps_sup@v5.2.0"}] = {
             {32, 4.81559f},
-            {96, 4.81539f},
     };
 }
 
