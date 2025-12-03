@@ -42,7 +42,6 @@ void ReadToBamTypeNode::input_thread_fn() {
                 read_common_data.protocol_start_time_ms,
                 read_common_data.subread_id,
                 is_status_pass,
-                read_common_data.num_minknow_events,
                 read_common_data.start_time_ms,
                 read_common_data.attributes.model_stride,
         };

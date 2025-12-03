@@ -279,7 +279,7 @@ void SummaryFileWriter::handle(const HtsData& data) const {
     m_summary_stream << separator << data.read_attrs.protocol_run_id;
     m_summary_stream << separator << get_tag(record, "ch", 0);
     m_summary_stream << separator << get_tag(record, "mx", 0);
-    m_summary_stream << separator << data.read_attrs.num_minknow_events;
+    m_summary_stream << separator << get_tag(record, "me", uint32_t(0));
     m_summary_stream << separator << (data.read_attrs.start_time_ms / 1000.f);
     m_summary_stream << separator << duration;
 

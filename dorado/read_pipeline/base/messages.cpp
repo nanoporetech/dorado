@@ -140,6 +140,11 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
         bam_aux_append(aln, "er", 'Z', int(attributes.end_reason.length() + 1),
                        reinterpret_cast<const uint8_t *>(attributes.end_reason.c_str()));
     }
+
+    // bam format only supports up to 32-bit uints
+    uint32_t reduced_minknow_events = static_cast<uint32_t>(num_minknow_events);
+    bam_aux_append(aln, "me", 'I', sizeof(reduced_minknow_events),
+                   (uint8_t *)&reduced_minknow_events);
 }
 
 void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
