@@ -219,6 +219,9 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
                 data.barcoding_result->alias = std::string(ks.s, ks.l);
             }
+            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
+                data.barcoding_result->kit = std::string(ks.s, ks.l);
+            }
         }
     }
 }

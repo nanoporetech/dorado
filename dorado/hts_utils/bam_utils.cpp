@@ -92,6 +92,7 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
     for (const auto& barcode_name : kit_info->second.barcodes) {
         auto additional_tags = "\tBC:" + get_barcode_sequence(barcode_name);
         const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+        additional_tags += "\tbk:" + kit_name;
         additional_tags += "\tSM:" + normalized_barcode_name;
         for (const auto& read_group : read_groups) {
             std::string alias;
