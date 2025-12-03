@@ -2,6 +2,7 @@
 
 #include "cli/cli.h"
 #include "dorado_version.h"
+#include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_writer/SummaryFileWriter.h"
 #include "read_pipeline/base/HtsReader.h"
@@ -66,8 +67,6 @@ int summary(int argc, char *argv[]) {
         reads = "-";
     }
 
-    const bool barcoding_info = false;
-
     HtsReader reader(reads, std::nullopt);
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
@@ -86,11 +85,19 @@ int summary(int argc, char *argv[]) {
             flags |= SummaryFileWriter::POLYA_FIELDS;
         }
 
-        if (barcoding_info) {
-            flags |= SummaryFileWriter::BARCODING_FIELDS;
+        auto hdr = sam_hdr_dup(reader.header());
+        int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
+        KString tag_wrapper(100000);
+        auto &tag_value = tag_wrapper.get();
+        for (int i = 0; i < num_rg_lines; ++i) {
+            if (sam_hdr_find_tag_pos(hdr, "RG", i, "SM", &tag_value) == 0) {
+                flags |= SummaryFileWriter::BARCODING_FIELDS;
+                break;
+            }
         }
+
+        SamHdrSharedPtr shared_hdr(hdr);
         auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags);
-        SamHdrSharedPtr shared_hdr(reader.header());
         summary_writer->set_header(shared_hdr);
         writers.push_back(std::move(summary_writer));
     }
