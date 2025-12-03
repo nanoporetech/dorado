@@ -129,15 +129,21 @@ std::vector<T> get_array(bam1_t* record, const char* tagname) {
 namespace dorado::hts_writer {
 
 SummaryFileWriter::SummaryFileWriter(const std::filesystem::path& output_directory,
-                                     FieldFlags flags)
-        : m_field_flags(flags),
+                                     FieldFlags flags,
+                                     std::optional<AlignmentCounts> alignment_counts)
+        : m_alignment_counts(std::move(alignment_counts)),
+          m_field_flags(flags),
           m_summary_file(output_directory / "sequencing_summary.txt"),
           m_summary_stream(m_summary_file) {
     init();
 }
 
-SummaryFileWriter::SummaryFileWriter(std::ostream& stream, FieldFlags flags)
-        : m_field_flags(flags), m_summary_stream(stream) {
+SummaryFileWriter::SummaryFileWriter(std::ostream& stream,
+                                     FieldFlags flags,
+                                     std::optional<AlignmentCounts> alignment_counts)
+        : m_alignment_counts(std::move(alignment_counts)),
+          m_field_flags(flags),
+          m_summary_stream(stream) {
     init();
 }
 
@@ -254,6 +260,17 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             }
             if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
                 data.barcoding_result->kit = std::string(ks.s, ks.l);
+            }
+        }
+
+        if ((m_field_flags & ALIGNMENT_FIELDS) && m_alignment_counts.has_value()) {
+            const auto alignment_counts_it =
+                    m_alignment_counts->find(bam_get_qname(data.bam_ptr.get()));
+            if (alignment_counts_it != std::end(*m_alignment_counts)) {
+                const auto& alignment_counts = alignment_counts_it->second;
+                data.read_attrs.num_alignments = alignment_counts[0];
+                data.read_attrs.num_secondary_alignments = alignment_counts[1];
+                data.read_attrs.num_supplementary_alignments = alignment_counts[2];
             }
         }
     }

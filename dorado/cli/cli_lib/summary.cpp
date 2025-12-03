@@ -14,11 +14,50 @@
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
+#include <array>
 #include <cctype>
 #include <csignal>
 #include <filesystem>
+#include <string>
+#include <unordered_map>
 
 namespace dorado {
+
+using AlignmentCounts = hts_writer::SummaryFileWriter::AlignmentCounts;
+namespace {
+std::optional<AlignmentCounts> get_alignment_counts(const std::string &path) {
+    auto file = dorado::HtsFilePtr(hts_open(path.c_str(), "r"));
+    if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam) {
+        return std::nullopt;
+    }
+
+    dorado::SamHdrPtr header(sam_hdr_read(file.get()));
+    if (header->n_targets == 0) {
+        return std::nullopt;
+    }
+
+    AlignmentCounts alignment_counts;
+    BamPtr record(bam_init1());
+    while (sam_read1(file.get(), header.get(), record.get()) >= 0) {
+        if (record->core.flag & BAM_FUNMAP) {
+            continue;
+        }
+        auto &read_counts = alignment_counts[bam_get_qname(record.get())];
+        if (record->core.flag & BAM_FSUPPLEMENTARY) {
+            ++read_counts[2];
+        }
+        if (record->core.flag & BAM_FSECONDARY) {
+            ++read_counts[1];
+        }
+        ++read_counts[0];
+    }
+    if (alignment_counts.empty()) {
+        return std::nullopt;
+    }
+
+    return alignment_counts;
+}
+}  // namespace
 
 volatile sig_atomic_t interrupt = 0;
 
@@ -49,6 +88,7 @@ int summary(int argc, char *argv[]) {
 
     auto reads(parser.get<std::string>("reads"));
 
+    std::optional<AlignmentCounts> alignment_counts;
     if (!reads.empty()) {
         if (!std::filesystem::exists(reads)) {
             spdlog::error("Unable to open file '{}', no such file.", reads);
@@ -59,6 +99,7 @@ int summary(int argc, char *argv[]) {
             spdlog::error("Failed to open file '{}', found a directory instead.", reads);
             return EXIT_FAILURE;
         }
+        alignment_counts = get_alignment_counts(reads);
     } else if (utils::is_fd_tty(stdin)) {
         // Only allow `reads` to be empty if we're accepting input from a pipe
         std::cout << parser << '\n';
@@ -97,7 +138,8 @@ int summary(int argc, char *argv[]) {
         }
 
         SamHdrSharedPtr shared_hdr(hdr);
-        auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags);
+        auto summary_writer =
+                std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags, alignment_counts);
         summary_writer->set_header(shared_hdr);
         writers.push_back(std::move(summary_writer));
     }

@@ -518,8 +518,8 @@ void setup(const std::vector<std::string>& args,
         if (barcoding_info) {
             flags |= SummaryFileWriter::BARCODING_FIELDS;
         }
-        auto summary_writer =
-                std::make_unique<hts_writer::SummaryFileWriter>(summary_output, flags);
+        auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(summary_output, flags,
+                                                                              std::nullopt);
         writers.push_back(std::move(summary_writer));
     }
 
