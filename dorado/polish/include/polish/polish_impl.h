@@ -191,6 +191,7 @@ std::vector<secondary::Variant> call_variants(
         const std::vector<std::unique_ptr<hts_io::FastxRandomReader>>& draft_readers,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const secondary::DecoderBase& decoder,
+        const float pass_min_qual,
         bool ambig_ref,
         bool gvcf,
         int32_t num_threads,

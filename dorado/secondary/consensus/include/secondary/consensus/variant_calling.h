@@ -62,6 +62,7 @@ std::vector<Variant> general_decode_variants(
         const std::vector<int64_t>& positions_minor,
         const at::Tensor& probs,  // Probabilities for a single sample (not batch).
         const std::string_view draft,
+        const float pass_min_qual,
         bool ambig_ref,
         bool return_all,
         bool normalize,

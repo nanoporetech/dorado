@@ -112,6 +112,7 @@ struct Options {
     VariantCallingEnum vc_type = VariantCallingEnum::VCF;
     bool ambig_ref = false;
     bool run_variant_calling = false;
+    float pass_min_qual = 3.0f;
     bool write_consensus = false;
     bool continue_on_error = false;
 };
@@ -240,6 +241,10 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Sites with depth lower than this value will not be processed.")
                 .default_value(0)
                 .scan<'i', int>();
+        parser.add_argument("--pass-qual-filter")
+                .help("Set quality filter for PASS variants.")
+                .default_value(3.0f)
+                .scan<'g', float>();
     }
 
     // Hidden advanced arguments.
@@ -384,6 +389,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
         opt.run_variant_calling = true;
     }
     opt.ambig_ref = parser.get<bool>("ambig-ref");
+
+    opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
@@ -1132,7 +1139,7 @@ void run_polishing(const Options& opt,
             if (opt.run_variant_calling) {
                 std::vector<secondary::Variant> variants = polisher::call_variants(
                         worker_terminate, stats, batch_interval, vc_input_data, draft_readers,
-                        draft_lens, *resources.decoder, opt.ambig_ref,
+                        draft_lens, *resources.decoder, opt.pass_min_qual, opt.ambig_ref,
                         opt.vc_type == VariantCallingEnum::GVCF, opt.threads,
                         opt.continue_on_error);
 
