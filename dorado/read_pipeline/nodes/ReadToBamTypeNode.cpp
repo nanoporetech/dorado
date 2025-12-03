@@ -43,7 +43,6 @@ void ReadToBamTypeNode::input_thread_fn() {
                 read_common_data.subread_id,
                 is_status_pass,
                 read_common_data.num_minknow_events,
-                std::move(read_common_data.attributes.end_reason),
                 read_common_data.start_time_ms,
                 read_common_data.attributes.model_stride,
         };

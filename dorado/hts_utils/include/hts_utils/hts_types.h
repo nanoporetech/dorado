@@ -121,7 +121,6 @@ public:
         std::size_t subread_id{0};
         bool is_status_pass{true};
         uint64_t num_minknow_events{0};
-        std::string end_reason{"unknown"};
         uint64_t start_time_ms{0};
         int model_stride{-1};
         int num_alignments{0};

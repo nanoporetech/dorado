@@ -301,7 +301,7 @@ void SummaryFileWriter::handle(const HtsData& data) const {
                          << (data.read_attrs.experiment_id.empty() ? "unknown"
                                                                    : data.read_attrs.experiment_id);
         m_summary_stream << separator << data.read_attrs.sample_id;
-        m_summary_stream << separator << data.read_attrs.end_reason;
+        m_summary_stream << separator << get_tag<std::string>(record, "er", "unknown");
     }
     if (m_field_flags & BARCODING_FIELDS) {
         std::string alias = "unknown";
