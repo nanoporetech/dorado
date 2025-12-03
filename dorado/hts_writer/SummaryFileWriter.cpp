@@ -326,7 +326,10 @@ void SummaryFileWriter::handle(const HtsData& data) const {
                                                          : data.barcoding_result->alias;
             type = data.barcoding_result->type;
             barcode_kit = data.barcoding_result->kit;
-            barcode_variant = data.barcoding_result->variant;
+
+            auto bv_tag = bam_aux_get(data.bam_ptr.get(), "bv");
+            barcode_variant = bv_tag != nullptr ? bam_aux2Z(bv_tag) : "n/a";
+
             barcode_score = data.barcoding_result->barcode_score;
             barcode_front_score = data.barcoding_result->top_barcode_score;
             barcode_rear_score = data.barcoding_result->bottom_barcode_score;

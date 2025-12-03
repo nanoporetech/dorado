@@ -115,6 +115,8 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
     if (bc != UNCLASSIFIED_BARCODE) {
         bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
+        bam_aux_update_str(irecord, "bv", int(read.barcoding_result->variant.length() + 1),
+                           read.barcoding_result->variant.c_str());
         auto rg_tag = bam_aux_get(irecord, "RG");
         if (rg_tag) {
             std::string rg_tag_value = bam_aux2Z(rg_tag);
@@ -128,10 +130,14 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
             }
         }
     } else {
-        auto bc_tag = bam_aux_get(irecord, "BC");
-        if (bc_tag) {
-            bam_aux_del(irecord, bc_tag);
-        }
+        auto delete_tag = [irecord](const char* tag) {
+            auto aux_tag = bam_aux_get(irecord, tag);
+            if (aux_tag) {
+                bam_aux_del(irecord, aux_tag);
+            }
+        };
+        delete_tag("BC");
+        delete_tag("bv");
     }
     m_num_records++;
     {
