@@ -232,6 +232,10 @@ void SummaryFileWriter::handle(const HtsData& data) const {
     // Write column data
 
     auto record = data.bam_ptr.get();
+    auto duration = get_tag(record, "du", 0.f);
+    auto num_samples = get_tag(record, "ns", 0);
+    auto sample_rate = (duration > 0) ? num_samples / duration : 0.f;
+
     m_summary_stream << get_tag<std::string>(record, "fn", "unknown");
     m_summary_stream << separator << "0";  // batch_id
     m_summary_stream << separator << get_tag<std::string>(record, "pi", bam_get_qname(record));
@@ -241,13 +245,13 @@ void SummaryFileWriter::handle(const HtsData& data) const {
     m_summary_stream << separator << get_tag(record, "mx", 0);
     m_summary_stream << separator << data.read_attrs.num_minknow_events;
     m_summary_stream << separator << (data.read_attrs.start_time_ms / 1000.f);
-    m_summary_stream << separator << get_tag(record, "du", 0.f);
+    m_summary_stream << separator << duration;
 
     if (m_field_flags & BASECALLING_FIELDS) {
-        auto template_start = (data.read_attrs.start_time_ms / 1000.f) +
-                              (get_tag(record, "ts", 0) / float(data.read_attrs.sample_rate));
+        auto template_start =
+                (data.read_attrs.start_time_ms / 1000.f) + (get_tag(record, "ts", 0) / sample_rate);
         auto template_samples = get_tag(record, "ns", 0) - get_tag(record, "ts", 0);
-        auto template_duration = float(template_samples) / data.read_attrs.sample_rate;
+        auto template_duration = float(template_samples) / sample_rate;
 
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
         m_summary_stream << separator << template_start;
