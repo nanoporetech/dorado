@@ -62,6 +62,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
             });
 
             auto exp_start_time_ms = run_info_data->protocol_start_time_ms;
+            auto acq_start_time_ms = run_info_data->acquisition_start_time_ms;
             std::string flowcell_id = run_info_data->flow_cell_id;
             std::string device_id = run_info_data->system_name;
             std::string run_id = run_info_data->protocol_run_id;
@@ -80,6 +81,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
                     std::move(sample_id),
                     std::move(position_id),
                     std::move(experiment_id),
+                    utils::get_string_timestamp_from_unix_time_ms(acq_start_time_ms),
             };
         }
     }

@@ -4,6 +4,7 @@
 #include "hts_utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/string_utils.h"
+#include "utils/time_utils.h"
 
 #include <htslib/sam.h>
 
@@ -205,6 +206,19 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             data.read_attrs.experiment_id = read_group.experiment_id;
             data.read_attrs.sample_id = read_group.sample_id;
             data.read_attrs.position_id = read_group.position_id;
+
+            try {
+                if (auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
+                    std::string read_start_time_str = bam_aux2Z(st_tag);
+                    auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
+                            read_group.acq_start_time);
+                    auto read_start_time =
+                            utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
+                    data.read_attrs.start_time_ms = read_start_time - acq_start_time;
+                }
+            } catch (...) {
+                // can't parse something, ignore start_time and continue
+            }
         }
 
         if ((m_field_flags & BARCODING_FIELDS) && !data.barcoding_result) {

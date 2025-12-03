@@ -104,6 +104,7 @@ struct ReadGroup {
     std::string sample_id{};
     std::string position_id{};
     std::string experiment_id{};
+    std::string acq_start_time{};
 };
 
 class HtsData {
@@ -121,7 +122,6 @@ public:
         bool is_status_pass{true};
         uint64_t num_minknow_events{0};
         std::string end_reason{"unknown"};
-        std::string pore_type{"not_set"};
         uint64_t start_time_ms{0};
         int model_stride{-1};
         int num_alignments{0};
