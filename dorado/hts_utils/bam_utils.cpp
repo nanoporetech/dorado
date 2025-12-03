@@ -65,7 +65,7 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
            << " basecall_model=" << value_or_unknown(read_group.basecalling_model)
            << (read_group.modbase_models.empty() ? ""
                                                  : (" modbase_models=" + read_group.modbase_models))
-           << "\t";
+           << " experiment_id=" << value_or_unknown(read_group.experiment_id) << "\t";
         rg << "LB:" << value_or_unknown(read_group.sample_id);
     }
     return rg.str();
@@ -165,6 +165,8 @@ std::unordered_map<std::string, dorado::ReadGroup> parse_read_groups(sam_hdr_t* 
                         read_group.basecalling_model = kv[1];
                     } else if (kv[0] == "modbase_models") {
                         read_group.modbase_models = kv[1];
+                    } else if (kv[0] == "experiment_id") {
+                        read_group.experiment_id = kv[1];
                     }
                 }
             }
