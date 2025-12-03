@@ -265,10 +265,11 @@ void SummaryFileWriter::handle(const HtsData& data) const {
     m_summary_stream << separator << duration;
 
     if (m_field_flags & BASECALLING_FIELDS) {
-        auto template_start =
-                (data.read_attrs.start_time_ms / 1000.f) + (get_tag(record, "ts", 0) / sample_rate);
+        auto template_start = sample_rate != 0 ? (data.read_attrs.start_time_ms / 1000.f) +
+                                                         (get_tag(record, "ts", 0) / sample_rate)
+                                               : 0.f;
         auto template_samples = get_tag(record, "ns", 0) - get_tag(record, "ts", 0);
-        auto template_duration = float(template_samples) / sample_rate;
+        auto template_duration = sample_rate != 0 ? float(template_samples) / sample_rate : 0.f;
 
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
         m_summary_stream << separator << template_start;
