@@ -296,7 +296,7 @@ void SummaryFileWriter::handle(const HtsData& data) const {
         }
     }
     if (m_field_flags & EXPERIMENT_FIELDS) {
-        m_summary_stream << separator << data.read_attrs.pore_type;
+        m_summary_stream << separator << get_tag<std::string>(record, "po", "not_set");
         m_summary_stream << separator
                          << (data.read_attrs.experiment_id.empty() ? "unknown"
                                                                    : data.read_attrs.experiment_id);

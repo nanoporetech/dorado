@@ -130,6 +130,11 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
         };
         bam_aux_update_array(aln, "pa", 'i', (int)poly_tail.size(), poly_tail.data());
     }
+
+    if (!attributes.pore_type.empty()) {
+        bam_aux_append(aln, "po", 'Z', int(attributes.pore_type.length() + 1),
+                       reinterpret_cast<const uint8_t *>(attributes.pore_type.c_str()));
+    }
 }
 
 void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
@@ -156,6 +161,11 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     if (!parent_read_id.empty()) {
         bam_aux_append(aln, "pi", 'Z', int(parent_read_id.size() + 1),
                        reinterpret_cast<const uint8_t *>(parent_read_id.c_str()));
+    }
+
+    if (!attributes.pore_type.empty()) {
+        bam_aux_append(aln, "po", 'Z', int(attributes.pore_type.length() + 1),
+                       reinterpret_cast<const uint8_t *>(attributes.pore_type.c_str()));
     }
 }
 
