@@ -183,11 +183,32 @@ void SummaryFileWriter::init() {
     m_summary_stream << '\n';
 }
 
+void SummaryFileWriter::set_header(dorado::SamHdrSharedPtr header) {
+    auto hdr = const_cast<sam_hdr_t*>(header.get());
+    m_read_groups = utils::parse_read_groups(hdr);
+    m_shared_header = std::move(header);
+}
+
 void SummaryFileWriter::process(const Processable item) {
+    dispatch_processable(item, [this](auto& t) { this->prepare_item(t); });
     dispatch_processable(item, [this](const auto& t) { this->handle(t); });
 }
 
-void SummaryFileWriter::handle(const HtsData& data) {
+void SummaryFileWriter::prepare_item(HtsData& data) const {
+    if (data.read_attrs == HtsData::ReadAttributes{}) {
+        if (auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+            std::string rg_tag_value = bam_aux2Z(rg_tag);
+            const auto& read_group = m_read_groups.at(rg_tag_value);
+            data.read_attrs.protocol_run_id = read_group.run_id;
+            data.read_attrs.flowcell_id = read_group.flowcell_id;
+            data.read_attrs.experiment_id = read_group.experiment_id;
+            data.read_attrs.sample_id = read_group.sample_id;
+            data.read_attrs.position_id = read_group.position_id;
+        }
+    }
+}
+
+void SummaryFileWriter::handle(const HtsData& data) const {
     // skip secondary and supplementary alignments in the summary
     if (data.bam_ptr->core.flag & (BAM_FSECONDARY | BAM_FSUPPLEMENTARY)) {
         return;
@@ -240,7 +261,9 @@ void SummaryFileWriter::handle(const HtsData& data) {
     }
     if (m_field_flags & EXPERIMENT_FIELDS) {
         m_summary_stream << separator << data.read_attrs.pore_type;
-        m_summary_stream << separator << data.read_attrs.experiment_id;
+        m_summary_stream << separator
+                         << (data.read_attrs.experiment_id.empty() ? "unknown"
+                                                                   : data.read_attrs.experiment_id);
         m_summary_stream << separator << data.read_attrs.sample_id;
         m_summary_stream << separator << data.read_attrs.end_reason;
     }

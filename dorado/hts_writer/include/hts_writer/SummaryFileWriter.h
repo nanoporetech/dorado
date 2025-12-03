@@ -6,6 +6,7 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <unordered_map>
 
 namespace dorado {
 class HtsData;
@@ -25,19 +26,20 @@ public:
     SummaryFileWriter(const std::filesystem::path& output_directory, FieldFlags flags);
     SummaryFileWriter(std::ostream& stream, FieldFlags flags);
 
+    void set_header(SamHdrSharedPtr header);
     void process(const Processable item) override;
     void shutdown() override;
 
     std::string get_name() const override { return "SummaryFileWriter"; }
     stats::NamedStats sample_stats() const override { return {}; }
 
-    void set_header(SamHdrSharedPtr header) { m_shared_header = std::move(header); }
-
 private:
     void init();
-    void handle(const HtsData& item);
+    void prepare_item(HtsData& data) const;
+    void handle(const HtsData& item) const;
 
     SamHdrSharedPtr m_shared_header{nullptr};
+    std::unordered_map<std::string, dorado::ReadGroup> m_read_groups;
 
     const FieldFlags m_field_flags;
     std::ofstream m_summary_file;

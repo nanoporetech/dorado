@@ -128,6 +128,8 @@ public:
         int num_alignments{0};
         int num_secondary_alignments{0};
         int num_supplementary_alignments{0};
+
+        auto operator<=>(const ReadAttributes&) const = default;
     };
 
     struct ReadAttributesCoreComparator {
