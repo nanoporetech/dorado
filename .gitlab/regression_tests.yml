@@ -92,7 +92,7 @@
   stage: regression_test
   variables:
     GIT_SUBMODULE_STRATEGY: normal
-    OUTPUT_SPEC_REF: "3ab7ca21ce882428c4e4be74b7276bc8bdfc34a0"
+    OUTPUT_SPEC_REF: "11a7f1001ad04484ce7ef84038168969139a9b15"
     OUTPUT_SPEC_REPO_URL: "${ONT_OUTPUT_SPEC_REPO}-/archive/${OUTPUT_SPEC_REF}/ont-output-specification-${OUTPUT_SPEC_REF}.zip"
     SPECIFICATION_FILE: "ont_output_spec.zip"
     VALIDATOR_COMMIT: "fb80ac5354580708aa1da4b65c0fb941ce4c3f37"
