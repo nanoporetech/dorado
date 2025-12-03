@@ -1,5 +1,6 @@
 #include "hts_writer/SummaryFileWriter.h"
 
+#include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/string_utils.h"
@@ -195,15 +196,29 @@ void SummaryFileWriter::process(const Processable item) {
 }
 
 void SummaryFileWriter::prepare_item(HtsData& data) const {
-    if (data.read_attrs == HtsData::ReadAttributes{}) {
-        if (auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
-            std::string rg_tag_value = bam_aux2Z(rg_tag);
+    if (auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+        std::string rg_tag_value = bam_aux2Z(rg_tag);
+        if (data.read_attrs == HtsData::ReadAttributes{}) {
             const auto& read_group = m_read_groups.at(rg_tag_value);
             data.read_attrs.protocol_run_id = read_group.run_id;
             data.read_attrs.flowcell_id = read_group.flowcell_id;
             data.read_attrs.experiment_id = read_group.experiment_id;
             data.read_attrs.sample_id = read_group.sample_id;
             data.read_attrs.position_id = read_group.position_id;
+        }
+
+        if ((m_field_flags & BARCODING_FIELDS) && !data.barcoding_result) {
+            KString ks_wrapper(100000);
+            auto& ks = ks_wrapper.get();
+            auto hdr = const_cast<sam_hdr_t*>(m_shared_header.get());
+
+            data.barcoding_result = std::make_shared<BarcodeScoreResult>();
+            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
+                data.barcoding_result->barcode_name = std::string(ks.s, ks.l);
+            }
+            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
+                data.barcoding_result->alias = std::string(ks.s, ks.l);
+            }
         }
     }
 }
@@ -287,7 +302,7 @@ void SummaryFileWriter::handle(const HtsData& data) const {
                     barcode_kits::normalize_barcode_name(data.barcoding_result->barcode_name);
             alias = data.barcoding_result->alias.empty() ? barcode_arrangement
                                                          : data.barcoding_result->alias;
-            type = data.barcoding_result->type.empty() ? "na" : data.barcoding_result->type;
+            type = data.barcoding_result->type;
             barcode_kit = data.barcoding_result->kit;
             barcode_variant = data.barcoding_result->variant;
             barcode_score = data.barcoding_result->barcode_score;
