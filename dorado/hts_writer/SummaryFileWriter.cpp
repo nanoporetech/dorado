@@ -228,7 +228,7 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             data.read_attrs.model_stride = read_group.model_stride;
 
             if (auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
-                float qscore = bam_aux2f(qs_tag);
+                float qscore = static_cast<float>(bam_aux2f(qs_tag));
                 data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
             }
 
@@ -367,11 +367,11 @@ void SummaryFileWriter::handle(const HtsData& data) const {
             auto barcode_info = get_array<float>(record, "bi");
             if (barcode_info.size() == 7) {
                 barcode_score = barcode_info[0];
-                barcode_front_begin_index = barcode_info[1];
-                barcode_front_foundseq_length = barcode_info[2];
+                barcode_front_begin_index = static_cast<int>(barcode_info[1]);
+                barcode_front_foundseq_length = static_cast<int>(barcode_info[2]);
                 barcode_front_score = barcode_info[3];
-                barcode_rear_end_index = barcode_info[4];
-                barcode_rear_foundseq_length = barcode_info[5];
+                barcode_rear_end_index = static_cast<int>(barcode_info[4]);
+                barcode_rear_foundseq_length = static_cast<int>(barcode_info[5]);
                 barcode_rear_score = barcode_info[6];
             }
         }
