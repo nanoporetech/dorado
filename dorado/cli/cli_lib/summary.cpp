@@ -2,6 +2,11 @@
 
 #include "cli/cli.h"
 #include "dorado_version.h"
+#include "hts_utils/bam_utils.h"
+#include "hts_writer/SummaryFileWriter.h"
+#include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/ReadPipeline.h"
+#include "read_pipeline/nodes/WriterNode.h"
 #include "utils/log_utils.h"
 #include "utils/tty_utils.h"
 
@@ -22,7 +27,6 @@ int summary(int argc, char *argv[]) {
             .help("SAM/BAM file produced by dorado basecaller.")
             .nargs(argparse::nargs_pattern::optional)
             .default_value(std::string{});
-    parser.add_argument("-s", "--separator").default_value(std::string("\t"));
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
             .flag()
@@ -43,7 +47,6 @@ int summary(int argc, char *argv[]) {
     }
 
     auto reads(parser.get<std::string>("reads"));
-    auto separator(parser.get<std::string>("separator"));
 
     if (!reads.empty()) {
         if (!std::filesystem::exists(reads)) {
@@ -63,9 +66,46 @@ int summary(int argc, char *argv[]) {
         reads = "-";
     }
 
-    SummaryData summary;
-    summary.set_separator(separator[0]);
-    summary.process_file(reads, std::cout);
+    const bool barcoding_info = false;
+
+    HtsReader reader(reads, std::nullopt);
+    std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
+    {
+        using namespace hts_writer;
+        SummaryFileWriter::FieldFlags flags =
+                SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
+        if (reader.is_aligned) {
+            flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
+        }
+
+        auto command_line_cl =
+                utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
+
+        // If dorado was run with --estimate-poly-a option, output polyA related fields in the summary
+        if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
+            flags |= SummaryFileWriter::POLYA_FIELDS;
+        }
+
+        if (barcoding_info) {
+            flags |= SummaryFileWriter::BARCODING_FIELDS;
+        }
+        auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags);
+        SamHdrSharedPtr shared_hdr(reader.header());
+        summary_writer->set_header(shared_hdr);
+        writers.push_back(std::move(summary_writer));
+    }
+
+    PipelineDescriptor pipeline_desc;
+    pipeline_desc.add_node<WriterNode>({}, std::move(writers));
+
+    auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
+    if (pipeline == nullptr) {
+        spdlog::error("Failed to create pipeline");
+        std::exit(EXIT_FAILURE);
+    }
+
+    reader.read(*pipeline, 0, false, nullptr, true);
+    pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
     return EXIT_SUCCESS;
 }
