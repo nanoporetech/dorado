@@ -389,9 +389,25 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
 
     if (!barcode.empty() && barcode != UNCLASSIFIED) {
         bam_aux_update_str(aln, "BC", int(barcode.length() + 1), barcode.c_str());
-        if (barcoding_result && !barcoding_result->variant.empty()) {
-            bam_aux_update_str(aln, "bv", int(barcoding_result->variant.length() + 1),
-                               barcoding_result->variant.c_str());
+        if (barcoding_result) {
+            if (!barcoding_result->variant.empty()) {
+                bam_aux_update_str(aln, "bv", int(barcoding_result->variant.length() + 1),
+                                   barcoding_result->variant.c_str());
+            }
+
+            std::vector<float> barcode_info;
+            barcode_info.reserve(7);  // update if dual-barcoding implemented
+            barcode_info.push_back(barcoding_result->barcode_score);
+            barcode_info.push_back(barcoding_result->top_barcode_pos.first);  // front_start_index
+            barcode_info.push_back(barcoding_result->top_barcode_pos.second -
+                                   barcoding_result->top_barcode_pos.first);
+            barcode_info.push_back(barcoding_result->top_barcode_score);
+            barcode_info.push_back(barcoding_result->bottom_barcode_pos.second);  // rear_end_index
+            barcode_info.push_back(barcoding_result->bottom_barcode_pos.second -
+                                   barcoding_result->bottom_barcode_pos.first);
+            barcode_info.push_back(barcoding_result->bottom_barcode_score);
+
+            bam_aux_update_array(aln, "bi", 'f', barcode_info.size(), barcode_info.data());
         }
     }
 

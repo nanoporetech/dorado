@@ -117,6 +117,20 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
         bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
         bam_aux_update_str(irecord, "bv", int(read.barcoding_result->variant.length() + 1),
                            read.barcoding_result->variant.c_str());
+
+        std::vector<float> barcode_info;
+        barcode_info.reserve(7);  // update if dual-barcoding implemented
+        barcode_info.push_back(read.barcoding_result->barcode_score);
+        barcode_info.push_back(read.barcoding_result->top_barcode_pos.first);  // front_start_index
+        barcode_info.push_back(read.barcoding_result->top_barcode_pos.second -
+                               read.barcoding_result->top_barcode_pos.first);
+        barcode_info.push_back(read.barcoding_result->top_barcode_score);
+        barcode_info.push_back(read.barcoding_result->bottom_barcode_pos.second);  // rear_end_index
+        barcode_info.push_back(read.barcoding_result->bottom_barcode_pos.second -
+                               read.barcoding_result->bottom_barcode_pos.first);
+        barcode_info.push_back(read.barcoding_result->bottom_barcode_score);
+        bam_aux_update_array(irecord, "bi", 'f', barcode_info.size(), barcode_info.data());
+
         auto rg_tag = bam_aux_get(irecord, "RG");
         if (rg_tag) {
             std::string rg_tag_value = bam_aux2Z(rg_tag);
@@ -138,6 +152,7 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
         };
         delete_tag("BC");
         delete_tag("bv");
+        delete_tag("bi");
     }
     m_num_records++;
     {

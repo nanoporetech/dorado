@@ -345,19 +345,18 @@ void SummaryFileWriter::handle(const HtsData& data) const {
                                                          : data.barcoding_result->alias;
             type = data.barcoding_result->type;
             barcode_kit = data.barcoding_result->kit;
+            barcode_variant = get_tag<std::string>(data.bam_ptr.get(), "bv", "n/a");
 
-            auto bv_tag = bam_aux_get(data.bam_ptr.get(), "bv");
-            barcode_variant = bv_tag != nullptr ? bam_aux2Z(bv_tag) : "n/a";
-
-            barcode_score = data.barcoding_result->barcode_score;
-            barcode_front_score = data.barcoding_result->top_barcode_score;
-            barcode_rear_score = data.barcoding_result->bottom_barcode_score;
-            barcode_front_foundseq_length = data.barcoding_result->top_barcode_pos.second -
-                                            data.barcoding_result->top_barcode_pos.first;
-            barcode_rear_foundseq_length = data.barcoding_result->bottom_barcode_pos.second -
-                                           data.barcoding_result->bottom_barcode_pos.first;
-            barcode_front_begin_index = data.barcoding_result->top_barcode_pos.first;
-            barcode_rear_end_index = data.barcoding_result->bottom_barcode_pos.second;
+            auto barcode_info = get_array<float>(record, "bi");
+            if (barcode_info.size() == 7) {
+                barcode_score = barcode_info[0];
+                barcode_front_begin_index = barcode_info[1];
+                barcode_front_foundseq_length = barcode_info[2];
+                barcode_front_score = barcode_info[3];
+                barcode_rear_end_index = barcode_info[4];
+                barcode_rear_foundseq_length = barcode_info[5];
+                barcode_rear_score = barcode_info[6];
+            }
         }
 
         m_summary_stream << separator << alias;
