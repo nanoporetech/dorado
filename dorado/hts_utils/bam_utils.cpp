@@ -66,7 +66,8 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
            << (read_group.modbase_models.empty() ? ""
                                                  : (" modbase_models=" + read_group.modbase_models))
            << " experiment_id=" << value_or_unknown(read_group.experiment_id)
-           << " acquisition_start_time=" << value_or_unknown(read_group.acq_start_time) << "\t";
+           << " acquisition_start_time=" << value_or_unknown(read_group.acq_start_time)
+           << " model_stride=" << read_group.model_stride << "\t";
         rg << "LB:" << value_or_unknown(read_group.sample_id);
     }
     return rg.str();
@@ -171,6 +172,8 @@ std::unordered_map<std::string, dorado::ReadGroup> parse_read_groups(sam_hdr_t* 
                         read_group.experiment_id = kv[1];
                     } else if (kv[0] == "acquisition_start_time") {
                         read_group.acq_start_time = kv[1];
+                    } else if (kv[0] == "model_stride") {
+                        read_group.model_stride = std::atoi(kv[1].c_str());
                     }
                 }
             }

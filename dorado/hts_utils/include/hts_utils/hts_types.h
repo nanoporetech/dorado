@@ -105,6 +105,7 @@ struct ReadGroup {
     std::string position_id{};
     std::string experiment_id{};
     std::string acq_start_time{};
+    int model_stride{};
 };
 
 class HtsData {

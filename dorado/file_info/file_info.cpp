@@ -17,6 +17,7 @@ namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(
         const std::vector<std::filesystem::directory_entry>& dir_files,
+        int model_stride,
         const std::string& model_name,
         const std::string& modbase_model_names) {
     if (pod5_init() != POD5_OK) {
@@ -82,6 +83,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
                     std::move(position_id),
                     std::move(experiment_id),
                     utils::get_string_timestamp_from_unix_time_ms(acq_start_time_ms),
+                    model_stride,
             };
         }
     }

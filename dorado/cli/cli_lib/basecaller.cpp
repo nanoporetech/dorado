@@ -447,8 +447,8 @@ void setup(const std::vector<std::string>& args,
     }
 
     auto read_groups = file_info::load_read_groups(
-            pod5_folder_info.files().get(), models.get_simplex_model_name(),
-            utils::join(models.get_modbase_model_names(), ","));
+            pod5_folder_info.files().get(), models.get_simplex_config().stride,
+            models.get_simplex_model_name(), utils::join(models.get_modbase_model_names(), ","));
 
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));

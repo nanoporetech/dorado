@@ -206,6 +206,7 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             data.read_attrs.experiment_id = read_group.experiment_id;
             data.read_attrs.sample_id = read_group.sample_id;
             data.read_attrs.position_id = read_group.position_id;
+            data.read_attrs.model_stride = read_group.model_stride;
 
             try {
                 if (auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
