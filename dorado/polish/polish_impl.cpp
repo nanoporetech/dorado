@@ -441,25 +441,6 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
                 ", chunk_overlap = " + std::to_string(chunk_overlap));
     }
 
-    const auto create_chunk = [](const secondary::Sample& sample, const int64_t start,
-                                 const int64_t end) {
-        torch::Tensor new_features = sample.features.slice(0, start, end);
-        std::vector<int64_t> new_major(std::begin(sample.positions_major) + start,
-                                       std::begin(sample.positions_major) + end);
-        std::vector<int64_t> new_minor(std::begin(sample.positions_minor) + start,
-                                       std::begin(sample.positions_minor) + end);
-        torch::Tensor new_depth = sample.depth.slice(0, start, end);
-        return secondary::Sample{
-                sample.seq_id,
-                std::move(new_features),
-                std::move(new_major),
-                std::move(new_minor),
-                std::move(new_depth),
-                {},
-                {},
-        };
-    };
-
     std::vector<secondary::Sample> results;
     results.reserve(std::size(samples));
 
@@ -473,17 +454,18 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
 
         const int64_t step = chunk_len - chunk_overlap;
 
+        // Slice out all but the last chunk unless perfectly sized.
         int64_t end = 0;
         for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
             end = start + chunk_len;
-            results.emplace_back(create_chunk(sample, start, end));
+            results.emplace_back(slice_sample(sample, start, end, false));
         }
 
-        // This will create a chunk with potentially large overlap.
+        // Last chunk will have a large overlap with previous, to maintain equal length.
         if (end < sample_len) {
             const int64_t start = sample_len - chunk_len;
             end = sample_len;
-            results.emplace_back(create_chunk(sample, start, end));
+            results.emplace_back(slice_sample(sample, start, end, false));
         }
     }
 
