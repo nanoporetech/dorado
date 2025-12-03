@@ -188,6 +188,19 @@ void SummaryFileWriter::init() {
 void SummaryFileWriter::set_header(dorado::SamHdrSharedPtr header) {
     auto hdr = const_cast<sam_hdr_t*>(header.get());
     m_read_groups = utils::parse_read_groups(hdr);
+
+    auto command_line_cl = utils::extract_pg_keys_from_hdr(hdr, {"CL"}, "ID", "basecaller");
+    // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
+    std::stringstream cl{command_line_cl["CL"]};
+    std::string out;
+    while (cl.good()) {
+        cl >> std::quoted(out);
+        if (out == "--min-qscore") {
+            cl >> std::quoted(out);
+            m_minimum_qscore = std::atoi(out.c_str());
+            break;
+        }
+    }
     m_shared_header = std::move(header);
 }
 
@@ -207,6 +220,11 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             data.read_attrs.sample_id = read_group.sample_id;
             data.read_attrs.position_id = read_group.position_id;
             data.read_attrs.model_stride = read_group.model_stride;
+
+            if (auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
+                float qscore = bam_aux2f(qs_tag);
+                data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
+            }
 
             try {
                 if (auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {

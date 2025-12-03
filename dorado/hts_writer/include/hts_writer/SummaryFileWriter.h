@@ -40,6 +40,7 @@ private:
 
     SamHdrSharedPtr m_shared_header{nullptr};
     std::unordered_map<std::string, dorado::ReadGroup> m_read_groups;
+    int m_minimum_qscore{0};
 
     const FieldFlags m_field_flags;
     std::ofstream m_summary_file;
