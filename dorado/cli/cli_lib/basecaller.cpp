@@ -216,7 +216,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
         parser.add_argument("--trim")
                 .help("Specify what to trim. Options are 'none', 'all', and 'adapters'. The "
                       "default behaviour is to trim all detected adapters, primers, and barcodes. "
-                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivelent to "
+                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivalent to "
                       "using --no-trim. Note that this only applies to DNA. RNA adapters are "
                       "always trimmed.")
                 .default_value(std::string{});
