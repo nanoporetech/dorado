@@ -65,7 +65,9 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
            << " basecall_model=" << value_or_unknown(read_group.basecalling_model)
            << (read_group.modbase_models.empty() ? ""
                                                  : (" modbase_models=" + read_group.modbase_models))
-           << "\t";
+           << " experiment_id=" << value_or_unknown(read_group.experiment_id)
+           << " acquisition_start_time=" << value_or_unknown(read_group.acq_start_time)
+           << " model_stride=" << read_group.model_stride << "\t";
         rg << "LB:" << value_or_unknown(read_group.sample_id);
     }
     return rg.str();
@@ -92,6 +94,7 @@ void add_barcode_kit_rg_hdrs(sam_hdr_t* hdr,
     for (const auto& barcode_name : kit_info->second.barcodes) {
         auto additional_tags = "\tBC:" + get_barcode_sequence(barcode_name);
         const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+        additional_tags += "\tbk:" + kit_name;
         additional_tags += "\tSM:" + normalized_barcode_name;
         for (const auto& read_group : read_groups) {
             std::string alias;
@@ -165,6 +168,12 @@ std::unordered_map<std::string, dorado::ReadGroup> parse_read_groups(sam_hdr_t* 
                         read_group.basecalling_model = kv[1];
                     } else if (kv[0] == "modbase_models") {
                         read_group.modbase_models = kv[1];
+                    } else if (kv[0] == "experiment_id") {
+                        read_group.experiment_id = kv[1];
+                    } else if (kv[0] == "acquisition_start_time") {
+                        read_group.acq_start_time = kv[1];
+                    } else if (kv[0] == "model_stride") {
+                        read_group.model_stride = std::atoi(kv[1].c_str());
                     }
                 }
             }

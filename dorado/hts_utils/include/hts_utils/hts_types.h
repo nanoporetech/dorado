@@ -104,6 +104,8 @@ struct ReadGroup {
     std::string sample_id{};
     std::string position_id{};
     std::string experiment_id{};
+    std::string acq_start_time{};
+    int model_stride{};
 };
 
 class HtsData {
@@ -119,15 +121,13 @@ public:
         int64_t protocol_start_time_ms{0};
         std::size_t subread_id{0};
         bool is_status_pass{true};
-        uint64_t num_minknow_events{0};
-        std::string end_reason{"unknown"};
-        std::string pore_type{"not_set"};
-        uint64_t sample_rate{0};
         uint64_t start_time_ms{0};
         int model_stride{-1};
         int num_alignments{0};
         int num_secondary_alignments{0};
         int num_supplementary_alignments{0};
+
+        auto operator<=>(const ReadAttributes&) const = default;
     };
 
     struct ReadAttributesCoreComparator {

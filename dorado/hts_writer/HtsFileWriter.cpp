@@ -7,18 +7,19 @@
 #include <htslib/sam.h>
 
 #include <atomic>
+#include <stdexcept>
 
 namespace dorado {
 namespace hts_writer {
 
 void HtsFileWriter::process(const Processable item) {
     // Type-specific dispatch to handle(T)
-    dispatch_processable(item, [this](const auto &t) { this->prepare_item(t); });
+    dispatch_processable(item, [this](auto &t) { this->prepare_item(t); });
     dispatch_processable(item, [this](const auto &t) { this->handle(t); });
     dispatch_processable(item, [this](const auto &t) { this->update_stats(t); });
 }
 
-void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
+void HtsFileWriter::prepare_item(HtsData &hts_data) const {
     if (m_mode == OutputMode::FASTQ) {
         if (!m_gpu_names.empty()) {
             bam_aux_append(hts_data.bam_ptr.get(), "DS", 'Z', int(m_gpu_names.length() + 1),

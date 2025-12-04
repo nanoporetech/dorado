@@ -130,6 +130,21 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
         };
         bam_aux_update_array(aln, "pa", 'i', (int)poly_tail.size(), poly_tail.data());
     }
+
+    if (!attributes.pore_type.empty()) {
+        bam_aux_append(aln, "po", 'Z', static_cast<int>(attributes.pore_type.length() + 1),
+                       reinterpret_cast<const uint8_t *>(attributes.pore_type.c_str()));
+    }
+
+    if (!attributes.end_reason.empty()) {
+        bam_aux_append(aln, "er", 'Z', static_cast<int>(attributes.end_reason.length() + 1),
+                       reinterpret_cast<const uint8_t *>(attributes.end_reason.c_str()));
+    }
+
+    // bam format only supports up to 32-bit uints
+    uint32_t reduced_minknow_events = static_cast<uint32_t>(num_minknow_events);
+    bam_aux_append(aln, "me", 'I', sizeof(reduced_minknow_events),
+                   (uint8_t *)&reduced_minknow_events);
 }
 
 void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
@@ -156,6 +171,11 @@ void ReadCommon::generate_duplex_read_tags(bam1_t *aln) const {
     if (!parent_read_id.empty()) {
         bam_aux_append(aln, "pi", 'Z', int(parent_read_id.size() + 1),
                        reinterpret_cast<const uint8_t *>(parent_read_id.c_str()));
+    }
+
+    if (!attributes.pore_type.empty()) {
+        bam_aux_append(aln, "po", 'Z', int(attributes.pore_type.length() + 1),
+                       reinterpret_cast<const uint8_t *>(attributes.pore_type.c_str()));
     }
 }
 
@@ -369,6 +389,26 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
 
     if (!barcode.empty() && barcode != UNCLASSIFIED) {
         bam_aux_update_str(aln, "BC", int(barcode.length() + 1), barcode.c_str());
+        if (barcoding_result) {
+            if (!barcoding_result->variant.empty()) {
+                bam_aux_update_str(aln, "bv", int(barcoding_result->variant.length() + 1),
+                                   barcoding_result->variant.c_str());
+            }
+
+            std::vector<float> barcode_info;
+            barcode_info.reserve(7);  // update if dual-barcoding implemented
+            barcode_info.push_back(barcoding_result->barcode_score);
+            barcode_info.push_back(barcoding_result->top_barcode_pos.first);  // front_start_index
+            barcode_info.push_back(barcoding_result->top_barcode_pos.second -
+                                   barcoding_result->top_barcode_pos.first);
+            barcode_info.push_back(barcoding_result->top_barcode_score);
+            barcode_info.push_back(barcoding_result->bottom_barcode_pos.second);  // rear_end_index
+            barcode_info.push_back(barcoding_result->bottom_barcode_pos.second -
+                                   barcoding_result->bottom_barcode_pos.first);
+            barcode_info.push_back(barcoding_result->bottom_barcode_score);
+
+            bam_aux_update_array(aln, "bi", 'f', barcode_info.size(), barcode_info.data());
+        }
     }
 
     if (is_duplex) {

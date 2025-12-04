@@ -1,13 +1,17 @@
 #include "hts_writer/SummaryFileWriter.h"
 
+#include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/string_utils.h"
+#include "utils/time_utils.h"
 
 #include <htslib/sam.h>
 
 #include <array>
 #include <iomanip>
+#include <ostream>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
@@ -127,15 +131,21 @@ std::vector<T> get_array(bam1_t* record, const char* tagname) {
 namespace dorado::hts_writer {
 
 SummaryFileWriter::SummaryFileWriter(const std::filesystem::path& output_directory,
-                                     FieldFlags flags)
-        : m_field_flags(flags),
+                                     FieldFlags flags,
+                                     std::optional<AlignmentCounts> alignment_counts)
+        : m_alignment_counts(std::move(alignment_counts)),
+          m_field_flags(flags),
           m_summary_file(output_directory / "sequencing_summary.txt"),
           m_summary_stream(m_summary_file) {
     init();
 }
 
-SummaryFileWriter::SummaryFileWriter(std::ostream& stream, FieldFlags flags)
-        : m_field_flags(flags), m_summary_stream(stream) {
+SummaryFileWriter::SummaryFileWriter(std::ostream& stream,
+                                     FieldFlags flags,
+                                     std::optional<AlignmentCounts> alignment_counts)
+        : m_alignment_counts(std::move(alignment_counts)),
+          m_field_flags(flags),
+          m_summary_stream(stream) {
     init();
 }
 
@@ -183,11 +193,92 @@ void SummaryFileWriter::init() {
     m_summary_stream << '\n';
 }
 
+void SummaryFileWriter::set_header(dorado::SamHdrSharedPtr header) {
+    auto hdr = const_cast<sam_hdr_t*>(header.get());
+    m_read_groups = utils::parse_read_groups(hdr);
+
+    auto command_line_cl = utils::extract_pg_keys_from_hdr(hdr, {"CL"}, "ID", "basecaller");
+    // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
+    std::stringstream cl{command_line_cl["CL"]};
+    std::string out;
+    while (cl.good()) {
+        cl >> std::quoted(out);
+        if (out == "--min-qscore") {
+            cl >> std::quoted(out);
+            m_minimum_qscore = std::atoi(out.c_str());
+            break;
+        }
+    }
+    m_shared_header = std::move(header);
+}
+
 void SummaryFileWriter::process(const Processable item) {
+    dispatch_processable(item, [this](auto& t) { this->prepare_item(t); });
     dispatch_processable(item, [this](const auto& t) { this->handle(t); });
 }
 
-void SummaryFileWriter::handle(const HtsData& data) {
+void SummaryFileWriter::prepare_item(HtsData& data) {
+    if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+        const std::string rg_tag_value = bam_aux2Z(rg_tag);
+        if (data.read_attrs == HtsData::ReadAttributes{}) {
+            const auto& read_group = m_read_groups.at(rg_tag_value);
+            data.read_attrs.protocol_run_id = read_group.run_id;
+            data.read_attrs.flowcell_id = read_group.flowcell_id;
+            data.read_attrs.experiment_id = read_group.experiment_id;
+            data.read_attrs.sample_id = read_group.sample_id;
+            data.read_attrs.position_id = read_group.position_id;
+            data.read_attrs.model_stride = read_group.model_stride;
+
+            if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
+                const float qscore = static_cast<float>(bam_aux2f(qs_tag));
+                data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
+            }
+
+            try {
+                if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
+                    const std::string read_start_time_str = bam_aux2Z(st_tag);
+                    const auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
+                            read_group.acq_start_time);
+                    const auto read_start_time =
+                            utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
+                    data.read_attrs.start_time_ms = read_start_time - acq_start_time;
+                }
+            } catch (...) {
+                // can't parse something, ignore start_time and continue
+            }
+        }
+
+        if ((m_field_flags & BARCODING_FIELDS) && !data.barcoding_result) {
+            KString ks_wrapper(100000);
+            auto& ks = ks_wrapper.get();
+            auto hdr = const_cast<sam_hdr_t*>(m_shared_header.get());
+
+            data.barcoding_result = std::make_shared<BarcodeScoreResult>();
+            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
+                data.barcoding_result->barcode_name = std::string(ks.s, ks.l);
+            }
+            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
+                data.barcoding_result->alias = std::string(ks.s, ks.l);
+            }
+            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
+                data.barcoding_result->kit = std::string(ks.s, ks.l);
+            }
+        }
+
+        if ((m_field_flags & ALIGNMENT_FIELDS) && m_alignment_counts.has_value()) {
+            const auto alignment_counts_it =
+                    m_alignment_counts->find(bam_get_qname(data.bam_ptr.get()));
+            if (alignment_counts_it != std::end(*m_alignment_counts)) {
+                const auto& alignment_counts = alignment_counts_it->second;
+                data.read_attrs.num_alignments = alignment_counts[0];
+                data.read_attrs.num_secondary_alignments = alignment_counts[1];
+                data.read_attrs.num_supplementary_alignments = alignment_counts[2];
+            }
+        }
+    }
+}
+
+void SummaryFileWriter::handle(const HtsData& data) const {
     // skip secondary and supplementary alignments in the summary
     if (data.bam_ptr->core.flag & (BAM_FSECONDARY | BAM_FSUPPLEMENTARY)) {
         return;
@@ -196,6 +287,10 @@ void SummaryFileWriter::handle(const HtsData& data) {
     // Write column data
 
     auto record = data.bam_ptr.get();
+    auto duration = get_tag(record, "du", 0.f);
+    auto num_samples = get_tag(record, "ns", 0);
+    auto sample_rate = (duration > 0) ? num_samples / duration : 0.f;
+
     m_summary_stream << get_tag<std::string>(record, "fn", "unknown");
     m_summary_stream << separator << "0";  // batch_id
     m_summary_stream << separator << get_tag<std::string>(record, "pi", bam_get_qname(record));
@@ -203,15 +298,16 @@ void SummaryFileWriter::handle(const HtsData& data) {
     m_summary_stream << separator << data.read_attrs.protocol_run_id;
     m_summary_stream << separator << get_tag(record, "ch", 0);
     m_summary_stream << separator << get_tag(record, "mx", 0);
-    m_summary_stream << separator << data.read_attrs.num_minknow_events;
+    m_summary_stream << separator << get_tag(record, "me", uint32_t(0));
     m_summary_stream << separator << (data.read_attrs.start_time_ms / 1000.f);
-    m_summary_stream << separator << get_tag(record, "du", 0.f);
+    m_summary_stream << separator << duration;
 
     if (m_field_flags & BASECALLING_FIELDS) {
-        auto template_start = (data.read_attrs.start_time_ms / 1000.f) +
-                              (get_tag(record, "ts", 0) / float(data.read_attrs.sample_rate));
+        auto template_start = sample_rate != 0 ? (data.read_attrs.start_time_ms / 1000.f) +
+                                                         (get_tag(record, "ts", 0) / sample_rate)
+                                               : 0.f;
         auto template_samples = get_tag(record, "ns", 0) - get_tag(record, "ts", 0);
-        auto template_duration = float(template_samples) / data.read_attrs.sample_rate;
+        auto template_duration = sample_rate != 0 ? float(template_samples) / sample_rate : 0.f;
 
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
         m_summary_stream << separator << template_start;
@@ -239,10 +335,12 @@ void SummaryFileWriter::handle(const HtsData& data) {
         }
     }
     if (m_field_flags & EXPERIMENT_FIELDS) {
-        m_summary_stream << separator << data.read_attrs.pore_type;
-        m_summary_stream << separator << data.read_attrs.experiment_id;
+        m_summary_stream << separator << get_tag<std::string>(record, "po", "not_set");
+        m_summary_stream << separator
+                         << (data.read_attrs.experiment_id.empty() ? "unknown"
+                                                                   : data.read_attrs.experiment_id);
         m_summary_stream << separator << data.read_attrs.sample_id;
-        m_summary_stream << separator << data.read_attrs.end_reason;
+        m_summary_stream << separator << get_tag<std::string>(record, "er", "unknown");
     }
     if (m_field_flags & BARCODING_FIELDS) {
         std::string alias = "unknown";
@@ -264,18 +362,20 @@ void SummaryFileWriter::handle(const HtsData& data) {
                     barcode_kits::normalize_barcode_name(data.barcoding_result->barcode_name);
             alias = data.barcoding_result->alias.empty() ? barcode_arrangement
                                                          : data.barcoding_result->alias;
-            type = data.barcoding_result->type.empty() ? "na" : data.barcoding_result->type;
+            type = data.barcoding_result->type;
             barcode_kit = data.barcoding_result->kit;
-            barcode_variant = data.barcoding_result->variant;
-            barcode_score = data.barcoding_result->barcode_score;
-            barcode_front_score = data.barcoding_result->top_barcode_score;
-            barcode_rear_score = data.barcoding_result->bottom_barcode_score;
-            barcode_front_foundseq_length = data.barcoding_result->top_barcode_pos.second -
-                                            data.barcoding_result->top_barcode_pos.first;
-            barcode_rear_foundseq_length = data.barcoding_result->bottom_barcode_pos.second -
-                                           data.barcoding_result->bottom_barcode_pos.first;
-            barcode_front_begin_index = data.barcoding_result->top_barcode_pos.first;
-            barcode_rear_end_index = data.barcoding_result->bottom_barcode_pos.second;
+            barcode_variant = get_tag<std::string>(data.bam_ptr.get(), "bv", "n/a");
+
+            auto barcode_info = get_array<float>(record, "bi");
+            if (barcode_info.size() == 7) {
+                barcode_score = barcode_info[0];
+                barcode_front_begin_index = static_cast<int>(barcode_info[1]);
+                barcode_front_foundseq_length = static_cast<int>(barcode_info[2]);
+                barcode_front_score = barcode_info[3];
+                barcode_rear_end_index = static_cast<int>(barcode_info[4]);
+                barcode_rear_foundseq_length = static_cast<int>(barcode_info[5]);
+                barcode_rear_score = barcode_info[6];
+            }
         }
 
         m_summary_stream << separator << alias;

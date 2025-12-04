@@ -31,7 +31,7 @@ mkdir -p ${models_directory}
 
 models_directory_arg="--models-directory ${models_directory}"
 
-ONT_OUTPUT_SPEC_REF="00d8b1220133b35f5c29de1d67af85fef3530f6f" # currently DOR-1280_dorado_bam_validation branch
+ONT_OUTPUT_SPEC_REF="11a7f1001ad04484ce7ef84038168969139a9b15"
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
 VALIDATOR_COMMIT="7dd56117df3dc354ae5b641e144fc8c5d9188261"
