@@ -187,7 +187,7 @@ int duplex(int argc, char* argv[]) {
                       "output files marked `fail` if `--output-dir` is set.")
                 .default_value(0)
                 .scan<'i', int>();
-        cli::add_basecaller_output_arguments(parser);
+        cli::add_basecaller_output_arguments(parser, false);
     }
     {
         parser.add_group("Alignment arguments");
