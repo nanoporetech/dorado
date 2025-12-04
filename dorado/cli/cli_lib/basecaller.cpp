@@ -142,11 +142,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 .default_value(0)
                 .scan<'i', int>();
         parser.add_argument("--emit-moves").help("Write the move table to the 'mv' tag.").flag();
-        parser.add_argument("--emit-summary")
-                .help("Generate a summary file in the --output-dir (or the current working "
-                      "directory if not set).")
-                .flag();
-        cli::add_basecaller_output_arguments(parser);
+        cli::add_basecaller_output_arguments(parser, true);
     }
     {
         parser.add_group("Alignment arguments");
@@ -220,7 +216,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
         parser.add_argument("--trim")
                 .help("Specify what to trim. Options are 'none', 'all', and 'adapters'. The "
                       "default behaviour is to trim all detected adapters, primers, and barcodes. "
-                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivelent to "
+                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivalent to "
                       "using --no-trim. Note that this only applies to DNA. RNA adapters are "
                       "always trimmed.")
                 .default_value(std::string{});
@@ -903,7 +899,7 @@ int basecaller(int argc, char* argv[]) {
         setup(args, models, pod5_folder_info, device, parser.get<std::string>("--reference"),
               parser.get<std::string>("--bed-file"), default_parameters.num_runners, modbase_params,
               cli::get_output_dir(parser), cli::get_emit_fastq(parser), cli::get_emit_sam(parser),
-              parser.get<bool>("--emit-moves"), parser.get<bool>("--emit-summary"),
+              parser.get<bool>("--emit-moves"), cli::get_emit_summary(parser),
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
               parser.get<std::string>("--read-ids"), *minimap_options,
               parser.get<std::string>("--dump_stats_file"),
