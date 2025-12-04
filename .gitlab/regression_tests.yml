@@ -21,7 +21,7 @@
     - export CURL_SSL_BACKEND="schannel"
     - pip install psutil
 
-.osx_regression_dependencies:
+.macos_regression_dependencies:
   before_script:
     - !reference [.create_venv]
     - export ROOT_DIR=$PWD
@@ -30,7 +30,7 @@
     - pip install psutil
     - pip install pysam "--only-binary=:all:"
 
-.osx_arm_regression_runner:
+.macos_arm_regression_runner:
   tags:
     - osx_arm64
     - xcode-15.3
@@ -39,7 +39,7 @@
     # so pin the OS to the one that we have the most runners of.
     - osx-14.4
 
-.osx_arm_regression_speed_runner:
+.macos_arm_regression_speed_runner:
   tags:
     - osx_arm64
     - on-prem
@@ -201,8 +201,8 @@ regression_test:macos:arm:
     BUILD_TYPE: Release
     BUILD_CUDA: 1
   extends:
-    - .osx_regression_dependencies
-    - .osx_arm_regression_runner
+    - .macos_regression_dependencies
+    - .macos_arm_regression_runner
     - .regression_test
   needs:
     - build_archive:macos:arm
@@ -382,8 +382,8 @@ regression_tests:speed:macos:arm:
     BUILD_TYPE: Release
     BUILD_CUDA: 1
   extends:
-    - .osx_regression_dependencies
-    - .osx_arm_regression_speed_runner
+    - .macos_regression_dependencies
+    - .macos_arm_regression_speed_runner
     - .speed_regression_test
   needs:
     - build_archive:macos:arm
