@@ -39,6 +39,17 @@
     # so pin the OS to the one that we have the most runners of.
     - osx-14.4
 
+.osx_arm_regression_speed_runner:
+  tags:
+    - osx_arm64
+    - on-prem
+    # We need to pin to an OS and GPU for consistent speeds.
+    # TODO: M4 CI runners currently have issues connecting to artifactory.
+    #- osx-15.1
+    #- m4
+    - osx-14.7
+    - m2-32gb
+
 .linux_regression_runner_v100:
   tags:
     - ubuntu-20.04
@@ -372,7 +383,7 @@ regression_tests:speed:macos:arm:
     BUILD_CUDA: 1
   extends:
     - .osx_regression_dependencies
-    - .osx_arm_regression_runner
+    - .osx_arm_regression_speed_runner
     - .speed_regression_test
   needs:
     - build_archive:macos:arm
