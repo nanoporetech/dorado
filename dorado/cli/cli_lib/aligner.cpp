@@ -130,14 +130,8 @@ int aligner(int argc, char* argv[]) {
     }
     {
         parser.add_group("Output arguments");
-        cli::add_output_dir_argument(parser);
         parser.add_argument("--no-sort").help("Disable sorting of output files.").flag();
-        parser.add_argument("--emit-sam").help("Output in SAM format.").flag();
-        parser.add_argument("--emit-summary")
-                .help("If specified, a summary file containing the details of the primary "
-                      "alignments for each read will be emitted to the root of the output folder. "
-                      "This option requires that the '--output-dir' option is also set.")
-                .flag();
+        cli::add_aligner_output_arguments(parser);
     }
     {
         parser.add_group("Advanced arguments");
@@ -188,8 +182,8 @@ int aligner(int argc, char* argv[]) {
     const bool skip_sec_supp = !parser.get<bool>("--allow-sec-supp");
 
     const auto sort_requested = !parser.get<bool>("--no-sort");
-    const auto emit_sam = parser.get<bool>("--emit-sam");
-    const auto emit_summary = parser.get<bool>("emit-summary");
+    const auto emit_sam = cli::get_emit_sam(parser);
+    const auto emit_summary = cli::get_emit_summary(parser);
     if (emit_summary && !output_dir.has_value()) {
         spdlog::error("Cannot specify '--emit-summary' if '--output-dir' is not also specified.");
         return EXIT_FAILURE;
