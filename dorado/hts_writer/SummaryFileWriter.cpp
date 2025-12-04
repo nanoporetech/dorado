@@ -10,6 +10,8 @@
 
 #include <array>
 #include <iomanip>
+#include <ostream>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
@@ -215,9 +217,9 @@ void SummaryFileWriter::process(const Processable item) {
     dispatch_processable(item, [this](const auto& t) { this->handle(t); });
 }
 
-void SummaryFileWriter::prepare_item(HtsData& data) const {
-    if (auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
-        std::string rg_tag_value = bam_aux2Z(rg_tag);
+void SummaryFileWriter::prepare_item(HtsData& data) {
+    if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+        const std::string rg_tag_value = bam_aux2Z(rg_tag);
         if (data.read_attrs == HtsData::ReadAttributes{}) {
             const auto& read_group = m_read_groups.at(rg_tag_value);
             data.read_attrs.protocol_run_id = read_group.run_id;
@@ -227,17 +229,17 @@ void SummaryFileWriter::prepare_item(HtsData& data) const {
             data.read_attrs.position_id = read_group.position_id;
             data.read_attrs.model_stride = read_group.model_stride;
 
-            if (auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
-                float qscore = static_cast<float>(bam_aux2f(qs_tag));
+            if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
+                const float qscore = static_cast<float>(bam_aux2f(qs_tag));
                 data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
             }
 
             try {
-                if (auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
-                    std::string read_start_time_str = bam_aux2Z(st_tag);
-                    auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
+                if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
+                    const std::string read_start_time_str = bam_aux2Z(st_tag);
+                    const auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
                             read_group.acq_start_time);
-                    auto read_start_time =
+                    const auto read_start_time =
                             utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
                     data.read_attrs.start_time_ms = read_start_time - acq_start_time;
                 }

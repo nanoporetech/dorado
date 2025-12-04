@@ -132,12 +132,12 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     }
 
     if (!attributes.pore_type.empty()) {
-        bam_aux_append(aln, "po", 'Z', int(attributes.pore_type.length() + 1),
+        bam_aux_append(aln, "po", 'Z', static_cast<int>(attributes.pore_type.length() + 1),
                        reinterpret_cast<const uint8_t *>(attributes.pore_type.c_str()));
     }
 
     if (!attributes.end_reason.empty()) {
-        bam_aux_append(aln, "er", 'Z', int(attributes.end_reason.length() + 1),
+        bam_aux_append(aln, "er", 'Z', static_cast<int>(attributes.end_reason.length() + 1),
                        reinterpret_cast<const uint8_t *>(attributes.end_reason.c_str()));
     }
 

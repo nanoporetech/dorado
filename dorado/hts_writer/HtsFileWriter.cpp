@@ -7,6 +7,7 @@
 #include <htslib/sam.h>
 
 #include <atomic>
+#include <stdexcept>
 
 namespace dorado {
 namespace hts_writer {

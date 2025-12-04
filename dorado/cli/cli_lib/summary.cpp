@@ -26,7 +26,7 @@ namespace dorado {
 using AlignmentCounts = hts_writer::SummaryFileWriter::AlignmentCounts;
 namespace {
 std::optional<AlignmentCounts> get_alignment_counts(const std::string &path) {
-    auto file = dorado::HtsFilePtr(hts_open(path.c_str(), "r"));
+    const auto file = dorado::HtsFilePtr(hts_open(path.c_str(), "r"));
     if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam) {
         return std::nullopt;
     }
@@ -126,7 +126,8 @@ int summary(int argc, char *argv[]) {
             flags |= SummaryFileWriter::POLYA_FIELDS;
         }
 
-        auto hdr = sam_hdr_dup(reader.header());
+        SamHdrSharedPtr shared_hdr(sam_hdr_dup(reader.header()));
+        auto hdr = const_cast<sam_hdr_t *>(shared_hdr.get());
         int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
         KString tag_wrapper(100000);
         auto &tag_value = tag_wrapper.get();
@@ -137,7 +138,6 @@ int summary(int argc, char *argv[]) {
             }
         }
 
-        SamHdrSharedPtr shared_hdr(hdr);
         auto summary_writer =
                 std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags, alignment_counts);
         summary_writer->set_header(shared_hdr);

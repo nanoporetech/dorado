@@ -6,7 +6,9 @@
 #include <array>
 #include <filesystem>
 #include <fstream>
+#include <iosfwd>
 #include <memory>
+#include <optional>
 #include <string>
 #include <unordered_map>
 
@@ -43,7 +45,7 @@ public:
 
 private:
     void init();
-    void prepare_item(HtsData& data) const;
+    void prepare_item(HtsData& data);
     void handle(const HtsData& item) const;
 
     SamHdrSharedPtr m_shared_header{nullptr};
