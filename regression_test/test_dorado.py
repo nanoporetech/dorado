@@ -103,9 +103,9 @@ class TestDorado(unittest.TestCase):
         with self.context.open_test(self, test_name) as context:
             # All of these tests should produce a single .bam file and a single .txt summary file.
             if USE_PYSAM:
-                expected_files = {"bam": 1, "txt": 1}
+                expected_files = {"bam": 1, "txt": 1, "tsv": 1}
             else:
-                expected_files = {"txt": 1}
+                expected_files = {"txt": 1, "tsv": 1}
             validation_settings = deepcopy(VALIDATION_OPTIONS)
 
             for run in runs:
@@ -148,18 +148,14 @@ class TestDorado(unittest.TestCase):
                         context.encountered_error()
                         self.fail(msg)
 
-                    dorado_errors = self.check_program_output(
+                    errors = self.check_program_output(
                         test_name,
                         subfolder,
                         expected_files,
                         validation_settings,
                     )
-                    summary_errors = self.check_program_output(
-                        test_name, subfolder, {"tsv": 1}, None
-                    )
 
-                    errors = "\n".join(filter(None, (dorado_errors, summary_errors)))
-                    if errors:
+                    if errors is not None:
                         # This indicates regression test failures due to file comparison and/or validation,
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)
@@ -228,9 +224,9 @@ class TestDorado(unittest.TestCase):
         with self.context.open_test(self, test_name) as context:
             # All of these tests should produce a single .bam file and a single .txt summary file.
             if USE_PYSAM:
-                expected_files = {"bam": 1, "txt": 1}
+                expected_files = {"bam": 1, "txt": 1, "tsv": 1}
             else:
-                expected_files = {"txt": 1}
+                expected_files = {"txt": 1, "tsv": 1}
             validation_settings = deepcopy(VALIDATION_OPTIONS)
             validation_settings["modified_bases_enabled"] = True
 
@@ -273,16 +269,11 @@ class TestDorado(unittest.TestCase):
                         context.encountered_error()
                         self.fail(msg)
 
-                    dorado_errors = self.check_program_output(
+                    errors = self.check_program_output(
                         test_name, subfolder, expected_files, validation_settings
                     )
 
-                    summary_errors = self.check_program_output(
-                        test_name, subfolder, {"tsv": 1}, None
-                    )
-
-                    errors = "\n".join(filter(None, (dorado_errors, summary_errors)))
-                    if errors:
+                    if errors is not None:
                         # This indicates regression test failures due to file comparison and/or validation,
                         # but not due to an exception being thrown or the executable crashing.
                         self.fail(errors)

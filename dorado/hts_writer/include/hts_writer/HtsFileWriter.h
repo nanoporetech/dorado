@@ -62,7 +62,7 @@ protected:
 
     std::string m_gpu_names{};
 
-    void prepare_item(const HtsData& item) const;
+    void prepare_item(HtsData& item) const;
     virtual void handle(const HtsData& item) = 0;
     void update_stats(const HtsData& item);
 

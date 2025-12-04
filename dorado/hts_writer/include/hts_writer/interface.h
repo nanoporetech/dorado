@@ -11,7 +11,7 @@ class HtsData;
 
 namespace hts_writer {
 
-using Processable = std::variant<std::reference_wrapper<const HtsData>>;
+using Processable = std::variant<std::reference_wrapper<HtsData>>;
 
 template <typename Visitor>
 void dispatch_processable(const Processable& item, Visitor&& visitor) {
@@ -19,7 +19,7 @@ void dispatch_processable(const Processable& item, Visitor&& visitor) {
     std::visit(
             [&](auto ref_wrapper) {
                 using T = std::decay_t<decltype(ref_wrapper.get())>;
-                const T& data = ref_wrapper.get();
+                T& data = ref_wrapper.get();
                 visitor(data);
             },
             item);
