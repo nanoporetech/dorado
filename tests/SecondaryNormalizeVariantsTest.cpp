@@ -142,12 +142,17 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
 
         TestCase{
             "Haploid, edge case",
+            //0123456
+            //0122345
+            //0001000
+            //   ^
+            //   xxx
              "GCT*TTGTGGGCTGGA",
             {"GCTCGGGTGGGCTGGA"},
             {0, 1, 2, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
             {0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0,  0,  0,  0,  0,  0},
             Variant{0, 2, "TT", {"CGG"}, {}, {}, 50.0f, {}, 3, 6},
-            Variant{0, 3, "TT", {"CGG"}, {}, {}, 50.0f, {}, 3, 6},
+            Variant{0, 3, "TT", {"CGG"}, {}, {}, 50.0f, {}, 2, 6},
             false,
         },
 
@@ -268,7 +273,7 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
             },
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0},
             Variant{0, 43499195, "TTA", {"TTT", "TATA"}, {}, {}, 3.0f, {}, 5, 25},
-            Variant{0, 43499197, "TA", {"TT", "ATA"}, {}, {}, 3.0f, {}, 5, 25},
+            Variant{0, 43499197, "TA", {"TT", "ATA"}, {}, {}, 3.0f, {}, 4, 25},
             false,
         },
     }));
