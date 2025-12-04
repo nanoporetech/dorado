@@ -4,6 +4,7 @@
 #include "config/BatchParams.h"
 #include "dorado_version.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "torch_utils/auto_detect_device.h"
 
 #if DORADO_CUDA_BUILD
@@ -11,6 +12,7 @@
 #endif
 
 #include "utils/dev_utils.h"
+#include "utils/fs_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <htslib/sam.h>
@@ -19,6 +21,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <sstream>
@@ -211,6 +214,42 @@ inline std::string parse_device(const argparse::ArgumentParser& parser) {
     }
 
     return device;
+}
+
+inline std::vector<std::filesystem::path> collect_inputs(const std::string& input_folder,
+                                                         bool recursive) {
+    namespace fs = std::filesystem;
+    auto is_valid_input_file = [](const fs::path& input_path) -> bool {
+        HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
+        if (!hts_file) {
+            return false;
+        }
+
+        SamHdrPtr header(sam_hdr_read(hts_file.get()));
+        return header != nullptr;
+    };
+
+    if (input_folder.empty()) {
+        if (recursive) {
+            spdlog::warn("--recursive is not valid if input is stdin. This argument is ignored.");
+        }
+        return {fs::path("-")};
+    }
+
+    const auto all_files = utils::fetch_directory_entries(input_folder, recursive);
+
+    std::vector<fs::path> inputs;
+    inputs.reserve(all_files.size());
+    for (const fs::directory_entry& dir_entry : all_files) {
+        if (!is_valid_input_file(dir_entry.path())) {
+            continue;
+        }
+        inputs.push_back(dir_entry.path());
+    }
+
+    spdlog::trace("Collected {} valid input files from '{}'{}.", inputs.size(), input_folder,
+                  recursive ? " recursively" : "");
+    return inputs;
 }
 
 }  // namespace cli

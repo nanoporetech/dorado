@@ -10,7 +10,6 @@ endif()
 add_executable(dorado_tests
     AdapterDetectorTest.cpp
     AlignerTest.cpp
-    alignment_processing_items_test.cpp
     arg_parse_ext_test.cpp
     async_task_executor_test.cpp
     AsyncQueueTest.cpp

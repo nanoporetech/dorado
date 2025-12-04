@@ -1,6 +1,5 @@
 #include "ProgressTracker.h"
 #include "alignment/alignment_info.h"
-#include "alignment/alignment_processing_items.h"
 #include "alignment/minimap2_args.h"
 #include "basecall_output_args.h"
 #include "cli/cli.h"
@@ -211,7 +210,7 @@ int aligner(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    const auto all_files = alignment::collect_inputs(reads, recursive_input);
+    const auto all_files = cli::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
         spdlog::info("No input files found");
         return EXIT_SUCCESS;
