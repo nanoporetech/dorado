@@ -22,28 +22,19 @@ void add_sam_emit_type(argparse::ArgumentParser& parser) {
     parser.add_argument(EMIT_SAM_ARG).help("Output in SAM format.").flag();
 }
 
-void add_emit_summary(argparse::ArgumentParser& parser, bool requires_output_dir) {
-    std::string help_text(
-            "If specified, a summary file containing the details of the primary "
-            "alignments for each read will be emitted to the root of the --output-dir folder");
-    if (requires_output_dir) {
-        help_text.append(".");
-    } else {
-        help_text.append(" (or to the current working directory if --output-dir is not set).");
-    }
-    parser.add_argument(EMIT_SUMMARY_ARG).help(help_text).flag();
+const std::string emit_summary_help_text =
+        "If specified, a summary file containing the details of the primary "
+        "alignments for each read will be emitted to the root of the --output-dir folder.";
+
+argparse::Argument& add_emit_summary(argparse::ArgumentParser& parser) {
+    return parser.add_argument(EMIT_SUMMARY_ARG).help(emit_summary_help_text).flag();
 }
 
-void add_output_dir_argument(argparse::ArgumentParser& parser, bool required) {
-    auto& arg = parser.add_argument("-o", OUTPUT_DIR_ARG);
-    std::string help_text =
-            "Output folder which becomes the root of the nested output folder structure.";
-    if (required) {
-        arg.required();
-    } else {
-        help_text.append(" (Optional)");
-    }
-    arg.help(help_text);
+const std::string out_dir_help_text =
+        "Output folder which becomes the root of the nested output folder structure.";
+
+argparse::Argument& add_output_dir_argument(argparse::ArgumentParser& parser) {
+    return parser.add_argument("-o", OUTPUT_DIR_ARG).help(out_dir_help_text);
 }
 
 }  // namespace
@@ -52,22 +43,30 @@ void add_basecaller_output_arguments(argparse::ArgumentParser& parser, bool allo
     add_fastq_emit_type(parser);
     add_sam_emit_type(parser);
     if (allow_summary) {
-        add_emit_summary(parser, false);
+        auto& summary_arg = add_emit_summary(parser);
+        summary_arg.help(emit_summary_help_text +
+                         " If --output-dir is not set, the summary file is placed in the current "
+                         "working directory.");
     }
-    add_output_dir_argument(parser, false);
+    add_output_dir_argument(parser);
 }
 
 void add_demux_output_arguments(argparse::ArgumentParser& parser) {
     add_fastq_emit_type(parser);
     add_sam_emit_type(parser);
-    add_emit_summary(parser, true);
-    add_output_dir_argument(parser, true);
+    add_emit_summary(parser);
+
+    auto& out_dir_arg = add_output_dir_argument(parser);
+    out_dir_arg.required();
 }
 
 void add_aligner_output_arguments(argparse::ArgumentParser& parser) {
     add_sam_emit_type(parser);
-    add_emit_summary(parser, true);
-    add_output_dir_argument(parser, false);
+    add_emit_summary(parser);
+
+    auto& out_dir_arg = add_output_dir_argument(parser);
+    out_dir_arg.help(out_dir_help_text +
+                     " Required if the 'reads' positional argument is a folder.");
 }
 
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser) {
