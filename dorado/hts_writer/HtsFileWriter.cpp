@@ -57,7 +57,7 @@ void HtsFileWriter::update_stats(const HtsData &hts_data) {
     const bool is_unmapped = ((flags & BAM_FUNMAP) != 0);
     const bool is_secondary = (flags & BAM_FSECONDARY) != 0;
     const bool is_supplementary = (flags & BAM_FSUPPLEMENTARY) != 0;
-    const bool is_primary = !is_secondary && !is_supplementary;
+    const bool is_primary = !(is_unmapped || is_secondary || is_supplementary);
 
     atomic_increment(m_total_records_written);
     if (is_unmapped) {
