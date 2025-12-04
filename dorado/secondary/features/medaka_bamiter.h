@@ -18,6 +18,7 @@ struct HtslibMpileupData {
     int32_t tag_value = 0;
     bool keep_missing = false;
     const char* read_group = nullptr;
+    double min_snp_accuracy = 0.0;
 };
 
 /**

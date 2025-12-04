@@ -92,6 +92,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::string& read_group,
                                    const std::string& tag_name,
                                    const int32_t tag_value,
+                                   const double min_snp_accuracy,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
                                    const std::optional<secondary::HaplotagSource>& haptag_source,
@@ -177,9 +178,10 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
             std::max(num_bam_threads, static_cast<int32_t>(std::size(resources.models)));
     spdlog::info("Creating {} encoders.", max_num_encoders);
     for (int32_t i = 0; i < max_num_encoders; ++i) {
-        resources.encoders.emplace_back(encoder_factory(
-                model_config, in_ref_fn, in_aln_bam_fn, read_group, tag_name, tag_value, true,
-                tag_keep_missing_override, min_mapq_override, haptag_source, phasing_bin_fn));
+        resources.encoders.emplace_back(
+                encoder_factory(model_config, in_ref_fn, in_aln_bam_fn, read_group, tag_name,
+                                tag_value, true, min_snp_accuracy, tag_keep_missing_override,
+                                min_mapq_override, haptag_source, phasing_bin_fn));
     }
 
     spdlog::info("Creating the decoder.");

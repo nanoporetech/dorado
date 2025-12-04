@@ -107,6 +107,7 @@ struct Options {
     bool unphased = false;
 
     bool continue_on_error = false;
+    double min_snp_accuracy = 0.0;
 };
 
 /// \brief Define the CLI options.
@@ -263,6 +264,12 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Continue the process even if an exception is thrown. This "
                       "may leave some regions unprocessed.")
                 .flag();
+        parser.add_argument("--min-snp-acc")
+                .hidden()
+                .help("Filter alignments with SNP accuracy below this threshold in range [0.0, "
+                      "1.0].")
+                .default_value(0.0f)
+                .scan<'g', float>();
     }
 }
 
@@ -357,6 +364,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
                           : (opt.unphased)        ? secondary::HaplotagSource::UNPHASED
                                                   : secondary::HaplotagSource::COMPUTE;
 
+    opt.min_snp_accuracy = parser.get<float>("min-snp-acc");
+
     return opt;
 }
 
@@ -431,6 +440,12 @@ void validate_options(const Options& opt) {
         spdlog::error(
                 "Selected multiple haplotagging options (phasing-bin, hp-tag or unphased). Only "
                 "one is allowed.");
+        std::exit(EXIT_FAILURE);
+    }
+
+    if ((opt.min_snp_accuracy < 0.0) || (opt.min_snp_accuracy > 1.0)) {
+        spdlog::error("The --min-snp-acc value needs to be in range [0.0, 1.0]. Specified: '{}'.",
+                      opt.min_snp_accuracy);
         std::exit(EXIT_FAILURE);
     }
 }
@@ -1007,7 +1022,8 @@ int variant_caller(int argc, char* argv[]) {
                 model_config, opt.in_ref_fastx_fn, opt.in_aln_bam_fn, opt.device_str, opt.threads,
                 opt.infer_threads,
                 /*full_precision=*/true, opt.read_group, opt.tag_name, opt.tag_value,
-                opt.tag_keep_missing, opt.min_mapq, opt.haplotag_source, opt.phasing_bin_path);
+                opt.min_snp_accuracy, opt.tag_keep_missing, opt.min_mapq, opt.haplotag_source,
+                opt.phasing_bin_path);
 
         // Progress bar.
         secondary::Stats stats;
