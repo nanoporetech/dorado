@@ -356,7 +356,7 @@ class TestBasecallingSpeeds_kit14_30kbp(BasecallingSpeedTestCases, unittest.Test
 
     @property
     def standard_reads(self):
-        return "r10.4.1_5khz_30kbp.pod5"
+        return "r10.4.1_5khz_30kbp_unsorted.pod5"
 
     @property
     def suffix(self):

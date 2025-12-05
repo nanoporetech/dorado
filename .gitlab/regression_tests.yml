@@ -241,7 +241,7 @@ regression_test:windows:
     - mkdir regression_test_data
     - cd regression_test_data
     - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/r10.4.1_5khz_200bp.pod5 > r10.4.1_5khz_200bp.pod5
-    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/r10.4.1_5khz_30kbp.pod5 > r10.4.1_5khz_30kbp.pod5
+    - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/dorado/r10.4.1_5khz_30kbp_unsorted.pod5 > r10.4.1_5khz_30kbp_unsorted.pod5
     - curl -LfsS ${ARTIFACTORY_BENCHMARKING_DATA_URL}/humanGRCh38.mmi > humanGRCh38.mmi
     - export INPUT_FOLDER=${PWD}
     - cd -
