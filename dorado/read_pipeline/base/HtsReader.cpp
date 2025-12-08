@@ -4,6 +4,7 @@
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
+#include "utils/time_utils.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
@@ -156,6 +157,10 @@ std::size_t HtsReader::read(Pipeline& pipeline,
         }
 
         BamMessage bam_message{std::move(hts_data), m_client_info};
+        for (const auto& initialiser : m_read_initialisers) {
+            initialiser(*bam_message.data);
+        }
+
         pipeline.push_message(std::move(bam_message));
 
         ++num_reads;
