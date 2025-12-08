@@ -7,6 +7,7 @@
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <iomanip>
@@ -187,9 +188,20 @@ void SummaryFileWriter::init() {
     m_summary_stream << '\n';
 }
 
-void SummaryFileWriter::set_header(dorado::SamHdrSharedPtr header) {
+void SummaryFileWriter::set_shared_header(dorado::SamHdrSharedPtr header) {
+    if (m_dynamic_header != nullptr) {
+        throw std::logic_error("set_shared_header is incompatible with set_dynamic_header.");
+    }
     m_shared_header = std::move(header);
 }
+
+void SummaryFileWriter::set_dynamic_header(
+        const std::shared_ptr<utils::HeaderMapper::HeaderMap>& header_map) {
+    if (m_shared_header != nullptr) {
+        throw std::logic_error("set_dynamic_header is incompatible with set_shared_header.");
+    }
+    m_dynamic_header = header_map;
+};
 
 void SummaryFileWriter::process(const Processable item) {
     dispatch_processable(item, [this](const auto& t) { this->handle(t); });
@@ -331,7 +343,19 @@ void SummaryFileWriter::handle(const HtsData& data) const {
         int alignment_num_supplementary_alignments = 0;
 
         if (!(record->core.flag & BAM_FUNMAP)) {
-            alignment_genome = sam_hdr_tid2name(m_shared_header.get(), record->core.tid);
+            if (m_dynamic_header != nullptr) {
+                const auto& it = m_dynamic_header->find(data.read_attrs);
+                if (it == m_dynamic_header->cend()) {
+                    spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
+                                  utils::get_read_group_tag(data.bam_ptr.get()),
+                                  data.read_attrs.protocol_run_id);
+                    throw std::runtime_error("SummaryFileWriter - Failed to load dynamic header.");
+                }
+                alignment_genome =
+                        sam_hdr_tid2name(it->second->get_merged_header(), record->core.tid);
+            } else if (m_shared_header != nullptr) {
+                alignment_genome = sam_hdr_tid2name(m_shared_header.get(), record->core.tid);
+            }
             alignment_direction = bam_is_rev(record) ? "-" : "+";
             alignment_genome_start = int32_t(record->core.pos);
             alignment_genome_end = int32_t(bam_endpos(record));

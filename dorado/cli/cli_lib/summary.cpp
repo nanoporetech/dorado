@@ -223,7 +223,7 @@ int summary(int argc, char *argv[]) {
         }
 
         auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags);
-        summary_writer->set_header(shared_hdr);
+        summary_writer->set_shared_header(shared_hdr);
         writers.push_back(std::move(summary_writer));
     }
 
