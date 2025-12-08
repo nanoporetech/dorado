@@ -13,6 +13,8 @@
 #include <string>
 #include <unordered_map>
 
+struct sam_hdr_t;
+
 namespace dorado {
 class HtsData;
 
@@ -20,6 +22,7 @@ namespace hts_writer {
 
 class SummaryFileWriter : public IWriter {
 public:
+    using AlignmentCounts = std::unordered_map<std::string, std::array<int, 3>>;
     using FieldFlags = uint32_t;
     static constexpr FieldFlags BASECALLING_FIELDS = 1 << 0;
     static constexpr FieldFlags POLYA_FIELDS = 1 << 1;
@@ -28,7 +31,19 @@ public:
     static constexpr FieldFlags ALIGNMENT_FIELDS = 1 << 4;
     static constexpr FieldFlags DUPLEX_FIELDS = 1 << 5;
 
-    using AlignmentCounts = std::unordered_map<std::string, std::array<int, 3>>;
+    class ReadInitialiser {
+    public:
+        ReadInitialiser(sam_hdr_t* hdr, AlignmentCounts aln_counts);
+        void update_read_attributes(HtsData& data) const;
+        void update_barcoding_fields(HtsData& data) const;
+        void update_alignment_fields(HtsData& data) const;
+
+    private:
+        sam_hdr_t* m_header;
+        AlignmentCounts m_alignment_counts;
+        std::unordered_map<std::string, dorado::ReadGroup> m_read_groups;
+        int m_minimum_qscore;
+    };
 
     SummaryFileWriter(const std::filesystem::path& output_directory, FieldFlags flags);
     SummaryFileWriter(std::ostream& stream, FieldFlags flags);
@@ -55,6 +70,9 @@ private:
     std::ofstream m_summary_file;
     std::ostream& m_summary_stream;
 };
+
+void update_alignment_counts(const std::string& path,
+                             SummaryFileWriter::AlignmentCounts& alignment_counts);
 
 }  // namespace hts_writer
 }  // namespace dorado
