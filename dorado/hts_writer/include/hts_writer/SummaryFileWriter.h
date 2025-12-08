@@ -29,12 +29,8 @@ public:
 
     using AlignmentCounts = std::unordered_map<std::string, std::array<int, 3>>;
 
-    SummaryFileWriter(const std::filesystem::path& output_directory,
-                      FieldFlags flags,
-                      std::optional<AlignmentCounts> alignment_counts);
-    SummaryFileWriter(std::ostream& stream,
-                      FieldFlags flags,
-                      std::optional<AlignmentCounts> alignment_counts);
+    SummaryFileWriter(const std::filesystem::path& output_directory, FieldFlags flags);
+    SummaryFileWriter(std::ostream& stream, FieldFlags flags);
 
     void set_header(SamHdrSharedPtr header);
     void process(const Processable item) override;
@@ -48,11 +44,6 @@ private:
     void handle(const HtsData& item) const;
 
     SamHdrSharedPtr m_shared_header{nullptr};
-    std::unordered_map<std::string, dorado::ReadGroup> m_read_groups;
-    int m_minimum_qscore{0};
-
-    const std::optional<AlignmentCounts> m_alignment_counts;
-
     const FieldFlags m_field_flags;
     std::ofstream m_summary_file;
     std::ostream& m_summary_stream;

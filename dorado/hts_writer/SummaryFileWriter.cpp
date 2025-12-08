@@ -131,21 +131,15 @@ std::vector<T> get_array(bam1_t* record, const char* tagname) {
 namespace dorado::hts_writer {
 
 SummaryFileWriter::SummaryFileWriter(const std::filesystem::path& output_directory,
-                                     FieldFlags flags,
-                                     std::optional<AlignmentCounts> alignment_counts)
-        : m_alignment_counts(std::move(alignment_counts)),
-          m_field_flags(flags),
+                                     FieldFlags flags)
+        : m_field_flags(flags),
           m_summary_file(output_directory / "sequencing_summary.txt"),
           m_summary_stream(m_summary_file) {
     init();
 }
 
-SummaryFileWriter::SummaryFileWriter(std::ostream& stream,
-                                     FieldFlags flags,
-                                     std::optional<AlignmentCounts> alignment_counts)
-        : m_alignment_counts(std::move(alignment_counts)),
-          m_field_flags(flags),
-          m_summary_stream(stream) {
+SummaryFileWriter::SummaryFileWriter(std::ostream& stream, FieldFlags flags)
+        : m_field_flags(flags), m_summary_stream(stream) {
     init();
 }
 
