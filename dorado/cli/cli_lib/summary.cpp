@@ -29,18 +29,17 @@ namespace dorado {
 
 using AlignmentCounts = hts_writer::SummaryFileWriter::AlignmentCounts;
 namespace {
-std::optional<AlignmentCounts> get_alignment_counts(const std::string &path) {
+void update_alignment_counts(const std::string &path, AlignmentCounts &alignment_counts) {
     const auto file = dorado::HtsFilePtr(hts_open(path.c_str(), "r"));
     if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam) {
-        return std::nullopt;
+        return;
     }
 
     dorado::SamHdrPtr header(sam_hdr_read(file.get()));
     if (header->n_targets == 0) {
-        return std::nullopt;
+        return;
     }
 
-    AlignmentCounts alignment_counts;
     BamPtr record(bam_init1());
     while (sam_read1(file.get(), header.get(), record.get()) >= 0) {
         if (record->core.flag & BAM_FUNMAP) {
@@ -55,11 +54,6 @@ std::optional<AlignmentCounts> get_alignment_counts(const std::string &path) {
         }
         ++read_counts[0];
     }
-    if (alignment_counts.empty()) {
-        return std::nullopt;
-    }
-
-    return alignment_counts;
 }
 }  // namespace
 
@@ -95,143 +89,53 @@ int summary(int argc, char *argv[]) {
 
     auto reads(parser.get<std::string>("reads"));
 
-    std::optional<AlignmentCounts> alignment_counts;
-    if (!reads.empty()) {
-        if (!std::filesystem::exists(reads)) {
-            spdlog::error("Unable to open file '{}', no such file.", reads);
-            return EXIT_FAILURE;
-        }
-
-        if (std::filesystem::is_directory(reads)) {
-            spdlog::error("Failed to open file '{}', found a directory instead.", reads);
-            return EXIT_FAILURE;
-        }
-        alignment_counts = get_alignment_counts(reads);
-    } else if (utils::is_fd_tty(stdin)) {
-        // Only allow `reads` to be empty if we're accepting input from a pipe
+    // Only allow `reads` to be empty if we're accepting input from a pipe
+    if (reads.empty() && utils::is_fd_tty(stdin)) {
         std::cout << parser << '\n';
         return EXIT_FAILURE;
-    } else {
-        reads = "-";
     }
 
     const auto all_files = cli::collect_inputs(reads, parser.get<bool>("recursive"));
-    auto header_mapper = utils::HeaderMapper(all_files, false);
+    if (all_files.empty()) {
+        spdlog::info("No input files found");
+        return EXIT_SUCCESS;
+    }
 
-    HtsReader reader(reads, std::nullopt);
+    using namespace hts_writer;
+    SummaryFileWriter::FieldFlags flags =
+            SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
+    AlignmentCounts alignment_counts;
+    if (!(all_files.size() == 1 && all_files[0] == "-")) {
+        for (const auto &input_file : all_files) {
+            update_alignment_counts(input_file, alignment_counts);
+            HtsReader reader(input_file, std::nullopt);
+            if (reader.is_aligned) {
+                flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
+            }
+            auto command_line_cl =
+                    utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
+            // If dorado was run with --estimate-poly-a option, output polyA related fields in the summary
+            if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
+                flags |= SummaryFileWriter::POLYA_FIELDS;
+            }
 
-    auto command_line_cl =
-            utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
-    // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
-    int minimum_qscore = 0;
-    std::stringstream cl{command_line_cl["CL"]};
-    std::string out;
-    while (cl.good()) {
-        cl >> std::quoted(out);
-        if (out == "--min-qscore") {
-            cl >> std::quoted(out);
-            minimum_qscore = std::atoi(out.c_str());
-            break;
+            SamHdrSharedPtr shared_hdr(sam_hdr_dup(reader.header()));
+            auto hdr = const_cast<sam_hdr_t *>(shared_hdr.get());
+            int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
+            KString tag_wrapper(100000);
+            auto &tag_value = tag_wrapper.get();
+            for (int i = 0; i < num_rg_lines; ++i) {
+                if (sam_hdr_find_tag_pos(hdr, "RG", i, "SM", &tag_value) == 0) {
+                    flags |= SummaryFileWriter::BARCODING_FIELDS;
+                    break;
+                }
+            }
         }
     }
 
-    auto read_groups = utils::parse_read_groups(reader.header());
-
-    auto update_read_attributes = [groups = std::move(read_groups), minimum_qscore](HtsData &data) {
-        if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
-            const std::string rg_tag_value = bam_aux2Z(rg_tag);
-            const auto &read_group = groups.at(rg_tag_value);
-            data.read_attrs.protocol_run_id = read_group.run_id;
-            data.read_attrs.flowcell_id = read_group.flowcell_id;
-            data.read_attrs.experiment_id = read_group.experiment_id;
-            data.read_attrs.sample_id = read_group.sample_id;
-            data.read_attrs.position_id = read_group.position_id;
-            data.read_attrs.model_stride = read_group.model_stride;
-
-            if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
-                const float qscore = static_cast<float>(bam_aux2f(qs_tag));
-                data.read_attrs.is_status_pass = qscore >= minimum_qscore;
-            }
-
-            try {
-                if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
-                    const std::string read_start_time_str = bam_aux2Z(st_tag);
-                    const auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
-                            read_group.acq_start_time);
-                    const auto read_start_time =
-                            utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
-                    data.read_attrs.start_time_ms = read_start_time - acq_start_time;
-                }
-            } catch (...) {
-                // can't parse something, ignore start_time and continue
-            }
-        }
-    };
-
-    auto update_barcoding_fields = [hdr = reader.header()](HtsData &data) {
-        if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
-            const std::string rg_tag_value = bam_aux2Z(rg_tag);
-            KString ks_wrapper(100000);
-            auto &ks = ks_wrapper.get();
-
-            data.barcoding_result = std::make_shared<BarcodeScoreResult>();
-            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
-                data.barcoding_result->barcode_name = std::string(ks.s, ks.l);
-            }
-            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
-                data.barcoding_result->alias = std::string(ks.s, ks.l);
-            }
-            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
-                data.barcoding_result->kit = std::string(ks.s, ks.l);
-            }
-        }
-    };
-
-    auto update_alignment_fields = [counts_by_read = std::move(alignment_counts)](HtsData &data) {
-        if (counts_by_read.has_value()) {
-            const auto alignment_counts_it =
-                    counts_by_read->find(bam_get_qname(data.bam_ptr.get()));
-            if (alignment_counts_it != std::end(*counts_by_read)) {
-                const auto &counts = alignment_counts_it->second;
-                data.read_attrs.num_alignments = counts[0];
-                data.read_attrs.num_secondary_alignments = counts[1];
-                data.read_attrs.num_supplementary_alignments = counts[2];
-            }
-        }
-    };
-
-    reader.add_read_initialiser(std::move(update_read_attributes));
-
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
-        using namespace hts_writer;
-        SummaryFileWriter::FieldFlags flags =
-                SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
-        if (reader.is_aligned) {
-            flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
-            reader.add_read_initialiser(std::move(update_alignment_fields));
-        }
-
-        // If dorado was run with --estimate-poly-a option, output polyA related fields in the summary
-        if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
-            flags |= SummaryFileWriter::POLYA_FIELDS;
-        }
-
-        SamHdrSharedPtr shared_hdr(sam_hdr_dup(reader.header()));
-        auto hdr = const_cast<sam_hdr_t *>(shared_hdr.get());
-        int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
-        KString tag_wrapper(100000);
-        auto &tag_value = tag_wrapper.get();
-        for (int i = 0; i < num_rg_lines; ++i) {
-            if (sam_hdr_find_tag_pos(hdr, "RG", i, "SM", &tag_value) == 0) {
-                flags |= SummaryFileWriter::BARCODING_FIELDS;
-                reader.add_read_initialiser(std::move(update_barcoding_fields));
-                break;
-            }
-        }
-
         auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags);
-        summary_writer->set_shared_header(shared_hdr);
         writers.push_back(std::move(summary_writer));
     }
 
@@ -244,10 +148,105 @@ int summary(int argc, char *argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
+    auto header_mapper = utils::HeaderMapper(all_files, false);
     pipeline->get_node_ref<WriterNode>(writer_node)
             .set_dynamic_header(header_mapper.get_merged_headers_map());
 
-    reader.read(*pipeline, 0, false, nullptr, true);
+    for (const auto &input_file : all_files) {
+        HtsReader reader(input_file, std::nullopt);
+
+        auto command_line_cl =
+                utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
+        // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
+        int minimum_qscore = 0;
+        std::stringstream cl{command_line_cl["CL"]};
+        std::string out;
+        while (cl.good()) {
+            cl >> std::quoted(out);
+            if (out == "--min-qscore") {
+                cl >> std::quoted(out);
+                minimum_qscore = std::atoi(out.c_str());
+                break;
+            }
+        }
+
+        auto read_groups = utils::parse_read_groups(reader.header());
+
+        auto update_read_attributes = [groups = std::move(read_groups),
+                                       minimum_qscore](HtsData &data) {
+            if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+                const std::string rg_tag_value = bam_aux2Z(rg_tag);
+                const auto &read_group = groups.at(rg_tag_value);
+                data.read_attrs.protocol_run_id = read_group.run_id;
+                data.read_attrs.flowcell_id = read_group.flowcell_id;
+                data.read_attrs.experiment_id = read_group.experiment_id;
+                data.read_attrs.sample_id = read_group.sample_id;
+                data.read_attrs.position_id = read_group.position_id;
+                data.read_attrs.model_stride = read_group.model_stride;
+
+                if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
+                    const float qscore = static_cast<float>(bam_aux2f(qs_tag));
+                    data.read_attrs.is_status_pass = qscore >= minimum_qscore;
+                }
+
+                try {
+                    if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st");
+                        st_tag != nullptr) {
+                        const std::string read_start_time_str = bam_aux2Z(st_tag);
+                        const auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
+                                read_group.acq_start_time);
+                        const auto read_start_time =
+                                utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
+                        data.read_attrs.start_time_ms = read_start_time - acq_start_time;
+                    }
+                } catch (...) {
+                    // can't parse something, ignore start_time and continue
+                }
+            }
+        };
+
+        auto update_barcoding_fields = [hdr = reader.header()](HtsData &data) {
+            if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+                const std::string rg_tag_value = bam_aux2Z(rg_tag);
+                KString ks_wrapper(100000);
+                auto &ks = ks_wrapper.get();
+
+                data.barcoding_result = std::make_shared<BarcodeScoreResult>();
+                if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
+                    data.barcoding_result->barcode_name = std::string(ks.s, ks.l);
+                }
+                if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
+                    data.barcoding_result->alias = std::string(ks.s, ks.l);
+                }
+                if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
+                    data.barcoding_result->kit = std::string(ks.s, ks.l);
+                }
+            }
+        };
+
+        auto update_alignment_fields = [counts_by_read =
+                                                std::move(alignment_counts)](HtsData &data) {
+            const auto alignment_counts_it = counts_by_read.find(bam_get_qname(data.bam_ptr.get()));
+            if (alignment_counts_it != std::end(counts_by_read)) {
+                const auto &counts = alignment_counts_it->second;
+                data.read_attrs.num_alignments = counts[0];
+                data.read_attrs.num_secondary_alignments = counts[1];
+                data.read_attrs.num_supplementary_alignments = counts[2];
+            }
+        };
+
+        reader.add_read_initialiser(std::move(update_read_attributes));
+
+        if (flags & SummaryFileWriter::ALIGNMENT_FIELDS) {
+            reader.add_read_initialiser(std::move(update_alignment_fields));
+        }
+
+        if (flags & SummaryFileWriter::BARCODING_FIELDS) {
+            reader.add_read_initialiser(std::move(update_barcoding_fields));
+        }
+
+        reader.read(*pipeline, 0, false, nullptr, true);
+    }
     pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
     return EXIT_SUCCESS;
