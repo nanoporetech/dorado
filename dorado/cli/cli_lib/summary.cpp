@@ -1,7 +1,9 @@
 #include "summary/summary.h"
 
 #include "cli/cli.h"
+#include "cli/utils/cli_utils.h"
 #include "dorado_version.h"
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
@@ -74,7 +76,10 @@ int summary(int argc, char *argv[]) {
             .flag()
             .action([&](const auto &) { ++verbosity; })
             .append();
-
+    parser.add_argument("-r", "--recursive")
+            .help("If the 'reads' positional argument is a folder any subfolders will also be "
+                  "searched for input files.")
+            .flag();
     try {
         parser.parse_args(argc, argv);
     } catch (const std::exception &e) {
@@ -109,6 +114,9 @@ int summary(int argc, char *argv[]) {
     } else {
         reads = "-";
     }
+
+    const auto all_files = cli::collect_inputs(reads, parser.get<bool>("recursive"));
+    auto header_mapper = utils::HeaderMapper(all_files, false);
 
     HtsReader reader(reads, std::nullopt);
 
@@ -228,13 +236,16 @@ int summary(int argc, char *argv[]) {
     }
 
     PipelineDescriptor pipeline_desc;
-    pipeline_desc.add_node<WriterNode>({}, std::move(writers));
+    auto writer_node = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
 
     auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
     if (pipeline == nullptr) {
         spdlog::error("Failed to create pipeline");
         std::exit(EXIT_FAILURE);
     }
+
+    pipeline->get_node_ref<WriterNode>(writer_node)
+            .set_dynamic_header(header_mapper.get_merged_headers_map());
 
     reader.read(*pipeline, 0, false, nullptr, true);
     pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
