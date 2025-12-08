@@ -172,6 +172,8 @@ std::size_t HtsReader::read(Pipeline& pipeline,
 
 sam_hdr_t* HtsReader::header() { return m_header; }
 
+const sam_hdr_t* HtsReader::header() const { return m_header; }
+
 const std::string& HtsReader::format() const { return m_format; }
 
 ReadMap read_bam(const std::string& filename, const std::unordered_set<std::string>& read_ids) {
