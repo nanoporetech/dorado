@@ -45,7 +45,6 @@ public:
 
 private:
     void init();
-    void prepare_item(HtsData& data);
     void handle(const HtsData& item) const;
 
     SamHdrSharedPtr m_shared_header{nullptr};

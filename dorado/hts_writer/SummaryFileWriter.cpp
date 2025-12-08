@@ -194,88 +194,11 @@ void SummaryFileWriter::init() {
 }
 
 void SummaryFileWriter::set_header(dorado::SamHdrSharedPtr header) {
-    auto hdr = const_cast<sam_hdr_t*>(header.get());
-    m_read_groups = utils::parse_read_groups(hdr);
-
-    auto command_line_cl = utils::extract_pg_keys_from_hdr(hdr, {"CL"}, "ID", "basecaller");
-    // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
-    std::stringstream cl{command_line_cl["CL"]};
-    std::string out;
-    while (cl.good()) {
-        cl >> std::quoted(out);
-        if (out == "--min-qscore") {
-            cl >> std::quoted(out);
-            m_minimum_qscore = std::atoi(out.c_str());
-            break;
-        }
-    }
     m_shared_header = std::move(header);
 }
 
 void SummaryFileWriter::process(const Processable item) {
-    dispatch_processable(item, [this](auto& t) { this->prepare_item(t); });
     dispatch_processable(item, [this](const auto& t) { this->handle(t); });
-}
-
-void SummaryFileWriter::prepare_item(HtsData& data) {
-    if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
-        const std::string rg_tag_value = bam_aux2Z(rg_tag);
-        if (data.read_attrs == HtsData::ReadAttributes{}) {
-            const auto& read_group = m_read_groups.at(rg_tag_value);
-            data.read_attrs.protocol_run_id = read_group.run_id;
-            data.read_attrs.flowcell_id = read_group.flowcell_id;
-            data.read_attrs.experiment_id = read_group.experiment_id;
-            data.read_attrs.sample_id = read_group.sample_id;
-            data.read_attrs.position_id = read_group.position_id;
-            data.read_attrs.model_stride = read_group.model_stride;
-
-            if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
-                const float qscore = static_cast<float>(bam_aux2f(qs_tag));
-                data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
-            }
-
-            try {
-                if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
-                    const std::string read_start_time_str = bam_aux2Z(st_tag);
-                    const auto acq_start_time = utils::get_unix_time_ms_from_string_timestamp(
-                            read_group.acq_start_time);
-                    const auto read_start_time =
-                            utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
-                    data.read_attrs.start_time_ms = read_start_time - acq_start_time;
-                }
-            } catch (...) {
-                // can't parse something, ignore start_time and continue
-            }
-        }
-
-        if ((m_field_flags & BARCODING_FIELDS) && !data.barcoding_result) {
-            KString ks_wrapper(100000);
-            auto& ks = ks_wrapper.get();
-            auto hdr = const_cast<sam_hdr_t*>(m_shared_header.get());
-
-            data.barcoding_result = std::make_shared<BarcodeScoreResult>();
-            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
-                data.barcoding_result->barcode_name = std::string(ks.s, ks.l);
-            }
-            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
-                data.barcoding_result->alias = std::string(ks.s, ks.l);
-            }
-            if (sam_hdr_find_tag_id(hdr, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
-                data.barcoding_result->kit = std::string(ks.s, ks.l);
-            }
-        }
-
-        if ((m_field_flags & ALIGNMENT_FIELDS) && m_alignment_counts.has_value()) {
-            const auto alignment_counts_it =
-                    m_alignment_counts->find(bam_get_qname(data.bam_ptr.get()));
-            if (alignment_counts_it != std::end(*m_alignment_counts)) {
-                const auto& alignment_counts = alignment_counts_it->second;
-                data.read_attrs.num_alignments = alignment_counts[0];
-                data.read_attrs.num_secondary_alignments = alignment_counts[1];
-                data.read_attrs.num_supplementary_alignments = alignment_counts[2];
-            }
-        }
-    }
 }
 
 void SummaryFileWriter::handle(const HtsData& data) const {
