@@ -141,14 +141,15 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
 {
     set +e
     echo "Testing split read without '--disable-read-splitting'"
-    $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read > $output_dir/calls.bam
+    mkdir -p $output_dir/read_splitting
+    $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read > $output_dir/read_splitting/calls.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-        num_sam_records=$(samtools view $output_dir/calls.bam | wc -l | awk '{print $1}')
+        num_sam_records=$(samtools view $output_dir/read_splitting/calls.bam | wc -l | awk '{print $1}')
         if [[ $num_sam_records -ne "2" ]]; then
             echo "Expected 2 sam records from 1 split read but found: ${num_sam_records}"
             exit 1
         fi
-        num_unique_parents=$(samtools view $output_dir/calls.bam | grep "pi:Z:[^\s]*" -oh | uniq | wc -l | awk '{print $1}')
+        num_unique_parents=$(samtools view $output_dir/read_splitting/calls.bam | grep "pi:Z:[^\s]*" -oh | uniq | wc -l | awk '{print $1}')
         if [[ $num_unique_parents -ne "1" ]]; then
             echo "Expected 1 unique parent read id in 'pi:Z' tag but found: ${num_unique_parents}"
             exit 1
@@ -156,14 +157,14 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
     fi
 
     echo "Testing split read with '--disable-read-splitting'"
-    $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read --disable-read-splitting > $output_dir/calls.bam
+    $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read --disable-read-splitting > $output_dir/read_splitting/calls-no-split.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-        num_sam_records=$(samtools view $output_dir/calls.bam | wc -l | awk '{print $1}')
+        num_sam_records=$(samtools view $output_dir/read_splitting/calls-no-split.bam | wc -l | awk '{print $1}')
         if [[ $num_sam_records -ne "1" ]]; then
             echo "Expected 1 sam records from 1 unsplit read with '--disable-read-splitting' but found: ${num_sam_records}"
             exit 1
         fi
-        num_parent_tags=$(samtools view $output_dir/calls.bam | grep "pi:Z:[^\s]*" -oh | wc -l | awk '{print $1}')
+        num_parent_tags=$(samtools view $output_dir/read_splitting/calls-no-split.bam | grep "pi:Z:[^\s]*" -oh | wc -l | awk '{print $1}')
         if [[ $num_parent_tags -ne "0" ]]; then
             echo "Expected 0 instances of 'pi:Z' tag with '--disable-read-splitting' but found: ${num_parent_tags}"
             exit 1
@@ -173,8 +174,8 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
 }
 
 echo dorado summary test stage
-$dorado_bin summary $output_dir/calls.bam > /dev/null
-$dorado_bin summary -r $output_dir > /dev/null
+$dorado_bin summary $output_dir/read_splitting/calls.bam > /dev/null
+$dorado_bin summary -r $output_dir/read_splitting > /dev/null
 $dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} | $dorado_bin summary > /dev/null
 set +e
 if $dorado_bin summary $output_dir/not_a_real_file.txt; then
