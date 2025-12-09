@@ -10,6 +10,7 @@
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
+#include "hts_writer/SummaryFileWriter.h"
 #include "hts_writer/interface.h"
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
@@ -17,14 +18,13 @@
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
-#include "summary/summary.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
+#include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 
 #include <minimap.h>
 #include <spdlog/spdlog.h>
-#include <utils/string_utils.h>
 
 #include <chrono>
 #include <filesystem>
@@ -183,10 +183,6 @@ int aligner(int argc, char* argv[]) {
     const auto sort_requested = !parser.get<bool>("--no-sort");
     const auto emit_sam = cli::get_emit_sam(parser);
     const auto emit_summary = cli::get_emit_summary(parser);
-    if (emit_summary && !output_dir.has_value()) {
-        spdlog::error("Cannot specify '--emit-summary' if '--output-dir' is not also specified.");
-        return EXIT_FAILURE;
-    }
 
     auto threads(parser.get<int>("threads"));
     std::size_t max_reads(parser.get<int>("max-reads"));
@@ -300,6 +296,18 @@ int aligner(int argc, char* argv[]) {
         writers.push_back(std::move(hts_file_writer));
     }
 
+    hts_writer::SummaryFileWriter::AlignmentCounts alignment_counts;
+    hts_writer::SummaryFileWriter::FieldFlags flags;
+    if (emit_summary) {
+        std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
+        flags |= hts_writer::SummaryFileWriter::ALIGNMENT_FIELDS;
+        auto summary_output = output_dir.has_value() ? std::filesystem::path(output_dir.value())
+                                                     : std::filesystem::current_path();
+        auto summary_writer =
+                std::make_unique<hts_writer::SummaryFileWriter>(summary_output, flags);
+        writers.push_back(std::move(summary_writer));
+    }
+
     PipelineDescriptor pipeline_desc;
     auto writer_node = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
     auto aligner_node = pipeline_desc.add_node<AlignerNode>(
@@ -359,6 +367,22 @@ int aligner(int argc, char* argv[]) {
     for (const auto& file_info : all_files) {
         spdlog::info("processing '{}'", file_info.string());
         HtsReader reader(file_info.string(), std::nullopt);
+        if (emit_summary) {
+            auto read_initialiser =
+                    std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
+                            reader.header(), alignment_counts);
+            reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                read_initialiser->update_read_attributes(data);
+            });
+            if (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS) {
+                reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                    read_initialiser->update_barcoding_fields(data);
+                });
+            }
+            reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                read_initialiser->update_alignment_fields(data);
+            });
+        }
         reader.set_client_info(client_info);
         spdlog::debug("> input:'{}' fmt:'{}' aligned:'{}'", file_info.filename().string(),
                       reader.format(), reader.is_aligned);
@@ -386,15 +410,6 @@ int aligner(int argc, char* argv[]) {
 
     spdlog::info("> finished alignment");
     tracker.summarize();
-
-    if (emit_summary) {
-        spdlog::info("> generating summary file");
-        SummaryData summary(SummaryData::ALIGNMENT_FIELDS);
-        auto summary_file = std::filesystem::path(output_dir.value()) / "alignment_summary.txt";
-        std::ofstream summary_out(summary_file.string());
-        summary.process_tree(output_dir.value(), summary_out);
-        spdlog::info("> summary file complete.");
-    }
 
     return EXIT_SUCCESS;
 }
