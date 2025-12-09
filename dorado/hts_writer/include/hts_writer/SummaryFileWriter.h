@@ -71,7 +71,7 @@ private:
     std::ostream& m_summary_stream;
 };
 
-void update_alignment_counts(const std::string& path,
+void update_alignment_counts(const std::filesystem::path& path,
                              SummaryFileWriter::AlignmentCounts& alignment_counts);
 
 }  // namespace hts_writer

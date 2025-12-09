@@ -266,7 +266,7 @@ make_summary_info(const std::vector<std::filesystem::path>& all_files) {
     if (!(all_files.size() == 1 && all_files[0] == "-")) {
         for (const auto& input_file : all_files) {
             update_alignment_counts(input_file, alignment_counts);
-            HtsReader reader(input_file, std::nullopt);
+            HtsReader reader(input_file.string(), std::nullopt);
             if (reader.is_aligned) {
                 flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
             }

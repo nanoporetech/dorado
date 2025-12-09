@@ -515,9 +515,9 @@ void SummaryFileWriter::ReadInitialiser::update_alignment_fields(HtsData& data) 
     }
 }
 
-void update_alignment_counts(const std::string& path,
+void update_alignment_counts(const std::filesystem::path& path,
                              SummaryFileWriter::AlignmentCounts& alignment_counts) {
-    const auto file = dorado::HtsFilePtr(hts_open(path.c_str(), "r"));
+    const auto file = dorado::HtsFilePtr(hts_open(path.string().c_str(), "r"));
     if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam) {
         return;
     }
