@@ -8,6 +8,7 @@
 #include "hts_utils/HeaderMapper.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_writer/HtsFileWriterBuilder.h"
+#include "hts_writer/SummaryFileWriter.h"
 #include "hts_writer/interface.h"
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
@@ -16,7 +17,6 @@
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
-#include "summary/summary.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/barcode_kits.h"
@@ -253,6 +253,15 @@ int demuxer(int argc, char* argv[]) {
         writers.push_back(std::move(hts_file_writer));
     }
 
+    hts_writer::SummaryFileWriter::AlignmentCounts alignment_counts;
+    hts_writer::SummaryFileWriter::FieldFlags flags;
+    if (emit_summary) {
+        std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
+        flags |= hts_writer::SummaryFileWriter::BARCODING_FIELDS;
+        auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(output_dir, flags);
+        writers.push_back(std::move(summary_writer));
+    }
+
     auto client_info = std::make_shared<DefaultClientInfo>();
 
     PipelineDescriptor pipeline_desc;
@@ -329,6 +338,22 @@ int demuxer(int argc, char* argv[]) {
     spdlog::info("> starting barcode demuxing");
     for (const auto& input : all_files) {
         HtsReader reader(input.string(), read_list);
+        if (emit_summary) {
+            auto read_initialiser =
+                    std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
+                            reader.header(), alignment_counts);
+            reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                read_initialiser->update_read_attributes(data);
+            });
+            reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                read_initialiser->update_barcoding_fields(data);
+            });
+            if (flags & hts_writer::SummaryFileWriter::ALIGNMENT_FIELDS) {
+                reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                    read_initialiser->update_alignment_fields(data);
+                });
+            }
+        }
         reader.set_client_info(client_info);
 
         const auto num_reads_in_file =
@@ -352,14 +377,6 @@ int demuxer(int argc, char* argv[]) {
     progress_stats.report_final_stats();
 
     spdlog::info("> finished barcode demuxing");
-    if (emit_summary) {
-        spdlog::info("> generating summary file");
-        SummaryData summary(SummaryData::BARCODING_FIELDS);
-        auto summary_file = std::filesystem::path(output_dir) / "barcoding_summary.txt";
-        std::ofstream summary_out(summary_file.string());
-        summary.process_tree(output_dir, summary_out);
-        spdlog::info("> summary file complete.");
-    }
 
     return EXIT_SUCCESS;
 }
