@@ -72,38 +72,7 @@ int summary(int argc, char *argv[]) {
         return EXIT_SUCCESS;
     }
 
-    using namespace hts_writer;
-    SummaryFileWriter::FieldFlags flags =
-            SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
-    AlignmentCounts alignment_counts;
-    if (!(all_files.size() == 1 && all_files[0] == "-")) {
-        for (const auto &input_file : all_files) {
-            update_alignment_counts(input_file, alignment_counts);
-            HtsReader reader(input_file, std::nullopt);
-            if (reader.is_aligned) {
-                flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
-            }
-            auto command_line_cl =
-                    utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
-            // If dorado was run with --estimate-poly-a option, output polyA related fields in the summary
-            if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
-                flags |= SummaryFileWriter::POLYA_FIELDS;
-            }
-
-            SamHdrSharedPtr shared_hdr(sam_hdr_dup(reader.header()));
-            auto hdr = const_cast<sam_hdr_t *>(shared_hdr.get());
-            int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
-            KString tag_wrapper(100000);
-            auto &tag_value = tag_wrapper.get();
-            for (int i = 0; i < num_rg_lines; ++i) {
-                if (sam_hdr_find_tag_pos(hdr, "RG", i, "SM", &tag_value) == 0) {
-                    flags |= SummaryFileWriter::BARCODING_FIELDS;
-                    break;
-                }
-            }
-        }
-    }
-
+    auto [flags, alignment_counts] = cli::make_summary_info(all_files);
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
         auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(std::cout, flags);
@@ -123,6 +92,7 @@ int summary(int argc, char *argv[]) {
     pipeline->get_node_ref<WriterNode>(writer_node)
             .set_dynamic_header(header_mapper.get_merged_headers_map());
 
+    using namespace hts_writer;
     for (const auto &input_file : all_files) {
         HtsReader reader(input_file, std::nullopt);
         SummaryFileWriter::ReadInitialiser read_initialiser(reader.header(), alignment_counts);
