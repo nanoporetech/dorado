@@ -506,7 +506,7 @@ fi
 
 echo dorado aligner output directory test stage
 $dorado_bin aligner $data_dir/aligner_test/basecall_target.fa $data_dir/aligner_test/basecall.sam --output-dir $output_dir/aligned --emit-summary
-num_summary_lines=$(wc -l < $output_dir/aligned/alignment_summary.txt)
+num_summary_lines=$(wc -l < $output_dir/aligned/sequencing_summary.txt)
 if [[ $num_summary_lines -ne "2" ]]; then
     echo "2 lines in summary expected. Found ${num_summary_lines}"
     exit 1
