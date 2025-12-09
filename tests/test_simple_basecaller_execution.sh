@@ -552,7 +552,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     expected_path="$output_dir/demux_from_folder/no_sample/19700101_0000_0_UNKNOWN_00000000/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
     samtools quickcheck -u $expected_path
 fi
-num_summary_lines=$(wc -l < $output_dir/demux/barcoding_summary.txt)
+num_summary_lines=$(wc -l < $output_dir/demux/sequencing_summary.txt)
 if [[ $num_summary_lines -ne "4" ]]; then
     echo "4 lines in summary expected. Found ${num_summary_lines}"
     exit 1
