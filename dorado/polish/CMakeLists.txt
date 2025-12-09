@@ -14,6 +14,7 @@ dorado_add_library(
         cxxpool
         dorado_hts_utils
         dorado_torch_utils
+        intervaltree
         htslib
         spdlog::spdlog
 )

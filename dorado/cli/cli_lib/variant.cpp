@@ -30,6 +30,7 @@
 
 #include <ATen/Parallel.h>
 #include <ATen/autocast_mode.h>
+#include <IntervalTree.h>
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
@@ -82,6 +83,7 @@ struct Options {
     int64_t encoding_batch_size = 0;
     int32_t window_len = 10000;
     int32_t window_overlap = 1000;
+    int32_t variant_flanking_bases = 100;
     int32_t bam_chunk = 1'000'000;
     int32_t bam_subchunk = 100'000;
     std::optional<std::string> regions_str;
@@ -103,6 +105,7 @@ struct Options {
 
     secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
     std::optional<std::filesystem::path> phasing_bin_path;
+    std::optional<std::filesystem::path> candidate_variants_path;
     bool hp_tag_from_bam = false;
     bool unphased = false;
 
@@ -270,6 +273,15 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                       "1.0].")
                 .default_value(0.0f)
                 .scan<'g', float>();
+        parser.add_argument("--candidates")
+                .hidden()
+                .help("Path to a tab-separated file containing coordinates of variant candidate "
+                      "sites to process.");
+        parser.add_argument("--variant-flanking-bases")
+                .hidden()
+                .help("Minimum number of flanking bases in samples around candidate variants.")
+                .default_value(100)
+                .scan<'i', int>();
     }
 }
 
@@ -319,6 +331,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.encoding_batch_size = (encoding_batch_size == 0) ? opt.threads : encoding_batch_size;
 
     opt.window_len = parser.get<int>("window-len");
+    opt.variant_flanking_bases = parser.get<int>("variant-flanking-bases");
     opt.window_overlap = parser.get<int>("window-overlap");
     opt.bam_chunk = parser.get<int>("bam-chunk");
     opt.bam_subchunk = parser.get<int>("bam-subchunk");
@@ -357,6 +370,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
     opt.phasing_bin_path = parser.present<std::string>("phasing-bin");
+    opt.candidate_variants_path = parser.present<std::string>("candidates");
     opt.hp_tag_from_bam = parser.get<bool>("hp-tag");
     opt.unphased = parser.get<bool>("unphased");
     opt.haplotag_source = (opt.phasing_bin_path)  ? secondary::HaplotagSource::BIN_FILE
@@ -394,6 +408,11 @@ void validate_options(const Options& opt) {
     }
     if (opt.window_len <= 0) {
         spdlog::error("Window size should be > 0. Given: {}.", opt.window_len);
+        std::exit(EXIT_FAILURE);
+    }
+    if (opt.variant_flanking_bases < 0) {
+        spdlog::error("Variant flanking bases should be >= 0. Given: {}.",
+                      opt.variant_flanking_bases);
         std::exit(EXIT_FAILURE);
     }
     if (opt.bam_chunk <= 0) {
@@ -446,6 +465,11 @@ void validate_options(const Options& opt) {
     if ((opt.min_snp_accuracy < 0.0) || (opt.min_snp_accuracy > 1.0)) {
         spdlog::error("The --min-snp-acc value needs to be in range [0.0, 1.0]. Specified: '{}'.",
                       opt.min_snp_accuracy);
+    }
+
+    if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
+        spdlog::error("Candidate site file {} does not exist.",
+                      opt.candidate_variants_path->string());
         std::exit(EXIT_FAILURE);
     }
 }
@@ -660,6 +684,52 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     return model_config;
 }
 
+std::unordered_map<std::string, std::vector<int64_t>> load_candidate_sites(
+        const std::optional<std::filesystem::path>& candidate_variants_path) {
+    if (!candidate_variants_path) {
+        return {};
+    }
+    std::unordered_map<std::string, std::vector<int64_t>> ret;
+    std::ifstream ifs(*candidate_variants_path);
+    std::string line;
+    while (std::getline(ifs, line)) {
+        std::istringstream iss(line);
+        std::string chr;
+        int64_t pos = 0;
+        iss >> chr >> pos;
+        ret[chr].emplace_back(pos);
+    }
+    for (auto& [chr, positions] : ret) {
+        std::sort(std::begin(positions), std::end(positions));
+    }
+    return ret;
+}
+
+std::optional<std::unordered_map<int32_t, polisher::IntervalTreeInt64>>
+create_candidate_interval_trees(
+        const std::unordered_map<std::string, std::vector<int64_t>>& candidate_sites,
+        const std::unordered_map<std::string, std::pair<int64_t, int64_t>>& draft_lookup) {
+    std::unordered_map<int32_t, polisher::IntervalTreeInt64> trees;
+    for (const auto& [ref_name, positions] : candidate_sites) {
+        const auto it = draft_lookup.find(ref_name);
+        if (it == std::cend(draft_lookup)) {
+            spdlog::warn(
+                    "Candidate variant reference name '{}' not found in the input reference file! "
+                    "Skipping candidates for this reference.",
+                    ref_name);
+            continue;
+        }
+        const int32_t seq_id = static_cast<int32_t>(it->second.first);
+        std::vector<interval_tree::Interval<int64_t, int64_t>> intervals;
+        for (const int64_t pos : positions) {
+            intervals.emplace_back(pos, pos + 1, 0);
+        }
+        trees[seq_id] = polisher::IntervalTreeInt64(std::move(intervals));
+    }
+    return std::optional<std::unordered_map<int32_t, polisher::IntervalTreeInt64>>(
+            std::move(trees));
+}
+
 void run_variant_calling(const Options& opt,
                          polisher::PolisherResources& resources,
                          variant::VariantProgressTracker& tracker,
@@ -689,6 +759,16 @@ void run_variant_calling(const Options& opt,
     }
 
     secondary::validate_regions(opt.regions, draft_lens);
+
+    // Parse candidate variant regions if a candidate file path was provided.
+    const std::unordered_map<std::string, std::vector<int64_t>> candidate_sites =
+            load_candidate_sites(opt.candidate_variants_path);
+
+    // Create interval trees from candidate variant locations.
+    const std::optional<polisher::IntervalTreesInt64Map> candidate_trees =
+            opt.candidate_variants_path
+                    ? create_candidate_interval_trees(candidate_sites, draft_lookup)
+                    : std::nullopt;
 
     // Open the draft FASTA file. One reader per thread.
     std::vector<std::unique_ptr<hts_io::FastxRandomReader>> draft_readers;
@@ -850,13 +930,14 @@ void run_variant_calling(const Options& opt,
 
                 // Create a thread for the sample producer.
                 polisher::WorkerReturnStatus wrs_sample_producer;
-                auto thread_sample_producer =
-                        utils::jthread([&resources, &bam_regions, &draft_lens, &opt, &usable_mem,
-                                        &batch_queue, &worker_terminate, &wrs_sample_producer] {
+                auto thread_sample_producer = utils::jthread(
+                        [&resources, &bam_regions, &draft_lens, &candidate_trees, &opt, &usable_mem,
+                         &batch_queue, &worker_terminate, &wrs_sample_producer] {
                             utils::set_thread_name("variant_produce");
                             polisher::sample_producer(
-                                    resources, bam_regions, draft_lens, opt.threads, opt.batch_size,
-                                    opt.encoding_batch_size, opt.window_len, opt.window_overlap,
+                                    resources, bam_regions, draft_lens, candidate_trees,
+                                    opt.threads, opt.batch_size, opt.encoding_batch_size,
+                                    opt.window_len, opt.window_overlap, opt.variant_flanking_bases,
                                     opt.bam_subchunk, usable_mem, opt.continue_on_error,
                                     batch_queue, worker_terminate, wrs_sample_producer);
                         });

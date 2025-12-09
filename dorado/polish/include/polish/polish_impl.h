@@ -18,10 +18,13 @@
 #include "utils/stats.h"
 #include "utils/timer_high_res.h"
 
+#include <IntervalTree.h>
+
 #include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -31,6 +34,9 @@ class FastxRandomReader;
 }  // namespace dorado::hts_io
 
 namespace dorado::polisher {
+
+using IntervalTreeInt64 = interval_tree::IntervalTree<int64_t, int64_t>;
+using IntervalTreesInt64Map = std::unordered_map<int32_t, IntervalTreeInt64>;
 
 enum class DeviceType { CPU, CUDA, METAL, UNKNOWN };
 
@@ -162,11 +168,13 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                     const std::optional<IntervalTreesInt64Map>& candidate_trees,
                      int32_t num_threads,
                      int32_t batch_size,
                      int32_t encoding_batch_size,
                      int32_t window_len,
                      int32_t window_overlap,
+                     int32_t variant_flanking_bases,
                      int32_t bam_subchunk_len,
                      double max_available_mem,
                      bool continue_on_exception,
