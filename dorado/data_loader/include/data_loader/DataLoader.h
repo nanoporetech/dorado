@@ -67,6 +67,7 @@ private:
 
     void load_reads_by_channel(const std::vector<std::filesystem::directory_entry>& files);
     void load_reads_unrestricted(const std::vector<std::filesystem::directory_entry>& files);
+    void wait_and_process_futures(std::vector<std::future<SimplexReadPtr>> futures);
 
     void initialise_read(ReadCommon& read) const;
 

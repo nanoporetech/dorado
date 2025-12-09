@@ -508,22 +508,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
             }));
         }
 
-        for (auto& v : futures) {
-            auto read = v.get();
-            if (!read) {
-                // This was either a POD5 error, in which case the worker logged
-                // an error, or a filtered read.
-                continue;
-            }
-            initialise_read(read->read_common);
-            check_read(read);
-            if (!m_pipeline.is_running()) {
-                m_stop_loading.store(true);
-                break;
-            }
-            m_pipeline.push_message(std::move(read));
-            m_loaded_read_count++;
-        }
+        wait_and_process_futures(std::move(futures));
 
         row_offset += traversal_batch_counts[batch_index];
     }
@@ -581,22 +566,26 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             }));
         }
 
-        for (auto& v : futures) {
-            auto read = v.get();
-            if (!read) {
-                // This was either a POD5 error, in which case the worker logged
-                // an error, or a filtered read.
-                continue;
-            }
-            initialise_read(read->read_common);
-            check_read(read);
-            if (!m_pipeline.is_running()) {
-                m_stop_loading.store(true);
-                break;
-            }
-            m_pipeline.push_message(std::move(read));
-            m_loaded_read_count++;
+        wait_and_process_futures(std::move(futures));
+    }
+}
+
+void DataLoader::wait_and_process_futures(std::vector<std::future<SimplexReadPtr>> futures) {
+    for (auto& v : futures) {
+        auto read = v.get();
+        if (!read) {
+            // This was either a POD5 error, in which case the worker logged
+            // an error, or a filtered read.
+            continue;
         }
+        initialise_read(read->read_common);
+        check_read(read);
+        if (!m_pipeline.is_running()) {
+            m_stop_loading.store(true);
+            break;
+        }
+        m_pipeline.push_message(std::move(read));
+        m_loaded_read_count++;
     }
 }
 
