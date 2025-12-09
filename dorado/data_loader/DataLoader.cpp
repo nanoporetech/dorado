@@ -507,10 +507,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                               m_allowed_read_ids, m_ignored_read_ids);
             }));
         }
+        row_offset += num_rows;
 
         wait_and_process_futures(std::move(futures));
-
-        row_offset += traversal_batch_counts[batch_index];
     }
 }
 
