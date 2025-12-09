@@ -212,7 +212,6 @@ add_subdirectory(dorado/read_pipeline)
 add_subdirectory(dorado/resume_loader)
 add_subdirectory(dorado/secondary)
 add_subdirectory(dorado/splitter)
-add_subdirectory(dorado/summary)
 add_subdirectory(dorado/utils)
 add_subdirectory(tests)
 

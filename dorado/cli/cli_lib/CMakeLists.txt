@@ -52,7 +52,6 @@ dorado_add_library(
         dorado_model_resolver_lib
         dorado_models_lib
         dorado_polish
-        dorado_summary
         indicators
         minimap2
 )
