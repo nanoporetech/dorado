@@ -48,6 +48,17 @@ def is_outlier(test_type: str, entry: typing.Dict) -> typing.Optional[str]:
     return None
 
 
+def metric_name(project: str, is_latency: bool) -> str:
+    if is_latency:
+        return "Latency (seconds)"
+    elif project == "ont_core":
+        return "Speed (K samples/second)"
+    elif project == "dorado":
+        return "Speed (samples/second)"
+    else:
+        raise RuntimeError(f"Unknown project: {project}")
+
+
 # Returns any outliers found while generating the graphs.
 def generate_graphs(
     project: str,
@@ -132,7 +143,7 @@ def generate_graphs(
             ax.plot(data["x"], data["y"], marker="x")
             ax.set_title("\n".join(name.split("-")), fontsize=8)
             ax.set_xlabel("Date")
-            ax.set_ylabel("Metric")
+            ax.set_ylabel(metric_name(project, "latency" in name))
             ax.set_ylim(bottom=0)
             fig.gca().xaxis.set_major_formatter(mpd.DateFormatter("%d-%m-%Y"))
             fig.gca().xaxis.set_major_locator(mpd.DayLocator(interval=7))
@@ -163,7 +174,7 @@ def generate_graphs(
                 markersize=3,
             )
         ax.set_xlabel("Date")
-        ax.set_ylabel("Metric")
+        ax.set_ylabel(metric_name(project, "latency" in group_name))
         ax.set_ylim(bottom=0)
         fig.legend(loc="center right", fontsize=6)
         fig.tight_layout()
