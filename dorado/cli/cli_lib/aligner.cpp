@@ -297,7 +297,7 @@ int aligner(int argc, char* argv[]) {
     }
 
     hts_writer::SummaryFileWriter::AlignmentCounts alignment_counts;
-    hts_writer::SummaryFileWriter::FieldFlags flags;
+    hts_writer::SummaryFileWriter::FieldFlags flags = 0;
     if (emit_summary) {
         std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
         flags |= hts_writer::SummaryFileWriter::ALIGNMENT_FIELDS;
