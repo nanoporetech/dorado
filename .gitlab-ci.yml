@@ -505,6 +505,7 @@ build_archive:macos:arm:
     - mv ../dist ../tests.archive .
     - !reference [.unzip_test_files]
     - bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}
+    - bash ./tests/test_nested_output_structure.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}
     - bash ./tests/test_model_resolution.sh ./dist/bin/dorado
     - bash ./tests/test_dorado_correct.sh ./dist/bin/dorado
