@@ -456,12 +456,15 @@ void SummaryFileWriter::ReadInitialiser::update_read_attributes(HtsData& data) c
     if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
         const std::string rg_tag_value = bam_aux2Z(rg_tag);
         const auto& read_group = m_read_groups.at(rg_tag_value);
-        data.read_attrs.protocol_run_id = read_group.run_id;
-        data.read_attrs.flowcell_id = read_group.flowcell_id;
+        data.read_attrs.model_stride = read_group.model_stride;
         data.read_attrs.experiment_id = read_group.experiment_id;
         data.read_attrs.sample_id = read_group.sample_id;
-        data.read_attrs.position_id = read_group.position_id;
-        data.read_attrs.model_stride = read_group.model_stride;
+        // position_id is not currently stored in the output files
+        // data.read_attrs.position_id = read_group.position_id;
+        data.read_attrs.flowcell_id = read_group.flowcell_id;
+        data.read_attrs.protocol_run_id = read_group.run_id;
+        data.read_attrs.protocol_start_time_ms =
+                utils::get_unix_time_ms_from_string_timestamp(read_group.exp_start_time);
 
         if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
             const float qscore = static_cast<float>(bam_aux2f(qs_tag));
