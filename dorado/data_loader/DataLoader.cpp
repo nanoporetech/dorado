@@ -577,12 +577,14 @@ void DataLoader::wait_and_process_futures(std::vector<std::future<SimplexReadPtr
             // an error, or a filtered read.
             continue;
         }
+        if (!m_pipeline.is_running()) {
+            // If the pipeline has finished early (--run-for) then stop processing
+            // reads, but don't bail since we need to wait for all futures to finish.
+            m_stop_loading.store(true);
+            continue;
+        }
         initialise_read(read->read_common);
         check_read(read);
-        if (!m_pipeline.is_running()) {
-            m_stop_loading.store(true);
-            break;
-        }
         m_pipeline.push_message(std::move(read));
         m_loaded_read_count++;
     }
