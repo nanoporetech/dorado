@@ -173,9 +173,9 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
 }
 
 echo dorado summary test stage
-$dorado_bin summary $output_dir/calls.bam
-$dorado_bin summary -r $output_dir
-$dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} | $dorado_bin summary
+$dorado_bin summary $output_dir/calls.bam > /dev/null
+$dorado_bin summary -r $output_dir > /dev/null
+$dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} | $dorado_bin summary > /dev/null
 set +e
 if $dorado_bin summary $output_dir/not_a_real_file.txt; then
     echo "Error: dorado sumary should fail when called on a non-existent file!"
