@@ -293,7 +293,8 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
             spdlog::trace("Sorted channel {}", channel);
         }
         for (const auto& entry : files) {
-            if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
+            if (m_loaded_read_count == m_max_reads ||
+                m_stop_loading.load(std::memory_order_relaxed)) {
                 break;
             }
 
@@ -316,7 +317,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
 void DataLoader::load_reads_unrestricted(
         const std::vector<std::filesystem::directory_entry>& files) {
     for (const auto& entry : files) {
-        if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
+        if (m_loaded_read_count == m_max_reads || m_stop_loading.load(std::memory_order_relaxed)) {
             break;
         }
         spdlog::debug("Load reads from file {}", entry.path().string());
@@ -482,7 +483,7 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
 
     uint32_t row_offset = 0;
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-        if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
+        if (m_loaded_read_count == m_max_reads || m_stop_loading.load(std::memory_order_relaxed)) {
             break;
         }
         Pod5ReadRecordBatch_t* batch = nullptr;
@@ -507,25 +508,9 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
                                               m_allowed_read_ids, m_ignored_read_ids);
             }));
         }
+        row_offset += num_rows;
 
-        for (auto& v : futures) {
-            auto read = v.get();
-            if (!read) {
-                // This was either a POD5 error, in which case the worker logged
-                // an error, or a filtered read.
-                continue;
-            }
-            initialise_read(read->read_common);
-            check_read(read);
-            if (!m_pipeline.is_running()) {
-                m_stop_loading.store(true);
-                break;
-            }
-            m_pipeline.push_message(std::move(read));
-            m_loaded_read_count++;
-        }
-
-        row_offset += traversal_batch_counts[batch_index];
+        wait_and_process_futures(std::move(futures));
     }
 }
 
@@ -549,7 +534,7 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
     }
 
     for (std::size_t batch_index = 0; batch_index < batch_count; ++batch_index) {
-        if (m_loaded_read_count == m_max_reads || m_stop_loading.load()) {
+        if (m_loaded_read_count == m_max_reads || m_stop_loading.load(std::memory_order_relaxed)) {
             break;
         }
         Pod5ReadRecordBatch_t* batch = nullptr;
@@ -581,22 +566,28 @@ void DataLoader::load_pod5_reads_from_file(const std::string& path) {
             }));
         }
 
-        for (auto& v : futures) {
-            auto read = v.get();
-            if (!read) {
-                // This was either a POD5 error, in which case the worker logged
-                // an error, or a filtered read.
-                continue;
-            }
-            initialise_read(read->read_common);
-            check_read(read);
-            if (!m_pipeline.is_running()) {
-                m_stop_loading.store(true);
-                break;
-            }
-            m_pipeline.push_message(std::move(read));
-            m_loaded_read_count++;
+        wait_and_process_futures(std::move(futures));
+    }
+}
+
+void DataLoader::wait_and_process_futures(std::vector<std::future<SimplexReadPtr>> futures) {
+    for (auto& v : futures) {
+        auto read = v.get();
+        if (!read) {
+            // This was either a POD5 error, in which case the worker logged
+            // an error, or a filtered read.
+            continue;
         }
+        if (!m_pipeline.is_running()) {
+            // If the pipeline has finished early (--run-for) then stop processing
+            // reads, but don't bail since we need to wait for all futures to finish.
+            m_stop_loading.store(true, std::memory_order_relaxed);
+            continue;
+        }
+        initialise_read(read->read_common);
+        check_read(read);
+        m_pipeline.push_message(std::move(read));
+        m_loaded_read_count++;
     }
 }
 
