@@ -41,8 +41,8 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux" OR WIN32)
         set(TORCH_VERSION 2.7.1)
         # Versions of nvcc before CUDA 12.x don't support CUDA C++20 as a standard.
         set(CMAKE_CUDA_STANDARD 17)
-    elseif (CUDAToolkit_VERSION VERSION_LESS 13.0)
-        # CUDA 12 doesn't support C++23.
+    elseif (CUDAToolkit_VERSION VERSION_LESS 14.0)
+        # CUDA 12 and 13 doesn't support C++23.
         set(CMAKE_CUDA_STANDARD 20)
     endif()
 endif()
