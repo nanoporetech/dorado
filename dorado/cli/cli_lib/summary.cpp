@@ -86,9 +86,15 @@ int summary(int argc, char *argv[]) {
         std::exit(EXIT_FAILURE);
     }
 
-    auto header_mapper = utils::HeaderMapper(all_files, false);
-    pipeline->get_node_ref<WriterNode>(writer_node)
-            .set_dynamic_header(header_mapper.get_merged_headers_map());
+    if (!reads.empty()) {
+        utils::HeaderMapper header_mapper(all_files, false);
+        pipeline->get_node_ref<WriterNode>(writer_node)
+                .set_dynamic_header(header_mapper.get_merged_headers_map());
+    } else {
+        spdlog::warn(
+                "Reading from stdin: unable to check for polyA, barcode or alignment information. "
+                "Some columns will be unavailable.");
+    }
 
     using namespace hts_writer;
     for (const auto &input_file : all_files) {
