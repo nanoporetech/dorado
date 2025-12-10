@@ -9,7 +9,7 @@ fi
 
 device_string=${2:-"auto"}
 echo "Using device string -x $device_string"
-data_dir=$(dirname $0)/../tests/data
+data_dir=$(dirname $0)/../../../tests/data
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
 pod5_dir=${data_dir}/pod5/dna_r10.4.1_e8.2_400bps_5khz/
 

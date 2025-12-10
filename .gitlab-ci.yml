@@ -1,6 +1,5 @@
 include:
   - local: .gitlab/sanitizers-ci.yml
-  - local: .gitlab/benchmarks-ci.yml
   - local: .gitlab/build-ont_core.yml
   - local: .gitlab/regression_tests.yml
   - local: .gitlab/mlhub.yml
