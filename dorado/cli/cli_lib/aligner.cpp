@@ -217,9 +217,7 @@ int aligner(int argc, char* argv[]) {
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and
     // rest for alignment. Empirically this shows good perf.
-    int aligner_threads, writer_threads;
-    std::tie(aligner_threads, writer_threads) =
-            cli::worker_vs_writer_thread_allocation(threads, 0.1f);
+    auto [aligner_threads, writer_threads] = cli::worker_vs_writer_thread_allocation(threads, 0.1f);
     spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
     std::shared_ptr<dorado::alignment::IndexFileAccess> index_file_access;
