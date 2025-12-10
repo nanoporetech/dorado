@@ -71,6 +71,18 @@ variables:
     - nvidia-docker
     - on-prem
 
+.linux_thor_runner:
+  tags:
+    - linux-arm64-gpu-thor
+    - nvidia-docker
+    - on-prem
+
+.linux_dgx_spark_runner:
+  tags:
+    - linux-arm64-gpu-spark
+    - nvidia-docker
+    - on-prem
+
 .windows_runner:
   tags:
     - windows-10
@@ -360,6 +372,16 @@ build:linux:arm64:jammy:
     - .linux_arm64_runner
     - .build_and_test_dorado
 
+build:linux:arm64:cuda13:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
+  extends:
+    - .linux_build_dependencies
+    - .linux_arm64_runner
+    - .build_and_test_dorado
+
 build:linux:x86:noble:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
@@ -422,6 +444,14 @@ build:macos:arm:no_ccache:
 
 build_archive:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  extends:
+    - .linux_build_dependencies
+    - .linux_arm64_runner
+    - .build_dorado_archive
+    - .on_nightly_or_manual
+
+build_archive:linux:arm64:cuda13:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
   extends:
     - .linux_build_dependencies
     - .linux_arm64_runner
@@ -606,6 +636,35 @@ test:linux:arm64:jammy:
   needs:
     - build:linux:arm64:jammy
 
+test:linux:arm64:thor:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
+  variables:
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
+  script:
+    - !reference [.enable_ont_python]
+    - !reference [.test_dorado, script]
+  extends:
+    - .linux_test_dependencies
+    - .linux_thor_runner
+    - .test_dorado
+    - .on_nightly_or_manual
+  needs:
+    - build:linux:arm64:cuda13
+
+test:linux:arm64:dgx_spark:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
+  variables:
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_312}
+  script:
+    - !reference [.enable_ont_python]
+    - !reference [.test_dorado, script]
+  extends:
+    - .linux_test_dependencies
+    - .linux_dgx_spark_runner
+    - .test_dorado
+  needs:
+    - build:linux:arm64:cuda13
+
 test:macos:arm:
   variables:
     PYTHON: python3.10
@@ -660,6 +719,15 @@ test_archive:linux:arm64:22.04:
     - .test_archive
   needs:
     - build_archive:linux:arm64:jammy
+
+test_archive:linux:arm64:24.04:
+  image: nvidia/cuda:13.0.0-devel-ubuntu24.04
+  extends:
+    - .linux_dgx_spark_runner
+    - .test_archive
+  needs:
+    - build_archive:linux:arm64:cuda13
+
 
 # Test that you can run dorado on a CUDA-less windows machine
 test_archive:windows:cpu:
