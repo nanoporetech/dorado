@@ -40,6 +40,7 @@ enum class FeatureColumns : int32_t {
     DWELL,
     HAPLOTAG,
     DTYPE,
+    SNP_QV,
 };
 
 using FeatureColumnMap = std::unordered_map<FeatureColumns, int32_t>;
@@ -87,6 +88,8 @@ inline std::string feature_column_to_string(const FeatureColumns feature) {
         return "DWELL";
     case FeatureColumns::HAPLOTAG:
         return "HAPLOTAG";
+    case FeatureColumns::SNP_QV:
+        return "SNP_QV";
     case FeatureColumns::DTYPE:
         return "DTYPE";
     default:

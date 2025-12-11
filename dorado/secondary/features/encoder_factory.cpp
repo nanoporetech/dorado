@@ -97,6 +97,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const bool row_per_read = get_bool_value(kwargs, "row_per_read", true);
         const bool include_dwells = get_bool_value(kwargs, "include_dwells", true);
         const bool include_haplotype_column = get_bool_value(kwargs, "include_haplotype", true);
+        const bool include_snp_qv_column = get_bool_value(kwargs, "include_snp_qv", false);
         HaplotagSource hap_source_final = hap_source ? *hap_source : HaplotagSource::UNPHASED;
 
         // Optional. Config version >= 3 feature.
@@ -116,7 +117,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
                 in_ref_fn, in_bam_aln_fn, config.feature_encoder_dtypes, tag_name, tag_value,
                 tag_keep_missing, read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read,
                 include_dwells, clip_to_zero, right_align_insertions, include_haplotype_column,
-                hap_source_final, phasing_bin_fn);
+                hap_source_final, phasing_bin_fn, include_snp_qv_column);
 
         return ret;
     }
@@ -135,9 +136,10 @@ FeatureColumnMap feature_column_map_factory(const ModelConfig& config) {
         const auto& kwargs = config.feature_encoder_kwargs;
         const bool include_dwells = get_bool_value(kwargs, "include_dwells", false);
         const bool include_haplotype_column = get_bool_value(kwargs, "include_haplotype", false);
+        const bool include_snp_qv_column = get_bool_value(kwargs, "include_snp_qv", false);
         const int64_t num_dtypes = std::ssize(config.feature_encoder_dtypes) + 1;
         return EncoderReadAlignment::produce_feature_column_map(
-                include_dwells, include_haplotype_column, (num_dtypes > 1));
+                include_dwells, include_haplotype_column, include_snp_qv_column, (num_dtypes > 1));
     }
 
     throw std::runtime_error{"Unsupported feature encoder type in feature_column_map_factory: " +

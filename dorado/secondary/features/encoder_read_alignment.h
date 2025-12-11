@@ -44,7 +44,8 @@ public:
                          const bool right_align_insertions,
                          const bool include_haplotype_column,  // Add a column to the tensor.
                          const HaplotagSource hap_source,      // Where the column value comes from.
-                         const std::optional<std::filesystem::path>& phasing_bin);
+                         const std::optional<std::filesystem::path>& phasing_bin,
+                         const bool include_snp_qv_column);
 
     ~EncoderReadAlignment() = default;
 
@@ -62,6 +63,7 @@ public:
 
     static FeatureColumnMap produce_feature_column_map(const bool include_dwells,
                                                        const bool include_haplotype_column,
+                                                       const bool include_snp_qv_column,
                                                        const bool include_dtypes);
 
 private:
@@ -79,6 +81,7 @@ private:
     bool m_row_per_read = false;
     bool m_include_dwells = true;
     bool m_include_haplotype_column = false;
+    bool m_include_snp_qv_column = false;
     HaplotagSource m_hap_source;
     bool m_clip_to_zero = false;
     bool m_right_align_insertions = false;

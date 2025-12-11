@@ -234,6 +234,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
     const bool clip_to_zero{true};
     const bool right_align_insertions{false};
     const bool include_haplotype_column{false};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const std::optional<std::filesystem::path> phasing_bin{};
     const std::string ref_name{"contig_1"};
@@ -260,10 +261,11 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10432, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(
-                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         const std::vector<int64_t> shape(std::cbegin(result.features.sizes()),
@@ -287,10 +289,11 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10431, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(
-                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         const std::vector<int64_t> shape(std::begin(result.features.sizes()),
@@ -335,6 +338,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
     const bool clip_to_zero{true};
     const bool right_align_insertions{false};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
     const std::optional<std::filesystem::path> phasing_bin{};
     const std::string ref_name{"contig_1"};
@@ -361,7 +365,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  test_case.min_snp_accuracy, row_per_read, include_dwells,
                                  clip_to_zero, right_align_insertions, include_haplotype_column,
-                                 hap_source, phasing_bin);
+                                 hap_source, phasing_bin, include_snp_qv_column);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -543,6 +547,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Test specific parameters.
         const bool include_dwells{true};
         const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
         const HaplotagSource hap_source{HaplotagSource::UNPHASED};
         const bool clip_to_zero{true};
 
@@ -558,10 +563,11 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         eval_sample(expected, result);
@@ -571,6 +577,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Test specific parameters.
         const bool include_dwells{false};
         const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
         const HaplotagSource hap_source{HaplotagSource::UNPHASED};
         const bool clip_to_zero{true};
 
@@ -586,10 +593,11 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         eval_sample(expected, result);
@@ -601,6 +609,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Test specific parameters.
         const bool include_dwells{true};
         const bool include_haplotype_column{true};
+        const bool include_snp_qv_column{false};
         const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
         const bool clip_to_zero{true};
 
@@ -608,10 +617,11 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         const Sample& expected = expected_total;
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         const std::vector<int64_t> shape(std::begin(result.features.sizes()),
@@ -626,6 +636,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         // Test specific parameters.
         const bool include_dwells{true};
         const bool include_haplotype_column{true};
+        const bool include_snp_qv_column{false};
         const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
         const bool clip_to_zero{false};
 
@@ -662,10 +673,11 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         }
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         eval_sample(expected, result);
@@ -802,6 +814,7 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     const int64_t ref_end = 10;
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
 
@@ -812,7 +825,8 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
                                  tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
                                  row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin);
+                                 include_haplotype_column, hap_source, phasing_bin,
+                                 include_snp_qv_column);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
     eval_sample(expected, result);
@@ -962,6 +976,7 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     const int64_t ref_end = 10;
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
 
@@ -972,7 +987,8 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
                                  tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
                                  row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin);
+                                 include_haplotype_column, hap_source, phasing_bin,
+                                 include_snp_qv_column);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
     eval_sample(expected, result);
@@ -1102,6 +1118,7 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     const int64_t ref_end = 10;
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
     const bool row_per_read{true};
@@ -1113,7 +1130,8 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
                                  tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
                                  row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin);
+                                 include_haplotype_column, hap_source, phasing_bin,
+                                 include_snp_qv_column);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),

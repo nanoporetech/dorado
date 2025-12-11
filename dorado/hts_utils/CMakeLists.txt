@@ -5,6 +5,7 @@ dorado_add_library(
         hts_utils
     SOURCES_PUBLIC
         bam_utils.h
+        cigar_utils.h
         fai_utils.h
         fastq_tags.h
         FastxRandomReader.h
@@ -18,6 +19,7 @@ dorado_add_library(
         sequence_file_format.h
     SOURCES_PRIVATE
         bam_utils.cpp
+        cigar_utils.cpp
         fai_utils.cpp
         fastq_tags.cpp
         FastxRandomReader.cpp
