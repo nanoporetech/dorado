@@ -172,16 +172,15 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
                 return tag_value;
             }
         }
+    }
 
+    // No barcode
+    if (barcode_name.empty()) {
         // Unclassified reads read from file won't have a BC tag. If we've been told this is a demux operation,
         // ensure these reads are correctly placed in the unclassified folder
         if (m_assume_barcodes) {
             return UNCLASSIFIED_STR;
         }
-    }
-
-    // No barcode
-    if (barcode_name.empty()) {
         return {};
     }
 
