@@ -259,12 +259,18 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         const bool use_reference =
                 (get_value(config.model_kwargs, "use_reference") == "true") ? true : false;
 
+        bool use_snp_qv = false;
+        if (config.model_kwargs.find("use_snp_qv") != std::cend(config.model_kwargs)) {
+            use_snp_qv = (get_value(config.model_kwargs, "use_snp_qv") == "true") ? true : false;
+        }
+
         const std::unordered_map<std::string, std::string> pooler_args;
 
         model = ModelSlotAttentionConsensus::make<ModelSlotAttentionConsensus>(
                 num_slots, classes_per_slot, read_embedding_size, cnn_size, kernel_sizes,
-                pooler_type, pooler_args, use_mapqc, use_dwells, use_haplotags, bases_alphabet_size,
-                bases_embedding_size, add_lstm, use_reference, feature_column_map);
+                pooler_type, pooler_args, use_mapqc, use_dwells, use_haplotags, use_snp_qv,
+                bases_alphabet_size, bases_embedding_size, add_lstm, use_reference,
+                feature_column_map);
 
         // The SlotAttentionConsensus model normalizes internally because of phasing, so
         // deactivate normalization after phasing.

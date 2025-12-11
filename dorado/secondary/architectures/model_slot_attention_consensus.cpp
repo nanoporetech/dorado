@@ -157,6 +157,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
         const bool use_mapqc,
         const bool use_dwells,
         const bool use_haplotags,
+        const bool use_snp_qv,
         const int32_t bases_alphabet_size,
         const int32_t bases_embedding_size,
         const bool add_lstm,
@@ -173,6 +174,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
           m_use_mapqc{use_mapqc},
           m_use_dwells{use_dwells},
           m_use_haplotags{use_haplotags},
+          m_use_snp_qv{use_snp_qv},
           m_bases_alphabet_size{bases_alphabet_size},
           m_bases_embedding_size{bases_embedding_size},
           m_add_lstm{add_lstm},
@@ -183,12 +185,13 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
           m_haplotag_embedder{
                   torch::nn::EmbeddingOptions(MAX_HAPLOTAGS + 1, m_bases_embedding_size)},
           m_strand_embedder{torch::nn::EmbeddingOptions(3, m_bases_embedding_size)},
-          m_read_level_conv{m_bases_embedding_size + (1 + m_use_dwells + m_use_mapqc),
-                            m_read_embedding_size,
-                            m_kernel_sizes,
-                            std::vector<int32_t>(std::size(m_kernel_sizes), m_cnn_size),
-                            true,
-                            false},
+          m_read_level_conv{
+                  m_bases_embedding_size + (1 + m_use_dwells + m_use_mapqc + m_use_snp_qv),
+                  m_read_embedding_size,
+                  m_kernel_sizes,
+                  std::vector<int32_t>(std::size(m_kernel_sizes), m_cnn_size),
+                  true,
+                  false},
           m_expansion_layer{m_cnn_size, m_read_embedding_size},
           m_slot_attention{m_num_slots, m_read_embedding_size, 3, 1e-8f, 128},
           m_slot_classifier{m_read_embedding_size, m_classes_per_slot},
@@ -215,6 +218,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
     // Optional feature columns.
     m_column_dwell = use_dwells ? get_feature_or_throw(FeatureColumns::DWELL) : -1;
     m_column_haplotag = use_haplotags ? get_feature_or_throw(FeatureColumns::HAPLOTAG) : -1;
+    m_column_snp_qv = use_snp_qv ? get_feature_or_throw(FeatureColumns::SNP_QV) : -1;
 
     if (m_add_lstm) {
         const int64_t lstm_size = m_num_slots * m_read_embedding_size;
@@ -375,6 +379,11 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
                 "ModelSlotAttentionConsensus: The haplotag column index is not valid! Got: " +
                 std::to_string(m_column_haplotag)};
     }
+    if (m_use_snp_qv && (m_column_snp_qv < 0)) {
+        throw std::runtime_error{
+                "ModelSlotAttentionConsensus: The snp_qv column index is not valid! Got: " +
+                std::to_string(m_column_snp_qv)};
+    }
 
     // Bases embeddings.
     at::Tensor embeddings =
@@ -402,6 +411,11 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
     if (m_use_dwells) {
         at::Tensor dwells = in_x.select(-1, m_column_dwell).unsqueeze(-1);
         features.emplace_back(std::move(dwells));
+    }
+
+    if (m_use_snp_qv) {
+        at::Tensor snp_qv = (in_x.select(-1, m_column_snp_qv) / 25).add(-1).unsqueeze(-1);
+        features.emplace_back(std::move(snp_qv));
     }
 
     at::Tensor x = torch::cat(features, -1);
