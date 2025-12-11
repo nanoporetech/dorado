@@ -58,7 +58,7 @@ $dorado_bin aligner --mm2-opts "-x map-ont" $data_dir/read_correction/ref.fasta 
 #
 # Sort the lines because the output of Correct is not stable.
 sort $data_dir/read_correction/expected.alignment_summary.txt > $output_dir_correct/sorted.expected.alignment_summary.txt
-sort $output_dir_correct/alignment_summary.txt > $output_dir_correct/sorted.alignment_summary.txt
+sort $output_dir_correct/sequencing_summary.txt > $output_dir_correct/sorted.alignment_summary.txt
 #
 # Test the accuracy and number of sequences in the output.
 set +e

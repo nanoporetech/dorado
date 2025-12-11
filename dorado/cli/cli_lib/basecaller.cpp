@@ -350,11 +350,6 @@ void setup(const std::vector<std::string>& args,
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());
 
-    if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
-        std::string err = "No POD5 data found in path: " + pod5_folder_info.path().string();
-        throw std::runtime_error(err);
-    }
-
     auto read_list = utils::load_read_list(read_list_file_path);
     size_t num_reads = file_info::get_num_reads(pod5_folder_info.files().get(), read_list, {});
     if (num_reads == 0) {
@@ -514,8 +509,8 @@ void setup(const std::vector<std::string>& args,
         if (barcoding_info) {
             flags |= SummaryFileWriter::BARCODING_FIELDS;
         }
-        auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(summary_output, flags,
-                                                                              std::nullopt);
+        auto summary_writer =
+                std::make_unique<hts_writer::SummaryFileWriter>(summary_output, flags);
         writers.push_back(std::move(summary_writer));
     }
 
@@ -769,6 +764,11 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
     const InputPod5FolderInfo pod5_folder_info(data_path, std::move(input_pod5s));
+
+    if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
+        spdlog::error("No POD5 data found in path: {}", pod5_folder_info.path().string());
+        return EXIT_FAILURE;
+    }
 
     const auto device = cli::parse_device(parser);
 

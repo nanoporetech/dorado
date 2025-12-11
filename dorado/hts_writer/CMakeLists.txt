@@ -12,6 +12,7 @@ dorado_add_library(
         SummaryFileWriter.h
         interface.h
     SOURCES_PRIVATE
+        hts_writer_utils.h
         HtsFileWriter.cpp
         HtsFileWriterBuilder.cpp
         StreamHtsFileWriter.cpp

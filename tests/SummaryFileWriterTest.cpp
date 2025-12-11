@@ -18,7 +18,7 @@ using namespace std::string_view_literals;
 
 CATCH_TEST_CASE(TEST_GROUP " constructor no throw", TEST_GROUP) {
     std::ostringstream stream;
-    CATCH_CHECK_NOTHROW(hts_writer::SummaryFileWriter(stream, 0, std::nullopt));
+    CATCH_CHECK_NOTHROW(hts_writer::SummaryFileWriter(stream, 0));
 }
 
 CATCH_TEST_CASE(TEST_GROUP " column headers by flags", TEST_GROUP) {
@@ -30,7 +30,7 @@ CATCH_TEST_CASE(TEST_GROUP " column headers by flags", TEST_GROUP) {
             {sfw::BARCODING_FIELDS | sfw::ALIGNMENT_FIELDS | sfw::BASECALLING_FIELDS, 47},
     }));
     std::ostringstream stream;
-    hts_writer::SummaryFileWriter writer(stream, flags, std::nullopt);
+    hts_writer::SummaryFileWriter writer(stream, flags);
     auto columns = utils::split(stream.str(), '\t');
     CATCH_CHECK(columns.size() == expected_column_count);
 }
@@ -44,7 +44,7 @@ CATCH_TEST_CASE(TEST_GROUP " rows have correct number of entries", TEST_GROUP) {
             {sfw::BARCODING_FIELDS | sfw::ALIGNMENT_FIELDS | sfw::BASECALLING_FIELDS},
     }));
     std::ostringstream stream;
-    hts_writer::SummaryFileWriter writer(stream, flags, std::nullopt);
+    hts_writer::SummaryFileWriter writer(stream, flags);
 
     BamPtr bam_record(bam_init1());
     std::string_view record_name = "test_record"sv;
