@@ -256,16 +256,7 @@ int aligner(int argc, char* argv[]) {
     std::unique_ptr<utils::HeaderMapper> header_mapper;
     if (!reads.empty()) {
         header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
-        auto hdr = header_mapper->get_shared_merged_header(strip_input_alignments);
-        int num_rg_lines = sam_hdr_count_lines(hdr.get(), "RG");
-        KString tag_wrapper(100000);
-        auto& tag_value = tag_wrapper.get();
-        for (int i = 0; i < num_rg_lines; ++i) {
-            if (sam_hdr_find_tag_pos(hdr.get(), "RG", i, "SM", &tag_value) == 0) {
-                has_barcoding = true;
-                break;
-            }
-        }
+        has_barcoding = header_mapper->has_barcodes();
     }
 
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
