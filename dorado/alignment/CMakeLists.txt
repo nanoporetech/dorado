@@ -5,7 +5,6 @@ dorado_add_library(
         alignment
     SOURCES_PUBLIC
         alignment_info.h
-        alignment_processing_items.h
         bed_file.h
         BedFileAccess.h
         IndexFileAccess.h
@@ -16,7 +15,6 @@ dorado_add_library(
         Minimap2Options.h
         sam_utils.h # only public for unit tests
     SOURCES_PRIVATE
-        alignment_processing_items.cpp
         bed_file.cpp
         BedFileAccess.cpp
         IndexFileAccess.cpp

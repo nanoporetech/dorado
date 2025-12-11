@@ -53,16 +53,21 @@ public:
     const sam_hdr_t* header() const;
     const std::string& format() const;
 
+    using ReadInitialiserF = std::function<void(HtsData&)>;
+    void add_read_initialiser(ReadInitialiserF func) {
+        m_read_initialisers.push_back(std::move(func));
+    }
+
 private:
     const std::string m_filename;
     sam_hdr_t* m_header{nullptr};  // non-owning
     std::string m_format;
     std::shared_ptr<ClientInfo> m_client_info;
 
-    std::function<void(BamPtr&)> m_record_mutator;
     std::optional<std::unordered_set<std::string>> m_read_list;
 
     std::function<bool(bam1_t&)> m_bam_record_generator;
+    std::vector<ReadInitialiserF> m_read_initialisers;
     bool m_add_filename_tag{true};
 
     template <typename T>

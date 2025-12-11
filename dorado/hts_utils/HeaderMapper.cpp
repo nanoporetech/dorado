@@ -138,7 +138,8 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
 
         HtsData::ReadAttributes& attrs = it->second;
         assign_not_empty(attrs.flowcell_id, rg_data.data.flowcell_id);
-        assign_not_empty(attrs.position_id, rg_data.data.device_id);
+        // TODO: position_id is not in the specification yet
+        // assign_not_empty(attrs.position_id, rg_data.data.position_id);
         assign_not_empty(attrs.sample_id, rg_data.data.sample_id);
         assign_not_empty(attrs.protocol_run_id, rg_data.data.run_id);
         assign_not_empty(attrs.experiment_id, rg_data.data.experiment_id);
@@ -198,7 +199,7 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
     // @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0
     //  DT:2022-10-18T10:38:07.247961+00:00
     //  DS:runid=e705d8cfbbe8a6bc43a865c71ace09553e8f15cd ...
-    //  LB:PCR_zymo PL:ONT   PM:4A  PU:PAM93185
+    //  LB:PCR_zymo PL:ONT   PM:MN12345  PU:PAM93185
     std::unordered_map<std::string, HtsData::ReadAttributes> rg_id_to_attrs_lut;
     for (const auto& rg_line : rg_lines) {
         if (rg_line.header_type != utils::HeaderLineType::RG) {
@@ -237,7 +238,8 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
         const std::string ds = (tag_it != std::end(tags)) ? tag_it->second : "";
         const auto ds_tokens = tokenize(ds, ' ');
         assign_not_empty(attrs.protocol_run_id, parse_DS_tag_key(ds_tokens, "runid="));
-        // TODO: experiment_id and acquisition_id are not in the specification yet
+        assign_not_empty(attrs.experiment_id, parse_DS_tag_key(ds_tokens, "experiment_id="));
+        // TODO: acquisition_id is not in the specification yet
     }
 
     return rg_id_to_attrs_lut;
