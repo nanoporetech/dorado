@@ -1,0 +1,15 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##fileformat=VCFv4.1
+##contig=<ID=chr20,length=10000>
+##FILTER=<ID=LowQual,Description="Variant quality is below threshold">
+##FILTER=<ID=.,Description="Non-variant position">
+##dorado_version=0.0.0+af31f4a16
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality score">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
+chr20	1959	.	T	G	14.446	PASS	.	GT:GQ	0/1:14
+chr20	2102	.	A	G	10.861	PASS	.	GT:GQ	0/1:11
+chr20	2126	.	C	G	11.721	PASS	.	GT:GQ	0/1:12
+chr20	6948	.	CGTGT	C,CGTGTGT	6.12	PASS	.	GT:GQ	1/2:6

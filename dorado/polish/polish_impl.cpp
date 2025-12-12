@@ -35,6 +35,7 @@
 // #define DEBUG_INFERENCE_DATA
 // #define DEBUG_VC_DATA
 // #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
+// #define DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
 
 #ifdef DEBUG_VC_DATA
 #include "secondary/consensus/consensus_utils.h"
@@ -474,6 +475,145 @@ std::vector<secondary::Sample> split_samples(std::vector<secondary::Sample> samp
     return results;
 }
 
+std::vector<secondary::Sample> split_samples_around_positions(
+        std::vector<secondary::Sample> samples,
+        const std::optional<IntervalTreesInt64Map>& candidate_trees,
+        const int64_t chunk_len,
+        const int64_t flanking_bases) {
+    constexpr int64_t MIN_FLANKING_BASES = 3;
+
+    if ((flanking_bases < 0) || (flanking_bases > chunk_len)) {
+        throw std::runtime_error(
+                "Wrong flanking_bases length. chunk_len = " + std::to_string(chunk_len) +
+                ", flanking_bases = " + std::to_string(flanking_bases));
+    }
+
+    if (!candidate_trees) {
+        return {};
+    }
+
+    const auto searchsorted_left = [](const std::vector<int64_t>& vec, const int64_t x) -> int64_t {
+        const auto it = std::lower_bound(std::begin(vec), std::end(vec), x);
+        return static_cast<std::int64_t>(std::distance(std::begin(vec), it));
+    };
+
+    std::vector<secondary::Sample> all_results;
+    all_results.reserve(std::size(samples));
+
+    for (auto& sample : samples) {
+        const auto it_seq_id = candidate_trees->find(sample.seq_id);
+
+        // No candidate positions for this sequence.
+        if (it_seq_id == std::cend(*candidate_trees)) {
+            continue;
+        }
+        const auto& tree = it_seq_id->second;
+
+        // Get all candidate positions for this region.
+        // Note: this interval tree lib uses inclusive end coordinate.
+        std::vector<interval_tree::Interval<int64_t, int64_t>> positions =
+                tree.findOverlapping(sample.start(), sample.end() - 1);
+
+        // Sort the positions in ascending order.
+        std::sort(std::begin(positions), std::end(positions),
+                  [](const auto& a, const auto& b) { return a.start < b.start; });
+
+        std::vector<secondary::Sample> results;
+        std::vector<int64_t> last_flanking_bases;
+
+#ifdef DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
+        spdlog::debug("[split_samples_around_positions] Input sample: {}",
+                      secondary::sample_to_string(sample));
+        for (int64_t i = 0; i < std::ssize(positions); ++i) {
+            spdlog::debug("[split_samples_around_positions]     [candidate i = {}] position = {}",
+                          i, positions[i].start);
+        }
+#endif
+
+        bool stop_chunking = false;
+        for (const auto itvl : positions) {
+            // Intervals are single-base width here.
+            const int64_t position = itvl.start;
+
+            // Skip candidates which are already covered by the previous chunk.
+            assert(std::size(last_flanking_bases) == std::size(results));
+            if (!std::empty(results) && !std::empty(last_flanking_bases) &&
+                (position < (results.back().end() - last_flanking_bases.back()))) {
+                continue;
+            }
+
+            int64_t curr_flanking_bases = 0;
+            int64_t chunk_start_pos = 0;
+            int64_t chunk_start_idx = 0;
+            int64_t chunk_end_idx = 0;
+            for (curr_flanking_bases = flanking_bases; curr_flanking_bases >= MIN_FLANKING_BASES;
+                 --curr_flanking_bases) {
+                chunk_start_pos = position - curr_flanking_bases;
+                chunk_start_idx = searchsorted_left(sample.positions_major, chunk_start_pos);
+                chunk_end_idx = chunk_start_idx + chunk_len;
+
+                if (chunk_start_idx >= std::ssize(sample.positions_major)) {
+                    // This shouldn't be possible, but need to check the bounds.
+                    std::ostringstream oss;
+                    oss << "Tried to create chunk from chunk_start_pos = " << chunk_start_pos
+                        << " on seq_id = " << sample.seq_id
+                        << " but the position could not be found in this sample! chunk_start_idx = "
+                        << chunk_start_idx << ", sample: " << sample;
+                    throw std::runtime_error{oss.str()};
+                }
+
+                // TODO: Handle this properly. E.g. Create an overlapping large chunk at the end.
+                if (chunk_end_idx >= std::ssize(sample.positions_major)) {
+                    spdlog::warn(
+                            "Tried to create chunk but "
+                            "chunk exceeds sample length. chunk_start_pos = {}, chunk_start_idx = "
+                            "{}, chunk_end_idx = {}, positions_major.size() = {}, seq_id = {}. "
+                            "Stopping. Sample: {}",
+                            chunk_start_pos, chunk_start_idx, chunk_end_idx,
+                            std::ssize(sample.positions_major), sample.seq_id, chunk_end_idx,
+                            secondary::sample_to_string(sample));
+                    stop_chunking = true;
+                    break;
+                }
+
+                const int64_t chunk_end_pos = sample.positions_major[chunk_end_idx];
+
+                if (position <= (chunk_end_pos - curr_flanking_bases)) {
+                    break;
+                }
+            }
+            if (stop_chunking) {
+                break;
+            }
+            if (curr_flanking_bases < MIN_FLANKING_BASES) {
+                spdlog::warn(
+                        "Could not create chunk around position = {} with more than {} bases of "
+                        "flanking context. Skipping this position.",
+                        position, MIN_FLANKING_BASES);
+                continue;
+            }
+
+            // Extract the chunk around this position.
+            results.emplace_back(slice_sample(sample, chunk_start_idx, chunk_end_idx, true));
+            last_flanking_bases.emplace_back(curr_flanking_bases);
+
+#ifdef DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
+            spdlog::debug(
+                    "[split_samples_around_positions] Created a chunk around position = {}. "
+                    "chunk_start_pos = {}, chunk_start_idx = {}, chunk_end_idx = {}, "
+                    "curr_flanking_bases = {}. Chunk sample: {}",
+                    position, chunk_start_pos, chunk_start_idx, chunk_end_idx, curr_flanking_bases,
+                    secondary::sample_to_string(results.back()));
+#endif
+        }
+
+        all_results.insert(std::end(all_results), std::make_move_iterator(std::begin(results)),
+                           std::make_move_iterator(std::end(results)));
+    }
+
+    return all_results;
+}
+
 /**
  * \brief This function performs the following operations:
  *          1. Merges adjacent samples, which were split for efficiency of computing the pileup.
@@ -497,9 +637,11 @@ merge_and_split_bam_regions_in_parallel(
         const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         const Span<const secondary::Window> bam_regions,
         const Span<const secondary::Interval> bam_region_intervals,
+        const std::optional<IntervalTreesInt64Map>& candidate_trees,
         const int32_t num_threads,
         const int32_t window_len,
         const int32_t window_overlap,
+        const int32_t variant_flanking_bases,
         const int32_t window_interval_offset,
         const bool continue_on_exception) {
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
@@ -573,7 +715,14 @@ merge_and_split_bam_regions_in_parallel(
 #endif
 
                 // Bluntly split samples for inference.
-                local_samples = split_samples(std::move(local_samples), window_len, window_overlap);
+                if (candidate_trees) {
+                    local_samples = split_samples_around_positions(std::move(local_samples),
+                                                                   candidate_trees, window_len,
+                                                                   variant_flanking_bases);
+                } else {
+                    local_samples =
+                            split_samples(std::move(local_samples), window_len, window_overlap);
+                }
 
                 spdlog::trace(
                         "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
@@ -831,11 +980,13 @@ std::vector<secondary::Window> create_windows_from_regions(
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+                     const std::optional<IntervalTreesInt64Map>& candidate_trees,
                      const int32_t num_threads,
                      const int32_t batch_size,
                      const int32_t encoding_batch_size,
                      const int32_t window_len,
                      const int32_t window_overlap,
+                     const int32_t variant_flanking_bases,
                      const int32_t bam_subchunk_len,
                      const double max_available_mem,
                      const bool continue_on_exception,
@@ -947,8 +1098,8 @@ void sample_producer(PolisherResources& resources,
                                                   num_regions),
                     Span<const secondary::Interval>(
                             std::data(bam_region_intervals) + region_id_start, num_regions),
-                    num_threads, window_len, window_overlap, window_id_start,
-                    continue_on_exception);
+                    candidate_trees, num_threads, window_len, window_overlap,
+                    variant_flanking_bases, window_id_start, continue_on_exception);
 
             if (std::size(samples) != std::size(trims)) {
                 throw std::runtime_error(
