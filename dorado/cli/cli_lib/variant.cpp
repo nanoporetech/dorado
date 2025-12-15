@@ -110,7 +110,13 @@ struct Options {
     bool unphased = false;
 
     bool continue_on_error = false;
+
     double min_snp_accuracy = 0.0;
+    bool tiled_regions = false;     // Candidate region selection using a tiled approach.
+    bool tiled_ext_flanks = false;  // Select neighboring windows if there are deletions in flanks.
+    int32_t tiled_ext_major = 10;   // Number of flanking major positions to check for the trigger.
+    int32_t tiled_ext_min_cov = 3;  // Minimum deletion coverage to trigger the extension.
+    float tiled_ext_cov_fract = 0.25f;  // Fraction of deletion coverage to trigger the heuristic.
 };
 
 /// \brief Define the CLI options.
@@ -273,6 +279,8 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                       "1.0].")
                 .default_value(0.0f)
                 .scan<'g', float>();
+
+        // Candidate region selection options.
         parser.add_argument("--candidates")
                 .hidden()
                 .help("Path to a tab-separated file containing coordinates of variant candidate "
@@ -282,6 +290,34 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Minimum number of flanking bases in samples around candidate variants.")
                 .default_value(100)
                 .scan<'i', int>();
+        parser.add_argument("--tiled-regions")
+                .hidden()
+                .help("Construct regions around variants using a tiled approach. Ignores the "
+                      "--variant-flanking-bases and uses --window-overlap instead.")
+                .flag()
+                .default_value(false);
+        parser.add_argument("--tiled-ext-flanks")
+                .hidden()
+                .help("Heuristic to additionally process neighboring windows if selected windows "
+                      "have deletions in the flanks.")
+                .flag();
+        parser.add_argument("--tiled-ext-major")
+                .hidden()
+                .help("Number of major bases to check in the flanks to trigger the extension "
+                      "heuristic.")
+                .default_value(10)
+                .scan<'i', int>();
+        parser.add_argument("--tiled-ext-min-cov")
+                .hidden()
+                .help("Minimum absolute deletion coverage to trigger the extension heuristic.")
+                .default_value(3)
+                .scan<'i', int>();
+        parser.add_argument("--tiled-ext-cov-fract")
+                .hidden()
+                .help("Minimum coverage fraction of deletions in the major columns to trigger the "
+                      "extension heuristic.")
+                .default_value(0.25f)
+                .scan<'g', float>();
     }
 }
 
@@ -377,6 +413,11 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
                           : (opt.hp_tag_from_bam) ? secondary::HaplotagSource::BAM_HAP_TAG
                           : (opt.unphased)        ? secondary::HaplotagSource::UNPHASED
                                                   : secondary::HaplotagSource::COMPUTE;
+    opt.tiled_regions = parser.get<bool>("tiled-regions");
+    opt.tiled_ext_flanks = parser.get<bool>("tiled-ext-flanks");
+    opt.tiled_ext_major = parser.get<int>("tiled-ext-major");
+    opt.tiled_ext_min_cov = parser.get<int>("tiled-ext-min-cov");
+    opt.tiled_ext_cov_fract = parser.get<float>("tiled-ext-cov-fract");
 
     opt.min_snp_accuracy = parser.get<float>("min-snp-acc");
 
@@ -939,7 +980,9 @@ void run_variant_calling(const Options& opt,
                                     opt.threads, opt.batch_size, opt.encoding_batch_size,
                                     opt.window_len, opt.window_overlap, opt.variant_flanking_bases,
                                     opt.bam_subchunk, usable_mem, opt.continue_on_error,
-                                    batch_queue, worker_terminate, wrs_sample_producer);
+                                    opt.tiled_regions, opt.tiled_ext_flanks, opt.tiled_ext_major,
+                                    opt.tiled_ext_min_cov, opt.tiled_ext_cov_fract, batch_queue,
+                                    worker_terminate, wrs_sample_producer);
                         });
 
                 // Create a thread for the sample decoder.

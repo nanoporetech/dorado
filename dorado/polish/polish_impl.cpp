@@ -36,6 +36,7 @@
 // #define DEBUG_VC_DATA
 // #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
 // #define DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
+// #define DEBUG_POLISH_SAMPLE_CONSTRUCTION
 
 #ifdef DEBUG_VC_DATA
 #include "secondary/consensus/consensus_utils.h"
@@ -614,6 +615,207 @@ std::vector<secondary::Sample> split_samples_around_positions(
     return all_results;
 }
 
+std::vector<secondary::Sample> split_samples_tiled_with_candidates(
+        std::vector<secondary::Sample> samples,
+        const std::optional<IntervalTreesInt64Map>& candidate_trees,
+        const int64_t chunk_len,
+        const int64_t chunk_overlap,
+        const bool ext_flanks,          // Control extension heuristic.
+        const int64_t ext_major_bases,  // Check this many major positions to trigger.
+        const int64_t ext_min_cov,      // Minimum absolute coverage to trigger the heuristic.
+        const double ext_cov_frac       // Minimum coverage fraction to trigger the heuristic.
+) {
+    if ((chunk_overlap < 0) || (chunk_overlap > chunk_len)) {
+        throw std::runtime_error(
+                "Wrong chunk_overlap length. chunk_len = " + std::to_string(chunk_len) +
+                ", chunk_overlap = " + std::to_string(chunk_overlap));
+    }
+
+    const auto has_candidates = [](const dorado::polisher::IntervalTreeInt64& tree,
+                                   const secondary::Sample& sample, const int64_t start_idx,
+                                   const int64_t end_idx) {
+        if ((start_idx < 0) || (end_idx <= 0) || (start_idx >= end_idx) ||
+            (end_idx > std::ssize(sample.positions_major))) {
+            return false;
+        }
+        const int64_t start = sample.positions_major[start_idx];
+        const int64_t end = sample.positions_major[end_idx - 1];  // Inclusive for IntervalTree.
+        const std::vector<interval_tree::Interval<int64_t, int64_t>> positions =
+                tree.findOverlapping(start, end);
+        return !std::empty(positions);
+    };
+
+    const auto check_excess_deletions = [](const secondary::Sample& sample, const int64_t start_idx,
+                                           const int64_t end_idx, const bool reverse,
+                                           const int64_t major_bases, const double cov_fraction,
+                                           const int64_t min_abs_cov) {
+        /// @brief Returns true if any of the first/last `major_bases` major positions have many deletion
+        ///         counts (above `max(cov * cov_fraction, min_abs_cov)`).
+        static constexpr int8_t DEL_VAL = 5;  // Value representing deletion in base channel.
+
+        const int64_t cov = sample.features.size(1);
+        const int64_t min_count = std::max(min_abs_cov, static_cast<int64_t>(cov * cov_fraction));
+
+        if (!reverse) {
+            for (int64_t pos = start_idx, num_major = 0; pos < end_idx; ++pos) {
+                if (sample.positions_minor[pos] > 0) {
+                    continue;
+                }
+                ++num_major;
+                if (num_major > major_bases) {
+                    break;
+                }
+                const at::Tensor pos_slice = sample.features.index({pos});
+                const at::Tensor bases = pos_slice.index({torch::indexing::Slice(), 0});
+                const at::Tensor mask = (bases == DEL_VAL);
+                const int64_t count = mask.sum().item<int64_t>();
+                if (count >= min_count) {
+                    return true;
+                }
+            }
+        } else {
+            for (int64_t pos = (end_idx - 1), num_major = 0; pos >= start_idx; --pos) {
+                if (sample.positions_minor[pos] > 0) {
+                    continue;
+                }
+                ++num_major;
+                if (num_major > major_bases) {
+                    break;
+                }
+                const at::Tensor pos_slice = sample.features.index({pos});
+                const at::Tensor bases = pos_slice.index({torch::indexing::Slice(), 0});
+                const at::Tensor mask = (bases == DEL_VAL);
+                const int64_t count = mask.sum().item<int64_t>();
+                if (count >= min_count) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    };
+
+    const auto check_flanking_minor = [](const secondary::Sample& sample, const int64_t start_idx,
+                                         const int64_t end_idx, const bool reverse) {
+        /// @brief Returns true if the first/last position is a minor one.
+        if (std::empty(sample.positions_minor)) {
+            return false;
+        }
+        if (start_idx >= end_idx) {
+            return false;
+        }
+        if ((start_idx < 0) || (end_idx <= 0) ||
+            (start_idx >= std::ssize(sample.positions_minor)) ||
+            (end_idx > std::ssize(sample.positions_minor))) {
+            return false;
+        }
+        if (!reverse) {
+            return sample.positions_minor[start_idx] != 0;
+        } else {
+            return sample.positions_minor[end_idx - 1] != 0;
+        }
+        return false;
+    };
+
+    std::vector<secondary::Sample> results;
+    results.reserve(std::size(samples));
+
+    for (auto& sample : samples) {
+        const int64_t sample_len = static_cast<int64_t>(std::size(sample.positions_major));
+
+        // Get the interval tree of candidates for this sequence ID.
+        const auto it_seq_id = candidate_trees->find(sample.seq_id);
+        if (it_seq_id == std::cend(*candidate_trees)) {
+            spdlog::debug("Cannot find seq_id = {} in candidate_trees! Sample: {}", sample.seq_id,
+                          secondary::sample_to_string(sample));
+            continue;
+        }
+        const auto& tree = it_seq_id->second;
+
+        if (sample_len <= chunk_len) {
+            if (has_candidates(tree, sample, 0, sample_len)) {
+                results.emplace_back(std::move(sample));
+            }
+            continue;
+        }
+
+        const int64_t step = chunk_len - chunk_overlap;
+
+        // Create window coordinates.
+        std::vector<std::pair<int64_t, int64_t>> windows;
+        {
+            windows.reserve((sample_len - chunk_len) / chunk_overlap);
+            int64_t end = 0;
+            for (int64_t start = 0; start < (sample_len - chunk_len + 1); start += step) {
+                end = start + chunk_len;
+                windows.emplace_back(start, end);
+            }
+            if (end < sample_len) {
+                const int64_t start = sample_len - chunk_len;
+                end = sample_len;
+                windows.emplace_back(start, end);
+            }
+        }
+
+        // Find windows with candidates.
+        std::vector<bool> window_used(std::size(windows), false);
+        for (int64_t i = 0; i < std::ssize(windows); ++i) {
+            const auto [start, end] = windows[i];
+            if (has_candidates(tree, sample, start, end)) {
+                window_used[i] = true;
+            }
+        }
+
+        // Heuristic to include neighboring windows if there are possible
+        // deletions at the flanks.
+        if (ext_flanks) {
+            for (int64_t i = 0; i < std::ssize(windows); ++i) {
+                if (!window_used[i]) {
+                    continue;
+                }
+
+                // Extend to the left if needed.
+                for (int64_t j = i; j > 0; --j) {
+                    // Predecessor window is already used, no need to extend to the left any further.
+                    if (!window_used[j] || window_used[j - 1]) {
+                        break;
+                    }
+                    const auto [start, end] = windows[j];
+                    if (!check_excess_deletions(sample, start, end, false, ext_major_bases,
+                                                ext_cov_frac, ext_min_cov) ||
+                        !check_flanking_minor(sample, start, end, false)) {
+                        break;
+                    }
+                    window_used[j - 1] = true;
+                }
+
+                // Extend to the right if needed.
+                for (int64_t j = i; j < (std::ssize(windows) - 1); ++j) {
+                    // Next window is already used, no need to extend to the right any further.
+                    if (!window_used[j] || window_used[j + 1]) {
+                        break;
+                    }
+                    const auto [start, end] = windows[j];
+                    if (!check_excess_deletions(sample, start, end, true, ext_major_bases,
+                                                ext_cov_frac, ext_min_cov) ||
+                        !check_flanking_minor(sample, start, end, true)) {
+                        break;
+                    }
+                    window_used[j + 1] = true;
+                }
+            }
+        }
+
+        // Slice out selected windows to return.
+        for (int64_t i = 0; i < std::ssize(windows); ++i) {
+            if (window_used[i]) {
+                const auto [start, end] = windows[i];
+                results.emplace_back(slice_sample(sample, start, end, true));
+            }
+        }
+    }
+
+    return results;
+}
 /**
  * \brief This function performs the following operations:
  *          1. Merges adjacent samples, which were split for efficiency of computing the pileup.
@@ -643,7 +845,12 @@ merge_and_split_bam_regions_in_parallel(
         const int32_t window_overlap,
         const int32_t variant_flanking_bases,
         const int32_t window_interval_offset,
-        const bool continue_on_exception) {
+        const bool continue_on_exception,
+        const bool tiled_regions,
+        const bool tiled_ext_flanks,
+        const int64_t tiled_ext_major,
+        const int64_t tiled_ext_min_cov,
+        const float tiled_ext_cov_fract) {
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
     const auto debug_print_samples =
             [](std::ostream& os, const std::vector<secondary::Sample>& samples,
@@ -716,9 +923,16 @@ merge_and_split_bam_regions_in_parallel(
 
                 // Bluntly split samples for inference.
                 if (candidate_trees) {
-                    local_samples = split_samples_around_positions(std::move(local_samples),
-                                                                   candidate_trees, window_len,
-                                                                   variant_flanking_bases);
+                    if (!tiled_regions) {
+                        local_samples = split_samples_around_positions(std::move(local_samples),
+                                                                       candidate_trees, window_len,
+                                                                       variant_flanking_bases);
+                    } else {
+                        local_samples = split_samples_tiled_with_candidates(
+                                std::move(local_samples), candidate_trees, window_len,
+                                window_overlap, tiled_ext_flanks, tiled_ext_major,
+                                tiled_ext_min_cov, tiled_ext_cov_fract);
+                    }
                 } else {
                     local_samples =
                             split_samples(std::move(local_samples), window_len, window_overlap);
@@ -990,6 +1204,11 @@ void sample_producer(PolisherResources& resources,
                      const int32_t bam_subchunk_len,
                      const double max_available_mem,
                      const bool continue_on_exception,
+                     const bool tiled_regions,
+                     const bool tiled_ext_flanks,
+                     const int64_t tiled_ext_major,
+                     const int64_t tiled_ext_min_cov,
+                     const float tiled_ext_cov_fract,
                      utils::AsyncQueue<InferenceData>& infer_data,
                      std::atomic<bool>& worker_terminate,
                      WorkerReturnStatus& ret_status) {
@@ -1099,7 +1318,8 @@ void sample_producer(PolisherResources& resources,
                     Span<const secondary::Interval>(
                             std::data(bam_region_intervals) + region_id_start, num_regions),
                     candidate_trees, num_threads, window_len, window_overlap,
-                    variant_flanking_bases, window_id_start, continue_on_exception);
+                    variant_flanking_bases, window_id_start, continue_on_exception, tiled_regions,
+                    tiled_ext_flanks, tiled_ext_major, tiled_ext_min_cov, tiled_ext_cov_fract);
 
             if (std::size(samples) != std::size(trims)) {
                 throw std::runtime_error(
