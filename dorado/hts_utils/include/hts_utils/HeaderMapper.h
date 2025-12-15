@@ -49,6 +49,8 @@ public:
     // Create a shared sam header by merging all dynamic headers.
     SamHdrPtr get_shared_merged_header(bool strip_alignments) const;
 
+    bool has_barcodes() const { return m_has_barcodes; }
+
 private:
     const bool m_strip_alignment;
     // Store this fallback for when we don't find a read group
@@ -65,6 +67,7 @@ private:
     AttributeMap get_read_attrs_by_id(const std::vector<utils::HeaderLineData>& header_lines);
 
     bool m_fastq_runtime_warning_issued{false};
+    bool m_has_barcodes{false};
 };
 
 }  // namespace dorado::utils

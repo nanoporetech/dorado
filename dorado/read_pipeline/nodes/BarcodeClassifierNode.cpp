@@ -115,6 +115,22 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
     if (bc != UNCLASSIFIED_BARCODE) {
         bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
+        bam_aux_update_str(irecord, "bv", int(read.barcoding_result->variant.length() + 1),
+                           read.barcoding_result->variant.c_str());
+
+        std::vector<float> barcode_info;
+        barcode_info.reserve(7);  // update if dual-barcoding implemented
+        barcode_info.push_back(read.barcoding_result->barcode_score);
+        barcode_info.push_back(read.barcoding_result->top_barcode_pos.first);  // front_start_index
+        barcode_info.push_back(read.barcoding_result->top_barcode_pos.second -
+                               read.barcoding_result->top_barcode_pos.first);
+        barcode_info.push_back(read.barcoding_result->top_barcode_score);
+        barcode_info.push_back(read.barcoding_result->bottom_barcode_pos.second);  // rear_end_index
+        barcode_info.push_back(read.barcoding_result->bottom_barcode_pos.second -
+                               read.barcoding_result->bottom_barcode_pos.first);
+        barcode_info.push_back(read.barcoding_result->bottom_barcode_score);
+        bam_aux_update_array(irecord, "bi", 'f', barcode_info.size(), barcode_info.data());
+
         auto rg_tag = bam_aux_get(irecord, "RG");
         if (rg_tag) {
             std::string rg_tag_value = bam_aux2Z(rg_tag);
@@ -128,10 +144,15 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
             }
         }
     } else {
-        auto bc_tag = bam_aux_get(irecord, "BC");
-        if (bc_tag) {
-            bam_aux_del(irecord, bc_tag);
-        }
+        auto delete_tag = [irecord](const char* tag) {
+            auto aux_tag = bam_aux_get(irecord, tag);
+            if (aux_tag) {
+                bam_aux_del(irecord, aux_tag);
+            }
+        };
+        delete_tag("BC");
+        delete_tag("bv");
+        delete_tag("bi");
     }
     m_num_records++;
     {

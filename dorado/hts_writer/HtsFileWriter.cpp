@@ -2,23 +2,25 @@
 
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
+#include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
 
 #include <atomic>
+#include <stdexcept>
 
 namespace dorado {
 namespace hts_writer {
 
 void HtsFileWriter::process(const Processable item) {
     // Type-specific dispatch to handle(T)
-    dispatch_processable(item, [this](const auto &t) { this->prepare_item(t); });
+    dispatch_processable(item, [this](auto &t) { this->prepare_item(t); });
     dispatch_processable(item, [this](const auto &t) { this->handle(t); });
     dispatch_processable(item, [this](const auto &t) { this->update_stats(t); });
 }
 
-void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
+void HtsFileWriter::prepare_item(HtsData &hts_data) const {
     if (m_mode == OutputMode::FASTQ) {
         if (!m_gpu_names.empty()) {
             bam_aux_append(hts_data.bam_ptr.get(), "DS", 'Z', int(m_gpu_names.length() + 1),
@@ -34,6 +36,19 @@ void HtsFileWriter::prepare_item(const HtsData &hts_data) const {
                 hts_data.read_attrs.protocol_start_time_ms);
         bam_aux_append(hts_data.bam_ptr.get(), "DT", 'Z', int(exp_start_time_str.length() + 1),
                        reinterpret_cast<const uint8_t *>(exp_start_time_str.c_str()));
+
+        if (hts_data.barcoding_result &&
+            hts_data.barcoding_result->barcode_name != UNCLASSIFIED_STR) {
+            std::string barcode_name =
+                    barcode_kits::normalize_barcode_name(hts_data.barcoding_result->barcode_name);
+            std::string_view alias = hts_data.barcoding_result->alias.empty()
+                                             ? barcode_name
+                                             : hts_data.barcoding_result->alias;
+            bam_aux_update_str(hts_data.bam_ptr.get(), "SM",
+                               static_cast<int>(barcode_name.length() + 1), barcode_name.c_str());
+            bam_aux_update_str(hts_data.bam_ptr.get(), "al", static_cast<int>(alias.length() + 1),
+                               alias.data());
+        }
     }
 
     // Verify that the MN tag, if it exists, and the sequence length are in sync.

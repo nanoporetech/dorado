@@ -142,11 +142,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 .default_value(0)
                 .scan<'i', int>();
         parser.add_argument("--emit-moves").help("Write the move table to the 'mv' tag.").flag();
-        parser.add_argument("--emit-summary")
-                .help("Generate a summary file in the --output-dir (or the current working "
-                      "directory if not set).")
-                .flag();
-        cli::add_basecaller_output_arguments(parser);
+        cli::add_basecaller_output_arguments(parser, true);
     }
     {
         parser.add_group("Alignment arguments");
@@ -220,7 +216,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
         parser.add_argument("--trim")
                 .help("Specify what to trim. Options are 'none', 'all', and 'adapters'. The "
                       "default behaviour is to trim all detected adapters, primers, and barcodes. "
-                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivelent to "
+                      "Choose 'adapters' to just trim adapters. The 'none' choice is equivalent to "
                       "using --no-trim. Note that this only applies to DNA. RNA adapters are "
                       "always trimmed.")
                 .default_value(std::string{});
@@ -354,11 +350,6 @@ void setup(const std::vector<std::string>& args,
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());
 
-    if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
-        std::string err = "No POD5 data found in path: " + pod5_folder_info.path().string();
-        throw std::runtime_error(err);
-    }
-
     auto read_list = utils::load_read_list(read_list_file_path);
     size_t num_reads = file_info::get_num_reads(pod5_folder_info.files().get(), read_list, {});
     if (num_reads == 0) {
@@ -447,8 +438,8 @@ void setup(const std::vector<std::string>& args,
     }
 
     auto read_groups = file_info::load_read_groups(
-            pod5_folder_info.files().get(), models.get_simplex_model_name(),
-            utils::join(models.get_modbase_model_names(), ","));
+            pod5_folder_info.files().get(), models.get_simplex_config().stride,
+            models.get_simplex_model_name(), utils::join(models.get_modbase_model_names(), ","));
 
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
@@ -774,6 +765,11 @@ int basecaller(int argc, char* argv[]) {
     }
     const InputPod5FolderInfo pod5_folder_info(data_path, std::move(input_pod5s));
 
+    if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
+        spdlog::error("No POD5 data found in path: {}", pod5_folder_info.path().string());
+        return EXIT_FAILURE;
+    }
+
     const auto device = cli::parse_device(parser);
 
     if (parser.get<std::string>("--reference").empty() &&
@@ -903,7 +899,7 @@ int basecaller(int argc, char* argv[]) {
         setup(args, models, pod5_folder_info, device, parser.get<std::string>("--reference"),
               parser.get<std::string>("--bed-file"), default_parameters.num_runners, modbase_params,
               cli::get_output_dir(parser), cli::get_emit_fastq(parser), cli::get_emit_sam(parser),
-              parser.get<bool>("--emit-moves"), parser.get<bool>("--emit-summary"),
+              parser.get<bool>("--emit-moves"), cli::get_emit_summary(parser),
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
               parser.get<std::string>("--read-ids"), *minimap_options,
               parser.get<std::string>("--dump_stats_file"),

@@ -247,7 +247,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     dest=${aligner_output_dir}/bam
     $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest}
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
-    core="./test/20231125_1913_0_TEST_4524e8b9"
+    core="test/test/20231125_1913_0_TEST_4524e8b9"
     expected=(
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam"
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam.bai"
@@ -258,7 +258,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     dest=${aligner_output_dir}/no-sort
     $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --no-sort
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
-    core="./test/20231125_1913_0_TEST_4524e8b9"
+    core="test/test/20231125_1913_0_TEST_4524e8b9"
     expected=(
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam"
     )
@@ -268,7 +268,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     dest=${aligner_output_dir}/sam
     $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --emit-sam 
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
-    core="./test/20231125_1913_0_TEST_4524e8b9"
+    core="test/test/20231125_1913_0_TEST_4524e8b9"
     expected=(
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.sam"
     )

@@ -14,6 +14,7 @@ namespace dorado::file_info {
 
 std::unordered_map<std::string, ReadGroup> load_read_groups(
         const std::vector<std::filesystem::directory_entry>& dir_files,
+        int model_stride,
         const std::string& model_name,
         const std::string& modbase_model_names);
 

@@ -2,6 +2,7 @@
 
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
+#include "hts_writer_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
@@ -27,32 +28,6 @@ std::tm get_gmtime(const std::time_t* time) {
     std::lock_guard lock(gmtime_mutex);
     std::tm* time_buffer = gmtime(time);
     return *time_buffer;
-}
-
-void create_output_folder(const std::filesystem::path& path) {
-#ifdef _WIN32
-    static std::once_flag long_path_warning_flag;
-    if (path.string().size() >= 260) {
-        std::call_once(long_path_warning_flag, [&path] {
-            spdlog::warn("Filepaths longer than 260 characters may cause issues on Windows.");
-        });
-    }
-#endif
-
-    if (std::filesystem::exists(path.parent_path())) {
-        return;
-    }
-
-    spdlog::debug("Creating output folder: '{}'. Length:{}", path.parent_path().string(),
-                  path.string().size());
-    std::error_code creation_error;
-    // N.B. No error code if folder already exists.
-    fs::create_directories(path.parent_path(), creation_error);
-    if (creation_error) {
-        spdlog::error("Unable to create output folder '{}'.  ErrorCode({}) {}", path.string(),
-                      creation_error.value(), creation_error.message());
-        throw std::runtime_error("Failed to create output directory");
-    }
 }
 
 }  // namespace
@@ -176,28 +151,36 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
         barcode_name = hts_data.barcoding_result->barcode_name;
     } else if (hts_data.bam_ptr) {
         // No barcoding result - check the BC tag in case this is a barcoded read we've read in from file
-        const auto bc_tag = bam_aux_get(hts_data.bam_ptr.get(), "BC");
-        if (bc_tag) {
-            barcode_name = bam_aux2Z(bc_tag);
+        auto get_tag_value = [&hts_data](const char* tag) -> std::string {
+            const auto aux_tag = bam_aux_get(hts_data.bam_ptr.get(), tag);
+            if (!aux_tag) {
+                return {};
+            }
+            std::string barcode = bam_aux2Z(aux_tag);
             for (const auto& [kit_name, kit_info] : barcode_kits::get_kit_infos()) {
-                if (barcode_name.starts_with(kit_name) &&
-                    barcode_name.size() > kit_name.size() + 1) {
+                if (barcode.starts_with(kit_name) && barcode.size() > kit_name.size() + 1) {
                     // strip the kit name from the barcode
-                    barcode_name = barcode_name.substr(kit_name.size() + 1);
+                    barcode = barcode.substr(kit_name.size() + 1);
                     break;
                 }
             }
-            return std::string(barcode_name);
-        }
-        // Unclassified reads read from file won't have a BC tag. If we've been told this is a demux operation,
-        // ensure these reads are correctly placed in the unclassified folder
-        if (m_assume_barcodes) {
-            return UNCLASSIFIED_STR;
+            return barcode;
+        };
+
+        for (const auto tag : {"BC", "al", "SM"}) {
+            if (const auto tag_value = get_tag_value(tag); !tag_value.empty()) {
+                return tag_value;
+            }
         }
     }
 
     // No barcode
     if (barcode_name.empty()) {
+        // Unclassified reads read from file won't have a BC tag. If we've been told this is a demux operation,
+        // ensure these reads are correctly placed in the unclassified folder
+        if (m_assume_barcodes) {
+            return UNCLASSIFIED_STR;
+        }
         return {};
     }
 

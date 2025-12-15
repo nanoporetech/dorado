@@ -1,13 +1,19 @@
 #include "hts_writer/SummaryFileWriter.h"
 
+#include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_writer_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/string_utils.h"
+#include "utils/time_utils.h"
 
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 #include <array>
 #include <iomanip>
+#include <ostream>
+#include <sstream>
 #include <string_view>
 #include <vector>
 
@@ -122,6 +128,27 @@ std::vector<T> get_array(bam1_t* record, const char* tagname) {
     return tag_value;
 }
 
+int get_min_qscore(sam_hdr_t* header) {
+    auto command_line_cl =
+            dorado::utils::extract_pg_keys_from_hdr(header, {"CL"}, "ID", "basecaller");
+    // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
+    std::stringstream cl{command_line_cl["CL"]};
+    std::string out;
+    while (cl.good()) {
+        cl >> std::quoted(out);
+        if (out == "--min-qscore") {
+            cl >> std::quoted(out);
+            return std::atoi(out.c_str());
+        }
+    }
+    return 0;
+}
+
+std::ofstream create_file_stream(const std::filesystem::path& output_path) {
+    dorado::hts_writer::create_output_folder(output_path);
+    return std::ofstream(output_path);
+}
+
 }  // namespace
 
 namespace dorado::hts_writer {
@@ -129,7 +156,7 @@ namespace dorado::hts_writer {
 SummaryFileWriter::SummaryFileWriter(const std::filesystem::path& output_directory,
                                      FieldFlags flags)
         : m_field_flags(flags),
-          m_summary_file(output_directory / "sequencing_summary.txt"),
+          m_summary_file(create_file_stream(output_directory / "sequencing_summary.txt")),
           m_summary_stream(m_summary_file) {
     init();
 }
@@ -183,11 +210,26 @@ void SummaryFileWriter::init() {
     m_summary_stream << '\n';
 }
 
+void SummaryFileWriter::set_shared_header(dorado::SamHdrSharedPtr header) {
+    if (m_dynamic_header != nullptr) {
+        throw std::logic_error("set_shared_header is incompatible with set_dynamic_header.");
+    }
+    m_shared_header = std::move(header);
+}
+
+void SummaryFileWriter::set_dynamic_header(
+        const std::shared_ptr<utils::HeaderMapper::HeaderMap>& header_map) {
+    if (m_shared_header != nullptr) {
+        throw std::logic_error("set_dynamic_header is incompatible with set_shared_header.");
+    }
+    m_dynamic_header = header_map;
+};
+
 void SummaryFileWriter::process(const Processable item) {
     dispatch_processable(item, [this](const auto& t) { this->handle(t); });
 }
 
-void SummaryFileWriter::handle(const HtsData& data) {
+void SummaryFileWriter::handle(const HtsData& data) const {
     // skip secondary and supplementary alignments in the summary
     if (data.bam_ptr->core.flag & (BAM_FSECONDARY | BAM_FSUPPLEMENTARY)) {
         return;
@@ -196,6 +238,10 @@ void SummaryFileWriter::handle(const HtsData& data) {
     // Write column data
 
     auto record = data.bam_ptr.get();
+    auto duration = get_tag(record, "du", 0.f);
+    auto num_samples = get_tag(record, "ns", 0);
+    auto sample_rate = (duration > 0) ? num_samples / duration : 0.f;
+
     m_summary_stream << get_tag<std::string>(record, "fn", "unknown");
     m_summary_stream << separator << "0";  // batch_id
     m_summary_stream << separator << get_tag<std::string>(record, "pi", bam_get_qname(record));
@@ -203,21 +249,22 @@ void SummaryFileWriter::handle(const HtsData& data) {
     m_summary_stream << separator << data.read_attrs.protocol_run_id;
     m_summary_stream << separator << get_tag(record, "ch", 0);
     m_summary_stream << separator << get_tag(record, "mx", 0);
-    m_summary_stream << separator << data.read_attrs.num_minknow_events;
+    m_summary_stream << separator << get_tag(record, "me", uint32_t(0));
     m_summary_stream << separator << (data.read_attrs.start_time_ms / 1000.f);
-    m_summary_stream << separator << get_tag(record, "du", 0.f);
+    m_summary_stream << separator << duration;
 
     if (m_field_flags & BASECALLING_FIELDS) {
-        auto trimmed_duration = (data.read_attrs.start_time_ms / 1000.f) +
-                                (get_tag(record, "ts", 0) / float(data.read_attrs.sample_rate));
-        auto template_duration = float(get_tag(record, "ns", 0) - get_tag(record, "ts", 0)) /
-                                 data.read_attrs.sample_rate;
+        auto template_start = sample_rate != 0 ? (data.read_attrs.start_time_ms / 1000.f) +
+                                                         (get_tag(record, "ts", 0) / sample_rate)
+                                               : 0.f;
+        auto template_samples = get_tag(record, "ns", 0) - get_tag(record, "ts", 0);
+        auto template_duration = sample_rate != 0 ? float(template_samples) / sample_rate : 0.f;
 
         m_summary_stream << separator << (data.read_attrs.is_status_pass ? "TRUE" : "FALSE");
-        m_summary_stream << separator << trimmed_duration;
+        m_summary_stream << separator << template_start;
         auto template_events =
                 data.read_attrs.model_stride > 0
-                        ? static_cast<uint64_t>(trimmed_duration / data.read_attrs.model_stride)
+                        ? static_cast<uint64_t>(template_samples / data.read_attrs.model_stride)
                         : 0;
         m_summary_stream << separator << template_events;
         m_summary_stream << separator << template_duration;
@@ -239,10 +286,12 @@ void SummaryFileWriter::handle(const HtsData& data) {
         }
     }
     if (m_field_flags & EXPERIMENT_FIELDS) {
-        m_summary_stream << separator << data.read_attrs.pore_type;
-        m_summary_stream << separator << data.read_attrs.experiment_id;
+        m_summary_stream << separator << get_tag<std::string>(record, "po", "not_set");
+        m_summary_stream << separator
+                         << (data.read_attrs.experiment_id.empty() ? "unknown"
+                                                                   : data.read_attrs.experiment_id);
         m_summary_stream << separator << data.read_attrs.sample_id;
-        m_summary_stream << separator << data.read_attrs.end_reason;
+        m_summary_stream << separator << get_tag<std::string>(record, "er", "unknown");
     }
     if (m_field_flags & BARCODING_FIELDS) {
         std::string alias = "unknown";
@@ -264,18 +313,20 @@ void SummaryFileWriter::handle(const HtsData& data) {
                     barcode_kits::normalize_barcode_name(data.barcoding_result->barcode_name);
             alias = data.barcoding_result->alias.empty() ? barcode_arrangement
                                                          : data.barcoding_result->alias;
-            type = data.barcoding_result->type.empty() ? "na" : data.barcoding_result->type;
+            type = data.barcoding_result->type;
             barcode_kit = data.barcoding_result->kit;
-            barcode_variant = data.barcoding_result->variant;
-            barcode_score = data.barcoding_result->barcode_score;
-            barcode_front_score = data.barcoding_result->top_barcode_score;
-            barcode_rear_score = data.barcoding_result->bottom_barcode_score;
-            barcode_front_foundseq_length = data.barcoding_result->top_barcode_pos.second -
-                                            data.barcoding_result->top_barcode_pos.first;
-            barcode_rear_foundseq_length = data.barcoding_result->bottom_barcode_pos.second -
-                                           data.barcoding_result->bottom_barcode_pos.first;
-            barcode_front_begin_index = data.barcoding_result->top_barcode_pos.first;
-            barcode_rear_end_index = data.barcoding_result->bottom_barcode_pos.second;
+            barcode_variant = get_tag<std::string>(data.bam_ptr.get(), "bv", "n/a");
+
+            auto barcode_info = get_array<float>(record, "bi");
+            if (barcode_info.size() == 7) {
+                barcode_score = barcode_info[0];
+                barcode_front_begin_index = static_cast<int>(barcode_info[1]);
+                barcode_front_foundseq_length = static_cast<int>(barcode_info[2]);
+                barcode_front_score = barcode_info[3];
+                barcode_rear_end_index = static_cast<int>(barcode_info[4]);
+                barcode_rear_foundseq_length = static_cast<int>(barcode_info[5]);
+                barcode_rear_score = barcode_info[6];
+            }
         }
 
         m_summary_stream << separator << alias;
@@ -314,7 +365,19 @@ void SummaryFileWriter::handle(const HtsData& data) {
         int alignment_num_supplementary_alignments = 0;
 
         if (!(record->core.flag & BAM_FUNMAP)) {
-            alignment_genome = sam_hdr_tid2name(m_shared_header.get(), record->core.tid);
+            if (m_dynamic_header != nullptr) {
+                const auto& it = m_dynamic_header->find(data.read_attrs);
+                if (it == m_dynamic_header->cend()) {
+                    spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
+                                  utils::get_read_group_tag(data.bam_ptr.get()),
+                                  data.read_attrs.protocol_run_id);
+                    throw std::runtime_error("SummaryFileWriter - Failed to load dynamic header.");
+                }
+                alignment_genome =
+                        sam_hdr_tid2name(it->second->get_merged_header(), record->core.tid);
+            } else if (m_shared_header != nullptr) {
+                alignment_genome = sam_hdr_tid2name(m_shared_header.get(), record->core.tid);
+            }
             alignment_direction = bam_is_rev(record) ? "-" : "+";
             alignment_genome_start = int32_t(record->core.pos);
             alignment_genome_end = int32_t(bam_endpos(record));
@@ -380,6 +443,110 @@ void SummaryFileWriter::shutdown() {
     // close the file if we're working with a file path
     if (m_summary_file.is_open()) {
         m_summary_file.close();
+    }
+}
+
+SummaryFileWriter::ReadInitialiser::ReadInitialiser(sam_hdr_t* hdr, AlignmentCounts aln_counts)
+        : m_header(hdr),
+          m_alignment_counts(std::move(aln_counts)),
+          m_read_groups(utils::parse_read_groups(m_header)),
+          m_minimum_qscore(get_min_qscore(m_header)) {}
+
+void SummaryFileWriter::ReadInitialiser::update_read_attributes(HtsData& data) const {
+    if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+        const std::string rg_tag_value = bam_aux2Z(rg_tag);
+        const auto& read_group = m_read_groups.at(rg_tag_value);
+        data.read_attrs.model_stride = read_group.model_stride;
+        data.read_attrs.experiment_id = read_group.experiment_id;
+        data.read_attrs.sample_id = read_group.sample_id;
+        // position_id is not currently stored in the output files
+        // data.read_attrs.position_id = read_group.position_id;
+        data.read_attrs.flowcell_id = read_group.flowcell_id;
+        data.read_attrs.protocol_run_id = read_group.run_id;
+        data.read_attrs.protocol_start_time_ms =
+                utils::get_unix_time_ms_from_string_timestamp(read_group.exp_start_time);
+
+        if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
+            const float qscore = static_cast<float>(bam_aux2f(qs_tag));
+            data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
+        }
+
+        try {
+            if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
+                const std::string read_start_time_str = bam_aux2Z(st_tag);
+                const auto acq_start_time =
+                        utils::get_unix_time_ms_from_string_timestamp(read_group.acq_start_time);
+                const auto read_start_time =
+                        utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
+                data.read_attrs.start_time_ms = read_start_time - acq_start_time;
+            }
+        } catch (...) {
+            // can't parse something, ignore start_time and continue
+        }
+    }
+}
+
+void SummaryFileWriter::ReadInitialiser::update_barcoding_fields(HtsData& data) const {
+    if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
+        const std::string rg_tag_value = bam_aux2Z(rg_tag);
+        KString ks_wrapper(100000);
+        auto& ks = ks_wrapper.get();
+
+        auto barcoding_result = std::make_shared<BarcodeScoreResult>();
+        bool found = false;
+        if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
+            barcoding_result->barcode_name = std::string(ks.s, ks.l);
+            found = true;
+        }
+        if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
+            barcoding_result->alias = std::string(ks.s, ks.l);
+            found = true;
+        }
+        if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
+            barcoding_result->kit = std::string(ks.s, ks.l);
+            found = true;
+        }
+        if (found) {
+            data.barcoding_result = std::move(barcoding_result);
+        }
+    }
+}
+
+void SummaryFileWriter::ReadInitialiser::update_alignment_fields(HtsData& data) const {
+    const auto alignment_counts_it = m_alignment_counts.find(bam_get_qname(data.bam_ptr.get()));
+    if (alignment_counts_it != std::end(m_alignment_counts)) {
+        const auto& counts = alignment_counts_it->second;
+        data.read_attrs.num_alignments = counts[0];
+        data.read_attrs.num_secondary_alignments = counts[1];
+        data.read_attrs.num_supplementary_alignments = counts[2];
+    }
+}
+
+void update_alignment_counts(const std::filesystem::path& path,
+                             SummaryFileWriter::AlignmentCounts& alignment_counts) {
+    const auto file = dorado::HtsFilePtr(hts_open(path.string().c_str(), "r"));
+    if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam) {
+        return;
+    }
+
+    dorado::SamHdrPtr header(sam_hdr_read(file.get()));
+    if (header->n_targets == 0) {
+        return;
+    }
+
+    BamPtr record(bam_init1());
+    while (sam_read1(file.get(), header.get(), record.get()) >= 0) {
+        if (record->core.flag & BAM_FUNMAP) {
+            continue;
+        }
+        auto& read_counts = alignment_counts[bam_get_qname(record.get())];
+        if (record->core.flag & BAM_FSUPPLEMENTARY) {
+            ++read_counts[2];
+        }
+        if (record->core.flag & BAM_FSECONDARY) {
+            ++read_counts[1];
+        }
+        ++read_counts[0];
     }
 }
 

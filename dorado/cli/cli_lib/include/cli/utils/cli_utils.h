@@ -3,7 +3,11 @@
 
 #include "config/BatchParams.h"
 #include "dorado_version.h"
+#include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
+#include "hts_writer/SummaryFileWriter.h"
+#include "read_pipeline/base/HtsReader.h"
 #include "torch_utils/auto_detect_device.h"
 
 #if DORADO_CUDA_BUILD
@@ -11,6 +15,7 @@
 #endif
 
 #include "utils/dev_utils.h"
+#include "utils/fs_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <htslib/sam.h>
@@ -19,12 +24,14 @@
 #include <algorithm>
 #include <cctype>
 #include <cmath>
+#include <filesystem>
 #include <iostream>
 #include <optional>
 #include <sstream>
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <tuple>
 #include <utility>
 #include <vector>
 
@@ -211,6 +218,80 @@ inline std::string parse_device(const argparse::ArgumentParser& parser) {
     }
 
     return device;
+}
+
+inline std::vector<std::filesystem::path> collect_inputs(const std::string& input_folder,
+                                                         bool recursive) {
+    namespace fs = std::filesystem;
+    auto is_valid_input_file = [](const fs::path& input_path) -> bool {
+        HtsFilePtr hts_file(hts_open(input_path.string().c_str(), "r"));
+        if (!hts_file) {
+            return false;
+        }
+
+        SamHdrPtr header(sam_hdr_read(hts_file.get()));
+        return header != nullptr;
+    };
+
+    if (input_folder.empty()) {
+        if (recursive) {
+            spdlog::warn("--recursive is not valid if input is stdin. This argument is ignored.");
+        }
+        return {fs::path("-")};
+    }
+
+    const auto all_files = utils::fetch_directory_entries(input_folder, recursive);
+
+    std::vector<fs::path> inputs;
+    inputs.reserve(all_files.size());
+    for (const fs::directory_entry& dir_entry : all_files) {
+        if (!is_valid_input_file(dir_entry.path())) {
+            continue;
+        }
+        inputs.push_back(dir_entry.path());
+    }
+
+    spdlog::trace("Collected {} valid input files from '{}'{}.", inputs.size(), input_folder,
+                  recursive ? " recursively" : "");
+    return inputs;
+}
+
+inline std::tuple<hts_writer::SummaryFileWriter::FieldFlags,
+                  hts_writer::SummaryFileWriter::AlignmentCounts>
+make_summary_info(const std::vector<std::filesystem::path>& all_files) {
+    using namespace hts_writer;
+    SummaryFileWriter::FieldFlags flags =
+            SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
+    SummaryFileWriter::AlignmentCounts alignment_counts;
+    if (!(all_files.size() == 1 && all_files[0] == "-")) {
+        for (const auto& input_file : all_files) {
+            update_alignment_counts(input_file, alignment_counts);
+            HtsReader reader(input_file.string(), std::nullopt);
+            if (reader.is_aligned) {
+                flags |= SummaryFileWriter::ALIGNMENT_FIELDS;
+            }
+            auto command_line_cl =
+                    utils::extract_pg_keys_from_hdr(reader.header(), {"CL"}, "ID", "basecaller");
+            // If dorado was run with --estimate-poly-a option, output polyA related fields in the summary
+            if (command_line_cl["CL"].find("estimate-poly-a") != std::string::npos) {
+                flags |= SummaryFileWriter::POLYA_FIELDS;
+            }
+
+            SamHdrSharedPtr shared_hdr(sam_hdr_dup(reader.header()));
+            auto hdr = const_cast<sam_hdr_t*>(shared_hdr.get());
+            int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
+            KString tag_wrapper(100000);
+            auto& tag_value = tag_wrapper.get();
+            for (int i = 0; i < num_rg_lines; ++i) {
+                if (sam_hdr_find_tag_pos(hdr, "RG", i, "SM", &tag_value) == 0) {
+                    flags |= SummaryFileWriter::BARCODING_FIELDS;
+                    break;
+                }
+            }
+        }
+    }
+
+    return {flags, alignment_counts};
 }
 
 }  // namespace cli

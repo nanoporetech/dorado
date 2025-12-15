@@ -1,6 +1,7 @@
 #include "hts_utils/HeaderMapper.h"
 
 #include "hts_utils/FastxSequentialReader.h"
+#include "hts_utils/KString.h"
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/fastq_tags.h"
@@ -136,9 +137,12 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
             continue;
         }
 
+        m_has_barcodes |= rg_data.has_barcodes;
+
         HtsData::ReadAttributes& attrs = it->second;
         assign_not_empty(attrs.flowcell_id, rg_data.data.flowcell_id);
-        assign_not_empty(attrs.position_id, rg_data.data.device_id);
+        // TODO: position_id is not in the specification yet
+        // assign_not_empty(attrs.position_id, rg_data.data.position_id);
         assign_not_empty(attrs.sample_id, rg_data.data.sample_id);
         assign_not_empty(attrs.protocol_run_id, rg_data.data.run_id);
         assign_not_empty(attrs.experiment_id, rg_data.data.experiment_id);
@@ -172,6 +176,22 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
         throw std::runtime_error("Could not open header for mapping");
     }
 
+    {
+        KString tag_wrapper(100000);
+        auto& tag_value = tag_wrapper.get();
+        int num_rg_lines = sam_hdr_count_lines(header.get(), "RG");
+        for (int i = 0; i < num_rg_lines; ++i) {
+            if (sam_hdr_find_tag_pos(header.get(), "RG", i, "SM", &tag_value) == 0) {
+                m_has_barcodes = true;
+                break;
+            }
+            if (sam_hdr_find_tag_pos(header.get(), "RG", i, "al", &tag_value) == 0) {
+                m_has_barcodes = true;
+                break;
+            }
+        }
+    }
+
     const auto header_lines = utils::parse_header(*header.get(), {utils::HeaderLineType::RG});
 
     // Map read group ids to ReadAttributes (struct containing file naming parameters)
@@ -198,7 +218,7 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
     // @RG	ID:e705d8cfbbe8a6bc43a865c71ace09553e8f15cd_dna_r10.4.1_e8.2_400bps_hac@v5.0.0
     //  DT:2022-10-18T10:38:07.247961+00:00
     //  DS:runid=e705d8cfbbe8a6bc43a865c71ace09553e8f15cd ...
-    //  LB:PCR_zymo PL:ONT   PM:4A  PU:PAM93185
+    //  LB:PCR_zymo PL:ONT   PM:MN12345  PU:PAM93185
     std::unordered_map<std::string, HtsData::ReadAttributes> rg_id_to_attrs_lut;
     for (const auto& rg_line : rg_lines) {
         if (rg_line.header_type != utils::HeaderLineType::RG) {
@@ -237,7 +257,8 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
         const std::string ds = (tag_it != std::end(tags)) ? tag_it->second : "";
         const auto ds_tokens = tokenize(ds, ' ');
         assign_not_empty(attrs.protocol_run_id, parse_DS_tag_key(ds_tokens, "runid="));
-        // TODO: experiment_id and acquisition_id are not in the specification yet
+        assign_not_empty(attrs.experiment_id, parse_DS_tag_key(ds_tokens, "experiment_id="));
+        // TODO: acquisition_id is not in the specification yet
     }
 
     return rg_id_to_attrs_lut;

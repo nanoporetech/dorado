@@ -1,11 +1,19 @@
 #pragma once
 
+#include "hts_utils/HeaderMapper.h"
 #include "hts_utils/hts_types.h"
 #include "interface.h"
 
+#include <array>
 #include <filesystem>
 #include <fstream>
+#include <iosfwd>
 #include <memory>
+#include <optional>
+#include <string>
+#include <unordered_map>
+
+struct sam_hdr_t;
 
 namespace dorado {
 class HtsData;
@@ -14,6 +22,7 @@ namespace hts_writer {
 
 class SummaryFileWriter : public IWriter {
 public:
+    using AlignmentCounts = std::unordered_map<std::string, std::array<int, 3>>;
     using FieldFlags = uint32_t;
     static constexpr FieldFlags BASECALLING_FIELDS = 1 << 0;
     static constexpr FieldFlags POLYA_FIELDS = 1 << 1;
@@ -22,8 +31,27 @@ public:
     static constexpr FieldFlags ALIGNMENT_FIELDS = 1 << 4;
     static constexpr FieldFlags DUPLEX_FIELDS = 1 << 5;
 
+    class ReadInitialiser {
+    public:
+        ReadInitialiser(sam_hdr_t* hdr, AlignmentCounts aln_counts);
+        void update_read_attributes(HtsData& data) const;
+        void update_barcoding_fields(HtsData& data) const;
+        void update_alignment_fields(HtsData& data) const;
+
+    private:
+        sam_hdr_t* m_header;
+        AlignmentCounts m_alignment_counts;
+        std::unordered_map<std::string, dorado::ReadGroup> m_read_groups;
+        int m_minimum_qscore;
+    };
+
     SummaryFileWriter(const std::filesystem::path& output_directory, FieldFlags flags);
     SummaryFileWriter(std::ostream& stream, FieldFlags flags);
+
+    // Set a single header to write to all output files
+    void set_shared_header(SamHdrSharedPtr header);
+    // Set a lookup for pre-built output headers based indexed on read attributes at file write time.
+    void set_dynamic_header(const std::shared_ptr<utils::HeaderMapper::HeaderMap>& header_map);
 
     void process(const Processable item) override;
     void shutdown() override;
@@ -31,18 +59,20 @@ public:
     std::string get_name() const override { return "SummaryFileWriter"; }
     stats::NamedStats sample_stats() const override { return {}; }
 
-    void set_header(SamHdrSharedPtr header) { m_shared_header = std::move(header); }
-
 private:
     void init();
-    void handle(const HtsData& item);
+    void handle(const HtsData& item) const;
 
     SamHdrSharedPtr m_shared_header{nullptr};
+    std::shared_ptr<utils::HeaderMapper::HeaderMap> m_dynamic_header{nullptr};
 
     const FieldFlags m_field_flags;
     std::ofstream m_summary_file;
     std::ostream& m_summary_stream;
 };
+
+void update_alignment_counts(const std::filesystem::path& path,
+                             SummaryFileWriter::AlignmentCounts& alignment_counts);
 
 }  // namespace hts_writer
 }  // namespace dorado
