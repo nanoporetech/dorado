@@ -492,15 +492,22 @@ void SummaryFileWriter::ReadInitialiser::update_barcoding_fields(HtsData& data) 
         KString ks_wrapper(100000);
         auto& ks = ks_wrapper.get();
 
-        data.barcoding_result = std::make_shared<BarcodeScoreResult>();
+        auto barcoding_result = std::make_shared<BarcodeScoreResult>();
+        bool found = false;
         if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
-            data.barcoding_result->barcode_name = std::string(ks.s, ks.l);
+            barcoding_result->barcode_name = std::string(ks.s, ks.l);
+            found = true;
         }
         if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
-            data.barcoding_result->alias = std::string(ks.s, ks.l);
+            barcoding_result->alias = std::string(ks.s, ks.l);
+            found = true;
         }
         if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "bk", &ks) == 0) {
-            data.barcoding_result->kit = std::string(ks.s, ks.l);
+            barcoding_result->kit = std::string(ks.s, ks.l);
+            found = true;
+        }
+        if (found) {
+            data.barcoding_result = std::move(barcoding_result);
         }
     }
 }

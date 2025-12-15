@@ -628,11 +628,15 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     const std::string expected_base =
             "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
 
+    const auto expected_classification_folder =
+            alias.empty() ? fs::path("unclassified") : fs::path(alias);
+
     std::ostringstream oss;
-    oss << "PAO25751" << "_pass_" << alias << (alias.empty() ? "" : "_") << "proto-id_acq-id_0";
+    oss << "PAO25751" << "_pass_" << alias << (alias.empty() ? "unclassified_" : "_")
+        << "proto-id_acq-id_0";
     const std::string expected_fname = oss.str();
 
-    hts_writer::NestedFileStructure structure(root, output_mode, false);
+    hts_writer::NestedFileStructure structure(root, output_mode, true);
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
     CATCH_SECTION(description) {
@@ -645,16 +649,15 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
         const std::string extension = get_suffix(output_mode);
         CATCH_CHECK(path.extension() == extension);
 
-        // Expect an additional subdir for the classification if the barcode is set
-        const auto base =
-                barcode_name.empty() ? path.parent_path() : path.parent_path().parent_path();
+        // Expect an additional subdir for the classification
+        const auto base = path.parent_path().parent_path();
         // Check the folder base structure (excluding the classification)
         const auto relative_base_folder = fs::relative(base, root);
         CATCH_CHECK(relative_base_folder == fs::path(expected_base));
 
         // Check the classification subdir should be the alias name
         const auto classification_folder = fs::relative(path, base).parent_path();
-        CATCH_CHECK(classification_folder == fs::path(alias));
+        CATCH_CHECK(classification_folder == expected_classification_folder);
     }
 }
 

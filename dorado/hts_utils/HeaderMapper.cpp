@@ -1,6 +1,7 @@
 #include "hts_utils/HeaderMapper.h"
 
 #include "hts_utils/FastxSequentialReader.h"
+#include "hts_utils/KString.h"
 #include "hts_utils/MergeHeaders.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/fastq_tags.h"
@@ -136,6 +137,8 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
             continue;
         }
 
+        m_has_barcodes |= rg_data.has_barcodes;
+
         HtsData::ReadAttributes& attrs = it->second;
         assign_not_empty(attrs.flowcell_id, rg_data.data.flowcell_id);
         // TODO: position_id is not in the specification yet
@@ -171,6 +174,22 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
     if (!header) {
         spdlog::error("Failed to read header from file: '{}'.", path.string());
         throw std::runtime_error("Could not open header for mapping");
+    }
+
+    {
+        KString tag_wrapper(100000);
+        auto& tag_value = tag_wrapper.get();
+        int num_rg_lines = sam_hdr_count_lines(header.get(), "RG");
+        for (int i = 0; i < num_rg_lines; ++i) {
+            if (sam_hdr_find_tag_pos(header.get(), "RG", i, "SM", &tag_value) == 0) {
+                m_has_barcodes = true;
+                break;
+            }
+            if (sam_hdr_find_tag_pos(header.get(), "RG", i, "al", &tag_value) == 0) {
+                m_has_barcodes = true;
+                break;
+            }
+        }
     }
 
     const auto header_lines = utils::parse_header(*header.get(), {utils::HeaderLineType::RG});

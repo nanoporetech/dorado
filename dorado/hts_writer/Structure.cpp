@@ -151,28 +151,36 @@ std::string NestedFileStructure::format_alias(const HtsData& hts_data) const {
         barcode_name = hts_data.barcoding_result->barcode_name;
     } else if (hts_data.bam_ptr) {
         // No barcoding result - check the BC tag in case this is a barcoded read we've read in from file
-        const auto bc_tag = bam_aux_get(hts_data.bam_ptr.get(), "BC");
-        if (bc_tag) {
-            barcode_name = bam_aux2Z(bc_tag);
+        auto get_tag_value = [&hts_data](const char* tag) -> std::string {
+            const auto aux_tag = bam_aux_get(hts_data.bam_ptr.get(), tag);
+            if (!aux_tag) {
+                return {};
+            }
+            std::string barcode = bam_aux2Z(aux_tag);
             for (const auto& [kit_name, kit_info] : barcode_kits::get_kit_infos()) {
-                if (barcode_name.starts_with(kit_name) &&
-                    barcode_name.size() > kit_name.size() + 1) {
+                if (barcode.starts_with(kit_name) && barcode.size() > kit_name.size() + 1) {
                     // strip the kit name from the barcode
-                    barcode_name = barcode_name.substr(kit_name.size() + 1);
+                    barcode = barcode.substr(kit_name.size() + 1);
                     break;
                 }
             }
-            return std::string(barcode_name);
-        }
-        // Unclassified reads read from file won't have a BC tag. If we've been told this is a demux operation,
-        // ensure these reads are correctly placed in the unclassified folder
-        if (m_assume_barcodes) {
-            return UNCLASSIFIED_STR;
+            return barcode;
+        };
+
+        for (const auto tag : {"BC", "al", "SM"}) {
+            if (const auto tag_value = get_tag_value(tag); !tag_value.empty()) {
+                return tag_value;
+            }
         }
     }
 
     // No barcode
     if (barcode_name.empty()) {
+        // Unclassified reads read from file won't have a BC tag. If we've been told this is a demux operation,
+        // ensure these reads are correctly placed in the unclassified folder
+        if (m_assume_barcodes) {
+            return UNCLASSIFIED_STR;
+        }
         return {};
     }
 
