@@ -27,12 +27,14 @@ ReadGroupData parse_rg_from_hts_tags(const std::string_view tag_str) {
     constexpr std::string_view KEY_DEVICE_ID{"PM:Z:"};
     constexpr std::string_view KEY_EXPERIMENT_START_TIME{"DT:Z:"};
     constexpr std::string_view KEY_SAMPLE_ID{"LB:Z:"};
+    constexpr std::string_view BARCODE_ID{"SM:Z:"};
+    constexpr std::string_view ALIAS_ID{"al:Z:"};
 
     const std::regex pattern(R"(^([0-9a-f\-]{1,})_(.*@v\d+\.\d+\.\d+)(.*)$)");
 
     const std::unordered_set<std::string_view> key_set{
             KEY_READ_GROUP, KEY_FLOWCELL_ID, KEY_DEVICE_ID, KEY_EXPERIMENT_START_TIME,
-            KEY_SAMPLE_ID,
+            KEY_SAMPLE_ID,  BARCODE_ID,      ALIAS_ID,
     };
 
     const std::vector<std::string_view> tokens = dorado::utils::split_view(tag_str, '\t');
@@ -82,6 +84,14 @@ ReadGroupData parse_rg_from_hts_tags(const std::string_view tag_str) {
         } else if (token.starts_with(KEY_SAMPLE_ID)) {
             // Example: LB:Z:PCR_zymo
             ret.data.sample_id = val;
+            ret.found = true;
+        } else if (token.starts_with(BARCODE_ID)) {
+            // Example: SM:Z:barcode01
+            ret.has_barcodes = true;
+            ret.found = true;
+        } else if (token.starts_with(ALIAS_ID)) {
+            // Example: al:Z:patient_1
+            ret.has_barcodes = true;
             ret.found = true;
         }
     }

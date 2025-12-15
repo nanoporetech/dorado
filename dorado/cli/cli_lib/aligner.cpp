@@ -256,16 +256,7 @@ int aligner(int argc, char* argv[]) {
     std::unique_ptr<utils::HeaderMapper> header_mapper;
     if (!reads.empty()) {
         header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
-        auto hdr = header_mapper->get_shared_merged_header(strip_input_alignments);
-        int num_rg_lines = sam_hdr_count_lines(hdr.get(), "RG");
-        KString tag_wrapper(100000);
-        auto& tag_value = tag_wrapper.get();
-        for (int i = 0; i < num_rg_lines; ++i) {
-            if (sam_hdr_find_tag_pos(hdr.get(), "RG", i, "SM", &tag_value) == 0) {
-                has_barcoding = true;
-                break;
-            }
-        }
+        has_barcoding = header_mapper->has_barcodes();
     }
 
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
@@ -365,18 +356,18 @@ int aligner(int argc, char* argv[]) {
     for (const auto& file_info : all_files) {
         spdlog::info("processing '{}'", file_info.string());
         HtsReader reader(file_info.string(), std::nullopt);
+        auto read_initialiser = std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
+                reader.header(), alignment_counts);
+        if (has_barcoding ||
+            (emit_summary && (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS))) {
+            reader.add_read_initialiser([read_initialiser](HtsData& data) {
+                read_initialiser->update_barcoding_fields(data);
+            });
+        }
         if (emit_summary) {
-            auto read_initialiser =
-                    std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
-                            reader.header(), alignment_counts);
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_read_attributes(data);
             });
-            if (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS) {
-                reader.add_read_initialiser([read_initialiser](HtsData& data) {
-                    read_initialiser->update_barcoding_fields(data);
-                });
-            }
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_alignment_fields(data);
             });
