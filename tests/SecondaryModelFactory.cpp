@@ -464,6 +464,44 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
         CATCH_CHECK_THROWS(model_factory(config, PARAM_STRATEGY));
     }
 
+    CATCH_SECTION("Feature tensor does not contain snp_qv, but the model needs it.") {
+        const ModelConfig config{
+                .version = 1,
+                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "SlotAttentionConsensus",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"num_slots", "2"},
+                                {"classes_per_slot", "5"},
+                                {"read_embedding_size", "192"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"pooler_type", "mean"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Use dwells
+                                {"use_haplotags", "true"},  // <- Use haplotags
+                                {"use_snp_qv", "true"},     // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"add_lstm", "true"},
+                                {"use_reference", "false"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},
+                                {"include_haplotype", "true"},
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        CATCH_CHECK_THROWS(model_factory(config, PARAM_STRATEGY));
+    }
+
     CATCH_SECTION(
             "Missing all optional columns but the model does not require them so it should pass") {
         const ModelConfig config{
@@ -506,8 +544,8 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     }
 
     CATCH_SECTION(
-            "Has dwells in features but no haplotags. Model needs the dwells column but not "
-            "haplotags. Should pass.") {
+            "Has dwells in features but no haplotags or snp_qv. Model needs the dwells column "
+            "only. Should pass.") {
         const ModelConfig config{
                 .version = 1,
                 .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
@@ -525,7 +563,7 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
                                 {"pooler_type", "mean"},
                                 {"use_mapqc", "true"},
                                 {"use_dwells", "true"},      // <- Use dwells
-                                {"use_haplotags", "false"},  // <- Use haplotags
+                                {"use_haplotags", "false"},  // <- No haplotags
                                 {"bases_alphabet_size", "6"},
                                 {"bases_embedding_size", "6"},
                                 {"add_lstm", "true"},
@@ -551,8 +589,8 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     }
 
     CATCH_SECTION(
-            "Has haplotags in features but no dwells. Model needs the haplotags column but not "
-            "dwells. Should pass.") {
+            "Has haplotags in features but no dwells or snp_qv. Model needs the haplotags column "
+            "only. Should pass.") {
         const ModelConfig config{
                 .version = 1,
                 .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
@@ -569,7 +607,7 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
                                 {"kernel_sizes", "[ 1, 17,]"},
                                 {"pooler_type", "mean"},
                                 {"use_mapqc", "true"},
-                                {"use_dwells", "false"},    // <- Use dwells
+                                {"use_dwells", "false"},    // <- No dwells
                                 {"use_haplotags", "true"},  // <- Use haplotags
                                 {"bases_alphabet_size", "6"},
                                 {"bases_embedding_size", "6"},
@@ -580,6 +618,98 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
                 .feature_encoder_kwargs =
                         {
                                 {"include_haplotype", "true"},  // <- No param for haplotags
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        // Positive test.
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
+
+        // Negative tests.
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
+    }
+
+    CATCH_SECTION(
+            "Has snp_qvs in features but no dwells or haplotags. Model needs only the snp_qv "
+            "column. Should pass.") {
+        const ModelConfig config{
+                .version = 1,
+                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "SlotAttentionConsensus",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"num_slots", "2"},
+                                {"classes_per_slot", "5"},
+                                {"read_embedding_size", "192"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"pooler_type", "mean"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "false"},     // <- No dwells
+                                {"use_haplotags", "false"},  // <- No haplotags
+                                {"use_snp_qv", "true"},      // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"add_lstm", "true"},
+                                {"use_reference", "false"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_snp_qv", "true"},  // <- No param for haplotags
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        // Positive test.
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
+
+        // Negative tests.
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
+    }
+
+    CATCH_SECTION("Feature tensor contains snp_qv, dwells and haplotags. Model uses all three.") {
+        const ModelConfig config{
+                .version = 1,
+                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "SlotAttentionConsensus",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"num_slots", "2"},
+                                {"classes_per_slot", "5"},
+                                {"read_embedding_size", "192"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"pooler_type", "mean"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Use dwells
+                                {"use_haplotags", "true"},  // <- Use haplotags
+                                {"use_snp_qv", "true"},     // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"add_lstm", "true"},
+                                {"use_reference", "false"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},
+                                {"include_haplotype", "true"},
+                                {"include_snp_qv", "true"},
                         },
                 .feature_encoder_dtypes = {},
                 .label_scheme_type = "DiploidLabelScheme",
