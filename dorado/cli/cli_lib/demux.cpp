@@ -183,8 +183,7 @@ int demuxer(int argc, char* argv[]) {
     const std::string reads(parser.get<std::string>("reads"));
     const std::string output_dir = cli::get_output_dir(parser).value();
     const bool recursive_input(parser.get<bool>("recursive"));
-    const bool emit_fastq = cli::get_emit_fastq(parser);
-    const bool emit_summary = cli::get_emit_summary(parser);
+    const cli::EmitArgs emit = cli::get_emit_args(parser);
     int threads(parser.get<int>("threads"));
     std::size_t max_reads(parser.get<int>("max-reads"));
 
@@ -243,7 +242,7 @@ int demuxer(int argc, char* argv[]) {
                 });
 
         auto hts_writer_builder = hts_writer::DemuxHtsFileWriterBuilder(
-                emit_fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
+                emit.fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
                 description_callback, "");
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
@@ -257,7 +256,7 @@ int demuxer(int argc, char* argv[]) {
 
     AlignmentCounts alignment_counts;
     hts_writer::SummaryFileWriter::FieldFlags flags = 0;
-    if (emit_summary) {
+    if (emit.summary) {
         std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
         flags |= hts_writer::SummaryFileWriter::BARCODING_FIELDS;
         auto summary_writer = std::make_unique<hts_writer::SummaryFileWriter>(output_dir, flags);
@@ -346,7 +345,7 @@ int demuxer(int argc, char* argv[]) {
         reader.add_read_initialiser([read_initialiser](HtsData& data) {
             read_initialiser->update_read_attributes(data);
         });
-        if (emit_summary) {
+        if (emit.summary) {
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_barcoding_fields(data);
             });

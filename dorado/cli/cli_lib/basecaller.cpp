@@ -141,8 +141,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                       "output files marked `fail` if `--output-dir` is set.")
                 .default_value(0)
                 .scan<'i', int>();
-        parser.add_argument("--emit-moves").help("Write the move table to the 'mv' tag.").flag();
-        cli::add_basecaller_output_arguments(parser, true);
+        cli::add_basecaller_output_arguments(parser);
     }
     {
         parser.add_group("Alignment arguments");
@@ -326,10 +325,7 @@ void setup(const std::vector<std::string>& args,
            size_t num_runners,
            const ModBaseBatchParams& modbase_params,
            const std::optional<std::string>& output_dir,
-           bool emit_fastq,
-           bool emit_sam,
-           bool emit_moves,
-           bool emit_summary,
+           const cli::EmitArgs emit,
            size_t max_reads,
            size_t min_qscore,
            const std::string& read_list_file_path,
@@ -471,7 +467,7 @@ void setup(const std::vector<std::string>& args,
                     tracker.set_description(description);
                 });
         auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
-                emit_fastq, emit_sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
+                emit.fastq, emit.sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
                 progress_callback, description_callback, gpu_names);
 
         if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
@@ -493,7 +489,7 @@ void setup(const std::vector<std::string>& args,
         writers.push_back(std::move(hts_file_writer));
     }
 
-    if (emit_summary) {
+    if (emit.summary) {
         using namespace hts_writer;
         auto summary_output = output_dir.has_value() ? std::filesystem::path(output_dir.value())
                                                      : std::filesystem::current_path();
@@ -532,7 +528,7 @@ void setup(const std::vector<std::string>& args,
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
-            {current_sink_node}, emit_moves, thread_allocations.read_converter_threads,
+            {current_sink_node}, emit.moves, thread_allocations.read_converter_threads,
             modbase_params.threshold, 1000, min_qscore);
 
     {
@@ -898,8 +894,7 @@ int basecaller(int argc, char* argv[]) {
     try {
         setup(args, models, pod5_folder_info, device, parser.get<std::string>("--reference"),
               parser.get<std::string>("--bed-file"), default_parameters.num_runners, modbase_params,
-              cli::get_output_dir(parser), cli::get_emit_fastq(parser), cli::get_emit_sam(parser),
-              parser.get<bool>("--emit-moves"), cli::get_emit_summary(parser),
+              cli::get_output_dir(parser), cli::get_emit_args(parser),
               parser.get<int>("--max-reads"), parser.get<int>("--min-qscore"),
               parser.get<std::string>("--read-ids"), *minimap_options,
               parser.get<std::string>("--dump_stats_file"),
