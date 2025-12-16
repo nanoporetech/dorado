@@ -15,9 +15,11 @@
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/ReadInitialiser.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/AlignerNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
+#include "summary_info.h"
 #include "utils/log_utils.h"
 #include "utils/stats.h"
 #include "utils/string_utils.h"
@@ -285,7 +287,7 @@ int aligner(int argc, char* argv[]) {
         writers.push_back(std::move(hts_file_writer));
     }
 
-    hts_writer::SummaryFileWriter::AlignmentCounts alignment_counts;
+    AlignmentCounts alignment_counts;
     hts_writer::SummaryFileWriter::FieldFlags flags = 0;
     if (emit_summary) {
         std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
@@ -356,8 +358,11 @@ int aligner(int argc, char* argv[]) {
     for (const auto& file_info : all_files) {
         spdlog::info("processing '{}'", file_info.string());
         HtsReader reader(file_info.string(), std::nullopt);
-        auto read_initialiser = std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
-                reader.header(), alignment_counts);
+        auto read_initialiser =
+                std::make_shared<ReadInitialiser>(reader.header(), alignment_counts);
+        reader.add_read_initialiser([read_initialiser](HtsData& data) {
+            read_initialiser->update_read_attributes(data);
+        });
         if (has_barcoding ||
             (emit_summary && (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS))) {
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
@@ -365,9 +370,6 @@ int aligner(int argc, char* argv[]) {
             });
         }
         if (emit_summary) {
-            reader.add_read_initialiser([read_initialiser](HtsData& data) {
-                read_initialiser->update_read_attributes(data);
-            });
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_alignment_fields(data);
             });

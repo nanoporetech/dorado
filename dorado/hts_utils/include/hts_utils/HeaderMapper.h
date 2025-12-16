@@ -38,9 +38,12 @@ public:
     // Apply a HeaderModifier function to all merged headers.
     void modify_headers(const Modifier& modifier) const;
 
-    std::shared_ptr<HeaderMap> get_merged_headers_map() const { return m_merged_headers_map; };
-    std::shared_ptr<AttributeMap> get_read_attributes_map() const {
-        return m_read_group_to_attributes;
+    std::shared_ptr<const HeaderMap> get_merged_headers_map() const {
+        return std::const_pointer_cast<const HeaderMap>(m_merged_headers_map);
+    };
+
+    std::shared_ptr<const AttributeMap> get_read_attributes_map() const {
+        return std::const_pointer_cast<const AttributeMap>(m_read_group_to_attributes);
     }
 
     const HtsData::ReadAttributes& get_read_attributes(const bam1_t* record) const;
@@ -57,8 +60,8 @@ private:
     // This can happen when a FASTQ has no header metadata
     HtsData::ReadAttributes m_fallback_read_attrs{};
 
-    std::shared_ptr<AttributeMap> m_read_group_to_attributes{nullptr};
-    std::shared_ptr<HeaderMap> m_merged_headers_map{nullptr};
+    const std::shared_ptr<AttributeMap> m_read_group_to_attributes;
+    const std::shared_ptr<HeaderMap> m_merged_headers_map;
 
     void process(const std::vector<std::filesystem::path>& inputs);
     void process_bam(const std::filesystem::path& path);
