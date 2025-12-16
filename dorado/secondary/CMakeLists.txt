@@ -1,13 +1,26 @@
+dorado_add_library(
+    NAME
+        dorado_secondary
+    PUBLIC_DIR
+        secondary/architectures
+        secondary/common
+        secondary/consensus
+        secondary/features
+    DEPENDS_PUBLIC
+        dorado_hts_utils
+        dorado_torch_utils
+        dorado_utils
+    DEPENDS_PRIVATE
+        cxxpool
+        dorado_version
+        htslib
+        intervaltree
+        kadayashi::haplotag_lib
+        spdlog::spdlog
+        toml11::toml11
+)
+
 add_subdirectory(architectures)
 add_subdirectory(consensus)
 add_subdirectory(features)
 add_subdirectory(common)
-
-add_library(dorado_secondary INTERFACE)
-target_link_libraries(dorado_secondary
-    INTERFACE
-        dorado_secondary_architectures
-        dorado_secondary_common
-        dorado_secondary_consensus
-        dorado_secondary_features
-)
