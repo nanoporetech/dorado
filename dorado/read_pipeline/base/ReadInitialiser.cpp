@@ -9,11 +9,12 @@
 #include <iomanip>
 #include <sstream>
 
+namespace dorado {
+
 namespace {
 
 int get_min_qscore(sam_hdr_t* header) {
-    auto command_line_cl =
-            dorado::utils::extract_pg_keys_from_hdr(header, {"CL"}, "ID", "basecaller");
+    auto command_line_cl = utils::extract_pg_keys_from_hdr(header, {"CL"}, "ID", "basecaller");
     // If dorado was run with --min-qscore option, parse the value so we can re-evaluate the pass/fail criterion
     std::stringstream cl{command_line_cl["CL"]};
     std::string out;
@@ -28,8 +29,6 @@ int get_min_qscore(sam_hdr_t* header) {
 }
 
 }  // namespace
-
-namespace dorado {
 
 ReadInitialiser::ReadInitialiser(sam_hdr_t* hdr, AlignmentCounts aln_counts)
         : m_header(hdr),

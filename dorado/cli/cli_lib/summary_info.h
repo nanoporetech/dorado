@@ -11,9 +11,7 @@
 #include <tuple>
 #include <vector>
 
-namespace dorado {
-
-namespace cli {
+namespace dorado::cli {
 
 inline std::tuple<hts_writer::SummaryFileWriter::FieldFlags, AlignmentCounts> make_summary_info(
         const std::vector<std::filesystem::path>& all_files) {
@@ -52,6 +50,4 @@ inline std::tuple<hts_writer::SummaryFileWriter::FieldFlags, AlignmentCounts> ma
     return {flags, alignment_counts};
 }
 
-}  // namespace cli
-
-}  // namespace dorado
+}  // namespace dorado::cli
