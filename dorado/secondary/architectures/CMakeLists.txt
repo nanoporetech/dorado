@@ -1,13 +1,11 @@
-dorado_add_library(
-    NAME
-        dorado_secondary_architectures
-    PUBLIC_DIR
-        secondary/architectures
-    SOURCES_PUBLIC
-        model_torch_base.h
-        model_factory.h
-        model_config.h
-    SOURCES_PRIVATE
+set(PUBLIC_BASE ${CMAKE_CURRENT_SOURCE_DIR}/include/secondary/architectures)
+
+target_sources(dorado_secondary
+    PUBLIC
+        ${PUBLIC_BASE}/model_torch_base.h
+        ${PUBLIC_BASE}/model_factory.h
+        ${PUBLIC_BASE}/model_config.h
+    PRIVATE
         model_config.cpp
         model_factory.cpp
         model_gru.cpp
@@ -19,11 +17,9 @@ dorado_add_library(
         model_torch_base.cpp
         model_torch_script.cpp
         model_torch_script.h
-    DEPENDS_PUBLIC
-        dorado_secondary_common
-        dorado_torch_utils
-        dorado_utils
-    DEPENDS_PRIVATE
-        spdlog::spdlog
-        toml11::toml11
+)
+
+target_include_directories(dorado_secondary
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )

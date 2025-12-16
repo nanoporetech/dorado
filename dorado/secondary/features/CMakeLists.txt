@@ -1,16 +1,14 @@
-dorado_add_library(
-    NAME
-        dorado_secondary_features
-    PUBLIC_DIR
-        secondary/features
-    SOURCES_PUBLIC
-        decoder_base.h
-        decoder_factory.h
-        encoder_base.h
-        encoder_factory.h
-        haplotag_source.h
-        kadayashi_utils.h
-    SOURCES_PRIVATE
+set(PUBLIC_BASE ${CMAKE_CURRENT_SOURCE_DIR}/include/secondary/features)
+
+target_sources(dorado_secondary
+    PUBLIC
+        ${PUBLIC_BASE}/decoder_base.h
+        ${PUBLIC_BASE}/decoder_factory.h
+        ${PUBLIC_BASE}/encoder_base.h
+        ${PUBLIC_BASE}/encoder_factory.h
+        ${PUBLIC_BASE}/haplotag_source.h
+        ${PUBLIC_BASE}/kadayashi_utils.h
+    PRIVATE
         decoder_base.cpp
         decoder_factory.cpp
         encoder_counts.cpp
@@ -27,14 +25,9 @@ dorado_add_library(
         medaka_counts.h
         medaka_read_matrix.cpp
         medaka_read_matrix.h
-    DEPENDS_PUBLIC
-        dorado_secondary_architectures
-        dorado_secondary_common
-        dorado_secondary_consensus
-        dorado_torch_utils
-        dorado_utils
-    DEPENDS_PRIVATE
-        htslib
-        kadayashi::haplotag_lib
-        spdlog::spdlog
+)
+
+target_include_directories(dorado_secondary
+    PUBLIC
+        ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
