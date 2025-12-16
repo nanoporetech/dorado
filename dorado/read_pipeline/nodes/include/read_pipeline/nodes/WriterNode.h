@@ -26,7 +26,7 @@ public:
     void set_shared_header(SamHdrPtr hdr) const;
     // Set a header map where new files will lookup their own header at runtime
     void set_dynamic_header(
-            const std::shared_ptr<utils::HeaderMapper::HeaderMap> & header_map) const;
+            const std::shared_ptr<const utils::HeaderMapper::HeaderMap> & header_map) const;
 
 private:
     void input_thread_fn();

@@ -134,7 +134,7 @@ void HtsFileWriter::set_shared_header(SamHdrSharedPtr header) {
 };
 
 void HtsFileWriter::set_dynamic_header(
-        const std::shared_ptr<utils::HeaderMapper::HeaderMap> &header_map) {
+        const std::shared_ptr<const utils::HeaderMapper::HeaderMap> &header_map) {
     if (m_shared_header != nullptr) {
         throw std::logic_error("set_dynamic_header is incompatible with set_shared_header.");
     }

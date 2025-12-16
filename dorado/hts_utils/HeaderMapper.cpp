@@ -118,6 +118,9 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
     const auto& fallback_merged_header = m_merged_headers_map->at(m_fallback_read_attrs);
 
     bool debug_msg_issued = false;
+
+    auto& merged_headers = *m_merged_headers_map;
+    std::unordered_map<std::string, HtsData::ReadAttributes> rg_to_attrs_lut;
     while (reader.get_next(record)) {
         // Check if the tags are HTS-style and parse them.
         ReadGroupData rg_data = dorado::utils::parse_rg_from_hts_tags(record.comment);
@@ -132,7 +135,7 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
             continue;
         }
 
-        auto [it, inserted] = m_read_group_to_attributes->try_emplace(rg_data.id);
+        auto [it, inserted] = rg_to_attrs_lut.try_emplace(rg_data.id);
         if (!inserted) {
             continue;
         }
@@ -152,13 +155,19 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
                     utils::get_unix_time_ms_from_string_timestamp(rg_data.data.exp_start_time);
         }
 
-        // Create a new empty merged header
-        auto& merged_header_ptr = (*m_merged_headers_map)[attrs];
+        auto& merged_header_ptr = merged_headers[attrs];
         if (!merged_header_ptr) {
             merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
-            merged_header_ptr->add_header(sam_hdr_init(), path.string(), rg_data.id);
         }
         merged_header_ptr->add_rg(rg_data.id, rg_data.data);
+    }
+
+    // Add the new read attrs and merge the headers for each output
+    // file only including the read groups that will be used.
+    SamHdrPtr hdr(sam_hdr_init());
+    for (const auto& [read_group_id, read_attrs] : rg_to_attrs_lut) {
+        (*m_read_group_to_attributes)[read_group_id] = read_attrs;
+        merged_headers[read_attrs]->add_header(hdr.get(), path.string(), read_group_id);
     }
 }
 
