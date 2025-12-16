@@ -32,6 +32,18 @@ using FeatureIndicesType =
 
 constexpr auto FeatureTensorType = torch::kFloat32;
 
+enum class FeatureColumns : int32_t {
+    BASE,
+    QUAL,
+    STRAND,
+    MAPQ,
+    DWELL,
+    HAPLOTAG,
+    DTYPE,
+};
+
+using FeatureColumnMap = std::unordered_map<FeatureColumns, int32_t>;
+
 inline NormaliseType parse_normalise_type(std::string type) {
     // Convert to lower case.
     std::transform(std::begin(type), std::end(type), std::begin(type),
@@ -57,6 +69,29 @@ public:
 
     virtual std::vector<secondary::Sample> merge_adjacent_samples(
             std::vector<secondary::Sample> samples) const = 0;
+
+    virtual FeatureColumnMap get_feature_column_map() const = 0;
 };
+
+inline std::string feature_column_to_string(const FeatureColumns feature) {
+    switch (feature) {
+    case FeatureColumns::BASE:
+        return "BASE";
+    case FeatureColumns::QUAL:
+        return "QUAL";
+    case FeatureColumns::STRAND:
+        return "STRAND";
+    case FeatureColumns::MAPQ:
+        return "MAPQ";
+    case FeatureColumns::DWELL:
+        return "DWELL";
+    case FeatureColumns::HAPLOTAG:
+        return "HAPLOTAG";
+    case FeatureColumns::DTYPE:
+        return "DTYPE";
+    default:
+        return "UNKNOWN";
+    }
+}
 
 }  // namespace dorado::secondary

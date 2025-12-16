@@ -276,7 +276,10 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
           m_hap_source{hap_source},
           m_clip_to_zero{clip_to_zero},
           m_right_align_insertions{right_align_insertions},
-          m_phasing_bin{phasing_bin} {}
+          m_phasing_bin{phasing_bin},
+          m_feature_column_map{produce_feature_column_map(include_dwells,
+                                                          include_haplotype_column,
+                                                          (m_num_dtypes > 1))} {}
 
 secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_name,
                                                       const int64_t ref_start,
@@ -385,6 +388,39 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch) const {
 std::vector<secondary::Sample> EncoderReadAlignment::merge_adjacent_samples(
         std::vector<secondary::Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
+}
+
+FeatureColumnMap EncoderReadAlignment::get_feature_column_map() const {
+    return m_feature_column_map;
+}
+
+FeatureColumnMap EncoderReadAlignment::produce_feature_column_map(
+        const bool include_dwells,
+        const bool include_haplotype_column,
+        const bool include_dtypes) {
+    // Fixed columns.
+    FeatureColumnMap feature_column_map = {
+            {FeatureColumns::BASE, 0},
+            {FeatureColumns::QUAL, 1},
+            {FeatureColumns::STRAND, 2},
+            {FeatureColumns::MAPQ, 3},
+    };
+
+    // Optional columns.
+    if (include_dwells) {
+        const int32_t id = static_cast<int32_t>(std::ssize(feature_column_map));
+        feature_column_map[FeatureColumns::DWELL] = id;
+    }
+    if (include_haplotype_column) {
+        const int32_t id = static_cast<int32_t>(std::ssize(feature_column_map));
+        feature_column_map[FeatureColumns::HAPLOTAG] = id;
+    }
+    if (include_dtypes) {
+        const int32_t id = static_cast<int32_t>(std::ssize(feature_column_map));
+        feature_column_map[FeatureColumns::DTYPE] = id;
+    }
+
+    return feature_column_map;
 }
 
 }  // namespace dorado::secondary

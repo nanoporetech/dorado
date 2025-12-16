@@ -11,6 +11,30 @@
 
 namespace dorado::secondary {
 
+namespace {
+std::string get_value(const std::unordered_map<std::string, std::string>& dict,
+                      const std::string& key,
+                      const bool throw_on_fail) {
+    const auto it = dict.find(key);
+    if (it == std::cend(dict)) {
+        if (!throw_on_fail) {
+            return {};
+        }
+        throw std::runtime_error{"Cannot find key '" + key + "' in kwargs!"};
+    }
+    if ((std::size(it->second) >= 2) && (it->second.front() == '"') && (it->second.back() == '"')) {
+        return it->second.substr(1, std::size(it->second) - 2);
+    }
+    return it->second;
+}
+
+bool get_bool_value(const std::unordered_map<std::string, std::string>& dict,
+                    const std::string& key,
+                    const bool throw_on_fail) {
+    return (get_value(dict, key, throw_on_fail) == "true") ? true : false;
+}
+}  // namespace
+
 FeatureEncoderType parse_feature_encoder_type(const std::string& type) {
     if (type == "CountsFeatureEncoder") {
         return FeatureEncoderType::COUNTS_FEATURE_ENCODER;
@@ -33,28 +57,6 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::optional<int32_t>& min_mapq_override,
         const std::optional<HaplotagSource>& hap_source,
         const std::optional<std::filesystem::path>& phasing_bin_fn) {
-    const auto get_value = [](const std::unordered_map<std::string, std::string>& dict,
-                              const std::string& key, const bool throw_on_fail) -> std::string {
-        const auto it = dict.find(key);
-        if (it == std::cend(dict)) {
-            if (!throw_on_fail) {
-                return {};
-            }
-            throw std::runtime_error{"Cannot find key '" + key + "' in kwargs!"};
-        }
-        if ((std::size(it->second) >= 2) && (it->second.front() == '"') &&
-            (it->second.back() == '"')) {
-            return it->second.substr(1, std::size(it->second) - 2);
-        }
-        return it->second;
-    };
-
-    const auto get_bool_value = [&get_value](
-                                        const std::unordered_map<std::string, std::string>& dict,
-                                        const std::string& key, const bool throw_on_fail) -> bool {
-        return (get_value(dict, key, throw_on_fail) == "true") ? true : false;
-    };
-
     const FeatureEncoderType feature_encoder_type =
             parse_feature_encoder_type(config.feature_encoder_type);
 
@@ -120,6 +122,26 @@ std::unique_ptr<EncoderBase> encoder_factory(
     }
 
     throw std::runtime_error{"Unsupported feature encoder type: " + config.feature_encoder_type};
+}
+
+FeatureColumnMap feature_column_map_factory(const ModelConfig& config) {
+    const FeatureEncoderType feature_encoder_type =
+            parse_feature_encoder_type(config.feature_encoder_type);
+
+    if (feature_encoder_type == FeatureEncoderType::COUNTS_FEATURE_ENCODER) {
+        return EncoderCounts::produce_feature_column_map();
+
+    } else if (feature_encoder_type == FeatureEncoderType::READ_ALIGNMENT_FEATURE_ENCODER) {
+        const auto& kwargs = config.feature_encoder_kwargs;
+        const bool include_dwells = get_bool_value(kwargs, "include_dwells", false);
+        const bool include_haplotype_column = get_bool_value(kwargs, "include_haplotype", false);
+        const int64_t num_dtypes = std::ssize(config.feature_encoder_dtypes) + 1;
+        return EncoderReadAlignment::produce_feature_column_map(
+                include_dwells, include_haplotype_column, (num_dtypes > 1));
+    }
+
+    throw std::runtime_error{"Unsupported feature encoder type in feature_column_map_factory: " +
+                             config.feature_encoder_type};
 }
 
 }  // namespace dorado::secondary

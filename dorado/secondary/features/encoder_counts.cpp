@@ -309,7 +309,8 @@ EncoderCounts::EncoderCounts(const std::filesystem::path& in_bam_aln_fn,
           m_min_mapq{min_mapq},
           m_symmetric_indels{symmetric_indels},
           m_clip_to_zero{clip_to_zero},
-          m_feature_indices{pileup_counts_norm_indices(dtypes, 1)} {}
+          m_feature_indices{pileup_counts_norm_indices(dtypes, 1)},
+          m_feature_column_map{produce_feature_column_map()} {}
 
 secondary::Sample EncoderCounts::encode_region(const std::string& ref_name,
                                                const int64_t ref_start,
@@ -366,5 +367,9 @@ std::vector<secondary::Sample> EncoderCounts::merge_adjacent_samples(
         std::vector<secondary::Sample> samples) const {
     return merge_adjacent_samples_impl(std::move(samples));
 }
+
+FeatureColumnMap EncoderCounts::produce_feature_column_map() { return {}; }
+
+FeatureColumnMap EncoderCounts::get_feature_column_map() const { return m_feature_column_map; }
 
 }  // namespace dorado::secondary
