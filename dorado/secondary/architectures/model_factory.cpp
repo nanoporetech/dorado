@@ -5,6 +5,8 @@
 #include "model_latent_space_lstm.h"
 #include "model_slot_attention_consensus.h"
 #include "model_torch_script.h"
+#include "secondary/features/encoder_base.h"
+#include "secondary/features/encoder_factory.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 
@@ -166,6 +168,8 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
 
     const ModelType model_type = parse_model_type(config.model_type);
 
+    const FeatureColumnMap feature_column_map = feature_column_map_factory(config);
+
     std::shared_ptr<ModelTorchBase> model;
 
     if ((config.model_file != "model.pt") && (config.model_file != "weights.pt")) {
@@ -227,7 +231,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
 
         model = ModelLatentSpaceLSTM::make<ModelLatentSpaceLSTM>(
                 num_classes, lstm_size, cnn_size, kernel_sizes, pooler_type, use_dwells,
-                bases_alphabet_size, bases_embedding_size, bidirectional);
+                bases_alphabet_size, bases_embedding_size, bidirectional, feature_column_map);
 
     } else if (model_type == ModelType::SLOT_ATTENTION_CONSENSUS) {
         spdlog::debug("Constructing a SLOT_ATTENTION_CONSENSUS model.");
@@ -260,7 +264,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         model = ModelSlotAttentionConsensus::make<ModelSlotAttentionConsensus>(
                 num_slots, classes_per_slot, read_embedding_size, cnn_size, kernel_sizes,
                 pooler_type, pooler_args, use_mapqc, use_dwells, use_haplotags, bases_alphabet_size,
-                bases_embedding_size, add_lstm, use_reference);
+                bases_embedding_size, add_lstm, use_reference, feature_column_map);
 
         // The SlotAttentionConsensus model normalizes internally because of phasing, so
         // deactivate normalization after phasing.

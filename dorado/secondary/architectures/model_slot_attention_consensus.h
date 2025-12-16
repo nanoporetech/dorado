@@ -2,6 +2,7 @@
 
 #include "model_latent_space_lstm.h"
 #include "secondary/architectures/model_torch_base.h"
+#include "secondary/features/encoder_base.h"
 
 #include <ATen/ATen.h>
 #include <torch/nn/modules/embedding.h>
@@ -65,7 +66,8 @@ public:
                                 int32_t bases_alphabet_size,
                                 int32_t bases_embedding_size,
                                 bool add_lstm,
-                                bool use_reference);
+                                bool use_reference,
+                                FeatureColumnMap feature_column_map);
 
     at::Tensor forward(at::Tensor x) override;
 
@@ -88,6 +90,7 @@ private:
     int32_t m_bases_embedding_size{6};
     bool m_add_lstm{false};
     bool m_use_reference{false};
+    FeatureColumnMap m_feature_column_map{};
     const bool m_normalise_before_phasing{true};
 
     torch::nn::Embedding m_base_embedder{nullptr};
@@ -98,6 +101,13 @@ private:
     SlotAttention m_slot_attention{nullptr};
     torch::nn::Linear m_slot_classifier{nullptr};
     torch::nn::Sequential m_lstm{nullptr};
+
+    int32_t m_column_base{-1};
+    int32_t m_column_qual{-1};
+    int32_t m_column_strand{-1};
+    int32_t m_column_mapq{-1};
+    int32_t m_column_dwell{-1};
+    int32_t m_column_haplotag{-1};
 
     std::pair<at::Tensor, at::Tensor> forward_impl(const at::Tensor& in_x);
     std::pair<at::Tensor, at::Tensor> quick_phase(at::Tensor hap_probs_unphased,

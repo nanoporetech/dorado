@@ -126,7 +126,8 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_
                                            const bool use_dwells,
                                            const int32_t bases_alphabet_size,
                                            const int32_t bases_embedding_size,
-                                           const bool bidirectional)
+                                           const bool bidirectional,
+                                           const FeatureColumnMap feature_column_map)
         : ModelTorchBase(ctor_tag),
           m_num_classes{num_classes},
           m_lstm_size{lstm_size},
@@ -137,6 +138,7 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_
           m_bases_alphabet_size{bases_alphabet_size},
           m_bases_embedding_size{bases_embedding_size},
           m_bidirectional{bidirectional},
+          m_feature_column_map{feature_column_map},
           m_base_embedder(
                   torch::nn::EmbeddingOptions(m_bases_alphabet_size, m_bases_embedding_size)),
           m_strand_embedder(torch::nn::EmbeddingOptions(3, m_bases_embedding_size)),
@@ -167,6 +169,26 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_
         throw std::runtime_error("Pooler " + m_pooler_type + " not implemented yet.");
     }
 
+    // Helper to get the feature column index.
+    const auto get_feature_or_throw =
+            [&feature_column_map](const FeatureColumns feature) -> int32_t {
+        const auto it = feature_column_map.find(feature);
+        if (it == std::cend(feature_column_map)) {
+            throw std::runtime_error{"Cannot find the " + feature_column_to_string(feature) +
+                                     " column in the feature_column_map!"};
+        }
+        return it->second;
+    };
+
+    // Mandatory feature columns.
+    m_column_base = get_feature_or_throw(FeatureColumns::BASE);
+    m_column_qual = get_feature_or_throw(FeatureColumns::QUAL);
+    m_column_strand = get_feature_or_throw(FeatureColumns::STRAND);
+    m_column_mapq = get_feature_or_throw(FeatureColumns::MAPQ);
+
+    // Optional feature columns.
+    m_column_dwell = use_dwells ? get_feature_or_throw(FeatureColumns::DWELL) : -1;
+
     register_module("base_embedder", m_base_embedder);
     register_module("strand_embedder", m_strand_embedder);
     register_module("read_level_conv", m_read_level_conv);
@@ -181,32 +203,50 @@ ModelLatentSpaceLSTM::ModelLatentSpaceLSTM(const MustConstructWithFactory& ctor_
 }
 
 torch::Tensor ModelLatentSpaceLSTM::forward(torch::Tensor x) {
+    if (x.size(-1) != std::ssize(m_feature_column_map)) {
+        throw std::runtime_error{
+                "ModelLatentSpaceLSTM: x has the wrong number of feature columns! Feature column "
+                "map is of size " +
+                std::to_string(std::size(m_feature_column_map)) + " but got " +
+                std::to_string(x.size(-1))};
+    }
+    if ((m_column_base < 0) || (m_column_qual < 0) || (m_column_strand < 0) ||
+        (m_column_mapq < 0)) {
+        throw std::runtime_error{
+                "ModelLatentSpaceLSTM: One or more of the fixed feature indices is not "
+                "valid! "
+                "Indices: base = " +
+                std::to_string(m_column_base) + ", qual = " + std::to_string(m_column_qual) +
+                ", strand = " + std::to_string(m_column_strand) +
+                ", mapq = " + std::to_string(m_column_mapq)};
+    }
+    if (m_use_dwells && (m_column_dwell < 0)) {
+        throw std::runtime_error{
+                "ModelLatentSpaceLSTM: The dwell column index is not valid! Got: " +
+                std::to_string(m_column_dwell)};
+    }
+
     // Non-const because it will be moved later. Needs to be placed here because x changes.
     auto non_empty_position_mask = (x.sum({1, -1}) != 0);
 
     auto bases_embedding =
             m_base_embedder->forward(x.index({torch::indexing::Slice(), torch::indexing::Slice(),
-                                              torch::indexing::Slice(), 0})
+                                              torch::indexing::Slice(), m_column_base})
                                              .to(torch::kLong));
     auto strand_embedding =
             m_strand_embedder->forward(x.index({torch::indexing::Slice(), torch::indexing::Slice(),
-                                                torch::indexing::Slice(), 2})
+                                                torch::indexing::Slice(), m_column_strand})
                                                .to(torch::kLong) +
                                        1);
     auto scaled_q_scores = (x.index({torch::indexing::Slice(), torch::indexing::Slice(),
-                                     torch::indexing::Slice(), 1}) /
+                                     torch::indexing::Slice(), m_column_qual}) /
                                     25 -
                             1)
                                    .unsqueeze(-1);
 
     if (m_use_dwells) {
-        if (x.sizes().back() != 5) {
-            throw std::runtime_error(
-                    "If using dwells, x must have 5 features/read/position. Shape of x: " +
-                    utils::tensor_shape_as_string(x));
-        }
         auto dwells = x.index({torch::indexing::Slice(), torch::indexing::Slice(),
-                               torch::indexing::Slice(), 4})
+                               torch::indexing::Slice(), m_column_dwell})
                               .unsqueeze(-1);
         x = torch::cat(
                 {bases_embedding + strand_embedding, std::move(scaled_q_scores), std::move(dwells)},

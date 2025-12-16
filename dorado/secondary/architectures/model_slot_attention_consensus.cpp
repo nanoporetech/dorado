@@ -160,7 +160,8 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
         const int32_t bases_alphabet_size,
         const int32_t bases_embedding_size,
         const bool add_lstm,
-        const bool use_reference)
+        const bool use_reference,
+        const FeatureColumnMap feature_column_map)
         : ModelTorchBase(ctor_tag),
           m_num_slots{num_slots},
           m_classes_per_slot{classes_per_slot},
@@ -176,6 +177,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
           m_bases_embedding_size{bases_embedding_size},
           m_add_lstm{add_lstm},
           m_use_reference{use_reference},
+          m_feature_column_map{feature_column_map},
           m_base_embedder{
                   torch::nn::EmbeddingOptions(m_bases_alphabet_size, m_bases_embedding_size)},
           m_haplotag_embedder{
@@ -192,6 +194,27 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
           m_slot_classifier{m_read_embedding_size, m_classes_per_slot},
           m_lstm{} {
     (void)m_use_reference;
+
+    // Helper to get the feature column index.
+    const auto get_feature_or_throw =
+            [&feature_column_map](const FeatureColumns feature) -> int32_t {
+        const auto it = feature_column_map.find(feature);
+        if (it == std::cend(feature_column_map)) {
+            throw std::runtime_error{"Cannot find the " + feature_column_to_string(feature) +
+                                     " column in the feature_column_map!"};
+        }
+        return it->second;
+    };
+
+    // Mandatory feature columns.
+    m_column_base = get_feature_or_throw(FeatureColumns::BASE);
+    m_column_qual = get_feature_or_throw(FeatureColumns::QUAL);
+    m_column_strand = get_feature_or_throw(FeatureColumns::STRAND);
+    m_column_mapq = get_feature_or_throw(FeatureColumns::MAPQ);
+
+    // Optional feature columns.
+    m_column_dwell = use_dwells ? get_feature_or_throw(FeatureColumns::DWELL) : -1;
+    m_column_haplotag = use_haplotags ? get_feature_or_throw(FeatureColumns::HAPLOTAG) : -1;
 
     if (m_add_lstm) {
         const int64_t lstm_size = m_num_slots * m_read_embedding_size;
@@ -212,13 +235,11 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
 
 namespace {
 at::Tensor batch_adjacency_phase(const at::Tensor& hap_probs_unphased,
-                                 const torch::Tensor& features,
+                                 const torch::Tensor& basecalls,
                                  const int32_t lookback) {
     // Dimensions: (n_batch, n_pos, n_reads, n_feats, n_class).
-    const int64_t n_pos = features.size(1);
+    const int64_t n_pos = basecalls.size(1);
 
-    at::Tensor basecalls = features.index({torch::indexing::Ellipsis, 0})
-                                   .clone();     // Shape (n_batch, n_pos, n_reads)
     basecalls.masked_fill_(basecalls == 0, -1);  // Remap padding bases.
     basecalls.masked_fill_(basecalls == 5, 0);   // Remap deletions to 0 as above.
 
@@ -288,7 +309,8 @@ at::Tensor ModelSlotAttentionConsensus::forward(torch::Tensor x) {
     auto [out, attn] = forward_impl(x);
 
     if constexpr (USE_BATCH_ADJACENCY_PHASE) {
-        out = batch_adjacency_phase(out, x, 4);
+        out = batch_adjacency_phase(out,
+                                    x.index({torch::indexing::Ellipsis, m_column_base}).clone(), 4);
     } else {
         for (int64_t i = 0; i < x.size(0); ++i) {
             out[i] = quick_phase(out[i], attn[i], x[i]).first;
@@ -326,35 +348,59 @@ double ModelSlotAttentionConsensus::estimate_batch_memory(
 
 std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
         const torch::Tensor& in_x) {
-    if (in_x.size(-1) != 6) {
+    if (in_x.size(-1) != std::ssize(m_feature_column_map)) {
         throw std::runtime_error{
-                "ModelSlotAttentionConsensus: x must have 6 features/read/position - bases, "
-                "quality scores, strand, mapq, dwells, haplotag. Got: " +
+                "ModelSlotAttentionConsensus: x has the wrong number of feature columns! Feature "
+                "column map is of size " +
+                std::to_string(std::size(m_feature_column_map)) + " but got " +
                 std::to_string(in_x.size(-1))};
+    }
+    if ((m_column_base < 0) || (m_column_qual < 0) || (m_column_strand < 0) ||
+        (m_column_mapq < 0)) {
+        throw std::runtime_error{
+                "ModelSlotAttentionConsensus: One or more of the fixed feature indices is not "
+                "valid! "
+                "Indices: base = " +
+                std::to_string(m_column_base) + ", qual = " + std::to_string(m_column_qual) +
+                ", strand = " + std::to_string(m_column_strand) +
+                ", mapq = " + std::to_string(m_column_mapq)};
+    }
+    if (m_use_dwells && (m_column_dwell < 0)) {
+        throw std::runtime_error{
+                "ModelSlotAttentionConsensus: The dwell column index is not valid! Got: " +
+                std::to_string(m_column_dwell)};
+    }
+    if (m_use_haplotags && (m_column_haplotag < 0)) {
+        throw std::runtime_error{
+                "ModelSlotAttentionConsensus: The haplotag column index is not valid! Got: " +
+                std::to_string(m_column_haplotag)};
     }
 
     // Bases embeddings.
-    at::Tensor embeddings = m_base_embedder->forward(in_x.select(-1, 0).to(torch::kLong));
+    at::Tensor embeddings =
+            m_base_embedder->forward(in_x.select(-1, m_column_base).to(torch::kLong));
 
     // Strand embeddings.
-    embeddings.add_(m_strand_embedder->forward(in_x.select(-1, 2).to(torch::kLong) + 1));
+    embeddings.add_(
+            m_strand_embedder->forward(in_x.select(-1, m_column_strand).to(torch::kLong) + 1));
 
     // Haplotag embeddings.
     if (m_use_haplotags) {
-        embeddings.add_(m_haplotag_embedder->forward(in_x.select(-1, -1).to(torch::kLong)));
+        embeddings.add_(
+                m_haplotag_embedder->forward(in_x.select(-1, m_column_haplotag).to(torch::kLong)));
     }
 
-    at::Tensor scaled_q_scores = (in_x.select(-1, 1) / 25).add_(-1).unsqueeze(-1);
+    at::Tensor scaled_q_scores = (in_x.select(-1, m_column_qual) / 25).add_(-1).unsqueeze(-1);
 
     std::vector<at::Tensor> features{std::move(embeddings), std::move(scaled_q_scores)};
 
     if (m_use_mapqc) {
-        at::Tensor scaled_mapqc = (in_x.select(-1, 3) / 25).add(-1).unsqueeze(-1);
+        at::Tensor scaled_mapqc = (in_x.select(-1, m_column_mapq) / 25).add(-1).unsqueeze(-1);
         features.emplace_back(std::move(scaled_mapqc));
     }
 
     if (m_use_dwells) {
-        at::Tensor dwells = in_x.select(-1, 4).unsqueeze(-1);
+        at::Tensor dwells = in_x.select(-1, m_column_dwell).unsqueeze(-1);
         features.emplace_back(std::move(dwells));
     }
 
@@ -375,7 +421,7 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
     x = x.permute({0, 3, 1, 2}).flatten(0, 1);
     x = m_expansion_layer(x);
 
-    at::Tensor empty_position_mask = in_x.select(-1, 0).eq(0).flatten(0, 1);
+    at::Tensor empty_position_mask = in_x.select(-1, m_column_base).eq(0).flatten(0, 1);
 
     at::Tensor attn;
     std::tie(x, attn) =
