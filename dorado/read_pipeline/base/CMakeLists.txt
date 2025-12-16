@@ -12,6 +12,7 @@ dorado_add_library(
         messages.h
         MessageSink.h
         read_utils.h
+        ReadInitialiser.h
         ReadPipeline.h
         stitch.h
     SOURCES_PRIVATE
@@ -20,10 +21,12 @@ dorado_add_library(
         messages.cpp
         MessageSink.cpp
         read_utils.cpp
+        ReadInitialiser.cpp
         ReadPipeline.cpp
         stereo_features.cpp
         stereo_features.h
         stitch.cpp
+
     DEPENDS_PUBLIC
         dorado_hts_utils
         dorado_models_lib

@@ -13,10 +13,12 @@
 #include "read_output_progress_stats.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/ReadInitialiser.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 #include "read_pipeline/nodes/TrimmerNode.h"
 #include "read_pipeline/nodes/WriterNode.h"
+#include "summary_info.h"
 #include "utils/SampleSheet.h"
 #include "utils/arg_parse_ext.h"
 #include "utils/barcode_kits.h"
@@ -253,7 +255,7 @@ int demuxer(int argc, char* argv[]) {
         writers.push_back(std::move(hts_file_writer));
     }
 
-    hts_writer::SummaryFileWriter::AlignmentCounts alignment_counts;
+    AlignmentCounts alignment_counts;
     hts_writer::SummaryFileWriter::FieldFlags flags = 0;
     if (emit_summary) {
         std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
@@ -338,8 +340,8 @@ int demuxer(int argc, char* argv[]) {
     spdlog::info("> starting barcode demuxing");
     for (const auto& input : all_files) {
         HtsReader reader(input.string(), read_list);
-        auto read_initialiser = std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
-                reader.header(), alignment_counts);
+        auto read_initialiser =
+                std::make_shared<ReadInitialiser>(reader.header(), alignment_counts);
         // update read attributes so we pick up any minimum qscore and filter reads into the appropriate folder
         reader.add_read_initialiser([read_initialiser](HtsData& data) {
             read_initialiser->update_read_attributes(data);

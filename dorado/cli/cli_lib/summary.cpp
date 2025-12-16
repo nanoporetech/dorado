@@ -7,8 +7,10 @@
 #include "hts_utils/hts_types.h"
 #include "hts_writer/SummaryFileWriter.h"
 #include "read_pipeline/base/HtsReader.h"
+#include "read_pipeline/base/ReadInitialiser.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/WriterNode.h"
+#include "summary_info.h"
 #include "utils/log_utils.h"
 #include "utils/tty_utils.h"
 
@@ -23,8 +25,6 @@
 #include <unordered_map>
 
 namespace dorado {
-
-using AlignmentCounts = hts_writer::SummaryFileWriter::AlignmentCounts;
 
 volatile sig_atomic_t interrupt = 0;
 
@@ -99,7 +99,7 @@ int summary(int argc, char *argv[]) {
     using namespace hts_writer;
     for (const auto &input_file : all_files) {
         HtsReader reader(input_file.string(), std::nullopt);
-        SummaryFileWriter::ReadInitialiser read_initialiser(reader.header(), alignment_counts);
+        ReadInitialiser read_initialiser(reader.header(), alignment_counts);
         reader.add_read_initialiser([&read_initialiser](HtsData &data) {
             read_initialiser.update_read_attributes(data);
         });
