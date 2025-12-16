@@ -455,7 +455,11 @@ SummaryFileWriter::ReadInitialiser::ReadInitialiser(sam_hdr_t* hdr, AlignmentCou
 void SummaryFileWriter::ReadInitialiser::update_read_attributes(HtsData& data) const {
     if (const auto rg_tag = bam_aux_get(data.bam_ptr.get(), "RG"); rg_tag != nullptr) {
         const std::string rg_tag_value = bam_aux2Z(rg_tag);
-        const auto& read_group = m_read_groups.at(rg_tag_value);
+        const auto read_group_it = m_read_groups.find(rg_tag_value);
+        if (read_group_it == std::cend(m_read_groups)) {
+            return;
+        }
+        const auto& read_group = read_group_it->second;
         data.read_attrs.model_stride = read_group.model_stride;
         data.read_attrs.experiment_id = read_group.experiment_id;
         data.read_attrs.sample_id = read_group.sample_id;

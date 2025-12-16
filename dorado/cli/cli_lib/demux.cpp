@@ -338,13 +338,13 @@ int demuxer(int argc, char* argv[]) {
     spdlog::info("> starting barcode demuxing");
     for (const auto& input : all_files) {
         HtsReader reader(input.string(), read_list);
+        auto read_initialiser = std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
+                reader.header(), alignment_counts);
+        // update read attributes so we pick up any minimum qscore and filter reads into the appropriate folder
+        reader.add_read_initialiser([read_initialiser](HtsData& data) {
+            read_initialiser->update_read_attributes(data);
+        });
         if (emit_summary) {
-            auto read_initialiser =
-                    std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
-                            reader.header(), alignment_counts);
-            reader.add_read_initialiser([read_initialiser](HtsData& data) {
-                read_initialiser->update_read_attributes(data);
-            });
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_barcoding_fields(data);
             });

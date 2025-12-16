@@ -358,6 +358,9 @@ int aligner(int argc, char* argv[]) {
         HtsReader reader(file_info.string(), std::nullopt);
         auto read_initialiser = std::make_shared<hts_writer::SummaryFileWriter::ReadInitialiser>(
                 reader.header(), alignment_counts);
+        reader.add_read_initialiser([read_initialiser](HtsData& data) {
+            read_initialiser->update_read_attributes(data);
+        });
         if (has_barcoding ||
             (emit_summary && (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS))) {
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
@@ -365,9 +368,6 @@ int aligner(int argc, char* argv[]) {
             });
         }
         if (emit_summary) {
-            reader.add_read_initialiser([read_initialiser](HtsData& data) {
-                read_initialiser->update_read_attributes(data);
-            });
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_alignment_fields(data);
             });
