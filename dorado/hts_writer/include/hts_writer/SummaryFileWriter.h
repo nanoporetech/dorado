@@ -36,7 +36,8 @@ public:
     // Set a single header to write to all output files
     void set_shared_header(SamHdrSharedPtr header);
     // Set a lookup for pre-built output headers based indexed on read attributes at file write time.
-    void set_dynamic_header(const std::shared_ptr<utils::HeaderMapper::HeaderMap>& header_map);
+    void set_dynamic_header(
+            const std::shared_ptr<const utils::HeaderMapper::HeaderMap>& header_map);
 
     void process(const Processable item) override;
     void shutdown() override;
@@ -49,7 +50,7 @@ private:
     void handle(const HtsData& item) const;
 
     SamHdrSharedPtr m_shared_header{nullptr};
-    std::shared_ptr<utils::HeaderMapper::HeaderMap> m_dynamic_header{nullptr};
+    std::shared_ptr<const utils::HeaderMapper::HeaderMap> m_dynamic_header{nullptr};
 
     const FieldFlags m_field_flags;
     std::ofstream m_summary_file;

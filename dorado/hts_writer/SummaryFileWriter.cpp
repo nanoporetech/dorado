@@ -200,7 +200,7 @@ void SummaryFileWriter::set_shared_header(dorado::SamHdrSharedPtr header) {
 }
 
 void SummaryFileWriter::set_dynamic_header(
-        const std::shared_ptr<utils::HeaderMapper::HeaderMap>& header_map) {
+        const std::shared_ptr<const utils::HeaderMapper::HeaderMap>& header_map) {
     if (m_shared_header != nullptr) {
         throw std::logic_error("set_dynamic_header is incompatible with set_shared_header.");
     }
