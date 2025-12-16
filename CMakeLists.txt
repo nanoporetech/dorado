@@ -58,7 +58,7 @@ if (APPLE AND NOT ECM_ENABLE_SANITIZERS)
     list(PREPEND CMAKE_FIND_LIBRARY_SUFFIXES ".a")
 endif()
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 # Set warnings and RPATH before we create any targets.

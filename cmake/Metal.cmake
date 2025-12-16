@@ -1,15 +1,15 @@
 # Setup metal-cpp target.
 download_and_extract(
-    https://developer.apple.com/metal/cpp/files/metal-cpp_macOS13_iOS16.zip
-    metal-cpp_macOS13_iOS16
-    "6f741894229e9c750add1afc3797274fc008c7507e2ae726370c17c34b7c6a68"
+    https://developer.apple.com/metal/cpp/files/metal-cpp_26.zip
+    metal-cpp_26
+    "4df3c078b9aadcb516212e9cb03004cbc5ce9a3e9c068fa3144d021db585a3a4"
 )
 add_library(metal_cpp STATIC
     ${CMAKE_CURRENT_LIST_DIR}/../dorado/metal-cpp-impl.cpp
 )
 target_include_directories(metal_cpp SYSTEM
     PUBLIC
-        ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp_macOS13_iOS16/metal-cpp
+        ${DORADO_3RD_PARTY_DOWNLOAD}/metal-cpp_26/metal-cpp
 )
 
 

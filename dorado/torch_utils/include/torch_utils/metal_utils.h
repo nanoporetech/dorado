@@ -1,10 +1,9 @@
 #pragma once
 
-// Must come before Metal.hpp or we get warnings about __attribute__
-#include <ostream>
-
 // Some NS types make use of tagged pointers which aren't aligned and trip up UBSan.
-#pragma clang attribute push(__attribute__((no_sanitize("alignment"))), apply_to = function)
+// NS::SharedPtr also incorrectly uses the no_sanitize attribute since it should be on the inner class.
+#pragma clang attribute push(__attribute__((no_sanitize("alignment"), no_sanitize("null"))), \
+                             apply_to = function)
 #include <Metal/Metal.hpp>
 #pragma clang attribute pop
 
