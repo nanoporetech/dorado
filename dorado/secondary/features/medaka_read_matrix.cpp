@@ -1,6 +1,6 @@
 #include "medaka_read_matrix.h"
 
-#include "hts_utils/cigar_utils.h"
+#include "hts_utils/bam_utils.h"
 #include "local_haplotagging.h"
 #include "medaka_bamiter.h"
 #include "secondary/common/bam_file.h"
@@ -160,9 +160,9 @@ double compute_logprob(const double p) {
 }
 
 int8_t compute_snp_qv(const bam1_t *alignment) {
-    const auto [accuracy_total, accuracy_snp] =
+    const dorado::utils::AlignmentAccuracy accuracy =
             dorado::utils::compute_accuracy_from_cigar(alignment);
-    return static_cast<int8_t>(nearbyint(compute_logprob(accuracy_snp)));
+    return static_cast<int8_t>(nearbyint(compute_logprob(accuracy.snp)));
 }
 
 }  // namespace

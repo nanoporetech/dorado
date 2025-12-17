@@ -20,12 +20,17 @@ class SampleSheet;
 using sq_t = std::vector<std::pair<std::string, uint32_t>>;
 
 struct AlignmentOps {
-    size_t softclip_start;
-    size_t softclip_end;
-    size_t matches;
-    size_t insertions;
-    size_t deletions;
-    size_t substitutions;
+    size_t softclip_start{};
+    size_t softclip_end{};
+    size_t matches{};
+    size_t insertions{};
+    size_t deletions{};
+    size_t substitutions{};
+};
+
+struct AlignmentAccuracy {
+    double total{0.0};  // nm / aln_len
+    double snp{0.0};    // num_x / num_m
 };
 
 // Attempts to write the fastq header record line to the custom tag "fq"
@@ -67,9 +72,9 @@ std::unordered_map<std::string, dorado::ReadGroup> parse_read_groups(sam_hdr_t* 
 /**
  * @brief Get the read group tag content from a SAM/BAM/CRAM record
  *
- * This function extracts and returns the read group tag string from a 
+ * This function extracts and returns the read group tag string from a
  * SAM/BAM/CRAM record's RG:Z tag.
- * 
+ *
  * @param record A pointer to a valid bam1_t object representing a SAM/BAM/CRAM record
  * @return A string containing the read group ID.
 */
@@ -89,7 +94,7 @@ std::string get_read_group_tag(const bam1_t* record);
  * @throws std::runtime_error If there are no read groups in the file.
  *
  * Example usage:
- * 
+ *
  * samFile *sam_fp = sam_open("example.bam", "r");
  * sam_hdr_t *header = sam_hdr_read(sam_fp);
  * std::map<std::string, std::string> read_group_info = get_read_group_info(header, "DT");
@@ -110,7 +115,20 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
  * @param record Pointer to a bam1_t structure representing a BAM record.
  * @return AlignmentOps structure containing counts of soft clipping, matches, insertions, deletions, and substitutions in the alignment.
  */
-AlignmentOps get_alignment_op_counts(bam1_t* record);
+AlignmentOps get_alignment_op_counts(const bam1_t* record);
+
+/**
+ * @brief Calculates the alignment accuracy from the CIGAR operations of a given BAM record.
+ *
+ * This function takes a pointer to a bam1_t structure as input and computes two types of alignment accuracies:
+ * (1) total alignment accuracy as the edit_distance / alignment_length; and
+ * (2) the SNP alignment accuracy as the num_mismatches / (num_mismatches + num_matches).
+ * It returns an AlignmentAccuracy structure containing these values.
+ *
+ * @param record Pointer to a bam1_t structure representing a BAM record.
+ * @return AlignmentAccuracy structure containing alignment accuracies.
+ */
+AlignmentAccuracy compute_accuracy_from_cigar(const bam1_t* record);
 
 /**
  * Extract keys for PG header from BAM header.
@@ -180,7 +198,7 @@ std::tuple<std::string, std::vector<uint8_t>> extract_modbase_info(bam1_t* input
 /*
  * Check that the modified base code supplied is suitable for use in the MM:Z bam tag.
  *
- * @param bam_name mod_bases alphabet entry  
+ * @param bam_name mod_bases alphabet entry
  * @return True if the entry is valid for use (i.e. is single letter or integer ChEBI code)
  */
 bool validate_bam_tag_code(const std::string& bam_name);
@@ -224,7 +242,7 @@ std::string cigar2str(uint32_t n_cigar, const uint32_t* cigar);
  * @param record BAM record.
  * @param seq New sequence.
  * @param qual New quality scores.
- * 
+ *
  * If seq is an empty string, then qual is ignored and the sequence and qualities from the
  * input record will be used. If seq is not empty then it will replace the original sequence
  * in the new object, and qual will replace the original qualities in the new object. This

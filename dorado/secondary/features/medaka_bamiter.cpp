@@ -1,6 +1,6 @@
 #include "medaka_bamiter.h"
 
-#include "hts_utils/cigar_utils.h"
+#include "hts_utils/bam_utils.h"
 #include "utils/cigar.h"
 
 #include <htslib/sam.h>
@@ -40,8 +40,8 @@ int32_t mpileup_read_bam(void *data, bam1_t *b) {
 
         // Filter by accuracy if available.
         if (min_snp_accuracy > 0.0) {
-            const auto [accuracy_total, accuracy_snp] = utils::compute_accuracy_from_cigar(b);
-            if ((accuracy_snp >= 0.0) && (accuracy_snp < min_snp_accuracy)) {
+            const utils::AlignmentAccuracy accuracy = dorado::utils::compute_accuracy_from_cigar(b);
+            if ((accuracy.snp >= 0.0) && (accuracy.snp < min_snp_accuracy)) {
                 continue;
             }
         }
