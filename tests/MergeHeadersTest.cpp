@@ -56,6 +56,52 @@ CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines", TEST_GROUP) {
     CATCH_CHECK(res2 == std::string("Error merging header header2. SQ lines are incompatible."));
 }
 
+CATCH_TEST_CASE("MergeHeadersTest: compatible SQ lines with different UR tags", TEST_GROUP) {
+    std::string hdr1_txt =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@SQ\tSN:ref1\tLN:2000\tUR:reference1.fasta\n";
+    std::string hdr2_txt =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@SQ\tSN:ref1\tLN:2000\tUR:reference2.fasta\n";
+    SamHdrPtr header1(sam_hdr_parse(hdr1_txt.size(), hdr1_txt.c_str()));
+    SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
+
+    MergeHeaders merger(false);
+    auto res1 = merger.add_header(header1.get(), "header1");
+    CATCH_CHECK(res1.empty());
+    auto res2 = merger.add_header(header2.get(), "header2");
+    CATCH_CHECK(res2.empty());
+}
+
+CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines with different M5 tags", TEST_GROUP) {
+    std::string hdr1_txt =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@SQ\tSN:ref1\tLN:2000\tM5:e11f9bbd41b8a7bfb9af35538cf999c1\n";
+    std::string hdr2_txt =
+            "@HD\tVN:1.6\tSO:coordinate\n"
+            "@PG\tID:aligner\tPN:minimap2\tVN:2.26-r1175zn\n"
+            "@RG\tID:run1_model1\tDT:2022-10-20T14:48:32Z\tDS:runid=run1 "
+            "basecall_model=model1\tLB:NA12878\tPL:ONT\tPU:SOMEBODY\tal:NA12878\n"
+            "@SQ\tSN:ref1\tLN:2000\tM5:3c9ee6dd1e793a5fa24f55ed2df90098\n";
+    SamHdrPtr header1(sam_hdr_parse(hdr1_txt.size(), hdr1_txt.c_str()));
+    SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
+
+    MergeHeaders merger(false);
+    auto res1 = merger.add_header(header1.get(), "header1");
+    CATCH_CHECK(res1.empty());
+    auto res2 = merger.add_header(header2.get(), "header2");
+    CATCH_CHECK(res2 == std::string("Error merging header header2. SQ lines are incompatible."));
+}
+
 CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP) {
     std::string hdr1_txt =
             "@HD\tVN:1.6\tSO:coordinate\n"
