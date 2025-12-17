@@ -110,25 +110,23 @@ int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
     std::map<std::string, RefInfo> ref_map;
     int nrefs = sam_hdr_nref(hdr);
     for (int i = 0; i < nrefs; ++i) {
-        auto ref_name = sam_hdr_line_name(hdr, "SQ", i);
-        if (!ref_name) {
+        std::string ref_name = sam_hdr_line_name(hdr, "SQ", i);
+        if (ref_name.empty()) {
             return -1;
         }
 
-        std::string url;
-        std::string reflen;
         SQLine sq_line{
-                .name = ref_name,
+                .name = std::move(ref_name),
                 .reflen = get_tag_string("LN", i),
                 .md5 = get_tag_string("M5", i),
                 .url = get_tag_string("UR", i),
         };
-        std::string key(ref_name);
+        const std::string& key = sq_line.name;
         RefInfo info{uint32_t(i), sq_line};
         ref_map[key] = std::move(info);
         auto entry = m_ref_lut.find(key);
         if (entry == m_ref_lut.end()) {
-            m_ref_lut[key] = sq_line;
+            m_ref_lut[key] = std::move(sq_line);
         } else {
             SQLineComparator cmp;
             if (!cmp(sq_line, entry->second)) {
