@@ -200,8 +200,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         const int32_t num_classes = std::stoi(get_value(config.model_kwargs, "num_classes"));
         const int32_t gru_size = std::stoi(get_value(config.model_kwargs, "gru_size"));
         const int32_t n_layers = std::stoi(get_value(config.model_kwargs, "n_layers"));
-        const bool bidirectional =
-                (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
+        const bool bidirectional = (get_value(config.model_kwargs, "bidirectional") == "true");
 
         model = ModelGRU::make<ModelGRU>(num_features, num_classes, gru_size, n_layers,
                                          bidirectional);
@@ -219,14 +218,12 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
                 std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
         const std::vector<int32_t> kernel_sizes =
                 utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"), ',');
-        const bool use_dwells =
-                (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
+        const bool use_dwells = (get_value(config.model_kwargs, "use_dwells") == "true");
 
         // Optionally parse the 'bidirectional' option to support older configs.
         bool bidirectional = true;
         if (config.model_kwargs.find("bidirectional") != std::cend(config.model_kwargs)) {
-            bidirectional =
-                    (get_value(config.model_kwargs, "bidirectional") == "true") ? true : false;
+            bidirectional = (get_value(config.model_kwargs, "bidirectional") == "true");
         }
 
         model = ModelLatentSpaceLSTM::make<ModelLatentSpaceLSTM>(
@@ -245,23 +242,19 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         const std::vector<int32_t> kernel_sizes =
                 utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"), ',');
         const std::string pooler_type = get_value(config.model_kwargs, "pooler_type");
-        const bool use_mapqc =
-                (get_value(config.model_kwargs, "use_mapqc") == "true") ? true : false;
-        const bool use_dwells =
-                (get_value(config.model_kwargs, "use_dwells") == "true") ? true : false;
-        const bool use_haplotags =
-                (get_value(config.model_kwargs, "use_haplotags") == "true") ? true : false;
+        const bool use_mapqc = (get_value(config.model_kwargs, "use_mapqc") == "true");
+        const bool use_dwells = (get_value(config.model_kwargs, "use_dwells") == "true");
+        const bool use_haplotags = (get_value(config.model_kwargs, "use_haplotags") == "true");
         const int32_t bases_alphabet_size =
                 std::stoi(get_value(config.model_kwargs, "bases_alphabet_size"));
         const int32_t bases_embedding_size =
                 std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
-        const bool add_lstm = (get_value(config.model_kwargs, "add_lstm") == "true") ? true : false;
-        const bool use_reference =
-                (get_value(config.model_kwargs, "use_reference") == "true") ? true : false;
+        const bool add_lstm = (get_value(config.model_kwargs, "add_lstm") == "true");
+        const bool use_reference = (get_value(config.model_kwargs, "use_reference") == "true");
 
         bool use_snp_qv = false;
         if (config.model_kwargs.find("use_snp_qv") != std::cend(config.model_kwargs)) {
-            use_snp_qv = (get_value(config.model_kwargs, "use_snp_qv") == "true") ? true : false;
+            use_snp_qv = (get_value(config.model_kwargs, "use_snp_qv") == "true");
         }
 
         const std::unordered_map<std::string, std::string> pooler_args;
