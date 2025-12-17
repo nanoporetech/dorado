@@ -97,28 +97,41 @@ const std::vector<uint32_t>& MergeHeaders::get_sq_mapping(const std::string& fil
 }
 
 int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
+    KString tag_wrapper(1000000);
+    auto tag_data = tag_wrapper.get();
+    auto get_tag_string = [&](const char* tag, int index) -> std::string {
+        std::string tag_string;
+        if (sam_hdr_find_tag_pos(hdr, "SQ", index, tag, &tag_data) == 0) {
+            return std::string(ks_str(&tag_data));
+        }
+        return {};
+    };
+
     std::map<std::string, RefInfo> ref_map;
     int nrefs = sam_hdr_nref(hdr);
     for (int i = 0; i < nrefs; ++i) {
-        KString line_wrapper(1000000);
-        auto line_data = line_wrapper.get();
-        auto res = sam_hdr_find_line_pos(hdr, "SQ", i, &line_data);
-        if (res < 0) {
-            return -1;
-        }
         auto ref_name = sam_hdr_line_name(hdr, "SQ", i);
         if (!ref_name) {
             return -1;
         }
+
+        std::string url;
+        std::string reflen;
+        SQLine sq_line{
+                .name = ref_name,
+                .reflen = get_tag_string("LN", i),
+                .md5 = get_tag_string("M5", i),
+                .url = get_tag_string("UR", i),
+        };
         std::string key(ref_name);
-        std::string line(ks_str(&line_data));
-        RefInfo info{uint32_t(i), line};
+        RefInfo info{uint32_t(i), sq_line};
         ref_map[key] = std::move(info);
         auto entry = m_ref_lut.find(key);
         if (entry == m_ref_lut.end()) {
-            m_ref_lut[key] = line;
+            m_ref_lut[key] = sq_line;
         } else {
-            if (line != entry->second) {
+            SQLineComparator cmp;
+            if (!cmp(sq_line, entry->second)) {
                 return -2;
             }
         }
@@ -226,8 +239,12 @@ void MergeHeaders::finalize_merge() {
     uint32_t sq_idx = 0;
     for (const auto& entry : m_ref_lut) {
         const auto& key = entry.first;
-        const auto& line = entry.second;
-        sam_hdr_add_lines(m_merged_header.get(), line.c_str(), 0);
+        const auto& sq_line = entry.second;
+        sam_hdr_add_line(m_merged_header.get(), "SQ", "SN", sq_line.name.c_str(), "LN",
+                         sq_line.reflen.c_str(), !sq_line.md5.empty() ? "M5" : nullptr,
+                         !sq_line.md5.empty() ? sq_line.md5.c_str() : nullptr,
+                         !sq_line.url.empty() ? "UR" : nullptr,
+                         !sq_line.url.empty() ? sq_line.url.c_str() : nullptr, nullptr);
         new_sq_order[key] = sq_idx++;
     }
 

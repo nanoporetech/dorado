@@ -112,11 +112,6 @@ public:
     const std::vector<uint32_t>& get_sq_mapping(const std::string& filename) const;
 
 private:
-    struct RefInfo {
-        uint32_t index;         // Index of SQ line in original header.
-        std::string line_text;  // Full SQ line text.
-    };
-
     bool m_strip_alignment;
     SamHdrPtr m_merged_header;
     std::vector<std::vector<uint32_t>> m_sq_mapping;
@@ -131,12 +126,31 @@ private:
     // Key = PG line id. Value = all unique lines seen with that id.
     std::map<std::string, std::set<std::string>> m_program_lut;
 
+    struct SQLine {
+        std::string name;
+        std::string reflen;
+        std::string md5;
+        std::string url;
+    };
+
+    struct SQLineComparator {
+        bool operator()(const SQLine& lhs, const SQLine& rhs) const {
+            return std::tie(lhs.name, lhs.md5, lhs.reflen) ==
+                   std::tie(rhs.name, rhs.md5, rhs.reflen);
+        }
+    };
+
     // Stores unique SQ lines across all headers.
-    // Key = ref name, Value = line text for SQ line.
-    std::map<std::string, std::string> m_ref_lut;
+    // Key = ref name, Value = SQ line data struct
+    std::map<std::string, SQLine> m_ref_lut;
 
     // Stores all unique non-SQ/PG/RG lines across all headers.
     std::set<std::string> m_other_lines;
+
+    struct RefInfo {
+        uint32_t index;  // Index of SQ line in original header.
+        SQLine sq_line;  // Full SQ line data.
+    };
 
     // Stores SQ line data for each header.
     // One entry for each header. Key = ref name, Value = info for ref.
