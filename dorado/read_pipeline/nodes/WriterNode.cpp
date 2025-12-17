@@ -60,7 +60,7 @@ void WriterNode::set_shared_header(SamHdrPtr hdr) const {
 }
 
 void WriterNode::set_dynamic_header(
-        const std::shared_ptr<utils::HeaderMapper::HeaderMap> &header_map) const {
+        const std::shared_ptr<const utils::HeaderMapper::HeaderMap> &header_map) const {
     for (const auto &writer : m_writers) {
         if (auto hts_w = dynamic_cast<hts_writer::HtsFileWriter *>(writer.get())) {
             hts_w->set_dynamic_header(header_map);
