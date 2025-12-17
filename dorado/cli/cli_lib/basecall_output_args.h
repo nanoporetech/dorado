@@ -9,13 +9,21 @@ class ArgumentParser;
 
 namespace dorado::cli {
 
-void add_basecaller_output_arguments(argparse::ArgumentParser& parser, bool allow_summary);
+struct EmitArgs {
+    bool bam{false};
+    bool sam{false};
+    bool fastq{false};
+    bool moves{false};
+    bool summary{false};
+};
+
+EmitArgs get_emit_args(const argparse::ArgumentParser& parser);
+
+void add_basecaller_output_arguments(argparse::ArgumentParser& parser);
+void add_duplex_output_arguments(argparse::ArgumentParser& parser);
 void add_demux_output_arguments(argparse::ArgumentParser& parser);
 void add_aligner_output_arguments(argparse::ArgumentParser& parser);
 
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser);
-bool get_emit_fastq(const argparse::ArgumentParser& parser);
-bool get_emit_sam(const argparse::ArgumentParser& parser);
-bool get_emit_summary(const argparse::ArgumentParser& parser);
 
 }  // namespace dorado::cli

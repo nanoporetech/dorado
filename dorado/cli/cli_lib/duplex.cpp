@@ -187,7 +187,7 @@ int duplex(int argc, char* argv[]) {
                       "output files marked `fail` if `--output-dir` is set.")
                 .default_value(0)
                 .scan<'i', int>();
-        cli::add_basecaller_output_arguments(parser, false);
+        cli::add_duplex_output_arguments(parser);
     }
     {
         parser.add_group("Alignment arguments");
@@ -291,7 +291,7 @@ int duplex(int argc, char* argv[]) {
                     "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
-        bool emit_moves = false;
+        const cli::EmitArgs emit = cli::get_emit_args(parser);
 
         if (parser.get<std::string>("--reference").empty() &&
             !parser.get<std::string>("--bed-file").empty()) {
@@ -350,9 +350,8 @@ int duplex(int argc, char* argv[]) {
 
             constexpr int WRITER_THREADS = 4;
             auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
-                    cli::get_emit_fastq(parser), cli::get_emit_sam(parser), !ref.empty(),
-                    cli::get_output_dir(parser), WRITER_THREADS, progress_callback,
-                    description_callback, gpu_names);
+                    emit.fastq, emit.sam, !ref.empty(), cli::get_output_dir(parser), WRITER_THREADS,
+                    progress_callback, description_callback, gpu_names);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             if (hts_file_writer == nullptr) {
@@ -396,7 +395,7 @@ int duplex(int argc, char* argv[]) {
         }
 
         const auto read_converter = pipeline_desc.add_node<ReadToBamTypeNode>(
-                {converted_reads_sink}, emit_moves, 2, std::nullopt, 1000, min_qscore);
+                {converted_reads_sink}, emit.moves, 2, std::nullopt, 1000, min_qscore);
         const auto duplex_read_tagger =
                 pipeline_desc.add_node<DuplexReadTaggingNode>({read_converter});
         // The minimum sequence length is set to 5 to avoid issues with duplex node printing very short sequences for mismatched pairs.

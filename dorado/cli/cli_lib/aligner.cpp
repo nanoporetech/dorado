@@ -183,8 +183,7 @@ int aligner(int argc, char* argv[]) {
     const bool skip_sec_supp = !parser.get<bool>("--allow-sec-supp");
 
     const auto sort_requested = !parser.get<bool>("--no-sort");
-    const auto emit_sam = cli::get_emit_sam(parser);
-    const auto emit_summary = cli::get_emit_summary(parser);
+    const cli::EmitArgs emit = cli::get_emit_args(parser);
 
     auto threads(parser.get<int>("threads"));
     std::size_t max_reads(parser.get<int>("max-reads"));
@@ -275,7 +274,7 @@ int aligner(int argc, char* argv[]) {
                 });
 
         auto hts_writer_builder = hts_writer::AlignerHtsFileWriterBuilder(
-                emit_sam, sort_requested, output_dir, writer_threads, progress_callback,
+                emit.sam, sort_requested, output_dir, writer_threads, progress_callback,
                 description_callback, has_barcoding);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
@@ -289,7 +288,7 @@ int aligner(int argc, char* argv[]) {
 
     AlignmentCounts alignment_counts;
     hts_writer::SummaryFileWriter::FieldFlags flags = 0;
-    if (emit_summary) {
+    if (emit.summary) {
         std::tie(flags, alignment_counts) = cli::make_summary_info(all_files);
         flags |= hts_writer::SummaryFileWriter::ALIGNMENT_FIELDS;
         auto summary_output = output_dir.has_value() ? std::filesystem::path(output_dir.value())
@@ -364,12 +363,12 @@ int aligner(int argc, char* argv[]) {
             read_initialiser->update_read_attributes(data);
         });
         if (has_barcoding ||
-            (emit_summary && (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS))) {
+            (emit.summary && (flags & hts_writer::SummaryFileWriter::BARCODING_FIELDS))) {
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_barcoding_fields(data);
             });
         }
-        if (emit_summary) {
+        if (emit.summary) {
             reader.add_read_initialiser([read_initialiser](HtsData& data) {
                 read_initialiser->update_alignment_fields(data);
             });
