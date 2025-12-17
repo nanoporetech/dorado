@@ -1,6 +1,7 @@
 #pragma once
 
 #include "secondary/architectures/model_torch_base.h"
+#include "secondary/features/encoder_base.h"
 
 #include <ATen/ATen.h>
 #include <torch/nn/modules/activation.h>
@@ -67,7 +68,8 @@ public:
                          const bool use_dwells,
                          const int32_t bases_alphabet_size,
                          const int32_t bases_embedding_size,
-                         const bool bidirectional);
+                         const bool bidirectional,
+                         FeatureColumnMap feature_column_map);
 
     at::Tensor forward(at::Tensor x) override;
 
@@ -84,6 +86,7 @@ private:
     int32_t m_bases_alphabet_size = 6;
     int32_t m_bases_embedding_size = 6;
     bool m_bidirectional = true;
+    FeatureColumnMap m_feature_column_map{};
 
     // Layers.
     torch::nn::Embedding m_base_embedder;
@@ -94,6 +97,12 @@ private:
     torch::nn::LSTM m_lstm_bidir;
     torch::nn::Sequential m_lstm_unidir;
     torch::nn::Linear m_linear;
+
+    int32_t m_column_base{-1};
+    int32_t m_column_qual{-1};
+    int32_t m_column_strand{-1};
+    int32_t m_column_mapq{-1};
+    int32_t m_column_dwell{-1};
 };
 
 }  // namespace dorado::secondary

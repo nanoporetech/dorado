@@ -45,6 +45,10 @@ public:
     std::vector<secondary::Sample> merge_adjacent_samples(
             std::vector<secondary::Sample> samples) const override;
 
+    FeatureColumnMap get_feature_column_map() const override;
+
+    static FeatureColumnMap produce_feature_column_map();
+
 private:
     secondary::BamFile m_bam_file;
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
@@ -59,6 +63,7 @@ private:
     bool m_clip_to_zero = false;
     FeatureIndicesType m_feature_indices;
     std::mutex m_mtx;
+    FeatureColumnMap m_feature_column_map{};
 };
 
 }  // namespace dorado::secondary

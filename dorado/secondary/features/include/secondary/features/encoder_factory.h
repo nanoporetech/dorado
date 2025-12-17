@@ -34,4 +34,6 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::optional<HaplotagSource>& hap_source,
         const std::optional<std::filesystem::path>& phasing_bin_fn);
 
+FeatureColumnMap feature_column_map_factory(const ModelConfig& config);
+
 }  // namespace dorado::secondary

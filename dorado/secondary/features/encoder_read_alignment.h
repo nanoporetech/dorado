@@ -58,6 +58,12 @@ public:
     std::vector<secondary::Sample> merge_adjacent_samples(
             std::vector<secondary::Sample> samples) const override;
 
+    FeatureColumnMap get_feature_column_map() const override;
+
+    static FeatureColumnMap produce_feature_column_map(const bool include_dwells,
+                                                       const bool include_haplotype_column,
+                                                       const bool include_dtypes);
+
 private:
     hts_io::FastxRandomReader m_fastx_reader;
     secondary::BamFile m_bam_file;
@@ -78,6 +84,7 @@ private:
     bool m_right_align_insertions = false;
     std::optional<std::filesystem::path> m_phasing_bin;
     std::mutex m_mtx;
+    FeatureColumnMap m_feature_column_map{};
 };
 
 }  // namespace dorado::secondary
