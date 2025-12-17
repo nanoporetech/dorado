@@ -288,11 +288,15 @@ std::map<std::string, std::string> get_read_group_info(sam_hdr_t* header, const 
     return read_group_info;
 }
 
-AlignmentOps get_alignment_op_counts(bam1_t* record) {
+AlignmentOps get_alignment_op_counts(const bam1_t* record) {
+    if (!record) {
+        return {};
+    }
+
     AlignmentOps counts = {};
 
-    uint32_t* cigar = bam_get_cigar(record);
-    int n_cigar = record->core.n_cigar;
+    const uint32_t* cigar = bam_get_cigar(record);
+    const int n_cigar = record->core.n_cigar;
 
     if (bam_cigar_op(cigar[0]) == BAM_CSOFT_CLIP) {
         counts.softclip_start = bam_cigar_oplen(cigar[0]);
@@ -303,11 +307,13 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
     }
 
     for (int i = 0; i < n_cigar; ++i) {
-        int op = bam_cigar_op(cigar[i]);
-        int op_len = bam_cigar_oplen(cigar[i]);
+        const int op = bam_cigar_op(cigar[i]);
+        const int op_len = bam_cigar_oplen(cigar[i]);
 
         switch (op) {
         case BAM_CMATCH:
+        case BAM_CEQUAL:
+        case BAM_CDIFF:
             counts.matches += op_len;
             break;
         case BAM_CINS:
@@ -321,12 +327,38 @@ AlignmentOps get_alignment_op_counts(bam1_t* record) {
         }
     }
 
-    uint8_t* nm_ptr = bam_aux_get(record, "NM");
+    const uint8_t* nm_ptr = bam_aux_get(record, "NM");
     if (nm_ptr) {
         counts.substitutions = bam_aux2i(nm_ptr) - counts.deletions - counts.insertions;
     }
 
     return counts;
+}
+
+AlignmentAccuracy compute_accuracy_from_cigar(const bam1_t* record) {
+    if (!record) {
+        return {};
+    }
+    const AlignmentOps counts = get_alignment_op_counts(record);
+
+    const size_t aln_query_len = counts.matches + counts.insertions;
+    const size_t aln_len = counts.matches + counts.insertions + counts.deletions;
+
+    if ((aln_query_len <= 0) || (aln_len <= 0) || (counts.matches <= 0)) {
+        return {0.0, 0.0};
+    }
+
+    const size_t nm = counts.substitutions + counts.insertions + counts.deletions;
+
+    const double acc_x =
+            (counts.matches == 0)
+                    ? 0.0
+                    : std::clamp((1.0 - ((double)counts.substitutions) / counts.matches), 0.0, 1.0);
+    const double acc_total =
+            (aln_len == 0) ? 0.0
+                           : std::clamp((1.0 - (static_cast<double>(nm)) / aln_len), 0.0, 1.0);
+
+    return AlignmentAccuracy{.total = acc_total, .snp = acc_x};
 }
 
 std::map<std::string, std::string> extract_pg_keys_from_hdr(const std::string& filename,

@@ -1,5 +1,6 @@
 #include "medaka_read_matrix.h"
 
+#include "hts_utils/bam_utils.h"
 #include "local_haplotagging.h"
 #include "medaka_bamiter.h"
 #include "secondary/common/bam_file.h"
@@ -44,16 +45,17 @@ static constexpr std::array<int8_t, 32> NUM_TO_COUNT_BASE_SYMM{
 };
 
 struct Read {
-    int64_t ref_start;
-    std::string qname;
-    uint8_t *seqi;
-    uint8_t *qual;
-    uint8_t mapq;
-    int8_t haplotype;
-    int8_t strand;
-    int8_t dtype;
-    int64_t ref_end;
-    std::vector<int8_t> dwells;
+    int64_t ref_start{};
+    std::string qname{};
+    uint8_t *seqi{nullptr};
+    uint8_t *qual{nullptr};
+    uint8_t mapq{};
+    int8_t snp_qv{};
+    int8_t haplotype{};
+    int8_t strand{};
+    int8_t dtype{};
+    int64_t ref_end{};
+    std::vector<int8_t> dwells{};
 };
 
 /** Populate an array of dwells per base.
@@ -150,6 +152,17 @@ size_t aligned_ref_pos_from_cigar(const uint32_t *cigar, const uint32_t n_cigar)
         }
     }
     return aligned_ref_pos;
+}
+
+double compute_logprob(const double p) {
+    const double e = 1.0 - p;
+    return (e <= 0.0) ? 60.0 : (e >= 1.0) ? 0.0 : (-10.0 * log10(e));
+}
+
+int8_t compute_snp_qv(const bam1_t *alignment) {
+    const dorado::utils::AlignmentAccuracy accuracy =
+            dorado::utils::compute_accuracy_from_cigar(alignment);
+    return static_cast<int8_t>(nearbyint(compute_logprob(accuracy.snp)));
 }
 
 }  // namespace
@@ -256,6 +269,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype_column,
+                                           const bool include_snp_qv,
                                            const secondary::HaplotagSource hap_source,
                                            const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,
@@ -373,7 +387,8 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     int32_t max_n_reads = 0;
     const int32_t buffer_pos = static_cast<int32_t>(2 * (end - start));
     const int32_t buffer_reads = std::min(max_reads, 100);
-    const int32_t extra_featlen = include_dwells + include_haplotype_column + (num_dtypes > 1);
+    const int32_t extra_featlen =
+            include_dwells + include_haplotype_column + include_snp_qv + (num_dtypes > 1);
     ReadAlignmentData pileup(n_pos, max_n_reads, buffer_pos, buffer_reads, extra_featlen, 0);
 
     int64_t major_col = 0;          // index into `pileup` corresponding to pos
@@ -506,18 +521,21 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 }
 
                 Read read = {
-                        alignment->core.pos,
-                        qname,
-                        bam_get_seq(alignment),
-                        bam_get_qual(alignment),
-                        alignment->core.qual,
-                        haplotype,
-                        static_cast<int8_t>(bam_is_rev(alignment) ? -1 : 1),
-                        static_cast<int8_t>(dtype),
-                        static_cast<int64_t>(alignment->core.pos +
-                                             aligned_ref_pos_from_cigar(bam_get_cigar(alignment),
-                                                                        alignment->core.n_cigar)),
-                        std::move(dwells),
+                        .ref_start = alignment->core.pos,
+                        .qname = qname,
+                        .seqi = bam_get_seq(alignment),
+                        .qual = bam_get_qual(alignment),
+                        .mapq = alignment->core.qual,
+                        .snp_qv =
+                                include_snp_qv ? compute_snp_qv(alignment) : static_cast<int8_t>(0),
+                        .haplotype = haplotype,
+                        .strand = static_cast<int8_t>(bam_is_rev(alignment) ? -1 : 1),
+                        .dtype = static_cast<int8_t>(dtype),
+                        .ref_end = static_cast<int64_t>(
+                                alignment->core.pos +
+                                aligned_ref_pos_from_cigar(bam_get_cigar(alignment),
+                                                           alignment->core.n_cigar)),
+                        .dwells = std::move(dwells),
                 };
 
                 // insert read into read_array in place of a read that's already completed
@@ -558,21 +576,27 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
             int32_t min_minor = 0;
             const int32_t max_minor = (p->indel > 0) ? p->indel : 0;
             if (p->is_del) {
-                pileup.matrix[major_col + pileup.featlen * read_i + 0] = DEL_VAL;      //base
-                pileup.matrix[major_col + pileup.featlen * read_i + 1] = -1;           //qual
-                pileup.matrix[major_col + pileup.featlen * read_i + 2] = read.strand;  //strand
-                pileup.matrix[major_col + pileup.featlen * read_i + 3] = read.mapq;    //mapq
+                const int64_t row = major_col + pileup.featlen * read_i;
+                pileup.matrix[row + 0] = DEL_VAL;      //base
+                pileup.matrix[row + 1] = -1;           //qual
+                pileup.matrix[row + 2] = read.strand;  //strand
+                pileup.matrix[row + 3] = read.mapq;    //mapq
+                int64_t feat_id = BASE_FEATLEN;
                 if (include_dwells) {
-                    pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN] = -1;  //dwell
+                    pileup.matrix[row + feat_id] = -1;  //dwell
+                    ++feat_id;
                 }
                 if (include_haplotype_column) {
-                    pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN +
-                                  (include_dwells ? 1 : 0)] = read.haplotype;  //haplotag
+                    pileup.matrix[row + feat_id] = read.haplotype;  //haplotag
+                    ++feat_id;
+                }
+                if (include_snp_qv) {
+                    pileup.matrix[row + feat_id] = read.snp_qv;  //snp-qv
+                    ++feat_id;
                 }
                 if (num_dtypes > 1) {
-                    pileup.matrix[major_col + pileup.featlen * read_i + BASE_FEATLEN +
-                                  (include_dwells ? 1 : 0) + (include_haplotype_column ? 1 : 0)] =
-                            read.dtype;  //dtype
+                    pileup.matrix[row + feat_id] = read.dtype;  //dtype
+                    ++feat_id;
                 }
                 min_minor = 1;  // in case there is also an indel, skip the major position
             }
@@ -596,17 +620,25 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 pileup.matrix[partial_index + 1] = read.qual[p->qpos + query_pos_offset];  //qual
                 pileup.matrix[partial_index + 2] = read.strand;                            //strand
                 pileup.matrix[partial_index + 3] = read.mapq;                              //qual
+                int64_t feat_id = BASE_FEATLEN;
                 if (include_dwells && !std::empty(read.dwells)) {
-                    pileup.matrix[partial_index + BASE_FEATLEN] =
+                    pileup.matrix[partial_index + feat_id] =
                             read.dwells[p->qpos + query_pos_offset];  //dwell
                 }
+                if (include_dwells) {  // Increment even if the dwell data is empty.
+                    ++feat_id;
+                }
                 if (include_haplotype_column) {
-                    pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0)] =
-                            read.haplotype;  //haplotag
+                    pileup.matrix[partial_index + feat_id] = read.haplotype;  //haplotag
+                    ++feat_id;
+                }
+                if (include_snp_qv) {
+                    pileup.matrix[partial_index + feat_id] = read.snp_qv;
+                    ++feat_id;
                 }
                 if (num_dtypes > 1) {
-                    pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0) +
-                                  (include_haplotype_column ? 1 : 0)] = read.dtype;  //dtype
+                    pileup.matrix[partial_index + feat_id] = read.dtype;  //dtype
+                    ++feat_id;
                 }
             }
 
@@ -624,16 +656,22 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                 pileup.matrix[partial_index + 1] = -1;           //qual
                 pileup.matrix[partial_index + 2] = read.strand;  //strand
                 pileup.matrix[partial_index + 3] = read.mapq;    //qual
+                int64_t feat_id = BASE_FEATLEN;
                 if (include_dwells) {
-                    pileup.matrix[partial_index + BASE_FEATLEN] = -1;  //dwell
+                    pileup.matrix[partial_index + feat_id] = -1;  //dwell
+                    ++feat_id;
                 }
                 if (include_haplotype_column) {
-                    pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0)] =
-                            read.haplotype;  //haplotag
+                    pileup.matrix[partial_index + feat_id] = read.haplotype;  //haplotag
+                    ++feat_id;
+                }
+                if (include_snp_qv) {
+                    pileup.matrix[partial_index + feat_id] = read.snp_qv;
+                    ++feat_id;
                 }
                 if (num_dtypes > 1) {
-                    pileup.matrix[partial_index + BASE_FEATLEN + (include_dwells ? 1 : 0) +
-                                  (include_haplotype_column ? 1 : 0)] = read.dtype;  //dtype
+                    pileup.matrix[partial_index + feat_id] = read.dtype;  //dtype
+                    ++feat_id;
                 }
             }
         }

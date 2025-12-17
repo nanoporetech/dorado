@@ -63,6 +63,7 @@ public:
                                 bool use_mapqc,
                                 bool use_dwells,
                                 bool use_haplotags,
+                                bool use_snp_qv,
                                 int32_t bases_alphabet_size,
                                 int32_t bases_embedding_size,
                                 bool add_lstm,
@@ -86,6 +87,7 @@ private:
     bool m_use_mapqc{false};
     bool m_use_dwells{false};
     bool m_use_haplotags{false};
+    bool m_use_snp_qv{false};
     int32_t m_bases_alphabet_size{6};
     int32_t m_bases_embedding_size{6};
     bool m_add_lstm{false};
@@ -108,6 +110,7 @@ private:
     int32_t m_column_mapq{-1};
     int32_t m_column_dwell{-1};
     int32_t m_column_haplotag{-1};
+    int32_t m_column_snp_qv{-1};
 
     std::pair<at::Tensor, at::Tensor> forward_impl(const at::Tensor& in_x);
     std::pair<at::Tensor, at::Tensor> quick_phase(at::Tensor hap_probs_unphased,

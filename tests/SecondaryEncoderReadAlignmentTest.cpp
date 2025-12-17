@@ -35,6 +35,7 @@ struct BamRecord {
     std::string_view qual{};
     std::vector<int8_t> dwell_tag{};
     std::optional<int32_t> hp_tag{};
+    std::optional<int32_t> nm{0};
 };
 
 // Utility to produce a synthetic BAM.
@@ -101,6 +102,12 @@ dorado::BamPtr make_bam1(const BamRecord& record) {
     if (record.hp_tag) {
         bam_aux_append(ret.get(), "HP", 'i', sizeof(int32_t),
                        reinterpret_cast<const uint8_t*>(&(*record.hp_tag)));
+    }
+
+    // Add the edit distance tag.
+    if (record.nm) {
+        bam_aux_append(ret.get(), "NM", 'i', sizeof(int32_t),
+                       reinterpret_cast<const uint8_t*>(&(*record.nm)));
     }
 
     return ret;
@@ -234,6 +241,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
     const bool clip_to_zero{true};
     const bool right_align_insertions{false};
     const bool include_haplotype_column{false};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const std::optional<std::filesystem::path> phasing_bin{};
     const std::string ref_name{"contig_1"};
@@ -260,10 +268,11 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10432, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(
-                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         const std::vector<int64_t> shape(std::cbegin(result.features.sizes()),
@@ -287,10 +296,11 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10431, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(
-                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
-                min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         const std::vector<int64_t> shape(std::begin(result.features.sizes()),
@@ -335,6 +345,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
     const bool clip_to_zero{true};
     const bool right_align_insertions{false};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
     const std::optional<std::filesystem::path> phasing_bin{};
     const std::string ref_name{"contig_1"};
@@ -361,7 +372,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  test_case.min_snp_accuracy, row_per_read, include_dwells,
                                  clip_to_zero, right_align_insertions, include_haplotype_column,
-                                 hap_source, phasing_bin);
+                                 hap_source, phasing_bin, include_snp_qv_column);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
@@ -385,6 +396,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
      *   read IDs, which resulted in uninitialized rows in read_ids_left and read_ids_right; (2) because of the uninitialized rows,
      *   reordering chunks and merging them was throwing an exception because the output tensor had more rows than it should have.
      * - Multiple non-overlapping reads which should be placed on the sam row in the read_array (and the tensor).
+     * - Switch the non-base feature columns on/off (dwells, haplotags, snp_qv).
      */
 
     const auto temp_dir = make_temp_dir("encoder_read_aln_test");
@@ -398,15 +410,15 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                 {"contig_1", "ACTGAACTGA"},
         };
         const std::vector<BamRecord> records{
-            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "10M", "ACTGAACTGA", "", {}, {}},                           // Full-span.
-            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "10M", "ACTGAACTGA", "", {}, {}},                           // Duplicate.
-            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "10M", "ACTGAACTGA", "", {}, {}},                           // Duplicate.
-            {"read_02", 0 /*tid*/, 0 /*pos*/, 16 /*flag*/, 60 /*mapq*/, "5M", "ACTGA", "", {}, 3},                                  // Left-flank only. Reverse.
-            {"read_03", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "3M", "ACT", "", {5, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 5},  // This should share the row with the next one.
-            {"read_04", 0 /*tid*/, 8 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "2M", "GA", "", {}, {}},                                    // This should share the row with the previous.
-            {"read_05", 0 /*tid*/, 1 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "8M", "CTGAACTG", "1234567890", {}, {}},                    // Contained. Has quals.
-            {"read_06", 0 /*tid*/, 5 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "5M", "ACTGA", "", {}, {}},                                 // Right-flank only.
-            {"read_06", 0 /*tid*/, 5 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "5M", "ACTGA", "", {}, {}},                                 // Duplicate.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 50 /*mapq*/, "10M" /*cigar*/, "ACTGAACTGA" /*seq*/, "" /*qual*/, {} /*dwell*/, {} /*hp*/, 0 /*NM*/},                           // Full-span.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 51 /*mapq*/, "10M", "ACTGAACTGA", "", {}, {}, 0},                           // Duplicate.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 52 /*mapq*/, "10M", "ACTGAACTGA", "", {}, {}, 0},                           // Duplicate.
+            {"read_02", 0 /*tid*/, 0 /*pos*/, 16 /*flag*/, 53 /*mapq*/, "5M", "ACTGA", "", {}, 3, 1},                                  // Left-flank only. Reverse. NM = 1 and cigar = 5M make snp_qv = 6.98.
+            {"read_03", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 54 /*mapq*/, "3M", "ACT", "", {5, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 5, 2},  // This should share the row with the next one. NM = 2 and cigar = 3M make snp_qv = 1.76.
+            {"read_04", 0 /*tid*/, 8 /*pos*/, 0  /*flag*/, 55 /*mapq*/, "2M", "GA", "", {}, {}, 1},                                    // This should share the row with the previous.
+            {"read_05", 0 /*tid*/, 1 /*pos*/, 0  /*flag*/, 56 /*mapq*/, "8M", "CTGAACTG", "1234567890", {}, {}, 3},                    // Contained. Has quals. NM = 3 and cigar = 8M make snp_qv = 4.26.
+            {"read_06", 0 /*tid*/, 5 /*pos*/, 0  /*flag*/, 57 /*mapq*/, "5M", "ACTGA", "", {}, {}, 5},                                 // Right-flank only.
+            {"read_06", 0 /*tid*/, 5 /*pos*/, 0  /*flag*/, 58 /*mapq*/, "5M", "ACTGA", "", {}, {}, 0},                                 // Duplicate.
         };
         // clang-format on
 
@@ -418,78 +430,79 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
     // clang-format off
     const Sample expected_total {
         .seq_id = 123,
-        // Features tensor shape: [pos, coverage, features] -> [10, 5, 6]
+        // Features tensor shape: [pos, coverage, features] -> [10, 5, 7]
+        // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
         .features = torch::tensor(
             {
                 // (0,.,.)
-                {{1, 0, 1, 60, 0, 0},
-                {1, 0, 0, 60, 0, 3},
-                {1, 0, 1, 60, 4, 5},
-                {0, 0, 0,  0, 0, 0},
-                {0, 0, 0,  0, 0, 0}},
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {1, 0, 0, 53, 0, 3, 7},
+                 {1, 0, 1, 54, 4, 5, 2},
+                 {0, 0, 0,  0, 0, 0, 0},
+                 {0, 0, 0,  0, 0, 0, 0}},
 
                 // (1,.,.)
-                {{2, 0,  1, 60, 0, 0},
-                {2, 0,  0, 60, 0, 3},
-                {2, 0,  1, 60, 5, 5},
-                {2, 49, 1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0}},
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {2, 0,  0, 53, 0, 3,  7},
+                 {2, 0,  1, 54, 5, 5,  2},
+                 {2, 49, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
 
                 // (2,.,.)
-                {{4, 0,  1, 60, 0, 0},
-                {4, 0,  0, 60, 0, 3},
-                {4, 0,  1, 60, 2, 5},
-                {4, 50, 1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0}},
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {4, 0,  0, 53, 0, 3, 7},
+                 {4, 0,  1, 54, 2, 5, 2},
+                 {4, 50, 1, 56, 0, 0, 4},
+                 {0, 0,  0,  0, 0, 0, 0}},
 
                 // (3,.,.)
-                {{3, 0,  1, 60, 0, 0},
-                {3, 0,  0, 60, 0, 3},
-                {0, 0,  0,  0, 0, 0},
-                {3, 51, 1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0}},
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {3, 0,  0, 53, 0, 3,  7},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 51, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
 
                 // (4,.,.)
-                {{1, 0,  1, 60, 0, 0},
-                {1, 0,  0, 60, 0, 3},
-                {0, 0,  0,  0, 0, 0},
-                {1, 52, 1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0}},
+                {{1,  0,  1, 50, 0, 0, 60},
+                 {1,  0,  0, 53, 0, 3,  7},
+                 {0,  0,  0,  0, 0, 0,  0},
+                 {1, 52,  1, 56, 0, 0,  4},
+                 {0,  0,  0,  0, 0, 0,  0}},
 
                 // (5,.,.)
-                {{1, 0,  1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {1, 53, 1, 60, 0, 0},
-                {1, 0,  1, 60, 0, 0}},
+                {{1, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {1, 53, 1, 56, 0, 0,  4},
+                 {1, 0,  1, 57, 0, 0,  0}},
 
                 // (6,.,.)
-                {{2, 0,  1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {2, 54, 1, 60, 0, 0},
-                {2, 0,  1, 60, 0, 0}},
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {2, 54, 1, 56, 0, 0,  4},
+                 {2, 0,  1, 57, 0, 0,  0}},
 
                 // (7,.,.)
-                {{4, 0,  1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {4, 55, 1, 60, 0, 0},
-                {4, 0,  1, 60, 0, 0}},
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {4, 55, 1, 56, 0, 0,  4},
+                 {4, 0,  1, 57, 0, 0,  0}},
 
                 // (8,.,.)
-                {{3, 0,  1, 60, 0, 0},
-                {0, 0,  0,  0, 0, 0},
-                {3, 0,  1, 60, 0, 0},
-                {3, 56, 1, 60, 0, 0},
-                {3, 0,  1, 60, 0, 0}},
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 0,  1, 55, 0, 0,  3},
+                 {3, 56, 1, 56, 0, 0,  4},
+                 {3, 0,  1, 57, 0, 0,  0}},
 
                 // (9,.,.)
-                {{1, 0, 1, 60, 0, 0},
-                {0, 0, 0,  0, 0, 0},
-                {1, 0, 1, 60, 0, 0},
-                {0, 0, 0,  0, 0, 0},
-                {1, 0, 1, 60, 0, 0}},
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 55, 0, 0,  3},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 57, 0, 0,  0}},
 
             }, torch::dtype(torch::kInt8)
         ),
@@ -538,39 +551,14 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
     const int64_t ref_end = 10;
 
     CATCH_SECTION(
+            "No dwell column, no hap column, no snp_qv column. Only the base features (base, qual, "
+            "strand, mapq)."
             "Tests the entire output Sample: feature tensor, depth tensor, positions major/minor, "
             "and read IDs. Include dwell col, no hap col") {
         // Test specific parameters.
-        const bool include_dwells{true};
-        const bool include_haplotype_column{false};
-        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
-        const bool clip_to_zero{true};
-
-        // Expected results for this test. Drop the haplotag column.
-        const Sample expected{
-                .seq_id = expected_total.seq_id,
-                .features = expected_total.features.index({"...", torch::indexing::Slice(0, 5)}),
-                .positions_major = expected_total.positions_major,
-                .positions_minor = expected_total.positions_minor,
-                .depth = expected_total.depth,
-                .read_ids_left = expected_total.read_ids_left,
-                .read_ids_right = expected_total.read_ids_right,
-        };
-
-        // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
-
-        eval_sample(expected, result);
-    }
-
-    CATCH_SECTION("No dwell column, everything else should be the same as before. No hap column.") {
-        // Test specific parameters.
         const bool include_dwells{false};
         const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
         const HaplotagSource hap_source{HaplotagSource::UNPHASED};
         const bool clip_to_zero{true};
 
@@ -586,21 +574,150 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
+        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+
+        eval_sample(expected, result);
+    }
+
+    CATCH_SECTION("Only dwell column, no hap column and no snp_qv column.") {
+        // Test specific parameters.
+        const bool include_dwells{true};
+        const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
+        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test. Drop the haplotag column.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index({"...", torch::indexing::Slice(0, 5)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
+
+        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+
+        eval_sample(expected, result);
+    }
+
+    CATCH_SECTION("Only haptag column, no dwell and no snp_qv columns.") {
+        // Test specific parameters.
+        const bool include_dwells{false};
+        const bool include_haplotype_column{true};
+        const bool include_snp_qv_column{false};
+        const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test: drop the dwell column from the last dimension.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index(
+                        {torch::indexing::Slice(), torch::indexing::Slice(),
+                         torch::tensor({0, 1, 2, 3, 5}, torch::kLong)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
+        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+
+        eval_sample(expected, result);
+    }
+
+    CATCH_SECTION("Only snp_qv column, no dwell and no hap columns.") {
+        // Test specific parameters.
+        const bool include_dwells{false};
+        const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{true};
+        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test: drop the dwell column from the last dimension.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index(
+                        {torch::indexing::Slice(), torch::indexing::Slice(),
+                         torch::tensor({0, 1, 2, 3, 6}, torch::kLong)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
+        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+
+        eval_sample(expected, result);
+    }
+
+    CATCH_SECTION("Use dwell and snp_qv columns, but no haptag column.") {
+        // Test specific parameters.
+        const bool include_dwells{true};
+        const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{true};
+        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test: drop the dwell column from the last dimension.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index(
+                        {torch::indexing::Slice(), torch::indexing::Slice(),
+                         torch::tensor({0, 1, 2, 3, 4, 6}, torch::kLong)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         eval_sample(expected, result);
     }
 
     CATCH_SECTION(
-            "With dwell column, and with hap column. Everything else should be the same as "
-            "before.") {
+            "Everything - with dwell column, hap column and snp_qv column. All else should be the "
+            "same as before.") {
         // Test specific parameters.
         const bool include_dwells{true};
         const bool include_haplotype_column{true};
+        const bool include_snp_qv_column{true};
         const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
         const bool clip_to_zero{true};
 
@@ -608,24 +725,24 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         const Sample& expected = expected_total;
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
 
-        const std::vector<int64_t> shape(std::begin(result.features.sizes()),
-                                         std::end(result.features.sizes()));
+        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         eval_sample(expected, result);
     }
 
     CATCH_SECTION(
-            "Test clip_to_zero == false. This is typically not used. In this case, the strand "
+            "Test clip_to_zero == false. In this case, the strand "
             "should be -1 or 1, instead of 0 and 1. Other values identical") {
         // Test specific parameters.
         const bool include_dwells{true};
         const bool include_haplotype_column{true};
+        const bool include_snp_qv_column{true};
         const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
         const bool clip_to_zero{false};
 
@@ -645,27 +762,29 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
             // Grab slices.
             const at::Tensor col0 = expected.features.index({"...", 0});
             const at::Tensor col1 = expected.features.index({"...", 1});
-            at::Tensor col2 = expected.features.index({"...", 2});
+            const at::Tensor col2 = expected.features.index({"...", 2});
 
             // Update col2 (strand) where col0 != 0 so that strand is either -1 or 1.
-            at::Tensor mask_col0_nonzero = (col0 != 0);
-            at::Tensor updated_col2 = col2 * 2 - 1;
+            const at::Tensor mask_col0_nonzero = (col0 != 0);
+            const at::Tensor updated_col2 = col2 * 2 - 1;
             expected.features.index_put_({"...", 2},
                                          torch::where(mask_col0_nonzero, updated_col2, col2));
 
             // Update col1 (qual) where col0 != 0 && col1 == 0.
             // This is because HTSlib will return -1 for each base if the input
             // BAM record does not contain qualities.
-            at::Tensor mask_col0_and_col1 = (col0 != 0) & (col1 == 0);
+            const at::Tensor mask_col0_and_col1 = (col0 != 0) & (col1 == 0);
             expected.features.index_put_(
                     {"...", 1}, torch::where(mask_col0_and_col1, torch::full_like(col1, -1), col1));
         }
 
         // Run UUT.
-        EncoderReadAlignment encoder(
-                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
-                read_group, min_mapq, max_reads, 0.0, row_per_read, include_dwells, clip_to_zero,
-                right_align_insertions, include_haplotype_column, hap_source, phasing_bin);
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
+                                     row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
+
         const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
         eval_sample(expected, result);
@@ -802,6 +921,7 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     const int64_t ref_end = 10;
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
 
@@ -812,7 +932,8 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
                                  tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
                                  row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin);
+                                 include_haplotype_column, hap_source, phasing_bin,
+                                 include_snp_qv_column);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
     eval_sample(expected, result);
@@ -962,6 +1083,7 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     const int64_t ref_end = 10;
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
 
@@ -972,7 +1094,8 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
                                  tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
                                  row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin);
+                                 include_haplotype_column, hap_source, phasing_bin,
+                                 include_snp_qv_column);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
     eval_sample(expected, result);
@@ -1102,6 +1225,7 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     const int64_t ref_end = 10;
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
     const bool row_per_read{true};
@@ -1113,7 +1237,8 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
                                  tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
                                  row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin);
+                                 include_haplotype_column, hap_source, phasing_bin,
+                                 include_snp_qv_column);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),

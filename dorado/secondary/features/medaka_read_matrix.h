@@ -54,6 +54,7 @@ public:
  * \param row_per_read Place each new read on a new row.
  * \param include_dwells Include dwells channel in features.
  * \param include_haplotype_column Include haplotag channel in features.
+ * \param include_snp_qv Include the global SNP QV channel in features.
  * \param max_reads Maximum allowed read depth.
  * \returns ReadAlignmentData object which contains the features, positions and read IDs.
  *
@@ -86,6 +87,7 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
                                            const bool row_per_read,
                                            const bool include_dwells,
                                            const bool include_haplotype_column,
+                                           const bool include_snp_qv,
                                            const secondary::HaplotagSource hap_source,
                                            const std::string &in_haplotag_bin_fn,
                                            const int32_t max_reads,

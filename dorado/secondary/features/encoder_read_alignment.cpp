@@ -258,7 +258,8 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
                                            const bool right_align_insertions,
                                            const bool include_haplotype_column,
                                            const HaplotagSource hap_source,
-                                           const std::optional<std::filesystem::path>& phasing_bin)
+                                           const std::optional<std::filesystem::path>& phasing_bin,
+                                           const bool include_snp_qv_column)
         : m_fastx_reader{in_ref_fn},
           m_bam_file{secondary::BamFile(in_bam_aln_fn)},
           m_dtypes{dtypes},
@@ -273,12 +274,14 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
           m_row_per_read{row_per_read},
           m_include_dwells{include_dwells},
           m_include_haplotype_column{include_haplotype_column},
+          m_include_snp_qv_column{include_snp_qv_column},
           m_hap_source{hap_source},
           m_clip_to_zero{clip_to_zero},
           m_right_align_insertions{right_align_insertions},
           m_phasing_bin{phasing_bin},
           m_feature_column_map{produce_feature_column_map(include_dwells,
                                                           include_haplotype_column,
+                                                          include_snp_qv_column,
                                                           (m_num_dtypes > 1))} {}
 
 secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_name,
@@ -297,8 +300,8 @@ secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_nam
                 m_bam_file, m_fastx_reader.get_raw_faidx_ptr(), ref_name, ref_start, ref_end,
                 m_num_dtypes, m_dtypes, m_tag_name, m_tag_value, m_tag_keep_missing, m_read_group,
                 m_min_mapq, m_row_per_read, m_include_dwells, m_include_haplotype_column,
-                m_hap_source, phasing_bin_fn_str, m_max_reads, m_right_align_insertions,
-                m_min_snp_accuracy);
+                m_include_snp_qv_column, m_hap_source, phasing_bin_fn_str, m_max_reads,
+                m_right_align_insertions, m_min_snp_accuracy);
 
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);
@@ -397,6 +400,7 @@ FeatureColumnMap EncoderReadAlignment::get_feature_column_map() const {
 FeatureColumnMap EncoderReadAlignment::produce_feature_column_map(
         const bool include_dwells,
         const bool include_haplotype_column,
+        const bool include_snp_qv_column,
         const bool include_dtypes) {
     // Fixed columns.
     FeatureColumnMap feature_column_map = {
@@ -414,6 +418,10 @@ FeatureColumnMap EncoderReadAlignment::produce_feature_column_map(
     if (include_haplotype_column) {
         const int32_t id = static_cast<int32_t>(std::ssize(feature_column_map));
         feature_column_map[FeatureColumns::HAPLOTAG] = id;
+    }
+    if (include_snp_qv_column) {
+        const int32_t id = static_cast<int32_t>(std::ssize(feature_column_map));
+        feature_column_map[FeatureColumns::SNP_QV] = id;
     }
     if (include_dtypes) {
         const int32_t id = static_cast<int32_t>(std::ssize(feature_column_map));
