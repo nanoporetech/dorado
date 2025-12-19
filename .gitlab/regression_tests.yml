@@ -114,6 +114,8 @@
     - pushd ont-output-specification-validator
     -   git checkout ${VALIDATOR_COMMIT}
     - popd
+    # Temporarily pin the version here as 0.36.3-0.36.5 are broken
+    - pip install "dataclass-wizard==0.36.2"
     - pip install -e ont-output-specification-validator
     # Grab the regression test data.
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${TEST_DATA_REPO}

@@ -48,6 +48,8 @@ if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
     pushd ont-output-specification-validator
     git checkout ${VALIDATOR_COMMIT}
     popd
+    # Temporarily pin the version here as 0.36.3-0.36.5 are broken
+    pip install "dataclass-wizard==0.36.2"
     # Note we use --prefer-binary to avoid issues with h5py 3.15, see DOR-1410
     pip install --prefer-binary -e ont-output-specification-validator
     curl -LfsS ${SPECIFICATION_URL} > ${SPECIFICATION_FILE}
