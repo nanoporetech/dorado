@@ -106,7 +106,7 @@
     OUTPUT_SPEC_REF: "11a7f1001ad04484ce7ef84038168969139a9b15"
     OUTPUT_SPEC_REPO_URL: "${ONT_OUTPUT_SPEC_REPO}-/archive/${OUTPUT_SPEC_REF}/ont-output-specification-${OUTPUT_SPEC_REF}.zip"
     SPECIFICATION_FILE: "ont_output_spec.zip"
-    VALIDATOR_COMMIT: "fb80ac5354580708aa1da4b65c0fb941ce4c3f37"
+    VALIDATOR_COMMIT: "156b6e2ebbe0c832f9f568166797205758b83a73"
     TEST_DATA_COMMIT: "version_0.2"
   script:
     - !reference [.extract_archive, script]
@@ -119,8 +119,6 @@
     - pushd ont-output-specification-validator
     -   git checkout ${VALIDATOR_COMMIT}
     - popd
-    # Temporarily pin the version here as 0.36.3-0.36.5 are broken
-    - pip install "dataclass-wizard==0.36.2"    
     - pip install -e ont-output-specification-validator
     # Grab the regression test data.
     - git clone https://gitlab-ci-token:${CI_JOB_TOKEN}@${TEST_DATA_REPO}
