@@ -408,7 +408,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
             if (m_variable_chunk_sizes) {
                 size_t overhang = input_slice.size(1) % stride;
                 while (overhang != 0) {  // needed for input_slice.size(1) < (stride - overhang)
-                    input_slice = input_slice.narrow(1, 0, input_slice.size(1) - overhang);
+                    input_slice =
+                            at::concat({input_slice,
+                                        input_slice.index({Ellipsis, Slice(0, stride - overhang)})},
+                                       1);
                     overhang = input_slice.size(1) % stride;
                 }
 

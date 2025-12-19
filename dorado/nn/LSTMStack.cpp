@@ -115,9 +115,9 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
                 auto timestep_out = reverse ? inout_left[wm.T - ts - 1] : inout_right[ts];
                 // Timestep matrix multiplication
                 dorado::utils::matmul_f16(timestep_in, device_weights[layer_idx], gate_buf);
-                host_lstm_step_f16(stream, wm.N, layer_size, device_bias[layer_idx].data_ptr(),
-                                   gate_buf.data_ptr(), state_buf.data_ptr(),
-                                   timestep_out.data_ptr());
+                host_lstm_step_f16(stream, wm.N, layer_size, 2 * layer_size, false,
+                                   device_bias[layer_idx].data_ptr(), gate_buf.data_ptr(),
+                                   state_buf.data_ptr(), timestep_out.data_ptr());
             }
         }
         wm.is_input_to_rev_lstm = !reverse;
