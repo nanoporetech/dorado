@@ -34,7 +34,7 @@ models_directory_arg="--models-directory ${models_directory}"
 ONT_OUTPUT_SPEC_REF="11a7f1001ad04484ce7ef84038168969139a9b15"
 SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-output-specification-${ONT_OUTPUT_SPEC_REF}.zip"
 SPECIFICATION_FILE="ont_output_spec.zip"
-VALIDATOR_COMMIT="7ae81bc28bfb143651fefb044a1ca30e796d1515"
+VALIDATOR_COMMIT="156b6e2ebbe0c832f9f568166797205758b83a73"
 
 # Set up the output specification validator so we can check output file formats
 if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
