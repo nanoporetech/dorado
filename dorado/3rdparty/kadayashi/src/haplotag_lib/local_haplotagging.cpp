@@ -47,13 +47,14 @@ void add_allele_qa_v_nt4seq(std::vector<qa_t> &h,
                             const std::vector<uint8_t> &allele,
                             const int allele_l,
                             const uint8_t cigar_op) {
-    h.push_back(qa_t{});
-    h.back().pos = pos;
-    h.back().is_used = 0;
-    h.back().allele_idx = std::numeric_limits<uint32_t>::max();
-    for (int i = 0; i < allele_l; i++) {
-        h.back().allele.push_back(allele[i]);
-    }
+    h.push_back(qa_t{.pos = pos,
+                     .allele = {},
+                     .var_idx = std::numeric_limits<uint32_t>::max(),
+                     .allele_idx = std::numeric_limits<uint32_t>::max(),
+                     .is_used = 0,
+                     .hp = HAPTAG_UNPHASED});
+    h.back().allele.insert(h.back().allele.end(), allele.begin(), allele.begin() + allele_l);
+
     // append cigar operation to the allele integer sequence
     h.back().allele.push_back(cigar_op);
 }
@@ -71,13 +72,17 @@ void filter_lift_qa_v_given_conf_list(const std::vector<qa_t> &src,
         const uint32_t pos = src[ir].pos;
         if (ht_refvars.find(pos) != ht_refvars.end()) {
             const qa_t &h = src[ir];
+
             // push
-            kadayashi::add_allele_qa_v(dst, h.pos, SENTINEL_REF_ALLELE, SENTINEL_REF_ALLELE_L,
-                                       VAR_OP_X);
+            const std::string_view sentinel_ref_allele{SENTINEL_REF_ALLELE};
+            kadayashi::add_allele_qa_v(dst, h.pos, sentinel_ref_allele, VAR_OP_X);
+
             // copy over the actual allele sequence
-            dst.back().allele.resize(h.allele.size());
+            auto &a = dst.back().allele;
+            a.clear();
+            a.reserve(h.allele.size());
             for (size_t j = 0; j < h.allele.size(); j++) {
-                dst.back().allele[j] = h.allele[j];
+                a.emplace_back(h.allele[j]);
             }
         }
     }
@@ -94,7 +99,7 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
     if (DEBUG_LOCAL_HAPLOTAGGING) {
         fprintf(stderr, "[dbg::%s] seq_l is %d, offset %d\n", __func__, seq_l, ref_start);
     }
-    FILE *fp = 0;
+    FILE *fp = nullptr;
     if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
         fp = fopen("test.bed", "w");
         assert(fp);
@@ -170,7 +175,7 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
             }
 
             // sort interval sizes
-            std::stable_sort(dists[i].begin(), dists[i].end());
+            std::sort(dists[i].begin(), dists[i].end());
 
             // Is there any recurring interval sizes?
             // if yes, remember them; otherwise blacklist the kmer.
@@ -197,7 +202,7 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
 
     // find promising match interval sizes
     std::vector<uint32_t> ds;
-    std::stable_sort(ds0.begin(), ds0.end());
+    std::sort(ds0.begin(), ds0.end());
     int cnt = 0;
     for (size_t i = 1; i < ds0.size(); i++) {
         if (ds0[i] != ds0[i - 1]) {
@@ -237,7 +242,7 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
         std::vector<uint32_t> intervals_buf;
         std::vector<uint8_t> used(idx_l);
         int buf[3] = {0, 0, 0};
-        int failed = 0;
+        bool failed = false;
         for (const uint32_t d : ds) {
             for (uint32_t i_mer = 0; i_mer < idx_l; i_mer++) {
                 if (!idx_good[i_mer]) {
@@ -291,7 +296,7 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                         if (DEBUG_LOCAL_HAPLOTAGGING) {
                             fprintf(stderr, "[E::%s] impossible\n", __func__);
                         }
-                        failed = 1;
+                        failed = true;
                         break;
                     }
                     if ((!ok) || stop) {
@@ -336,12 +341,13 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
             || intervals_buf.empty()) {
             if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
                 fprintf(stderr,
-                        "[dbg::%s] failed parsing mers (%d) or intervals_buf is empty (%d)\n",
-                        __func__, failed, (int)intervals_buf.size());
+                        "[dbg::%s] failed parsing mers (failed=%s) or intervals_buf is empty "
+                        "(%d)\n",
+                        __func__, failed ? "failed" : "not", (int)intervals_buf.size());
             }
             intervals.clear();
         } else {
-            std::stable_sort(intervals_buf.begin(), intervals_buf.end());
+            std::sort(intervals_buf.begin(), intervals_buf.end());
             int depth = 0;
             int start = -1;
             int end = -1;
@@ -477,28 +483,28 @@ interval_t expand_query_interval(BamFileView &hf,
     // too long.
     constexpr uint32_t OFFSET_DEFAULT = 50000;
 
-    const std::string itvl_left = create_region_string(refname, itvl_start, itvl_start + 1);
-    hts_itr_t *bamitr = sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str());
-    bam1_t *aln = bam_init1();
+    const std::string itvl_left = create_region_string(refname, itvl_start, itvl_start);
+
+    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    HtsItrPtr bamitr =
+            HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str()), HtsItrDestructor());
 
     uint32_t offset_left = OFFSET_DEFAULT;
     int offset_right = 0;
 
     // left
-    bamitr = sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str());
-    while (sam_itr_next(hf.fp, bamitr, aln) >= 0) {
+    while (sam_itr_next(hf.fp, bamitr.get(), aln.get()) >= 0) {
         if ((itvl_start < OFFSET_DEFAULT + aln->core.pos) && (itvl_start > aln->core.pos)) {
-            offset_left = itvl_start - aln->core.pos;
+            offset_left = itvl_start - static_cast<uint32_t>(aln->core.pos);
             break;
         }
     }
-    hts_itr_destroy(bamitr);
 
     //right
-    const std::string itvl_right = create_region_string(refname, itvl_end, itvl_end + 1);
-    bamitr = sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str());
-    while (sam_itr_next(hf.fp, bamitr, aln) >= 0) {
-        const uint32_t end_pos = bam_endpos(aln);
+    const std::string itvl_right = create_region_string(refname, itvl_end, itvl_end);
+    bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str()), HtsItrDestructor());
+    while (sam_itr_next(hf.fp, bamitr.get(), aln.get()) >= 0) {
+        const uint32_t end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
         if (end_pos < OFFSET_DEFAULT + itvl_end) {
             offset_right = offset_right + itvl_end > end_pos ? offset_right : end_pos - itvl_end;
         }
@@ -506,12 +512,10 @@ interval_t expand_query_interval(BamFileView &hf,
     if (offset_right == 0) {
         offset_right = OFFSET_DEFAULT;
     }
-    hts_itr_destroy(bamitr);
 
     // finalize
     const uint32_t abs_start = itvl_start <= offset_left ? 0 : itvl_start - offset_left;
     const uint32_t abs_end = itvl_end + offset_right;
-    bam_destroy1(aln);
 
     interval_t ret = {.refname = std::string(refname), .start = abs_start, .end = abs_end};
     return ret;
@@ -544,18 +548,19 @@ bool is_adjacent_to_perfect_repeats(const char *refseq,
         return false;
     }
 
-    constexpr uint32_t SPANS[4] = {6, 6, 9, 12};
-    constexpr uint32_t PATTERN_LS[4] = {1, 2, 3, 4};
-    for (uint32_t is = 0; is < 4; is++) {
-        const uint32_t span = SPANS[is];
-        const uint32_t pattern_l = PATTERN_LS[is];
+    constexpr int LEN = 4;
+    const std::array<uint32_t, LEN> spans = {6, 6, 9, 12};
+    const std::array<uint32_t, LEN> pattern_ls = {1, 2, 3, 4};
+    for (uint32_t is = 0; is < LEN; is++) {
+        const uint32_t span = spans[is];
+        const uint32_t pattern_l = pattern_ls[is];
 
         uint32_t left_start = pos - refseq_start;
         left_start = left_start < span ? 0 : left_start - span;
 
-        const uint32_t starts[4] = {left_start, left_start + 1, pos - refseq_start,
-                                    pos - refseq_start + 1};
-        for (int i = 0; i < 4; i++) {
+        const std::array<uint32_t, LEN> starts = {left_start, left_start + 1, pos - refseq_start,
+                                                  pos - refseq_start + 1};
+        for (int i = 0; i < LEN; i++) {
             if (starts[i] + span >= refseq_l) {
                 continue;
             }
@@ -569,35 +574,44 @@ bool is_adjacent_to_perfect_repeats(const char *refseq,
     return false;
 }
 
-int classify_variant_prefilter(vc_variants1_val_t &var,
-                               const uint32_t pos,
-                               const char *refseq,
-                               const int refseq_l,
-                               const uint32_t itvl_start,
-                               const str2int_t *qname2hp,
-                               const int debug_print) {
-    // return 1 if variant is being classified & shall not proceed
-    // return 0 otherwise
-    const int is_done = 1;
-    const int not_done = 0;
+bool classify_variant_prefilter(vc_variants1_val_t &var,
+                                const uint32_t pos,
+                                const char *refseq,
+                                const int refseq_l,
+                                const uint32_t itvl_start,
+                                const str2int_t *qname2hp,
+                                const int debug_print) {
+    // return true if variant is being classified & shall not proceed
+    // return false otherwise
+
+    constexpr int MIN_COV_ONE = 3;
+    constexpr int MIN_COV_TOT = 5;
+    constexpr int LOW_COV = 15;
+    constexpr int LOW_COV2 = 20;
+    constexpr int SMALL_COV_DIFF = 3;
+    constexpr float MIN_ALT_FRAC = 0.2f;
+    constexpr float MAX_UNPHASED_FRAC = 0.7f;
+    constexpr float MIN_HOMALT_FRAC = 0.9f;
+
     if (var.is_accepted != FLAG_VARSTAT_MAYBE) {
         // ref allele was not collected for the candidate,
         // only consider rescues
         float tot_cov_alt = 0;
         float tot_cov_any = 0;
         int suf_alt = 0;
-        for (auto _ : var.alleles) {
-            int tmp = _.cov.cov_hap0 + _.cov.cov_hap1 + _.cov.cov_unphased;
+        for (auto allele : var.alleles) {
+            int tmp = allele.cov.cov_hap0 + allele.cov.cov_hap1 + allele.cov.cov_unphased;
             tot_cov_any += static_cast<float>(tmp);
-            if (_.allele[0] != SENTINEL_REF_ALLELE_INT) {
+            if (allele.allele[0] != SENTINEL_REF_ALLELE_INT) {
                 tot_cov_alt += static_cast<float>(tmp);
                 if (tmp > 1) {
                     suf_alt++;
                 }
             }
         }
-        if (qname2hp && var.alleles.size() >= 2 && tot_cov_alt > 5 && suf_alt > 2 &&
-            tot_cov_alt / tot_cov_any > 0.2) {
+
+        if (qname2hp && var.alleles.size() >= 2 && tot_cov_alt > MIN_COV_TOT &&
+            suf_alt >= MIN_COV_ONE && tot_cov_alt / tot_cov_any > MIN_ALT_FRAC) {
             if (debug_print) {
                 fprintf(stderr,
                         "[dbg::%s] let pos %d set to unsure although flag is bad, due to its "
@@ -606,7 +620,7 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
             }
             var.is_accepted = FLAG_VARSTAT_UNSURE;
             var.type = FLAG_VAR_NA;
-            return is_done;
+            return true;
         } else {
             if (debug_print) {
                 fprintf(stderr,
@@ -616,32 +630,28 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
             }
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
-            return is_done;
+            return true;
         }
     } else {
         // default to reject
         var.is_accepted = FLAG_VARSTAT_REJECTED;
-
-        for (uint32_t i_allele = 0; i_allele < var.alleles.size(); i_allele++) {
-            var.alleles[i_allele].cov.cov_tot = qname2hp ? (var.alleles[i_allele].cov.cov_hap0 +
-                                                            var.alleles[i_allele].cov.cov_hap1)
-                                                         : var.alleles[i_allele].cov.cov_unphased;
-        }
 
         // should not happen
         if (var.alleles.size() < 3) {  // 3: alt *1, ref placeholders *2
             if (debug_print) {
                 fprintf(stderr, "[W::%s] bad size\n", __func__);
             }
-            return is_done;
+            return true;  // not really done, but return true to let caller ignore this candidate
         }
 
         // (make coverage easier to access)
         var.type = FLAG_VAR_HET;
         vc_allele_t &a0 = var.alleles[0];
         vc_allele_t &a1 = var.alleles[1];
-        const float top_cov_1 = static_cast<float>(var.alleles[0].cov.cov_tot);
-        const float top_cov_2 = static_cast<float>(var.alleles[1].cov.cov_tot);
+        const float top_cov_1 = static_cast<float>(qname2hp ? var.alleles[0].cov.cov_tot_phased
+                                                            : var.alleles[0].cov.cov_unphased);
+        const float top_cov_2 = static_cast<float>(qname2hp ? var.alleles[1].cov.cov_tot_phased
+                                                            : var.alleles[1].cov.cov_unphased);
         const float top_cov_1_unphased = static_cast<float>(var.alleles[0].cov.cov_unphased);
         const float top_cov_2_unphased = static_cast<float>(var.alleles[1].cov.cov_unphased);
         const float top_two_cov = top_cov_1 + top_cov_2;
@@ -649,13 +659,15 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
         float tot_cov = top_two_cov;
         float tot_all_non_refs = 0;
         for (uint32_t i = 2; i < var.alleles.size(); i++) {
-            tot_cov += var.alleles[i].cov.cov_tot;
+            tot_cov += static_cast<float>(qname2hp ? var.alleles[i].cov.cov_tot_phased
+                                                   : var.alleles[i].cov.cov_unphased);
         }
         for (uint32_t i = 0; i < var.alleles.size(); i++) {
             if (!(var.alleles[i].allele[0] == SENTINEL_REF_ALLELE_INT &&
                   var.alleles[i].allele.back() == VAR_OP_X)) {
-                tot_all_non_refs += var.alleles[i].cov.cov_hap0 + var.alleles[i].cov.cov_hap1 +
-                                    var.alleles[i].cov.cov_unphased;
+                tot_all_non_refs += static_cast<float>(var.alleles[i].cov.cov_hap0) +
+                                    static_cast<float>(var.alleles[i].cov.cov_hap1) +
+                                    static_cast<float>(var.alleles[i].cov.cov_unphased);
             }
         }
 
@@ -663,11 +675,6 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
         if (var.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT &&
             var.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT) {
             int is_at_repeat = 2;
-            //is_at_repeat = is_adjacent_to_perfect_repeats(refseq, refseq_l, itvl_start, pos);
-            //if (is_at_repeat==1) {
-            //    var.is_accepted = FLAG_VARSTAT_UNSURE;
-            //    var.type = FLAG_VAR_NA;
-            //}
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
             if (debug_print) {
@@ -676,21 +683,23 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
                         "repeat? %c)\n",
                         __func__, pos, "NY-"[is_at_repeat]);
             }
-            return is_done;
+            return true;
         }
 
         // if we are doing phased pileup,
         // mark candiate with substantial unphased coverage as unsure
         if (qname2hp) {
-            // clang-format off
             const float top_cov_12_unphased = top_cov_1_unphased + top_cov_2_unphased;
-            const int has_many_alts1 = (tot_cov + tot_cov_unphased >= 20 && tot_all_non_refs / (tot_cov + tot_cov_unphased) >= 0.2);
-            const int has_many_alts2 = (tot_cov + tot_cov_unphased < 20  && tot_all_non_refs >= 3);
-            // clang-format on
+            const int has_many_alts1 =
+                    (tot_cov + tot_cov_unphased >= LOW_COV2 &&
+                     tot_all_non_refs / (tot_cov + tot_cov_unphased) >= MIN_ALT_FRAC);
+            const int has_many_alts2 =
+                    (tot_cov + tot_cov_unphased < LOW_COV2 && tot_all_non_refs >= MIN_COV_ONE);
             if (top_cov_12_unphased > (top_cov_1 + top_cov_2) &&
                 (has_many_alts1 || has_many_alts2)) {
                 // alt has enough coverage; we will only consider hom case here
-                if (top_cov_1_unphased / tot_cov_unphased >= 0.7 && tot_cov_unphased >= 20) {
+                if (top_cov_1_unphased / tot_cov_unphased >= MAX_UNPHASED_FRAC &&
+                    tot_cov_unphased >= LOW_COV2) {
                     var.is_accepted = FLAG_VARSTAT_UNSURE;
                     var.type = FLAG_VAR_HOM;
                     if (debug_print) {
@@ -699,7 +708,7 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
                                 "totcov=%d\n",
                                 __func__, pos, (int)tot_all_non_refs, (int)tot_cov);
                     }
-                    return is_done;
+                    return true;
                 }
             }
         }
@@ -708,10 +717,9 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
         // we need to check phasing (if is phased pileup), as strong hap-specific
         // coverage can be sever as 12 alts in hap0, 2 ref in hap1 and nothing else.
         double fisher_left_p_nounphased, fisher_right_p_nounphased, fisher_twosided_p_nounphased;
-        kt_fisher_exact((float)(a0.cov.cov_hap0), (float)(a0.cov.cov_hap1),
-                        (float)(a1.cov.cov_hap0), (float)(a1.cov.cov_hap1),
-                        &fisher_left_p_nounphased, &fisher_right_p_nounphased,
-                        &fisher_twosided_p_nounphased);
+        kt_fisher_exact((int)(a0.cov.cov_hap0), (int)(a0.cov.cov_hap1), (int)(a1.cov.cov_hap0),
+                        (int)(a1.cov.cov_hap1), &fisher_left_p_nounphased,
+                        &fisher_right_p_nounphased, &fisher_twosided_p_nounphased);
         if (debug_print) {
             fprintf(stderr,
                     "[dbg::%s] pos %d in prefiltering fisher: phased-only, twosided p: %.4f (%d "
@@ -724,7 +732,7 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
         int is_hom = 0;
         if (var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
             if (!qname2hp) {
-                if (top_cov_1 / tot_cov >= 0.7 && tot_cov >= 20) {
+                if (top_cov_1 / tot_cov >= 0.7f && tot_cov >= LOW_COV2) {
                     is_hom = 1;
                     if (debug_print) {
                         fprintf(stderr, "[dbg::%s] set pos %d as hom (2, unphased; %d/%d)\n",
@@ -732,40 +740,45 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
                     }
                 }
             } else {
-                const float hap0_tot = std::accumulate(
-                        var.alleles.begin(), var.alleles.end(), 0.0,
-                        [](float acc, const auto &_) { return acc + _.cov.cov_hap0; });
-                const float hap1_tot = std::accumulate(
-                        var.alleles.begin(), var.alleles.end(), 0.0,
-                        [](float acc, const auto &_) { return acc + _.cov.cov_hap1; });
-                const float tot_cov2 = std::accumulate(
-                        var.alleles.begin(), var.alleles.end(), 0.0, [](float acc, const auto &_) {
-                            return acc + _.cov.cov_hap0 + _.cov.cov_hap1 + _.cov.cov_unphased;
-                        });
-                const float hap0 = var.alleles[0].cov.cov_hap0;
-                const float hap1 = var.alleles[0].cov.cov_hap1;
-                const float hap_unphased = var.alleles[0].cov.cov_unphased;
+                const float hap0_tot = std::accumulate(var.alleles.begin(), var.alleles.end(), 0.0f,
+                                                       [](float acc, const auto &allele) -> float {
+                                                           return acc + (float)allele.cov.cov_hap0;
+                                                       });
+                const float hap1_tot = std::accumulate(var.alleles.begin(), var.alleles.end(), 0.0f,
+                                                       [](float acc, const auto &allele) -> float {
+                                                           return acc + (float)allele.cov.cov_hap1;
+                                                       });
+                const float tot_cov2 = std::accumulate(var.alleles.begin(), var.alleles.end(), 0.0f,
+                                                       [](float acc, const auto &allele) -> float {
+                                                           return acc + (float)allele.cov.cov_hap0 +
+                                                                  (float)allele.cov.cov_hap1 +
+                                                                  (float)allele.cov.cov_unphased;
+                                                       });
+                const float hap0 = static_cast<float>(var.alleles[0].cov.cov_hap0);
+                const float hap1 = static_cast<float>(var.alleles[0].cov.cov_hap1);
+                const float hap_unphased = static_cast<float>(var.alleles[0].cov.cov_unphased);
                 const float hap_all = hap0 + hap1 + hap_unphased;
                 const float threshold = var.alleles[0].allele.back() == VAR_OP_X ? 0.7f : 0.5f;
-                if (hap0_tot != 0 && hap1_tot != 0 && hap0 / hap0_tot >= threshold &&
-                    hap1 / hap1_tot >= threshold && hap0_tot > 3 && hap1_tot > 3) {
+                if (hap0_tot > MIN_COV_ONE && hap1_tot > MIN_COV_ONE &&
+                    hap0 / hap0_tot >= threshold && hap1 / hap1_tot >= threshold) {
                     is_hom = 1;
                     if (debug_print) {
                         fprintf(stderr, "[dbg::%s] set pos %d as hom (2, phased; %d/%d, %d/%d)\n",
                                 __func__, pos, (int)hap0, (int)hap0_tot, (int)hap1, (int)hap1_tot);
                     }
                 } else if (
-                        hap_all / tot_cov2 >= 0.9 ||
-                        (tot_cov2 - hap_all < 3 &&
+                        hap_all / tot_cov2 >= MIN_HOMALT_FRAC ||
+                        (tot_cov2 - hap_all < SMALL_COV_DIFF &&
                          hap_all >
-                                 15)) {  // alternatively, as long as we have almost all bases being the one alt allele, call hom regardless of phasing quality
+                                 LOW_COV)) {  // alternatively, as long as we have almost all bases being the one alt allele, call hom regardless of phasing quality
                     is_hom = 1;
                     if (debug_print) {
                         fprintf(stderr,
                                 "[dbg::%s] set pos %d as hom (2b; hap_all=%d tot_cov2=%d)\n",
                                 __func__, pos, (int)hap_all, (int)tot_cov2);
                     }
-                } else if (hap_all / tot_cov2 > 0.8 && (int)(tot_cov2 - tot_all_non_refs) < 3) {
+                } else if (hap_all / tot_cov2 > 0.8f &&
+                           (int)(tot_cov2 - tot_all_non_refs) < SMALL_COV_DIFF) {
                     is_hom = 1;
                     if (debug_print) {
                         fprintf(stderr,
@@ -781,7 +794,7 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
         if (is_hom) {
             var.is_accepted = FLAG_VARSTAT_ACCEPTED;
             var.type = FLAG_VAR_HOM;
-            if (is_at_repeat || fisher_twosided_p_nounphased < 0.05) {
+            if (is_at_repeat || fisher_twosided_p_nounphased < 0.05f) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
                 if (debug_print) {
                     fprintf(stderr,
@@ -790,10 +803,10 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
                             __func__, pos, var.type);
                 }
             }
-            return is_done;
+            return true;
         }
         if (top_two_cov / tot_cov <
-            0.8) {  // top two calls did not dominate over all observations (e.g. INS at a homopolyer)
+            0.8f) {  // top two calls did not dominate over all observations (e.g. INS at a homopolyer)
             if (std::min(top_cov_1, top_cov_2) >= 5 || tot_all_non_refs >= 10 || is_at_repeat) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
                 if (debug_print) {
@@ -814,7 +827,7 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
                             (int)var.alleles[1].allele[0], (int)top_two_cov, (int)tot_cov);
                 }
             }
-            return is_done;
+            return true;
         }
 
         if (debug_print && qname2hp) {
@@ -825,17 +838,83 @@ int classify_variant_prefilter(vc_variants1_val_t &var,
                     (int)top_cov_2_unphased);
         }
 
-        return not_done;
+        return false;
     }
-    return not_done;
 }
 
+enum var_classify_code {
+    UNSET,
+
+    // check het first
+    HET_FISHER_COV_STRAND,  // "het, passed fisher test, passed coverage eveness requirement, passed strand no-bias requirement"
+    HET_FISHER,
+    HET_WEAKERFISHER,
+    HET_NOTHING,
+    REJECT_TOO_MANY_ALLELE,
+    REJECT_REFREF,
+
+    // then consider hom
+    HOM_STRAND,  // "hom, passed strand biase requirement"
+    HOM_NOTHING,
+    HOM_RESUCEFAIL,
+
+    // we may still set unsure before returning
+    SUS_LONG_ALT,
+    SUS_MULTI_ALLELE,
+    SUS_REPETITIVE,
+    SUS_PHASE
+};
 struct var_classify_t {
     uint8_t type;
     uint8_t is_accepted;
-    int code;
+    var_classify_code code;
     std::string info;
 };
+struct cov_extended_t {
+    cov_t cov;
+    int cov_any_alt = 0;  // both phased and unphased
+    int n_long_alts = 0;
+    int n_alts_in_first_two = 0;
+    const int min_len_long_alt = 5;
+};
+void variant_fill_cov_tot(vc_variants1_val_t &var) {
+    for (auto &allele : var.alleles) {
+        allele.cov.cov_tot_phased = allele.cov.cov_hap0 + allele.cov.cov_hap1;
+        allele.cov.cov_tot_all = allele.cov.cov_tot_phased + allele.cov.cov_unphased;
+    }
+}
+cov_extended_t variant_get_all_allele_coverage(const vc_variants1_val_t &var) {
+    cov_extended_t ret{};
+
+    for (const auto &allele : var.alleles) {
+        ret.cov.cov_hap0 += allele.cov.cov_hap0;
+        ret.cov.cov_hap1 += allele.cov.cov_hap1;
+        ret.cov.cov_unphased += allele.cov.cov_unphased;
+
+        ret.cov.cov_tot_all += allele.cov.cov_tot_all;
+        ret.cov.cov_tot_phased += allele.cov.cov_tot_phased;
+
+        ret.cov.cov_fwd += allele.cov.cov_fwd;
+        ret.cov.cov_bwd += allele.cov.cov_bwd;
+
+        if (allele.allele[0] != SENTINEL_REF_ALLELE_INT) {
+            ret.cov_any_alt += allele.cov.cov_tot_all;
+        }
+
+        if (allele.allele[0] != SENTINEL_REF_ALLELE_INT &&
+            static_cast<int>(allele.allele.size()) >= ret.min_len_long_alt) {
+            ret.n_long_alts += allele.cov.cov_tot_all;
+        }
+    }
+    if (var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
+        ret.n_alts_in_first_two++;
+    }
+    if (var.alleles[1].allele[0] != SENTINEL_REF_ALLELE_INT) {
+        ret.n_alts_in_first_two++;
+    }
+    return ret;
+}
+
 var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                                        const uint32_t pos,
                                        const char *refseq,
@@ -854,9 +933,8 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     var_classify_t ret;
     ret.is_accepted = FLAG_VARSTAT_REJECTED;
     ret.type = FLAG_VAR_NA;
-    ret.code = -1;
+    ret.code = UNSET;
 
-    constexpr uint32_t MIN_LEN_LONG_ALT = 5;
     constexpr int N_LONG_ALTS = 3;
     constexpr int MIN_SUF_COV_ALLELE = 3;
 
@@ -864,15 +942,51 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     constexpr float FISHER_P_THRESHOLD = 0.005f;
     constexpr float FISHER_P_THRESHOLD_NOUNPHASED = 0.01f;
 
+    // prep coverage
+    cov_extended_t varcov = variant_get_all_allele_coverage(var);
+    vc_allele_t &a0 = var.alleles[0];
+    vc_allele_t &a1 = var.alleles[1];
+
     // regular het requirements
+    // (cov diff)
     constexpr int MAX_COVDIFF_RATIO = 3;
     constexpr int MIN_HAP_COVERAGE = 5;
-    constexpr float MAX_INHAP_RATIO = 0.2;
-    constexpr float MAX_INHAP_RATIO_OPPOSITE = 1 - MAX_INHAP_RATIO;
+    auto has_cov_diff_between_two_alleles = [](const vc_allele_t &allele_A,
+                                               const vc_allele_t &allele_B) -> bool {
+        const int hi = std::max(allele_A.cov.cov_tot_all, allele_B.cov.cov_tot_all);
+        const int lo = std::min(allele_A.cov.cov_tot_all, allele_B.cov.cov_tot_all);
+        return ((static_cast<float>(hi) / static_cast<float>(lo)) >= MAX_COVDIFF_RATIO) ||
+               lo < MIN_HAP_COVERAGE;
+    };
+    // (intra-haplotype ratio)
+    constexpr float MIN_INHAP_RATIO = 0.8f;
     // note: for min_strand_cov, >=2 is too much for 30x in regions prone to coverage drop,
     // but 1 may be too low and allows confident false positives.
     constexpr int LOWCOV_THRESHOLD = 15;
     constexpr int LOWCOV_ALT_THRESHOLD = 3;
+    enum which_hap { HAP0, HAP1 };
+    auto allele_dominates_haplotype = [&varcov](const vc_allele_t &allele, which_hap hap) {
+        int a_cov_hap;
+        int tot_cov_hap;
+        if (hap == HAP0) {
+            a_cov_hap = allele.cov.cov_hap0;
+            tot_cov_hap = varcov.cov.cov_hap0;
+        } else {
+            a_cov_hap = allele.cov.cov_hap1;
+            tot_cov_hap = varcov.cov.cov_hap1;
+        }
+        const bool lowcov_ok = tot_cov_hap < LOWCOV_THRESHOLD && a_cov_hap < LOWCOV_ALT_THRESHOLD;
+        const bool regular_ok =
+                a_cov_hap < static_cast<int>(MIN_INHAP_RATIO * static_cast<float>(tot_cov_hap));
+        return regular_ok || lowcov_ok;
+    };
+    auto allele_is_cleanly_phased = [&allele_dominates_haplotype](vc_allele_t &a) {
+        const bool dominates_hap0 =
+                allele_dominates_haplotype(a, HAP0) && !allele_dominates_haplotype(a, HAP1);
+        const bool dominates_hap1 =
+                allele_dominates_haplotype(a, HAP1) && !allele_dominates_haplotype(a, HAP0);
+        return dominates_hap0 || dominates_hap1;
+    };
 
     // weaker het requirements
     constexpr float WEAKTHRESHOLD_MIN_ALT_RATIO = 0.3f;
@@ -880,105 +994,55 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     // hom
     constexpr float THRESHOLD_MIN_HOM_RATIO = 0.8f;
 
-    float tot_cov = 0;
-    float tot_cov_hap0 = 0;
-    float tot_cov_hap1 = 0;
-    float tot_cov_unphased = 0;
-    float tot_any_alt_cov = 0;
-    int n_long_alts = 0;
-    vc_allele_t &a0 = var.alleles[0];
-    vc_allele_t &a1 = var.alleles[1];
-    cov_t &a0_cov = a0.cov;
-    cov_t &a1_cov = a1.cov;
-    for (auto &_ : var.alleles) {
-        int tmp = _.cov.cov_hap0 + _.cov.cov_hap1 + _.cov.cov_unphased;
-        _.cov.cov_tot = tmp;
-        tot_cov += tmp;
-        tot_cov_hap0 += _.cov.cov_hap0;
-        tot_cov_hap1 += _.cov.cov_hap1;
-        tot_cov_unphased += _.cov.cov_unphased;
-        if (_.allele[0] != SENTINEL_REF_ALLELE_INT) {
-            tot_any_alt_cov += tmp;
-        }
-        if (_.allele[0] != SENTINEL_REF_ALLELE_INT && _.allele.size() >= MIN_LEN_LONG_ALT) {
-            n_long_alts += tmp;
-        }
-    }
-    int n_alts_in_first_two = 0;
-    if (var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
-        n_alts_in_first_two++;
-    }
-    if (var.alleles[1].allele[0] != SENTINEL_REF_ALLELE_INT) {
-        n_alts_in_first_two++;
-    }
-
     double fisher_left_p, fisher_right_p, fisher_twosided_p;
     double fisher_left_p_nounphased, fisher_right_p_nounphased, fisher_twosided_p_nounphased;
-    kt_fisher_exact(static_cast<float>(a0_cov.cov_hap0 + a0_cov.cov_unphased / UNPHASED_DISCOUNT),
-                    static_cast<float>(a0_cov.cov_hap1 + a0_cov.cov_unphased / UNPHASED_DISCOUNT),
-                    static_cast<float>(a1_cov.cov_hap0 + a1_cov.cov_unphased / UNPHASED_DISCOUNT),
-                    static_cast<float>(a1_cov.cov_hap1 + a1_cov.cov_unphased / UNPHASED_DISCOUNT),
+    kt_fisher_exact(a0.cov.cov_hap0 + a0.cov.cov_unphased / static_cast<int>(UNPHASED_DISCOUNT),
+                    a0.cov.cov_hap1 + a0.cov.cov_unphased / static_cast<int>(UNPHASED_DISCOUNT),
+                    a1.cov.cov_hap0 + a1.cov.cov_unphased / static_cast<int>(UNPHASED_DISCOUNT),
+                    a1.cov.cov_hap1 + a1.cov.cov_unphased / static_cast<int>(UNPHASED_DISCOUNT),
                     &fisher_left_p, &fisher_right_p, &fisher_twosided_p);
-    kt_fisher_exact(static_cast<float>(a0_cov.cov_hap0), static_cast<float>(a0_cov.cov_hap1),
-                    static_cast<float>(a1_cov.cov_hap0), static_cast<float>(a1_cov.cov_hap1),
+    kt_fisher_exact(a0.cov.cov_hap0, a0.cov.cov_hap1, a1.cov.cov_hap0, a1.cov.cov_hap1,
                     &fisher_left_p_nounphased, &fisher_right_p_nounphased,
                     &fisher_twosided_p_nounphased);
 
+    bool has_decided = false;
+
     // het
-    // clang-format off
-    const int passed_fisher = fisher_twosided_p < FISHER_P_THRESHOLD ||
-                              (fisher_twosided_p_nounphased < FISHER_P_THRESHOLD_NOUNPHASED &&
-                               n_alts_in_first_two > 0);
-    const int has_cov_diff =
-            std::max(a0_cov.cov_tot, a1_cov.cov_tot) / std::min(a0_cov.cov_tot, a1_cov.cov_tot) >=
-                    MAX_COVDIFF_RATIO ||
-            std::min(a0_cov.cov_tot, a1_cov.cov_tot) < MIN_HAP_COVERAGE;
-    const int alt0_is_proper =
-            ((a0_cov.cov_hap0 < MAX_INHAP_RATIO * tot_cov_hap0 ||
-              (tot_cov_hap0 < LOWCOV_THRESHOLD && a0_cov.cov_hap0 < LOWCOV_ALT_THRESHOLD)) &&
-             (a0_cov.cov_hap1 >= MAX_INHAP_RATIO_OPPOSITE * tot_cov_hap1 ||
-              (tot_cov_hap1 < LOWCOV_THRESHOLD &&
-               tot_cov_hap1 < LOWCOV_ALT_THRESHOLD + a0_cov.cov_hap1))) ||
-            ((a0_cov.cov_hap1 < MAX_INHAP_RATIO * tot_cov_hap1 ||
-              (tot_cov_hap1 < LOWCOV_THRESHOLD && a0_cov.cov_hap1 < LOWCOV_ALT_THRESHOLD)) &&
-             (a0_cov.cov_hap0 >= MAX_INHAP_RATIO_OPPOSITE * tot_cov_hap0 ||
-              (tot_cov_hap0 < LOWCOV_THRESHOLD &&
-               tot_cov_hap0 < LOWCOV_ALT_THRESHOLD + a0_cov.cov_hap0)));
-    const int alt1_is_proper =
-            ((a1_cov.cov_hap0 < MAX_INHAP_RATIO * tot_cov_hap0 ||
-              (tot_cov_hap0 < LOWCOV_THRESHOLD && a1_cov.cov_hap0 < LOWCOV_ALT_THRESHOLD)) &&
-             (a1_cov.cov_hap1 >= MAX_INHAP_RATIO_OPPOSITE * tot_cov_hap1 ||
-              (tot_cov_hap1 < LOWCOV_THRESHOLD &&
-               tot_cov_hap1 < LOWCOV_ALT_THRESHOLD + a1_cov.cov_hap1))) ||
-            ((a1_cov.cov_hap1 < MAX_INHAP_RATIO * tot_cov_hap1 ||
-              (tot_cov_hap1 < LOWCOV_THRESHOLD && a1_cov.cov_hap1 < LOWCOV_ALT_THRESHOLD)) &&
-             (a1_cov.cov_hap0 >= MAX_INHAP_RATIO_OPPOSITE * tot_cov_hap0 ||
-              (tot_cov_hap0 < LOWCOV_THRESHOLD &&
-               tot_cov_hap0 < LOWCOV_ALT_THRESHOLD + a1_cov.cov_hap0)));
-    const int alt0_strand_ok = a0_cov.cov_fwd >= std::max(min_strand_cov, static_cast<int>(a0_cov.cov_tot * min_strand_cov_frac))
-                            && a0_cov.cov_bwd >= std::max(min_strand_cov, static_cast<int>(a0_cov.cov_tot * min_strand_cov_frac));
-    const int alt1_strand_ok = a1_cov.cov_fwd >= std::max(min_strand_cov, static_cast<int>(a1_cov.cov_tot * min_strand_cov_frac))
-                            && a1_cov.cov_bwd >= std::max(min_strand_cov, static_cast<int>(a1_cov.cov_tot * min_strand_cov_frac));
-    // clang-format on
+    const bool passed_fisher = fisher_twosided_p < FISHER_P_THRESHOLD ||
+                               (fisher_twosided_p_nounphased < FISHER_P_THRESHOLD_NOUNPHASED &&
+                                varcov.n_alts_in_first_two > 0);
+    const bool has_cov_diff = has_cov_diff_between_two_alleles(a0, a1);
+    const bool alt0_is_proper = allele_is_cleanly_phased(a0);
+    const bool alt1_is_proper = allele_is_cleanly_phased(a1);
+
+    auto strand_has_enough_cov = [&min_strand_cov, &min_strand_cov_frac](const cov_t &cov) -> bool {
+        return std::min(cov.cov_fwd, cov.cov_bwd) >=
+               std::max(min_strand_cov, static_cast<int>(static_cast<float>(cov.cov_tot_all) *
+                                                         min_strand_cov_frac));
+    };
+    const bool alt0_strand_ok = strand_has_enough_cov(a0.cov);
+    const bool alt1_strand_ok = strand_has_enough_cov(a1.cov);
 
     const bool ok = passed_fisher && alt0_is_proper && alt1_is_proper;
     const bool ok_weaker =
-            (tot_any_alt_cov >= WEAKTHRESHOLD_MIN_ALT_RATIO * tot_cov) || passed_fisher;
+            (varcov.cov_any_alt >=
+             WEAKTHRESHOLD_MIN_ALT_RATIO * static_cast<float>(varcov.cov.cov_tot_all)) ||
+            passed_fisher;
     if (ok) {
         if (!has_cov_diff && alt0_strand_ok && alt1_strand_ok) {
             ret.is_accepted = FLAG_VARSTAT_ACCEPTED;
-            ret.code = 10;
+            ret.code = HET_FISHER_COV_STRAND;
         } else {
             ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.code = 11;
+            ret.code = HET_FISHER;
         }
     } else {
         if (ok_weaker) {
             ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.code = 12;
+            ret.code = HET_WEAKERFISHER;
         } else {
             ret.is_accepted = FLAG_VARSTAT_REJECTED;
-            ret.code = 13;
+            ret.code = HET_NOTHING;
         }
     }
     if constexpr (DEBUG_PRINT) {
@@ -986,14 +1050,14 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     }
     if (ret.is_accepted !=
         FLAG_VARSTAT_REJECTED) {  // is het, need to decide whether it has multi alleles
-        if (n_alts_in_first_two == 2) {
+        if (varcov.n_alts_in_first_two == 2) {
             ret.type = FLAG_VAR_MULTHET;
-        } else if (n_alts_in_first_two == 1) {
+        } else if (varcov.n_alts_in_first_two == 1) {
             ret.type = FLAG_VAR_HET;
         } else {
             ret.is_accepted = FLAG_VARSTAT_REJECTED;
             ret.type = FLAG_VAR_NA;
-            ret.code = 15;
+            ret.code = REJECT_TOO_MANY_ALLELE;
         }
         if constexpr (DEBUG_PRINT) {
             fprintf(stderr,
@@ -1002,40 +1066,43 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                     "%d] unphased{a0,a1}=[%d %d]; proper: %d %d; strand covs: %d %d %d %d)\n",
                     __func__, pos, ret.code, fisher_twosided_p_nounphased,
                     "ACGT_R"[var.alleles[0].allele[0]], var.alleles[0].allele.back(),
-                    a0_cov.cov_hap0, a0_cov.cov_hap1, "ACGT_R"[var.alleles[1].allele[0]],
-                    var.alleles[1].allele.back(), a1_cov.cov_hap0, a1_cov.cov_hap1,
-                    a0_cov.cov_unphased, a1_cov.cov_unphased, alt0_is_proper, alt1_is_proper,
-                    a0_cov.cov_fwd, a0_cov.cov_bwd, a1_cov.cov_fwd, a1_cov.cov_bwd
+                    a0.cov.cov_hap0, a0.cov.cov_hap1, "ACGT_R"[var.alleles[1].allele[0]],
+                    var.alleles[1].allele.back(), a1.cov.cov_hap0, a1.cov.cov_hap1,
+                    a0.cov.cov_unphased, a1.cov.cov_unphased, alt0_is_proper, alt1_is_proper,
+                    a0.cov.cov_fwd, a0.cov.cov_bwd, a1.cov.cov_fwd, a1.cov.cov_bwd
 
             );
         }
-        goto done;
+        has_decided = true;
     }
 
     if constexpr (DEBUG_PRINT) {
-        fprintf(stderr,
-                "[dbg::%s] pos %d fell thru het1 (p was %.4f; allele0(%c%d)=[%d %d] "
-                "allele1(%c%d)=[%d "
-                "%d] unphased{a0,a1}=[%d %d]; proper: %d %d)\n",
-                __func__, pos, fisher_twosided_p_nounphased, "ACGT_R"[var.alleles[0].allele[0]],
-                var.alleles[0].allele.back(), a0_cov.cov_hap0, a0_cov.cov_hap1,
-                "ACGT_R"[var.alleles[1].allele[0]], var.alleles[1].allele.back(), a1_cov.cov_hap0,
-                a1_cov.cov_hap1, a0_cov.cov_unphased, a1_cov.cov_unphased, alt0_is_proper,
-                alt1_is_proper);
+        if (!has_decided) {
+            fprintf(stderr,
+                    "[dbg::%s] pos %d fell thru het1 (p was %.4f; allele0(%c%d)=[%d %d] "
+                    "allele1(%c%d)=[%d "
+                    "%d] unphased{a0,a1}=[%d %d]; proper: %d %d)\n",
+                    __func__, pos, fisher_twosided_p_nounphased, "ACGT_R"[var.alleles[0].allele[0]],
+                    var.alleles[0].allele.back(), a0.cov.cov_hap0, a0.cov.cov_hap1,
+                    "ACGT_R"[var.alleles[1].allele[0]], var.alleles[1].allele.back(),
+                    a1.cov.cov_hap0, a1.cov.cov_hap1, a0.cov.cov_unphased, a1.cov.cov_unphased,
+                    alt0_is_proper, alt1_is_proper);
+        }
     }
 
     // not clean het, and top two are ref(substitution) and ref(del), ignore
-    if (var.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT &&
+    if (!has_decided && var.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT &&
         var.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT) {
         ret.is_accepted = FLAG_VARSTAT_REJECTED;
         ret.type = FLAG_VAR_NA;
-        ret.code = 3;
-        goto done;
+        ret.code = REJECT_REFREF;
+        has_decided = true;
     }
 
     // hom
-    if (var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
-        const float ratio = (float)a0_cov.cov_tot / std::max(1.0f, tot_cov);
+    if (!has_decided && var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
+        const float ratio =
+                (float)a0.cov.cov_tot_all / static_cast<float>(std::max(1, varcov.cov.cov_tot_all));
         if constexpr (DEBUG_PRINT) {
             fprintf(stderr, "[dbg::%s] pos %d try hom (ratio %.3f)\n", __func__, pos, ratio);
         }
@@ -1043,68 +1110,76 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             ret.type = FLAG_VAR_HOM;
             if (alt0_strand_ok) {
                 ret.is_accepted = FLAG_VARSTAT_ACCEPTED;
-                ret.code = 41;
+                ret.code = HOM_STRAND;
             } else {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
-                ret.code = 43;
+                ret.code = HOM_NOTHING;
             }
-            goto done;
+            has_decided = true;
         }
     }
-    for (auto &_ : var.alleles) {
-        if (_.allele[0] != SENTINEL_REF_ALLELE_INT &&
-            static_cast<float>(_.cov.cov_tot) >= 0.3 * tot_cov) {
-            ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.type = FLAG_VAR_NA;
-            ret.code = 42;
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] pos %d hom rescue try altcov=%d (af %.2f)\n", __func__,
-                        pos, _.cov.cov_tot, (float)_.cov.cov_tot / tot_cov);
+    if (!has_decided) {
+        for (auto &allele : var.alleles) {
+            if (allele.allele[0] != SENTINEL_REF_ALLELE_INT &&
+                static_cast<float>(allele.cov.cov_tot_all) >= 0.3f * varcov.cov.cov_tot_all) {
+                ret.is_accepted = FLAG_VARSTAT_UNSURE;
+                ret.type = FLAG_VAR_NA;
+                ret.code = HOM_RESUCEFAIL;
+                if constexpr (DEBUG_PRINT) {
+                    fprintf(stderr, "[dbg::%s] pos %d hom rescue try altcov=%d (af %.2f)\n",
+                            __func__, pos, allele.cov.cov_tot_all,
+                            (float)allele.cov.cov_tot_all / varcov.cov.cov_tot_all);
+                }
+                has_decided = true;
+                break;
             }
-            goto done;
         }
     }
 
-    if (n_long_alts >= N_LONG_ALTS) {  // long alt
-        ret.is_accepted = FLAG_VARSTAT_UNSURE;
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[dbg::%s] pos %d code5a unsure\n", __func__, pos);
-        }
-    } else if (var.alleles.size() > 4) {  // many alts; 4:ref/ref/alt/alt
-        int n_allele_with_suf_cov = 0;
-        for (auto &_ : var.alleles) {
-            if (_.allele[0] != SENTINEL_REF_ALLELE_INT && _.cov.cov_tot >= MIN_SUF_COV_ALLELE) {
-                n_allele_with_suf_cov++;
+    if (!has_decided) {
+        if (varcov.n_long_alts >= N_LONG_ALTS) {  // long alt
+            ret.is_accepted = FLAG_VARSTAT_UNSURE;
+            ret.code = SUS_LONG_ALT;
+            if constexpr (DEBUG_PRINT) {
+                fprintf(stderr, "[dbg::%s] pos %d code %d\n", __func__, pos, ret.code);
+            }
+        } else if (var.alleles.size() > 4) {  // many alts; 4:ref/ref/alt/alt
+            int n_allele_with_suf_cov = 0;
+            for (auto &allele : var.alleles) {
+                if (allele.allele[0] != SENTINEL_REF_ALLELE_INT &&
+                    allele.cov.cov_tot_all >= MIN_SUF_COV_ALLELE) {
+                    n_allele_with_suf_cov++;
+                    if constexpr (DEBUG_PRINT) {
+                        fprintf(stderr, "[dbg::%s] pos %d code5: saw alt (%c) cov=%d\n", __func__,
+                                pos, "ACGT"[allele.allele[0]], allele.cov.cov_tot_all);
+                    }
+                }
+            }
+            if (n_allele_with_suf_cov >= 2) {
+                ret.is_accepted = FLAG_VARSTAT_UNSURE;
+                ret.code = SUS_MULTI_ALLELE;
                 if constexpr (DEBUG_PRINT) {
-                    fprintf(stderr, "[dbg::%s] pos %d code5: saw alt (%c) cov=%d\n", __func__, pos,
-                            "ACGT"[_.allele[0]], _.cov.cov_tot);
+                    fprintf(stderr, "[dbg::%s] pos %d code %d\n", __func__, pos, ret.code);
                 }
             }
         }
-        if (n_allele_with_suf_cov >= 2) {
-            ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.code = 5;
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] pos %d code5b unsure\n", __func__, pos);
-            }
-        }
     }
-done:
-    // before we are all done, consider to (1) rescue candidate close to
-    // repeat, and (2) un-trust indel candidates if close to repeat
-    const int is_non_ref = var.alleles.size() > 1 && tot_any_alt_cov >= 0.15f * tot_cov &&
-                           (!(var.alleles[0].allele.back() == VAR_OP_X &&
-                              var.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT) ||
-                            !(var.alleles[1].allele.back() != VAR_OP_X &&
-                              var.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT));
+
+    // additional criteria for marking candidate as unsure at the last moment
+    // (1) rescue candidates close to repeats
+    // (2) untrust indel candidates if close repeats
+    const bool is_non_ref =
+            var.alleles.size() > 1 &&
+            static_cast<float>(varcov.cov_any_alt) >=
+                    (0.15f * static_cast<float>(varcov.cov.cov_tot_all)) &&
+            (!(a0.allele.back() == VAR_OP_X && a0.allele[0] == SENTINEL_REF_ALLELE_INT) ||
+             !(a1.allele.back() != VAR_OP_X && a1.allele[0] == SENTINEL_REF_ALLELE_INT));
     const int is_rejected_non_ref = is_non_ref && var.is_accepted == FLAG_VARSTAT_REJECTED;
     int is_indel = 0;
     int n_long_indel = 0;
     if (var.alleles.size() > 1) {
-        is_indel = (var.alleles[0].allele.back() == VAR_OP_I ||
-                    var.alleles[1].allele.back() == VAR_OP_I ||
-                    var.alleles[0].allele.back() == VAR_OP_D ||
-                    var.alleles[1].allele.back() == VAR_OP_D);
+        is_indel = (a0.allele.back() == VAR_OP_I || a1.allele.back() == VAR_OP_I ||
+                    a0.allele.back() == VAR_OP_D || a1.allele.back() == VAR_OP_D);
         for (uint32_t i = 0; i < var.alleles.size(); i++) {
             if (var.alleles[i].allele[0] != SENTINEL_REF_ALLELE_INT &&
                 var.alleles[i].allele.size() > 10) {
@@ -1114,29 +1189,32 @@ done:
         }
     }
     if (is_rejected_non_ref || is_indel || n_long_indel > 1) {
-        if (tot_any_alt_cov >= 0.2f * tot_cov) {
+        if (static_cast<float>(varcov.cov_any_alt) >=
+            0.2f * static_cast<float>(varcov.cov.cov_tot_all)) {
             const bool is_at_repeat =
                     is_adjacent_to_perfect_repeats(refseq, refseq_l, itvl_start, pos);
             if constexpr (DEBUG_PRINT) {
-                fprintf(stderr,
-                        "[dbg::%s] pos %d code 90: test next to perfect repeat: %d ; var type %d\n",
+                fprintf(stderr, "[dbg::%s] pos %d test next to perfect repeat: %d ; var type %d\n",
                         __func__, pos, is_at_repeat, ret.type);
             }
             if (is_at_repeat) {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
-                ret.code = 90;
+                ret.code = SUS_REPETITIVE;
             }
         }
     }
     if (ret.is_accepted == FLAG_VARSTAT_ACCEPTED &&
-        tot_cov_unphased > (tot_cov_hap0 + tot_cov_hap1)) {
+        (varcov.cov.cov_tot_all - varcov.cov.cov_tot_phased) >
+                (varcov.cov.cov_hap0 + varcov.cov.cov_hap1)) {
         ret.is_accepted = FLAG_VARSTAT_UNSURE;
-        ret.code = 91;
+        ret.code = SUS_PHASE;
         if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[dbg::%s] pos %d code 91 (hap0=%d hap1=%d unphased=%d)\n", __func__,
-                    pos, (int)tot_cov_hap0, (int)tot_cov_hap1, (int)tot_cov_unphased);
+            fprintf(stderr, "[dbg::%s] pos %d test phase (hap0=%d hap1=%d unphased=%d)\n", __func__,
+                    pos, (int)varcov.cov.cov_hap0, (int)varcov.cov.cov_hap1,
+                    (int)(varcov.cov.cov_tot_all - varcov.cov.cov_tot_phased));
         }
     }
+
     return ret;
 }
 
@@ -1274,50 +1352,44 @@ void ck_derive_variant_genophase_from_phased_read(chunk_t &ck) {
 }
 
 variant_dorado_style_t convert_fullinfo_var_to_dorado_style(const variant_fullinfo_t &var) {
-    // clang-format off
-    std::pair<char, char> genotype{0, 0};
-    std::string ref = var.ref_allele_seq0;
+    std::pair<char, char> genotype;
+    std::string_view ref = var.ref_allele_seq0;
     std::string alt0 = var.alt_allele_seq0;
-    std::string alt1 = var.is_multi_allele? var.alt_allele_seq1 : "";
+    std::string alt1 = var.is_multi_allele ? var.alt_allele_seq1 : "";
     if (var.is_multi_allele) {
         if (var.genotype0[0] == '0') {
             genotype = {'2', '1'};
         } else {
             genotype = {'1', '2'};
         }
-        if (var.ref_allele_seq0!=var.ref_allele_seq1){
-            if (var.ref_allele_seq0.size()>var.ref_allele_seq1.size()){
+        if (var.ref_allele_seq0 != var.ref_allele_seq1) {
+            if (var.ref_allele_seq0.size() > var.ref_allele_seq1.size()) {
                 // REF will simply be the longer one.
                 ref = var.ref_allele_seq0;
 
                 // Adjust the alt with the short ref allele.
                 const std::string &alt_raw = var.alt_allele_seq1;
-                const std::string ref_extra = ref.substr(1, ref.size());
-                std::string &alt_new = alt1;
-                alt_new = alt_raw + ref_extra;
-            }else{
+                alt1 = alt_raw;
+                alt1.append(ref.data() + 1, ref.size() - 1);
+            } else {
                 ref = var.ref_allele_seq1;
                 const std::string &alt_raw = var.alt_allele_seq0;
-                const std::string ref_extra = ref.substr(1, ref.size());
-                std::string &alt_new = alt0;
-                alt_new = alt_raw + ref_extra;
+                alt0 = alt_raw;
+                alt0.append(ref.data() + 1, ref.size() - 1);
             }
         }
     } else {
         genotype = {var.genotype0[0], var.genotype0[2]};
     }
 
-    return {.is_confident = var.is_confident, 
+    return {.is_confident = var.is_confident,
             .is_phased = var.is_phased0,
-            .pos = var.pos0, 
-            .qual = var.is_confident? 60 : 0,
-            .ref = ref,
-            .alts = var.is_multi_allele
-                    ? std::vector<std::string>{alt0, alt1} 
-                    : std::vector<std::string>{alt0},
-            .genotype = genotype
-            };
-    // clang-format on
+            .pos = var.pos0,
+            .qual = var.is_confident ? 60 : 0,
+            .ref = std::string(ref),
+            .alts = var.is_multi_allele ? std::vector<std::string>{alt0, alt1}
+                                        : std::vector<std::string>{alt0},
+            .genotype = genotype};
 }
 
 variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
@@ -1339,8 +1411,7 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
         ret.is_valid = false;
         ret.is_confident = false;
         return ret;
-    }
-    if (var.pos == 0) {
+    } else if (var.pos == ref_start) {
         if (!allow_N_base) {
             ret.is_valid = false;
             ret.is_confident = false;
@@ -1349,7 +1420,6 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
         ref_s = "N";  // store extra 1 base before
         ref_s += refseq_s[var.pos - ref_start];
     } else {
-        assert(var.pos >= ref_start);
         const int tmppos = var.pos - ref_start;  // 0-index
         if (!allow_N_base) {
             if (refseq_s[tmppos - 1] == 'N' || refseq_s[tmppos] == 'N' ||
@@ -1473,15 +1543,14 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
 }
 
 void fix_variant_fullinfo_genotype_snp_in_del(std::vector<variant_fullinfo_t> &vars) {
-    // Note:
-    //   - If at a positon, one hap has a substitution while the other hap
-    //     has a deletion that started prior to this position & extends to
-    //     cover it, the substitution's genotype needs to be marked as hom
-    //     according to hap.py . For example, chr6:1128114 .
-    //     Either way seems a bit ambiguous. `ta_t` saves this case as het,
-    //     because the other hap doesn't have the ref base & is different.
-    //     Let's convert it to hom here to be consistent with others in
-    //     evaluations.
+    // Note (variant representation):
+    //    If at a position, one hap has a substitution while the other hap
+    //    has a deletion that started prior to this position & extends to
+    //    cover it, it may be preferrable to mark the substitution's genotype
+    //    as hom. For an example,  see HG002 chr6:1128114 .
+    //    `ta_t` saves this case as het,
+    //    because the other hap doesn't have the ref base and thus is different.
+    //    Let's convert it to hom here.
     constexpr bool DEBUG_PRINT = false;
     for (int64_t i = 1; i < std::ssize(vars); i++) {
         const auto &prev_var = vars[i - 1];
@@ -1505,14 +1574,14 @@ void fix_variant_fullinfo_genotype_snp_in_del(std::vector<variant_fullinfo_t> &v
         }
 
         if (prev_var.ref_allele_seq0.size() > prev_var.alt_allele_seq0.size()) {  // is del
-            const uint32_t del_len = prev_var.ref_allele_seq0.size();
+            const uint32_t del_len = static_cast<uint32_t>(prev_var.ref_allele_seq0.size());
             if (prev_var.pos0 + del_len >= var.pos0) {
                 should_set_to_hom = true;
             }
         }
         if (prev_var.is_multi_allele) {
             if (prev_var.ref_allele_seq1.size() > prev_var.alt_allele_seq1.size()) {  // is del
-                const uint32_t del_len = prev_var.ref_allele_seq1.size();
+                const uint32_t del_len = static_cast<uint32_t>(prev_var.ref_allele_seq1.size());
                 if (prev_var.pos1 + del_len >= var.pos1) {
                     should_set_to_hom = true;
                 }
@@ -1538,7 +1607,12 @@ void fix_variant_fullinfo_genotype_snp_in_del(std::vector<variant_fullinfo_t> &v
 std::string create_region_string(const std::string_view ref_name,
                                  const uint32_t start,
                                  const uint32_t end) {
-    return std::string(ref_name) + ":" + std::to_string(start + 1) + "-" + std::to_string(end);
+    std::string ret(ref_name);
+    ret.append(":");
+    ret.append(std::to_string(start + 1));
+    ret.append("-");
+    ret.append(std::to_string(end));
+    return ret;
 }
 
 chunk_t variant_pileup_ht(BamFileView &hf,
@@ -1563,24 +1637,8 @@ chunk_t variant_pileup_ht(BamFileView &hf,
     const int downsample_window = 10000;
     const int downsample_readcap = 150;  // 10k window 30x has ~50 reads
 
-    const bool retain_het_only = pp.retain_het_only;
-    const bool retain_SNP_only = pp.retain_SNP_only;
-    const bool use_bloomfilter = pp.use_bloomfilter;
-    const bool disable_lowcmp_mask = pp.disable_low_complexity_masking;
-    const bool disable_interval_expansion = pp.disable_region_expansion;
-
-    const int min_base_quality = pp.min_base_quality;
-    const int min_varcall_coverage = pp.min_varcall_coverage;
-    const float min_varcall_coverage_ratio = pp.min_varcall_fraction;
-    const int min_mapq = pp.min_mapq;
-    const int max_clipping = pp.max_clipping;
-    const float max_gapcompressed_seqdiv = pp.max_gapcompressed_seqdiv;
-
-    const int min_strand_cov = pp.min_strand_cov;
-    const float min_strand_cov_frac = pp.min_strand_cov_frac;
-
     if (debug_print) {
-        fprintf(stderr, "[dbg::%s] pileup at %s:%d-%d (1-index)\n", __func__, refname.data(),
+        fprintf(stderr, "[dbg::%s] pileup at %s:%d-%d (1-index, [) )\n", __func__, refname.data(),
                 (int)itvl_start + 1, (int)itvl_end);
     }
     vc_variants1_t ht;
@@ -1600,29 +1658,24 @@ chunk_t variant_pileup_ht(BamFileView &hf,
     uint32_t abs_end = ck.abs_end;
 
     const std::string itvl = create_region_string(refname, itvl_start, itvl_end);
-    hts_itr_t *bamitr = sam_itr_querys(hf.idx, hf.hdr, itvl.c_str());
-    if (!bamitr) {
-        fprintf(stderr, "[W::%s] %s has no bamitr\n", __func__, itvl.c_str());
-        ck.is_valid = false;
-        return ck;
-    }
-    bam1_t *aln = bam_init1();
+    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()), HtsItrDestructor());
+    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
 
-    if (!disable_interval_expansion) {
+    if (!pp.disable_region_expansion) {
         interval_t new_itvl = expand_query_interval(hf, refname, itvl_start, itvl_end);
         abs_start = new_itvl.start;
         abs_end = new_itvl.end;
         const std::string itvl2 = create_region_string(refname, abs_start, abs_end);
-        hts_itr_destroy(bamitr);
-        bamitr = sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str());
+
+        bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()), HtsItrDestructor());
         if (debug_print && DEBUG_LOCAL_HAPLOTAGGING) {
             fprintf(stderr, "[dbg::%s] expanded: %s (disable_interval_expansion=%d\n", __func__,
-                    itvl2.c_str(), disable_interval_expansion);
+                    itvl2.c_str(), pp.disable_region_expansion);
         }
     }
 
     BlockedBloomFilter bf(4, 25);
-    if (use_bloomfilter) {
+    if (pp.use_bloomfilter) {
         bf.enable();  // allocates
     }
 
@@ -1635,8 +1688,8 @@ chunk_t variant_pileup_ht(BamFileView &hf,
     }
     uint32_t n_reads = 0;
     bool pileup_failed = false;
-    while (sam_itr_next(hf.fp, bamitr, aln) >= 0) {
-        const char *qn = bam_get_qname(aln);
+    while (sam_itr_next(hf.fp, bamitr.get(), aln.get()) >= 0) {
+        const char *qn = bam_get_qname(aln.get());
 
         if (n_reads > MAX_READS) {
             if (DEBUG_LOCAL_HAPLOTAGGING) {
@@ -1649,37 +1702,45 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         if (debug_print && DEBUG_LOCAL_HAPLOTAGGING && n_reads % 1000 == 0) {
             fprintf(stderr,
                     "[dbg::%s] piled %d reads (read start pos is %d) ht size %d, seen size %d\n",
-                    __func__, (int)n_reads, (int)aln->core.pos, (int)ht.size(),
+                    __func__, (int)n_reads, (int)aln.get()->core.pos, (int)ht.size(),
                     (int)ck.reads.size());
         }
 
-        const int flag = aln->core.flag;
+        const int flag = aln.get()->core.flag;
         const int mapq = (int)aln->core.qual;
         float de = 0;
-        uint8_t *tmp = bam_aux_get(aln, "de");
+        uint8_t *tmp = bam_aux_get(aln.get(), "de");
         if (tmp) {
             de = static_cast<float>(bam_aux2f(tmp));
         }
 
-        // clang-format off
-        const int md_is_ok = sancheck_MD_tag_exists_and_is_valid(aln);
-        if (!md_is_ok) continue;
-        if (aln->core.n_cigar == 0) continue;
-        if ((flag & 4) || (flag & 256) || (flag & 2048)) continue;
-        if (mapq < min_mapq) continue;
-        if (de > max_gapcompressed_seqdiv) continue;
+        const bool md_is_ok = sancheck_MD_tag_exists_and_is_valid(aln.get());
+        if (!md_is_ok) {
+            continue;
+        }
+        if (aln.get()->core.n_cigar == 0) {
+            continue;
+        }
+        if ((flag & 4) || (flag & 256) || (flag & 2048)) {
+            continue;
+        }
+        if (mapq < pp.min_mapq) {
+            continue;
+        }
+        if (de > pp.max_gapcompressed_seqdiv) {
+            continue;
+        }
         uint8_t hp = HAPTAG_UNPHASED;
-        if (qname2hp){
+        if (qname2hp) {
             const auto it = qname2hp->find(qn);
-            if (it==qname2hp->cend()) {
+            if (it == qname2hp->cend()) {
                 hp = HAPTAG_UNPHASED;
-            }else{
-                hp = it->second;
+            } else {
+                hp = static_cast<uint8_t>(it->second);
             }
         }
-        const uint32_t r_start_pos = static_cast<uint32_t>(aln->core.pos);
-        const uint32_t r_end_pos = static_cast<uint32_t>(bam_endpos(aln));
-        // clang-format on
+        const uint32_t r_start_pos = static_cast<uint32_t>(aln.get()->core.pos);
+        const uint32_t r_end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
 
         if (enable_downsample) {
             const uint32_t effective_r_start =
@@ -1705,8 +1766,8 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         n_reads++;
         // collect variants of the read
         read_t r{
-                .start_pos = static_cast<uint32_t>(aln->core.pos),
-                .end_pos = static_cast<uint32_t>(bam_endpos(aln)),
+                .start_pos = static_cast<uint32_t>(aln.get()->core.pos),
+                .end_pos = static_cast<uint32_t>(bam_endpos(aln.get())),
                 .ID = n_reads,
                 .vars = {},
                 .hp = hp,
@@ -1721,11 +1782,11 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         // TODO could be done in parse_variant_for_one_read instead.
         std::vector<qa_t> tmp_read_vars_buffer{};
         std::vector<qa_t> &read_vars_buffer = ht_refvars.empty() ? r.vars : tmp_read_vars_buffer;
-        const int parse_failed = parse_variants_for_one_read(
-                aln, read_vars_buffer, min_base_quality, &r.left_clip_len, &r.right_clip_len,
-                retain_SNP_only, NULL);
-        if (!parse_failed && !read_vars_buffer.empty() && r.left_clip_len < max_clipping &&
-            r.right_clip_len < max_clipping) {
+        const bool parse_ok = parse_variants_for_one_read(
+                aln.get(), read_vars_buffer, pp.min_base_quality, &r.left_clip_len,
+                &r.right_clip_len, pp.retain_SNP_only, nullptr);
+        if (parse_ok && !read_vars_buffer.empty() && r.left_clip_len < pp.max_clipping &&
+            r.right_clip_len < pp.max_clipping) {
             if (!ht_refvars.empty()) {
                 filter_lift_qa_v_given_conf_list(read_vars_buffer, r.vars, ht_refvars);
             }
@@ -1736,8 +1797,9 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                 if (r.vars[i].pos >= abs_end) {
                     break;
                 }
-                const int exists = use_bloomfilter ? bf.insert(r.vars[i].pos) : 1;
-                if (!exists) {
+                const int is_not_seen_before =
+                        pp.use_bloomfilter ? bf.insert(r.vars[i].pos) : false;
+                if (is_not_seen_before) {
                     continue;
                 }
 
@@ -1767,7 +1829,7 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                                 fprintf(stderr,
                                         "[dbg::%s] pos %d alt++(allele=%d) hp=%d from qn %s (use "
                                         "bf=%d)\n",
-                                        __func__, var.pos, j, hp, qn, use_bloomfilter);
+                                        __func__, var.pos, j, hp, qn, pp.use_bloomfilter);
                             }
                             allele_found = 1;
                             break;
@@ -1777,20 +1839,21 @@ chunk_t variant_pileup_ht(BamFileView &hf,
 
                 if (!allele_found) {
                     ht[var.pos].is_accepted = FLAG_VARSTAT_UNKNOWN;
-                    ht[var.pos].alleles.push_back({(cov_t){.cov_hap0 = 0,
-                                                           .cov_hap1 = 0,
-                                                           .cov_unphased = 0,
-                                                           .cov_tot = 0,
-                                                           .cov_fwd = 0,
-                                                           .cov_bwd = 0},
+                    ht[var.pos].alleles.push_back({{.cov_hap0 = 0,
+                                                    .cov_hap1 = 0,
+                                                    .cov_unphased = 0,
+                                                    .cov_tot_all = 0,
+                                                    .cov_tot_phased = 0,
+                                                    .cov_fwd = 0,
+                                                    .cov_bwd = 0},
                                                    var.allele});
                     vc_allele_t &allele = ht[var.pos].alleles.back();
                     if (hp == 0) {
-                        allele.cov.cov_hap0 += 1;  // TODO what about bloomfilter?
+                        allele.cov.cov_hap0 += 1;
                     } else if (hp == 1) {
                         allele.cov.cov_hap1 += 1;
                     } else {
-                        allele.cov.cov_unphased += 2;  // account for bloomfilter
+                        allele.cov.cov_unphased += 1;
                     }
                     // update per-strand coverage
                     if (r.strand == 0) {
@@ -1802,7 +1865,7 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                         fprintf(stderr,
                                 "[dbg::%s] pos %d alt++(allele=%d) hp=%d from qn %s (use bf=%d)\n",
                                 __func__, var.pos, (int)ht[var.pos].alleles.size(), hp, qn,
-                                use_bloomfilter);
+                                pp.use_bloomfilter);
                     }
                 }
             }
@@ -1817,8 +1880,6 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                 __func__, (int)ht.size(), (int)ck.reads.size(), enable_downsample,
                 downsample_filtered, (int)n_reads);
     }
-    bam_destroy1(aln);
-    hts_itr_destroy(bamitr);
     if (pileup_failed) {
         if (debug_print && DEBUG_LOCAL_HAPLOTAGGING) {
             fprintf(stderr,
@@ -1847,12 +1908,12 @@ chunk_t variant_pileup_ht(BamFileView &hf,
     std::string refseq_s;
     int refseq_l = 0;
     if (fai) {
-        if (!disable_lowcmp_mask) {
+        if (!pp.disable_low_complexity_masking) {
             hplowcmp_mask = get_lowcmp_mask(fai, refname, abs_start, abs_end);
         }
         const std::string span_s = create_region_string(refname, abs_start, abs_end);
         refseq_s = kadayashi::hts_utils::fetch_seq(fai, span_s.c_str());
-        refseq_l = refseq_s.size();
+        refseq_l = static_cast<int>(refseq_s.size());
     }
 
     // initial parsing: filter by ALT variant's coverage
@@ -1872,24 +1933,26 @@ chunk_t variant_pileup_ht(BamFileView &hf,
             (qname2hp &&
              alt_cov >= 3)) {  // we will try to collect REF; push the ref allele placeholders now
             q.is_accepted = FLAG_VARSTAT_MAYBE;
-            q.alleles.push_back({(cov_t){.cov_hap0 = 0,
-                                         .cov_hap1 = 0,
-                                         .cov_unphased = 0,
-                                         .cov_tot = 0,
-                                         .cov_fwd = 0,
-                                         .cov_bwd = 0},
+            q.alleles.push_back({{.cov_hap0 = 0,
+                                  .cov_hap1 = 0,
+                                  .cov_unphased = 0,
+                                  .cov_tot_all = 0,
+                                  .cov_tot_phased = 0,
+                                  .cov_fwd = 0,
+                                  .cov_bwd = 0},
                                  {SENTINEL_REF_ALLELE_INT, VAR_OP_D}});
-            q.alleles.push_back({(cov_t){.cov_hap0 = 0,
-                                         .cov_hap1 = 0,
-                                         .cov_unphased = 0,
-                                         .cov_tot = 0,
-                                         .cov_fwd = 0,
-                                         .cov_bwd = 0},
+            q.alleles.push_back({{.cov_hap0 = 0,
+                                  .cov_hap1 = 0,
+                                  .cov_unphased = 0,
+                                  .cov_tot_all = 0,
+                                  .cov_tot_phased = 0,
+                                  .cov_fwd = 0,
+                                  .cov_bwd = 0},
                                  {SENTINEL_REF_ALLELE_INT, VAR_OP_X}});
             candidate_poss.push_back(pos);
             if (debug_print) {
                 fprintf(stderr, "[dbg::%s] pos %d will collect ref (%s pileup)\n", __func__, pos,
-                        qname2hp ? "phase" : "unphasd");
+                        qname2hp ? "phased" : "unphased");
             }
         } else {
             q.is_accepted = FLAG_VARSTAT_REJECTED;
@@ -1920,9 +1983,9 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         const uint32_t aln_end = read.end_pos;
 
         // get range on known alts
-        uint32_t i_lower = std::distance(
+        uint32_t i_lower = static_cast<uint32_t>(std::distance(
                 candidate_poss.begin(),
-                std::lower_bound(candidate_poss.begin(), candidate_poss.end(), aln_start));
+                std::lower_bound(candidate_poss.begin(), candidate_poss.end(), aln_start)));
         if (i_lower >= candidate_poss.size()) {
             continue;
         }
@@ -1930,11 +1993,11 @@ chunk_t variant_pileup_ht(BamFileView &hf,
             aln_start) {  // if not equal, get less-than rather than no-less-than
             i_lower = i_lower == 0 ? 0 : i_lower - 1;
         }
-        uint32_t i_higher = std::distance(
+        uint32_t i_higher = static_cast<uint32_t>(std::distance(
                 candidate_poss.begin(),
-                std::upper_bound(candidate_poss.begin(), candidate_poss.end(), aln_end));
+                std::upper_bound(candidate_poss.begin(), candidate_poss.end(), aln_end)));
         if (i_higher > candidate_poss.size()) {
-            i_higher = candidate_poss.size();
+            i_higher = static_cast<uint32_t>(candidate_poss.size());
         }
         if (debug_print > 1) {
             fprintf(stderr, "[dbg::%s] qn %s candidate alts bewtween: %d - %d (aln_end is %d)\n",
@@ -1953,11 +2016,11 @@ chunk_t variant_pileup_ht(BamFileView &hf,
             if (candidate_poss[i] >= aln_end || i >= i_higher) {
                 break;
             }
-            int read_prev_var_was_del = (j > 0 && read.vars[j - 1].allele.back() == VAR_OP_D);
-            int last_del_size =
+            const int read_prev_var_was_del = (j > 0 && read.vars[j - 1].allele.back() == VAR_OP_D);
+            const int last_del_size =
                     read_prev_var_was_del ? (int)std::ssize(read.vars[j - 1].allele) - 1 : 0;
             while (candidate_poss[i] < read.vars[j].pos) {
-                vc_allele_t *aa = 0;
+                vc_allele_t *aa = nullptr;
                 int is_del_case = 0;
                 if (ht[candidate_poss[i]].alleles.size() > 0 &&
                     (!read_prev_var_was_del ||
@@ -1989,7 +2052,6 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                     fprintf(stderr, "[dbg::%s] pos %d ref hp=%d cov++ from %s\n", __func__,
                             candidate_poss[i], hp, qn_s.c_str());
                 }
-                ht[candidate_poss[i]].alleles.back().cov.cov_tot++;
                 add_allele_qa_v_nt4seq(read.vars, candidate_poss[i],
                                        std::vector<uint8_t>{SENTINEL_REF_ALLELE_INT},
                                        SENTINEL_REF_ALLELE_L, is_del_case ? VAR_OP_D : VAR_OP_X);
@@ -2011,6 +2073,11 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         std::stable_sort(read.vars.begin(), read.vars.end());
     }  // iter through reads
 
+    // finish filling in coverages
+    for (auto &[pos, q] : ht) {
+        variant_fill_cov_tot(q);
+    }
+
     // 3rd parsing: decide candidates
     // There's three cases for diploid: hom ALT/ALT, het REF/ALT, and HET1/HET2
     for (auto &[pos, q] : ht) {
@@ -2021,8 +2088,8 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                                     b.cov.cov_hap0 + b.cov.cov_hap1 + b.cov.cov_unphased;
                          });
 
-        const int is_done = classify_variant_prefilter(q, pos, refseq_s.c_str(), refseq_l,
-                                                       abs_start, qname2hp, debug_print);
+        const bool is_done = classify_variant_prefilter(q, pos, refseq_s.c_str(), refseq_l,
+                                                        abs_start, qname2hp, debug_print);
         if (is_done) {
             continue;
         }
@@ -2033,25 +2100,26 @@ chunk_t variant_pileup_ht(BamFileView &hf,
             assert(fai);
             const var_classify_t result =
                     classify_variant_phased(q, pos, refseq_s.c_str(), refseq_l, abs_start,
-                                            min_strand_cov, min_strand_cov_frac);
+                                            pp.min_strand_cov, pp.min_strand_cov_frac);
             q.is_accepted = result.is_accepted;
             q.type = result.type;
         } else {  // unphased varcall: either accept or reject, no middle ground
-            const int c0 = q.alleles[0].cov.cov_tot;
-            const int c1 = q.alleles[1].cov.cov_tot;
+            const int c0 = q.alleles[0].cov.cov_tot_all;
+            const int c1 = q.alleles[1].cov.cov_tot_all;
             const float c0c1 = (c0 == 0 && c1 == 0) ? 1.0f : static_cast<float>(c0 + c1);
-            const int threshold = std::max(static_cast<int>((c0 + c1) * min_varcall_coverage_ratio),
-                                           min_varcall_coverage);
+            const int threshold = static_cast<int>(
+                    std::max(static_cast<int>((float)(c0 + c1) * pp.min_varcall_fraction),
+                             pp.min_varcall_coverage));
             const float ratio = static_cast<float>(std::min(c0, c1)) / c0c1;
             if (debug_print) {
                 fprintf(stderr, "[dbg::%s] unphased %d : c0=%d (%c) c1=%d (%c) ratio=%.2f ",
                         __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
                         "ACGT_R"[q.alleles[1].allele[0]], ratio);
             }
-            if (c0 >= threshold && c1 >= threshold && ratio >= min_varcall_coverage_ratio) {
+            if (c0 >= threshold && c1 >= threshold && ratio >= pp.min_varcall_fraction) {
                 q.is_accepted = FLAG_VARSTAT_ACCEPTED;
                 if (debug_print) {
-                    fprintf(stderr, "ACCPET ");
+                    fprintf(stderr, "ACCEPT ");
                 }
                 if (q.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT ||
                     q.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT) {
@@ -2086,7 +2154,7 @@ chunk_t variant_pileup_ht(BamFileView &hf,
     std::vector<valid_pos_t> valid_poss;
     std::unordered_map<uint32_t, uint32_t> valid_poss_set;
     std::vector<uint32_t> tmp_sorted_poss;
-    for (auto &[pos, q] : ht) {
+    for (const auto &[pos, q] : ht) {
         tmp_sorted_poss.push_back(pos);
     }
     std::sort(tmp_sorted_poss.begin(), tmp_sorted_poss.end());
@@ -2095,7 +2163,7 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         const auto &q = ht[pos];
         const uint8_t var_stat = q.is_accepted;
         if ((var_stat & (FLAG_VARSTAT_ACCEPTED | FLAG_VARSTAT_UNSURE))) {
-            if (retain_het_only && q.type != FLAG_VAR_HET) {
+            if (pp.retain_het_only && q.type != FLAG_VAR_HET) {
                 continue;
             }
             if (valid_poss.size() > 0 && pos == valid_poss.back().pos) {
@@ -2103,15 +2171,13 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                 // filtering impl above becomes able to handle them.
                 continue;
             }
-            valid_poss.push_back((valid_pos_t){.pos = pos, .stat = var_stat});
+            valid_poss.push_back({.pos = pos, .stat = var_stat});
         }
     }
-    std::sort(valid_poss.begin(), valid_poss.end(),
-              [](const valid_pos_t &a, const valid_pos_t &b) { return a.pos < b.pos; });
     for (size_t i = 0; i < valid_poss.size(); i++) {
-        valid_poss_set[valid_poss[i].pos] = i;
+        valid_poss_set[valid_poss[i].pos] = static_cast<uint32_t>(i);
     }
-    for (auto pos_stat : valid_poss) {
+    for (const auto pos_stat : valid_poss) {
         const uint32_t pos = pos_stat.pos;
         const uint8_t var_stat = pos_stat.stat;
         const uint8_t var_type = ht[pos].type;
@@ -2191,26 +2257,19 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                     ta.allele2readIDs[allele_idx].push_back(i_read);
 
                     // log the read var
-                    new_.push_back(qa_t{});
-                    new_.back().allele = allele;
-                    new_.back().allele_idx = static_cast<uint32_t>(allele_idx);
-                    new_.back().hp = HAPTAG_UNPHASED;
-                    new_.back().is_used = ta.is_used;
-                    new_.back().pos = pos;
-                    new_.back().var_idx = valid_poss_set[pos];
-                } else {
-                    ;
+                    new_.push_back(qa_t{.pos = pos,
+                                        .allele = allele,
+                                        .var_idx = valid_poss_set[pos],
+                                        .allele_idx = static_cast<uint32_t>(allele_idx),
+                                        .is_used = ta.is_used,
+                                        .hp = HAPTAG_UNPHASED});
                 }
-            } else {
-                ;
             }
         }
 
         // let read's var buffer to only have called variants
         read.vars.clear();
-        for (size_t i = 0; i < new_.size(); i++) {
-            read.vars.push_back(new_[i]);
-        }
+        read.vars.insert(read.vars.end(), new_.begin(), new_.end());
     }
 
     return ck;
@@ -2226,39 +2285,26 @@ std::unordered_map<std::string, int> kadayashi_local_haptagging_gen_ht(chunk_t &
 }
 
 bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
-    // clang-format off
-    return std::tie(a.is_confident, a.is_multi_allele, 
-             a.pos0,          a.qual0,        a.ref_allele_seq0, a.alt_allele_seq0, a.is_phased0,
-             a.genotype0[0],  a.genotype0[1], a.genotype0[2], 
-             a.pos1,          a.qual1,        a.ref_allele_seq1, a.alt_allele_seq1, a.is_phased1,
-             a.genotype1[0],  a.genotype1[1], a.genotype1[2])
-            == 
-           std::tie(b.is_confident,  b.is_multi_allele, 
-             b.pos0,          b.qual0,        b.ref_allele_seq0, b.alt_allele_seq0, b.is_phased0,
-             b.genotype0[0],  b.genotype0[1], b.genotype0[2], 
-             b.pos1,          b.qual1,        b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1,
-             b.genotype1[0],  b.genotype1[1], b.genotype1[2])
-            ;
-    // clang-format on
+    return std::tie(a.is_confident, a.is_multi_allele, a.pos0, a.qual0, a.ref_allele_seq0,
+                    a.alt_allele_seq0, a.is_phased0, a.genotype0[0], a.genotype0[1], a.genotype0[2],
+                    a.pos1, a.qual1, a.ref_allele_seq1, a.alt_allele_seq1, a.is_phased1,
+                    a.genotype1[0], a.genotype1[1], a.genotype1[2]) ==
+           std::tie(b.is_confident, b.is_multi_allele, b.pos0, b.qual0, b.ref_allele_seq0,
+                    b.alt_allele_seq0, b.is_phased0, b.genotype0[0], b.genotype0[1], b.genotype0[2],
+                    b.pos1, b.qual1, b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1,
+                    b.genotype1[0], b.genotype1[1], b.genotype1[2]);
 };
 
 bool operator==(const variant_dorado_style_t &a, const variant_dorado_style_t &b) {
-    // clang-format off
-    //fprintf(stderr, "[dbg] conf=%s phased=%s pos=%d qual=%d ref=%s alt=%s,%s geno=%c,%c\n", 
-    //            a.is_confident? "true":"false", 
-    //        a.is_phased?"true":"false", 
-    //        (int)a.pos, a.qual, a.ref.c_str(), 
-    //        a.alts[0].c_str(), a.alts.size()>1? a.alts[1].c_str():"", 
-    //        a.genotype.first, a.genotype.second);
-    bool ret = std::tie(a.is_confident, a.is_phased,
-             a.pos,          a.qual,        
-             a.ref, a.alts, a.genotype)
-            == 
-            std::tie(b.is_confident, b.is_phased,
-             b.pos,          b.qual,        
-             b.ref, b.alts, b.genotype);
-    return ret;
-    // clang-format on
+    constexpr bool DEBUG_PRINT = false;
+    if constexpr (DEBUG_PRINT) {
+        fprintf(stderr, "[dbg] conf=%s phased=%s pos=%d qual=%d ref=%s alt=%s,%s geno=%c,%c\n",
+                a.is_confident ? "true" : "false", a.is_phased ? "true" : "false", (int)a.pos,
+                a.qual, a.ref.c_str(), a.alts[0].c_str(),
+                a.alts.size() > 1 ? a.alts[1].c_str() : "", a.genotype.first, a.genotype.second);
+    }
+    return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype) ==
+           std::tie(b.is_confident, b.is_phased, b.pos, b.qual, b.ref, b.alts, b.genotype);
 };
 
 phase_return_t kadayashi_local_haptagging_dvr_single_region(samFile *fp_bam,
@@ -2344,12 +2390,6 @@ phase_return_t kadayashi_local_haptagging_simple_single_region(samFile *fp_bam,
                 continue;
             }
 
-            //fprintf(stderr, "[dbg::%s] qn %s range %d-%d hp=%d broke=%s (phased_until=%d) (first var %d, last %d)\n",
-            //    __func__,
-            //    ck.qnames[readID].c_str(), (int)read.start_pos,
-            //    (int)read.end_pos, (int)hp, broke?"true":"false", (int)phased_until,
-            //    (int)read.vars[0].pos, (int)read.vars.back().pos
-            //);
             if (broke) {
                 // take the leftmost variant's position of the
                 // first unphased read as the phasing breakpoint.
@@ -2430,13 +2470,6 @@ ck_and_varcall_result_t kadayashi_phase_and_varcall(samFile *fp_bam,
                                                     const float max_gapcompressed_seqdiv,
                                                     const bool use_dvr_for_phasing) {
     BamFileView hf_view{fp_bam, fp_bai, fp_header};
-    //fprintf(stderr,
-    //        "[dbg::%s] %s:%d-%d disable_exp=%s min_baseq=%d, min_cov=%d frac=%.2f clip=%d "
-    //        "div=%.2f, use_dvr=%s\n",
-    //        __func__, ref_name.data(), (int)ref_start+1, (int)ref_end,
-    //        disable_interval_expansion ? "ture" : "false", min_base_quality, min_varcall_coverage,
-    //        min_varcall_fraction, max_clipping, max_gapcompressed_seqdiv,
-    //        use_dvr_for_phasing ? "ture" : "false");
 
     phase_return_t phasing_result;
     if (use_dvr_for_phasing) {
@@ -2525,14 +2558,6 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
     for (const auto &var : ck_and_vr.vr.variants) {  // return variants in dorado style
         if (var.is_valid) {
             ret.variants.push_back(convert_fullinfo_var_to_dorado_style(var));
-            //auto &tmp = ret.variants.back();
-            //fprintf(stderr, "[dbg::%s] %s %s %d %d %s,%s %s,%s %c %c\n",
-            //    __func__,
-            //        tmp.is_confident?"true":"false", tmp.is_phased?"true":"false",
-            //        (int)tmp.pos, (int)tmp.qual,
-            //        tmp.refs[0].c_str(),  tmp.refs.size()==1?"":tmp.refs[1].c_str(),
-            //        tmp.alts[0].c_str(),  tmp.alts.size()==1?"":tmp.alts[1].c_str(),
-            //        tmp.genotype.first, tmp.genotype.second);
         }
     }
 

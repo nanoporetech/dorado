@@ -9,7 +9,7 @@
 namespace kadayashi {
 bool variant_graph_gen(chunk_t &ck);
 void variant_graph_propogate(chunk_t &ck);
-int variant_graph_check_if_phasing_succeeded(const chunk_t &ck);
+bool variant_graph_check_if_phasing_succeeded(const chunk_t &ck);
 void variant_graph_haptag_reads(chunk_t &ck);
 void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested);
 

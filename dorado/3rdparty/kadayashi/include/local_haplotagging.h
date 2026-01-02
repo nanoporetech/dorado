@@ -15,8 +15,6 @@ struct faidx_t;
 struct bam1_t;
 
 namespace kadayashi {
-// clang-format off
-
 /**
  * @brief Construct a htslib-style region string (1-index, inclusive–inclusive)
  *        from 0-index, inclusive-exclusive coordinates.
@@ -27,9 +25,8 @@ namespace kadayashi {
  * @return Region string in the format "ref_name:start-end".
  */
 std::string create_region_string(const std::string_view ref_name,
-                                        const uint32_t start,
-                                        const uint32_t end);
-
+                                 const uint32_t start,
+                                 const uint32_t end);
 
 /**
  * @brief  Make a hashtable that maps read names to read haptags
@@ -37,7 +34,6 @@ std::string create_region_string(const std::string_view ref_name,
  * @param ck   The chunk's full pileup info.
  */
 std::unordered_map<std::string, int> kadayashi_local_haptagging_gen_ht(chunk_t &ck);
-
 
 /**
  * @brief Perform phasing for a query region with the deepvariant replica method, 
@@ -70,7 +66,6 @@ phase_return_t kadayashi_local_haptagging_dvr_single_region(samFile *fp_bam,
                                                             const uint32_t ref_start,
                                                             const uint32_t ref_end,
                                                             const pileup_pars_t &pp);
-
 
 /**
  * @brief Perform phasing for a query region with the simple phasing method (flip-flop), 
@@ -105,7 +100,6 @@ phase_return_t kadayashi_local_haptagging_simple_single_region(samFile *fp_bam,
                                                                const uint32_t ref_end,
                                                                const pileup_pars_t &pp);
 
-
 /// Used to store read depth info of a variant candidate allele.
 struct cov_t {
     int cov_hap0 = 0;
@@ -113,48 +107,46 @@ struct cov_t {
     int cov_unphased = 0;
 
     /// for temporary usage
-    int cov_tot = 0;  
+    int cov_tot_all = 0;
+    int cov_tot_phased = 0;
 
     /// forward stand coverage (regardless of phase)
-    int cov_fwd = 0;  
+    int cov_fwd = 0;
     /// reverse stand coverage (regardless of phase)
-    int cov_bwd = 0;  
+    int cov_bwd = 0;
 };
 
-
-/// A varaint candidate allele.
+/// A variant candidate allele.
 struct vc_allele_t {
     /// read depth
     cov_t cov;
 
     /// the allele's sequence in u8i, where the last slot is cigar op.
-    std::vector<uint8_t> allele = {};  
+    std::vector<uint8_t> allele = {};
 };
 
-
-constexpr uint8_t FLAG_VAR_NA      = 0;
-constexpr uint8_t FLAG_VAR_HOM     = 1;
-constexpr uint8_t FLAG_VAR_HET     = 2;
+constexpr uint8_t FLAG_VAR_NA = 0;
+constexpr uint8_t FLAG_VAR_HOM = 1;
+constexpr uint8_t FLAG_VAR_HET = 2;
 constexpr uint8_t FLAG_VAR_MULTHET = 4;
 
-constexpr uint8_t FLAG_VARSTAT_MAYBE    = 0;  // temporary state
+constexpr uint8_t FLAG_VARSTAT_MAYBE = 0;  // temporary state
 constexpr uint8_t FLAG_VARSTAT_ACCEPTED = 1;
 constexpr uint8_t FLAG_VARSTAT_REJECTED = 2;
-constexpr uint8_t FLAG_VARSTAT_UNSURE   = 4;
-constexpr uint8_t FLAG_VARSTAT_UNKNOWN  = 8;
+constexpr uint8_t FLAG_VARSTAT_UNSURE = 4;
+constexpr uint8_t FLAG_VARSTAT_UNKNOWN = 8;
 
-struct vc_variants1_val_t{
-     uint8_t is_accepted = 0;
-     uint8_t type = 0;
-     std::vector<vc_allele_t> alleles = {};
+struct vc_variants1_val_t {
+    uint8_t is_accepted = 0;
+    uint8_t type = 0;
+    std::vector<vc_allele_t> alleles = {};
 };
 
 /// variants on one reference or interval
-typedef std::unordered_map<uint32_t, vc_variants1_val_t> vc_variants1_t;  
+typedef std::unordered_map<uint32_t, vc_variants1_val_t> vc_variants1_t;
 
 /// variants on multiple references
-typedef std::unordered_map<std::string, vc_variants1_t> vc_variants_t;  
-
+typedef std::unordered_map<std::string, vc_variants1_t> vc_variants_t;
 
 /**
  * @brief Parse read pile up to produce variant candidates. 
@@ -183,15 +175,13 @@ typedef std::unordered_map<std::string, vc_variants1_t> vc_variants_t;
  * @param pp         Parameters for the pileup and variant filtering.
  */
 chunk_t variant_pileup_ht(BamFileView &hf,
-                       const variants_t &ht_refvars,
-                       const faidx_t *fai,
-                       const str2int_t *qname2hp,
-                       const std::string_view refname,
-                       const uint32_t itvl_start,
-                       const uint32_t itvl_end,
-                       const pileup_pars_t &pp);
-
-
+                          const variants_t &ht_refvars,
+                          const faidx_t *fai,
+                          const str2int_t *qname2hp,
+                          const std::string_view refname,
+                          const uint32_t itvl_start,
+                          const uint32_t itvl_end,
+                          const pileup_pars_t &pp);
 
 /**
  * @brief Phase reads in a query region. Produces a hashtable mapping
@@ -242,11 +232,10 @@ std::unordered_map<std::string, int> kadayashi_dvr_single_region_wrapper(
         const float min_strand_cov_frac,
         const float max_gapcompressed_seqdiv);
 
-
 /** Same as `kadayashi_dvr_single_region_wrapper` except for that 
  * phasing is performed with the simple phasing method (flip-flop) 
  * instead of deepvariant replica.
- */ 
+ */
 std::unordered_map<std::string, int> kadayashi_simple_single_region_wrapper(
         samFile *fp_bam,
         hts_idx_t *fp_bai,
@@ -264,9 +253,8 @@ std::unordered_map<std::string, int> kadayashi_simple_single_region_wrapper(
         const float min_strand_cov_frac,
         const float max_gapcompressed_seqdiv);
 
-
 /// Exposed for CLI. Used `variant_dorado_style_t` instead.
-struct variant_fullinfo_t{
+struct variant_fullinfo_t {
     bool is_valid{true};
     bool is_confident{true};
     bool is_multi_allele{false};
@@ -276,28 +264,27 @@ struct variant_fullinfo_t{
     std::string ref_allele_seq0{};
     std::string alt_allele_seq0{};
     bool is_phased0{false};
-    char genotype0[3]={'0','/', '0'};  
+    char genotype0[3] = {'0', '/', '0'};
 
     uint32_t pos1{0};  // 0-index
     uint8_t qual1{60};
     std::string ref_allele_seq1{};
     std::string alt_allele_seq1{};
     bool is_phased1{false};
-    char genotype1[3]={'0', '/', '0'};  
+    char genotype1[3] = {'0', '/', '0'};
 };
-
 
 /** Variant information that can be directly used to compose 
 * VCF line, except for `pos` which is in 0-index.
 */
-struct variant_dorado_style_t{
+struct variant_dorado_style_t {
     bool is_confident;
     bool is_phased;
     uint32_t pos;
-    
-    /** Currently a placeholder value: confident varaints 
+
+    /** Currently a placeholder value: confident variant 
      * are assigned 60. Unsure variants are assigned 0.
-     */ 
+     */
     int qual;
 
     std::string ref;
@@ -323,7 +310,6 @@ struct ck_and_varcall_result_t {
     chunk_t ck{};
     varcall_result_internal_t vr{};
 };
-
 
 /// Exposed for CLI usage. Use `kadayashi_phase_and_varcall_wrapper` instead.
 ck_and_varcall_result_t kadayashi_phase_and_varcall(samFile *fp_bam,
@@ -394,5 +380,4 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
                                                      const float max_gapcompressed_seqdiv,
                                                      const bool use_dvr_for_phasing);
 
-// clang-format on
 }  // namespace kadayashi

@@ -15,22 +15,19 @@ public:
 
     void enable();
     bool insert(uint32_t val);
-    uintptr_t get_data_address() const;
-    bool is_frozen() const;
-
-    bool query(uint32_t val) const;
+    bool query(uint32_t val);
 
 private:
     bool m_is_enabled;
-    bool m_is_frozen;
-    int m_n_hashes;
-    int m_n_blocks_bits;
-    uint64_t m_mask_whichblock;
-    unsigned int m_align_size_bytes;
-    uint64_t m_bbf_size_bytes;
+    const int m_n_hashes;
+    const int m_n_blocks_bits;
+    const uint64_t m_mask_whichblock;
+    const unsigned int m_align_size_bytes;
+    const uint64_t m_bbf_size_bytes;
     uint8_t *m_data;
 
     uint64_t m_bbf_hash64(uint32_t i) const;
+    bool find_or_insert_impl(uint32_t val, const bool is_insert);
 };
 
 bool check_blockedbloomfilter_to_decide_inserting(BlockedBloomFilter *bf, uint32_t pos);

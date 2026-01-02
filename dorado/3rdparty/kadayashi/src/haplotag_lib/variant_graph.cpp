@@ -44,7 +44,7 @@ void variant_graph_update_varhp_given_read(const chunk_t &ck,
 }
 
 struct infer_readhp_stat_t {
-    float score_best = 0.0;
+    float score_best = 0.0f;
     int updated_best = 0;
     uint8_t hp_best = HAPTAG_UNPHASED;
 };
@@ -53,8 +53,8 @@ infer_readhp_stat_t variant_graph_infer_readhp_given_vars(
         const std::vector<std::array<float, 3>> &varhps,
         const uint32_t readID) {
     const read_t &r = ck.reads[readID];
-    float hp0 = 0.0;
-    float hp1 = 0.0;
+    float hp0 = 0.0f;
+    float hp1 = 0.0f;
     int updated = 0;
     for (size_t i_var = 0; i_var < r.vars.size(); i_var++) {
         const uint32_t idx_var = r.vars[i_var].var_idx;
@@ -62,7 +62,7 @@ infer_readhp_stat_t variant_graph_infer_readhp_given_vars(
         if (idx_allele > 1) {
             continue;
         }
-        if (varhps[idx_var][2] < 0.1) {
+        if (varhps[idx_var][2] < 0.1f) {
             continue;  // accumulate count is zero
         }
         if (idx_allele == 0) {
@@ -91,8 +91,8 @@ infer_readhp_stat_t variant_graph_infer_readhp_given_vars_ht(
         uint32_t readID,
         int debug_print) {
     read_t &r = ck.reads[readID];
-    float hp0 = 0.0;
-    float hp1 = 0.0;
+    float hp0 = 0.0f;
+    float hp1 = 0.0f;
     int updated = 0;
     for (size_t i_var = 0; i_var < r.vars.size(); i_var++) {
         if (r.vars[i_var].is_used != TA_STAT_ACCEPTED) {
@@ -103,7 +103,7 @@ infer_readhp_stat_t variant_graph_infer_readhp_given_vars_ht(
         if (idx_allele > 1) {
             continue;
         }
-        if (pos2counter[pos][2] < 0.1) {
+        if (pos2counter[pos][2] < 0.1f) {
             continue;  // accumulate count is zero
         }
 
@@ -265,12 +265,13 @@ bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
     return true;
 }
 
-int variant_graph_pos_is_confident(const variant_graph_t &vg, const int var_idx) {
-    std::vector<uint32_t> tmpcounter(4, 0);
+int variant_graph_pos_score_diff_of_top_two(const variant_graph_t &vg, const int var_idx) {
+    std::array<uint32_t, 4> tmpcounter = {0};
     for (int tmpi = 0; tmpi < 4; tmpi++) {
         tmpcounter[tmpi] = vg.nodes[var_idx].scores[tmpi];
     }
-    return diff_of_top_two(tmpcounter) > 5;
+    std::sort(tmpcounter.begin(), tmpcounter.end(), std::greater<>());
+    return tmpcounter[0] - tmpcounter[1];
 }
 
 void variant_graph_get_edge_values(chunk_t &ck,
@@ -311,7 +312,7 @@ void variant_graph_get_edge_values(chunk_t &ck,
     }
 }
 
-int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx, int do_wipeout) {
+int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx, bool do_wipeout) {
     // return 1 when re-init was a hard one
     constexpr int DEBUG_PRINT = 0;
     int ret = -1;
@@ -337,17 +338,7 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
                 }
                 if (pos - pos2 > 300 && (pos - pos2 < 5000 ||
                                          i == 0)) {  // search within 5kb or until finally found one
-                    std::vector<uint32_t> tmpcounter(4, 0);
-                    for (int tmpi = 0; tmpi < 4; tmpi++) {
-                        tmpcounter[tmpi] = vg.nodes[k].scores[tmpi];
-                    }
-                    const int tmpdiff = diff_of_top_two(tmpcounter);
-                    if constexpr (DEBUG_PRINT) {
-                        fprintf(stderr,
-                                "trying pos_resume %d (k=%d) checkpoint 2; %d %d %d %d ; %d\n",
-                                pos2, k, tmpcounter[0], tmpcounter[1], tmpcounter[2], tmpcounter[3],
-                                tmpdiff);
-                    }
+                    const int tmpdiff = variant_graph_pos_score_diff_of_top_two(vg, k);
                     if (tmpdiff > diff) {
                         diff = tmpdiff;
                         i = k;
@@ -355,13 +346,13 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
                 }
             }
         }
-        if (i > 0 /* && ok*/) {
+        if (i > 0) {
             if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
                 fprintf(stderr, "[dbg::%s] *maybe* re-init pos %d using pos %d\n", __func__,
                         (int)pos, (int)ck.varcalls[i].pos);
-                for (int tmpi = 0; tmpi < 4; tmpi++) {
+                for (uint8_t comb = 0; comb < 4; comb++) {
                     fprintf(stderr, "[dbg::%s] original %d : %d\n", __func__, i,
-                            variant_graph_get_node_val2(vg, var_idx, tmpi));
+                            static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
                 }
             }
             variant_graph_get_edge_values(ck, static_cast<uint32_t>(i),
@@ -371,10 +362,10 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
             // need to check if there's any read supporting the connection.
             // if not, resort to hard init as this is probably a
             // real phasing break.
-            if (counter[0] < 3 && counter[1] < 3 && counter[2] < 3 && counter[3] < 3) {
-                do_wipeout = 1;
-                // This should go directly to the "maybewipe" part.
-
+            constexpr int MIN_SUPPORTING_READS = 3;
+            if (std::all_of(std::begin(counter), std::end(counter),
+                            [](uint32_t val) { return val < MIN_SUPPORTING_READS; })) {
+                do_wipeout = true;
             } else {
                 if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
                     fprintf(stderr,
@@ -383,20 +374,20 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
                             __func__, counter[0], counter[1], counter[2], counter[3], i, var_idx);
                 }
 
-                std::vector<uint32_t> bests(4, 0);
+                std::array<uint32_t, 4> bests = {0};
                 vgnode_t *n1 = &vg.nodes[var_idx];
-                for (int tmpi = 0; tmpi < 4; ++tmpi) {
-                    n1->scores[tmpi] = vg.nodes[i].scores[tmpi];
-                    bests[tmpi] = n1->scores[tmpi];
+                for (uint8_t comb = 0; comb < 4; comb++) {
+                    n1->scores[comb] = vg.nodes[i].scores[comb];
+                    bests[comb] = n1->scores[comb];
                 }
                 int best_i = 0;
-                max_of_u32_vec(bests, &best_i);
+                max_of_u32_arr(bests, &best_i, nullptr);
                 n1->best_score_i = best_i;
 
                 if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    for (int tmpi = 0; tmpi < 4; tmpi++) {
-                        fprintf(stderr, "[dbg::%s] new %d : %d\n", __func__, tmpi,
-                                variant_graph_get_node_val2(vg, var_idx, tmpi));
+                    for (uint8_t comb = 0; comb < 4; comb++) {
+                        fprintf(stderr, "[dbg::%s] new %d : %d\n", __func__, static_cast<int>(comb),
+                                static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
                     }
                 }
             }
@@ -404,11 +395,10 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
             if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
                 fprintf(stderr, "[dbg::%s] tried but failed to find resume point\n", __func__);
             }
-            do_wipeout = 1;  // did not find a good resume point, will hard re-init
+            do_wipeout = true;  // did not find a good resume point, will hard re-init
         }
     }
 
-    // Previously: maybewipe section.
     if (var_idx == 0 || do_wipeout) {
         ret = 1;
         if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
@@ -443,12 +433,12 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
         ret = 0;
     }
 
-    std::vector<uint32_t> tmp(4, 0);
-    for (int i = 0; i < 4; i++) {
-        tmp[i] = variant_graph_get_node_val2(vg, var_idx, i);
+    std::array<uint32_t, 4> tmp = {0};
+    for (uint8_t comb = 0; comb < 4; comb++) {
+        tmp[comb] = variant_graph_get_node_val2(vg, var_idx, comb);
     }
     int best_i = 0;
-    max_of_u32_vec(tmp, &best_i);
+    max_of_u32_arr(tmp, &best_i, nullptr);
     vg.nodes[var_idx].best_score_i = best_i;
     for (int i = 0; i < 4; i++) {
         vg.nodes[var_idx].scores_source[i] = 4;  // sentinel
@@ -469,7 +459,7 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
     int i_prev = *i_prev_;
     vgnode_t *n1 = &vg.nodes[i_self];
 
-    std::vector<uint32_t> bests(4, 0);
+    std::array<uint32_t, 4> bests = {0};
     if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
         const std::string a0 = nt4seq2seq(ck.varcalls[i_self].alleles[0]);
         const std::string a1 = nt4seq2seq(ck.varcalls[i_self].alleles[1]);
@@ -478,18 +468,19 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
     }
 
     // check whether we have a coverage dropout
-    for (int i = 0; i < 4; i++) {
+    for (uint8_t i = 0; i < 4; i++) {
         bests[i] = variant_graph_get_edge_val2(vg, i_prev, i);
     }
-    const uint32_t best = max_of_u32_vec(bests, nullptr);
+    uint32_t best;
+    max_of_u32_arr(bests, nullptr, &best);
     if (best < 3) {  // less than 3 reads support any combination, spot is
                      // a coverage dropout, redo initialization.
-        int reinit_failed = variant_graph_init_scores_for_a_location(ck, i_self, 0);
+        int reinit_failed = variant_graph_init_scores_for_a_location(ck, i_self, false);
         if (reinit_failed) {
             vg.next_link_is_broken[i_prev] = 1;
             vg.has_breakpoints = 1;
         }
-        if (!variant_graph_pos_is_confident(vg, i_self)) {
+        if (variant_graph_pos_score_diff_of_top_two(vg, i_self) <= 5) {
             vg.next_link_is_broken[i_self] = 1;
         }
         *i_prev_ = i_self;
@@ -500,7 +491,7 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
     }
 
     for (uint8_t self_combo = 0; self_combo < 4; self_combo++) {
-        std::vector<uint32_t> score(4, 0);
+        std::array<uint32_t, 4> score = {0};
         for (uint8_t prev_combo = 0; prev_combo < 4; prev_combo++) {
             int both_hom =
                     ((self_combo == 0 || self_combo == 3) && (prev_combo == 0 || prev_combo == 3));
@@ -520,23 +511,24 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
             }
         }
         int source = 0;
-        uint32_t best_score = max_of_u32_vec(score, &source);
+        uint32_t best_score;
+        max_of_u32_arr(score, &source, &best_score);
         bests[self_combo] = best_score;
         n1->scores[self_combo] = bests[self_combo];
         n1->scores_source[self_combo] = static_cast<uint8_t>(source);
     }
     int best_i = 0;
-    max_of_u32_vec(bests, &best_i);
+    max_of_u32_arr(bests, &best_i, nullptr);
     n1->best_score_i = best_i;
 
     // another check: if phasing is broken, redo init for self
     if (best_i == 0 || best_i == 3) {  // decision was hom
-        int reinit_failed = variant_graph_init_scores_for_a_location(ck, i_self, 0);
+        int reinit_failed = variant_graph_init_scores_for_a_location(ck, i_self, false);
         if (reinit_failed) {
             vg.next_link_is_broken[i_prev] = 1;
             vg.has_breakpoints = 1;
         }
-        if (!variant_graph_pos_is_confident(vg, i_self)) {
+        if (variant_graph_pos_score_diff_of_top_two(vg, i_self) <= 5) {
             vg.next_link_is_broken[i_self] = 1;
         }
         if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
@@ -600,7 +592,7 @@ bool variant_graph_gen(chunk_t &ck) {
     }
 
     // init the first node
-    variant_graph_init_scores_for_a_location(ck, 0, 1);
+    variant_graph_init_scores_for_a_location(ck, 0, true);
 
     return true;
 }
@@ -613,16 +605,16 @@ void variant_graph_propogate(chunk_t &ck) {
     }
 }
 
-int variant_graph_check_if_phasing_succeeded(const chunk_t &ck) {
+bool variant_graph_check_if_phasing_succeeded(const chunk_t &ck) {
     constexpr int VERBOSE = 0;
     if (!ck.is_valid || ck.vg.n_vars == 0) {
-        return 0;
+        return false;
     }
 
-    // return: 1 if fully phased, 0 if phase is broken at somewhere
+    // return: true if fully phased, false if phase is broken at somewhere
     // If we ever have a best score that suggests homozygous assignment,
     // the phasing is broken.
-    int ret = 1;
+    bool is_ok = true;
     int source;
     for (int i_pos = ck.vg.n_vars - 1; i_pos > 0; i_pos--) {
         if (ck.vg.nodes[i_pos].del) {
@@ -630,14 +622,16 @@ int variant_graph_check_if_phasing_succeeded(const chunk_t &ck) {
         }
         source = ck.vg.nodes[i_pos].scores_source[ck.vg.nodes[i_pos].best_score_i];
         if (source == 0 || source == 3) {
-            ret = 0;
+            is_ok = false;
             if constexpr (VERBOSE) {
                 fprintf(stderr, "[dbg::%s] phasing broke at pos %d \n", __func__,
                         ck.varcalls[i_pos].pos);
+            } else {
+                return false;
             }
         }
     }
-    return ret;
+    return is_ok;
 }
 
 void variant_graph_haptag_reads(chunk_t &ck) {
@@ -649,7 +643,7 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             0, 0,
             0,  // no variant
             0,  // ambiguous
-            0,  // unphasd due to conflict
+            0,  // unphaseddue to conflict
     };
     uint32_t var_i_start = 0;
     uint32_t var_i_end = vg.n_vars;
@@ -714,7 +708,7 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             }
 
             // (get largest block)
-            std::stable_sort(buf.begin(), buf.end());
+            std::sort(buf.begin(), buf.end());
             var_i_start = static_cast<uint32_t>(buf.back());
             for (uint32_t i = var_i_start; i < vg.n_vars; i++) {
                 var_i_end = i + 1;
@@ -782,7 +776,8 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             }
         }
         if (votes[0] > votes[1] && votes[0] > veto) {
-            if ((float)votes[1] / votes[0] <= HAP_TAG_MAX_CNFLCT_RATIO) {
+            if (static_cast<float>(votes[1]) / static_cast<float>(votes[0]) <=
+                HAP_TAG_MAX_CNFLCT_RATIO) {
                 r->hp = 0;
                 sancheck_cnt[0]++;
             } else {
@@ -790,7 +785,8 @@ void variant_graph_haptag_reads(chunk_t &ck) {
                 sancheck_cnt[4]++;
             }
         } else if (votes[1] > votes[0] && votes[1] > veto) {
-            if ((float)votes[0] / votes[1] <= HAP_TAG_MAX_CNFLCT_RATIO) {
+            if (static_cast<float>(votes[0]) / static_cast<float>(votes[1]) <=
+                HAP_TAG_MAX_CNFLCT_RATIO) {
                 r->hp = 1;
                 sancheck_cnt[1]++;
             } else {
@@ -836,17 +832,8 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
     int j_cutoff = 0;
     for (int i = 1; i < std::ssize(arr_read2hp); i++) {
         auto &ht_self = arr_read2hp[i];
-        int n_consecutive_fails = 0;  // For local phasing we normalize by checking
-                                      // all previous iterations, but for global phasing
-                                      // many of them may be irrelevant. We check the
-                                      // closeby iterations first, and terminate
-                                      // when it seems that nothing from that point on
-                                      // will be useful.
-        int n_success = 0;            // we don't want to compare wtih all comparable refs,
-                                      // which will be slow when seeding was dense.
-                                      // note: with no "unlucky" seeding, we could get away with
-                                      // only comparing to the previous iteration. But it's possible
-                                      // that the init was a lemon and we need to balance this out.
+        int n_consecutive_fails = 0;
+        int n_success = 0;
 
         int count_ref = -1;
         int i_ref = 0;
@@ -902,9 +889,13 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
             if (firstreadID != std::numeric_limits<uint32_t>::max()) {
                 breakpoint_reads[firstreadID] = 1;
             } else {
-                fprintf(stderr, "[E::%s] failed to get first read ID at phasing breakpoint?\n",
-                        __func__);
-                exit(1);
+                if constexpr (DEBUG_PRINT) {
+                    fprintf(stderr,
+                            "[E::%s] should not happen: failed to get first read ID at phasing "
+                            "breakpoint? Giving up haptag normalization.\n",
+                            __func__);
+                }
+                return;
             }
 
             if constexpr (DEBUG_PRINT) {
@@ -1039,9 +1030,7 @@ void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested
                 }
             }
 
-            if ((cnt[0] > 3 && cnt[1] > 3) || (cnt[0] + cnt[1] < 0.5)
-                //||((cnt[0] + cnt[1] > 0 && cnt[2] / (cnt[0] + cnt[1] + cnt[2]) > 0.5))
-            ) {
+            if ((cnt[0] > 3 && cnt[1] > 3) || (cnt[0] + cnt[1] < 0.5f)) {
                 ck.reads[i_read].hp = HAPTAG_UNPHASED;
             } else {
                 if (cnt[0] > cnt[1]) {
@@ -1106,7 +1095,7 @@ std::vector<uint8_t> variant_graph_do_simple_haptag1(chunk_t &ck, const uint32_t
                     score_best = stat.score_best;
                     updated_best = stat.updated_best;
                     hp_best = stat.hp_best;
-                    i_best = readID;
+                    i_best = static_cast<uint32_t>(readID);
                 }
             }
         }
@@ -1178,7 +1167,7 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
     }
 
     while (true) {
-        uint32_t i_best = -1;
+        uint32_t i_best = std::numeric_limits<uint32_t>::max();
         uint8_t hp_best = HAPTAG_UNPHASED;
         float score_best = 0;
         int updated_best = 0;
@@ -1186,7 +1175,7 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
 
         // to the right of self read
         n_consecutive_no_tagging = 0;
-        for (size_t readID = seedreadID + 1; readID < ck.reads.size(); readID++) {
+        for (uint32_t readID = seedreadID + 1; readID < ck.reads.size(); readID++) {
             if (ck.reads[readID].start_pos > ck.reads[seedreadID].end_pos) {
                 break;
             }
@@ -1194,7 +1183,7 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
                 continue;
             }
             infer_readhp_stat_t stat =
-                    variant_graph_infer_readhp_given_vars_ht(ck, pos2counter, readID, 0);
+                    variant_graph_infer_readhp_given_vars_ht(ck, pos2counter, readID, (uint8_t)0);
             if (stat.updated_best < 1) {
                 n_consecutive_no_tagging++;
                 if (n_consecutive_no_tagging > 100) {

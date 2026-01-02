@@ -1,14 +1,14 @@
 cmake_minimum_required(VERSION 3.10)
 project(kadayashi CXX)
 
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 
 option(BUILD_KADAYASHI_ENABLE_COVERAGE "Build tests with gcov coverage" OFF)
-option(BUILD_KADAYASHI_TESTS "Build the kadayashi unit test executable" ON)
-option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" ON)
+option(BUILD_KADAYASHI_TESTS "Build the kadayashi unit test executable" OFF)
+option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" OFF)
 option(BUILD_KADAYASHI_AS_SUBPROJECT "If ON, custom compiler options will not be set" OFF)
 
 # Helper: enable gcov only for selected targets
