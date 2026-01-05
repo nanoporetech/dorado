@@ -29,6 +29,15 @@ size_t find_rna_polya(const std::string& seq);
 // Calculate a mean qscore from a per-base Q string.
 float mean_qscore_from_qstring(std::string_view qstring);
 
+static const std::array<char, 4> BASES = {'A', 'C', 'G', 'T'};
+
+// Convert the base integer representation (0123) to the canonical base character (ACGT)
+// No checking is performed on the input.
+inline char int_to_base(uint8_t i) { return BASES[i]; }
+
+// Convert int base array (minimap seq4) to string
+std::string int_sequence_to_string(const std::vector<uint8_t>& seq4);
+
 // Convert a canonical base character (ACGT) to an integer representation (0123).
 // No checking is performed on the input.
 inline int base_to_int(char c) { return 0b11 & ((c >> 2) ^ (c >> 1)); }
