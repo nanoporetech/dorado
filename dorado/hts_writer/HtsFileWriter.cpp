@@ -1,7 +1,9 @@
 #include "hts_writer/HtsFileWriter.h"
 
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
+#include "spdlog/fmt/bundled/format.h"
 #include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
@@ -125,6 +127,14 @@ stats::NamedStats HtsFileWriter::sample_stats() const {
     stats["split_reads_written"] = atomic_load(m_split_reads_written);
     return stats;
 }
+
+void HtsFileWriter::set_cram_reference(const std::string &reference) {
+    if (m_mode != OutputMode::CRAM) {
+        throw std::logic_error(fmt::format(
+                "Invalid call to set_cram_reference when output mode is: '{}'", to_string(m_mode)));
+    }
+    m_reference = reference;
+};
 
 void HtsFileWriter::set_shared_header(SamHdrSharedPtr header) {
     if (m_dynamic_header != nullptr) {

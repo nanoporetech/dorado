@@ -12,6 +12,7 @@ namespace dorado::cli {
 struct EmitArgs {
     bool bam{false};
     bool sam{false};
+    bool cram{false};
     bool fastq{false};
     bool moves{false};
     bool summary{false};

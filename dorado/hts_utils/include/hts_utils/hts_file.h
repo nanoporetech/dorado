@@ -19,6 +19,7 @@ public:
         UBAM,
         BAM,
         SAM,
+        CRAM,
         FASTQ,
         FASTA,
     };
@@ -29,6 +30,7 @@ public:
     HtsFile& operator=(const HtsFile&) = delete;
 
     void set_buffer_size(size_t buff_size);
+    void set_cram_reference(const std::string& reference);
     int set_header(const sam_hdr_t* header);
     int write(bam1_t* record);
 
@@ -37,6 +39,8 @@ public:
     static uint64_t calculate_sorting_key(const bam1_t* record);
 
     OutputMode get_output_mode() const { return m_mode; }
+    std::string htslib_write_mode() const;
+    std::string index_extension() const;
 
 private:
     const std::string m_filename;
@@ -48,6 +52,8 @@ private:
     bool m_finalise_is_noop;
     bool m_sort_bam;
     const OutputMode m_mode;
+    const std::string m_htslib_write_mode;
+    std::string m_reference;
 
     std::vector<std::byte> m_bam_buffer;
     std::multimap<uint64_t, int64_t> m_buffer_map;
@@ -55,6 +61,7 @@ private:
     int64_t m_current_buffer_offset{0};
 
     struct ProgressUpdater;
+    void init_file();
 
     void flush_temp_file(const bam1_t* last_record);
     int write_to_file(const bam1_t* record);

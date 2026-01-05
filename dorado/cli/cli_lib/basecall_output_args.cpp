@@ -12,17 +12,15 @@ namespace {
 constexpr std::string_view OUTPUT_DIR_ARG{"--output-dir"};
 constexpr std::string_view EMIT_FASTQ_ARG{"--emit-fastq"};
 constexpr std::string_view EMIT_SAM_ARG{"--emit-sam"};
+constexpr std::string_view EMIT_CRAM_ARG{"--emit-cram"};
 constexpr std::string_view EMIT_SUMMARY_ARG{"--emit-summary"};
 constexpr std::string_view EMIT_MOVES_ARG{"--emit-moves"};
-
-void add_sam_emit_type(argparse::ArgumentParser& parser) {
-    parser.add_argument(EMIT_SAM_ARG).help("Output in SAM format.").flag();
-}
 
 void add_emit_hts_types(argparse::ArgumentParser& parser) {
     auto& emit_mutex = parser.add_mutually_exclusive_group();
     emit_mutex.add_argument(EMIT_FASTQ_ARG).help("Output in FASTQ format.").flag();
     emit_mutex.add_argument(EMIT_SAM_ARG).help("Output in SAM format.").flag();
+    emit_mutex.add_argument(EMIT_CRAM_ARG).help("Output in CRAM format.").flag();
 }
 
 const std::string emit_summary_help_text =
@@ -79,7 +77,11 @@ void add_demux_output_arguments(argparse::ArgumentParser& parser) {
 }
 
 void add_aligner_output_arguments(argparse::ArgumentParser& parser) {
-    add_sam_emit_type(parser);
+    // Aligner doesn't support FASTQ
+    auto& emit_mutex = parser.add_mutually_exclusive_group();
+    emit_mutex.add_argument(EMIT_SAM_ARG).help("Output in SAM format.").flag();
+    emit_mutex.add_argument(EMIT_CRAM_ARG).help("Output in CRAM format.").flag();
+
     add_emit_summary(parser);
 
     auto& out_dir_arg = add_output_dir_argument(parser);
@@ -91,8 +93,9 @@ EmitArgs get_emit_args(const argparse::ArgumentParser& parser) {
     EmitArgs emit;
 
     emit.sam = get_optional_flag(parser, EMIT_SAM_ARG, false);
+    emit.cram = get_optional_flag(parser, EMIT_CRAM_ARG, false);
     emit.fastq = get_optional_flag(parser, EMIT_FASTQ_ARG, false);
-    emit.bam = !(emit.sam || emit.fastq);
+    emit.bam = !(emit.sam || emit.cram || emit.fastq);
 
     emit.moves = get_optional_flag(parser, EMIT_MOVES_ARG, false);
     emit.summary = get_optional_flag(parser, EMIT_SUMMARY_ARG, false);

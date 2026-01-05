@@ -23,6 +23,7 @@ namespace fs = std::filesystem;
 
 HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            bool emit_sam,
+                                           bool emit_cram,
                                            bool sort_requested,
                                            const std::optional<std::string>& output_dir,
                                            int threads,
@@ -32,6 +33,7 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            bool assume_barcodes)
         : m_emit_fastq(emit_fastq),
           m_emit_sam(emit_sam),
+          m_emit_cram(emit_cram),
           m_sort_requested(sort_requested),
           m_output_dir(output_dir),
           m_writer_threads(threads),
@@ -41,8 +43,8 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_assume_barcodes(assume_barcodes),
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {
-    if (m_emit_fastq && m_emit_sam) {
-        spdlog::error("Only one of --emit-{fastq, sam} can be set (or none).");
+    if ((int(m_emit_fastq) + int(m_emit_sam) + int(m_emit_cram)) > 1) {
+        spdlog::error("Only one of --emit-{fastq, sam, cram} can be set (or none).");
         throw std::runtime_error("Invalid writer configuration");
     }
 };
@@ -64,6 +66,10 @@ void HtsFileWriterBuilder::update() {
     } else if (m_emit_sam) {
         // Write SAM if chosen by user - sort only if we have a reference and are writing to a file
         m_output_mode = OutputMode::SAM;
+        m_sort = to_file && m_sort_requested;
+    } else if (m_emit_cram) {
+        // Write CRAM if chosen by user - sort only if we have a reference and are writing to a file
+        m_output_mode = OutputMode::CRAM;
         m_sort = to_file && m_sort_requested;
     } else if (!to_file && m_is_fd_pipe) {
         // Write uncompressed zlib-wrapped BAM files when piping and emit-sam is not set
@@ -99,6 +105,7 @@ OutputMode HtsFileWriterBuilder::get_output_mode() {
 BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
         bool emit_fastq,
         bool emit_sam,
+        bool emit_cram,
         bool reference_requested,
         const std::optional<std::string>& output_dir,
         int writer_threads,
@@ -107,6 +114,7 @@ BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
         std::string gpu_names)
         : HtsFileWriterBuilder(emit_fastq,
                                emit_sam,
+                               emit_cram,
                                reference_requested,
                                output_dir,
                                writer_threads,
@@ -124,6 +132,8 @@ BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
 
 DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
         bool emit_fastq,
+        bool emit_sam,
+        bool emit_cram,
         bool sort_requested,
         const std::optional<std::string>& output_dir,
         int writer_threads,
@@ -131,7 +141,8 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
         utils::DescriptionCallback description_callback,
         std::string gpu_names)
         : HtsFileWriterBuilder(emit_fastq,
-                               false,
+                               emit_sam,
+                               emit_cram,
                                sort_requested,
                                output_dir,
                                writer_threads,
@@ -142,6 +153,7 @@ DemuxHtsFileWriterBuilder::DemuxHtsFileWriterBuilder(
 
 AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
         bool emit_sam,
+        bool emit_cram,
         bool sort_requested,
         const std::optional<std::string>& output_dir,
         int writer_threads,
@@ -150,6 +162,7 @@ AlignerHtsFileWriterBuilder::AlignerHtsFileWriterBuilder(
         bool assume_barcodes)
         : HtsFileWriterBuilder(false,
                                emit_sam,
+                               emit_cram,
                                sort_requested,
                                output_dir,
                                writer_threads,

@@ -12,6 +12,7 @@ class HtsFileWriterBuilder {
 protected:
     HtsFileWriterBuilder(bool emit_fastq,
                          bool emit_sam,
+                         bool emit_cram,
                          bool sort_requested,
                          const std::optional<std::string>& output_dir,
                          int writer_threads,
@@ -27,7 +28,7 @@ public:
     std::unique_ptr<HtsFileWriter> build();
 
 private:
-    const bool m_emit_fastq{false}, m_emit_sam{false}, m_sort_requested{false};
+    const bool m_emit_fastq{false}, m_emit_sam{false}, m_emit_cram{false}, m_sort_requested{false};
     const std::optional<std::string> m_output_dir{std::nullopt};
     const int m_writer_threads{0};
     const utils::ProgressCallback m_progress_callback;
@@ -48,6 +49,7 @@ class BasecallHtsFileWriterBuilder final : public HtsFileWriterBuilder {
 public:
     BasecallHtsFileWriterBuilder(bool emit_fastq,
                                  bool emit_sam,
+                                 bool emit_cram,
                                  bool reference_requested,
                                  const std::optional<std::string>& output_dir,
                                  int writer_threads,
@@ -59,6 +61,8 @@ public:
 class DemuxHtsFileWriterBuilder final : public HtsFileWriterBuilder {
 public:
     DemuxHtsFileWriterBuilder(bool emit_fastq,
+                              bool emit_sam,
+                              bool emit_cram,
                               bool sort_requested,
                               const std::optional<std::string>& output_dir,
                               int writer_threads,
@@ -70,6 +74,7 @@ public:
 class AlignerHtsFileWriterBuilder final : public HtsFileWriterBuilder {
 public:
     AlignerHtsFileWriterBuilder(bool emit_sam,
+                                bool emit_cram,
                                 bool sort_requested,
                                 const std::optional<std::string>& output_dir,
                                 int writer_threads,

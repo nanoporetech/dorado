@@ -104,7 +104,7 @@ int demuxer(int argc, char* argv[]) {
         parser.add_group("Output arguments");
         cli::add_demux_output_arguments(parser);
         parser.add_argument("--sort-bam")
-                .help("Sort any BAM output files that contain mapped reads. Using this option "
+                .help("Sort any BAM/CRAM output files that contain mapped reads. Using this option "
                       "requires that the --no-trim option is also set.")
                 .flag();
     }
@@ -242,8 +242,8 @@ int demuxer(int argc, char* argv[]) {
                 });
 
         auto hts_writer_builder = hts_writer::DemuxHtsFileWriterBuilder(
-                emit.fastq, sort_bam, output_dir, demux_writer_threads, progress_callback,
-                description_callback, "");
+                emit.fastq, emit.sam, emit.cram, sort_bam, output_dir, demux_writer_threads,
+                progress_callback, description_callback, "");
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {

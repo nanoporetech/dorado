@@ -9,6 +9,7 @@ enum class SequenceFormatType {
     FASTA,
     FASTQ,
     SAM,
+    CRAM,
     UNKNOWN,
 };
 

@@ -73,6 +73,10 @@ void StructuredHtsFileWriter::set_hts_file_header(const HtsData &item,
         return;
     }
 
+    if (m_mode == OutputMode::CRAM) {
+        hts_file.set_cram_reference(m_reference);
+    }
+
     if (m_shared_header != nullptr) {
         hts_file.set_header(m_shared_header.get());
         return;
