@@ -180,7 +180,7 @@ int demuxer(int argc, char* argv[]) {
     }
 
     const std::string reads(parser.get<std::string>("reads"));
-    const std::string output_dir = cli::get_output_dir(parser).value();
+    const std::string output_dir = cli::get_output_dir(parser).value_or(".");
     const bool recursive_input(parser.get<bool>("recursive"));
     const bool emit_fastq = cli::get_emit_fastq(parser);
     const bool emit_summary = cli::get_emit_summary(parser);
