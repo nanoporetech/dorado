@@ -94,7 +94,7 @@ AlignerNode::AlignerNode(std::shared_ptr<alignment::IndexFileAccess> index_file_
         }
         auto header_sequence_records = m_index_for_bam_messages->get_sequence_records_for_header();
         for (const auto& entry : header_sequence_records) {
-            m_header_sequence_names.emplace_back(entry.first);
+            m_header_sequence_names.emplace_back(entry.sequence_name);
         }
     }
 }
@@ -147,7 +147,7 @@ std::shared_ptr<alignment::BedFile> AlignerNode::get_bedfile(const ClientInfo& c
     throw std::runtime_error("Expected bed-file is not loaded: " + bedfile);
 }
 
-alignment::HeaderSequenceRecords AlignerNode::get_sequence_records_for_header() const {
+utils::HeaderSQRecords AlignerNode::get_sequence_records_for_header() const {
     assert(m_index_for_bam_messages != nullptr &&
            "get_sequence_records_for_header only valid if AlignerNode constructed with index file");
     return alignment::Minimap2Aligner(m_index_for_bam_messages).get_sequence_records_for_header();

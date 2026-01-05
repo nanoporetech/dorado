@@ -1,6 +1,7 @@
 #include "alignment/Minimap2Index.h"
 
 #include "alignment/minimap2_wrappers.h"
+#include "hts_utils/header_sq_record.h"
 
 #include <spdlog/spdlog.h>
 
@@ -20,11 +21,12 @@ struct IndexDeleter {
 };
 using IndexUniquePtr = std::unique_ptr<mm_idx_t, IndexDeleter>;
 
-dorado::alignment::IndexReaderPtr create_index_reader(const std::string& index_file,
-                                                      const mm_idxopt_t& index_options) {
+dorado::alignment::IndexReader create_index_reader(const std::string& index_file,
+                                                   const mm_idxopt_t& index_options) {
     dorado::alignment::IndexReaderPtr reader;
     reader.reset(mm_idx_reader_open(index_file.c_str(), &index_options, 0));
-    return reader;
+
+    return dorado::alignment::IndexReader{std::move(reader), index_file};
 }
 
 }  // namespace
@@ -53,22 +55,22 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
         const std::string& index_file,
         int num_threads) {
     m_index_reader = create_index_reader(index_file, m_options.index_options->get());
-    if (!m_index_reader) {
+    if (!m_index_reader.inner) {
         // Reason could be not having permissions to open the file
         return {nullptr, IndexLoadResult::file_open_error};
     }
-    std::shared_ptr<mm_idx_t> index(mm_idx_reader_read(m_index_reader.get(), num_threads),
+    std::shared_ptr<mm_idx_t> index(mm_idx_reader_read(m_index_reader.inner.get(), num_threads),
                                     IndexDeleter());
 
     if (!index) {
-        m_index_reader.reset();
+        m_index_reader.inner.reset();
         return {nullptr, IndexLoadResult::end_of_index};
     }
 
     if (index->n_seq == 0) {
         // An empty or improperly formatted file can result in an mm_idx_t object with
         // no indexes in it. Check for this, and treat it as a load failure.
-        m_index_reader.reset();
+        m_index_reader.inner.reset();
         return {nullptr, IndexLoadResult::end_of_index};
     }
 
@@ -90,17 +92,17 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
 }
 
 IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
-    if (!m_index_reader) {
+    if (!m_index_reader.inner) {
         if (m_indexes.empty()) {
             return IndexLoadResult::no_index_loaded;
         }
         return IndexLoadResult::end_of_index;
     }
 
-    std::shared_ptr<const mm_idx_t> next_idx(mm_idx_reader_read(m_index_reader.get(), num_threads),
-                                             IndexDeleter());
+    std::shared_ptr<const mm_idx_t> next_idx(
+            mm_idx_reader_read(m_index_reader.inner.get(), num_threads), IndexDeleter());
     if (!next_idx) {
-        m_index_reader.reset();
+        m_index_reader.inner.reset();
         return IndexLoadResult::end_of_index;
     }
 
@@ -190,12 +192,18 @@ void Minimap2Index::add_index(std::shared_ptr<const mm_idx_t> index) {
     m_indexes.emplace_back(std::move(index));
 }
 
-HeaderSequenceRecords Minimap2Index::get_sequence_records_for_header() const {
-    HeaderSequenceRecords records;
+utils::HeaderSQRecords Minimap2Index::get_sequence_records_for_header() const {
+    const std::shared_ptr<std::string> uri = std::make_shared<std::string>(
+            "file://" + std::filesystem::weakly_canonical(m_index_reader.file).string());
+
+    utils::HeaderSQRecords records;
     for (const auto& index : m_indexes) {
         for (uint32_t j = 0; j < index->n_seq; ++j) {
-            records.emplace_back(
-                    std::make_pair(std::string(index->seq[j].name), index->seq[j].len));
+            utils::HeaderSQRecord record{std::string(index->seq[j].name), index->seq[j].len, uri};
+            std::vector<uint8_t> seq(record.length);
+            mm_idx_getseq(index.get(), j, 0, record.length, seq.data());
+            utils::get_sequence_md5(record.md5, seq);
+            records.emplace_back(std::move(record));
         }
     }
     return records;
