@@ -164,13 +164,6 @@ class TestDorado(unittest.TestCase):
             model: str
             emit_cram: bool = False
 
-        @dataclass
-        class Run:
-            folder: str
-            data: str
-            model: str
-            emit_cram: bool = False
-
         _DNA = "modbase_DNA"
         _RNA = "modbase_RNA"
         runs = [

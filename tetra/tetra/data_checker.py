@@ -124,7 +124,7 @@ class DataChecker(object):
                 return f"check_pandas_equal failed for {output_file}, {ref_file}"
             if regression_diffs == "":
                 regression_diffs = None
-        elif extension in [".sam", ".bam"]:
+        elif extension in [".sam", ".bam", ".cram"]:
             result, message = compare_alignment_files(output_file, ref_file)
             if not result:
                 regression_diffs = message
