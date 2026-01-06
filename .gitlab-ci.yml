@@ -339,7 +339,7 @@ build:linux:x86:clang_tidy:
     - apt update
     - apt install -y automake clang clang-tidy
     - !reference [.set_parallel_jobs]
-    - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS}
+    - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS} -c dorado-dependencies
   artifacts: null
   cache:
     key: dorado-dependencies-$CI_JOB_NAME_SLUG

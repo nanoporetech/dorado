@@ -7,7 +7,8 @@
 build_dir=build-tidy
 num_jobs=$(( $( command -v nproc > /dev/null && nproc || sysctl -n hw.physicalcpu ) / 2 ))
 apply_fixits=
-while getopts j:B:f opt; do
+cache_dir=
+while getopts "j:B:fc:" opt; do
   case $opt in
     j) # Number of jobs to use during build/analysis
        num_jobs="$OPTARG"
@@ -17,6 +18,9 @@ while getopts j:B:f opt; do
        ;;
     f) # Attempt to apply fixits
        apply_fixits="-fix"
+       ;;
+    c) # Location of download cache
+       cache_dir="$OPTARG"
        ;;
     ?) echo "Usage $0 [-j jobs] [-B build_dir] [-f]"
        grep " .) #" $0 | grep -v grep
@@ -42,6 +46,7 @@ source_dir=$(dirname $(dirname $0))
 cmake \
   -S ${source_dir} \
   -B ${build_dir} \
+  ${cache_dir:+-D DORADO_3RD_PARTY_DOWNLOAD=${cache_dir}} \
   -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Build dependencies so that their headers get installed, otherwise
