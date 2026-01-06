@@ -130,8 +130,8 @@ stats::NamedStats HtsFileWriter::sample_stats() const {
 
 void HtsFileWriter::set_cram_reference(const std::string &reference) {
     if (m_mode != OutputMode::CRAM) {
-        throw std::logic_error(fmt::format(
-                "Invalid call to set_cram_reference when output mode is: '{}'", to_string(m_mode)));
+        throw std::logic_error("Invalid call to set_cram_reference when output mode is: '" +
+                               to_string(m_mode) + "'");
     }
     m_reference = reference;
 };

@@ -346,6 +346,22 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusiv
                           std::runtime_error);
 }
 
+CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and CRAM mutually exclusive", TEST_GROUP) {
+    auto [out_dir] = GENERATE(table<MaybeString>({
+            {std::nullopt},
+            {"out"},
+    }));
+
+    bool emit_fastq = true;  // << Both true
+    bool emit_cram = true;   // << Both true
+    bool ref_req = false;
+    CATCH_CAPTURE(emit_fastq, emit_cram, ref_req, out_dir.has_value());
+
+    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, false, emit_cram, ref_req,
+                                                       out_dir, threads, p_cb, d_cb, GPU_NAMES),
+                          std::runtime_error);
+}
+
 CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) {
     auto [output_mode, finalise_noop, ref_req, out_dir] =
             GENERATE(table<OutputMode, bool, bool, MaybeString>({
@@ -424,23 +440,25 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder tty and pipe settings", TEST_G
     CATCH_CHECK(writer->get_mode() == output_mode);
 }
 
-CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM happy paths", TEST_GROUP) {
-    auto [output_mode, finalise_noop, ref_req, out_dir] =
-            GENERATE(table<OutputMode, bool, bool, MaybeString>({
-                    {OutputMode::BAM, true, false, std::nullopt},
-                    {OutputMode::BAM, true, false, "out"},
-                    {OutputMode::BAM, true, true, std::nullopt},
-                    // BAM will sort if writing to file AND reference is set
-                    {OutputMode::BAM, false, true, "out"},
-            }));
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM/CRAM happy paths", TEST_GROUP) {
+    auto [finalise_noop, ref_req, out_dir] = GENERATE(table<bool, bool, MaybeString>({
+            {true, false, std::nullopt},
+            {true, false, "out"},
+            {true, true, std::nullopt},
+            // BAM/CRAM will sort if writing to file AND reference is set
+            {false, true, "out"},
+    }));
+
+    auto [output_mode] = GENERATE(table<OutputMode>({OutputMode::BAM, OutputMode::CRAM}));
 
     bool is_fd_tty = false;
     bool is_fd_pipe = false;
     CATCH_CAPTURE(to_string(output_mode), finalise_noop, ref_req, out_dir.has_value(), is_fd_tty,
                   is_fd_pipe);
 
-    auto writer_builder = HtsFileWriterBuilderTest(false, false, false, ref_req, out_dir, threads,
-                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
+    auto writer_builder = HtsFileWriterBuilderTest(false, false, output_mode == OutputMode::CRAM,
+                                                   ref_req, out_dir, threads, p_cb, d_cb, GPU_NAMES,
+                                                   is_fd_tty, is_fd_pipe);
 
     auto writer = writer_builder.build();
 
@@ -487,6 +505,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
             {OutputMode::FASTQ},
             {OutputMode::SAM},
             {OutputMode::BAM},
+            {OutputMode::CRAM},
             {OutputMode::UBAM},
     }));
 
@@ -523,11 +542,13 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
     const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
     const auto root = tmp_dir.m_path.string();
 
-    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+    // subfolder here is NOT the file extension but the output folder name
+    auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
             {OutputMode::SAM, "bam"},
             {OutputMode::BAM, "bam"},
             {OutputMode::UBAM, "bam"},
+            {OutputMode::CRAM, "bam"},
     }));
 
     auto [attrs, expected_dir, expected_stem] = GENERATE_COPY(table<HtsData::ReadAttributes,
@@ -546,7 +567,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                              0,
                      },
                      "experiment-id/sample-id/19700101_0000_position-id_flowcell-id_protocol/" +
-                             ftype + "_pass",
+                             subfolder + "_pass",
                      "flowcell-id_pass_protocol_acquisit_0",
              },
              {
@@ -561,7 +582,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                              946782245000 /* 2000/01/02 03:04:05 */,
                              1,
                      },
-                     "exp/sample/20000102_0304_pos_fc_proto/" + ftype + "_pass",
+                     "exp/sample/20000102_0304_pos_fc_proto/" + subfolder + "_pass",
                      "fc_pass_proto_acq_0",
              }}));
 
@@ -587,9 +608,11 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
     const auto root = tmp_dir.m_path.string();
 
-    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+    auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
             {OutputMode::BAM, "bam"},
+            {OutputMode::SAM, "bam"},
+            {OutputMode::CRAM, "bam"},
     }));
 
     auto [barcode_name, alias, description] =
@@ -621,7 +644,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     };
 
     const std::string expected_base =
-            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
+            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + subfolder + "_pass";
 
     const auto expected_classification_folder =
             alias.empty() ? fs::path("unclassified") : fs::path(alias);
@@ -663,9 +686,11 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
     const auto root = tmp_dir.m_path.string();
 
-    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+    auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
             {OutputMode::BAM, "bam"},
+            {OutputMode::SAM, "bam"},
+            {OutputMode::CRAM, "bam"},
     }));
 
     auto [barcode_name, alias, description] =
@@ -690,7 +715,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     };
 
     const std::string expected_base =
-            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
+            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + subfolder + "_pass";
 
     const auto expected_classification_folder =
             alias.empty() ? fs::path("unclassified") : fs::path(alias);

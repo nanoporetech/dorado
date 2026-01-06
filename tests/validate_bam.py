@@ -13,10 +13,13 @@ from ont_output_specification_validator.specification import (
     load_local_specification_bundle,
 )
 
-from ont_output_specification_validator.validators.bam import BamValidator
+from ont_output_specification_validator.validators.bam import (
+    BamValidator,
+    CramValidator,
+)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("bam_file", help="Input bam file to validate")
+parser.add_argument("bam_file", help="Input bam file to validate", type=pathlib.Path)
 parser.add_argument(
     "spec_folder",
     help="Folder containing the specification to validate bam_file against",
@@ -39,14 +42,24 @@ exp_settings = settings.ExperimentSettings(
 
 spec_path = pathlib.Path(args.spec_folder)
 specification_bundle = load_local_specification_bundle(spec_path)
-validator = BamValidator(specification_bundle.get_file_content("bam/spec.yaml"))
+specification = specification_bundle.get_file_content("bam/spec.yaml")
+
+path = pathlib.Path(args.bam_file)
+if path.suffix == ".bam":
+    validator = BamValidator(specification)
+elif path.suffix == ".cram":
+    validator = CramValidator(specification)
+else:
+    print(f"Unknown file extension '{path.suffix}' for '{path}'")
+    sys.exit(1)
+
 validator_errors = errors.ErrorContainer()
 
-validate_file(pathlib.Path(args.bam_file), exp_settings, validator_errors, validator)
+validate_file(path, exp_settings, validator_errors, validator)
 
 if validator_errors.has_errors():
     formatted_errors = validator_errors.format_errors()
-    print(f"Errors from validating {args.bam_file}:\n{formatted_errors}")
+    print(f"Errors from validating {path}:\n{formatted_errors}")
     sys.exit(1)
 else:
-    print(f"BAM file {args.bam_file} validated")
+    print(f"{validator.name.upper()} file {path} validated")
