@@ -21,6 +21,9 @@ SequenceFormatType parse_sequence_format(const std::filesystem::path& in_path) {
     } else if (utils::ends_with(path_str, ".sam")) {
         fmt = SequenceFormatType::SAM;
 
+    } else if (utils::ends_with(path_str, ".cram")) {
+        fmt = SequenceFormatType::CRAM;
+
     } else if (utils::ends_with(path_str, ".fasta") || utils::ends_with(path_str, ".fa") ||
                utils::ends_with(path_str, ".fna") || utils::ends_with(path_str, ".fasta.gz") ||
                utils::ends_with(path_str, ".fa.gz") || utils::ends_with(path_str, ".fna.gz")) {

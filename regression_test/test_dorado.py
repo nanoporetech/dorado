@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import os
 import pathlib
 import contextlib
@@ -66,64 +67,52 @@ class TestDorado(unittest.TestCase):
         """
         Test basic basecalling functionality dorado.
         """
+
+        @dataclass
+        class Run:
+            folder: str
+            data: str
+            model: str
+            emit_cram: bool = False
+
         runs = [
-            {
-                "folder": "Kit14_fast",
-                "input": "SQK-LSK114",
-                "model": "fast",
-            },
-            {
-                "folder": "Kit14_hac",
-                "input": "SQK-LSK114",
-                "model": "hac",
-            },
-            {
-                "folder": "Kit14_sup",
-                "input": "SQK-LSK114",
-                "model": "sup",
-            },
-            {
-                "folder": "Kit14_RNA_fast",
-                "input": "SQK-RNA004",
-                "model": "fast",
-            },
-            {
-                "folder": "Kit14_RNA_hac",
-                "input": "SQK-RNA004",
-                "model": "hac",
-            },
-            {
-                "folder": "Kit14_RNA_sup",
-                "input": "SQK-RNA004",
-                "model": "sup",
-            },
+            Run("Kit14_fast", "SQK-LSK114", "fast"),
+            Run("Kit14_hac", "SQK-LSK114", "hac"),
+            Run("Kit14_hac_cram", "SQK-LSK114", "hac", emit_cram=True),
+            Run("Kit14_sup", "SQK-LSK114", "sup"),
+            Run("Kit14_RNA_fast", "SQK-RNA004", "fast"),
+            Run("Kit14_RNA_hac", "SQK-RNA004", "hac"),
+            Run("Kit14_RNA_sup", "SQK-RNA004", "sup"),
+            Run("Kit14_RNA_hac_cram", "SQK-RNA004", "hac", emit_cram=True),
         ]
 
         test_name = "basecalling"
         with self.context.open_test(self, test_name) as context:
-            # All of these tests should produce a single .bam file and a single .txt summary file.
-            if USE_PYSAM:
-                expected_files = {"bam": 1, "txt": 1, "tsv": 1}
-            else:
-                expected_files = {"txt": 1, "tsv": 1}
             validation_settings = deepcopy(VALIDATION_OPTIONS)
 
             for run in runs:
+                suffix = "cram" if run.emit_cram else "bam"
+                expected_files = {"txt": 1}
+                if USE_PYSAM:
+                    expected_files[suffix] = 1
+
                 with self.context.open_subtest("test_basecalling", line=run):
-                    subfolder = run["folder"]
-                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
-                    log_file = OUTPUT_FOLDER / test_name / subfolder / "dorado.log"
+                    output_file = (
+                        OUTPUT_FOLDER / test_name / run.folder / f"out.{suffix}"
+                    )
+                    log_file = OUTPUT_FOLDER / test_name / run.folder / "dorado.log"
                     dorado_args = self.get_dorado_args(
-                        input_path=INPUT_FOLDER / run["input"],
+                        input_path=INPUT_FOLDER / run.data,
                         save_path=None,
-                        model=run["model"],
+                        model=run.model,
                         emit_fastq=False,
                         emit_summary=True,
+                        emit_cram=run.emit_cram,
                     )
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
                     # prevent non-deterministic results.
-                    _orin_sup_batchsize_args(run["model"], dorado_args)
+                    _orin_sup_batchsize_args(run.model, dorado_args)
 
                     try:
                         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -144,13 +133,13 @@ class TestDorado(unittest.TestCase):
                                 output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
                             )
                     except Exception as ex:
-                        msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
+                        msg = f"Error checking output files for 'test_basecalling {run.folder}'.\n{ex}"
                         context.encountered_error()
                         self.fail(msg)
 
                     errors = self.check_program_output(
                         test_name,
-                        subfolder,
+                        run.folder,
                         expected_files,
                         validation_settings,
                     )
@@ -167,86 +156,64 @@ class TestDorado(unittest.TestCase):
         See Jira ticket DOR-1405 for details on validation process before committing updated
         regression test data.
         """
+
+        @dataclass
+        class Run:
+            folder: str
+            data: str
+            model: str
+            emit_cram: bool = False
+
+        _DNA = "modbase_DNA"
+        _RNA = "modbase_RNA"
         runs = [
-            {
-                "folder": "HAC_4mC_5mC_6mA",
-                "input": "modbase_DNA",
-                "model": "hac,4mC_5mC,6mA",
-            },
-            {
-                "folder": "HAC_5mC_5hmC",
-                "input": "modbase_DNA",
-                "model": "hac,5mC_5hmC",
-            },
-            {
-                "folder": "HAC_5mCG_5hmCG",
-                "input": "modbase_DNA",
-                "model": "hac,5mCG_5hmCG",
-            },
-            {
-                "folder": "SUP_4mC_5mC_6mA",
-                "input": "modbase_DNA",
-                "model": "sup,4mC_5mC,6mA",
-            },
-            {
-                "folder": "SUP_5mC_5hmC",
-                "input": "modbase_DNA",
-                "model": "sup,5mC_5hmC",
-            },
-            {
-                "folder": "SUP_5mCG_5hmCG",
-                "input": "modbase_DNA",
-                "model": "sup,5mCG_5hmCG",
-            },
-            {
-                "folder": "HAC_inosine_m6A_m5C",
-                "input": "modbase_RNA",
-                "model": "hac,inosine_m6A,m5C",
-            },
-            {
-                "folder": "HAC_m6A_DRACH_pseU",
-                "input": "modbase_RNA",
-                "model": "hac,m6A_DRACH,pseU",
-            },
-            {
-                "folder": "SUP_m6A_DRACH_pseU_2OmeU",
-                "input": "modbase_RNA",
-                "model": "sup,m6A_DRACH,pseU_2OmeU",
-            },
-            {
-                "folder": "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
-                "input": "modbase_RNA",
-                "model": "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
-            },
+            Run("HAC_4mC_5mC_6mA", _DNA, "hac,4mC_5mC,6mA"),
+            Run("HAC_5mC_5hmC", _DNA, "hac,5mC_5hmC"),
+            Run("HAC_5mCG_5hmCG", _DNA, "hac,5mCG_5hmCG"),
+            Run("SUP_4mC_5mC_6mA", _DNA, "sup,4mC_5mC,6mA"),
+            Run("SUP_4mC_5mC_6mA_cram", _DNA, "sup,4mC_5mC,6mA", emit_cram=True),
+            Run("SUP_5mC_5hmC", _DNA, "sup,5mC_5hmC"),
+            Run("SUP_5mCG_5hmCG", _DNA, "sup,5mCG_5hmCG"),
+            Run("HAC_inosine_m6A_m5C", _RNA, "hac,inosine_m6A,m5C"),
+            Run("HAC_m6A_DRACH_pseU", _RNA, "hac,m6A_DRACH,pseU"),
+            Run("HAC_m6A_DRACH_pseU_cram", _RNA, "hac,m6A_DRACH,pseU", emit_cram=True),
+            Run("SUP_m6A_DRACH_pseU_2OmeU", _RNA, "sup,m6A_DRACH,pseU_2OmeU"),
+            Run(
+                "SUP_inosine_m6A_2OmeA_m5C_2OmeC_2OmeG",
+                _RNA,
+                "sup,inosine_m6A_2OmeA,m5C_2OmeC,2OmeG",
+            ),
         ]
 
         test_name = "modified_basecalling"
         with self.context.open_test(self, test_name) as context:
-            # All of these tests should produce a single .bam file and a single .txt summary file.
-            if USE_PYSAM:
-                expected_files = {"bam": 1, "txt": 1, "tsv": 1}
-            else:
-                expected_files = {"txt": 1, "tsv": 1}
             validation_settings = deepcopy(VALIDATION_OPTIONS)
             validation_settings["modified_bases_enabled"] = True
 
             for run in runs:
+                suffix = "cram" if run.emit_cram else "bam"
+                expected_files = {"txt": 1}
+                if USE_PYSAM:
+                    expected_files[suffix] = 1
+
                 with self.context.open_subtest("test_modified_basecalling", line=run):
-                    subfolder = run["folder"]
-                    output_file = OUTPUT_FOLDER / test_name / subfolder / "out.bam"
-                    log_file = OUTPUT_FOLDER / test_name / subfolder / "dorado.log"
+                    output_file = (
+                        OUTPUT_FOLDER / test_name / run.folder / f"out.{suffix}"
+                    )
+                    log_file = OUTPUT_FOLDER / test_name / run.folder / "dorado.log"
                     dorado_args = self.get_dorado_args(
-                        input_path=INPUT_FOLDER / run["input"],
+                        input_path=INPUT_FOLDER / run.data,
                         save_path=None,
-                        model=run["model"],
+                        model=run.model,
                         emit_fastq=False,
                         emit_summary=True,
+                        emit_cram=run.emit_cram,
                         recursive=True,
                     )
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
                     # prevent non-deterministic results.
-                    _orin_sup_batchsize_args(run["model"], dorado_args)
+                    _orin_sup_batchsize_args(run.model, dorado_args)
 
                     try:
                         output_file.parent.mkdir(parents=True, exist_ok=True)
@@ -265,12 +232,12 @@ class TestDorado(unittest.TestCase):
                                 output_file, "summary.tsv", DEFAULT_MAX_TIMEOUT
                             )
                     except Exception as ex:
-                        msg = f"Error checking output files for 'test_basecalling {subfolder}'.\n{ex}"
+                        msg = f"Error checking output files for 'test_basecalling {run.folder}'.\n{ex}"
                         context.encountered_error()
                         self.fail(msg)
 
                     errors = self.check_program_output(
-                        test_name, subfolder, expected_files, validation_settings
+                        test_name, run.folder, expected_files, validation_settings
                     )
 
                     if errors is not None:
@@ -312,6 +279,7 @@ class TestDorado(unittest.TestCase):
         save_path: pathlib.Path | None,
         model: str,
         emit_fastq: bool,
+        emit_cram: bool,
         emit_summary: bool,
         recursive: bool = False,
     ) -> list:
@@ -339,6 +307,8 @@ class TestDorado(unittest.TestCase):
             args.append("--emit-fastq")
         if emit_summary:
             args.append("--emit-summary")
+        if emit_cram:
+            args.append("--emit-cram")
         if recursive:
             args.append("--recursive")
         return args

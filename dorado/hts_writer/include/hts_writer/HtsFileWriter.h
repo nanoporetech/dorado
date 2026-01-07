@@ -34,6 +34,8 @@ public:
     std::string get_name() const override { return "HtsFileWriter"; }
     stats::NamedStats sample_stats() const override;
 
+    // Set the alignment reference for CRAM compression
+    void set_cram_reference(const std::string& reference);
     // Set a single header to write to all output files
     void set_shared_header(SamHdrSharedPtr header);
     // Set a lookup for pre-built output headers based indexed on read attributes at file write time.
@@ -61,6 +63,7 @@ protected:
     SamHdrSharedPtr m_shared_header{nullptr};
     std::shared_ptr<const utils::HeaderMapper::HeaderMap> m_dynamic_header{nullptr};
 
+    std::string m_reference{};
     std::string m_gpu_names{};
 
     void prepare_item(HtsData& item) const;

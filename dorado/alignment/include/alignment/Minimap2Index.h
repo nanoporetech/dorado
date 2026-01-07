@@ -2,6 +2,7 @@
 
 #include "Minimap2IndexSupportTypes.h"
 #include "Minimap2Options.h"
+#include "hts_utils/header_sq_record.h"
 
 #include <minimap.h>
 
@@ -17,11 +18,15 @@ struct IndexReaderDeleter {
     void operator()(mm_idx_reader_t* index_reader);
 };
 using IndexReaderPtr = std::unique_ptr<mm_idx_reader_t, IndexReaderDeleter>;
+struct IndexReader {
+    IndexReaderPtr inner;
+    std::string file;
+};
 
 class Minimap2Index {
     Minimap2Options m_options;
     std::vector<std::shared_ptr<const mm_idx_t>> m_indexes;
-    IndexReaderPtr m_index_reader;
+    IndexReader m_index_reader;
     bool m_incremental_load{false};
 
     void set_index(std::shared_ptr<const mm_idx_t> index);
@@ -49,7 +54,7 @@ public:
     const mm_idxopt_t& index_options() const;
     const mm_mapopt_t& mapping_options() const;  ///< Should only be called for non-split indexes.
 
-    HeaderSequenceRecords get_sequence_records_for_header() const;
+    utils::HeaderSQRecords get_sequence_records_for_header() const;
     size_t num_loaded_index_blocks() const { return m_indexes.size(); }
 
     // Testability

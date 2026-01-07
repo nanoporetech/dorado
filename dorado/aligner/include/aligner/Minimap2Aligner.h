@@ -36,7 +36,7 @@ public:
     std::tuple<mm_reg1_t*, int> get_mapping(bam1_t* record, mm_tbuf_t* buf);
 
     /// This will combine the sequence records from all blocks of a split-index.
-    HeaderSequenceRecords get_sequence_records_for_header() const;
+    utils::HeaderSQRecords get_sequence_records_for_header() const;
 
 private:
     std::shared_ptr<const Minimap2Index> m_minimap_index;

@@ -127,10 +127,13 @@ std::string NestedFileStructure::status(const HtsData::ReadAttributes& attrs) co
 };
 
 std::string NestedFileStructure::filetype() const {
+    // String here is not the file extension but the string used in the folder name
+    // for example {bam}_pass/
     switch (m_mode) {
     case utils::HtsFile::OutputMode::UBAM:
     case utils::HtsFile::OutputMode::BAM:
     case utils::HtsFile::OutputMode::SAM:
+    case utils::HtsFile::OutputMode::CRAM:
         return "bam";
     case utils::HtsFile::OutputMode::FASTQ:
         return "fastq";

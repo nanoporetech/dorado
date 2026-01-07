@@ -274,13 +274,17 @@ int aligner(int argc, char* argv[]) {
                 });
 
         auto hts_writer_builder = hts_writer::AlignerHtsFileWriterBuilder(
-                emit.sam, sort_requested, output_dir, writer_threads, progress_callback,
+                emit.sam, emit.cram, sort_requested, output_dir, writer_threads, progress_callback,
                 description_callback, has_barcoding);
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {
             spdlog::error("Failed to create hts file writer");
             std::exit(EXIT_FAILURE);
+        }
+
+        if (emit.cram) {
+            hts_file_writer->set_cram_reference(align_info->reference_file);
         }
 
         writers.push_back(std::move(hts_file_writer));

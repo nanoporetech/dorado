@@ -28,6 +28,13 @@ bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& 
 // BAM tags to add to the read header for fastx output
 constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs", "ch", "PU", "DT", "mv", "SM", "al"};
 
+void set_cram_opt(const dorado::HtsFilePtr& file, const std::string& reference) {
+    if (hts_set_opt(file.get(), CRAM_OPT_REFERENCE, reference.c_str()) < 0) {
+        throw std::runtime_error(
+                fmt::format("Failed to set CRAM reference using '{}'.", reference));
+    }
+}
+
 }  // namespace
 
 namespace dorado {
@@ -61,35 +68,10 @@ HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_b
           m_threads(threads),
           m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
-          m_mode(mode) {
-    switch (m_mode) {
-    case OutputMode::FASTQ:
-        m_file.reset(hts_open(m_filename.c_str(), "wf"));
-        break;
-    case OutputMode::FASTA:
-        m_file.reset(hts_open(m_filename.c_str(), "wF"));
-        break;
-    case OutputMode::BAM:
-        if (m_filename != "-" && m_sort_bam) {
-            set_buffer_size(DEFAULT_BUFFER_SIZE);
-            // We're doing sorted BAM output. We need to indicate this for the
-            // finalise method.
-            m_finalise_is_noop = false;
-        } else {
-            m_sort_bam = false;
-            m_file.reset(hts_open(m_filename.c_str(), "wb"));
-        }
-        break;
-    case OutputMode::SAM:
-        m_file.reset(hts_open(m_filename.c_str(), "w"));
-        break;
-    case OutputMode::UBAM:
-        m_file.reset(hts_open(m_filename.c_str(), "wb0"));
-        break;
-    default:
-        throw std::runtime_error("Unknown output mode selected: " +
-                                 std::to_string(static_cast<int>(m_mode)));
-    }
+          m_mode(mode),
+          m_htslib_write_mode(htslib_write_mode()) {
+    init_file();
+
     if (m_finalise_is_noop && !m_file) {
         throw std::runtime_error("Could not open file: " + m_filename);
     }
@@ -103,6 +85,60 @@ HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_b
     if (m_threads > 0) {
         initialise_threads();
     }
+}
+
+void HtsFile::init_file() {
+    switch (m_mode) {
+    case OutputMode::FASTQ:
+    case OutputMode::FASTA:
+    case OutputMode::SAM:
+    case OutputMode::UBAM:
+        m_file.reset(hts_open(m_filename.c_str(), m_htslib_write_mode.c_str()));
+        return;
+    case OutputMode::BAM:
+    case OutputMode::CRAM:
+        if (m_filename != "-" && m_sort_bam) {
+            set_buffer_size(DEFAULT_BUFFER_SIZE);
+            // We're doing sorted BAM/CRAM output. We need to indicate this for the
+            // finalise method.
+            m_finalise_is_noop = false;
+        } else {
+            m_sort_bam = false;
+            m_file.reset(hts_open(m_filename.c_str(), m_htslib_write_mode.c_str()));
+        }
+        return;
+    }
+    throw std::runtime_error("Unknown output mode selected: " +
+                             std::to_string(static_cast<int>(m_mode)));
+};
+
+std::string HtsFile::htslib_write_mode() const {
+    switch (m_mode) {
+    case OutputMode::UBAM:
+        return "wb0";
+    case OutputMode::BAM:
+        return "wb";
+    case OutputMode::CRAM:
+        return "wc";
+    case OutputMode::SAM:
+        return "w";
+    case OutputMode::FASTQ:
+        return "wf";
+    case OutputMode::FASTA:
+        return "wF";
+    }
+    throw std::logic_error("Unknown htslib write mode for '" + to_string(m_mode) + "'.");
+}
+
+std::string HtsFile::index_extension() const {
+    if (m_mode == OutputMode::BAM) {
+        return ".bai";
+    }
+    if (m_mode == OutputMode::CRAM) {
+        return ".crai";
+    }
+
+    throw std::logic_error("Unknown htslib index extension for '" + to_string(m_mode) + "'.");
 }
 
 void HtsFile::initialise_threads() {
@@ -151,7 +187,7 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     auto file_index = m_temp_files.size();
     auto tempfilename = m_filename + "." + std::to_string(file_index) + ".tmp";
     m_temp_files.push_back(tempfilename);
-    m_file.reset(hts_open(tempfilename.c_str(), "wb"));
+    m_file.reset(hts_open(tempfilename.c_str(), m_htslib_write_mode.c_str()));
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + tempfilename);
     }
@@ -159,6 +195,9 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
         throw std::runtime_error("Could not enable multi threading for file writing");
     }
     if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
+        if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
+            set_cram_opt(m_file, m_reference);
+        }
         if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {
             throw std::runtime_error("Could not write header to temp file.");
         }
@@ -190,8 +229,8 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     m_buffer_map.clear();
 }
 
-// If we are doing sorted BAM output, then when we are done we will have sorted temporary files
-// that need to be merged into a single sorted BAM file. If there's only one temporary file, we
+// If we are doing sorted BAM/CRAM output, then when we are done we will have sorted temporary files
+// that need to be merged into a single sorted BAM/CRAM file. If there's only one temporary file, we
 // can just rename it. Otherwise we create a new file, merge the temporary files into it, and
 // delete the temporary files. In case an error occurs, the temporary files are left on disk, so
 // users can recover their data.
@@ -215,7 +254,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     // If any reads are cached for writing, write out the final temporary file.
     flush_temp_file(nullptr);
 
-    bool file_is_mapped = (sam_hdr_nref(m_header.get()) > 0);
+    bool file_is_mapped = (sam_hdr_nref(m_header.get()) > 0) || m_mode == OutputMode::CRAM;
     m_header.reset();
 
     if (m_temp_files.empty()) {
@@ -229,7 +268,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         std::filesystem::rename(m_temp_files.back(), m_filename);
         m_temp_files.clear();
         if (file_is_mapped) {
-            // We still need to index the sorted BAM file.
+            // We still need to index the sorted BAM/CRAM file.
             // We can't update the progress while this is ongoing, so it's just going to
             // say 50% complete until it finishes.
             constexpr size_t percent_start_indexing = 50;
@@ -248,6 +287,19 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     }
 }
 
+void HtsFile::set_cram_reference(const std::string& reference) {
+    if (m_mode != OutputMode::CRAM) {
+        throw std::logic_error(
+                fmt::format("set_cram_reference failed - invalid mode: {}.", to_string(m_mode)));
+    }
+
+    if (reference.empty() || m_finalised) {
+        return;
+    }
+
+    m_reference = reference;
+}
+
 int HtsFile::set_header(const sam_hdr_t* const header) {
     if (header) {
         m_header.reset(sam_hdr_dup(header));
@@ -255,6 +307,9 @@ int HtsFile::set_header(const sam_hdr_t* const header) {
             sam_hdr_change_HD(m_header.get(), "SO", "coordinate");
         }
         if (m_file) {
+            if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
+                set_cram_opt(m_file, m_reference);
+            }
             return sam_hdr_write(m_file.get(), m_header.get());
         }
     }
@@ -341,7 +396,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     std::vector<uint64_t> top_record_scores(num_temp_files);
     SamHdrPtr header{};
     for (size_t i = 0; i < num_temp_files; ++i) {
-        in_files[i].reset(hts_open(temp_files[i].c_str(), "rb"));
+        in_files[i].reset(hts_open(temp_files[i].c_str(), "r"));
         if (bgzf_mt(in_files[i]->fp.bgzf, m_threads, 128) < 0) {
             spdlog::error("Could not enable multi threading for BAM reading.");
             return false;
@@ -369,10 +424,14 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     }
 
     // Open the output file, and write the header.
-    HtsFilePtr out_file(hts_open(merged_filename.c_str(), "wb"));
+    HtsFilePtr out_file(hts_open(merged_filename.c_str(), m_htslib_write_mode.c_str()));
     if (bgzf_mt(out_file->fp.bgzf, m_threads, 128) < 0) {
         spdlog::error("Could not enable multi threading for BAM generation.");
         return false;
+    }
+
+    if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
+        set_cram_opt(out_file, m_reference);
     }
 
     SamHdrPtr out_header(sam_hdr_dup(header.get()));
@@ -384,7 +443,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
 
     // If this is the final iteration, initialise for indexing.
     bool final_iteration = (std::filesystem::path(merged_filename).extension().string() != ".tmp");
-    std::string idx_fname = merged_filename + ".bai";
+    std::string idx_fname = merged_filename + index_extension();
     if (final_iteration) {
         auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
         if (res < 0) {
@@ -562,6 +621,8 @@ std::string to_string(utils::HtsFile::OutputMode mode) {
         return "UBAM";
     case utils::HtsFile::OutputMode::SAM:
         return "SAM";
+    case utils::HtsFile::OutputMode::CRAM:
+        return "CRAM";
     case utils::HtsFile::OutputMode::FASTA:
         return "FASTA";
     case utils::HtsFile::OutputMode::FASTQ:
@@ -577,6 +638,8 @@ std::string get_suffix(utils::HtsFile::OutputMode mode) {
         return ".bam";
     case utils::HtsFile::OutputMode::SAM:
         return ".sam";
+    case utils::HtsFile::OutputMode::CRAM:
+        return ".cram";
     case utils::HtsFile::OutputMode::FASTA:
         return "fasta";
     case utils::HtsFile::OutputMode::FASTQ:

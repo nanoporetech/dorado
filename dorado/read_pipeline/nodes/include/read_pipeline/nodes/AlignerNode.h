@@ -3,6 +3,7 @@
 #include "alignment/BedFileAccess.h"
 #include "alignment/IndexFileAccess.h"
 #include "alignment/Minimap2Options.h"
+#include "hts_utils/header_sq_record.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/MessageSink.h"
 #include "utils/concurrency/async_task_executor.h"
@@ -44,7 +45,7 @@ public:
     void terminate(const TerminateOptions&) override;
     void restart() override;
 
-    alignment::HeaderSequenceRecords get_sequence_records_for_header() const;
+    utils::HeaderSQRecords get_sequence_records_for_header() const;
 
 private:
     void input_thread_fn();

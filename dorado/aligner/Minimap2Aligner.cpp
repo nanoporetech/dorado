@@ -563,7 +563,7 @@ std::vector<AlignmentResult> Minimap2Aligner::align_impl(dorado::ReadCommon& rea
     return parse_sam_lines(alignment_string, read_common.seq, read_common.qstring);
 }
 
-HeaderSequenceRecords Minimap2Aligner::get_sequence_records_for_header() const {
+utils::HeaderSQRecords Minimap2Aligner::get_sequence_records_for_header() const {
     return m_minimap_index->get_sequence_records_for_header();
 }
 

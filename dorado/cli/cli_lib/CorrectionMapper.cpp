@@ -207,13 +207,12 @@ void CorrectionMapper::process(Pipeline& pipeline) {
         size_t total_skipped = 0;
 
         do {
-            const alignment::HeaderSequenceRecords headers =
-                    m_index->get_sequence_records_for_header();
+            const utils::HeaderSQRecords headers = m_index->get_sequence_records_for_header();
 
             bool found = false;
             for (size_t i = 0; i < std::size(headers); ++i) {
-                const auto& [header, _] = headers[i];
-                if (header == m_furthest_skip_header) {
+                const auto& header = headers[i];
+                if (header.sequence_name == m_furthest_skip_header) {
                     found = true;
                     spdlog::debug("Resume: found header {} in index chunk ID {}.",
                                   m_furthest_skip_header, m_current_index);

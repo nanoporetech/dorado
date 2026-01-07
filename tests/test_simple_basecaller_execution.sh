@@ -201,6 +201,11 @@ $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batc
 dorado_check_bam_not_empty
 $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
+
+# Check CRAM file format
+$dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq --emit-cram > $output_dir/calls.cram
+dorado_check_bam_not_empty
+
 # Check that the aligner strips old alignment tags
 $dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then

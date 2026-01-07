@@ -6,6 +6,7 @@
 #include "alignment/minimap2_wrappers.h"
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/header_sq_record.h"
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/nodes/AlignerNode.h"

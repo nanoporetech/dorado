@@ -112,7 +112,8 @@ void ReadInitialiser::update_alignment_fields(HtsData& data) const {
 
 void update_alignment_counts(const std::filesystem::path& path, AlignmentCounts& alignment_counts) {
     const auto file = dorado::HtsFilePtr(hts_open(path.string().c_str(), "r"));
-    if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam) {
+    if (file->format.format != htsExactFormat::sam && file->format.format != htsExactFormat::bam &&
+        file->format.format != htsExactFormat::cram) {
         return;
     }
 

@@ -467,8 +467,9 @@ void setup(const std::vector<std::string>& args,
                     tracker.set_description(description);
                 });
         auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
-                emit.fastq, emit.sam, !ref.empty(), output_dir, thread_allocations.writer_threads,
-                progress_callback, description_callback, gpu_names);
+                emit.fastq, emit.sam, emit.cram, !ref.empty(), output_dir,
+                thread_allocations.writer_threads, progress_callback, description_callback,
+                gpu_names);
 
         if (hts_writer_builder.get_output_mode() == OutputMode::FASTQ && !modbase_runners.empty()) {
             spdlog::error(
@@ -483,6 +484,10 @@ void setup(const std::vector<std::string>& args,
             spdlog::error("Failed to create hts file writer");
             terminate_runners(runners, modbase_runners);
             std::exit(EXIT_FAILURE);
+        }
+
+        if (!ref.empty() && emit.cram) {
+            hts_file_writer->set_cram_reference(ref);
         }
 
         tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);

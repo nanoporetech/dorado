@@ -61,8 +61,6 @@ void add_rg_headers_with_barcode_kit(sam_hdr_t* hdr,
                                      const std::string& kit_name,
                                      const utils::SampleSheet* const sample_sheet);
 
-void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs);
-
 /// Remove SO tag and any SQ lines from the header.
 void strip_alignment_data_from_header(sam_hdr_t* hdr);
 

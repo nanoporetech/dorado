@@ -83,11 +83,34 @@ check_structure() {
         cd -
     fi
 
+    # Quickcheck sam/bam/cram files
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then 
+        for relative_path in "${expected_paths[@]}"; do
+            local full_path="${root_directory%/}/$relative_path"
+            if [[ ${full_path} =~ \.(bam|sam|cram)$  ]]; then
+                samtools quickcheck -vu ${full_path} \
+                    && echo "quickcheck ok: ${relative_path}" \
+                    || { echo "ERROR FAILED quickcheck: ${full_path}" >&2; exit 1; }
+            fi
+        done
+    fi
+
     set -x
     return $failed
 }
 
-TEST_INLINE_DEMUX=1
+
+title() {
+    set +x 
+    echo ""
+    echo ""
+    echo "====================================================================="
+    echo $1
+    echo "====================================================================="
+    set -x
+}
+
+TEST_INLINE_DEMUX=0
 TEST_POSTRUN_DEMUX=1
 TEST_ALIGNER=1
 
@@ -103,7 +126,7 @@ fi
 if [ $TEST_INLINE_DEMUX -eq 1 ]; then 
 {
     # No demultiplexing
-    echo "Testing basic nested output structure"
+    title "Testing basic nested output structure baseline"
     dest="${output_dir}/basic_structure"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
@@ -115,7 +138,7 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
 }
 {
     # Inline demultiplexing without sample sheet into BAM
-    echo "Testing nested output structure with demultiplexing into BAM"
+    title "Testing nested output structure with inline demux into BAM"
     dest="${output_dir}/demux_structure_BAM"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
@@ -129,7 +152,7 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
 }
 {
     # Inline demultiplexing without sample sheet into FASTQ
-    echo "Testing nested output structure with demultiplexing into FASTQ"
+    title "Testing nested output structure with inline demux into FASTQ"
     dest="${output_dir}/demux_structure_FASTQ"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
@@ -142,8 +165,22 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
+    # Inline demultiplexing without sample sheet into cram
+    title "Testing nested output structure with inline demux into cram"
+    dest="${output_dir}/demux_structure_cram"
+    core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    expected=(
+        "${core}/bam_pass/barcode01/PAO25751_pass_barcode01_0d85015e_9bf5b3eb_0.cram"
+        "${core}/bam_pass/barcode04/PAO25751_pass_barcode04_0d85015e_9bf5b3eb_0.cram"
+        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.cram"
+    )
+
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-cram
+    check_structure ${dest} "${expected[@]}"
+}
+{
     # Inline demultiplexing with sample sheet into SAM
-    echo "Testing nested output structure with demultiplexing and sample sheet into SAM"
+    title "Testing nested output structure with inline demux and sample sheet into SAM"
     dest="${output_dir}/demux_sample_sheet_structure_SAM"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
@@ -155,8 +192,21 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
+    # Inline demultiplexing with sample sheet into CRAM
+    title "Testing nested output structure with inline demux and sample sheet into CRAM"
+    dest="${output_dir}/demux_sample_sheet_structure_CRAM"
+    core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    expected=(
+        "${core}/bam_pass/patient_id_1/PAO25751_pass_patient_id_1_0d85015e_9bf5b3eb_0.cram"
+        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.cram"
+    )
+
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-cram --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
+    check_structure ${dest} "${expected[@]}"
+}
+{
     # Inline demultiplexing with sample sheet into FASTQ
-    echo "Testing nested output structure with demultiplexing and sample sheet into FASTQ"
+    title "Testing nested output structure with inline demux and sample sheet into FASTQ"
     dest="${output_dir}/demux_sample_sheet_structure"
     core="no_sample/20230807_1018_2H_PAO25751_0d85015e"
     expected=(
@@ -169,7 +219,7 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
 }
 {
     # Inline demultiplexing split reads 
-    echo "Testing nested output structure with split reads"
+    title "Testing nested output structure with inline demux and split reads"
     dest="${output_dir}/demux_split_read"
     core="E8p2p1_400bps/no_sample/20231121_1559_5B_PAS14411_76cd574f"
     expected=(
@@ -181,7 +231,7 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
 }
 {
     # Inline demultiplexing aligned reads
-    echo "Testing nested output structure with aligned reads"
+    title "Testing nested output structure inline demux with aligned reads"
     dest="${output_dir}/demux_aligned_reads"
     core="test/test/20231125_1913_test_TEST_4524e8b9"
     expected=(
@@ -202,6 +252,7 @@ if [ $TEST_POSTRUN_DEMUX -eq 1 ]; then
     mkdir -p $postrun_output_dir    
 }
 {
+     title "Test untrimmed basecalls post-run demux with barcode classification into BAM"
     calls_notrim_bam="${postrun_output_dir}/calls.no-trim.bam"
     $dorado_bin ${common_args} --no-trim > ${calls_notrim_bam}
 
@@ -217,6 +268,7 @@ if [ $TEST_POSTRUN_DEMUX -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
+    title "Test untrimmed basecalls post-run demux with barcode classification into FASTQ"
     calls_notrim_fastq="${postrun_output_dir}/calls.no-trim.fastq"
     $dorado_bin ${common_args} --no-trim --emit-fastq > ${calls_notrim_fastq}
 
@@ -236,6 +288,7 @@ fi # TEST_POSTRUN_DEMUX
 # Testing for post-run demux where we have untrimmed basecalls and run barcode classification
 if [ $TEST_ALIGNER -eq 1 ]; then 
 {
+    title "Preparing test reference"
     aligner_output_dir="${output_dir}/aligner"
     mkdir -p $aligner_output_dir    
 
@@ -244,6 +297,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
 
 }
 {
+    title "Test aligner demux into BAM sorted"
     dest=${aligner_output_dir}/bam
     $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest}
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
@@ -255,6 +309,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
+    title "Test aligner demux into BAM unsorted"
     dest=${aligner_output_dir}/no-sort
     $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --no-sort
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
@@ -265,6 +320,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
+    title "Test aligner demux into SAM"
     dest=${aligner_output_dir}/sam
     $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --emit-sam 
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
@@ -275,6 +331,18 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
+    title "Test aligner demux into CRAM unsorted"
+    dest=${aligner_output_dir}/cram
+    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --no-sort --emit-cram 
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    core="/test/test/20231125_1913_0_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.cram"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
+{
+    title "Test aligned demux into BAM aligned"
     dest=${aligner_output_dir}/fastq
     # Use the "reference" fastq as original calls
     $dorado_bin aligner ${align_data_ref} ${align_data_ref} --output-dir ${dest}
@@ -287,8 +355,23 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     )
     check_structure ${dest} "${expected[@]}"
 }
-
+{
+    title "Test aligned demux into CRAM aligned"
+    dest=${aligner_output_dir}/aligned_cram
+    # Use the "reference" fastq as original calls
+    $dorado_bin aligner ${align_data_ref} ${align_data_ref} --output-dir ${dest} --emit-cram
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    # Also have no_sample here because the sample id is not added to the FASTQ file spec yet.
+    core="./no_sample/20231125_1913_0_TEST_4524e8b9"
+    expected=(
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.cram"
+        "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.cram.crai"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
 
 fi # TEST_ALIGNER
+
+title "done"
 
 # rm -rf ${TMPDIR} // Trap will clean-up

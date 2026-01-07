@@ -125,7 +125,8 @@ std::string IndexFileAccess::generate_sequence_records_header(const std::string&
         } else {
             first_record = false;
         }
-        header_stream << "@SQ\tSN:" << sequence_record.first << "\tLN:" << sequence_record.second;
+        header_stream << "@SQ\tSN:" << sequence_record.sequence_name
+                      << "\tLN:" << sequence_record.length;
     }
 
     return header_stream.str();

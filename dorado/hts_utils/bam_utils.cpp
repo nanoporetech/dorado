@@ -235,13 +235,6 @@ void add_rg_headers_with_barcode_kit(sam_hdr_t* hdr,
     add_barcode_kit_rg_hdrs(hdr, read_groups, kit_name, sample_sheet);
 }
 
-void add_sq_hdr(sam_hdr_t* hdr, const sq_t& seqs) {
-    for (const auto& pair : seqs) {
-        sam_hdr_add_line(hdr, "SQ", "SN", pair.first.c_str(), "LN",
-                         std::to_string(pair.second).c_str(), NULL);
-    }
-}
-
 void strip_alignment_data_from_header(sam_hdr_t* hdr) {
     sam_hdr_remove_except(hdr, "SQ", nullptr, nullptr);
     sam_hdr_change_HD(hdr, "SO", "unknown");

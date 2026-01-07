@@ -304,12 +304,10 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ happy paths", TEST_GROUP)
     }));
 
     bool emit_fastq = true;
-    bool emit_sam = false;
     bool ref_req = false;
-    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
-                  out_dir.has_value());
+    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, ref_req, out_dir.has_value());
 
-    auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+    auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, false, false, ref_req, out_dir,
                                                        threads, p_cb, d_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
@@ -325,10 +323,9 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ throws given reference", 
 
     bool emit_fastq = true;
     bool ref_req = true;  // << FASTQ cannot store alignment results
-    bool emit_sam = false;
-    CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
+    CATCH_CAPTURE(emit_fastq, ref_req, out_dir.has_value());
 
-    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, false, false, ref_req, out_dir,
                                                        threads, p_cb, d_cb, GPU_NAMES),
                           std::runtime_error);
 }
@@ -344,8 +341,24 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and SAM mutually exclusiv
     bool ref_req = false;
     CATCH_CAPTURE(emit_fastq, emit_sam, ref_req, out_dir.has_value());
 
-    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
-                                                       threads, p_cb, d_cb, GPU_NAMES),
+    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, false, ref_req,
+                                                       out_dir, threads, p_cb, d_cb, GPU_NAMES),
+                          std::runtime_error);
+}
+
+CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and CRAM mutually exclusive", TEST_GROUP) {
+    auto [out_dir] = GENERATE(table<MaybeString>({
+            {std::nullopt},
+            {"out"},
+    }));
+
+    bool emit_fastq = true;  // << Both true
+    bool emit_cram = true;   // << Both true
+    bool ref_req = false;
+    CATCH_CAPTURE(emit_fastq, emit_cram, ref_req, out_dir.has_value());
+
+    CATCH_CHECK_THROWS_AS(BasecallHtsFileWriterBuilder(emit_fastq, false, emit_cram, ref_req,
+                                                       out_dir, threads, p_cb, d_cb, GPU_NAMES),
                           std::runtime_error);
 }
 
@@ -360,11 +373,9 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
             }));
 
     bool emit_sam = true;
-    bool emit_fastq = false;
-    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
-                  out_dir.has_value());
+    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_sam, ref_req, out_dir.has_value());
 
-    auto writer_builder = BasecallHtsFileWriterBuilder(emit_fastq, emit_sam, ref_req, out_dir,
+    auto writer_builder = BasecallHtsFileWriterBuilder(false, emit_sam, false, ref_req, out_dir,
                                                        threads, p_cb, d_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
@@ -376,6 +387,7 @@ class HtsFileWriterBuilderTest : public HtsFileWriterBuilder {
 public:
     HtsFileWriterBuilderTest(bool emit_fastq,
                              bool emit_sam,
+                             bool emit_cram,
                              bool reference_requested,
                              const std::optional<std::string>& output_dir,
                              int writer_threads,
@@ -386,6 +398,7 @@ public:
                              bool is_fd_pipe)
             : HtsFileWriterBuilder(emit_fastq,
                                    emit_sam,
+                                   emit_cram,
                                    reference_requested,
                                    output_dir,
                                    writer_threads,
@@ -415,37 +428,37 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder tty and pipe settings", TEST_G
 
             }));
 
-    bool emit_fastq = false;
-    CATCH_CAPTURE(to_string(output_mode), emit_fastq, emit_sam, ref_req, out_dir.has_value(),
-                  is_fd_tty, is_fd_pipe);
+    CATCH_CAPTURE(to_string(output_mode), emit_sam, ref_req, out_dir.has_value(), is_fd_tty,
+                  is_fd_pipe);
 
-    auto writer_builder = HtsFileWriterBuilderTest(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
+    auto writer_builder =
+            HtsFileWriterBuilderTest(false, emit_sam, false, ref_req, out_dir, threads, p_cb, d_cb,
+                                     GPU_NAMES, is_fd_tty, is_fd_pipe);
     auto writer = writer_builder.build();
 
     CATCH_CHECK(is_fd_tty != is_fd_pipe);
     CATCH_CHECK(writer->get_mode() == output_mode);
 }
 
-CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM happy paths", TEST_GROUP) {
-    auto [output_mode, finalise_noop, ref_req, out_dir] =
-            GENERATE(table<OutputMode, bool, bool, MaybeString>({
-                    {OutputMode::BAM, true, false, std::nullopt},
-                    {OutputMode::BAM, true, false, "out"},
-                    {OutputMode::BAM, true, true, std::nullopt},
-                    // BAM will sort if writing to file AND reference is set
-                    {OutputMode::BAM, false, true, "out"},
-            }));
+CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM/CRAM happy paths", TEST_GROUP) {
+    auto [finalise_noop, ref_req, out_dir] = GENERATE(table<bool, bool, MaybeString>({
+            {true, false, std::nullopt},
+            {true, false, "out"},
+            {true, true, std::nullopt},
+            // BAM/CRAM will sort if writing to file AND reference is set
+            {false, true, "out"},
+    }));
+
+    auto [output_mode] = GENERATE(table<OutputMode>({OutputMode::BAM, OutputMode::CRAM}));
 
     bool is_fd_tty = false;
     bool is_fd_pipe = false;
-    bool emit_sam = false;
-    bool emit_fastq = false;
-    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_fastq, emit_sam, ref_req,
-                  out_dir.has_value(), is_fd_tty, is_fd_pipe);
+    CATCH_CAPTURE(to_string(output_mode), finalise_noop, ref_req, out_dir.has_value(), is_fd_tty,
+                  is_fd_pipe);
 
-    auto writer_builder = HtsFileWriterBuilderTest(emit_fastq, emit_sam, ref_req, out_dir, threads,
-                                                   p_cb, d_cb, GPU_NAMES, is_fd_tty, is_fd_pipe);
+    auto writer_builder = HtsFileWriterBuilderTest(false, false, output_mode == OutputMode::CRAM,
+                                                   ref_req, out_dir, threads, p_cb, d_cb, GPU_NAMES,
+                                                   is_fd_tty, is_fd_pipe);
 
     auto writer = writer_builder.build();
 
@@ -463,7 +476,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     auto description_cb = utils::DescriptionCallback(
             [&description_res](const std::string& value) { description_res = value; });
     auto writer_builder =
-            BasecallHtsFileWriterBuilder(true, false, false, std::nullopt, writer_threads,
+            BasecallHtsFileWriterBuilder(true, false, false, false, std::nullopt, writer_threads,
                                          progress_cb, description_cb, GPU_NAMES);
     auto writer = writer_builder.build();
 
@@ -492,6 +505,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
             {OutputMode::FASTQ},
             {OutputMode::SAM},
             {OutputMode::BAM},
+            {OutputMode::CRAM},
             {OutputMode::UBAM},
     }));
 
@@ -528,11 +542,13 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
     const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
     const auto root = tmp_dir.m_path.string();
 
-    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+    // subfolder here is NOT the file extension but the output folder name
+    auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
             {OutputMode::SAM, "bam"},
             {OutputMode::BAM, "bam"},
             {OutputMode::UBAM, "bam"},
+            {OutputMode::CRAM, "bam"},
     }));
 
     auto [attrs, expected_dir, expected_stem] = GENERATE_COPY(table<HtsData::ReadAttributes,
@@ -551,7 +567,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                              0,
                      },
                      "experiment-id/sample-id/19700101_0000_position-id_flowcell-id_protocol/" +
-                             ftype + "_pass",
+                             subfolder + "_pass",
                      "flowcell-id_pass_protocol_acquisit_0",
              },
              {
@@ -566,7 +582,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
                              946782245000 /* 2000/01/02 03:04:05 */,
                              1,
                      },
-                     "exp/sample/20000102_0304_pos_fc_proto/" + ftype + "_pass",
+                     "exp/sample/20000102_0304_pos_fc_proto/" + subfolder + "_pass",
                      "fc_pass_proto_acq_0",
              }}));
 
@@ -592,9 +608,11 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
     const auto root = tmp_dir.m_path.string();
 
-    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+    auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
             {OutputMode::BAM, "bam"},
+            {OutputMode::SAM, "bam"},
+            {OutputMode::CRAM, "bam"},
     }));
 
     auto [barcode_name, alias, description] =
@@ -626,7 +644,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     };
 
     const std::string expected_base =
-            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
+            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + subfolder + "_pass";
 
     const auto expected_classification_folder =
             alias.empty() ? fs::path("unclassified") : fs::path(alias);
@@ -668,9 +686,11 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
     const auto root = tmp_dir.m_path.string();
 
-    auto [output_mode, ftype] = GENERATE(table<OutputMode, std::string>({
+    auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
             {OutputMode::BAM, "bam"},
+            {OutputMode::SAM, "bam"},
+            {OutputMode::CRAM, "bam"},
     }));
 
     auto [barcode_name, alias, description] =
@@ -695,7 +715,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     };
 
     const std::string expected_base =
-            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + ftype + "_pass";
+            "barcoding_run/20000102_0304_fc-pos_PAO25751_proto-id/" + subfolder + "_pass";
 
     const auto expected_classification_folder =
             alias.empty() ? fs::path("unclassified") : fs::path(alias);

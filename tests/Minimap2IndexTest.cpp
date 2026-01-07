@@ -152,6 +152,7 @@ CATCH_TEST_CASE_METHOD(
 }
 
 CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
+    std::unordered_map<std::string, std::string> sequences;
     // Create large index file
     auto temp_dir = tests::make_temp_dir("mm2_split_index_test");
     auto temp_input_file = temp_dir.m_path / "input.fa";
@@ -173,6 +174,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         bam_set1(rec.get(), read_id.length(), read_id.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0,
                  seq.length(), seq.c_str(), nullptr, 0);
         writer.write(rec.get());
+        sequences[read_id] = seq;
     }
     hts_file.finalise([](size_t) { /* noop */ });
 
@@ -190,8 +192,12 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         auto header_records = cut.get_sequence_records_for_header();
         CATCH_CHECK(header_records.size() == 5);
         for (size_t i = 0; i < header_records.size(); ++i) {
-            CATCH_CHECK(header_records[i].first == ("read" + std::to_string(i + 1)));
-            CATCH_CHECK(header_records[i].second == 10000u);
+            CATCH_CHECK(header_records[i].sequence_name == ("read" + std::to_string(i + 1)));
+            CATCH_CHECK(header_records[i].length == 10000u);
+            CATCH_CHECK(header_records[i].uri != nullptr);
+            MD5Hex hex;
+            get_sequence_md5(hex, sequences[header_records[i].sequence_name]);
+            CATCH_CHECK(std::string(header_records[i].md5) == std::string(hex));
         }
     }
 
@@ -202,14 +208,20 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         CATCH_CHECK(cut.load(temp_input_file.string(), 1, true) == IndexLoadResult::success);
         auto header_records = cut.get_sequence_records_for_header();
         CATCH_CHECK(header_records.size() == 1);
-        CATCH_CHECK(std::string(header_records[0].first) == "read1");
-        CATCH_CHECK(header_records[0].second == 10000u);
+        CATCH_CHECK(header_records[0].sequence_name == "read1");
+        CATCH_CHECK(header_records[0].length == 10000u);
+        CATCH_CHECK(header_records[0].uri != nullptr);
+        MD5Hex hex;
+        get_sequence_md5(hex, sequences[header_records[0].sequence_name]);
+        CATCH_CHECK(std::string(header_records[0].md5) == std::string(hex));
 
         for (int i = 2; i < 6; ++i) {
             CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::success);
             header_records = cut.get_sequence_records_for_header();
-            CATCH_CHECK(header_records[0].first == ("read" + std::to_string(i)));
-            CATCH_CHECK(header_records[0].second == 10000u);
+            CATCH_CHECK(header_records[0].sequence_name == ("read" + std::to_string(i)));
+            CATCH_CHECK(header_records[0].length == 10000u);
+            get_sequence_md5(hex, sequences[header_records[0].sequence_name]);
+            CATCH_CHECK(std::string(header_records[0].md5) == std::string(hex));
         }
         CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::end_of_index);
     }

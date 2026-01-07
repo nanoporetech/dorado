@@ -33,6 +33,10 @@ void StreamHtsFileWriter::set_hts_file_header(utils::HtsFile& hts_file) const {
         return;
     }
 
+    if (m_mode == OutputMode::CRAM) {
+        hts_file.set_cram_reference(m_reference);
+    }
+
     if (m_shared_header != nullptr) {
         hts_file.set_header(m_shared_header.get());
         return;

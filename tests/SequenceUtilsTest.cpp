@@ -51,6 +51,19 @@ CATCH_TEST_CASE(TEST_GROUP ": Test compute_overlap", TEST_GROUP) {
     }
 }
 
+CATCH_TEST_CASE(TEST_GROUP ": Test int_to_base", TEST_GROUP) {
+    CATCH_CHECK(int_to_base(0) == 'A');
+    CATCH_CHECK(int_to_base(1) == 'C');
+    CATCH_CHECK(int_to_base(2) == 'G');
+    CATCH_CHECK(int_to_base(3) == 'T');
+}
+
+CATCH_TEST_CASE(TEST_GROUP ": Test int_sequence_to_string", TEST_GROUP) {
+    const std::vector<uint8_t> seq4 = {0, 1, 2, 3, 3, 2, 1, 0, 0, 3, 3, 1, 1, 2, 2};
+    const std::string seq = int_sequence_to_string(seq4);
+    CATCH_CHECK(seq == "ACGTTGCAATTCCGG");
+}
+
 CATCH_TEST_CASE(TEST_GROUP ": Test base_to_int", TEST_GROUP) {
     CATCH_CHECK(base_to_int('A') == 0);
     CATCH_CHECK(base_to_int('C') == 1);
@@ -68,6 +81,16 @@ CATCH_TEST_CASE(TEST_GROUP ": Test sequence_to_ints", TEST_GROUP) {
     CATCH_SECTION("Test single char") {
         auto actual_results = sequence_to_ints("G");
         std::vector<int> expected_results = {2};
+        CATCH_CHECK(expected_results == actual_results);
+    }
+
+    CATCH_SECTION("Test sequence") {
+        auto actual_results = sequence_to_ints(
+                "ACGACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTACGTT");
+        std::vector<int> expected_results = {0, 1, 2, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1,
+                                             2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2,
+                                             3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3,
+                                             0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3, 3};
         CATCH_CHECK(expected_results == actual_results);
     }
 }
