@@ -320,6 +320,7 @@ build:linux:x86:coverage:
   artifacts:
     paths: 
       - build/dorado_test_coverage.xml
+      - build/dorado_test_coverage/
     reports:
       coverage_report:
         coverage_format: cobertura
