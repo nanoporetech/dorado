@@ -120,7 +120,6 @@ stats::NamedStats HtsFileWriter::sample_stats() const {
     stats["primary_records_written"] = atomic_load(m_primary_records_written);
 
     stats["unique_simplex_reads_written"] = atomic_load(m_primary_simplex_reads_written);
-    stats["unique_simplex_reads_written"] = atomic_load(m_primary_simplex_reads_written);
     stats["duplex_reads_written"] = atomic_load(m_duplex_reads_written);
     stats["split_reads_written"] = atomic_load(m_split_reads_written);
     return stats;
