@@ -57,7 +57,7 @@ auto get_num_reads_written(const stats::NamedStats& stats) {
     };
 
     return size_t_stat("HtsWriterNode.unique_simplex_reads_written") +
-           size_t_stat("BarcodeDemuxerNode.demuxed_reads_written");
+           size_t_stat("WriterNode.HtsFileWriter.unique_simplex_reads_written");
 }
 
 std::size_t to_size_t(double value) { return static_cast<std::size_t>(std::llround(value)); }
