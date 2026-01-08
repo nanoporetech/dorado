@@ -30,10 +30,10 @@ example_data=${data_dir}/pod5/dna_r10.4.1_e8.2_400bps_5khz
 common_args=" --recursive --max-reads 1 -b 128 -v "
 models_directory_arg="--models-directory ${models_directory}"
 
-TEST_DOWNLOADER_NAMED=1
-TEST_DOWNLOADER_VARIANT=1
-TEST_BASECALLER=1
-TEST_BASECALLER_PATH=1
+RUN_TESTS_DOWNLOADER_NAMED=1
+RUN_TESTS_DOWNLOADER_VARIANT=1
+RUN_TESTS_BASECALLER=1
+RUN_TESTS_BASECALLER_PATH=1
 
 check_exists() {
     set +x
@@ -68,7 +68,7 @@ title() {
 }
 
 # Testing dorado downloader
-if [ $TEST_DOWNLOADER_NAMED -eq 1 ]; then 
+if [ $RUN_TESTS_DOWNLOADER_NAMED -eq 1 ]; then 
 {
     title "Test we can download a named model"
     simplex_name="rna004_130bps_fast@v5.2.0"
@@ -116,9 +116,9 @@ if [ $TEST_DOWNLOADER_NAMED -eq 1 ]; then
         fi
     popd
 }
-fi # TEST_DOWNLOADER_NAMED
+fi # RUN_TESTS_DOWNLOADER_NAMED
 
-if [ $TEST_DOWNLOADER_VARIANT -eq 1 ]; then 
+if [ $RUN_TESTS_DOWNLOADER_VARIANT -eq 1 ]; then 
 {
     title "Test we can download using a model complex"
     local_dir="${output_dir}/download_complex"
@@ -145,10 +145,10 @@ if [ $TEST_DOWNLOADER_VARIANT -eq 1 ]; then
         check_exists ${local_dir} "${expected[@]}"
     popd
 }
-fi # TEST_DOWNLOADER_VARIANT
+fi # RUN_TESTS_DOWNLOADER_VARIANT
 
 
-if [ $TEST_BASECALLER -eq 1 ]; then 
+if [ $RUN_TESTS_BASECALLER -eq 1 ]; then 
 {
     title "Test we can auto download using a model complex which is then cleaned up"
     local_dir="${output_dir}/basecaller_variant_complex_temporary"
@@ -266,9 +266,9 @@ if [ $TEST_BASECALLER -eq 1 ]; then
         cat basecaller.stderr.txt >&2
     popd
 }
-fi # TEST_BASECALLER
+fi # RUN_TESTS_BASECALLER
 
-if [ $TEST_BASECALLER_PATH -eq 1 ]; then 
+if [ $RUN_TESTS_BASECALLER_PATH -eq 1 ]; then 
 {
     title "Test we can use a model by path"
     local_dir="${output_dir}/basecaller_path"
@@ -333,7 +333,7 @@ if [ $TEST_BASECALLER_PATH -eq 1 ]; then
         fi
     popd
 }
-fi
+fi # RUN_TESTS_BASECALLER_PATH
 
 title "DONE"
 

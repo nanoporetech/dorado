@@ -210,8 +210,7 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
 
     if (rg_to_attrs_lut.empty()) {
         // No RG lines in the BAM header: route this file through the fallback merged header.
-        m_merged_headers_map->at(m_fallback_read_attrs)
-                ->add_header(header.get(), path.string(), "");
+        merged_headers.at(m_fallback_read_attrs)->add_header(header.get(), path.string(), "");
         return;
     }
 

@@ -31,8 +31,8 @@ void check_read_attrs(const dorado::HtsData::ReadAttributes &result,
     CATCH_CHECK(result.is_status_pass == expected.is_status_pass);
 }
 
-fs::path write_bam_without_rg(const fs::path &output_dir) {
-    auto bam_path = output_dir / "no_rg.bam";
+fs::path write_bam_without_rg(const fs::path &output_dir, const std::string &filename) {
+    auto bam_path = output_dir / filename;
     dorado::HtsFilePtr file(hts_open(bam_path.string().c_str(), "wb"));
     CATCH_REQUIRE(file != nullptr);
 
@@ -43,7 +43,7 @@ fs::path write_bam_without_rg(const fs::path &output_dir) {
     CATCH_REQUIRE(sam_hdr_write(file.get(), header.get()) == 0);
 
     dorado::BamPtr record(bam_init1());
-    const std::string qname = "read1";
+    const std::string qname{"read1"};
     bam_set1(record.get(), qname.size(), qname.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0, 1, "*",
              "*", 0);
     CATCH_REQUIRE(sam_write1(file.get(), header.get(), record.get()) >= 0);
@@ -116,7 +116,7 @@ CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
 
 CATCH_TEST_CASE(TEST_GROUP " fallback for BAM without RG lines", TEST_GROUP) {
     auto temp_dir = dorado::tests::make_temp_dir("header_mapper_no_rg");
-    auto bam_path = write_bam_without_rg(temp_dir.m_path);
+    auto bam_path = write_bam_without_rg(temp_dir.m_path, "no_rg.bam");
 
     utils::HeaderMapper mapper({bam_path}, false);
     HtsReader reader(bam_path.string(), std::nullopt);
@@ -128,6 +128,41 @@ CATCH_TEST_CASE(TEST_GROUP " fallback for BAM without RG lines", TEST_GROUP) {
     CATCH_CHECK_NOTHROW(merged_header.get_sq_mapping(bam_path.string()));
     const auto &mapping = merged_header.get_sq_mapping(bam_path.string());
     CATCH_CHECK(mapping.size() == 1);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " fallback merges multiple BAMs without RG lines", TEST_GROUP) {
+    // Create two BAMS without RG lines
+    auto temp_dir = dorado::tests::make_temp_dir("header_mapper_multi_no_rg");
+    auto first_bam = write_bam_without_rg(temp_dir.m_path, "no_rg_one.bam");
+    auto second_bam = write_bam_without_rg(temp_dir.m_path, "no_rg_two.bam");
+
+    // Map headers for both files
+    utils::HeaderMapper mapper({first_bam, second_bam}, false);
+
+    // Load attrs and headers of each
+    HtsReader first_reader(first_bam.string(), std::nullopt);
+    CATCH_REQUIRE(first_reader.read());
+    const auto &first_attrs = mapper.get_read_attributes(first_reader.record.get());
+    const auto &first_header = mapper.get_merged_header(first_attrs);
+
+    HtsReader second_reader(second_bam.string(), std::nullopt);
+    CATCH_REQUIRE(second_reader.read());
+    const auto &second_attrs = mapper.get_read_attributes(second_reader.record.get());
+    const auto &second_header = mapper.get_merged_header(second_attrs);
+
+    // Expect headers to be the same instance
+    CATCH_CHECK(&first_header == &second_header);
+
+    // The header should include both files
+    CATCH_CHECK_NOTHROW(first_header.get_sq_mapping(first_bam.string()));
+    CATCH_CHECK_NOTHROW(first_header.get_sq_mapping(second_bam.string()));
+
+    // There should be more extra records (to unknown files)
+    CATCH_CHECK(first_header.get_sq_mapping().size() == 2);
+
+    // There should be no extra records in the maps
+    CATCH_CHECK(first_header.get_sq_mapping(first_bam.string()).size() == 1);
+    CATCH_CHECK(first_header.get_sq_mapping(second_bam.string()).size() == 1);
 }
 
 };  // namespace dorado::utils::test
