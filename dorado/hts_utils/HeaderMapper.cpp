@@ -208,6 +208,13 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
 
     auto& merged_headers = *m_merged_headers_map;
 
+    if (rg_to_attrs_lut.empty()) {
+        // No RG lines in the BAM header: route this file through the fallback merged header.
+        m_merged_headers_map->at(m_fallback_read_attrs)
+                ->add_header(header.get(), path.string(), "");
+        return;
+    }
+
     // Add the new read attrs and merge the headers for each output
     // file only including the read groups that will be used.
     for (const auto& [read_group_id, read_attrs] : rg_to_attrs_lut) {

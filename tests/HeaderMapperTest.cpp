@@ -2,10 +2,12 @@
 
 #include "TestUtils.h"
 #include "hts_utils/hts_types.h"
+#include "read_pipeline/base/HtsReader.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
+#include <htslib/sam.h>
 
 #include <filesystem>
 #include <unordered_map>
@@ -27,6 +29,26 @@ void check_read_attrs(const dorado::HtsData::ReadAttributes &result,
     CATCH_CHECK(result.protocol_start_time_ms == expected.protocol_start_time_ms);
     CATCH_CHECK(result.subread_id == expected.subread_id);
     CATCH_CHECK(result.is_status_pass == expected.is_status_pass);
+}
+
+fs::path write_bam_without_rg(const fs::path &output_dir) {
+    auto bam_path = output_dir / "no_rg.bam";
+    dorado::HtsFilePtr file(hts_open(bam_path.string().c_str(), "wb"));
+    CATCH_REQUIRE(file != nullptr);
+
+    dorado::SamHdrPtr header(sam_hdr_init());
+    CATCH_REQUIRE(header != nullptr);
+    CATCH_REQUIRE(sam_hdr_add_line(header.get(), "HD", "VN", "1.6", "SO", "unknown", nullptr) == 0);
+    CATCH_REQUIRE(sam_hdr_add_line(header.get(), "SQ", "SN", "ref", "LN", "10", nullptr) == 0);
+    CATCH_REQUIRE(sam_hdr_write(file.get(), header.get()) == 0);
+
+    dorado::BamPtr record(bam_init1());
+    const std::string qname = "read1";
+    bam_set1(record.get(), qname.size(), qname.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0, 1, "*",
+             "*", 0);
+    CATCH_REQUIRE(sam_write1(file.get(), header.get(), record.get()) >= 0);
+
+    return bam_path;
 }
 }  // namespace
 
@@ -90,6 +112,22 @@ CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
             CATCH_REQUIRE(sam_header != nullptr);
         }
     }
+}
+
+CATCH_TEST_CASE(TEST_GROUP " fallback for BAM without RG lines", TEST_GROUP) {
+    auto temp_dir = dorado::tests::make_temp_dir("header_mapper_no_rg");
+    auto bam_path = write_bam_without_rg(temp_dir.m_path);
+
+    utils::HeaderMapper mapper({bam_path}, false);
+    HtsReader reader(bam_path.string(), std::nullopt);
+    CATCH_REQUIRE(reader.read());
+
+    const auto &attrs = mapper.get_read_attributes(reader.record.get());
+    const auto &merged_header = mapper.get_merged_header(attrs);
+
+    CATCH_CHECK_NOTHROW(merged_header.get_sq_mapping(bam_path.string()));
+    const auto &mapping = merged_header.get_sq_mapping(bam_path.string());
+    CATCH_CHECK(mapping.size() == 1);
 }
 
 };  // namespace dorado::utils::test

@@ -283,6 +283,22 @@ if [ $TEST_POSTRUN_DEMUX -eq 1 ]; then
     )
     check_structure ${dest} "${expected[@]}"
 }
+{
+    title "Test BAM file without RG lines"
+    calls_notrim_no_rg_sam="${postrun_output_dir}/calls.no-trim.no-rg.sam"
+    samtools view -h ${calls_notrim_bam} | grep -v '^@RG' > ${calls_notrim_no_rg_sam}
+
+    dest="${postrun_output_dir}/no_rg_sam"
+    $dorado_bin demux ${calls_notrim_no_rg_sam} --kit-name SQK-RBK114-96 --output-dir ${dest}
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    core="./no_sample/19700101_0000_0_UNKNOWN_00000000"
+    expected=(
+        "${core}/bam_pass/unclassified/UNKNOWN_pass_unclassified_00000000_00000000_0.bam"
+        "${core}/bam_pass/barcode01/UNKNOWN_pass_barcode01_00000000_00000000_0.bam"
+        "${core}/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
 fi # TEST_POSTRUN_DEMUX
 
 # Testing for post-run demux where we have untrimmed basecalls and run barcode classification
