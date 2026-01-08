@@ -55,7 +55,7 @@ fi
 
 echo dorado download models
 $dorado_bin download --list
-$dorado_bin download --list-structured
+$dorado_bin download --list-structured | $PYTHON ./${test_dir}/validate_json.py -
 $dorado_bin download --model ${model_name_5k} ${models_directory_arg}
 model_5k=${models_directory}/${model_name_5k}
 $dorado_bin download --model ${model_name_5k_v43} ${models_directory_arg}
