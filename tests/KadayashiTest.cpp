@@ -7,6 +7,7 @@
 #include "types.h"
 
 #include <catch2/catch_test_macros.hpp>
+//#include <spdlog/spdlog.h>
 #include <htslib/faidx.h>
 #include <htslib/khash.h>
 #include <htslib/khash_str2int.h>
@@ -47,7 +48,11 @@ bool compare_haptags(const std::unordered_map<std::string, int32_t> &result,
 
 CATCH_TEST_CASE("kadayashi blocked bloom filter basic operation", TEST_GROUP) {
     kadayashi::BlockedBloomFilter bf(4, 16);  // tiny
-    bf.enable();
+    const bool enable1 = bf.enable();
+    const bool enable2 = bf.enable();
+    CATCH_CHECK(enable1);
+    CATCH_CHECK_FALSE(enable2);
+
     bf.insert(42);
     bool real_is_found = bf.query(42);
     bool fake_is_found = bf.query(43);

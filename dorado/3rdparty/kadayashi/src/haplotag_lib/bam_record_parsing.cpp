@@ -3,10 +3,18 @@
 #include "sequence_utility.h"
 
 #include <htslib/sam.h>
+#include <spdlog/fmt/bundled/format.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <charconv>
 #include <cstdio>
+
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#endif
 
 namespace kadayashi {
 
@@ -40,6 +48,7 @@ const unsigned char md_op_table[256]={
     4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,  4, 4, 4, 4,
 };
 // clang-format on
+
 }  // namespace
 
 bool sancheck_MD_tag_exists_and_is_valid(const bam1_t *aln) {
@@ -93,7 +102,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     //        initial unphased pileup, and caller should ensure no race.
     //        (2)If the bloom filter is provided and is frozen, we will check
     //        with it and only collect known variants.
-    constexpr int DEBUG_PRINT = 0;
+    constexpr bool DEBUG_PRINT = false;
     bool failed = false;
 
     int self_start = 0;
@@ -106,8 +115,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     uint32_t ref_pos = ref_start;
     uint32_t self_pos = 0;
     if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        fprintf(stderr, "[dbg::%s] at read %s (ref start pos=%u)\n", __func__, bam_get_qname(aln),
-                ref_start);
+        LOG_TRACE("[{}] at read {} (ref start pos={})", __func__, bam_get_qname(aln), ref_start);
     }
 
     uint32_t op = std::numeric_limits<uint32_t>::max();
@@ -159,8 +167,8 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     int prev_md_i = 0;
     int prev_md_type, md_type;
     if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        fprintf(stderr, "[dbg::%s] qn=%s\n", __func__, bam_get_qname(aln));
-        fprintf(stderr, "[dbg::%s] MD=%s\n", __func__, md_s);
+        LOG_TRACE("[{}] qn={:s}", __func__, bam_get_qname(aln));
+        LOG_TRACE("[{}] MD={:s}", __func__, md_s);
     }
 
     // (init)
@@ -238,9 +246,8 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                         snp_base_dbg[y] =
                                 filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, x)], min_base_qv);
                     }
-                    fprintf(stderr,
-                            "[dbg::%s] pushed SNP ref_pos=%d self_pos=%d base=%s, -7~+1:%s\n",
-                            __func__, ref_pos, self_pos, snp_base.c_str(), snp_base_dbg);
+                    spdlog::trace("[{}] pushed SNP ref_pos={} self_pos={} base={}, -7~+1:{}",
+                                  __func__, ref_pos, self_pos, snp_base, snp_base_dbg);
                 }
                 ref_pos++;
                 self_pos++;
@@ -257,17 +264,20 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                      [](const qa_t &a, const qa_t &b) { return a.pos < b.pos; });
 
     if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
+        //print_dbg_var_variants(vars);
         for (size_t tmpi = 0; tmpi < vars.size(); tmpi++) {
-            const int tmpop = vars[tmpi].allele[vars[tmpi].allele.size() - 2];
-            fprintf(stderr, "[dbg::%s]    op=%c pos=%d len=%d ", __func__, "MXID"[tmpop],
-                    vars[tmpi].pos, (int)std::ssize(vars[tmpi].allele) - 1);
+            const int tmpop = vars[tmpi].allele[vars[tmpi].allele.size() -
+                                                2];  // -2 because the last char is the cigar op
+            std::string tmp =
+                    fmt::format("[{}]    op={:c} pos={} (0-idx) len={} ", __func__, "MXID"[tmpop],
+                                vars[tmpi].pos, std::ssize(vars[tmpi].allele) - 1);
             if (tmpop > 0) {
-                fprintf(stderr, "seq=");
+                tmp += "seq=";
                 for (int64_t tmpj = 0; tmpj < std::ssize(vars[tmpi].allele) - 1; tmpj++) {
-                    fprintf(stderr, "%c", "ACGT?"[vars[tmpi].allele[tmpj]]);
+                    tmp += "ACGT?"[vars[tmpi].allele[tmpj]];
                 }
             }
-            fprintf(stderr, "\n");
+            LOG_TRACE("{}", tmp);
         }
     }
 
