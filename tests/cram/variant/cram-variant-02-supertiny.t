@@ -13,5 +13,7 @@ Run a supertiny test case.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
   > cat out/out.vcf | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
+  > grep "\[E::" out/stderr || true
   Exit code: 0
   [warning] This is an alpha preview of Dorado Variant. Results should be considered experimental.
+
