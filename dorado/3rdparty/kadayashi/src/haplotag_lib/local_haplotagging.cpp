@@ -483,7 +483,8 @@ interval_t expand_query_interval(BamFileView &hf,
     // too long.
     constexpr uint32_t OFFSET_DEFAULT = 50000;
 
-    const std::string itvl_left = create_region_string(refname, itvl_start, itvl_start);
+    const std::string itvl_left =
+            create_region_string(refname, itvl_start, itvl_start + 1);  // +1 to get 1 base
 
     BamPtr aln = BamPtr(bam_init1(), BamDestructor());
     HtsItrPtr bamitr =
@@ -501,7 +502,8 @@ interval_t expand_query_interval(BamFileView &hf,
     }
 
     //right
-    const std::string itvl_right = create_region_string(refname, itvl_end, itvl_end);
+    const std::string itvl_right =
+            create_region_string(refname, itvl_end, itvl_end + 1);  // +1 to get 1 base
     bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str()), HtsItrDestructor());
     while (sam_itr_next(hf.fp, bamitr.get(), aln.get()) >= 0) {
         const uint32_t end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
