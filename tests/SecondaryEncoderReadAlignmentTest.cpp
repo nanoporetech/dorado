@@ -10,6 +10,7 @@
 #include <catch2/generators/catch_generators.hpp>
 #include <htslib/sam.h>
 
+#include <algorithm>
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
@@ -17,6 +18,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_set>
 #include <vector>
 
 #define TEST_GROUP "[SecondaryEncoderReadAlignment]"
@@ -147,6 +149,23 @@ void eval_sample(const dorado::secondary::Sample& expected,
     CATCH_CHECK(result.positions_minor == expected.positions_minor);
     CATCH_CHECK(result.depth.equal(expected.depth));
     CATCH_CHECK(result.features.equal(expected.features));
+}
+
+template <typename T>
+std::vector<T> get_unique_sorted_column(const at::Tensor& in_tensor, const int64_t column_id) {
+    using namespace torch::indexing;
+    const torch::Tensor flat =
+            in_tensor.index({Slice(), Slice(), column_id}).flatten().to(torch::kCPU).contiguous();
+    const T* data = flat.data_ptr<T>();
+    const int64_t n = flat.numel();
+    std::unordered_set<T> uniq;
+    uniq.reserve(n);
+    for (int64_t i = 0; i < n; ++i) {
+        uniq.insert(data[i]);
+    }
+    std::vector<T> uniq_vec(std::begin(uniq), std::end(uniq));
+    std::sort(std::begin(uniq_vec), std::end(uniq_vec));
+    return uniq_vec;
 }
 
 }  // namespace
@@ -310,6 +329,67 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         CATCH_CHECK(result.read_ids_right == expected_read_ids_right);
         CATCH_CHECK(shape == expected_shape);
     }
+}
+
+CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
+    /**
+     * This test computes the haptags internally instead of loading them from the BAM file.
+     *
+     * NOTE: Kadayashi is actually tested in another unit test file. This only checks the code path which
+     * invokes Kadayashi. The difference is that the internally hardcoded parameters of the medaka_read_matrix
+     * are too stringent for this small test case and all haptags end up equal to zero here.
+     * However, this tests provides code coverage for this path.
+     */
+
+    // Test data.
+    const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-02-supertiny";
+    const std::filesystem::path in_bam_aln_fn = test_data_dir / "in.aln.bam";
+    const std::filesystem::path in_ref_fn = test_data_dir / "in.ref.fasta.gz";
+
+    // Parameters which we aren't testing at the moment.
+    const std::vector<std::string> dtypes{};
+    const std::string tag_name{};
+    const int32_t tag_value{0};
+    const bool tag_keep_missing{false};
+    const std::string read_group{};
+    const int32_t min_mapq{1};
+    const int32_t max_reads{100};
+    const bool row_per_read{false};
+    const bool clip_to_zero{true};
+    const bool right_align_insertions{false};
+    const bool include_dwells{true};
+    const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
+    const double min_snp_accuracy = 0.0;
+    const std::optional<std::filesystem::path> phasing_bin{};
+    const std::string ref_name{"chr20"};
+    const int32_t ref_id = 123;
+    const int64_t ref_start = 0;
+    const int64_t ref_end = 10000;
+
+    // Important for this test - testing that the COMPUTE path works.
+    const HaplotagSource hap_source{HaplotagSource::COMPUTE};
+
+    // Expected results.
+    const std::vector<int64_t> expected_shape{10491, 20, 6};
+    const std::vector<int8_t> expected_haptags{0};
+
+    // Run UUT.
+    EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
+                                 tag_keep_missing, read_group, min_mapq, max_reads,
+                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                                 right_align_insertions, include_haplotype_column, hap_source,
+                                 phasing_bin, include_snp_qv_column);
+
+    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+
+    const std::vector<int64_t> shape(std::begin(result.features.sizes()),
+                                     std::end(result.features.sizes()));
+
+    const std::vector<int8_t> haptags = get_unique_sorted_column<int8_t>(result.features, -1);
+
+    CATCH_CHECK(shape == expected_shape);
+    CATCH_CHECK(haptags == expected_haptags);
 }
 
 CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
