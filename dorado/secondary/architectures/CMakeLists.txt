@@ -17,6 +17,8 @@ target_sources(dorado_secondary
         model_torch_base.cpp
         model_torch_script.cpp
         model_torch_script.h
+        model_variant_perceiver.cpp
+        model_variant_perceiver.h
 )
 
 target_include_directories(dorado_secondary

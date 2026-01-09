@@ -12,6 +12,7 @@ dorado_add_library(
         dorado_utils
     DEPENDS_PRIVATE
         cxxpool
+        dorado_nn
         dorado_version
         htslib
         intervaltree

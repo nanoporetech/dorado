@@ -142,7 +142,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
 
                 // Half-precision if needed.
                 if ((device_info.type == DeviceType::CUDA) && !full_precision) {
-                    spdlog::debug("[create_resources] Converting the model to half.");
+                    spdlog::debug("[create_resources] Converting the model to half precision.");
                     model->to_half();
                 } else {
                     spdlog::debug("[create_resources] Using full precision.");
