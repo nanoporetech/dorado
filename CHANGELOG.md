@@ -2,6 +2,20 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.3.1] (12 January 2026)
+
+This release of Dorado updates summary files and the output structure of Dorado `aligner` to comply with the [Oxford Nanopore Output Specifications (26.01)](https://nanoporetech.github.io/ont-output-specifications/26.01/). Changes to the file outputs include:
+* Dorado `summary` now complies with the 26.01 Output Specifications.
+* Dorado `demux` with `--emit-summary` now emits a full summary file, and fixes a bug causing barcode IDs to show up "unclassified" when using `--emit-fastq`.
+* Dorado `basecaller` with `--emit-summary` now includes the correct number of samples in `num_template_events` in the emitted summary file.
+* Dorado `aligner` with `--emit-fastq` now adds `SM` and `al` tags in emitted FASTQ files and uses these tags when populating the filepath.
+
+This release also improves stability, including fixing a CUDA error that can arise during short read basecalling and enabling Dorado `demux` to run properly when the `-o` parameter is omitted.
+
+* cb8fe64a042458a4a61c46cfe758673d32fadb2f - Update to specification-compliant outputs and fix several bugs for Dorado `summary`, `demux`, `basecaller`, and `aligner`
+* d7a6de37a67e8b2db92ff9ffa6269856f279f48b - Fix bug causing `CUDA error: an illegal memory access` when basecalling very short reads
+
+
 # [1.3.0] (21 November 2025)
 
 This release of Dorado expands GPU compatibility with support for Nvidia DGX Spark* and Jetson Thor, and updates to Torch 2.9.0. Dorado 1.3.0 introduces an `--emit-summary` option in the basecaller and improved handling of modified base models, as well as several fixes to `summary`, `demux`, and `basecaller` and performance improvements to `polish` and `variant`.
