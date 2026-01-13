@@ -203,11 +203,13 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
     const std::shared_ptr<std::string> uri = std::make_shared<std::string>(
             "file://" + std::filesystem::weakly_canonical(m_index_reader.file).string());
 
+    utils::MD5Generator md5gen;
+    m_header_records_cache.reserve(m_header_records_cache.size() + index.n_seq);
     for (uint32_t j = 0; j < index.n_seq; ++j) {
         utils::HeaderSQRecord record{std::string(index.seq[j].name), index.seq[j].len, uri};
         std::vector<uint8_t> seq(record.length);
         mm_idx_getseq(&index, j, 0, record.length, seq.data());
-        utils::get_sequence_md5(record.md5, seq);
+        md5gen.get_sequence_md5(record.md5, seq);
         m_header_records_cache.emplace_back(std::move(record));
     }
 }

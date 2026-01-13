@@ -23,16 +23,18 @@ void add_sq_hdr(sam_hdr_t* hdr, const HeaderSQRecords& seqs) {
     }
 }
 
-void get_sequence_md5(MD5Hex& hex, const std::string& sequence) {
-    hts_md5_context* ctx = hts_md5_init();
-    hts_md5_update(ctx, sequence.data(), static_cast<uint32_t>(sequence.size()));
+MD5Generator::MD5Generator() : m_ctx(hts_md5_init()) {}
+MD5Generator::~MD5Generator() { hts_md5_destroy(m_ctx); }
+
+void MD5Generator::get_sequence_md5(MD5Hex& hex, const std::string& sequence) {
+    hts_md5_reset(m_ctx);
+    hts_md5_update(m_ctx, sequence.data(), static_cast<uint32_t>(sequence.size()));
     unsigned char digest[16];
-    hts_md5_final(digest, ctx);
+    hts_md5_final(digest, m_ctx);
     hts_md5_hex(hex, digest);
-    hts_md5_destroy(ctx);
 }
 
-void get_sequence_md5(MD5Hex& hex, const std::vector<uint8_t>& int_sequence) {
+void MD5Generator::get_sequence_md5(MD5Hex& hex, const std::vector<uint8_t>& int_sequence) {
     return get_sequence_md5(hex, int_sequence_to_string(int_sequence));
 }
 

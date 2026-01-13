@@ -7,6 +7,7 @@
 #include <vector>
 
 struct sam_hdr_t;
+struct hts_md5_context;
 
 namespace dorado::utils {
 
@@ -20,12 +21,21 @@ struct HeaderSQRecord {
     MD5Hex md5 = {};  // `@SQ M5`: MD5 sequence checksum (iff uri != nullptr)
 };
 
+class MD5Generator {
+public:
+    MD5Generator();
+    ~MD5Generator();
+
+    void get_sequence_md5(MD5Hex& hex, const std::string& sequence);
+    void get_sequence_md5(MD5Hex& hex, const std::vector<uint8_t>& int_sequence);
+
+private:
+    hts_md5_context* m_ctx;
+};
+
 // Collection of SQ records
 using HeaderSQRecords = std::vector<HeaderSQRecord>;
 
 void add_sq_hdr(sam_hdr_t* hdr, const HeaderSQRecords& seqs);
-
-void get_sequence_md5(MD5Hex& hex, const std::string& sequence);
-void get_sequence_md5(MD5Hex& hex, const std::vector<uint8_t>& int_sequence);
 
 }  // namespace dorado::utils
