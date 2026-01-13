@@ -1,7 +1,13 @@
 #include "torch_utils/metal_utils.h"
 
-#include <CoreFoundation/CoreFoundation.h>
+// A header included by IOKitLib.h uses #if instead of #ifdef for an
+// undefined macro - which we warn about - so ignore that warning.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wundef"
 #include <IOKit/IOKitLib.h>
+#pragma clang diagnostic pop
+
+#include <CoreFoundation/CoreFoundation.h>
 #include <mach-o/dyld.h>
 #include <objc/objc-runtime.h>
 #include <spdlog/spdlog.h>

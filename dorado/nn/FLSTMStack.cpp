@@ -2,8 +2,8 @@
 
 #include "torch_utils/gpu_profiling.h"
 
-#include <iostream>
 #include <stdexcept>
+#include <tuple>
 
 #if DORADO_CUDA_BUILD
 
@@ -34,6 +34,10 @@ FLSTMStackImpl::FLSTMStackImpl(const int num_layers,
                                const int K,
                                const bool first_reverse)
         : C_(C), K_(K), first_reverse_(first_reverse) {
+#if !DORADO_CUDA_BUILD
+    // These are only used in the CUDA path.
+    std::ignore = std::make_tuple(C_, K_, first_reverse_);
+#endif
     for (int i = 0; i < num_layers; ++i) {
         const auto label = std::string{"rnn"} + std::to_string(i + 1);
         layers_.emplace_back(register_module(label, FLSTMLayer(C, K)));
