@@ -6,6 +6,7 @@ All notable changes to Dorado will be documented in this file.
 
 This release of Dorado updates summary files and the output structure of Dorado `aligner` to comply with the [Oxford Nanopore Output Specifications (26.01)](https://nanoporetech.github.io/ont-output-specifications/26.01/). Changes to the file outputs include:
 * Dorado `summary` now complies with the 26.01 Output Specifications.
+* Dorado `summary` can now run on an input directory, and provides an optional --recursive flag.
 * Dorado `demux` with `--emit-summary` now emits a full summary file, and fixes a bug causing barcode IDs to show up "unclassified" when using `--emit-fastq`.
 * Dorado `basecaller` with `--emit-summary` now includes the correct number of samples in `num_template_events` in the emitted summary file.
 * Dorado `aligner` with `--emit-fastq` now adds `SM` and `al` tags in emitted FASTQ files and uses these tags when populating the filepath.
