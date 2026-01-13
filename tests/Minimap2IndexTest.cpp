@@ -182,6 +182,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
     // the total number of bases exceeds this value. So setting this to 10K would result in it
     // putting 2 full 10,000 base sequences into each batch.
     auto opts = mm2::parse_options("-I 8K");
+    dorado::utils::MD5Generator md5gen;
 
     CATCH_SECTION("Full split-index loading") {
         Minimap2Index cut{};
@@ -196,7 +197,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
             CATCH_CHECK(header_records[i].length == 10000u);
             CATCH_CHECK(header_records[i].uri != nullptr);
             MD5Hex hex;
-            get_sequence_md5(hex, sequences[header_records[i].sequence_name]);
+            md5gen.get_sequence_md5(hex, sequences[header_records[i].sequence_name]);
             CATCH_CHECK(std::string(header_records[i].md5) == std::string(hex));
         }
     }
@@ -212,7 +213,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         CATCH_CHECK(header_records[0].length == 10000u);
         CATCH_CHECK(header_records[0].uri != nullptr);
         MD5Hex hex;
-        get_sequence_md5(hex, sequences[header_records[0].sequence_name]);
+        md5gen.get_sequence_md5(hex, sequences[header_records[0].sequence_name]);
         CATCH_CHECK(std::string(header_records[0].md5) == std::string(hex));
 
         for (int i = 2; i < 6; ++i) {
@@ -220,7 +221,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
             header_records = cut.get_sequence_records_for_header();
             CATCH_CHECK(header_records[0].sequence_name == ("read" + std::to_string(i)));
             CATCH_CHECK(header_records[0].length == 10000u);
-            get_sequence_md5(hex, sequences[header_records[0].sequence_name]);
+            md5gen.get_sequence_md5(hex, sequences[header_records[0].sequence_name]);
             CATCH_CHECK(std::string(header_records[0].md5) == std::string(hex));
         }
         CATCH_CHECK(cut.load_next_chunk(1) == IndexLoadResult::end_of_index);

@@ -26,11 +26,13 @@ struct IndexReader {
 class Minimap2Index {
     Minimap2Options m_options;
     std::vector<std::shared_ptr<const mm_idx_t>> m_indexes;
+    utils::HeaderSQRecords m_header_records_cache;
     IndexReader m_index_reader;
     bool m_incremental_load{false};
 
     void set_index(std::shared_ptr<const mm_idx_t> index);
     void add_index(std::shared_ptr<const mm_idx_t> index);
+    void cache_header_records(const mm_idx_t& index);
 
     // Returns nullptr if loading failed, and the load-result, as a pair.
     std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> load_initial_index(
@@ -54,7 +56,7 @@ public:
     const mm_idxopt_t& index_options() const;
     const mm_mapopt_t& mapping_options() const;  ///< Should only be called for non-split indexes.
 
-    utils::HeaderSQRecords get_sequence_records_for_header() const;
+    const utils::HeaderSQRecords& get_sequence_records_for_header() const;
     size_t num_loaded_index_blocks() const { return m_indexes.size(); }
 
     // Testability

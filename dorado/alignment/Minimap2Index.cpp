@@ -184,29 +184,34 @@ std::shared_ptr<Minimap2Index> Minimap2Index::create_compatible_index(
 
 void Minimap2Index::set_index(std::shared_ptr<const mm_idx_t> index) {
     m_indexes.clear();
+    m_header_records_cache.clear();
     mm_mapopt_update(&m_options.mapping_options->get(), index.get());
+    cache_header_records(*index);
     m_indexes.emplace_back(std::move(index));
 }
 
 void Minimap2Index::add_index(std::shared_ptr<const mm_idx_t> index) {
+    cache_header_records(*index);
     m_indexes.emplace_back(std::move(index));
 }
 
-utils::HeaderSQRecords Minimap2Index::get_sequence_records_for_header() const {
+const utils::HeaderSQRecords& Minimap2Index::get_sequence_records_for_header() const {
+    return m_header_records_cache;
+}
+
+void Minimap2Index::cache_header_records(const mm_idx_t& index) {
     const std::shared_ptr<std::string> uri = std::make_shared<std::string>(
             "file://" + std::filesystem::weakly_canonical(m_index_reader.file).string());
 
-    utils::HeaderSQRecords records;
-    for (const auto& index : m_indexes) {
-        for (uint32_t j = 0; j < index->n_seq; ++j) {
-            utils::HeaderSQRecord record{std::string(index->seq[j].name), index->seq[j].len, uri};
-            std::vector<uint8_t> seq(record.length);
-            mm_idx_getseq(index.get(), j, 0, record.length, seq.data());
-            utils::get_sequence_md5(record.md5, seq);
-            records.emplace_back(std::move(record));
-        }
+    utils::MD5Generator md5gen;
+    m_header_records_cache.reserve(m_header_records_cache.size() + index.n_seq);
+    for (uint32_t j = 0; j < index.n_seq; ++j) {
+        utils::HeaderSQRecord record{std::string(index.seq[j].name), index.seq[j].len, uri};
+        std::vector<uint8_t> seq(record.length);
+        mm_idx_getseq(&index, j, 0, record.length, seq.data());
+        md5gen.get_sequence_md5(record.md5, seq);
+        m_header_records_cache.emplace_back(std::move(record));
     }
-    return records;
 }
 
 const mm_idxopt_t& Minimap2Index::index_options() const {

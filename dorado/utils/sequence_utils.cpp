@@ -198,9 +198,8 @@ std::string int_sequence_to_string(const std::vector<uint8_t>& int_seq) {
 
 std::vector<int> sequence_to_ints(const std::string& sequence) {
     NVTX3_FUNC_RANGE();
-    std::vector<int> sequence_ints;
-    sequence_ints.reserve(sequence.size());
-    std::transform(std::begin(sequence), std::end(sequence), std::back_inserter(sequence_ints),
+    std::vector<int> sequence_ints(sequence.size());
+    std::transform(std::cbegin(sequence), std::cend(sequence), std::begin(sequence_ints),
                    &base_to_int);
     return sequence_ints;
 }
