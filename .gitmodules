@@ -1,6 +1,7 @@
 [submodule "dorado/3rdparty/toml11"]
 	path = dorado/3rdparty/toml11
 	url = https://github.com/ToruNiina/toml11.git
+	ignore = dirty
 [submodule "dorado/3rdparty/cpp-httplib"]
 	path = dorado/3rdparty/cpp-httplib
 	url = https://github.com/yhirose/cpp-httplib.git
