@@ -99,6 +99,7 @@ set(BUILD_TESTING ON)
 add_subdirectory(date EXCLUDE_FROM_ALL)
 
 # toml11
+apply_3rdparty_patch(toml11)
 set(TOML11_PRECOMPILE ON)
 add_subdirectory(toml11 EXCLUDE_FROM_ALL)
 
