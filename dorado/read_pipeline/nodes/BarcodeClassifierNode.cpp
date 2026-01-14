@@ -233,6 +233,7 @@ stats::NamedStats BarcodeClassifierNode::sample_stats() const {
     stats["queued_tasks"] = double(m_task_executor.num_tasks_in_flight());
     stats["num_barcodes_demuxed"] = m_num_records.load();
     {
+        std::lock_guard lock(m_barcode_count_mutex);
         for (const auto& [bc_name, bc_count] : m_barcode_count) {
             std::string key = "bc." + bc_name;
             stats[key] = static_cast<float>(bc_count);
