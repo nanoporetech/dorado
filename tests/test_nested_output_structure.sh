@@ -110,11 +110,11 @@ title() {
     set -x
 }
 
-TEST_INLINE_DEMUX=0
-TEST_POSTRUN_DEMUX=1
-TEST_ALIGNER=1
+RUN_TESTS_INLINE_DEMUX=1
+RUN_TESTS_POSTRUN_DEMUX=1
+RUN_TESTS_ALIGNER=1
 
-if [ $TEST_INLINE_DEMUX -eq 1 ] || [ $TEST_ALIGNER -eq 1 ]; then
+if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ] || [ $RUN_TESTS_ALIGNER -eq 1 ]; then
 {
     # Create a fastq "reference" by basecalling some data
     align_data_ref="${output_dir}/align_data_ref.fq"
@@ -123,7 +123,7 @@ if [ $TEST_INLINE_DEMUX -eq 1 ] || [ $TEST_ALIGNER -eq 1 ]; then
 fi
 
 # Testing for inline demux where we have basecall, barcode and demux at once
-if [ $TEST_INLINE_DEMUX -eq 1 ]; then 
+if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then 
 {
     # No demultiplexing
     title "Testing basic nested output structure baseline"
@@ -242,11 +242,11 @@ if [ $TEST_INLINE_DEMUX -eq 1 ]; then
     $dorado_bin basecaller ${model} ${align_data} ${basic_args} --output-dir ${dest} --reference $align_data_ref
     check_structure ${dest} "${expected[@]}"
 }
-fi # TEST_INLINE_DEMUX
+fi # RUN_TESTS_INLINE_DEMUX
 
 
 # Testing for post-run demux where we have untrimmed basecalls and run barcode classification
-if [ $TEST_POSTRUN_DEMUX -eq 1 ]; then 
+if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then 
 {
     postrun_output_dir="${output_dir}/postrun_demux"
     mkdir -p $postrun_output_dir    
@@ -283,10 +283,26 @@ if [ $TEST_POSTRUN_DEMUX -eq 1 ]; then
     )
     check_structure ${dest} "${expected[@]}"
 }
-fi # TEST_POSTRUN_DEMUX
+{
+    title "Test BAM file without RG lines"
+    calls_notrim_no_rg_sam="${postrun_output_dir}/calls.no-trim.no-rg.sam"
+    samtools view -h ${calls_notrim_bam} | grep -v '^@RG' > ${calls_notrim_no_rg_sam}
+
+    dest="${postrun_output_dir}/no_rg_sam"
+    $dorado_bin demux ${calls_notrim_no_rg_sam} --kit-name SQK-RBK114-96 --output-dir ${dest}
+    # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
+    core="./no_sample/19700101_0000_0_UNKNOWN_00000000"
+    expected=(
+        "${core}/bam_pass/unclassified/UNKNOWN_pass_unclassified_00000000_00000000_0.bam"
+        "${core}/bam_pass/barcode01/UNKNOWN_pass_barcode01_00000000_00000000_0.bam"
+        "${core}/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
+    )
+    check_structure ${dest} "${expected[@]}"
+}
+fi # RUN_TESTS_POSTRUN_DEMUX
 
 # Testing for post-run demux where we have untrimmed basecalls and run barcode classification
-if [ $TEST_ALIGNER -eq 1 ]; then 
+if [ $RUN_TESTS_ALIGNER -eq 1 ]; then 
 {
     title "Preparing test reference"
     aligner_output_dir="${output_dir}/aligner"
@@ -370,7 +386,7 @@ if [ $TEST_ALIGNER -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 
-fi # TEST_ALIGNER
+fi # RUN_TESTS_ALIGNER
 
 title "done"
 

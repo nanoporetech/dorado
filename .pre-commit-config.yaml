@@ -45,6 +45,14 @@ repos:
         entry: '\A(?!\[?[A-Z]+-[0-9]+\]?)'
         args: [--multiline]
         stages: [commit-msg]
+    -   id: shell-tests-active
+        name: check all toggleable shell tests are active
+        language: script
+        entry: tests/check_shell_tests_active.sh
+        files: ^tests/.*\.sh$
+        pass_filenames: false
+        always_run: true
+
 
 # NB: by default, pre-commit only installs the pre-commit hook ("commit" stage),
 # but you can tell `pre-commit install` to install other hooks using e.g. `-t commit-msg`
