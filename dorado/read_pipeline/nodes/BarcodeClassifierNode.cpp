@@ -180,6 +180,9 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
         delete_tag("bi");
     }
     m_num_records++;
+    if (read.barcoding_result->found_midstrand) {
+        m_mid_strand_count++;
+    }
     {
         std::lock_guard lock(m_barcode_count_mutex);
         m_barcode_count[bc]++;
@@ -207,6 +210,9 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     {
         std::lock_guard lock(m_barcode_count_mutex);
         m_barcode_count[read.read_common.barcode]++;
+    }
+    if (bc_res.found_midstrand) {
+        m_mid_strand_count++;
     }
 
     if (barcoding_info->sample_sheet) {
@@ -239,6 +245,8 @@ stats::NamedStats BarcodeClassifierNode::sample_stats() const {
             stats[key] = static_cast<float>(bc_count);
         }
     }
+    stats["num_midstrand_barcodes"] = m_mid_strand_count.load();
+
     return stats;
 }
 
