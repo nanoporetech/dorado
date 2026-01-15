@@ -45,6 +45,7 @@ private:
 
     // Track how many reads were classified as each barcode for debugging
     // purposes.
+    std::atomic<size_t> m_mid_strand_count{0};
     std::map<std::string, size_t> m_barcode_count;
     mutable std::mutex m_barcode_count_mutex;
 };

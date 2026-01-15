@@ -109,6 +109,10 @@ void ProgressTracker::summarize() const {
         }
     }
 
+    if (m_num_midstrand_barcodes > 0) {
+        spdlog::debug("Midstrand barcodes detected: {}", m_num_midstrand_barcodes);
+    }
+
     if (m_num_untrimmed_short_reads > 0) {
         spdlog::debug("> Untrimmed short reads: {}", m_num_untrimmed_short_reads);
     }
@@ -201,6 +205,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
 
     // Barcode demuxing stats.
     m_num_barcodes_demuxed = int(fetch_stat("BarcodeClassifierNode.num_barcodes_demuxed"));
+    m_num_midstrand_barcodes = int(fetch_stat("BarcodeClassifierNode.num_midstrand_barcodes"));
 
     // PolyA tail stats.
     m_num_poly_a_called = int(fetch_stat("PolyACalculator.reads_estimated"));

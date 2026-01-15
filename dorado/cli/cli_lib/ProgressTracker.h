@@ -61,6 +61,7 @@ private:
     int64_t m_supplementary_records_written{0};
 
     int m_num_barcodes_demuxed{0};
+    int m_num_midstrand_barcodes{0};
     int m_num_poly_a_called{0};
     int m_num_poly_a_not_called{0};
     int m_avg_poly_a_tail_lengths{0};
