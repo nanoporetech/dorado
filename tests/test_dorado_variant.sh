@@ -56,4 +56,5 @@ fi
 export DORADO_BIN
 export TEST_DATA_DIR
 export MODEL_DIR
+export MODEL_NAME
 python3 ${CRAM} --verbose ${TEST_DIR}/cram/variant/*.t
