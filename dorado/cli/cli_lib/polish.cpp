@@ -767,8 +767,25 @@ void validate_bam_model(const secondary::BamInfo& bam_info,
                                            ? (it_dwells->second == "true")
                                            : false;
 
-    const bool run_dwell_check =
-            !bacteria && (legacy_basecaller_models.count(model_config.basecaller_model) == 0);
+    const bool run_dwell_check = [&]() {
+        // Bacterial models currently use the counts-based features (no dwells).
+        if (bacteria) {
+            return false;
+        }
+        int64_t num_legacy_hits = 0;
+        for (const std::string& supported_model : model_config.supported_basecallers) {
+            num_legacy_hits += (legacy_basecaller_models.count(supported_model) > 0);
+        }
+        // Sanity check.
+        if ((num_legacy_hits > 0) &&
+            (num_legacy_hits != std::ssize(model_config.supported_basecallers))) {
+            throw std::runtime_error{
+                    "The model_config.supported_basecallers contains a mixture of legacy and new "
+                    "models. Is the model config ill defined?"};
+        }
+        // If this is a legacy model, then do not run a dwells check.
+        return (num_legacy_hits == 0);
+    }();
 
     const bool label_scheme_is_compatible =
             secondary::parse_label_scheme_type(model_config.label_scheme_type) ==
