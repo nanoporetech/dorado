@@ -19,6 +19,9 @@
 
 namespace {
 
+constexpr std::size_t MAX_INPUT_QUEUE_SIZE{10000};
+constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};
+
 const std::string UNCLASSIFIED_BARCODE = "unclassified";
 
 std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
@@ -44,7 +47,18 @@ const dorado::demux::BarcodingInfo* get_barcoding_info(const dorado::ClientInfo&
 
 namespace dorado {
 
-BarcodeClassifierNode::BarcodeClassifierNode(int threads) : MessageSink(10000, threads) {}
+BarcodeClassifierNode::BarcodeClassifierNode(
+        std::shared_ptr<utils::concurrency::MultiQueueThreadPool> thread_pool,
+        utils::concurrency::TaskPriority pipeline_priority)
+        : MessageSink(10000, 1),
+          m_thread_pool(std::move(thread_pool)),
+          m_task_executor(*m_thread_pool, pipeline_priority, MAX_PROCESSING_QUEUE_SIZE) {}
+
+BarcodeClassifierNode::BarcodeClassifierNode(int threads)
+        : BarcodeClassifierNode(
+                  std::make_shared<utils::concurrency::MultiQueueThreadPool>(threads,
+                                                                             "barcode_pool"),
+                  utils::concurrency::TaskPriority::normal) {}
 
 BarcodeClassifierNode::~BarcodeClassifierNode() {
     stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
@@ -54,34 +68,45 @@ std::string BarcodeClassifierNode::get_name() const { return "BarcodeClassifierN
 
 void BarcodeClassifierNode::terminate(const TerminateOptions& terminate_options) {
     stop_input_processing(terminate_options.fast);
+    m_task_executor.flush();
 }
 
 void BarcodeClassifierNode::restart() {
+    m_task_executor.restart();
     start_input_processing([this] { input_thread_fn(); }, "brcd_classifier");
 }
 
 void BarcodeClassifierNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
-        if (std::holds_alternative<BamMessage>(message)) {
-            auto bam_message = std::get<BamMessage>(std::move(message));
-            // If the read is a secondary or supplementary read, ignore it if
-            // client requires read trimming.
-            const auto* barcoding_info = get_barcoding_info(*bam_message.client_info);
-            if (barcoding_info && barcoding_info->trim &&
-                (bam_message.data->bam_ptr->core.flag & (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
-                continue;
-            }
+        std::visit(
+                [this](auto&& read) {
+                    using T = std::decay_t<decltype(read)>;
+                    if constexpr (std::is_same_v<T, BamMessage>) {
+                        // If the read is a secondary or supplementary read, ignore it if
+                        // client requires read trimming.
+                        m_task_executor.send([this, read_ = std::move(read)]() mutable {
+                            const auto* barcoding_info = get_barcoding_info(*read_.client_info);
+                            if (barcoding_info && barcoding_info->trim &&
+                                (read_.data->bam_ptr->core.flag &
+                                 (BAM_FSUPPLEMENTARY | BAM_FSECONDARY))) {
+                                return;  // n.b. discards the read!
+                            }
 
-            barcode(bam_message, barcoding_info);
-            send_message_to_sink(std::move(bam_message));
-        } else if (std::holds_alternative<SimplexReadPtr>(message)) {
-            auto read = std::get<SimplexReadPtr>(std::move(message));
-            barcode(*read);
-            send_message_to_sink(std::move(read));
-        } else {
-            send_message_to_sink(std::move(message));
-        }
+                            barcode(read_, barcoding_info);
+                            send_message_to_sink(std::move(read_));
+                        });
+
+                    } else if constexpr (std::is_same_v<T, SimplexReadPtr>) {
+                        m_task_executor.send([this, read_ = std::move(read)]() mutable {
+                            barcode(*read_);
+                            send_message_to_sink(std::move(read_));
+                        });
+                    } else {
+                        send_message_to_sink(std::move(read));
+                    }
+                },
+                message);
     }
 }
 
@@ -205,8 +230,10 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 
 stats::NamedStats BarcodeClassifierNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
+    stats["queued_tasks"] = double(m_task_executor.num_tasks_in_flight());
     stats["num_barcodes_demuxed"] = m_num_records.load();
     {
+        std::lock_guard lock(m_barcode_count_mutex);
         for (const auto& [bc_name, bc_count] : m_barcode_count) {
             std::string key = "bc." + bc_name;
             stats[key] = static_cast<float>(bc_count);
