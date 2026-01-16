@@ -1,12 +1,9 @@
 #include "secondary/consensus/variant_calling.h"
 
-#include "secondary/common/batching.h"
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/consensus_utils.h"
-#include "secondary/consensus/sample_trimming.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/rle.h"
-#include "utils/span.h"
 #include "utils/ssize.h"
 
 #include <ATen/ATen.h>
@@ -17,7 +14,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
-#include <iomanip>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <unordered_map>
@@ -109,9 +106,8 @@ float compute_subseq_log_prob(
     const int64_t num_haplotypes = probs_3D.size(1);
     const int64_t num_classes = probs_3D.size(2);
 
-    const dorado::Span<const float> data(
-            probs_3D.data_ptr<float>(),
-            static_cast<size_t>(num_pos * num_haplotypes * num_classes));
+    const std::span<const float> data(probs_3D.data_ptr<float>(),
+                                      static_cast<size_t>(num_pos * num_haplotypes * num_classes));
 
     if (std::empty(data)) {
         return 0.0f;
@@ -1000,7 +996,7 @@ std::vector<Variant> general_decode_variants(
     const size_t seq_len = std::size(positions_major);
     const size_t num_haplotypes = static_cast<size_t>(probs_3D.size(1));
     const size_t num_classes = std::size(symbols);
-    const dorado::Span<const float> raw_probs_data(
+    const std::span<const float> raw_probs_data(
             probs_3D.data_ptr<float>(), batch_size * seq_len * num_haplotypes * num_classes);
 
     // Consensus sequences.

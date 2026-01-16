@@ -1,7 +1,6 @@
 #include "secondary/features/decoder_base.h"
 
 #include "torch_utils/tensor_utils.h"
-#include "utils/span.h"
 
 #include <cassert>
 #include <cstdint>
@@ -32,7 +31,7 @@ LabelSchemeType parse_label_scheme_type(const std::string& type) {
 
 std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
         const std::string& symbols,
-        const dorado::Span<const float> logits,
+        const std::span<const float> logits,
         const size_t batch_size,
         const size_t sequence_length,
         const size_t num_haplotypes,
@@ -119,8 +118,8 @@ std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
 
     const std::string symbols = label_scheme_symbols(label_scheme_type);
 
-    const dorado::Span<const float> data(
-            logits.data_ptr<float>(), batch_size * sequence_length * num_haplotypes * num_classes);
+    const std::span<const float> data(logits.data_ptr<float>(),
+                                      batch_size * sequence_length * num_haplotypes * num_classes);
 
     return decode_batch_bases_impl(symbols, data, batch_size, sequence_length, num_haplotypes,
                                    num_classes);
