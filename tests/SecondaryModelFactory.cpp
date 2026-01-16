@@ -21,7 +21,6 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
     CATCH_SECTION("Unknown model, should throw") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "Unknown",
                 .model_file = "wrong_weights_file.pt",
@@ -39,7 +38,6 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
     CATCH_SECTION("Wrong weights file, it should be either weights.pt or model.pt.") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "GRUModel",
                 .model_file = "wrong_weights_file.pt",
@@ -64,7 +62,6 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
     CATCH_SECTION("TorchScript model cannot be loaded without loading the weights") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "GRUModel",
                 .model_file = "model.pt",
@@ -89,7 +86,6 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
     CATCH_SECTION("GRU model") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "GRUModel",
                 .model_file = "weights.pt",
@@ -121,7 +117,6 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
     CATCH_SECTION("LSTM model") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "LatentSpaceLSTM",
                 .model_file = "weights.pt",
@@ -160,7 +155,6 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
     CATCH_SECTION("SlotAttentionConsensus model") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -209,7 +203,6 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Missing dwells") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "LatentSpaceLSTM",
                 .model_file = "weights.pt",
@@ -238,7 +231,6 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Has dwells") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "LatentSpaceLSTM",
                 .model_file = "weights.pt",
@@ -278,7 +270,6 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
             "Missing all optional columns but the model does not require them so it should pass") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "LatentSpaceLSTM",
                 .model_file = "weights.pt",
@@ -316,7 +307,6 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
             "one it needs is there") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "LatentSpaceLSTM",
                 .model_file = "weights.pt",
@@ -362,7 +352,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Missing dwells, missing haplotags") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -395,7 +384,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Has dwells, but missing haplotags") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -431,7 +419,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Missing dwells, but has the haplotags column") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -467,7 +454,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Feature tensor does not contain snp_qv, but the model needs it.") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -506,7 +492,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
             "Missing all optional columns but the model does not require them so it should pass") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -548,7 +533,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
             "only. Should pass.") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -593,7 +577,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
             "only. Should pass.") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -638,7 +621,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
             "column. Should pass.") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",
@@ -682,7 +664,6 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
     CATCH_SECTION("Feature tensor contains snp_qv, dwells and haplotags. Model uses all three.") {
         const ModelConfig config{
                 .version = 1,
-                .basecaller_model = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0",
                 .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
                 .model_type = "SlotAttentionConsensus",
                 .model_file = "weights.pt",

@@ -11,7 +11,6 @@ namespace dorado::secondary {
 
 struct ModelConfig {
     int32_t version = 0;
-    std::string basecaller_model;
     std::unordered_set<std::string> supported_basecallers;
 
     // Model section.

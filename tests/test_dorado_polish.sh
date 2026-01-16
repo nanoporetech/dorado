@@ -63,6 +63,7 @@ fi
 
 export DORADO_BIN
 export TEST_DATA_DIR
+export MODEL_NAME
 export MODEL_DIR
 export MODEL_ROOT_DIR
 python3 ${CRAM} --verbose ${TEST_DIR}/cram/polish/cram-polish-??-*.t ${TEST_DIR}/cram/polish/cram-polish-models*.t

@@ -69,6 +69,29 @@ std::unordered_map<std::string, std::string> parse_kwargs(const toml::value& tab
     return kwargs;
 }
 
+std::unordered_set<std::string> parse_supported_basecallers(const toml::value& config_toml) {
+    std::unordered_set<std::string> ret;
+
+    if (config_toml.contains("basecaller_model")) {
+        ret.emplace(toml::find<std::string>(config_toml, "basecaller_model"));
+    }
+
+    if (config_toml.contains("supported_basecallers")) {
+        try {
+            std::vector<std::string> data =
+                    toml::find<std::vector<std::string>>(config_toml, "supported_basecallers");
+            ret.insert(std::begin(data), std::end(data));
+        } catch (const std::exception& e) {
+            throw std::runtime_error(
+                    std::string(
+                            "Error parsing 'supported_basecallers' from model config. Message: ") +
+                    e.what());
+        }
+    }
+
+    return ret;
+}
+
 }  // namespace
 
 ModelConfig parse_model_config(const std::filesystem::path& config_path,
@@ -98,24 +121,13 @@ ModelConfig parse_model_config(const std::filesystem::path& config_path,
         cfg.version = toml::find<int>(config_toml, "config_version");
     }
 
-    // Parse the config version.
+    // Parse the supported basecaller models.
     {
-        cfg.basecaller_model = toml::find<std::string>(config_toml, "basecaller_model");
-    }
+        cfg.supported_basecallers = parse_supported_basecallers(config_toml);
 
-    cfg.supported_basecallers.emplace(cfg.basecaller_model);
-
-    // Check if the "supported_basecallers" key exists
-    if (cfg.version >= 2) {
-        if (config_toml.contains("supported_basecallers")) {
-            try {
-                std::vector<std::string> data =
-                        toml::find<std::vector<std::string>>(config_toml, "supported_basecallers");
-                cfg.supported_basecallers.insert(std::begin(data), std::end(data));
-            } catch (const std::exception& e) {
-                throw std::runtime_error("Error parsing 'supported_basecallers' from config: '" +
-                                         config_path.string() + "'. Message: " + e.what());
-            }
+        if (std::empty(cfg.supported_basecallers)) {
+            throw std::runtime_error{
+                    "Model config has zero supported basecaller models specified."};
         }
     }
 
