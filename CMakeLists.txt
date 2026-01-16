@@ -111,8 +111,8 @@ if (GENERATE_TEST_COVERAGE)
     if (NOT DORADO_DISABLE_TESTS)
         setup_target_for_coverage_gcovr_xml_html(
             NAME dorado_test_coverage
-            EXECUTABLE ctest --test-dir ${CMAKE_BINARY_DIR} --verbose -R dorado_tests
-            DEPENDENCIES dorado_tests
+            EXECUTABLE ctest --test-dir "${CMAKE_BINARY_DIR}" --verbose -R "dorado.*tests"
+            DEPENDENCIES dorado_tests dorado_smoke_tests
             BASE_DIRECTORY "${PROJECT_SOURCE_DIR}"
             EXCLUDE
                 "${DORADO_3RD_PARTY_SOURCE}/*"
