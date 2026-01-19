@@ -38,7 +38,6 @@ dorado_add_library(
         scoped_trace_log.h
         SeparatedStream.h
         sequence_utils.h
-        span.h
         ssize.h
         stats.h
         stream_utils.h

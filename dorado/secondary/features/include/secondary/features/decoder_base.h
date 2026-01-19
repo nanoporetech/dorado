@@ -1,11 +1,11 @@
 #pragma once
 
 #include "secondary/consensus/consensus_result.h"
-#include "utils/span.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
 
+#include <span>
 #include <string>
 #include <vector>
 
@@ -71,7 +71,7 @@ std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
  */
 std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
         const std::string& symbols,
-        const dorado::Span<const float> logits,
+        const std::span<const float> logits,
         const size_t batch_size,
         const size_t sequence_length,
         const size_t num_haplotypes,

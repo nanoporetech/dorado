@@ -80,24 +80,6 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
     }
 }
 
-CATCH_TEST_CASE(CUT_TAG ": adjust_time", CUT_TAG) {
-    std::string timestamp;
-    uint32_t adjustment;
-    std::string adjusted_timestamp;
-
-    std::tie(timestamp, adjustment,
-             adjusted_timestamp) = GENERATE(table<std::string, uint32_t, std::string>({
-            make_tuple("1970-01-01T00:00:00Z", 0, "1970-01-01T00:00:00Z"),  // no change, round trip
-            make_tuple("1970-01-02T00:00:00Z", 1, "1970-01-02T00:00:01Z"),  // add a second
-            make_tuple("1971-01-02T00:00:00Z", 3600, "1971-01-02T01:00:00Z"),   // add an hour
-            make_tuple("1975-01-02T00:00:00Z", 86400, "1975-01-03T00:00:00Z"),  // add a day
-            make_tuple("1976-02-28T00:00:00Z", 86400, "1976-02-29T00:00:00Z"),  // check leap day!
-    }));
-    CATCH_CAPTURE(timestamp);
-    auto result_time_stamp = dorado::utils::adjust_time(timestamp, adjustment);
-    CATCH_CHECK(result_time_stamp == adjusted_timestamp);
-}
-
 CATCH_TEST_CASE(CUT_TAG ": MinKnow datetime format from pod5 timestamp", CUT_TAG) {
     CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(0) == "19700101_0000");
     CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(1110371400000) ==

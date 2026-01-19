@@ -12,6 +12,7 @@
 #include "utils/memory_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
+#include "utils/timer_high_res.h"
 
 #include <ATen/ATen.h>
 #include <cxxpool.h>
@@ -837,8 +838,8 @@ merge_and_split_bam_regions_in_parallel(
         std::vector<secondary::Sample>& window_samples,
         std::atomic<bool>& worker_terminate,
         const std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
-        const Span<const secondary::Window> bam_regions,
-        const Span<const secondary::Interval> bam_region_intervals,
+        const std::span<const secondary::Window> bam_regions,
+        const std::span<const secondary::Interval> bam_region_intervals,
         const std::optional<IntervalTreesInt64Map>& candidate_trees,
         const int32_t num_threads,
         const int32_t window_len,
@@ -1056,7 +1057,7 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         std::atomic<bool>& worker_terminate,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        const dorado::Span<const secondary::Window> windows,
+        const std::span<const secondary::Window> windows,
         const int32_t num_threads,
         const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
@@ -1301,8 +1302,8 @@ void sample_producer(PolisherResources& resources,
             // Encode samples in parallel. Non-const by design, data will be moved.
             std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
                     resources.encoders, worker_terminate, draft_lens,
-                    Span<const secondary::Window>(std::data(windows) + window_id_start,
-                                                  num_windows),
+                    std::span<const secondary::Window>(std::data(windows) + window_id_start,
+                                                       num_windows),
                     num_threads, continue_on_exception);
 
             spdlog::trace(
@@ -1313,9 +1314,9 @@ void sample_producer(PolisherResources& resources,
             // Passing only one const encoder because it only calls const functions without sideeffects.
             auto [samples, trims] = merge_and_split_bam_regions_in_parallel(
                     region_samples, worker_terminate, resources.encoders,
-                    Span<const secondary::Window>(std::data(bam_regions) + region_id_start,
-                                                  num_regions),
-                    Span<const secondary::Interval>(
+                    std::span<const secondary::Window>(std::data(bam_regions) + region_id_start,
+                                                       num_regions),
+                    std::span<const secondary::Interval>(
                             std::data(bam_region_intervals) + region_id_start, num_regions),
                     candidate_trees, num_threads, window_len, window_overlap,
                     variant_flanking_bases, window_id_start, continue_on_exception, tiled_regions,
@@ -1758,8 +1759,8 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
             if (min_depth > 0) {
                 good_intervals.clear();
 
-                const Span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
-                                          static_cast<size_t>(sample.depth.size(0)));
+                const std::span<int64_t> depth(sample.depth.data_ptr<int64_t>(),
+                                               static_cast<size_t>(sample.depth.size(0)));
                 secondary::Interval interval{0, 0};
                 for (int32_t ii = 0; ii < static_cast<int32_t>(std::size(depth)); ++ii) {
                     if (depth[ii] < min_depth) {

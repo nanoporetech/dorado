@@ -2,7 +2,6 @@
 
 #include "secondary/architectures/model_config.h"
 #include "secondary/architectures/model_torch_base.h"
-#include "secondary/common/bam_file.h"
 #include "secondary/common/interval.h"
 #include "secondary/common/stats.h"
 #include "secondary/common/variant.h"
@@ -14,9 +13,6 @@
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
 #include "utils/AsyncQueue.h"
-#include "utils/span.h"
-#include "utils/stats.h"
-#include "utils/timer_high_res.h"
 
 #include <IntervalTree.h>
 
