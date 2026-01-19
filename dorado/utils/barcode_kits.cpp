@@ -128,42 +128,42 @@ const std::vector<std::string> RNA_1_24 = {"RNA01", "RNA02", "RNA03", "RNA04", "
 const BarcodeKitScoringParams DEFAULT_PARAMS{};
 
 const BarcodeKitScoringParams RBK114_PARAMS{
-        /*max_barcode_penalty*/ 12,
-        /*barcode_end_proximity*/ 75,
-        /*min_barcode_penalty_dist*/ 3,
-        /*min_separation_only_dist*/ 6,
-        /*flank_left_pad*/ 5,
-        /*flank_right_pad*/ 10,
-        /*front_barcode_window*/ 175,
-        /*rear_barcode_window*/ 175,
-        /*min_flank_score*/ 0.0f,
-        /*midstrand_flank_score*/ 0.95f,
+        .max_barcode_penalty = 12,
+        .barcode_end_proximity = 75,
+        .min_barcode_penalty_dist = 3,
+        .min_separation_only_dist = 6,
+        .flank_left_pad = 5,
+        .flank_right_pad = 10,
+        .front_barcode_window = 175,
+        .rear_barcode_window = 175,
+        .min_flank_score = 0.0f,
+        .midstrand_flank_score = 0.95f,
 };
 
 const BarcodeKitScoringParams MAB114_PARAMS{
-        /*max_barcode_penalty*/ 12,
-        /*barcode_end_proximity*/ 75,
-        /*min_barcode_penalty_dist*/ 3,
-        /*min_separation_only_dist*/ 6,
-        /*flank_left_pad*/ 5,
-        /*flank_right_pad*/ 10,
-        /*front_barcode_window*/ 175,
-        /*rear_barcode_window*/ 175,
-        /*min_flank_score*/ 0.0f,
-        /*midstrand_flank_score*/ 0.7f,  // Note: see wiki writeup attached to INSTX-9193.
+        .max_barcode_penalty = 12,
+        .barcode_end_proximity = 75,
+        .min_barcode_penalty_dist = 3,
+        .min_separation_only_dist = 6,
+        .flank_left_pad = 5,
+        .flank_right_pad = 10,
+        .front_barcode_window = 175,
+        .rear_barcode_window = 175,
+        .min_flank_score = 0.0f,
+        .midstrand_flank_score = 0.7f,  // Note: see wiki writeup attached to INSTX-9193.
 };
 
 const BarcodeKitScoringParams TWIST_PARAMS{
-        /*max_barcode_penalty*/ 5,
-        /*barcode_end_proximity*/ 75,
-        /*min_barcode_penalty_dist*/ 2,
-        /*min_separation_only_dist*/ 6,
-        /*flank_left_pad*/ 10,
-        /*flank_right_pad*/ 10,
-        /*front_barcode_window*/ 175,
-        /*rear_barcode_window*/ 175,
-        /*min_flank_score*/ 0.5f,
-        /*midstrand_flank_score*/ 0.95f,
+        .max_barcode_penalty = 5,
+        .barcode_end_proximity = 75,
+        .min_barcode_penalty_dist = 2,
+        .min_separation_only_dist = 6,
+        .flank_left_pad = 10,
+        .flank_right_pad = 10,
+        .front_barcode_window = 175,
+        .rear_barcode_window = 175,
+        .min_flank_score = 0.5f,
+        .midstrand_flank_score = 0.95f,
 };
 
 // Some arrangement names are just aliases of each other. This is because they were released
