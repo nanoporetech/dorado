@@ -6,6 +6,7 @@
 #include "../model_gru.h"
 #include "../model_latent_space_lstm.h"
 #include "../model_slot_attention_consensus.h"
+#include "../model_variant_perceiver.h"
 
 #include <cstdint>
 #include <memory>
@@ -112,6 +113,7 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
         // Negative tests.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) == nullptr);
     }
 
     CATCH_SECTION("LSTM model") {
@@ -150,6 +152,7 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
         // Negative tests.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) == nullptr);
     }
 
     CATCH_SECTION("SlotAttentionConsensus model") {
@@ -193,6 +196,55 @@ CATCH_TEST_CASE("Instantiate models", TEST_GROUP) {
         // Negative tests.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) == nullptr);
+    }
+
+    CATCH_SECTION("VariantPerceiver model") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},
+                                {"use_haplotags", "true"},
+                                {"use_snp_qv", "true"},
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},
+                                {"include_haplotype", "true"},
+                                {"include_snp_qv", "true"},
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        // Positive test.
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) != nullptr);
+
+        // Negative tests.
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) == nullptr);
     }
 }
 
@@ -258,12 +310,7 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) == nullptr);
     }
 
     CATCH_SECTION(
@@ -294,12 +341,7 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) == nullptr);
     }
 
     CATCH_SECTION(
@@ -336,12 +378,7 @@ CATCH_TEST_CASE("LatentSpaceLSTM-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) == nullptr);
     }
 }
 
@@ -520,12 +557,7 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
     }
 
     CATCH_SECTION(
@@ -564,12 +596,7 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
     }
 
     CATCH_SECTION(
@@ -608,12 +635,7 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
     }
 
     CATCH_SECTION(
@@ -653,12 +675,7 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
-
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
     }
 
     CATCH_SECTION("Feature tensor contains snp_qv, dwells and haplotags. Model uses all three.") {
@@ -698,12 +715,368 @@ CATCH_TEST_CASE("SlotAttentionConsensus-FeatureColumns", TEST_GROUP) {
 
         std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
 
-        // Positive test.
         CATCH_REQUIRE(std::dynamic_pointer_cast<ModelSlotAttentionConsensus>(model) != nullptr);
+    }
+}
 
-        // Negative tests.
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelGRU>(model) == nullptr);
-        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelLatentSpaceLSTM>(model) == nullptr);
+CATCH_TEST_CASE("VariantPerceiver-FeatureColumns", TEST_GROUP) {
+    // Deactivate actual weight loading.
+    constexpr ParameterLoadingStrategy PARAM_STRATEGY = ParameterLoadingStrategy::NO_OP;
+
+    CATCH_SECTION("Missing dwells, missing haplotags, missing snp_qv") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Use dwells
+                                {"use_haplotags", "true"},  // <- Use haplotags
+                                {"use_snp_qv", "true"},     // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs = {},  // <- No param for dwells or haplotags
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        CATCH_CHECK_THROWS(model_factory(config, PARAM_STRATEGY));
+    }
+
+    CATCH_SECTION("Has dwells, but missing haplotags and snp_qv") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Use dwells
+                                {"use_haplotags", "true"},  // <- Use haplotags
+                                {"use_snp_qv", "true"},     // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},  // <- No param for haplotags or snp_qv
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        CATCH_CHECK_THROWS(model_factory(config, PARAM_STRATEGY));
+    }
+
+    CATCH_SECTION("Missing dwells and snp_qv, but has the haplotags column") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Use dwells
+                                {"use_haplotags", "true"},  // <- Use haplotags
+                                {"use_snp_qv", "true"},     // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_haplotype", "true"},  // <- No param for dwells or snp_qv
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        CATCH_CHECK_THROWS(model_factory(config, PARAM_STRATEGY));
+    }
+
+    CATCH_SECTION("Feature tensor does not contain snp_qv, but the model needs it.") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Use dwells
+                                {"use_haplotags", "true"},  // <- Use haplotags
+                                {"use_snp_qv", "true"},     // <- Use snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},
+                                {"include_haplotype", "true"},
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        CATCH_CHECK_THROWS(model_factory(config, PARAM_STRATEGY));
+    }
+
+    CATCH_SECTION(
+            "Missing all optional columns but the model does not require them so it should pass") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "false"},     // <- No dwells
+                                {"use_haplotags", "false"},  // <- No haplotags
+                                {"use_snp_qv", "false"},     // <- No snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs = {},  // <- No param for dwells or haplotags
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) != nullptr);
+    }
+
+    CATCH_SECTION(
+            "Has dwells in features but no haplotags or snp_qv. Model needs the dwells column "
+            "only. Should pass.") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},      // <- Use dwells
+                                {"use_haplotags", "false"},  // <- No haplotags
+                                // {"use_snp_qv", "false"},     // <- No snp_qv. Intentionally not explicitly added, should be false by default.
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},  // <- No param for haplotags or snp_qvs
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) != nullptr);
+    }
+
+    CATCH_SECTION(
+            "Has haplotags in features but no dwells or snp_qv. Model needs the haplotags column "
+            "only. Should pass.") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "false"},    // <- No dwells
+                                {"use_haplotags", "true"},  // <- Has haplotags
+                                {"use_snp_qv", "false"},    // <- No snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_haplotype", "true"},  // <- No param for dwells or snp_qv
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) != nullptr);
+    }
+
+    CATCH_SECTION(
+            "Has snp_qvs in features but no dwells or haplotags. Model needs only the snp_qv "
+            "column. Should pass.") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "false"},     // <- No dwells
+                                {"use_haplotags", "false"},  // <- No haplotags
+                                {"use_snp_qv", "true"},      // <- Has snp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_snp_qv", "true"},  // <- No param for haplotags or dwells
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) != nullptr);
+    }
+
+    CATCH_SECTION("Feature tensor contains snp_qv, dwells and haplotags. Model uses all three.") {
+        const ModelConfig config{
+                .version = 1,
+                .supported_basecallers = {"dna_r10.4.1_e8.2_400bps_hac@v5.0.0"},
+                .model_type = "VariantPerceiver",
+                .model_file = "weights.pt",
+                .model_dir = "",
+                .model_kwargs =
+                        {
+                                {"ploidy", "2"},
+                                {"num_classes", "5"},
+                                {"read_embedding_size", "256"},
+                                {"cnn_size", "64"},
+                                {"kernel_sizes", "[ 1, 17,]"},
+                                {"dimension", "256"},
+                                {"num_blocks", "2"},
+                                {"num_heads", "8"},
+                                {"use_mapqc", "true"},
+                                {"use_dwells", "true"},     // <- Has dwells
+                                {"use_haplotags", "true"},  // <- Has haplotags
+                                {"use_snp_qv", "true"},     // <- Hassnp_qv
+                                {"bases_alphabet_size", "6"},
+                                {"bases_embedding_size", "6"},
+                                {"use_decoder_lstm", "false"},
+                                {"update_read_embeddings", "true"},
+                        },
+                .feature_encoder_type = "ReadAlignmentFeatureEncoder",
+                .feature_encoder_kwargs =
+                        {
+                                {"include_dwells", "true"},
+                                {"include_haplotype", "true"},
+                                {"include_snp_qv", "true"},
+                        },
+                .feature_encoder_dtypes = {},
+                .label_scheme_type = "DiploidLabelScheme",
+        };
+
+        std::shared_ptr<ModelTorchBase> model = model_factory(config, PARAM_STRATEGY);
+
+        CATCH_REQUIRE(std::dynamic_pointer_cast<ModelVariantPerceiver>(model) != nullptr);
     }
 }
 
