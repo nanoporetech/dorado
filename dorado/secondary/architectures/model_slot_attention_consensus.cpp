@@ -162,7 +162,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
         const int32_t bases_embedding_size,
         const bool add_lstm,
         const bool use_reference,
-        const FeatureColumnMap feature_column_map)
+        const FeatureColumnMap& feature_column_map)
         : ModelTorchBase(ctor_tag),
           m_num_slots{num_slots},
           m_classes_per_slot{classes_per_slot},
