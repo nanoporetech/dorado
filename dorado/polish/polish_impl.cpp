@@ -1057,10 +1057,36 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         std::atomic<bool>& worker_terminate,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const std::vector<std::unordered_map<std::string, int32_t>>& bam_region_haplotags,
         const std::span<const secondary::Window> windows,
         const int32_t num_threads,
         const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("encode_windows_in_parallel", 3);
+
+    const std::unordered_map<std::string, int32_t> empty_haplotags;
+
+    // Find the haplotags for this BAM region.
+    const auto find_haplotags_for_region = [&bam_region_haplotags,
+                                            &empty_haplotags](const int32_t bam_region_id)
+            -> const std::unordered_map<std::string, int32_t>& {
+        // If the input is unphased, just return an empty set.
+        if (std::empty(bam_region_haplotags)) {
+            return empty_haplotags;
+        }
+
+        // Otherwise, get the haplotags for this region and validate the indices.
+        const bool bam_region_valid =
+                (bam_region_id >= 0) && (bam_region_id < std::ssize(bam_region_haplotags));
+
+        if (!bam_region_valid) {
+            throw std::logic_error{"The window.source_region_id is not valid! Value = " +
+                                   std::to_string(bam_region_id) +
+                                   ", bam_region_haplotags.size() = " +
+                                   std::to_string(std::size(bam_region_haplotags))};
+        }
+
+        return bam_region_haplotags[bam_region_id];
+    };
 
     // Worker function, each thread computes tensors for a set of windows assigned to it.
     const auto worker = [&](const int32_t thread_id, utils::AsyncQueue<std::size_t>& window_queue,
@@ -1077,6 +1103,11 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
 
             try {
                 const auto& window = windows[window_id];
+
+                // Find the haplotags for this BAM region.
+                const std::unordered_map<std::string, int32_t>& haplotags =
+                        find_haplotags_for_region(window.source_region_id);
+
                 const std::string& name = draft_lens[window.seq_id].first;
 
                 if (thread_id == 0) {
@@ -1087,8 +1118,8 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
                             100.0 * static_cast<double>(window_id) / n_windows);
                 }
 
-                results[window_id] = encoders[thread_id]->encode_region(name, window.start,
-                                                                        window.end, window.seq_id);
+                results[window_id] = encoders[thread_id]->encode_region(
+                        name, window.start, window.end, window.seq_id, haplotags);
 
             } catch (const std::exception& e) {
                 if (continue_on_exception) {
@@ -1194,6 +1225,59 @@ std::vector<secondary::Window> create_windows_from_regions(
     return windows;
 }
 
+std::vector<std::unordered_map<std::string, int32_t>> haplotag_regions_in_parallel(
+        const std::vector<secondary::Window>& regions,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+        const int32_t num_threads) {
+    if (std::empty(encoders)) {
+        return {};
+    }
+
+    const int64_t num_regions = std::ssize(regions);
+    std::atomic<int64_t> num_processed{0};
+
+    const auto worker =
+            [&](const int32_t thread_id,
+                std::vector<std::unordered_map<std::string, int32_t>>& region_haplotags) {
+                auto& encoder = *encoders[thread_id];
+
+                while (true) {
+                    // Fetch next job.
+                    const int64_t region_id = num_processed.fetch_add(1, std::memory_order_relaxed);
+                    if (region_id >= num_regions) {
+                        break;
+                    }
+
+                    // Get the region info.
+                    const secondary::Window& region = regions[region_id];
+                    const std::string& ref_name = draft_lens[region.seq_id].first;
+
+                    // Haplotag.
+                    region_haplotags[region_id] =
+                            (encoder.produce_haplotags(ref_name, region.start, region.end));
+                }
+            };
+
+    // Return data.
+    std::vector<std::unordered_map<std::string, int32_t>> region_haplotags(std::size(regions));
+
+    // Thread pool.
+    const size_t final_num_threads =
+            std::min(static_cast<size_t>(num_threads), std::size(encoders));
+    cxxpool::thread_pool pool{final_num_threads};
+    std::vector<std::future<void>> futures;
+    futures.reserve(num_threads);
+    for (int32_t tid = 0; tid < static_cast<int32_t>(final_num_threads); ++tid) {
+        futures.emplace_back(pool.push(worker, tid, std::ref(region_haplotags)));
+    }
+    for (auto& f : futures) {
+        f.get();
+    }
+
+    return region_haplotags;
+}
+
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -1205,6 +1289,7 @@ void sample_producer(PolisherResources& resources,
                      const int32_t window_overlap,
                      const int32_t variant_flanking_bases,
                      const int32_t bam_subchunk_len,
+                     const secondary::HaplotagSource haplotag_source,
                      const double max_available_mem,
                      const bool continue_on_exception,
                      const bool tiled_regions,
@@ -1218,27 +1303,6 @@ void sample_producer(PolisherResources& resources,
     utils::ScopedProfileRange spr1("sample_producer", 2);
 
     spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
-
-    // Split large BAM regions into non-overlapping windows for parallel encoding.
-    // The non-overlapping windows will be merged after samples are constructed.
-    std::vector<secondary::Window> windows;
-    std::vector<secondary::Interval>
-            bam_region_intervals;  // Intervals of windows for each BAM region.
-    for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
-        const secondary::Window& bw = bam_regions[i];
-        std::vector<secondary::Window> new_windows = secondary::create_windows(
-                bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
-        if (std::empty(new_windows)) {
-            bam_region_intervals.emplace_back(secondary::Interval{0, 0});
-            continue;
-        }
-        const int32_t num_windows = static_cast<int32_t>(std::size(windows));
-        const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
-        bam_region_intervals.emplace_back(
-                secondary::Interval{num_windows, num_windows + num_new_windows});
-        windows.reserve(std::size(windows) + std::size(new_windows));
-        windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
-    }
 
     const auto move_buffer_data_to_queue = [](InferenceData& buffer,
                                               utils::AsyncQueue<InferenceData>& queue,
@@ -1277,6 +1341,35 @@ void sample_producer(PolisherResources& resources,
         buffer.trims = std::move(remainder.trims);
     };
 
+    // Haplotag the BAM regions.
+    std::vector<std::unordered_map<std::string, int32_t>> bam_region_haplotags;
+    if ((haplotag_source == secondary::HaplotagSource::COMPUTE) ||
+        (haplotag_source == secondary::HaplotagSource::BIN_FILE)) {
+        bam_region_haplotags = haplotag_regions_in_parallel(bam_regions, draft_lens,
+                                                            resources.encoders, num_threads);
+    }
+
+    // Split large BAM regions into non-overlapping windows for parallel encoding.
+    // The non-overlapping windows will be merged after samples are constructed.
+    std::vector<secondary::Window> windows;
+    std::vector<secondary::Interval>
+            bam_region_intervals;  // Intervals of windows for each BAM region.
+    for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
+        const secondary::Window& bw = bam_regions[i];
+        std::vector<secondary::Window> new_windows = secondary::create_windows(
+                bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
+        if (std::empty(new_windows)) {
+            bam_region_intervals.emplace_back(secondary::Interval{0, 0});
+            continue;
+        }
+        const int32_t num_windows = static_cast<int32_t>(std::size(windows));
+        const int32_t num_new_windows = static_cast<int32_t>(std::size(new_windows));
+        bam_region_intervals.emplace_back(
+                secondary::Interval{num_windows, num_windows + num_new_windows});
+        windows.reserve(std::size(windows) + std::size(new_windows));
+        windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
+    }
+
     // Divide BAM regions into groups of specified size (in terms of num windows), as sort of a barrier.
     const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
             bam_region_intervals, encoding_batch_size,
@@ -1304,7 +1397,7 @@ void sample_producer(PolisherResources& resources,
 
             // Encode samples in parallel. Non-const by design, data will be moved.
             std::vector<secondary::Sample> region_samples = encode_windows_in_parallel(
-                    resources.encoders, worker_terminate, draft_lens,
+                    resources.encoders, worker_terminate, draft_lens, bam_region_haplotags,
                     std::span<const secondary::Window>(std::data(windows) + window_id_start,
                                                        num_windows),
                     num_threads, continue_on_exception);

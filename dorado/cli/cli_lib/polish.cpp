@@ -115,6 +115,7 @@ struct Options {
     float pass_min_qual = 3.0f;
     bool write_consensus = false;
     bool continue_on_error = false;
+    const secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::UNPHASED;
 };
 
 /// \brief Define the CLI options.
@@ -1054,9 +1055,9 @@ void run_polishing(const Options& opt,
                             polisher::sample_producer(
                                     resources, bam_regions, draft_lens, std::nullopt, opt.threads,
                                     opt.batch_size, opt.encoding_batch_size, opt.window_len,
-                                    opt.window_overlap, 0, opt.bam_subchunk, usable_mem,
-                                    opt.continue_on_error, false, false, 0, 0, 0.25, batch_queue,
-                                    worker_terminate, wrs_sample_producer);
+                                    opt.window_overlap, 0, opt.bam_subchunk, opt.haplotag_source,
+                                    usable_mem, opt.continue_on_error, false, false, 0, 0, 0.25,
+                                    batch_queue, worker_terminate, wrs_sample_producer);
                         });
 
                 // Create a thread for the sample decoder.

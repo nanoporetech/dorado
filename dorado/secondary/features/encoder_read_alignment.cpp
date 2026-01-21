@@ -291,8 +291,9 @@ std::unordered_map<std::string, int32_t> EncoderReadAlignment::produce_haplotags
         const std::string& ref_name,
         const int64_t ref_start,
         const int64_t ref_end) {
-    std::cerr << "Haplotagging region: " << ref_name << ":" << (ref_start + 1) << "-" << ref_end
-              << ", source = " << secondary::haplotag_source_to_string(m_hap_source) << "\n";
+    spdlog::debug("Haplotagging region: %s:%d-%d, source = %s", ref_name, (ref_start + 1), ref_end,
+                  secondary::haplotag_source_to_string(m_hap_source));
+
     if (m_hap_source == secondary::HaplotagSource::BIN_FILE) {
         LOG_TRACE("Loading haplotags from a Kadayashi bin file for region: {}:{}-{}", ref_name,
                   (ref_start + 1), ref_end);
@@ -325,24 +326,23 @@ std::unordered_map<std::string, int32_t> EncoderReadAlignment::produce_haplotags
     return {};
 }
 
-secondary::Sample EncoderReadAlignment::encode_region(const std::string& ref_name,
-                                                      const int64_t ref_start,
-                                                      const int64_t ref_end,
-                                                      const int32_t seq_id) {
+secondary::Sample EncoderReadAlignment::encode_region(
+        const std::string& ref_name,
+        const int64_t ref_start,
+        const int64_t ref_end,
+        const int32_t seq_id,
+        const std::unordered_map<std::string, int32_t>& haplotags) {
     // Compute the counts and data.
     ReadAlignmentTensors tensors;
     try {
         std::unique_lock<std::mutex> lock(m_mtx);
 
-        const std::string phasing_bin_fn_str =
-                (m_phasing_bin) ? m_phasing_bin->string() : std::string();
-
         ReadAlignmentData counts = calculate_read_alignment(
-                m_bam_file, m_fastx_reader.get_raw_faidx_ptr(), ref_name, ref_start, ref_end,
-                m_num_dtypes, m_dtypes, m_tag_name, m_tag_value, m_tag_keep_missing, m_read_group,
-                m_min_mapq, m_row_per_read, m_include_dwells, m_include_haplotype_column,
-                m_include_snp_qv_column, m_hap_source, phasing_bin_fn_str, m_max_reads,
-                m_right_align_insertions, m_min_snp_accuracy);
+                m_bam_file, ref_name, ref_start, ref_end, haplotags, m_num_dtypes, m_dtypes,
+                m_tag_name, m_tag_value, m_tag_keep_missing, m_read_group, m_min_mapq,
+                m_row_per_read, m_include_dwells, m_include_haplotype_column,
+                m_include_snp_qv_column, m_hap_source, m_max_reads, m_right_align_insertions,
+                m_min_snp_accuracy);
 
         // Create Torch tensors from the pileup.
         tensors = read_matrix_data_to_tensors(counts);

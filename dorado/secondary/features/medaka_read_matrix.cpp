@@ -254,27 +254,27 @@ void ReadAlignmentData::resize_num_reads(const int32_t new_buffer_reads) {
     buffer_reads = new_buffer_reads;
 }
 
-ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
-                                           faidx_t *fai_ptr,  // Can be nullptr.
-                                           const std::string &chr_name,
-                                           const int64_t start,  // Zero-based.
-                                           const int64_t end,    // Non-inclusive.
-                                           const int64_t num_dtypes,
-                                           const std::vector<std::string> &dtypes,
-                                           const std::string &tag_name,
-                                           const int32_t tag_value,
-                                           const bool keep_missing,
-                                           const std::string &read_group,
-                                           const int32_t min_mapq,
-                                           const bool row_per_read,
-                                           const bool include_dwells,
-                                           const bool include_haplotype_column,
-                                           const bool include_snp_qv,
-                                           const secondary::HaplotagSource hap_source,
-                                           const std::string &in_haplotag_bin_fn,
-                                           const int32_t max_reads,
-                                           const bool right_align_insertions,
-                                           const double min_snp_accuracy) {
+ReadAlignmentData calculate_read_alignment(
+        secondary::BamFile &bam_file,
+        const std::string &chr_name,
+        const int64_t start,  // Zero-based.
+        const int64_t end,    // Non-inclusive.
+        const std::unordered_map<std::string, int32_t> &haplotags,
+        const int64_t num_dtypes,
+        const std::vector<std::string> &dtypes,
+        const std::string &tag_name,
+        const int32_t tag_value,
+        const bool keep_missing,
+        const std::string &read_group,
+        const int32_t min_mapq,
+        const bool row_per_read,
+        const bool include_dwells,
+        const bool include_haplotype_column,
+        const bool include_snp_qv,
+        const secondary::HaplotagSource hap_source,
+        const int32_t max_reads,
+        const bool right_align_insertions,
+        const double min_snp_accuracy) {
     if ((num_dtypes == 1) && !std::empty(dtypes)) {
         throw std::runtime_error(
                 "Received invalid num_dtypes and dtypes args. num_dtypes == 1 but size(dtypes) = " +
@@ -282,12 +282,6 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     }
     if (num_dtypes == 0) {
         throw std::runtime_error("The num_dtypes needs to be > 0.");
-    }
-
-    if ((hap_source == secondary::HaplotagSource::BIN_FILE) && std::empty(in_haplotag_bin_fn)) {
-        throw std::runtime_error{
-                "Cannot load haplotags from the input bin file, because input bin file path is "
-                "empty!"};
     }
 
     // Open bam etc. This is all now deferred to the caller
@@ -298,38 +292,6 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
     if (!fp || !idx || !hdr) {
         throw std::runtime_error{"[calculate_read_alignment] BamFile not opened properly!"};
     }
-
-    // Load haplotags, either from file or compute in place.
-    const std::unordered_map<std::string, int32_t> kadayashi_qn2tag =
-            [&hap_source, &in_haplotag_bin_fn, &fp, &idx, &hdr, &fai_ptr, &chr_name, start, end]() {
-                if (hap_source == secondary::HaplotagSource::BIN_FILE) {
-                    return query_bin_file_get_qname2tag(in_haplotag_bin_fn, chr_name, start, end);
-
-                } else if (hap_source == secondary::HaplotagSource::COMPUTE) {
-                    LOG_TRACE("Running Kadayashi on region: {}:{}-{}", chr_name, (start + 1), end);
-
-                    constexpr bool DISABLE_INTERVAL_EXPANSION = false;
-                    constexpr int32_t MIN_BASE_QUALITY = 5;
-                    constexpr int32_t MIN_VARCALL_COVERAGE = 5;
-                    constexpr float MIN_VARCALL_FRACTION = 0.2f;
-                    constexpr int32_t MAX_CLIPPING = 200;
-                    constexpr int32_t MIN_STRAND_COV = 3;
-                    constexpr float MIN_STRAND_COV_FRAC = 0.03f;
-                    constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
-
-                    std::unordered_map<std::string, int32_t> ret =
-                            kadayashi::kadayashi_dvr_single_region_wrapper(
-                                    fp, idx, hdr, fai_ptr, chr_name.c_str(), start, end,
-                                    DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY,
-                                    MIN_VARCALL_COVERAGE, MIN_VARCALL_FRACTION, MAX_CLIPPING,
-                                    MIN_STRAND_COV, MIN_STRAND_COV_FRAC, MAX_GAPCOMPRESSED_SEQDIV);
-                    LOG_TRACE("Kadayashi done on region: {}:{}-{}", chr_name, (start + 1), end);
-
-                    return ret;
-                }
-
-                return std::unordered_map<std::string, int32_t>();
-            }();
 
     const auto get_haplotag = [&](const bam1_t *alignment, const std::string &qname) {
         constexpr int8_t DEFAULT_HAPLOTYPE = 0;
@@ -356,10 +318,9 @@ ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
 
             return haplotype;
 
-        } else if ((hap_source == secondary::HaplotagSource::BIN_FILE) ||
-                   (hap_source == secondary::HaplotagSource::COMPUTE)) {
-            const auto it_hap = kadayashi_qn2tag.find(qname);
-            const int8_t haplotype = (it_hap == std::cend(kadayashi_qn2tag))
+        } else {
+            const auto it_hap = haplotags.find(qname);
+            const int8_t haplotype = (it_hap == std::cend(haplotags))
                                              ? DEFAULT_HAPLOTYPE
                                              : static_cast<int8_t>(it_hap->second);
 

@@ -18,6 +18,7 @@
 #include <span>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <unordered_set>
 #include <vector>
 
@@ -261,11 +262,13 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
     const bool right_align_insertions{false};
     const bool include_haplotype_column{false};
     const bool include_snp_qv_column{false};
+    const double min_snp_accuracy{0.0};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const std::optional<std::filesystem::path> phasing_bin{};
     const std::string ref_name{"contig_1"};
     const int32_t ref_id = 123;
     const int64_t ref_start = 0;
+    const std::unordered_map<std::string, int32_t> haplotags{};
 
     CATCH_SECTION("Region has no overhangs") {
         /**
@@ -288,11 +291,12 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
 
         // UUT.
         EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         const std::vector<int64_t> shape(std::cbegin(result.features.sizes()),
                                          std::cend(result.features.sizes()));
@@ -316,11 +320,12 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
 
         // UUT.
         EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         const std::vector<int64_t> shape(std::begin(result.features.sizes()),
                                          std::end(result.features.sizes()));
@@ -360,12 +365,13 @@ CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
     const bool include_dwells{true};
     const bool include_haplotype_column{true};
     const bool include_snp_qv_column{false};
-    const double min_snp_accuracy = 0.0;
+    const double min_snp_accuracy{0.0};
     const std::optional<std::filesystem::path> phasing_bin{};
     const std::string ref_name{"chr20"};
     const int32_t ref_id = 123;
     const int64_t ref_start = 0;
     const int64_t ref_end = 10000;
+    const std::unordered_map<std::string, int32_t> haplotags{};
 
     // Important for this test - testing that the COMPUTE path works.
     const HaplotagSource hap_source{HaplotagSource::COMPUTE};
@@ -381,7 +387,7 @@ CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
                                  right_align_insertions, include_haplotype_column, hap_source,
                                  phasing_bin, include_snp_qv_column);
 
-    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),
                                      std::end(result.features.sizes()));
@@ -432,10 +438,11 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
     const int32_t ref_id = 123;
     const int64_t ref_start = 0;
     const int64_t ref_end = 111;
+    const std::unordered_map<std::string, int32_t> haplotags{};
 
     struct TestCase {
         std::string test_name;
-        double min_snp_accuracy = 0.0;
+        double min_snp_accuracy{0.0};
         std::vector<int64_t> expected_shape{};
     };
 
@@ -454,7 +461,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
                                  clip_to_zero, right_align_insertions, include_haplotype_column,
                                  hap_source, phasing_bin, include_snp_qv_column);
 
-    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),
                                      std::end(result.features.sizes()));
@@ -622,6 +629,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
     const int32_t min_mapq{1};
     const int32_t max_reads{100};
     const bool row_per_read{false};
+    const double min_snp_accuracy{0.0};
 
     const bool right_align_insertions{false};
     const std::optional<std::filesystem::path> phasing_bin{};
@@ -629,6 +637,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
     const int32_t ref_id = 123;
     const int64_t ref_start = 0;
     const int64_t ref_end = 10;
+    const std::unordered_map<std::string, int32_t> haplotags{};
 
     CATCH_SECTION(
             "No dwell column, no hap column, no snp_qv column. Only the base features (base, qual, "
@@ -655,11 +664,12 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -685,12 +695,13 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
 
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -718,11 +729,12 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -750,11 +762,12 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -782,11 +795,12 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -806,12 +820,13 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
 
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -860,12 +875,13 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
 
         // Run UUT.
         EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                     row_per_read, include_dwells, clip_to_zero,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
                                      phasing_bin, include_snp_qv_column);
 
-        const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
         eval_sample(expected, result);
     }
@@ -1003,6 +1019,8 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     const bool include_haplotype_column{true};
     const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const double min_snp_accuracy{0.0};
     const bool clip_to_zero{true};
 
     // Test specific parameter.
@@ -1010,11 +1028,11 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
 
     // Run UUT.
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                 row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin,
-                                 include_snp_qv_column);
-    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+                                 tag_keep_missing, read_group, min_mapq, max_reads,
+                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                                 right_align_insertions, include_haplotype_column, hap_source,
+                                 phasing_bin, include_snp_qv_column);
+    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
 }
@@ -1166,17 +1184,19 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     const bool include_snp_qv_column{false};
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const double min_snp_accuracy{0.0};
 
     // Test specific parameter.
     const bool row_per_read{true};
 
     // Run UUT.
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                 row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin,
-                                 include_snp_qv_column);
-    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+                                 tag_keep_missing, read_group, min_mapq, max_reads,
+                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                                 right_align_insertions, include_haplotype_column, hap_source,
+                                 phasing_bin, include_snp_qv_column);
+    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
 }
@@ -1309,22 +1329,182 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     const HaplotagSource hap_source{HaplotagSource::UNPHASED};
     const bool clip_to_zero{true};
     const bool row_per_read{true};
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const double min_snp_accuracy{0.0};
 
     // Test a specific parameter.
     const int32_t max_reads{1};
 
     // Run UUT.
     EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads, 0.0,
-                                 row_per_read, include_dwells, clip_to_zero, right_align_insertions,
-                                 include_haplotype_column, hap_source, phasing_bin,
-                                 include_snp_qv_column);
-    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id);
+                                 tag_keep_missing, read_group, min_mapq, max_reads,
+                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                                 right_align_insertions, include_haplotype_column, hap_source,
+                                 phasing_bin, include_snp_qv_column);
+    const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),
                                      std::end(result.features.sizes()));
 
     eval_sample(expected, result);
+}
+
+CATCH_TEST_CASE("synthetic_test_05-haplotags", TEST_GROUP) {
+    /**
+     * Tests the haplotags assigned from the input unordered_map.
+     * Auxiliary testing the same things as `synthetic_test_02` (insertion columns, deletion base values and multiple reads per row).
+     */
+
+    const auto temp_dir = make_temp_dir("encoder_read_aln_test");
+    const auto temp_in_ref_fn = temp_dir.m_path / "in.ref.fasta";
+    const auto temp_in_bam_fn = temp_dir.m_path / "in.aln.bam";
+
+    // Create the input test BAM/ref FASTA.
+    {
+        // clang-format off
+        // Target (reference) sequences.
+        const std::vector<std::pair<std::string, std::string>> targets{
+                {"contig_1", "ACTGAACTGA"},
+        };
+        const std::vector<BamRecord> records{
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "8M1D1M", "ACTGAACTA", "", {}, {}},     // Full-span.
+            {"read_02", 0 /*tid*/, 0 /*pos*/, 0 /*flag*/,  60 /*mapq*/, "2M2I1M", "ACAAT", "", {}, {}},         // Reusable row, part 1.
+            {"read_03", 0 /*tid*/, 8 /*pos*/, 0  /*flag*/, 60 /*mapq*/, "2M", "GA", "", {}, {}},                // Reusable row, part 2.
+        };
+        // clang-format on
+
+        write_bam(temp_in_bam_fn, targets, records);
+        write_ref(temp_in_ref_fn, targets);
+    }
+
+    // Expected results.
+    // clang-format off
+    /**
+     * Columns of the feature tensor are:
+     *      base, qual, strand, mapq, dwell, haplotype [, dtype]
+     *
+     * NOTE: The base column is encoded in the following way:
+     *      A = 1, C = 2, G = 3, T = 4, DEL = 5
+     *
+     *      The strand column is:
+     *          FWD = 1, REV = 0
+     */
+    const Sample expected {
+        .seq_id = 123,
+        .features = torch::tensor(
+            {
+                // (0,.,.) "A"/"A", major/minor: 0/0
+                {{1, 0, 1, 60, 0, 1},
+                {1, 0, 1, 60, 0, 123}},
+
+                // (1,.,.) "C"/"C", major/minor: 1/0
+                {{2, 0, 1, 60, 0, 1},
+                {2, 0, 1, 60, 0, 123}},
+
+                // (2,.,.)  -> Insertion ("-"/"A"), major/minor: 1/1
+                {{5, 0, 1, 60, 0, 1},
+                {1, 0, 1, 60, 0, 123}},
+
+                // (3,.,.)  -> Insertion ("-"/"A"), major/minor: 1/2
+                {{5, 0, 1, 60, 0, 1},
+                {1, 0, 1, 60, 0, 123}},
+
+                // (4,.,.) "T"/"T", major/minor: 2/0
+                {{4, 0, 1, 60, 0, 1},
+                {4, 0, 1, 60, 0, 123}},
+
+                // (5,.,.) "G"/nothing, major/minor: 3/0
+                {{3, 0, 1, 60, 0, 1},
+                {0, 0, 0, 0, 0, 0}},
+
+                // (6,.,.), "A"/nothing, major/minor: 4/0
+                {{1, 0, 1, 60, 0, 1},
+                {0, 0, 0, 0, 0, 0}},
+
+                // (7,.,.), "A"/nothing, major/minor: 5/0
+                {{1, 0, 1, 60, 0, 1},
+                {0, 0, 0, 0, 0, 0}},
+
+                // (8,.,.), "C"/nothing, major/minor: 6/0
+                {{2, 0, 1, 60, 0, 1},
+                {0, 0, 0, 0, 0, 0}},
+
+                // (9,.,.), "T"/nothing, major/minor: 7/0
+                {{4, 0, 1, 60, 0, 1},
+                {0, 0, 0, 0, 0, 0}},
+
+                // (10,.,.), "-"/"G", major/minor: 8/0
+                {{5, 0, 1, 60, 0, 1},
+                {3, 0, 1, 60, 0, 5}},
+
+                // (11,.,.), "A"/"A", major/minor: 9/0
+                {{1, 0, 1, 60, 0, 1},
+                {1, 0, 1, 60, 0, 5}},
+
+            }, torch::dtype(torch::kInt8)
+        ),
+        .positions_major = {
+            0, 1, 1, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+        },
+        .positions_minor = {
+            0, 0, 1, 2, 0, 0, 0, 0, 0, 0, 0, 0,
+        },
+        .depth = torch::tensor(
+            {2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 2, 2},
+            torch::dtype(torch::kInt32)
+        ),
+        .read_ids_left = {
+            "read_01",
+            "read_02",
+        },
+        .read_ids_right = {
+            "read_01",
+            "read_03",
+        },
+    };
+    // clang-format on
+
+    // Parameters, fixed for this test.
+    const std::vector<std::string> dtypes{};
+    const std::string tag_name{};
+    const int32_t tag_value{0};
+    const bool tag_keep_missing{false};
+    const std::string read_group{};
+    const int32_t min_mapq{1};
+    const int32_t max_reads{100};
+    const bool right_align_insertions{false};
+    const std::optional<std::filesystem::path> phasing_bin{};
+    const std::string ref_name{"contig_1"};
+    const int32_t ref_id = 123;
+    const int64_t ref_start = 0;
+    const int64_t ref_end = 10;
+    const bool include_dwells{true};
+    const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{false};
+    const double min_snp_accuracy{0.0};
+    const bool clip_to_zero{true};
+    const bool row_per_read{false};
+
+    CATCH_SECTION("Haplotags are precomputed and passed to the encoder") {
+        // Test-specific parameters.
+        const HaplotagSource hap_source{HaplotagSource::COMPUTE};
+        const std::unordered_map<std::string, int32_t> haplotags{
+                {"read_01", 1},
+                {"read_02", 123},
+                {"read_03", 5},
+        };
+
+        // Run UUT.
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
+
+        eval_sample(expected, result);
+    }
 }
 
 }  // namespace dorado::secondary::tests

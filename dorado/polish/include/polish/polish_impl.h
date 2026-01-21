@@ -18,6 +18,7 @@
 
 #include <cstdint>
 #include <filesystem>
+#include <memory>
 #include <optional>
 #include <string>
 #include <unordered_map>
@@ -161,6 +162,12 @@ void infer_samples_in_parallel(utils::AsyncQueue<InferenceData>& batch_queue,
                                const std::vector<std::pair<std::string, int64_t>>& draft_lens,
                                bool continue_on_exception);
 
+std::vector<std::unordered_map<std::string, int32_t>> haplotag_regions_in_parallel(
+        const std::vector<secondary::Window>& regions,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
+        const int32_t num_threads);
+
 void sample_producer(PolisherResources& resources,
                      const std::vector<secondary::Window>& bam_regions,
                      const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -172,6 +179,7 @@ void sample_producer(PolisherResources& resources,
                      int32_t window_overlap,
                      int32_t variant_flanking_bases,
                      int32_t bam_subchunk_len,
+                     secondary::HaplotagSource haplotag_source,
                      double max_available_mem,
                      bool continue_on_exception,
                      bool tiled_regions,

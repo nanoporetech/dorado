@@ -320,10 +320,12 @@ std::unordered_map<std::string, int32_t> EncoderCounts::produce_haplotags(
     return {};
 }
 
-secondary::Sample EncoderCounts::encode_region(const std::string& ref_name,
-                                               const int64_t ref_start,
-                                               const int64_t ref_end,
-                                               const int32_t seq_id) {
+secondary::Sample EncoderCounts::encode_region(
+        const std::string& ref_name,
+        const int64_t ref_start,
+        const int64_t ref_end,
+        const int32_t seq_id,
+        const std::unordered_map<std::string, int32_t>& /*haplotags*/) {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 
