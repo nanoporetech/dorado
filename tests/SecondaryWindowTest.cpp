@@ -19,92 +19,93 @@ CATCH_TEST_CASE("create_windows tests", TEST_GROUP) {
         int64_t seq_len = 0;
         int32_t window_len = 0;
         int32_t window_overlap = 0;
+        int32_t source_region_id = 0;
         std::vector<Window> expected;
     };
 
     // clang-format off
     auto [test_case] = GENERATE(table<TestCase>({
         TestCase{
-            "Coordinates and lengths all zero", 0, 0, 0, 0, 0, 0,
+            "Coordinates and lengths all zero", 0, 0, 0, 0, 0, 0, 0,
             {},
         },
         TestCase{
-            "Normal full-contig", 0, 0, 10000, 10000, 2000, 100,
+            "Normal full-contig", 0, 0, 10000, 10000, 2000, 100, 1,
             {
-                Window{0, 10000, 0, 2000, 0, 2000},
-                Window{0, 10000, 1900, 3900, 2000, 3900},
-                Window{0, 10000, 3800, 5800, 3900, 5800},
-                Window{0, 10000, 5700, 7700, 5800, 7700},
-                Window{0, 10000, 7600, 9600, 7700, 9600},
-                Window{0, 10000, 9500, 10000, 9600, 10000},
+                Window{0, 10000, 0, 2000, 0, 2000, 1},
+                Window{0, 10000, 1900, 3900, 2000, 3900, 1},
+                Window{0, 10000, 3800, 5800, 3900, 5800, 1},
+                Window{0, 10000, 5700, 7700, 5800, 7700, 1},
+                Window{0, 10000, 7600, 9600, 7700, 9600, 1},
+                Window{0, 10000, 9500, 10000, 9600, 10000, 1},
             },
         },
         TestCase{
-            "Normal short", 0, 0, 500, 10000, 2000, 100,
+            "Normal short", 0, 0, 500, 10000, 2000, 100, 2,
             {
-                Window{0, 10000, 0, 500, 0, 500},
+                Window{0, 10000, 0, 500, 0, 500, 2},
             },
         },
         TestCase{
-            "Normal, internal region", 0, 100, 3000, 10000, 2000, 100,
+            "Normal, internal region", 0, 100, 3000, 10000, 2000, 100, 3,
             {
                 Window{0, 10000, 100, 2100, 100, 2100},
                 Window{0, 10000, 2000, 3000, 2100, 3000},
             },
         },
         TestCase{
-            "Zero-length input interval. Returns empty.", 0, 5, 5, 10000, 2000, 100,
+            "Zero-length input interval. Returns empty.", 0, 5, 5, 10000, 2000, 100, 4,
             {},
         },
         TestCase{
-            "End coordinate over contig length. Returns empty.", 0, 0, 20000, 10000, 2000, 100,
+            "End coordinate over contig length. Returns empty.", 0, 0, 20000, 10000, 2000, 100, 5,
             {},
         },
         TestCase{
-            "Start coordinate is < 0. Returns empty.", 0, -5, 10000, 10000, 2000, 100,
+            "Start coordinate is < 0. Returns empty.", 0, -5, 10000, 10000, 2000, 100, 6,
             {},
         },
         TestCase{
-            "Sequence length is < 0. Returns empty.", 0, 0, 10000, -10000, 2000, 100,
+            "Sequence length is < 0. Returns empty.", 0, 0, 10000, -10000, 2000, 100, 7,
             {},
         },
         TestCase{
-            "Start coordinate is > end coordinate. Returns empty.", 0, 12000, 10000, 10000, 2000, 100,
+            "Start coordinate is > end coordinate. Returns empty.", 0, 12000, 10000, 10000, 2000, 100, 8,
             {},
         },
         TestCase{
-            "Window overlap is >= window_len / 2. Returns empty.", 0, 0, 10000, 10000, 2000, 1000,
+            "Window overlap is >= window_len / 2. Returns empty.", 0, 0, 10000, 10000, 2000, 1000, 9,
             {},
         },
         TestCase{
-            "Window len == 0. Returns empty.", 0, 0, 10000, 10000, 0, 1000,
+            "Window len == 0. Returns empty.", 0, 0, 10000, 10000, 0, 1000, 10,
             {},
         },
         TestCase{
-            "Window len < 0. Returns empty.", 0, 0, 10000, 10000, -1, 1000,
+            "Window len < 0. Returns empty.", 0, 0, 10000, 10000, -1, 1000, 11,
             {},
         },
         TestCase{
-            "Window overlap < 0. Returns empty.", 0, 0, 10000, 10000, 2000, -1,
+            "Window overlap < 0. Returns empty.", 0, 0, 10000, 10000, 2000, -1, 12,
             {},
         },
         TestCase{
-            "Window overlap == 0. This is fine, should return non-overlapping windows.", 0, 0, 10000, 10000, 2000, 0,
+            "Window overlap == 0. This is fine, should return non-overlapping windows.", 0, 0, 10000, 10000, 2000, 0, 13,
             {
-                Window{0, 10000, 0, 2000, 0, 2000},
-                Window{0, 10000, 2000, 4000, 2000, 4000},
-                Window{0, 10000, 4000, 6000, 4000, 6000},
-                Window{0, 10000, 6000, 8000, 6000, 8000},
-                Window{0, 10000, 8000, 10000, 8000, 10000},
+                Window{0, 10000, 0, 2000, 0, 2000, 13},
+                Window{0, 10000, 2000, 4000, 2000, 4000, 13},
+                Window{0, 10000, 4000, 6000, 4000, 6000, 13},
+                Window{0, 10000, 6000, 8000, 6000, 8000, 13},
+                Window{0, 10000, 8000, 10000, 8000, 10000, 13},
             },
         },
     }));
     // clang-format on
 
     CATCH_INFO(TEST_GROUP << " Test name: " << test_case.name);
-    const std::vector<Window> result =
-            create_windows(test_case.seq_id, test_case.seq_start, test_case.seq_end,
-                           test_case.seq_len, test_case.window_len, test_case.window_overlap);
+    const std::vector<Window> result = create_windows(
+            test_case.seq_id, test_case.seq_start, test_case.seq_end, test_case.seq_len,
+            test_case.window_len, test_case.window_overlap, test_case.source_region_id);
     CATCH_CHECK(result == test_case.expected);
 }
 

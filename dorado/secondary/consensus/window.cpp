@@ -24,7 +24,8 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int64_t seq_end,
                                    const int64_t seq_len,
                                    const int32_t window_len,
-                                   const int32_t window_overlap) {
+                                   const int32_t window_overlap,
+                                   const int32_t source_region_id) {
     if (window_overlap >= (window_len / 2)) {
         spdlog::warn(
                 "Window overlap cannot be larger than the (window_len / 2) because of transitive "
@@ -83,14 +84,8 @@ std::vector<Window> create_windows(const int32_t seq_id,
         const int64_t start_no_overlap =
                 (start == seq_start) ? start : std::min<int64_t>(start + window_overlap, seq_end);
 
-        ret.emplace_back(Window{
-                seq_id,
-                seq_len,
-                start,
-                end,
-                start_no_overlap,
-                end,
-        });
+        ret.emplace_back(
+                Window{seq_id, seq_len, start, end, start_no_overlap, end, source_region_id});
 
         if (end == seq_end) {
             break;

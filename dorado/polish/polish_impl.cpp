@@ -1157,7 +1157,9 @@ std::vector<secondary::Window> create_windows_from_regions(
 
     std::vector<secondary::Window> windows;
 
-    for (auto region : regions) {
+    for (int64_t i = 0; i < std::ssize(regions); ++i) {
+        secondary::Region region = regions[i];
+
         spdlog::debug("Creating windows for region: '{}'.", region_to_string(region));
 
         const auto it = draft_lookup.find(region.name);
@@ -1179,9 +1181,9 @@ std::vector<secondary::Window> create_windows_from_regions(
         }
 
         // Split the custom region if it's too long.
-        std::vector<secondary::Window> new_windows =
-                secondary::create_windows(static_cast<int32_t>(seq_id), region.start, region.end,
-                                          seq_length, bam_chunk_len, window_overlap);
+        std::vector<secondary::Window> new_windows = secondary::create_windows(
+                static_cast<int32_t>(seq_id), region.start, region.end, seq_length, bam_chunk_len,
+                window_overlap, static_cast<int32_t>(i));
 
         spdlog::debug("Generated {} windows for region: '{}'.", std::size(new_windows),
                       region_to_string(region));
@@ -1220,11 +1222,12 @@ void sample_producer(PolisherResources& resources,
     // Split large BAM regions into non-overlapping windows for parallel encoding.
     // The non-overlapping windows will be merged after samples are constructed.
     std::vector<secondary::Window> windows;
-    std::vector<secondary::Interval> bam_region_intervals;
+    std::vector<secondary::Interval>
+            bam_region_intervals;  // Intervals of windows for each BAM region.
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(bam_regions)); ++i) {
         const secondary::Window& bw = bam_regions[i];
         std::vector<secondary::Window> new_windows = secondary::create_windows(
-                bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0);
+                bw.seq_id, bw.start, bw.end, bw.seq_length, bam_subchunk_len, 0, i);
         if (std::empty(new_windows)) {
             bam_region_intervals.emplace_back(secondary::Interval{0, 0});
             continue;
@@ -1274,7 +1277,7 @@ void sample_producer(PolisherResources& resources,
         buffer.trims = std::move(remainder.trims);
     };
 
-    // Divide draft sequences into groups of specified size, as sort of a barrier.
+    // Divide BAM regions into groups of specified size (in terms of num windows), as sort of a barrier.
     const std::vector<secondary::Interval> bam_region_batches = secondary::create_batches(
             bam_region_intervals, encoding_batch_size,
             [](const secondary::Interval& val) { return val.end - val.start; });
