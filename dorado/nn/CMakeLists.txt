@@ -13,6 +13,7 @@ dorado_add_library(
         LinearUpsample.h
         LSTMStack.h
         MetalModules.h
+        RMSNorm.h
         RNNStack.h
         TxModules.h
         WorkingMemory.h
@@ -23,6 +24,7 @@ dorado_add_library(
         FLSTMStack.cpp
         LinearUpsample.cpp
         LSTMStack.cpp
+        RMSNorm.cpp
         TxModules.cpp
         WorkingMemory.cpp
     DEPENDS_PUBLIC

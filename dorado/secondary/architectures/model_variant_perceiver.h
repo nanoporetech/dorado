@@ -1,7 +1,7 @@
 #pragma once
 
 #include "model_latent_space_lstm.h"
-#include "nn/TxModules.h"
+#include "nn/RMSNorm.h"
 #include "secondary/architectures/model_torch_base.h"
 #include "secondary/features/encoder_base.h"
 
