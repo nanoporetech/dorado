@@ -4,8 +4,7 @@
 #include <sstream>
 
 // Some stdlibs don't support parse()/from_stream() yet, or they can't format a sys_time<> correctly.
-#if defined(__cpp_lib_format) && \
-        ((defined(__GNUC__) && __GNUC__ >= 14) || (defined(__clang__) && defined(__linux__)))
+#if defined(__cpp_lib_format) && (defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE >= 14)
 #define FULL_CHRONO_SUPPORT 1
 #else
 #define FULL_CHRONO_SUPPORT 0
