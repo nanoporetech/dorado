@@ -27,7 +27,7 @@ bool BlockedBloomFilter::enable() {
         m_is_enabled = true;
         return true;
     } else {  // should not happen
-        spdlog::error("[{}] bloom filter: tried to enable bbf when it is already allocated.",
+        spdlog::error("[kdys::{}] bloom filter: tried to enable bbf when it is already allocated.",
                       __func__);
         return false;
     }

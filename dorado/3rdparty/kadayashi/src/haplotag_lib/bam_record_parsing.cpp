@@ -102,7 +102,6 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     //        initial unphased pileup, and caller should ensure no race.
     //        (2)If the bloom filter is provided and is frozen, we will check
     //        with it and only collect known variants.
-    constexpr bool DEBUG_PRINT = false;
     bool failed = false;
 
     int self_start = 0;
@@ -114,9 +113,6 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     const uint8_t *seqi = bam_get_seq(aln);
     uint32_t ref_pos = ref_start;
     uint32_t self_pos = 0;
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_TRACE("[{}] at read {} (ref start pos={})", __func__, bam_get_qname(aln), ref_start);
-    }
 
     uint32_t op = std::numeric_limits<uint32_t>::max();
     uint32_t op_l = 0;
@@ -166,10 +162,6 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     const std::string md_ss = md_s;
     int prev_md_i = 0;
     int prev_md_type, md_type;
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_TRACE("[{}] qn={:s}", __func__, bam_get_qname(aln));
-        LOG_TRACE("[{}] MD={:s}", __func__, md_s);
-    }
 
     // (init)
     self_pos = self_start;
@@ -238,17 +230,6 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                 if (check_blockedbloomfilter_to_decide_inserting(bf, ref_pos)) {
                     add_allele_qa_v(vars, ref_pos, snp_base, VAR_OP_X);
                 }
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    char snp_base_dbg[10];
-                    snp_base_dbg[9] = 0;
-                    for (uint32_t x = (self_pos > 7 ? self_pos - 7 : 0), y = 0; x < self_pos + 2;
-                         x++, y++) {
-                        snp_base_dbg[y] =
-                                filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, x)], min_base_qv);
-                    }
-                    spdlog::trace("[{}] pushed SNP ref_pos={} self_pos={} base={}, -7~+1:{}",
-                                  __func__, ref_pos, self_pos, snp_base, snp_base_dbg);
-                }
                 ref_pos++;
                 self_pos++;
                 prev_md_type = -1;
@@ -262,24 +243,6 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     }
     std::stable_sort(vars.begin(), vars.end(),
                      [](const qa_t &a, const qa_t &b) { return a.pos < b.pos; });
-
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        //print_dbg_var_variants(vars);
-        for (size_t tmpi = 0; tmpi < vars.size(); tmpi++) {
-            const int tmpop = vars[tmpi].allele[vars[tmpi].allele.size() -
-                                                2];  // -2 because the last char is the cigar op
-            std::string tmp =
-                    fmt::format("[{}]    op={:c} pos={} (0-idx) len={} ", __func__, "MXID"[tmpop],
-                                vars[tmpi].pos, std::ssize(vars[tmpi].allele) - 1);
-            if (tmpop > 0) {
-                tmp += "seq=";
-                for (int64_t tmpj = 0; tmpj < std::ssize(vars[tmpi].allele) - 1; tmpj++) {
-                    tmp += "ACGT?"[vars[tmpi].allele[tmpj]];
-                }
-            }
-            LOG_TRACE("{}", tmp);
-        }
-    }
 
     return !failed;
 }
