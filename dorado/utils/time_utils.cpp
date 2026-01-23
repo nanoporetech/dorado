@@ -33,17 +33,17 @@ namespace dorado::utils {
 
 std::string get_minknow_timestamp_from_unix_time_ms(int64_t ms) {
     auto tp = get_us_timepoint_from_ms(ms);
-    return date::format("%Y%m%d_%H%M", tp);
+    return std::format("{0:%Y%m%d}_{0:%H%M}", tp);
 }
 
 std::string get_string_timestamp_from_unix_time_ms(int64_t ms) {
     auto tp = get_us_timepoint_from_ms(ms);
-    return date::format("%FT%T%Ez", tp);
+    return std::format("{0:%F}T{0:%T%Ez}", tp);
 }
 
 std::string get_string_timestamp_from_unix_time_sZ(int64_t s) {
     auto tp = get_timepoint_from_s(s);
-    return date::format("%FT%TZ", tp);
+    return std::format("{0:%F}T{0:%T}Z", tp);
 }
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".
