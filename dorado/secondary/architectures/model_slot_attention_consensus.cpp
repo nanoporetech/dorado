@@ -162,7 +162,7 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
         const int32_t bases_embedding_size,
         const bool add_lstm,
         const bool use_reference,
-        const FeatureColumnMap feature_column_map)
+        const FeatureColumnMap& feature_column_map)
         : ModelTorchBase(ctor_tag),
           m_num_slots{num_slots},
           m_classes_per_slot{classes_per_slot},
@@ -198,27 +198,22 @@ ModelSlotAttentionConsensus::ModelSlotAttentionConsensus(
           m_lstm{} {
     (void)m_use_reference;
 
-    // Helper to get the feature column index.
-    const auto get_feature_or_throw =
-            [&feature_column_map](const FeatureColumns feature) -> int32_t {
-        const auto it = feature_column_map.find(feature);
-        if (it == std::cend(feature_column_map)) {
-            throw std::runtime_error{"Cannot find the " + feature_column_to_string(feature) +
-                                     " column in the feature_column_map!"};
-        }
-        return it->second;
-    };
-
     // Mandatory feature columns.
-    m_column_base = get_feature_or_throw(FeatureColumns::BASE);
-    m_column_qual = get_feature_or_throw(FeatureColumns::QUAL);
-    m_column_strand = get_feature_or_throw(FeatureColumns::STRAND);
-    m_column_mapq = get_feature_or_throw(FeatureColumns::MAPQ);
+    m_column_base = get_feature_column_or_throw(feature_column_map, FeatureColumns::BASE);
+    m_column_qual = get_feature_column_or_throw(feature_column_map, FeatureColumns::QUAL);
+    m_column_strand = get_feature_column_or_throw(feature_column_map, FeatureColumns::STRAND);
+    m_column_mapq = get_feature_column_or_throw(feature_column_map, FeatureColumns::MAPQ);
 
     // Optional feature columns.
-    m_column_dwell = use_dwells ? get_feature_or_throw(FeatureColumns::DWELL) : -1;
-    m_column_haplotag = use_haplotags ? get_feature_or_throw(FeatureColumns::HAPLOTAG) : -1;
-    m_column_snp_qv = use_snp_qv ? get_feature_or_throw(FeatureColumns::SNP_QV) : -1;
+    m_column_dwell =
+            use_dwells ? get_feature_column_or_throw(feature_column_map, FeatureColumns::DWELL)
+                       : -1;
+    m_column_haplotag = use_haplotags ? get_feature_column_or_throw(feature_column_map,
+                                                                    FeatureColumns::HAPLOTAG)
+                                      : -1;
+    m_column_snp_qv =
+            use_snp_qv ? get_feature_column_or_throw(feature_column_map, FeatureColumns::SNP_QV)
+                       : -1;
 
     if (m_add_lstm) {
         const int64_t lstm_size = m_num_slots * m_read_embedding_size;

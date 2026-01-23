@@ -4,6 +4,9 @@
 #include <torch/nn/module.h>
 
 #include <memory>
+#include <mutex>
+#include <string>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::secondary {
@@ -67,6 +70,11 @@ public:
      */
     virtual double estimate_batch_memory(const std::vector<int64_t> &batch_tensor_shape) const = 0;
 
+    /**
+     * \brief Getter for the set of non-persistent buffers. Libtorch lacks this feature in `register_buffer`.
+     */
+    const std::unordered_set<std::string> &get_non_persistent_buffers() const;
+
 protected:
     // Hidden tag to enforce construction via the factory function.
     class MustConstructWithFactory {
@@ -77,6 +85,10 @@ protected:
 
     bool m_normalise = true;
     bool m_half_precision = false;
+    std::mutex m_mutex_write;
+    std::unordered_set<std::string> m_non_persistent_buffers{};
+
+    void add_nonpersistent_buffer(const std::string &name);
 };
 
 }  // namespace dorado::secondary

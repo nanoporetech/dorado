@@ -12,6 +12,7 @@ enum class ModelType {
     GRU,
     LATENT_SPACE_LSTM,
     SLOT_ATTENTION_CONSENSUS,
+    VARIANT_PERCEIVER,
 };
 
 enum class ParameterLoadingStrategy {

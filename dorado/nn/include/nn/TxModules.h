@@ -1,6 +1,7 @@
 #pragma once
 
 #include "config/BasecallModelConfig.h"
+#include "nn/RMSNorm.h"
 #include "torch_utils/tensor_utils.h"
 
 #include <c10/core/Device.h>
@@ -18,17 +19,6 @@ torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &k,
                                                  const torch::Tensor &v,
                                                  const torch::Tensor &mask);
-
-struct RMSNormImpl : torch::nn::Module {
-    RMSNormImpl(int hidden_size_);
-    at::Tensor forward(at::Tensor x);
-
-    at::Tensor weight;
-    const int hidden_size;
-    const float eps{1e-5f};
-};
-
-TORCH_MODULE(RMSNorm);
 
 struct GatedMLPImpl : torch::nn::Module {
     GatedMLPImpl(int in_features, int hidden_features);

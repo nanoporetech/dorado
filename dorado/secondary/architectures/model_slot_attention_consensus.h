@@ -68,7 +68,7 @@ public:
                                 int32_t bases_embedding_size,
                                 bool add_lstm,
                                 bool use_reference,
-                                FeatureColumnMap feature_column_map);
+                                const FeatureColumnMap& feature_column_map);
 
     at::Tensor forward(at::Tensor x) override;
 

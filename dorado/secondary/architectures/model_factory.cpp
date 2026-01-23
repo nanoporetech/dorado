@@ -5,6 +5,7 @@
 #include "model_latent_space_lstm.h"
 #include "model_slot_attention_consensus.h"
 #include "model_torch_script.h"
+#include "model_variant_perceiver.h"
 #include "secondary/features/encoder_base.h"
 #include "secondary/features/encoder_factory.h"
 #include "torch_utils/tensor_utils.h"
@@ -30,6 +31,8 @@ ModelType parse_model_type(const std::string& type) {
         return ModelType::LATENT_SPACE_LSTM;
     } else if (type == "SlotAttentionConsensus") {
         return ModelType::SLOT_ATTENTION_CONSENSUS;
+    } else if (type == "VariantPerceiver") {
+        return ModelType::VARIANT_PERCEIVER;
     }
     throw std::runtime_error{"Unknown model type: '" + type + "'!"};
 }
@@ -51,15 +54,17 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         return bytes;
     };
 
-    if (spdlog::default_logger()->level() == spdlog::level::debug) {
+    if (spdlog::default_logger()->should_log(spdlog::level::debug)) {
         const torch::OrderedDict<std::string, at::Tensor> model_params = model.named_parameters();
         for (const auto& w : model_params) {
             spdlog::debug("[model_params] w.key() = {}", w.key());
         }
         for (const auto& buffer : model.named_buffers()) {
-            spdlog::debug("[model_params] Buffer key: {}, shape: {}", buffer.key(),
-                          (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
-                                                    : "undefined"));
+            spdlog::debug(
+                    "[model_params] Buffer key: {}, shape: {}, persistent: {}", buffer.key(),
+                    (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
+                                              : "undefined"),
+                    ((model.get_non_persistent_buffers().count(buffer.key())) ? "no" : "yes"));
         }
     }
 
@@ -71,14 +76,16 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
         const c10::Dict<c10::IValue, c10::IValue> weights =
                 torch::jit::pickle_load(bytes).toGenericDict();
 
-        if (spdlog::default_logger()->level() == spdlog::level::debug) {
+        if (spdlog::default_logger()->should_log(spdlog::level::debug)) {
             for (const auto& w : weights) {
-                spdlog::debug("[pt_param] w.key() = {}", w.key().toStringRef());
+                spdlog::debug("[loaded pt_param] w.key() = {}", w.key().toStringRef());
             }
         }
 
         auto params = model.named_parameters(true /*recurse*/);
         auto buffers = model.named_buffers(true /*recurse*/);
+        const std::unordered_set<std::string>& non_persistent_buffers =
+                model.get_non_persistent_buffers();
 
         // Create a set of model parameters.
         std::unordered_set<std::string> set_model_params;
@@ -86,6 +93,10 @@ void load_parameters(ModelTorchBase& model, const std::filesystem::path& in_pt) 
             set_model_params.emplace(param.key());
         }
         for (const auto& param : buffers) {
+            // Skip non-persistent buffers.
+            if (non_persistent_buffers.count(param.key())) {
+                continue;
+            }
             set_model_params.emplace(param.key());
         }
 
@@ -268,6 +279,44 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         // The SlotAttentionConsensus model normalizes internally because of phasing, so
         // deactivate normalization after phasing.
         model->set_normalise(false);
+
+    } else if (model_type == ModelType::VARIANT_PERCEIVER) {
+        spdlog::debug("Constructing a VARIANT_PERCEIVER model.");
+
+        const int32_t ploidy = std::stoi(get_value(config.model_kwargs, "ploidy"));
+        const int32_t num_classes = std::stoi(get_value(config.model_kwargs, "num_classes"));
+        const int32_t read_embedding_size =
+                std::stoi(get_value(config.model_kwargs, "read_embedding_size"));
+        const int32_t cnn_size = std::stoi(get_value(config.model_kwargs, "cnn_size"));
+        const std::vector<int32_t> kernel_sizes =
+                utils::parse_int32_vector(get_value(config.model_kwargs, "kernel_sizes"), ',');
+        const int32_t dimension = std::stoi(get_value(config.model_kwargs, "dimension"));
+        const int32_t num_blocks = std::stoi(get_value(config.model_kwargs, "num_blocks"));
+        const int32_t num_heads = std::stoi(get_value(config.model_kwargs, "num_heads"));
+
+        const bool use_mapqc = (get_value(config.model_kwargs, "use_mapqc") == "true");
+        const bool use_dwells = (get_value(config.model_kwargs, "use_dwells") == "true");
+        const bool use_haplotags = (get_value(config.model_kwargs, "use_haplotags") == "true");
+        bool use_snp_qv = false;
+        if (config.model_kwargs.find("use_snp_qv") != std::cend(config.model_kwargs)) {
+            use_snp_qv = (get_value(config.model_kwargs, "use_snp_qv") == "true");
+        }
+
+        const int32_t bases_alphabet_size =
+                std::stoi(get_value(config.model_kwargs, "bases_alphabet_size"));
+        const int32_t bases_embedding_size =
+                std::stoi(get_value(config.model_kwargs, "bases_embedding_size"));
+
+        const bool use_decoder_lstm =
+                (get_value(config.model_kwargs, "use_decoder_lstm") == "true");
+        const bool update_read_embeddings =
+                (get_value(config.model_kwargs, "update_read_embeddings") == "true");
+
+        model = ModelVariantPerceiver::make<ModelVariantPerceiver>(
+                ploidy, num_classes, read_embedding_size, cnn_size, kernel_sizes, dimension,
+                num_blocks, num_heads, use_mapqc, use_dwells, use_haplotags, use_snp_qv,
+                bases_alphabet_size, bases_embedding_size, use_decoder_lstm, update_read_embeddings,
+                feature_column_map);
 
     } else {
         throw std::runtime_error("Unsupported model type!");
