@@ -21,7 +21,17 @@
 #define CPPHTTPLIB_SEND_FLAGS MSG_NOSIGNAL
 #endif
 #define CPPHTTPLIB_OPENSSL_SUPPORT
+
+// <httplib.h> pulls in <regex> which needs -Wmaybe-uninitialized ignoring.
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <httplib.h>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
+
 #endif  // DORADO_MODELS_HAS_HTTPLIB
 
 namespace fs = std::filesystem;
