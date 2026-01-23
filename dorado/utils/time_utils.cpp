@@ -3,7 +3,8 @@
 #include <chrono>
 #include <sstream>
 
-#if __cplusplus >= 202002L && 0  // Most stdlibs don't support parse()/from_stream() yet
+// Some stdlibs don't support parse()/from_stream() yet.
+#if (defined(__GNUC__) && __GNUC__ >= 14) || (defined(__clang__) && defined(__linux__))
 namespace date = std::chrono;
 #else
 #include <date/date.h>

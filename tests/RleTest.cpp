@@ -9,6 +9,14 @@
 
 #define TEST_GROUP "[RLE]"
 
+#if defined(__clang__) && defined(__GLIBCXX__)
+// See https://github.com/catchorg/Catch2/issues/2923
+template <>
+struct std::tuple_size<Catch::Decomposer> {
+    static constexpr size_t value = 1;
+};
+#endif
+
 namespace dorado::rle::tests {
 
 CATCH_TEST_CASE("run_length_encode handles empty input", TEST_GROUP) {
