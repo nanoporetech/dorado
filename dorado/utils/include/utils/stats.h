@@ -2,7 +2,14 @@
 
 #include <atomic>
 #include <chrono>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#endif
 #include <functional>
+#if defined(__GNUC__) && !defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 #include <iosfwd>
 #include <optional>
 #include <regex>

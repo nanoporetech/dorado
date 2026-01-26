@@ -15,9 +15,9 @@ using MD5Hex = char[33];
 
 // SAM SQ Header with optional UR and M5 tags
 struct HeaderSQRecord {
-    std::string sequence_name;                   // `@SQ SN`: Sequence Name
-    uint32_t length;                             // `@SQ LN`: Sequence length
-    std::shared_ptr<std::string> uri = nullptr;  // `@SQ UR`: URI of sequence.
+    std::string sequence_name;                         // `@SQ SN`: Sequence Name
+    uint32_t length;                                   // `@SQ LN`: Sequence length
+    std::shared_ptr<const std::string> uri = nullptr;  // `@SQ UR`: URI of sequence.
     MD5Hex md5 = {};  // `@SQ M5`: MD5 sequence checksum (iff uri != nullptr)
 };
 

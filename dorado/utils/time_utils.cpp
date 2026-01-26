@@ -3,7 +3,15 @@
 #include <chrono>
 #include <sstream>
 
-#if __cplusplus >= 202002L && 0  // Most stdlibs don't support parse()/from_stream() yet
+// Some stdlibs don't support parse()/from_stream() yet, or they can't format a sys_time<> correctly.
+#if defined(__cpp_lib_format) && (defined(_GLIBCXX_RELEASE) && _GLIBCXX_RELEASE >= 14)
+#define FULL_CHRONO_SUPPORT 1
+#else
+#define FULL_CHRONO_SUPPORT 0
+#endif
+
+#if FULL_CHRONO_SUPPORT
+#include <format>
 namespace date = std::chrono;
 #else
 #include <date/date.h>
@@ -33,17 +41,29 @@ namespace dorado::utils {
 
 std::string get_minknow_timestamp_from_unix_time_ms(int64_t ms) {
     auto tp = get_us_timepoint_from_ms(ms);
+#if FULL_CHRONO_SUPPORT
+    return std::format("{0:%Y%m%d}_{0:%H%M}", tp);
+#else
     return date::format("%Y%m%d_%H%M", tp);
+#endif
 }
 
 std::string get_string_timestamp_from_unix_time_ms(int64_t ms) {
     auto tp = get_us_timepoint_from_ms(ms);
+#if FULL_CHRONO_SUPPORT
+    return std::format("{0:%F}T{0:%T%Ez}", tp);
+#else
     return date::format("%FT%T%Ez", tp);
+#endif
 }
 
 std::string get_string_timestamp_from_unix_time_sZ(int64_t s) {
     auto tp = get_timepoint_from_s(s);
+#if FULL_CHRONO_SUPPORT
+    return std::format("{0:%F}T{0:%T}Z", tp);
+#else
     return date::format("%FT%TZ", tp);
+#endif
 }
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".

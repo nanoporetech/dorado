@@ -200,7 +200,7 @@ const utils::HeaderSQRecords& Minimap2Index::get_sequence_records_for_header() c
 }
 
 void Minimap2Index::cache_header_records(const mm_idx_t& index) {
-    const std::shared_ptr<std::string> uri = std::make_shared<std::string>(
+    const std::shared_ptr<const std::string> uri = std::make_shared<std::string>(
             "file://" + std::filesystem::weakly_canonical(m_index_reader.file).string());
 
     utils::MD5Generator md5gen;
