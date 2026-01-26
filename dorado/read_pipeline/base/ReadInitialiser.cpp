@@ -12,6 +12,11 @@
 namespace dorado {
 
 namespace {
+void assign_not_empty(std::string& attr_target, const std::string_view maybe_value) {
+    if (!maybe_value.empty()) {
+        attr_target = maybe_value;
+    }
+};
 
 int get_min_qscore(sam_hdr_t* header) {
     auto command_line_cl = utils::extract_pg_keys_from_hdr(header, {"CL"}, "ID", "basecaller");
@@ -45,12 +50,12 @@ void ReadInitialiser::update_read_attributes(HtsData& data) const {
         }
         const auto& read_group = read_group_it->second;
         data.read_attrs.model_stride = read_group.model_stride;
-        data.read_attrs.experiment_id = read_group.experiment_id;
-        data.read_attrs.sample_id = read_group.sample_id;
+        assign_not_empty(data.read_attrs.flowcell_id, read_group.flowcell_id);
+        assign_not_empty(data.read_attrs.experiment_id, read_group.experiment_id);
+        assign_not_empty(data.read_attrs.sample_id, read_group.sample_id);
+        assign_not_empty(data.read_attrs.protocol_run_id, read_group.run_id);
         // position_id is not currently stored in the output files
-        // data.read_attrs.position_id = read_group.position_id;
-        data.read_attrs.flowcell_id = read_group.flowcell_id;
-        data.read_attrs.protocol_run_id = read_group.run_id;
+        // assign_not_empty(data.read_attrs.position_id, read_group.position_id);
         data.read_attrs.protocol_start_time_ms =
                 utils::get_unix_time_ms_from_string_timestamp(read_group.exp_start_time);
 
