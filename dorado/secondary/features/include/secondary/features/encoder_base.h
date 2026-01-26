@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace dorado::secondary {
@@ -61,10 +62,16 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual secondary::Sample encode_region(const std::string& ref_name,
-                                            const int64_t ref_start,
-                                            const int64_t ref_end,
-                                            const int32_t seq_id) = 0;
+    virtual std::unordered_map<std::string, int32_t> produce_haplotags(const std::string& ref_name,
+                                                                       const int64_t ref_start,
+                                                                       const int64_t ref_end) = 0;
+
+    virtual secondary::Sample encode_region(
+            const std::string& ref_name,
+            const int64_t ref_start,
+            const int64_t ref_end,
+            const int32_t seq_id,
+            const std::unordered_map<std::string, int32_t>& haplotags) = 0;
 
     virtual at::Tensor collate(std::vector<at::Tensor> batch) const = 0;
 

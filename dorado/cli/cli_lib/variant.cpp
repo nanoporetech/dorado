@@ -979,10 +979,11 @@ void run_variant_calling(const Options& opt,
                                     resources, bam_regions, draft_lens, candidate_trees,
                                     opt.threads, opt.batch_size, opt.encoding_batch_size,
                                     opt.window_len, opt.window_overlap, opt.variant_flanking_bases,
-                                    opt.bam_subchunk, usable_mem, opt.continue_on_error,
-                                    opt.tiled_regions, opt.tiled_ext_flanks, opt.tiled_ext_major,
-                                    opt.tiled_ext_min_cov, opt.tiled_ext_cov_fract, batch_queue,
-                                    worker_terminate, wrs_sample_producer);
+                                    opt.bam_subchunk, opt.haplotag_source, usable_mem,
+                                    opt.continue_on_error, opt.tiled_regions, opt.tiled_ext_flanks,
+                                    opt.tiled_ext_major, opt.tiled_ext_min_cov,
+                                    opt.tiled_ext_cov_fract, batch_queue, worker_terminate,
+                                    wrs_sample_producer);
                         });
 
                 // Create a thread for the sample decoder.

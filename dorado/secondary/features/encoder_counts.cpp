@@ -312,10 +312,20 @@ EncoderCounts::EncoderCounts(const std::filesystem::path& in_bam_aln_fn,
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)},
           m_feature_column_map{produce_feature_column_map()} {}
 
-secondary::Sample EncoderCounts::encode_region(const std::string& ref_name,
-                                               const int64_t ref_start,
-                                               const int64_t ref_end,
-                                               const int32_t seq_id) {
+std::unordered_map<std::string, int32_t> EncoderCounts::produce_haplotags(
+        [[maybe_unused]] const std::string& ref_name,
+        [[maybe_unused]] const int64_t ref_start,
+        [[maybe_unused]] const int64_t ref_end) {
+    // No phasing in this encoder.
+    return {};
+}
+
+secondary::Sample EncoderCounts::encode_region(
+        const std::string& ref_name,
+        const int64_t ref_start,
+        const int64_t ref_end,
+        const int32_t seq_id,
+        const std::unordered_map<std::string, int32_t>& /*haplotags*/) {
     constexpr size_t num_qstrat = 1;
     constexpr bool weibull_summation = false;
 

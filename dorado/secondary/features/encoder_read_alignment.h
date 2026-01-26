@@ -49,10 +49,16 @@ public:
 
     ~EncoderReadAlignment() = default;
 
-    secondary::Sample encode_region(const std::string& ref_name,
-                                    const int64_t ref_start,
-                                    const int64_t ref_end,
-                                    const int32_t seq_id) override;
+    std::unordered_map<std::string, int32_t> produce_haplotags(const std::string& ref_name,
+                                                               const int64_t ref_start,
+                                                               const int64_t ref_end) override;
+
+    secondary::Sample encode_region(
+            const std::string& ref_name,
+            const int64_t ref_start,
+            const int64_t ref_end,
+            const int32_t seq_id,
+            const std::unordered_map<std::string, int32_t>& haplotags) override;
 
     at::Tensor collate(std::vector<at::Tensor> batch) const override;
 

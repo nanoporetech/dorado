@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 struct faidx_t;
@@ -72,26 +73,26 @@ public:
  *  If row_per_read is false, new reads will be placed in the first row where
  *  there previous read has terminated, if one exists.
  */
-ReadAlignmentData calculate_read_alignment(secondary::BamFile &bam_file,
-                                           faidx_t *fai_ptr,  // Can be nullptr.
-                                           const std::string &chr_name,
-                                           const int64_t start,  // Zero-based.
-                                           const int64_t end,    // Non-inclusive.
-                                           const int64_t num_dtypes,
-                                           const std::vector<std::string> &dtypes,
-                                           const std::string &tag_name,
-                                           const int32_t tag_value,
-                                           const bool keep_missing,
-                                           const std::string &read_group,
-                                           const int32_t min_mapq,
-                                           const bool row_per_read,
-                                           const bool include_dwells,
-                                           const bool include_haplotype_column,
-                                           const bool include_snp_qv,
-                                           const secondary::HaplotagSource hap_source,
-                                           const std::string &in_haplotag_bin_fn,
-                                           const int32_t max_reads,
-                                           const bool right_align_insertions,
-                                           const double min_snp_accuracy);
+ReadAlignmentData calculate_read_alignment(
+        secondary::BamFile &bam_file,
+        const std::string &chr_name,
+        const int64_t start,  // Zero-based.
+        const int64_t end,    // Non-inclusive.
+        const std::unordered_map<std::string, int32_t> &haplotags,
+        const int64_t num_dtypes,
+        const std::vector<std::string> &dtypes,
+        const std::string &tag_name,
+        const int32_t tag_value,
+        const bool keep_missing,
+        const std::string &read_group,
+        const int32_t min_mapq,
+        const bool row_per_read,
+        const bool include_dwells,
+        const bool include_haplotype_column,
+        const bool include_snp_qv,
+        const secondary::HaplotagSource hap_source,
+        const int32_t max_reads,
+        const bool right_align_insertions,
+        const double min_snp_accuracy);
 
 }  // namespace dorado::secondary
