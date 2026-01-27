@@ -56,7 +56,8 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
         const std::optional<HaplotagSource>& hap_source,
-        const std::optional<std::filesystem::path>& phasing_bin_fn) {
+        const std::optional<std::filesystem::path>& phasing_bin_fn,
+        const KadayashiOptions& kadayashi_opt) {
     const FeatureEncoderType feature_encoder_type =
             parse_feature_encoder_type(config.feature_encoder_type);
 
@@ -114,7 +115,7 @@ std::unique_ptr<EncoderBase> encoder_factory(
                 in_ref_fn, in_bam_aln_fn, config.feature_encoder_dtypes, tag_name, tag_value,
                 tag_keep_missing, read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read,
                 include_dwells, clip_to_zero, right_align_insertions, include_haplotype_column,
-                hap_source_final, phasing_bin_fn, include_snp_qv_column);
+                hap_source_final, phasing_bin_fn, include_snp_qv_column, kadayashi_opt);
 
         return ret;
     }

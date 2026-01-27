@@ -117,6 +117,8 @@ struct Options {
     int32_t tiled_ext_major = 10;   // Number of flanking major positions to check for the trigger.
     int32_t tiled_ext_min_cov = 3;  // Minimum deletion coverage to trigger the extension.
     float tiled_ext_cov_fract = 0.25f;  // Fraction of deletion coverage to trigger the heuristic.
+
+    secondary::KadayashiOptions kadayashi_opt;
 };
 
 /// \brief Define the CLI options.
@@ -318,6 +320,52 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                       "extension heuristic.")
                 .default_value(0.25f)
                 .scan<'g', float>();
+
+        // Kadayashi options.
+        parser.add_argument("--kada-disable-interval-exp")
+                .hidden()
+                .help("Disable interval expansion for Kadayashi haplotagging/variant calling.")
+                .flag();
+        parser.add_argument("--kada-min-base-qual")
+                .hidden()
+                .help("Minimum base quality for Kadayashi haplotagging/variant calling.")
+                .default_value(5)
+                .scan<'i', int>();
+        parser.add_argument("--kada-min-varcall-cov")
+                .hidden()
+                .help("Minimum base variant calling coverage for Kadayashi.")
+                .default_value(5)
+                .scan<'i', int>();
+        parser.add_argument("--kada-min-varcall-fract")
+                .hidden()
+                .help("Minimum coverage fraction for Kadayashi haplotagging/variant calling.")
+                .default_value(0.2f)
+                .scan<'g', float>();
+        parser.add_argument("--kada-max-clipping")
+                .hidden()
+                .help("Maximum alignment clipping for Kadayashi haplotagging/variant calling.")
+                .default_value(200)
+                .scan<'i', int>();
+        parser.add_argument("--kada-min-strand-cov")
+                .hidden()
+                .help("Minimum strand coverage Kadayashi haplotagging/variant calling.")
+                .default_value(3)
+                .scan<'i', int>();
+        parser.add_argument("--kada-min-strand-cov-fract")
+                .hidden()
+                .help("Minimum strand coverage fraction for Kadayashi haplotagging/variant "
+                      "calling.")
+                .default_value(0.03f)
+                .scan<'g', float>();
+        parser.add_argument("--kada-max-gapcomp-seq-div")
+                .hidden()
+                .help("Maximum gapcompressed seqdiv for Kadayashi haplotagging/variant calling.")
+                .default_value(0.1f)
+                .scan<'g', float>();
+        parser.add_argument("--kada-use-dvr")
+                .hidden()
+                .help("Use DVR for phasing for Kadayashi haplotagging/variant calling.")
+                .flag();
     }
 }
 
@@ -420,6 +468,16 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.tiled_ext_cov_fract = parser.get<float>("tiled-ext-cov-fract");
 
     opt.min_snp_accuracy = parser.get<float>("min-snp-acc");
+
+    opt.kadayashi_opt.disable_interval_expansion = parser.get<bool>("kada-disable-interval-exp");
+    opt.kadayashi_opt.min_base_quality = parser.get<int>("kada-min-base-qual");
+    opt.kadayashi_opt.min_varcall_coverage = parser.get<int>("kada-min-varcall-cov");
+    opt.kadayashi_opt.min_varcall_fraction = parser.get<float>("kada-min-varcall-fract");
+    opt.kadayashi_opt.max_clipping = parser.get<int>("kada-max-clipping");
+    opt.kadayashi_opt.min_strand_cov = parser.get<int>("kada-min-strand-cov");
+    opt.kadayashi_opt.min_strand_cov_frac = parser.get<float>("kada-min-strand-cov-fract");
+    opt.kadayashi_opt.max_gapcompressed_seqdiv = parser.get<float>("kada-max-gapcomp-seq-div");
+    opt.kadayashi_opt.use_dvr_for_phasing = parser.get<bool>("kada-use-dvr");
 
     return opt;
 }
@@ -1162,7 +1220,7 @@ int variant_caller(int argc, char* argv[]) {
                 opt.infer_threads,
                 /*full_precision=*/true, opt.read_group, opt.tag_name, opt.tag_value,
                 opt.min_snp_accuracy, opt.tag_keep_missing, opt.min_mapq, opt.haplotag_source,
-                opt.phasing_bin_path);
+                opt.phasing_bin_path, opt.kadayashi_opt);
 
         // Progress bar.
         secondary::Stats stats;

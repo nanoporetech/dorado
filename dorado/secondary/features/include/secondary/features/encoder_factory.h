@@ -2,6 +2,7 @@
 
 #include "encoder_base.h"
 #include "haplotag_source.h"
+#include "secondary/features/kadayashi_options.h"
 
 #include <cstdint>
 #include <filesystem>
@@ -32,7 +33,8 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const std::optional<bool>& tag_keep_missing_override,
         const std::optional<int32_t>& min_mapq_override,
         const std::optional<HaplotagSource>& hap_source,
-        const std::optional<std::filesystem::path>& phasing_bin_fn);
+        const std::optional<std::filesystem::path>& phasing_bin_fn,
+        const KadayashiOptions& kadayashi_opt);
 
 FeatureColumnMap feature_column_map_factory(const ModelConfig& config);
 

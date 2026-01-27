@@ -100,7 +100,8 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
                                    const std::optional<secondary::HaplotagSource>& haptag_source,
-                                   const std::optional<std::filesystem::path>& phasing_bin_fn) {
+                                   const std::optional<std::filesystem::path>& phasing_bin_fn,
+                                   const secondary::KadayashiOptions& kadayashi_opt) {
     PolisherResources resources;
 
     spdlog::info("Initializing the devices.");
@@ -185,7 +186,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
         resources.encoders.emplace_back(
                 encoder_factory(model_config, in_ref_fn, in_aln_bam_fn, read_group, tag_name,
                                 tag_value, true, min_snp_accuracy, tag_keep_missing_override,
-                                min_mapq_override, haptag_source, phasing_bin_fn));
+                                min_mapq_override, haptag_source, phasing_bin_fn, kadayashi_opt));
     }
 
     spdlog::info("Creating the decoder.");

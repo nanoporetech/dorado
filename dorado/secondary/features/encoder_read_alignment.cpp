@@ -262,7 +262,8 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
                                            const bool include_haplotype_column,
                                            const HaplotagSource hap_source,
                                            const std::optional<std::filesystem::path>& phasing_bin,
-                                           const bool include_snp_qv_column)
+                                           const bool include_snp_qv_column,
+                                           const KadayashiOptions& kadayashi_opt)
         : m_fastx_reader{in_ref_fn},
           m_bam_file{secondary::BamFile(in_bam_aln_fn)},
           m_dtypes{dtypes},
@@ -282,6 +283,7 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
           m_clip_to_zero{clip_to_zero},
           m_right_align_insertions{right_align_insertions},
           m_phasing_bin{phasing_bin},
+          m_kadayashi_opt{kadayashi_opt},
           m_feature_column_map{produce_feature_column_map(include_dwells,
                                                           include_haplotype_column,
                                                           include_snp_qv_column,
@@ -307,22 +309,14 @@ kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
     } else if (m_hap_source == secondary::HaplotagSource::COMPUTE) {
         LOG_TRACE("Running Kadayashi on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
 
-        constexpr bool DISABLE_INTERVAL_EXPANSION = false;
-        constexpr int32_t MIN_BASE_QUALITY = 5;
-        constexpr int32_t MIN_VARCALL_COVERAGE = 5;
-        constexpr float MIN_VARCALL_FRACTION = 0.2f;
-        constexpr int32_t MAX_CLIPPING = 200;
-        constexpr int32_t MIN_STRAND_COV = 3;
-        constexpr float MIN_STRAND_COV_FRAC = 0.03f;
-        constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
-        constexpr bool USE_DVR_FOR_PHASING = false;
+        const KadayashiOptions& opt = m_kadayashi_opt;
 
         const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 m_bam_file.fp(), m_bam_file.idx(), m_bam_file.hdr(),
                 m_fastx_reader.get_raw_faidx_ptr(), ref_name.c_str(), ref_start, ref_end,
-                DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
-                MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
-                MAX_GAPCOMPRESSED_SEQDIV, USE_DVR_FOR_PHASING);
+                opt.disable_interval_expansion, opt.min_base_quality, opt.min_varcall_coverage,
+                opt.min_varcall_fraction, opt.max_clipping, opt.min_strand_cov,
+                opt.min_strand_cov_frac, opt.max_gapcompressed_seqdiv, opt.use_dvr_for_phasing);
 
         LOG_TRACE("Kadayashi done on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
 
