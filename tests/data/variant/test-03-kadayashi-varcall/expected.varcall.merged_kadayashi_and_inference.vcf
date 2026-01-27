@@ -1,0 +1,27 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##fileformat=VCFv4.1
+##contig=<ID=chr20,length=10000>
+##FILTER=<ID=LowQual,Description="Variant quality is below threshold">
+##FILTER=<ID=.,Description="Non-variant position">
+##dorado_version=0.0.0+a07198d95+dirty
+##INFO=<ID=DP,Number=1,Type=Integer,Description="Total Depth">
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality score">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
+chr20	94	.	C	T	44.734	PASS	.	GT:GQ	0/1:45
+chr20	306	.	G	A	39.827	PASS	.	GT:GQ	0/1:40
+chr20	1472	.	T	G	35.765	PASS	.	GT:GQ	0/1:36
+chr20	1959	.	T	G	34.556	PASS	.	GT:GQ	0/1:35
+chr20	2102	.	A	G	27.89	PASS	.	GT:GQ	0/1:28
+chr20	2126	.	C	G	31.326	PASS	.	GT:GQ	0/1:31
+chr20	2438	.	T	C	37.751	PASS	.	GT:GQ	0/1:38
+chr20	2446	.	G	A	44.466	PASS	.	GT:GQ	0/1:44
+chr20	2967	.	G	C	56.932	PASS	.	GT:GQ	1/1:57
+chr20	3176	.	G	T	37.807	PASS	.	GT:GQ	0/1:38
+chr20	3735	.	G	C	54.185	PASS	.	GT:GQ	1/1:54
+chr20	4696	.	A	T	29.193	PASS	.	GT:GQ	0/1:29
+chr20	5000	.	AAAAT	A,AAAATAAAT	27.655	PASS	.	GT:GQ	1/2:28
+chr20	5387	.	C	G	32.858	PASS	.	GT:GQ	0/1:33
+chr20	6948	.	CGTGT	C,CGTGTGT	11.879	PASS	.	GT:GQ	1/2:12
+chr20	7430	.	C	T	33.467	PASS	.	GT:GQ	0/1:33
