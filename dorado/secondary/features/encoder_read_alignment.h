@@ -5,6 +5,7 @@
 #include "secondary/consensus/sample.h"
 #include "secondary/features/encoder_base.h"
 #include "secondary/features/haplotag_source.h"
+#include "secondary/features/kadayashi_options.h"
 
 #include <ATen/ATen.h>
 #include <torch/types.h>
@@ -45,7 +46,8 @@ public:
                          const bool include_haplotype_column,  // Add a column to the tensor.
                          const HaplotagSource hap_source,      // Where the column value comes from.
                          const std::optional<std::filesystem::path>& phasing_bin,
-                         const bool include_snp_qv_column);
+                         const bool include_snp_qv_column,
+                         const KadayashiOptions& kadayashi_opt);
 
     ~EncoderReadAlignment() = default;
 
@@ -92,6 +94,7 @@ private:
     bool m_clip_to_zero = false;
     bool m_right_align_insertions = false;
     std::optional<std::filesystem::path> m_phasing_bin;
+    KadayashiOptions m_kadayashi_opt;
     std::mutex m_mtx;
     FeatureColumnMap m_feature_column_map{};
 };

@@ -7,6 +7,7 @@ target_sources(dorado_secondary
         ${PUBLIC_BASE}/encoder_base.h
         ${PUBLIC_BASE}/encoder_factory.h
         ${PUBLIC_BASE}/haplotag_source.h
+        ${PUBLIC_BASE}/kadayashi_options.h
         ${PUBLIC_BASE}/kadayashi_utils.h
     PRIVATE
         decoder_base.cpp

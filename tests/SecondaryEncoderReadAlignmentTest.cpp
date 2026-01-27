@@ -3,6 +3,7 @@
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
 #include "secondary/features/haplotag_source.h"
+#include "secondary/features/kadayashi_options.h"
 #include "utils/cigar.h"
 
 #include <ATen/ATen.h>
@@ -269,6 +270,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
     const int32_t ref_id = 123;
     const int64_t ref_start = 0;
     const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     CATCH_SECTION("Region has no overhangs") {
         /**
@@ -294,7 +296,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -323,7 +325,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -372,6 +374,7 @@ CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
     const int64_t ref_start = 0;
     const int64_t ref_end = 10000;
     const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     // Important for this test - testing that the COMPUTE path works.
     const HaplotagSource hap_source{HaplotagSource::COMPUTE};
@@ -385,7 +388,7 @@ CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                  right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column);
+                                 phasing_bin, include_snp_qv_column, kadayashi_opt);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -439,6 +442,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
     const int64_t ref_start = 0;
     const int64_t ref_end = 111;
     const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     struct TestCase {
         std::string test_name;
@@ -459,7 +463,7 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  test_case.min_snp_accuracy, row_per_read, include_dwells,
                                  clip_to_zero, right_align_insertions, include_haplotype_column,
-                                 hap_source, phasing_bin, include_snp_qv_column);
+                                 hap_source, phasing_bin, include_snp_qv_column, kadayashi_opt);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -638,6 +642,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
     const int64_t ref_start = 0;
     const int64_t ref_end = 10;
     const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     CATCH_SECTION(
             "No dwell column, no hap column, no snp_qv column. Only the base features (base, qual, "
@@ -667,7 +672,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -698,7 +703,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -732,7 +737,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -765,7 +770,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -798,7 +803,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -823,7 +828,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -878,7 +883,7 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -1022,6 +1027,7 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     const std::unordered_map<std::string, int32_t> haplotags{};
     const double min_snp_accuracy{0.0};
     const bool clip_to_zero{true};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     // Test specific parameter.
     const bool row_per_read{false};
@@ -1031,7 +1037,7 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                  right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column);
+                                 phasing_bin, include_snp_qv_column, kadayashi_opt);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
@@ -1186,6 +1192,7 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     const bool clip_to_zero{true};
     const std::unordered_map<std::string, int32_t> haplotags{};
     const double min_snp_accuracy{0.0};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     // Test specific parameter.
     const bool row_per_read{true};
@@ -1195,7 +1202,7 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                  right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column);
+                                 phasing_bin, include_snp_qv_column, kadayashi_opt);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
@@ -1331,6 +1338,7 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     const bool row_per_read{true};
     const std::unordered_map<std::string, int32_t> haplotags{};
     const double min_snp_accuracy{0.0};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     // Test a specific parameter.
     const int32_t max_reads{1};
@@ -1340,7 +1348,7 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
                                  tag_keep_missing, read_group, min_mapq, max_reads,
                                  min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                  right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column);
+                                 phasing_bin, include_snp_qv_column, kadayashi_opt);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),
@@ -1484,6 +1492,7 @@ CATCH_TEST_CASE("synthetic_test_05-haplotags", TEST_GROUP) {
     const double min_snp_accuracy{0.0};
     const bool clip_to_zero{true};
     const bool row_per_read{false};
+    const secondary::KadayashiOptions kadayashi_opt;
 
     CATCH_SECTION("Haplotags are precomputed and passed to the encoder") {
         // Test-specific parameters.
@@ -1499,7 +1508,7 @@ CATCH_TEST_CASE("synthetic_test_05-haplotags", TEST_GROUP) {
                                      tag_keep_missing, read_group, min_mapq, max_reads,
                                      min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
                                      right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column);
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 

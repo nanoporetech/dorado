@@ -12,6 +12,7 @@
 #include "secondary/consensus/window.h"
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
+#include "secondary/features/kadayashi_options.h"
 #include "utils/AsyncQueue.h"
 
 #include <IntervalTree.h>
@@ -93,7 +94,8 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const std::optional<bool>& tag_keep_missing_override,
                                    const std::optional<int32_t>& min_mapq_override,
                                    const std::optional<secondary::HaplotagSource>& haptag_source,
-                                   const std::optional<std::filesystem::path>& phasing_bin_fn);
+                                   const std::optional<std::filesystem::path>& phasing_bin_fn,
+                                   const secondary::KadayashiOptions& kadayashi_opt);
 
 /**
  * \brief For a given consensus, goes through the sequence and removes all '*' characters.
