@@ -312,7 +312,7 @@ EncoderCounts::EncoderCounts(const std::filesystem::path& in_bam_aln_fn,
           m_feature_indices{pileup_counts_norm_indices(dtypes, 1)},
           m_feature_column_map{produce_feature_column_map()} {}
 
-std::unordered_map<std::string, int32_t> EncoderCounts::produce_haplotags(
+kadayashi::varcall_result_t EncoderCounts::produce_haplotags(
         [[maybe_unused]] const std::string& ref_name,
         [[maybe_unused]] const int64_t ref_start,
         [[maybe_unused]] const int64_t ref_end) {

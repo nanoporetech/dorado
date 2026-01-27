@@ -1,5 +1,6 @@
 #pragma once
 
+#include "local_haplotagging.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/sample.h"
@@ -62,9 +63,9 @@ class EncoderBase {
 public:
     virtual ~EncoderBase() = default;
 
-    virtual std::unordered_map<std::string, int32_t> produce_haplotags(const std::string& ref_name,
-                                                                       const int64_t ref_start,
-                                                                       const int64_t ref_end) = 0;
+    virtual kadayashi::varcall_result_t produce_haplotags(const std::string& ref_name,
+                                                          const int64_t ref_start,
+                                                          const int64_t ref_end) = 0;
 
     virtual secondary::Sample encode_region(
             const std::string& ref_name,

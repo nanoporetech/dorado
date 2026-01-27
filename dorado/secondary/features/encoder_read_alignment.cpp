@@ -287,19 +287,23 @@ EncoderReadAlignment::EncoderReadAlignment(const std::filesystem::path& in_ref_f
                                                           include_snp_qv_column,
                                                           (m_num_dtypes > 1))} {}
 
-std::unordered_map<std::string, int32_t> EncoderReadAlignment::produce_haplotags(
+kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
         const std::string& ref_name,
-        const int64_t ref_start,
-        const int64_t ref_end) {
-    spdlog::debug("Haplotagging region: %s:%d-%d, source = %s", ref_name, (ref_start + 1), ref_end,
+        const int64_t ref_start,  // 0-based, inclusive
+        const int64_t ref_end     // 0-based, exclusive
+) {
+    spdlog::debug("Haplotagging region: {}:{}-{}, source = {}", ref_name, (ref_start + 1), ref_end,
                   secondary::haplotag_source_to_string(m_hap_source));
 
     if (m_hap_source == secondary::HaplotagSource::BIN_FILE) {
         LOG_TRACE("Loading haplotags from a Kadayashi bin file for region: {}:{}-{}", ref_name,
                   (ref_start + 1), ref_end);
-        return secondary::query_bin_file_get_qname2tag(m_phasing_bin ? *m_phasing_bin : "",
-                                                       ref_name, ref_start, ref_end);
 
+        kadayashi::varcall_result_t ret{
+                .qname2hp = secondary::query_bin_file_get_qname2tag(
+                        m_phasing_bin ? *m_phasing_bin : "", ref_name, ref_start, ref_end)};
+
+        return ret;
     } else if (m_hap_source == secondary::HaplotagSource::COMPUTE) {
         LOG_TRACE("Running Kadayashi on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
 
@@ -311,16 +315,18 @@ std::unordered_map<std::string, int32_t> EncoderReadAlignment::produce_haplotags
         constexpr int32_t MIN_STRAND_COV = 3;
         constexpr float MIN_STRAND_COV_FRAC = 0.03f;
         constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
+        constexpr bool USE_DVR_FOR_PHASING = false;
 
-        std::unordered_map<std::string, int32_t> ret =
-                kadayashi::kadayashi_dvr_single_region_wrapper(
-                        m_bam_file.fp(), m_bam_file.idx(), m_bam_file.hdr(),
-                        m_fastx_reader.get_raw_faidx_ptr(), ref_name.c_str(), ref_start, ref_end,
-                        DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
-                        MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
-                        MAX_GAPCOMPRESSED_SEQDIV);
+        const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
+                m_bam_file.fp(), m_bam_file.idx(), m_bam_file.hdr(),
+                m_fastx_reader.get_raw_faidx_ptr(), ref_name.c_str(), ref_start, ref_end,
+                DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
+                MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
+                MAX_GAPCOMPRESSED_SEQDIV, USE_DVR_FOR_PHASING);
+
         LOG_TRACE("Kadayashi done on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
-        return ret;
+
+        return result;
     }
 
     return {};

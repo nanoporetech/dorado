@@ -56,4 +56,5 @@ dorado_add_library(
         intervaltree
         indicators
         minimap2
+        kadayashi::haplotag_lib
 )
