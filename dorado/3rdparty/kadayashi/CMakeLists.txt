@@ -43,6 +43,18 @@ endif()
 find_package(htslib REQUIRED)
 find_package(ZLIB REQUIRED)
 
+if (NOT TARGET spdlog::spdlog)
+  set(SPDLOG_SRC_DIR "${CMAKE_CURRENT_LIST_DIR}/../spdlog" CACHE PATH "")
+  if (EXISTS "${SPDLOG_SRC_DIR}/CMakeLists.txt")
+    add_subdirectory("${SPDLOG_SRC_DIR}" "${CMAKE_BINARY_DIR}/_deps/spdlog-build")
+  else()
+    message(FATAL_ERROR "spdlog not available. Expected source at: ${SPDLOG_SRC_DIR}")
+  endif()
+  if (NOT TARGET spdlog::spdlog)
+    message(FATAL_ERROR "spdlog not available.")
+  endif()
+endif()
+
 ################################
 ### Create the haplotag_lib. ###
 ################################
@@ -63,7 +75,6 @@ add_library(haplotag_lib STATIC
     include/blocked_bloom_filter.h
 )
 
-
 set_target_properties(haplotag_lib PROPERTIES LINKER_LANGUAGE CXX)
 
 add_library(kadayashi::haplotag_lib ALIAS haplotag_lib)
@@ -81,11 +92,15 @@ target_link_libraries(haplotag_lib
     PRIVATE
         ${HTSLIB_LIBRARIES}
         ${ZLIB_LIBRARIES}
+        spdlog::spdlog
 )
 enable_gcov(haplotag_lib)
 enable_wall(haplotag_lib)
 
 # Optional install
+install(TARGETS spdlog 
+  EXPORT kadayashi_targets
+)
 install(TARGETS haplotag_lib EXPORT kadayashi_targets
     ARCHIVE DESTINATION lib
     LIBRARY DESTINATION lib
@@ -127,6 +142,7 @@ if (BUILD_KADAYASHI_EXE OR BUILD_KADAYASHI_TESTS)
             Threads::Threads
             ${HTSLIB_LIBRARIES}
             ${ZLIB_LIBRARIES}
+            spdlog::spdlog
     )
     enable_gcov(kadayashi_main_lib)
     enable_wall(kadayashi_main_lib)
@@ -153,6 +169,7 @@ if (BUILD_KADAYASHI_EXE)
             kadayashi_main_lib
             ${HTSLIB_LIBRARIES}
             ${ZLIB_LIBRARIES}
+            spdlog::spdlog
     )
     enable_gcov(kadayashi)
     enable_wall(kadayashi)

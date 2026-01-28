@@ -12,6 +12,7 @@
 #include <htslib/hts.h>
 #include <htslib/kfunc.h>
 #include <htslib/sam.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
@@ -27,6 +28,14 @@
 #include <span>
 #include <stdexcept>
 #include <utility>
+
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#define LOG_DEBUG(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_DEBUG(...) spdlog::debug(__VA_ARGS__)
+#endif
 
 namespace kadayashi {
 
@@ -94,16 +103,7 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
     // non-tandem direct repeats, unlike the TRF.
     // The usecase is to merely avoid picking up variants
     // too close to low-complexity runs for phasing.
-    constexpr int DEBUG_PRINT = 0;
     const int seq_l = static_cast<int>(seq.size());
-    if (DEBUG_LOCAL_HAPLOTAGGING) {
-        fprintf(stderr, "[dbg::%s] seq_l is %d, offset %d\n", __func__, seq_l, ref_start);
-    }
-    FILE *fp = nullptr;
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        fp = fopen("test.bed", "w");
-        assert(fp);
-    }
 
     // We will enumerate all k-mer combos and check for exact match.
     constexpr int K = 3;
@@ -120,9 +120,6 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
     }
     std::vector<std::vector<uint32_t>> idx(idx_l);
     std::vector<uint8_t> idx_good(idx_l, 0);
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        fprintf(stderr, "[dbg::%s] idx_l %d\n", __func__, (int)idx_l);
-    }
 
     // index kmers
     const uint32_t mermask = (1 << (K * 2)) - 1;
@@ -141,24 +138,6 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
         } else {
             mer = 0;
             mer_n = 0;
-        }
-    }
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        for (uint32_t i = 0; i < idx_l; i++) {
-            if (idx[i].size() != 0) {
-                fprintf(stderr, "[dbg::%s] combo#%d ", __func__, i);
-                for (int j = 0; j < K; j++) {
-                    fprintf(stderr, "%c", "ACGT"[(i >> ((K - j - 1) * 2)) & 3]);
-                }
-                fprintf(stderr, " n=%d\n", (int)idx[i].size());
-                if constexpr (DEBUG_PRINT > 1) {
-                    fprintf(stderr, "   ^");
-                    for (size_t j = 0; j < idx[i].size(); j++) {
-                        fprintf(stderr, " %d", idx[i][j]);
-                    }
-                    fprintf(stderr, "\n");
-                }
-            }
         }
     }
 
@@ -221,19 +200,19 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
     }
     std::vector<uint64_t> intervals;
     if (ds.empty()) {
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s] ds is empty (ds0 was %d)\n", __func__, (int)ds0.size());
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}] ds is empty (ds0 was {})", __func__, ds0.size());
             for (size_t i = 0; i < ds0.size(); i++) {
-                fprintf(stderr, "[dbg::%s] ds0 #%d is %d\n", __func__, (int)i, (int)ds0[i]);
+                LOG_TRACE("[kdys::{}] ds0 #{} is {}", __func__, i, ds0[i]);
             }
         }
 
     } else {
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s] there are %d candidate distances (raw: %d)\n", __func__,
-                    (int)ds.size(), (int)ds0.size());
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}] there are {} candidate distances (raw: {})", __func__, ds.size(),
+                      ds0.size());
             for (size_t i = 0; i < ds.size(); i++) {
-                fprintf(stderr, "[dbg::%s] ds #%d is %d\n", __func__, (int)i, (int)ds[i]);
+                LOG_TRACE("[kdys::{}] ds #{} is {}", __func__, i, ds[i]);
             }
         }
 
@@ -293,9 +272,8 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                             stop = 1;
                         }
                     } else {
-                        if (DEBUG_LOCAL_HAPLOTAGGING) {
-                            fprintf(stderr, "[E::%s] impossible\n", __func__);
-                        }
+                        spdlog::error("[kdys::{}] TRF kmer chain made impossible comparison.",
+                                      __func__);
                         failed = true;
                         break;
                     }
@@ -313,9 +291,9 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                                 end += 2 * K + TRF_ADD_PADDING;
                                 intervals_buf.push_back(start << 1);
                                 intervals_buf.push_back(end << 1 | 1);
-                                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                                    fprintf(stderr, "[dbg::%s] d=%d mer=%d saw start-end: %d-%d\n",
-                                            __func__, d, i_mer, start, end);
+                                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                                    LOG_TRACE("[kdys::{}] d={} mer={} saw start-end: {}-{}",
+                                              __func__, d, i_mer, start, end);
                                 }
                                 mer_is_used = 1;
                             }
@@ -339,11 +317,11 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
         // merge intervals (requires a minimum depth)
         if (failed /*impossible seen when parsing mers*/
             || intervals_buf.empty()) {
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr,
-                        "[dbg::%s] failed parsing mers (failed=%s) or intervals_buf is empty "
-                        "(%d)\n",
-                        __func__, failed ? "failed" : "not", (int)intervals_buf.size());
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE(
+                        "[{}] failed parsing mers (failed={}) or intervals_buf is empty "
+                        "({})",
+                        __func__, failed ? "true" : "false", intervals_buf.size());
             }
             intervals.clear();
         } else {
@@ -364,9 +342,9 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                 int current_pos = intervals_buf[i] >> 1;
                 const int lbreak = 0;
 
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    fprintf(stderr, "[dbg::%s] %d stat=%d depth=%d lbreak=%d\n", __func__,
-                            current_pos, intervals_buf[i] & 1, depth, lbreak);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_TRACE("[kdys::{}] current_pos={} stat={} depth={} lbreak={}", __func__,
+                              current_pos, intervals_buf[i] & 1, depth, lbreak);
                 }
 
                 if (depth >= TRF_MIN_TANDAM_DEPTH && !lbreak) {
@@ -416,26 +394,16 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                     }
                 }
             }
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr, "[dbg::%s] had %d intervals\n", __func__, (int)intervals.size());
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG("[kdys::{}] had {} intervals", __func__, intervals.size());
                 for (size_t i = 0; i < intervals.size(); i++) {
-                    fprintf(stderr, "[dbg::%s]    #%d %d-%d\n", __func__, (int)i,
-                            (int)(intervals[i] >> 32), (int)(uint32_t)intervals[i]);
-                }
-            }
-
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                for (size_t i = 0; i < intervals.size(); i++) {
-                    fprintf(fp, "chr20\t%d\t%d\n", (int)(intervals[i] >> 32),
-                            (int)(uint32_t)intervals[i]);
+                    LOG_DEBUG("[kdys::{}]    itvl#{} {}-{}", __func__, i, intervals[i] >> 32,
+                              intervals[i] & std::numeric_limits<uint32_t>::max());
                 }
             }
         }
     }
 
-    if constexpr (DEBUG_PRINT) {
-        fclose(fp);
-    }
     return intervals;
 }
 
@@ -545,8 +513,8 @@ bool is_adjacent_to_perfect_repeats(const char *refseq,
         return false;
     }
     if (refseq_start > pos) {
-        fprintf(stderr, "[E::%s] shouldn't happen, bad input check code (pos %d refseq_start %d)\n",
-                __func__, pos, refseq_start);
+        spdlog::error("[kdys::{}] shouldn't happen, bad input check code (pos {} refseq_start {})",
+                      __func__, pos, refseq_start);
         return false;
     }
 
@@ -581,8 +549,7 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                                 const char *refseq,
                                 const int refseq_l,
                                 const uint32_t itvl_start,
-                                const str2int_t *qname2hp,
-                                const int debug_print) {
+                                const str2int_t *qname2hp) {
     // return true if variant is being classified & shall not proceed
     // return false otherwise
 
@@ -614,21 +581,21 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
 
         if (qname2hp && var.alleles.size() >= 2 && tot_cov_alt > MIN_COV_TOT &&
             suf_alt >= MIN_COV_ONE && tot_cov_alt / tot_cov_any > MIN_ALT_FRAC) {
-            if (debug_print) {
-                fprintf(stderr,
-                        "[dbg::%s] let pos %d set to unsure although flag is bad, due to its "
-                        "many alleles & sufficient coverage in alt (%d/%d)\n",
-                        __func__, (int)pos, (int)tot_cov_alt, (int)tot_cov_any);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG(
+                        "[{}] let pos {} set to unsure although flag is bad, due to its "
+                        "many alleles & sufficient coverage in alt ({}/{})",
+                        __func__, pos, tot_cov_alt, tot_cov_any);
             }
             var.is_accepted = FLAG_VARSTAT_UNSURE;
             var.type = FLAG_VAR_NA;
             return true;
         } else {
-            if (debug_print) {
-                fprintf(stderr,
-                        "[dbg::%s] straight ignore pos %d (flag is bad; size is %d, tot cov is "
-                        "%d)\n",
-                        __func__, (int)pos, (int)var.alleles.size(), (int)tot_cov_alt);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG(
+                        "[{}] straight ignore pos {} (flag is bad; size is {}, tot cov is "
+                        "{})",
+                        __func__, pos, var.alleles.size(), tot_cov_alt);
             }
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
@@ -640,9 +607,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
 
         // should not happen
         if (var.alleles.size() < 3) {  // 3: alt *1, ref placeholders *2
-            if (debug_print) {
-                fprintf(stderr, "[W::%s] bad size\n", __func__);
-            }
+            spdlog::error("[kdys::{}] bad number of alleles (var.alleles.size={})", __func__,
+                          var.alleles.size());
             return true;  // not really done, but return true to let caller ignore this candidate
         }
 
@@ -676,14 +642,10 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
         // first 2 are both REF sentinel
         if (var.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT &&
             var.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT) {
-            int is_at_repeat = 2;
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
-            if (debug_print) {
-                fprintf(stderr,
-                        "[dbg::%s] ignore pos %d (first two are REF sentinels) (mark unsure due to "
-                        "repeat? %c)\n",
-                        __func__, pos, "NY-"[is_at_repeat]);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG("[kdys::{}] ignore pos {} (first two are REF sentinels)", __func__, pos);
             }
             return true;
         }
@@ -704,11 +666,11 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                     tot_cov_unphased >= LOW_COV2) {
                     var.is_accepted = FLAG_VARSTAT_UNSURE;
                     var.type = FLAG_VAR_HOM;
-                    if (debug_print) {
-                        fprintf(stderr,
-                                "[dbg::%s] set pos %d as unsure (due to unphased) totnon=%d "
-                                "totcov=%d\n",
-                                __func__, pos, (int)tot_all_non_refs, (int)tot_cov);
+                    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                        LOG_DEBUG(
+                                "[{}] set pos {} as unsure (due to unphased) tot_all_non_refs={} "
+                                "totcov={}",
+                                __func__, pos, tot_all_non_refs, tot_cov);
                     }
                     return true;
                 }
@@ -719,13 +681,13 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
         // we need to check phasing (if is phased pileup), as strong hap-specific
         // coverage can be sever as 12 alts in hap0, 2 ref in hap1 and nothing else.
         double fisher_left_p_nounphased, fisher_right_p_nounphased, fisher_twosided_p_nounphased;
-        kt_fisher_exact((int)(a0.cov.cov_hap0), (int)(a0.cov.cov_hap1), (int)(a1.cov.cov_hap0),
-                        (int)(a1.cov.cov_hap1), &fisher_left_p_nounphased,
-                        &fisher_right_p_nounphased, &fisher_twosided_p_nounphased);
-        if (debug_print) {
-            fprintf(stderr,
-                    "[dbg::%s] pos %d in prefiltering fisher: phased-only, twosided p: %.4f (%d "
-                    "%d, %d %d)\n",
+        kt_fisher_exact(a0.cov.cov_hap0, a0.cov.cov_hap1, a1.cov.cov_hap0, a1.cov.cov_hap1,
+                        &fisher_left_p_nounphased, &fisher_right_p_nounphased,
+                        &fisher_twosided_p_nounphased);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_DEBUG(
+                    "[{}] pos {} in prefiltering fisher: phased-only, twosided p: {:.4f} ({} "
+                    "{}, {} {})",
                     __func__, pos, fisher_twosided_p_nounphased, a0.cov.cov_hap0, a0.cov.cov_hap1,
                     a1.cov.cov_hap0, a1.cov.cov_hap1);
         }
@@ -736,9 +698,9 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             if (!qname2hp) {
                 if (top_cov_1 / tot_cov >= 0.7f && tot_cov >= LOW_COV2) {
                     is_hom = 1;
-                    if (debug_print) {
-                        fprintf(stderr, "[dbg::%s] set pos %d as hom (2, unphased; %d/%d)\n",
-                                __func__, pos, (int)top_cov_1, (int)tot_cov);
+                    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2, unphased; {}/{})", __func__,
+                                  pos, top_cov_1, tot_cov);
                     }
                 }
             } else {
@@ -764,9 +726,9 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                 if (hap0_tot > MIN_COV_ONE && hap1_tot > MIN_COV_ONE &&
                     hap0 / hap0_tot >= threshold && hap1 / hap1_tot >= threshold) {
                     is_hom = 1;
-                    if (debug_print) {
-                        fprintf(stderr, "[dbg::%s] set pos %d as hom (2, phased; %d/%d, %d/%d)\n",
-                                __func__, pos, (int)hap0, (int)hap0_tot, (int)hap1, (int)hap1_tot);
+                    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2, phased; {}/{}, {}/{})",
+                                  __func__, pos, hap0, hap0_tot, hap1, hap1_tot);
                     }
                 } else if (
                         hap_all / tot_cov2 >= MIN_HOMALT_FRAC ||
@@ -774,19 +736,18 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                          hap_all >
                                  LOW_COV)) {  // alternatively, as long as we have almost all bases being the one alt allele, call hom regardless of phasing quality
                     is_hom = 1;
-                    if (debug_print) {
-                        fprintf(stderr,
-                                "[dbg::%s] set pos %d as hom (2b; hap_all=%d tot_cov2=%d)\n",
-                                __func__, pos, (int)hap_all, (int)tot_cov2);
+                    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2b; hap_all={} tot_cov2={})",
+                                  __func__, pos, hap_all, tot_cov2);
                     }
                 } else if (hap_all / tot_cov2 > 0.8f &&
                            (int)(tot_cov2 - tot_all_non_refs) < SMALL_COV_DIFF) {
                     is_hom = 1;
-                    if (debug_print) {
-                        fprintf(stderr,
-                                "[dbg::%s] set pos %d as hom (2c; allel0all=%d, tot_cov2=%d, "
-                                "totallnonref=%d)\n",
-                                __func__, pos, (int)hap_all, (int)tot_cov2, (int)tot_all_non_refs);
+                    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                        LOG_DEBUG(
+                                "[{}] set pos {} as hom (2c; allel0all={}, tot_cov2={}, "
+                                "totallnonref={})",
+                                __func__, pos, hap_all, tot_cov2, tot_all_non_refs);
                     }
                 }
             }
@@ -798,10 +759,10 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             var.type = FLAG_VAR_HOM;
             if (is_at_repeat || fisher_twosided_p_nounphased < 0.05f) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
-                if (debug_print) {
-                    fprintf(stderr,
-                            "[dbg::%s] pos %d was set to accepted hom, but flipping this to unsure "
-                            "due to nearby repeat; type flag is now %d\n",
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_DEBUG(
+                            "[{}] pos {} was set to accepted hom, but flipping this to unsure "
+                            "due to nearby repeat; type flag is now {}",
                             __func__, pos, var.type);
                 }
             }
@@ -811,33 +772,35 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             0.8f) {  // top two calls did not dominate over all observations (e.g. INS at a homopolyer)
             if (std::min(top_cov_1, top_cov_2) >= 5 || tot_all_non_refs >= 10 || is_at_repeat) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
-                if (debug_print) {
-                    fprintf(stderr,
-                            "[dbg::%s] set pos %d unsure (1a: weird coverage (top1=%d top2=%d; all "
-                            "alts=%d))\n",
-                            __func__, pos, (int)top_cov_1, (int)top_cov_2, (int)tot_all_non_refs);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_DEBUG(
+                            "[{}] set pos {} unsure (1a: weird coverage (top1={} top2={}; all "
+                            "alts={}))",
+                            __func__, pos, top_cov_1, top_cov_2, tot_all_non_refs);
                 }
             } else {
                 var.is_accepted = FLAG_VARSTAT_REJECTED;
-                if (debug_print) {
-                    fprintf(stderr,
-                            "[dbg::%s] reject pos %d (1a: weird coverage (%d alleles) and they are "
-                            "low: %d (base_int=%d) and %d (base_int=%d) while top2 cov=%d, tot cov "
-                            "is %d )\n",
-                            __func__, (int)pos, (int)var.alleles.size(), (int)top_cov_1,
-                            (int)var.alleles[0].allele[0], (int)top_cov_2,
-                            (int)var.alleles[1].allele[0], (int)top_two_cov, (int)tot_cov);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_DEBUG(
+                            "[{}] reject pos {} (1a: weird coverage ({} alleles) and they are "
+                            "low: {} (base_int={}) and {} (base_int={}) while top2 cov={}, tot cov "
+                            "is {} )",
+                            __func__, pos, var.alleles.size(), top_cov_1, var.alleles[0].allele[0],
+                            top_cov_2, var.alleles[1].allele[0], top_two_cov, tot_cov);
                 }
             }
             return true;
         }
 
-        if (debug_print && qname2hp) {
-            fprintf(stderr,
-                    "[dbg::%s] pos %d remained, two top covs: phased=(%d and %d) unphased=(%d and "
-                    "%d)\n",
-                    __func__, pos, (int)top_cov_1, (int)top_cov_2, (int)top_cov_1_unphased,
-                    (int)top_cov_2_unphased);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            if (qname2hp) {
+                LOG_DEBUG(
+                        "[kdys::{}] pos {} remained, two top covs: phased=({} and {}) unphased=({} "
+                        "and "
+                        "{})",
+                        __func__, pos, top_cov_1, top_cov_2, top_cov_1_unphased,
+                        top_cov_2_unphased);
+            }
         }
 
         return false;
@@ -924,13 +887,8 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                                        const uint32_t itvl_start,
                                        const int min_strand_cov,
                                        const float min_strand_cov_frac) {
-    constexpr int DEBUG_PRINT = 0;
-    assert(var.alleles.size() >
-           1);  // i.e. candidate should have its ref allele collected. prefilter should guarantee this
-
-    if constexpr (DEBUG_PRINT) {
-        fprintf(stderr, "[dbg::%s] checking pos %d\n", __func__, pos);
-    }
+    // Candidate should have its ref allele collected.
+    assert(var.alleles.size() > 1);
 
     var_classify_t ret;
     ret.is_accepted = FLAG_VARSTAT_REJECTED;
@@ -1047,9 +1005,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             ret.code = HET_NOTHING;
         }
     }
-    if constexpr (DEBUG_PRINT) {
-        fprintf(stderr, "[dbg::%s] pos %d code %d at first checkpoint\n", __func__, pos, ret.code);
-    }
+
     if (ret.is_accepted !=
         FLAG_VARSTAT_REJECTED) {  // is het, need to decide whether it has multi alleles
         if (varcov.n_alts_in_first_two == 2) {
@@ -1061,35 +1017,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             ret.type = FLAG_VAR_NA;
             ret.code = REJECT_TOO_MANY_ALLELE;
         }
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr,
-                    "[dbg::%s] pos %d took het1 code=%d (p was %.4f; allele0(%c%d)=[%d %d] "
-                    "allele1(%c%d)=[%d "
-                    "%d] unphased{a0,a1}=[%d %d]; proper: %d %d; strand covs: %d %d %d %d)\n",
-                    __func__, pos, ret.code, fisher_twosided_p_nounphased,
-                    "ACGT_R"[var.alleles[0].allele[0]], var.alleles[0].allele.back(),
-                    a0.cov.cov_hap0, a0.cov.cov_hap1, "ACGT_R"[var.alleles[1].allele[0]],
-                    var.alleles[1].allele.back(), a1.cov.cov_hap0, a1.cov.cov_hap1,
-                    a0.cov.cov_unphased, a1.cov.cov_unphased, alt0_is_proper, alt1_is_proper,
-                    a0.cov.cov_fwd, a0.cov.cov_bwd, a1.cov.cov_fwd, a1.cov.cov_bwd
-
-            );
-        }
         has_decided = true;
-    }
-
-    if constexpr (DEBUG_PRINT) {
-        if (!has_decided) {
-            fprintf(stderr,
-                    "[dbg::%s] pos %d fell thru het1 (p was %.4f; allele0(%c%d)=[%d %d] "
-                    "allele1(%c%d)=[%d "
-                    "%d] unphased{a0,a1}=[%d %d]; proper: %d %d)\n",
-                    __func__, pos, fisher_twosided_p_nounphased, "ACGT_R"[var.alleles[0].allele[0]],
-                    var.alleles[0].allele.back(), a0.cov.cov_hap0, a0.cov.cov_hap1,
-                    "ACGT_R"[var.alleles[1].allele[0]], var.alleles[1].allele.back(),
-                    a1.cov.cov_hap0, a1.cov.cov_hap1, a0.cov.cov_unphased, a1.cov.cov_unphased,
-                    alt0_is_proper, alt1_is_proper);
-        }
     }
 
     // not clean het, and top two are ref(substitution) and ref(del), ignore
@@ -1105,9 +1033,6 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     if (!has_decided && var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
         const float ratio =
                 (float)a0.cov.cov_tot_all / static_cast<float>(std::max(1, varcov.cov.cov_tot_all));
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[dbg::%s] pos %d try hom (ratio %.3f)\n", __func__, pos, ratio);
-        }
         if (ratio >= THRESHOLD_MIN_HOM_RATIO) {
             ret.type = FLAG_VAR_HOM;
             if (alt0_strand_ok) {
@@ -1127,11 +1052,6 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
                 ret.type = FLAG_VAR_NA;
                 ret.code = HOM_RESUCEFAIL;
-                if constexpr (DEBUG_PRINT) {
-                    fprintf(stderr, "[dbg::%s] pos %d hom rescue try altcov=%d (af %.2f)\n",
-                            __func__, pos, allele.cov.cov_tot_all,
-                            (float)allele.cov.cov_tot_all / varcov.cov.cov_tot_all);
-                }
                 has_decided = true;
                 break;
             }
@@ -1142,27 +1062,17 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
         if (varcov.n_long_alts >= N_LONG_ALTS) {  // long alt
             ret.is_accepted = FLAG_VARSTAT_UNSURE;
             ret.code = SUS_LONG_ALT;
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] pos %d code %d\n", __func__, pos, ret.code);
-            }
         } else if (var.alleles.size() > 4) {  // many alts; 4:ref/ref/alt/alt
             int n_allele_with_suf_cov = 0;
             for (auto &allele : var.alleles) {
                 if (allele.allele[0] != SENTINEL_REF_ALLELE_INT &&
                     allele.cov.cov_tot_all >= MIN_SUF_COV_ALLELE) {
                     n_allele_with_suf_cov++;
-                    if constexpr (DEBUG_PRINT) {
-                        fprintf(stderr, "[dbg::%s] pos %d code5: saw alt (%c) cov=%d\n", __func__,
-                                pos, "ACGT"[allele.allele[0]], allele.cov.cov_tot_all);
-                    }
                 }
             }
             if (n_allele_with_suf_cov >= 2) {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
                 ret.code = SUS_MULTI_ALLELE;
-                if constexpr (DEBUG_PRINT) {
-                    fprintf(stderr, "[dbg::%s] pos %d code %d\n", __func__, pos, ret.code);
-                }
             }
         }
     }
@@ -1190,15 +1100,12 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             }
         }
     }
+
+    bool is_at_repeat = false;
     if (is_rejected_non_ref || is_indel || n_long_indel > 1) {
         if (static_cast<float>(varcov.cov_any_alt) >=
             0.2f * static_cast<float>(varcov.cov.cov_tot_all)) {
-            const bool is_at_repeat =
-                    is_adjacent_to_perfect_repeats(refseq, refseq_l, itvl_start, pos);
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] pos %d test next to perfect repeat: %d ; var type %d\n",
-                        __func__, pos, is_at_repeat, ret.type);
-            }
+            is_at_repeat = is_adjacent_to_perfect_repeats(refseq, refseq_l, itvl_start, pos);
             if (is_at_repeat) {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
                 ret.code = SUS_REPETITIVE;
@@ -1210,11 +1117,22 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                 (varcov.cov.cov_hap0 + varcov.cov.cov_hap1)) {
         ret.is_accepted = FLAG_VARSTAT_UNSURE;
         ret.code = SUS_PHASE;
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[dbg::%s] pos %d test phase (hap0=%d hap1=%d unphased=%d)\n", __func__,
-                    pos, (int)varcov.cov.cov_hap0, (int)varcov.cov.cov_hap1,
-                    (int)(varcov.cov.cov_tot_all - varcov.cov.cov_tot_phased));
-        }
+    }
+
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+        LOG_DEBUG(
+                "[{}] pos={} is_accepted={} type={} code={}; fisher_p={}; is_at_repeat={}; "
+                "a0({}{})=[{} {}] a1({}{})=[{} {}] "
+                "proper: {} {}; strand covs: {} {} {} {}",
+                __func__, pos, ret.is_accepted, ret.type, ret.code, fisher_twosided_p_nounphased,
+                is_at_repeat,
+
+                "ACGT_R"[var.alleles[0].allele[0]], var.alleles[0].allele.back(), a0.cov.cov_hap0,
+                a0.cov.cov_hap1, "ACGT_R"[var.alleles[1].allele[0]], var.alleles[1].allele.back(),
+                a1.cov.cov_hap0, a1.cov.cov_hap1,
+
+                alt0_is_proper, alt1_is_proper, a0.cov.cov_fwd, a0.cov.cov_bwd, a1.cov.cov_fwd,
+                a1.cov.cov_bwd);
     }
 
     return ret;
@@ -1400,8 +1318,6 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
                                                         const bool allow_N_base) {
     // Note:
     //   - Variant position will be in 0-index.
-
-    constexpr bool DEBUG_PRINT = false;
     variant_fullinfo_t ret;
 
     std::string ref_s;
@@ -1527,20 +1443,6 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
         ret.is_phased1 = var.genotype[1] == '|';
     }
 
-    if constexpr (DEBUG_PRINT) {
-        fprintf(stderr,
-                "[dbg::%s] is_valid=%s conf=%s pos=%d phased=%s ref=%s alt=%s geno: %c%c%c "
-                "(%c%c%c)  |is_multi=%s| pos=%d phased=%s ref=%s alt=%s geno=%c%c%c\n",
-                __func__, ret.is_valid ? "true" : "false", ret.is_confident ? "true" : "false",
-                ret.pos0, ret.is_phased0 ? "true" : "false", ret.ref_allele_seq0.c_str(),
-                ret.alt_allele_seq0.c_str(), ret.genotype0[0], ret.genotype0[1], ret.genotype0[2],
-                var.genotype[0], var.genotype[1], var.genotype[2],
-
-                ret.is_multi_allele ? "true" : "false",
-
-                ret.pos1, ret.is_phased1 ? "true" : "false", ret.ref_allele_seq1.c_str(),
-                ret.alt_allele_seq1.c_str(), ret.genotype1[0], ret.genotype1[1], ret.genotype1[2]);
-    }
     return ret;
 }
 
@@ -1553,7 +1455,6 @@ void fix_variant_fullinfo_genotype_snp_in_del(std::vector<variant_fullinfo_t> &v
     //    `ta_t` saves this case as het,
     //    because the other hap doesn't have the ref base and thus is different.
     //    Let's convert it to hom here.
-    constexpr bool DEBUG_PRINT = false;
     for (int64_t i = 1; i < std::ssize(vars); i++) {
         const auto &prev_var = vars[i - 1];
         auto &var = vars[i];
@@ -1591,12 +1492,13 @@ void fix_variant_fullinfo_genotype_snp_in_del(std::vector<variant_fullinfo_t> &v
         }
 
         if (should_set_to_hom) {
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr,
-                        "[dbg::%s] sub at pos %d shadowed by del (%d %s->%s), setting to hom\n",
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG(
+                        "[{}] substitution het candidate at pos {} shadowed by del ({:d} {}->{}), "
+                        "setting to hom.",
                         __func__, static_cast<int>(var.pos0) + 1,
-                        static_cast<int>(prev_var.pos0) + 1, prev_var.ref_allele_seq0.c_str(),
-                        prev_var.alt_allele_seq0.c_str());
+                        static_cast<int>(prev_var.pos0) + 1, prev_var.ref_allele_seq0,
+                        prev_var.alt_allele_seq0);
             }
             var.genotype0[0] = '1';
             var.genotype0[1] = '/';  // also marking as unphased
@@ -1627,21 +1529,14 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                           const pileup_pars_t &pp) {
     // A simpler pileup that allows hom variants, non-SNPs and multi-alleles.
     // This is for variant calling.
-    int debug_print = 0;
-    if (qname2hp) {
-        debug_print = 0;
-    }
-    if (!qname2hp) {
-        debug_print = 0;
-    }
 
     const bool enable_downsample = true;
     const int downsample_window = 10000;
     const int downsample_readcap = 150;  // 10k window 30x has ~50 reads
 
-    if (debug_print) {
-        fprintf(stderr, "[dbg::%s] pileup at %s:%d-%d (1-index, [) )\n", __func__, refname.data(),
-                (int)itvl_start + 1, (int)itvl_end);
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+        LOG_DEBUG("[kdys::{}] pileup at {}:{}-{} (1-index, close-open)", __func__, refname.data(),
+                  itvl_start + 1, itvl_end);
     }
     vc_variants1_t ht;
 
@@ -1670,9 +1565,9 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         const std::string itvl2 = create_region_string(refname, abs_start, abs_end);
 
         bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()), HtsItrDestructor());
-        if (debug_print && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s] expanded: %s (disable_interval_expansion=%d\n", __func__,
-                    itvl2.c_str(), pp.disable_region_expansion);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_DEBUG("[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__, itvl2,
+                      pp.disable_region_expansion);
         }
     }
 
@@ -1694,18 +1589,18 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         const char *qn = bam_get_qname(aln.get());
 
         if (n_reads > MAX_READS) {
-            if (DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr, "[E::%s] too many reads (after downsampling), giving up.\n",
-                        __func__);
-            }
+            spdlog::error(
+                    "[kdys::{}] too many reads (after downsampling), giving up the whole chunk.",
+                    __func__);
             pileup_failed = true;
             break;
         }
-        if (debug_print && DEBUG_LOCAL_HAPLOTAGGING && n_reads % 1000 == 0) {
-            fprintf(stderr,
-                    "[dbg::%s] piled %d reads (read start pos is %d) ht size %d, seen size %d\n",
-                    __func__, (int)n_reads, (int)aln.get()->core.pos, (int)ht.size(),
-                    (int)ck.reads.size());
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            if (n_reads % 1000 == 0) {
+                LOG_DEBUG(
+                        "[kdys::{}] piled {} reads (read start pos is {}) ht size {}, seen size {}",
+                        __func__, n_reads, aln.get()->core.pos, ht.size(), ck.reads.size());
+            }
         }
 
         const int flag = aln.get()->core.flag;
@@ -1827,12 +1722,6 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                             } else {
                                 allele.cov.cov_bwd += 1;
                             }
-                            if (debug_print > 1) {
-                                fprintf(stderr,
-                                        "[dbg::%s] pos %d alt++(allele=%d) hp=%d from qn %s (use "
-                                        "bf=%d)\n",
-                                        __func__, var.pos, j, hp, qn, pp.use_bloomfilter);
-                            }
                             allele_found = 1;
                             break;
                         }
@@ -1863,12 +1752,6 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                     } else {
                         allele.cov.cov_bwd += 1;
                     }
-                    if (debug_print > 1) {
-                        fprintf(stderr,
-                                "[dbg::%s] pos %d alt++(allele=%d) hp=%d from qn %s (use bf=%d)\n",
-                                __func__, var.pos, (int)ht[var.pos].alleles.size(), hp, qn,
-                                pp.use_bloomfilter);
-                    }
                 }
             }
 
@@ -1876,28 +1759,25 @@ chunk_t variant_pileup_ht(BamFileView &hf,
             ck.qnames.emplace_back(qn);
         }
     }  // iterate through read alignments
-    if (debug_print) {
-        fprintf(stderr,
-                "[dbg::%s] ht size is %d, ck size %d (downsample=%d, filtered=%d), n_reads=%d\n",
-                __func__, (int)ht.size(), (int)ck.reads.size(), enable_downsample,
-                downsample_filtered, (int)n_reads);
+
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+        spdlog::debug("[{}] ht size is {}, ck size {} (downsample={}, filtered={}), n_reads={}",
+                      __func__, ht.size(), ck.reads.size(), enable_downsample, downsample_filtered,
+                      n_reads);
     }
+
     if (pileup_failed) {
-        if (debug_print && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr,
-                    "[E::%s] pileup's initial collection failed, check previous error message\n",
-                    __func__);
-        }
+        spdlog::error(
+                "[kdys::{}] query {}:{}-{} (1-index [) ]) pileup's initial collection failed.",
+                __func__, refname.data(), itvl_start + 1, itvl_end);
         return {};
     }
+
     if (ck.qnames.size() != ck.reads.size()) {
-        if (debug_print && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr,
-                    "[E::%s] ck qnames and reads buffers have different lenghts (%d and %d), "
-                    "impossible, check code\n",
-                    __func__, static_cast<int>(ck.qnames.size()),
-                    static_cast<int>(ck.reads.size()));
-        }
+        spdlog::error(
+                "[{}] ck qnames and reads buffers have different lenghts ({} and {}), "
+                "impossible, check code",
+                __func__, static_cast<int>(ck.qnames.size()), static_cast<int>(ck.reads.size()));
         return {};
     }
 
@@ -1952,9 +1832,9 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                                   .cov_bwd = 0},
                                  {SENTINEL_REF_ALLELE_INT, VAR_OP_X}});
             candidate_poss.push_back(pos);
-            if (debug_print) {
-                fprintf(stderr, "[dbg::%s] pos %d will collect ref (%s pileup)\n", __func__, pos,
-                        qname2hp ? "phased" : "unphased");
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG("[kdys::{}] pos {} will collect ref ({} pileup)", __func__, pos,
+                          qname2hp ? "phased" : "unphased");
             }
         } else {
             q.is_accepted = FLAG_VARSTAT_REJECTED;
@@ -1965,9 +1845,7 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         ck.is_valid = false;
         return ck;
     }
-    if (debug_print) {
-        fprintf(stderr, "[dbg::%s] %d candidate poss\n", __func__, (int)candidate_poss.size());
-    }
+
     std::sort(candidate_poss.begin(), candidate_poss.end());
     for (uint32_t i_read = 0; i_read < ck.reads.size(); i_read++) {
         std::stable_sort(ck.reads[i_read].vars.begin(), ck.reads[i_read].vars.end());
@@ -1978,8 +1856,6 @@ chunk_t variant_pileup_ht(BamFileView &hf,
     //       otherwise here we risk calling ALT/REF when it is actually ALT/. genotype.
     for (uint32_t i_read = 0; i_read < ck.reads.size(); i_read++) {
         read_t &read = ck.reads[i_read];
-        std::string &qn_s = ck.qnames[i_read];
-
         const int hp = (int)read.hp;
         const uint32_t aln_start = read.start_pos;
         const uint32_t aln_end = read.end_pos;
@@ -2001,10 +1877,11 @@ chunk_t variant_pileup_ht(BamFileView &hf,
         if (i_higher > candidate_poss.size()) {
             i_higher = static_cast<uint32_t>(candidate_poss.size());
         }
-        if (debug_print > 1) {
-            fprintf(stderr, "[dbg::%s] qn %s candidate alts bewtween: %d - %d (aln_end is %d)\n",
-                    __func__, ck.qnames[i_read].c_str(), candidate_poss[i_lower],
-                    candidate_poss[i_higher], aln_end);
+
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_DEBUG("[kdys::{}] qn {} candidate alts bewtween: {} - {} (aln_end is {})", __func__,
+                      ck.qnames[i_read], candidate_poss[i_lower], candidate_poss[i_higher],
+                      aln_end);
         }
 
         // scan
@@ -2050,10 +1927,6 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                 } else {
                     aa->cov.cov_bwd++;
                 }
-                if (debug_print > 1) {
-                    fprintf(stderr, "[dbg::%s] pos %d ref hp=%d cov++ from %s\n", __func__,
-                            candidate_poss[i], hp, qn_s.c_str());
-                }
                 add_allele_qa_v_nt4seq(read.vars, candidate_poss[i],
                                        std::vector<uint8_t>{SENTINEL_REF_ALLELE_INT},
                                        SENTINEL_REF_ALLELE_L, is_del_case ? VAR_OP_D : VAR_OP_X);
@@ -2090,8 +1963,8 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                                     b.cov.cov_hap0 + b.cov.cov_hap1 + b.cov.cov_unphased;
                          });
 
-        const bool is_done = classify_variant_prefilter(q, pos, refseq_s.c_str(), refseq_l,
-                                                        abs_start, qname2hp, debug_print);
+        const bool is_done =
+                classify_variant_prefilter(q, pos, refseq_s.c_str(), refseq_l, abs_start, qname2hp);
         if (is_done) {
             continue;
         }
@@ -2113,41 +1986,30 @@ chunk_t variant_pileup_ht(BamFileView &hf,
                     std::max(static_cast<int>((float)(c0 + c1) * pp.min_varcall_fraction),
                              pp.min_varcall_coverage));
             const float ratio = static_cast<float>(std::min(c0, c1)) / c0c1;
-            if (debug_print) {
-                fprintf(stderr, "[dbg::%s] unphased %d : c0=%d (%c) c1=%d (%c) ratio=%.2f ",
-                        __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
-                        "ACGT_R"[q.alleles[1].allele[0]], ratio);
-            }
+
             if (c0 >= threshold && c1 >= threshold && ratio >= pp.min_varcall_fraction) {
                 q.is_accepted = FLAG_VARSTAT_ACCEPTED;
-                if (debug_print) {
-                    fprintf(stderr, "ACCEPT ");
-                }
                 if (q.alleles[0].allele[0] == SENTINEL_REF_ALLELE_INT ||
                     q.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT) {
                     q.type = FLAG_VAR_HET;
-                    if (debug_print) {
-                        fprintf(stderr, "as het\n");
-                    }
                 } else {
                     q.type = FLAG_VAR_MULTHET;
-                    if (debug_print) {
-                        fprintf(stderr, "as multi-het\n");
-                    }
                 }
             } else {
                 if (c0 >= 3 && c1 < 3 && q.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT) {
                     q.is_accepted = FLAG_VARSTAT_ACCEPTED;
                     q.type = FLAG_VAR_HOM;
-                    if (debug_print) {
-                        fprintf(stderr, "ACCEPT as hom\n");
-                    }
                 } else {
                     q.is_accepted = FLAG_VARSTAT_REJECTED;
-                    if (debug_print) {
-                        fprintf(stderr, "REJECT\n");
-                    }
                 }
+            }
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_DEBUG(
+                        "[{}] unphased pileup pos {} : c0={} ({:c}) c1={} ({:c}) ratio={:.2f} -> "
+                        "type={} "
+                        "is_accepted={}",
+                        __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
+                        "ACGT_R"[q.alleles[1].allele[0]], ratio, q.type, q.is_accepted);
             }
         }
     }  // iter through variant candidate positions
@@ -2300,10 +2162,12 @@ bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
 bool operator==(const variant_dorado_style_t &a, const variant_dorado_style_t &b) {
     constexpr bool DEBUG_PRINT = false;
     if constexpr (DEBUG_PRINT) {
-        fprintf(stderr, "[dbg] conf=%s phased=%s pos=%d qual=%d ref=%s alt=%s,%s geno=%c,%c\n",
-                a.is_confident ? "true" : "false", a.is_phased ? "true" : "false", (int)a.pos,
-                a.qual, a.ref.c_str(), a.alts[0].c_str(),
-                a.alts.size() > 1 ? a.alts[1].c_str() : "", a.genotype.first, a.genotype.second);
+        LOG_TRACE(
+                "[variant_dorado_style_t=] conf={} phased={} pos={} qual={} ref={} alt={},{} "
+                "geno={:c},{:c}",
+                a.is_confident ? "true" : "false", a.is_phased ? "true" : "false", a.pos, a.qual,
+                a.ref, a.alts[0], a.alts.size() > 1 ? a.alts[1] : "", a.genotype.first,
+                a.genotype.second);
     }
     return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype) ==
            std::tie(b.is_confident, b.is_phased, b.pos, b.qual, b.ref, b.alts, b.genotype);

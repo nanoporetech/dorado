@@ -1,5 +1,7 @@
 #include "blocked_bloom_filter.h"
 
+#include <spdlog/spdlog.h>
+
 #include <cstdio>
 #include <cstring>
 #include <memory>
@@ -17,17 +19,18 @@ BlockedBloomFilter::BlockedBloomFilter(int n_hashes, int n_blocks_bits)
           m_bbf_size_bytes{1ULL << (BBF_BLOCK_SHIFT + m_n_blocks_bits - 3)},
           m_data{nullptr} {}
 
-void BlockedBloomFilter::enable() {
+bool BlockedBloomFilter::enable() {
     if (!m_is_enabled) {
         m_data = static_cast<uint8_t *>(
                 ::operator new(m_bbf_size_bytes, std::align_val_t{m_align_size_bytes}));
         std::memset(m_data, 0, m_bbf_size_bytes);
-    } else {
-        if (DEBUG_BBF_VERBOSE) {
-            fprintf(stderr, "[E::%s] tried to enable bbf when it is already allocated\n", __func__);
-        }
+        m_is_enabled = true;
+        return true;
+    } else {  // should not happen
+        spdlog::error("[kdys::{}] bloom filter: tried to enable bbf when it is already allocated.",
+                      __func__);
+        return false;
     }
-    m_is_enabled = true;
 }
 
 BlockedBloomFilter::~BlockedBloomFilter() {

@@ -4,7 +4,6 @@
 
 namespace kadayashi {
 
-constexpr bool DEBUG_BBF_VERBOSE = false;
 constexpr int32_t BBF_BLOCK_SHIFT = 9;
 constexpr uint64_t BBF_BLOCK_MASK = (1ULL << BBF_BLOCK_SHIFT) - 1;
 
@@ -13,7 +12,7 @@ public:
     BlockedBloomFilter(int n_hashes, int n_blocks_bits);
     ~BlockedBloomFilter();
 
-    void enable();
+    bool enable();
     bool insert(uint32_t val);
     bool query(uint32_t val);
 

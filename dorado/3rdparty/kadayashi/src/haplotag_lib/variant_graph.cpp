@@ -2,9 +2,20 @@
 
 #include "sequence_utility.h"
 
+#include <spdlog/fmt/bundled/format.h>
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <array>
 #include <cstdio>
+
+#ifdef NDEBUG
+#define LOG_TRACE(...)
+#define LOG_DEBUG(...)
+#else
+#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_DEBUG(...) spdlog::debug(__VA_ARGS__)
+#endif
 
 namespace kadayashi {
 
@@ -115,8 +126,8 @@ infer_readhp_stat_t variant_graph_infer_readhp_given_vars_ht(
             hp1 += pos2counter[pos][0] / pos2counter[pos][2];
         }
         if (debug_print) {
-            fprintf(stderr, "[dbg::%s]   try qn %s : pos %d hp0=%.1f hp1=%.1f\n", __func__,
-                    ck.qnames[readID].c_str(), (int)pos, hp0, hp1);
+            LOG_TRACE("[kdys::{}]   try qn {} : pos {} hp0={:.1f} hp1={:.1f}", __func__,
+                      ck.qnames[readID], pos, hp0, hp1);
         }
 
         updated++;
@@ -206,28 +217,17 @@ std::pair<int, int> normalize_readtaggings1(const std::vector<uint8_t> &d1,
 bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
     // return true when ok
 
-    constexpr int DEBUG_PRINT = 0;
     if (data.size() <= 1) {
         return false;
     }
     for (int64_t i = 0; i < std::ssize(data) - 1; i++) {
         if (data[i].size() != data[i + 1].size()) {
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr,
-                        "[E::%s] data entries have at least 1 pair of unequal lengths, should not "
-                        "happen.\n",
-                        __func__);
-            }
+            spdlog::error(
+                    "[{}] data entries have at least 1 pair of unequal lengths, should not "
+                    "happen. Will do nothing.",
+                    __func__);
             return false;
         }
-    }
-
-    if constexpr (DEBUG_PRINT) {
-        fprintf(stderr, "[dbg::%s]", __func__);
-        for (size_t i = 0; i < data[0].size(); i++) {
-            fprintf(stderr, " %d", static_cast<int32_t>(data[0][i]));
-        }
-        fprintf(stderr, "\n");
     }
 
     for (size_t i = 1; i < data.size(); i++) {
@@ -236,10 +236,12 @@ bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
         for (size_t j = 0; j < i; j++) {  // find a previous one as the reference for flipping
             const int comparable = normalize_readtaggings_count(data[j], data[i]);
             if (comparable < 0) {
-                if constexpr (DEBUG_PRINT) {
-                    fprintf(stderr,
-                            "[E::%s] entries have unequal lengths, should not happen, check code\n",
-                            __func__);
+                spdlog::error(
+                        "[kdys::{}] entries have unequal lengths, should not happen, check code",
+                        __func__);
+                for (size_t ii = 0; ii < data.size(); ii++) {
+                    spdlog::error("[kdys::{}]   data[{}] is length {}", __func__, ii,
+                                  data[ii].size());
                 }
                 continue;
             }
@@ -253,13 +255,9 @@ bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
         }
 
         const std::pair<int, int> counts = normalize_readtaggings1(data[i_ref], data[i]);
-
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[dbg::%s] <%d %d>\t", __func__, counts.first, counts.second);
-            for (size_t k = 0; k < data[i].size(); k++) {
-                fprintf(stderr, " %d", static_cast<int32_t>(data[i][k]));
-            }
-            fprintf(stderr, "\n");
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            spdlog::debug("[kdys::{}] read haplotag normalization: score raw={} flip={}", __func__,
+                          counts.first, counts.second);
         }
     }
     return true;
@@ -300,9 +298,9 @@ void variant_graph_get_edge_values(chunk_t &ck,
                 i1 = r.vars[i1].allele_idx;
                 i2 = r.vars[i2].allele_idx;
                 if ((i1 != 0 && i1 != 1) || (i2 != 0 && i2 != 1)) {
-                    fprintf(stderr,
-                            "[E::%s] 2-allele diploid sancheck failed, impossible, check code. "
-                            "Results may be wrong.\n",
+                    spdlog::error(
+                            "[{}] 2-allele diploid sancheck failed, impossible, check code. "
+                            "Results may be wrong.",
                             __func__);
                     continue;
                 }
@@ -314,7 +312,6 @@ void variant_graph_get_edge_values(chunk_t &ck,
 
 int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx, bool do_wipeout) {
     // return 1 when re-init was a hard one
-    constexpr int DEBUG_PRINT = 0;
     int ret = -1;
     variant_graph_t &vg = ck.vg;
     const uint32_t pos = ck.varcalls[var_idx].pos;
@@ -326,15 +323,16 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
         int diff = 5;
         for (int k = var_idx - 1; k > 0; k--) {
             const uint32_t pos2 = ck.varcalls[k].pos;
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "trying pos_resume %d (k=%d)\n", pos2, k);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE("[kdys::{}] trying pos_resume {} (k={})", __func__, pos2, k);
             }
             if (pos - pos2 > 50000) {
                 break;  // too far
             }
             if (!vg.next_link_is_broken[k - 1]) {
-                if constexpr (DEBUG_PRINT) {
-                    fprintf(stderr, "trying pos_resume %d (k=%d) checkpoint 1\n", pos2, k);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_TRACE("[kdys::{}] trying pos_resume {} (k={}) checkpoint 1", __func__, pos2,
+                              k);
                 }
                 if (pos - pos2 > 300 && (pos - pos2 < 5000 ||
                                          i == 0)) {  // search within 5kb or until finally found one
@@ -347,12 +345,12 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
             }
         }
         if (i > 0) {
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr, "[dbg::%s] *maybe* re-init pos %d using pos %d\n", __func__,
-                        (int)pos, (int)ck.varcalls[i].pos);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE("[kdys::{}] *maybe* re-init pos {} using pos {}", __func__, pos,
+                          ck.varcalls[i].pos);
                 for (uint8_t comb = 0; comb < 4; comb++) {
-                    fprintf(stderr, "[dbg::%s] original %d : %d\n", __func__, i,
-                            static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
+                    LOG_TRACE("[kdys::{}] original {} : {}", __func__, i,
+                              static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
                 }
             }
             variant_graph_get_edge_values(ck, static_cast<uint32_t>(i),
@@ -367,10 +365,10 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
                             [](uint32_t val) { return val < MIN_SUPPORTING_READS; })) {
                 do_wipeout = true;
             } else {
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    fprintf(stderr,
-                            "[dbg::%s] *maybe* not wiping; edge counts are %d %d %d %d; var idx "
-                            "are %d and %d\n",
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_TRACE(
+                            "[{}] *maybe* not wiping; edge counts are {} {} {} {}; var idx "
+                            "are {} and {}",
                             __func__, counter[0], counter[1], counter[2], counter[3], i, var_idx);
                 }
 
@@ -384,16 +382,16 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
                 max_of_u32_arr(bests, &best_i, nullptr);
                 n1->best_score_i = best_i;
 
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
                     for (uint8_t comb = 0; comb < 4; comb++) {
-                        fprintf(stderr, "[dbg::%s] new %d : %d\n", __func__, static_cast<int>(comb),
-                                static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
+                        LOG_TRACE("[kdys::{}] new {} : {}", __func__, static_cast<int>(comb),
+                                  static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
                     }
                 }
             }
         } else {
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr, "[dbg::%s] tried but failed to find resume point\n", __func__);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE("[kdys::{}] tried but failed to find resume point", __func__);
             }
             do_wipeout = true;  // did not find a good resume point, will hard re-init
         }
@@ -401,8 +399,8 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
 
     if (var_idx == 0 || do_wipeout) {
         ret = 1;
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s] hard re-init for pos %d\n", __func__, (int)pos);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}] hard re-init for pos {}", __func__, pos);
         }
         for (int i = 0; i < 4; i++) {
             counter[i] = 0;
@@ -452,7 +450,6 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
     // let backtracing figure out these phasing breakpoints.
     // The breakpoints are stored in vg. When haptagging
     // a read, we will not mix evidences from different phase blocks.
-    constexpr int DEBUG_PRINT = 0;
     assert(i_self > 0);
 
     variant_graph_t &vg = ck.vg;
@@ -460,11 +457,11 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
     vgnode_t *n1 = &vg.nodes[i_self];
 
     std::array<uint32_t, 4> bests = {0};
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
         const std::string a0 = nt4seq2seq(ck.varcalls[i_self].alleles[0]);
         const std::string a1 = nt4seq2seq(ck.varcalls[i_self].alleles[1]);
-        fprintf(stderr, "[dbg::%s] i_self=%d (pos=%d a1=%s a2=%s):\n", __func__, i_self,
-                ck.varcalls[i_self].pos, a0.c_str(), a1.c_str());
+        LOG_TRACE("[kdys::{}] i_self={} (pos={} a1={} a2={}):", __func__, i_self,
+                  ck.varcalls[i_self].pos, a0, a1);
     }
 
     // check whether we have a coverage dropout
@@ -484,9 +481,9 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
             vg.next_link_is_broken[i_self] = 1;
         }
         *i_prev_ = i_self;
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s]    ! phasing broke at %d (coverage dropout)\n", __func__,
-                    ck.varcalls[i_self].pos);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}]    phasing broke at {} (coverage dropout)", __func__,
+                      ck.varcalls[i_self].pos);
         }
     }
 
@@ -502,9 +499,9 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
                                                            self_combo & 1);
 
             score[prev_combo] = s1 + s2 + s3;
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr,
-                        "[dbg::%s]  self combo %d, %d + %d + %d = %d(i_prev=%d; key1=%d key2=%d)\n",
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE(
+                        "[kdys::{}]  self combo {}, {} + {} + {} = {}(i_prev={}; key1={} key2={})",
                         __func__, self_combo, s1, s2, s3, score[prev_combo], i_prev,
                         (prev_combo >> 1) << 1 | (self_combo >> 1),
                         (prev_combo & 1) << 1 | (self_combo & 1));
@@ -531,16 +528,16 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
         if (variant_graph_pos_score_diff_of_top_two(vg, i_self) <= 5) {
             vg.next_link_is_broken[i_self] = 1;
         }
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s]    ! phasing broke at %d (hom decision = %d)\n", __func__,
-                    ck.varcalls[i_self].pos, best_i);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}]    ! phasing broke at {} (hom decision = {})", __func__,
+                      ck.varcalls[i_self].pos, best_i);
         }
     }
 
     *i_prev_ = i_self;
-    if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-        fprintf(stderr, "[dbg::%s]    best i: %d (bests: %d %d %d %d)\n", __func__, best_i,
-                bests[0], bests[1], bests[2], bests[3]);
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+        LOG_TRACE("[kdys::{}]    best i: {} (bests: {} {} {} {})", __func__, best_i, bests[0],
+                  bests[1], bests[2], bests[3]);
     }
 }
 
@@ -580,9 +577,9 @@ bool variant_graph_gen(chunk_t &ck) {
                 const uint8_t i1 = static_cast<uint8_t>(r.vars[i].allele_idx);
                 const uint8_t i2 = static_cast<uint8_t>(r.vars[i + 1].allele_idx);
                 if (((i1 != 0) && (i1 != 1)) || ((i2 != 0) && (i2 != 1))) {
-                    fprintf(stderr,
-                            "[E::%s] this impl is 2-allele diploid, sancheck failed; should not "
-                            "happen here, check code. Not incrementing edge weight\n",
+                    spdlog::error(
+                            "[{}] 2-allele diploid assumption violated? Should not happen. Not "
+                            "incrementing edge weight.",
                             __func__);
                 } else {
                     vg.edges[varID1].counts[i1 << 1 | i2]++;
@@ -624,8 +621,7 @@ bool variant_graph_check_if_phasing_succeeded(const chunk_t &ck) {
         if (source == 0 || source == 3) {
             is_ok = false;
             if constexpr (VERBOSE) {
-                fprintf(stderr, "[dbg::%s] phasing broke at pos %d \n", __func__,
-                        ck.varcalls[i_pos].pos);
+                LOG_TRACE("[kdys::{}] phasing broke at pos {} ", __func__, ck.varcalls[i_pos].pos);
             } else {
                 return false;
             }
@@ -637,7 +633,6 @@ bool variant_graph_check_if_phasing_succeeded(const chunk_t &ck) {
 void variant_graph_haptag_reads(chunk_t &ck) {
     // 2-allele diploid, dvr method
     // Given phased variants, assign haptags to reads.
-    constexpr int DEBUG_PRINT = 0;
     variant_graph_t &vg = ck.vg;
     int sancheck_cnt[5] = {
             0, 0,
@@ -651,14 +646,13 @@ void variant_graph_haptag_reads(chunk_t &ck) {
 
     for (size_t i_read = 0; i_read < ck.reads.size(); i_read++) {
         read_t *r = &ck.reads[i_read];
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s] saw qn %s\n", __func__, ck.qnames[i_read].c_str());
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}] saw qn {}", __func__, ck.qnames[i_read]);
         }
 
         if (r->vars.empty()) {
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr, "[dbg::%s] skip %s (no var)\n", __func__,
-                        ck.qnames[i_read].c_str());
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE("[kdys::{}] skip {} (no var)", __func__, ck.qnames[i_read]);
             }
             r->hp = HAPTAG_UNPHASED;
             sancheck_cnt[2]++;
@@ -698,9 +692,9 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             }
             // (do we have any variants?)
             if (buf.empty()) {
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    fprintf(stderr, "[dbg::%s] skip %s (no intersecting var)\n", __func__,
-                            ck.qnames[i_read].c_str());
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_TRACE("[kdys::{}] skip {} (no intersecting var)", __func__,
+                              ck.qnames[i_read]);
                 }
                 r->hp = HAPTAG_UNPHASED;
                 sancheck_cnt[2]++;
@@ -719,14 +713,15 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             if (var_i_end <= var_i_start) {
                 var_i_end = var_i_start + 1;  // interval specified as [)
             }
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr,
-                        "[dbg::%s] (now using [s=%d e=%d] (%d blocks available; read has %d vars):",
-                        __func__, var_i_start, var_i_end, (int)buf.size(), (int)r->vars.size());
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                std::string tmp = fmt::format(
+                        "[{}] (now using [s={} e={}] ({} blocks available; read has {} vars):",
+                        __func__, var_i_start, var_i_end, buf.size(), r->vars.size());
                 for (uint32_t i = var_i_start; i < var_i_end; i++) {
-                    fprintf(stderr, "%d, ", ck.varcalls[i].pos);
+                    tmp += std::to_string(ck.varcalls[i].pos);
+                    tmp += ", ";
                 }
-                fprintf(stderr, "\n");
+                LOG_TRACE("{}", tmp);
             }
         }
 
@@ -742,8 +737,8 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             }
             if (vg.nodes[r->vars[i].var_idx].del) {
                 uint32_t pos = ck.varcalls[r->vars[i].var_idx].pos;
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    fprintf(stderr, "[dbg::%s] veto at pos=%d\n", __func__, pos);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    spdlog::trace("[kdys::{}] veto at pos={}", __func__, pos);
                 }
                 veto++;
                 continue;
@@ -754,22 +749,23 @@ void variant_graph_haptag_reads(chunk_t &ck) {
             }
             int idx = r->vars[i_pos].allele_idx;
             if (idx == (combo >> 1)) {
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    fprintf(stderr, "[dbg::%s]    %s pos=%d hap 0 (idx=%d combo=%d)\n", __func__,
-                            ck.qnames[i_read].c_str(), r->vars[i_pos].pos, idx, combo);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_TRACE("[kdys::{}]    {} pos={} hap 0 (idx={} combo={})", __func__,
+                              ck.qnames[i_read], r->vars[i_pos].pos, idx, combo);
                 }
                 votes[0]++;
             } else if (idx == (combo & 1)) {
-                if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                    fprintf(stderr, "[dbg::%s]    %s pos=%d hap 1 (idx=%d combo=%d)\n", __func__,
-                            ck.qnames[i_read].c_str(), r->vars[i_pos].pos, idx, combo);
+                if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                    LOG_TRACE("[kdys::{}]    {} pos={} hap 1 (idx={} combo={})", __func__,
+                              ck.qnames[i_read], r->vars[i_pos].pos, idx, combo);
                 }
                 votes[1]++;
             } else {
-                fprintf(stderr,
-                        "[E::%s] %s qn=%d impossible (combo=%d idx=%d), check code. This read will "
-                        "be untagged.\n",
-                        __func__, ck.qnames[i_read].c_str(), r->vars[i_pos].pos, combo, idx);
+                spdlog::error(
+                        "[{}] {} qn={} impossible (combo={} idx={}), check code. This read "
+                        "will "
+                        "be untagged.",
+                        __func__, ck.qnames[i_read], r->vars[i_pos].pos, combo, idx);
                 votes[0] = 0;
                 votes[1] = 0;
                 break;
@@ -800,16 +796,16 @@ void variant_graph_haptag_reads(chunk_t &ck) {
         r->votes_diploid[0] = votes[0];
         r->votes_diploid[1] = votes[1];
 
-        if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-            fprintf(stderr, "[dbg::%s] qname %s vote0=%d vote1=%d veto=%d => hp=%d\n", __func__,
-                    ck.qnames[i_read].c_str(), votes[0], votes[1], veto, r->hp);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}] qname {} vote0={} vote1={} veto={} => hp={}", __func__,
+                      ck.qnames[i_read], votes[0], votes[1], veto, r->hp);
         }
     }
     if (DEBUG_LOCAL_HAPLOTAGGING) {
-        fprintf(stderr,
-                "[M::%s] n_reads %d, hap0=%d hap1=%d no_variant=%d ambiguous=%d "
-                "unphased_due_conflict=%d\n",
-                __func__, (int)ck.reads.size(), sancheck_cnt[0], sancheck_cnt[1], sancheck_cnt[2],
+        LOG_TRACE(
+                "[{}] n_reads {}, hap0={} hap1={} no_variant={} ambiguous={} "
+                "unphased_due_conflict={}",
+                __func__, ck.reads.size(), sancheck_cnt[0], sancheck_cnt[1], sancheck_cnt[2],
                 sancheck_cnt[3], sancheck_cnt[4]);
     }
 }
@@ -817,10 +813,10 @@ void variant_graph_haptag_reads(chunk_t &ck) {
 void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>> &arr_read2hp,
                                std::unordered_map<uint32_t, uint8_t> &breakpoint_reads,
                                const chunk_t &ck) {
-    constexpr int DEBUG_PRINT = 0;
     if (arr_read2hp.size() <= 1) {
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[M::%s] nothing done\n", __func__);
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE("[kdys::{}] nothing done (arr_read2hp.size={})", __func__,
+                      arr_read2hp.size());
         }
         return;
     }
@@ -889,17 +885,14 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
             if (firstreadID != std::numeric_limits<uint32_t>::max()) {
                 breakpoint_reads[firstreadID] = 1;
             } else {
-                if constexpr (DEBUG_PRINT) {
-                    fprintf(stderr,
-                            "[E::%s] should not happen: failed to get first read ID at phasing "
-                            "breakpoint? Giving up haptag normalization.\n",
-                            __func__);
-                }
+                spdlog::error(
+                        "[{}] should not happen: failed to get first read ID at phasing "
+                        "breakpoint? Giving up haptag normalization.",
+                        __func__);
                 return;
             }
 
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] no change for iter#%d (sample qn: ", __func__, i);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
                 uint32_t sampleqID = std::numeric_limits<uint32_t>::max();
                 uint32_t left_pos = std::numeric_limits<uint32_t>::max();
                 uint32_t right_pos = 0;
@@ -914,8 +907,8 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
                         sampleqID = qID;
                     }
                 }
-                fprintf(stderr, "%s , pos is : %d-%d)\n", ck.qnames[sampleqID].c_str(),
-                        (int)left_pos, (int)right_pos);
+                LOG_TRACE("[kdys::{}] no change for iter#{} (sample qn: {} , pos is : {}-{})",
+                          __func__, i, ck.qnames[sampleqID], left_pos, right_pos);
             }
 
             j_cutoff = i;
@@ -923,10 +916,7 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
         }
 
         if (best_trans > best_cis) {  // flip self
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr,
-                        "[dbg::%s] flip iter#%d (ref: iter#%d, n_comparable=%d, sample qn: ",
-                        __func__, i, i_ref, count_ref);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
                 uint32_t sampleqID = std::numeric_limits<uint32_t>::max();
                 uint32_t left_pos = std::numeric_limits<uint32_t>::max();
                 uint32_t right_pos = 0;
@@ -941,8 +931,10 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
                         sampleqID = qID;
                     }
                 }
-                fprintf(stderr, "%s , pos is : %d-%d)\n", ck.qnames[sampleqID].c_str(),
-                        (int)left_pos, (int)right_pos);
+                spdlog::trace(
+                        "[{}] flip iter#{} (ref: iter#{}, n_comparable={}, sample qn: {} , pos is "
+                        ": {}-{})",
+                        __func__, i, i_ref, count_ref, ck.qnames[sampleqID], left_pos, right_pos);
             }
             for (auto &[readID, hp] : arr_read2hp[i]) {
                 if (hp != HAPTAG_UNPHASED) {
@@ -954,8 +946,6 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
 }
 
 void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested) {
-    constexpr int DEBUG_PRINT = 0;
-
     uint32_t n_iter = n_iter_requested;
     if (n_iter == 0 || n_iter >= ck.reads.size()) {
         n_iter = static_cast<int>(ck.reads.size());
@@ -991,34 +981,24 @@ void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested
         }
         prev_seedID = seedreadID;
 
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr,
-                    "[dbg::%s] collected a seed (iter# %d/%d), qn %s, range %s:%d-%d, max_var = "
-                    "%d var_size=%d\n",
-                    __func__, (int)(i_iter), n_iter, ck.qnames[i_max_var].c_str(),
-                    ck.refname.c_str(), (int)ck.reads[i_max_var].start_pos,
-                    (int)ck.reads[i_max_var].end_pos, max_var,
-                    (int)ck.reads[i_max_var].vars.size());
+        if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+            LOG_TRACE(
+                    "[{}] collected a seed (iter# {}/{}), qn {}, range {}:{}-{}, max_var = "
+                    "{} var_size={}",
+                    __func__, i_iter, n_iter, ck.qnames[i_max_var], ck.refname,
+                    ck.reads[i_max_var].start_pos, ck.reads[i_max_var].end_pos, max_var,
+                    ck.reads[i_max_var].vars.size());
         }
 
         std::vector<uint8_t> readhps = variant_graph_do_simple_haptag1(ck, seedreadID);
-        if (readhps.empty()) {
-            if constexpr (DEBUG_PRINT && DEBUG_LOCAL_HAPLOTAGGING) {
-                fprintf(stderr,
-                        "[E::%s] seedreadID >= total number of reads, should not happen, check "
-                        "code\n",
-                        __func__);
-            }
-        } else {
+        if (!readhps.empty()) {
             results.push_back(std::move(readhps));
         }
     }
 
     const bool norm_ok = normalize_readtaggings(results);
     if (!norm_ok) {
-        if constexpr (DEBUG_PRINT) {
-            fprintf(stderr, "[E::%s] normalization of read haptags failed\n", __func__);
-        }
+        spdlog::error("[kdys::{}] normalization of read haptags failed", __func__);
     } else {
         for (uint32_t i_read = 0; i_read < ck.reads.size(); i_read++) {
             float cnt[3] = {0, 0, 0};
@@ -1040,9 +1020,9 @@ void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested
                 }
             }
 
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] qn %s hp %d; cnt: %.1f %.1f %.1f\n", __func__,
-                        ck.qnames[i_read].c_str(), ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                LOG_TRACE("[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__,
+                          ck.qnames[i_read], ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
             }
         }
     }
@@ -1053,10 +1033,11 @@ std::vector<uint8_t> variant_graph_do_simple_haptag1(chunk_t &ck, const uint32_t
     // to its variants. Then for each iteration, haptag one read
     // with best score, and accumulate new phased variants
     // & discount known phased variants when there are conflicts.
-    constexpr int DEBUG_PRINT = 0;
     variant_graph_t &vg = ck.vg;
 
     if (seedreadID >= ck.reads.size()) {  // should not happen
+        spdlog::error("[kdys::{}] should not happen: seedreadID ({}) >= ck reads size ({})",
+                      __func__, seedreadID, ck.reads.size());
         return {};
     }
 
@@ -1130,10 +1111,10 @@ std::vector<uint8_t> variant_graph_do_simple_haptag1(chunk_t &ck, const uint32_t
         if (hp_best != HAPTAG_UNPHASED) {
             readhps[i_best] = hp_best;
             variant_graph_update_varhp_given_read(ck, varhps, i_best, hp_best);
-            if constexpr (DEBUG_PRINT) {
-                fprintf(stderr, "[dbg::%s] updated qn %s (i=%d) as hp %d, score=%.5f, updated=%d\n",
-                        __func__, ck.qnames[i_best].c_str(), (int)i_best, hp_best, score_best,
-                        updated_best);
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+                spdlog::trace("[kdys::{}] updated qn {} (i={}) as hp {}, score={:.5f}, updated={}",
+                              __func__, ck.qnames[i_best], i_best, hp_best, score_best,
+                              updated_best);
             }
         } else {
             break;
@@ -1147,10 +1128,9 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
         const int seedreadID) {
     // (produce a hashtable of readID2haptag rather than an array of such info)
 
-    constexpr int DEBUG_PRINT = 0;
     assert(seedreadID >= 0 && (uint32_t)seedreadID < ck.reads.size());
-    if constexpr (DEBUG_PRINT) {
-        fprintf(stderr, "[dbg::%s] start from qn %s\n", __func__, ck.qnames[seedreadID].c_str());
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+        LOG_TRACE("[kdys::{}] start from qn {}", __func__, ck.qnames[seedreadID]);
     }
 
     // counter of allele0-as-hp0, allele0-as-hp1 and the sum
@@ -1159,10 +1139,10 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
 
     readID2hp[seedreadID] = 0;
     variant_graph_update_varhp_given_read_ht(ck, pos2counter, seedreadID, 0);
-    if constexpr (DEBUG_PRINT) {
-        for (auto &pair : pos2counter) {
-            fprintf(stderr, "[dbg::%s] (init) pos %d : %.1f, %.1f\n", __func__, pair.first,
-                    std::get<0>(pair.second), std::get<1>(pair.second));
+    if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
+        for (const auto &pair : pos2counter) {
+            spdlog::trace("[kdys::{}] (init) pos {} : {:.1f}, {:.1f}", __func__, pair.first,
+                          std::get<0>(pair.second), std::get<1>(pair.second));
         }
     }
 
@@ -1228,15 +1208,15 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
         }
 
         if (hp_best != HAPTAG_UNPHASED) {
-            if constexpr (DEBUG_PRINT) {
+            if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
                 infer_readhp_stat_t stat =
                         variant_graph_infer_readhp_given_vars_ht(ck, pos2counter, i_best, 1);
-                fprintf(stderr,
-                        "[dbg::%s] updated qn %s (i=%d pos %d-%d) as hp %d, score=%.5f, "
-                        "updated=%d (stat: %.2f, %d, %d)\n",
-                        __func__, ck.qnames[i_best].c_str(), (int)i_best,
-                        (int)ck.reads[i_best].start_pos, (int)ck.reads[i_best].end_pos, hp_best,
-                        score_best, updated_best, stat.score_best, stat.updated_best, stat.hp_best);
+                spdlog::trace(
+                        "[{}] updated qn {} (i={} pos {}-{}) as hp {}, score={:.5f}, "
+                        "updated={} (stat: {:.2f}, {}, {})",
+                        __func__, ck.qnames[i_best], i_best, ck.reads[i_best].start_pos,
+                        ck.reads[i_best].end_pos, hp_best, score_best, updated_best,
+                        stat.score_best, stat.updated_best, stat.hp_best);
             }
             readID2hp[i_best] = hp_best;
             variant_graph_update_varhp_given_read_ht(ck, pos2counter, i_best, hp_best);
