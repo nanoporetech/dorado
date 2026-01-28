@@ -1023,21 +1023,41 @@ void run_variant_calling(const Options& opt,
                     tracker.set_description("Processing sequences: " + oss.str());
                 }
 
+                // Haplotag the BAM regions if needed.
+                std::vector<std::unordered_map<std::string, int32_t>> bam_region_haplotags;
+                if ((opt.haplotag_source == secondary::HaplotagSource::COMPUTE) ||
+                    (opt.haplotag_source == secondary::HaplotagSource::BIN_FILE)) {
+                    std::vector<kadayashi::varcall_result_t> varcalls =
+                            polisher::haplotag_regions_in_parallel(bam_regions, draft_lens,
+                                                                   resources.encoders, opt.threads);
+
+                    // Convert the regions.
+                    bam_region_haplotags.resize(std::size(varcalls));
+                    for (int64_t i = 0; i < std::ssize(varcalls); ++i) {
+                        bam_region_haplotags[i] = std::move(varcalls[i].qname2hp);
+                        // Increment the haplotag from 0/1 -> 1/2 because the model was trained on that.
+                        for (auto& [key, val] : bam_region_haplotags[i]) {
+                            ++val;
+                        }
+                    }
+                }
+
                 // Each item is one batch for inference.
                 utils::AsyncQueue<polisher::InferenceData> batch_queue(opt.queue_size);
                 utils::AsyncQueue<polisher::DecodeData> decode_queue(opt.queue_size);
 
                 // Create a thread for the sample producer.
                 polisher::WorkerReturnStatus wrs_sample_producer;
-                auto thread_sample_producer = utils::jthread(
-                        [&resources, &bam_regions, &draft_lens, &candidate_trees, &opt, &usable_mem,
-                         &batch_queue, &worker_terminate, &wrs_sample_producer] {
+                auto thread_sample_producer =
+                        utils::jthread([&resources, &bam_regions, &draft_lens, &candidate_trees,
+                                        &opt, &usable_mem, &batch_queue, &worker_terminate,
+                                        &wrs_sample_producer, &bam_region_haplotags] {
                             utils::set_thread_name("variant_produce");
                             polisher::sample_producer(
-                                    resources, bam_regions, draft_lens, candidate_trees,
-                                    opt.threads, opt.batch_size, opt.encoding_batch_size,
-                                    opt.window_len, opt.window_overlap, opt.variant_flanking_bases,
-                                    opt.bam_subchunk, opt.haplotag_source, usable_mem,
+                                    resources, bam_regions, draft_lens, bam_region_haplotags,
+                                    candidate_trees, opt.threads, opt.batch_size,
+                                    opt.encoding_batch_size, opt.window_len, opt.window_overlap,
+                                    opt.variant_flanking_bases, opt.bam_subchunk, usable_mem,
                                     opt.continue_on_error, opt.tiled_regions, opt.tiled_ext_flanks,
                                     opt.tiled_ext_major, opt.tiled_ext_min_cov,
                                     opt.tiled_ext_cov_fract, batch_queue, worker_terminate,

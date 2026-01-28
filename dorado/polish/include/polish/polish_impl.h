@@ -1,5 +1,6 @@
 #pragma once
 
+#include "local_haplotagging.h"
 #include "secondary/architectures/model_config.h"
 #include "secondary/architectures/model_torch_base.h"
 #include "secondary/common/interval.h"
@@ -170,28 +171,29 @@ std::vector<kadayashi::varcall_result_t> haplotag_regions_in_parallel(
         std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         const int32_t num_threads);
 
-void sample_producer(PolisherResources& resources,
-                     const std::vector<secondary::Window>& bam_regions,
-                     const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-                     const std::optional<IntervalTreesInt64Map>& candidate_trees,
-                     int32_t num_threads,
-                     int32_t batch_size,
-                     int32_t encoding_batch_size,
-                     int32_t window_len,
-                     int32_t window_overlap,
-                     int32_t variant_flanking_bases,
-                     int32_t bam_subchunk_len,
-                     secondary::HaplotagSource haplotag_source,
-                     double max_available_mem,
-                     bool continue_on_exception,
-                     bool tiled_regions,
-                     bool tiled_ext_flanks,
-                     int64_t tiled_ext_major,
-                     int64_t tiled_ext_min_cov,
-                     float tiled_ext_cov_fract,
-                     utils::AsyncQueue<InferenceData>& infer_data,
-                     std::atomic<bool>& worker_terminate,
-                     WorkerReturnStatus& ret_status);
+void sample_producer(
+        PolisherResources& resources,
+        const std::vector<secondary::Window>& bam_regions,
+        const std::vector<std::pair<std::string, int64_t>>& draft_lens,
+        const std::vector<std::unordered_map<std::string, int32_t>>& bam_region_haplotags,
+        const std::optional<IntervalTreesInt64Map>& candidate_trees,
+        int32_t num_threads,
+        int32_t batch_size,
+        int32_t encoding_batch_size,
+        int32_t window_len,
+        int32_t window_overlap,
+        int32_t variant_flanking_bases,
+        int32_t bam_subchunk_len,
+        double max_available_mem,
+        bool continue_on_exception,
+        bool tiled_regions,
+        bool tiled_ext_flanks,
+        int64_t tiled_ext_major,
+        int64_t tiled_ext_min_cov,
+        float tiled_ext_cov_fract,
+        utils::AsyncQueue<InferenceData>& infer_data,
+        std::atomic<bool>& worker_terminate,
+        WorkerReturnStatus& ret_status);
 
 /// \brief Dimensions: [draft_id x part_id x haplotype_id]
 std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_consensus_seqs(
