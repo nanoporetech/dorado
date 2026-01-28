@@ -1,5 +1,7 @@
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 
+#include "utils/barcode_kits.h"
+
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
@@ -39,6 +41,12 @@ void ReadToBamTypeNode::input_thread_fn() {
                 std::move(read_common_data.flowcell_id),
                 std::move(read_common_data.run_id),
                 std::move(read_common_data.acquisition_id),
+                read_common_data.barcoding_result
+                        ? barcode_kits::normalize_barcode_name(
+                                  read_common_data.barcoding_result->barcode_name)
+                        : std::string(),
+                read_common_data.barcoding_result ? read_common_data.barcoding_result->alias
+                                                  : std::string(),
                 read_common_data.protocol_start_time_ms,
                 read_common_data.subread_id,
                 is_status_pass,

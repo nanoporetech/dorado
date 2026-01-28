@@ -140,7 +140,8 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
             continue;
         }
 
-        m_has_barcodes |= rg_data.has_barcodes;
+        m_has_barcodes |= !rg_data.data.barcode_id.empty();
+        m_has_barcodes |= !rg_data.data.barcode_alias.empty();
 
         HtsData::ReadAttributes& attrs = it->second;
         assign_not_empty(attrs.flowcell_id, rg_data.data.flowcell_id);
@@ -149,6 +150,8 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
         assign_not_empty(attrs.sample_id, rg_data.data.sample_id);
         assign_not_empty(attrs.protocol_run_id, rg_data.data.run_id);
         assign_not_empty(attrs.experiment_id, rg_data.data.experiment_id);
+        assign_not_empty(attrs.barcode_id, rg_data.data.barcode_id);
+        assign_not_empty(attrs.barcode_alias, rg_data.data.barcode_alias);
 
         if (!rg_data.data.exp_start_time.empty()) {
             attrs.protocol_start_time_ms =
@@ -266,6 +269,8 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
 
         assign_not_empty(attrs.flowcell_id, get_tag("PU", tags));
         assign_not_empty(attrs.sample_id, get_tag("LB", tags));
+        assign_not_empty(attrs.barcode_id, get_tag("SM", tags));
+        assign_not_empty(attrs.barcode_alias, get_tag("al", tags));
         // TODO: position_id is not in the specification yet
 
         const auto& tag_it = tags.find("DS");

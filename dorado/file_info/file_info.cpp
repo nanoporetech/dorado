@@ -73,17 +73,21 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
 
             std::string id = std::string(run_id).append("_").append(model_name);
             read_groups[id] = ReadGroup{
-                    std::move(run_id),
-                    model_name,
-                    modbase_model_names,
-                    std::move(flowcell_id),
-                    std::move(device_id),
-                    utils::get_string_timestamp_from_unix_time_ms(exp_start_time_ms),
-                    std::move(sample_id),
-                    std::move(position_id),
-                    std::move(experiment_id),
-                    utils::get_string_timestamp_from_unix_time_ms(acq_start_time_ms),
-                    model_stride,
+                    .run_id = std::move(run_id),
+                    .basecalling_model = model_name,
+                    .modbase_models = modbase_model_names,
+                    .flowcell_id = std::move(flowcell_id),
+                    .device_id = std::move(device_id),
+                    .exp_start_time =
+                            utils::get_string_timestamp_from_unix_time_ms(exp_start_time_ms),
+                    .sample_id = std::move(sample_id),
+                    .position_id = std::move(position_id),
+                    .experiment_id = std::move(experiment_id),
+                    .acq_start_time =
+                            utils::get_string_timestamp_from_unix_time_ms(acq_start_time_ms),
+                    .barcode_id = {},
+                    .barcode_alias = {},
+                    .model_stride = model_stride,
             };
         }
     }
