@@ -448,15 +448,14 @@ void setup(const std::vector<std::string>& args,
     gpu_names = utils::get_cuda_gpu_names(device);
 #endif
 
-    SamHdrPtr hdr(sam_hdr_init());
-    cli::add_pg_hdr(hdr.get(), "basecaller", args, device);
-
+    std::optional<std::string> barcode_kit;
+    const utils::SampleSheet* sample_sheet = nullptr;
     if (barcoding_info) {
-        utils::add_rg_headers_with_barcode_kit(hdr.get(), read_groups, barcoding_info->kit_name,
-                                               barcoding_info->sample_sheet.get());
-    } else {
-        utils::add_rg_headers(hdr.get(), read_groups);
+        barcode_kit = barcoding_info->kit_name;
+        sample_sheet = barcoding_info->sample_sheet.get();
     }
+
+    utils::HeaderMapper header_mapper(read_groups, barcode_kit, sample_sheet);
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
         auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
@@ -596,18 +595,31 @@ void setup(const std::vector<std::string>& args,
         std::exit(EXIT_FAILURE);
     }
 
+    auto modify_hdr = utils::HeaderMapper::Modifier([&args, &device](sam_hdr_t* hdr) {
+        utils::add_hd_header_line(hdr);
+        cli::add_pg_hdr(hdr, "basecaller", args, device);
+    });
+
+    header_mapper.modify_headers(modify_hdr);
+
     // At present, header output file header writing relies on direct node method calls
     // rather than the pipeline framework - because we must guarantee that the header is set
     // BEFORE we write any reads.
     if (enable_aligner) {
         const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
-        utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
+        header_mapper.modify_headers([&aligner_ref](sam_hdr_t* hdr) {
+            utils::add_sq_hdr(hdr, aligner_ref.get_sequence_records_for_header());
+        });
     }
 
     {
-        // Set the sam header for all writers
+        // Set the headers for all writers
         const auto& hts_writer_ref = pipeline->get_node_ref<WriterNode>(hts_writer);
-        hts_writer_ref.set_shared_header(std::move(hdr));
+        if (output_dir.has_value()) {
+            hts_writer_ref.set_dynamic_header(header_mapper.get_merged_headers_map());
+        } else {
+            hts_writer_ref.set_shared_header(header_mapper.get_shared_merged_header(false));
+        }
     }
 
     std::unordered_set<std::string> reads_already_processed;
