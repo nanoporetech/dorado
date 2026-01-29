@@ -88,30 +88,36 @@ void assign_not_empty(std::string& attr_target, const std::string_view maybe_val
 
 namespace dorado::utils {
 
-HeaderMapper::HeaderMapper(bool strip_alignment)
-        : m_strip_alignment(strip_alignment),
-          m_read_group_to_attributes(std::make_shared<HeaderMapper::AttributeMap>()),
+HeaderMapper::HeaderMapper(const std::unordered_map<std::string, ReadGroup>& read_groups,
+                           std::optional<std::string> kit_name,
+                           const utils::SampleSheet* const sample_sheet)
+        : HeaderMapper(std::move(kit_name), sample_sheet, true) {
+    process(read_groups);
+    finalize_merge();
+}
+
+HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs,
+                           std::optional<std::string> kit_name,
+                           const utils::SampleSheet* const sample_sheet,
+                           bool strip_alignment)
+        : HeaderMapper(std::move(kit_name), sample_sheet, strip_alignment) {
+    process(inputs);
+    finalize_merge();
+}
+
+HeaderMapper::HeaderMapper(std::optional<std::string> kit_name,
+                           const utils::SampleSheet* const sample_sheet,
+                           bool strip_alignment)
+        : m_kit_name(std::move(kit_name)),
+          m_sample_sheet(sample_sheet),
+          m_strip_alignment(strip_alignment),
           m_merged_headers_map(std::make_shared<HeaderMapper::HeaderMap>()) {
     m_merged_headers_map->emplace(m_fallback_read_attrs,
                                   std::make_unique<MergeHeaders>(m_strip_alignment));
 }
 
-HeaderMapper::HeaderMapper(const std::unordered_map<std::string, ReadGroup>& read_groups,
-                           std::optional<std::string> kit_name,
-                           const utils::SampleSheet* const sample_sheet)
-        : HeaderMapper(true) {
-    process(read_groups, std::move(kit_name), sample_sheet);
-}
-
-HeaderMapper::HeaderMapper(const std::vector<std::filesystem::path>& inputs, bool strip_alignment)
-        : HeaderMapper(strip_alignment) {
-    process(inputs);
-}
-
-void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& read_groups,
-                           std::optional<std::string> kit_name,
-                           const utils::SampleSheet* const sample_sheet) {
-    m_has_barcodes = kit_name.has_value();
+void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& read_groups) {
+    m_has_barcodes = m_kit_name.has_value();
     auto& merged_headers = *m_merged_headers_map;
     for (auto [id, read_group] : read_groups) {
         HtsData::ReadAttributes attrs;
@@ -121,7 +127,7 @@ void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& rea
         assign_not_empty(attrs.protocol_run_id, read_group.run_id);
         assign_not_empty(attrs.experiment_id, read_group.experiment_id);
 
-        if (kit_name.has_value()) {
+        if (m_kit_name.has_value()) {
             read_group.barcode_id = "unclassified";
             attrs.barcode_id = "unclassified";
             read_group.barcode_alias = "";
@@ -140,23 +146,25 @@ void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& rea
             }
 
             merged_header_ptr->add_rg(id, read_group, {});
-            (*m_read_group_to_attributes)[id] = attrs;
+            m_read_group_to_attributes[id] = attrs;
         }
 
-        if (kit_name.has_value()) {
+        if (m_kit_name.has_value()) {
             const auto& kit_info_map = barcode_kits::get_kit_infos();
-            auto kit_info = kit_info_map.find(*kit_name);
+            auto kit_info = kit_info_map.find(*m_kit_name);
             for (const auto& barcode_name : kit_info->second.barcodes) {
                 const auto normalized_barcode_name =
                         barcode_kits::normalize_barcode_name(barcode_name);
+                const auto standard_barcode_name =
+                        barcode_kits::generate_standard_barcode_name(*m_kit_name, barcode_name);
                 std::string alias;
-                if (sample_sheet) {
-                    if (!sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
+                if (m_sample_sheet) {
+                    if (!m_sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
                         continue;
                     }
-                    alias = sample_sheet->get_alias(read_group.flowcell_id, read_group.position_id,
-                                                    read_group.experiment_id,
-                                                    normalized_barcode_name);
+                    alias = m_sample_sheet->get_alias(
+                            read_group.flowcell_id, read_group.position_id,
+                            read_group.experiment_id, normalized_barcode_name);
                     attrs.barcode_alias = alias;
                     read_group.barcode_alias = alias;
                 }
@@ -173,22 +181,17 @@ void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& rea
                 }
 
                 auto new_id = id;
-                new_id.append("_").append(normalized_barcode_name);
+                new_id.append("_").append(alias.empty() ? standard_barcode_name : alias);
                 std::map<std::string, std::string> kv_pairs = {
-                        {"bk", kit_name.value()},
+                        {"bk", m_kit_name.value()},
                         {"SM", normalized_barcode_name},
                         {"al", alias.empty() ? normalized_barcode_name : alias},
                         {"BC", get_barcode_sequence(barcode_name)},
                 };
                 merged_header_ptr->add_rg(new_id, read_group, kv_pairs);
-                (*m_read_group_to_attributes)[new_id] = attrs;
+                m_read_group_to_attributes[new_id] = attrs;
             }
         }
-    }
-
-    // Finalize the headers
-    for (const auto& [_, merged_header_ptr] : *m_merged_headers_map) {
-        merged_header_ptr->finalize_merge();
     }
 }
 
@@ -196,8 +199,7 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
     for (const auto& input : inputs) {
         if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ ||
             hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
-            if (!m_fastq_runtime_warning_issued) {
-                m_fastq_runtime_warning_issued = true;
+            if (!std::exchange(m_fastq_runtime_warning_issued, true)) {
                 spdlog::warn(
                         "Mapping headers from FASTQ files. This might take some time. Using BAM "
                         "files as input is recommended as this avoids FASTQ header mapping.");
@@ -207,12 +209,7 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
             process_bam(input);
         }
     }
-
-    // Finalize the headers
-    for (const auto& [_, merged_header_ptr] : *m_merged_headers_map) {
-        merged_header_ptr->finalize_merge();
-    }
-};
+}
 
 void HeaderMapper::process_fastx(const std::filesystem::path& path) {
     spdlog::trace("HeaderMapper::process_fastx processing '{}'", path.string());
@@ -227,6 +224,9 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
 
     auto& merged_headers = *m_merged_headers_map;
     std::unordered_map<std::string, HtsData::ReadAttributes> rg_to_attrs_lut;
+    std::unordered_map<std::string, ReadGroup> id_to_rg_lut;
+
+    SamHdrPtr hdr(sam_hdr_init());
     while (reader.get_next(record)) {
         // Check if the tags are HTS-style and parse them.
         ReadGroupData rg_data = dorado::utils::parse_rg_from_hts_tags(record.comment);
@@ -236,7 +236,7 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
                 debug_msg_issued = true;
                 spdlog::debug("FASTQ record missing read group data in file '{}'", path.string());
             }
-            fallback_merged_header->add_header(sam_hdr_init(), path.string(),
+            fallback_merged_header->add_header(hdr.get(), path.string(),
                                                m_fallback_read_attrs.protocol_run_id);
             continue;
         }
@@ -259,23 +259,102 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
         assign_not_empty(attrs.barcode_id, rg_data.data.barcode_id);
         assign_not_empty(attrs.barcode_alias, rg_data.data.barcode_alias);
 
+        if (attrs.barcode_alias == attrs.barcode_id) {
+            // File headers may have both the barcode and alias set to the same value
+            // But when we classify we leave the alias blank if it is unused, so clear it here to match
+            attrs.barcode_alias.clear();
+        }
+
         if (!rg_data.data.exp_start_time.empty()) {
             attrs.protocol_start_time_ms =
                     utils::get_unix_time_ms_from_string_timestamp(rg_data.data.exp_start_time);
         }
 
-        auto& merged_header_ptr = merged_headers[attrs];
-        if (!merged_header_ptr) {
-            merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+        if (m_kit_name.has_value()) {
+            if (attrs.barcode_id.empty()) {
+                rg_data.data.barcode_id = "unclassified";
+                attrs.barcode_id = "unclassified";
+            }
         }
-        merged_header_ptr->add_rg(rg_data.id, rg_data.data, {});
+
+        {
+            auto& merged_header_ptr = merged_headers[attrs];
+            if (!merged_header_ptr) {
+                merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+            }
+
+            std::map<std::string, std::string> kv_pairs;
+            if (!(attrs.barcode_id.empty() || attrs.barcode_id == "unclassified")) {
+                kv_pairs = {
+                        {"SM", attrs.barcode_id},
+                        {"al",
+                         attrs.barcode_alias.empty() ? attrs.barcode_id : attrs.barcode_alias},
+                        // BC and bk tags are not present in fastq files
+                };
+            }
+            merged_header_ptr->add_rg(rg_data.id, rg_data.data, kv_pairs);
+            id_to_rg_lut[rg_data.id] = std::move(rg_data.data);
+        }
+    }
+
+    if (m_kit_name.has_value()) {
+        auto unclassified_rg_it =
+                std::find_if(std::begin(rg_to_attrs_lut), std::end(rg_to_attrs_lut),
+                             [](const auto& rg_attr_pair) {
+                                 return rg_attr_pair.second.barcode_id == "unclassified";
+                             });
+        if (unclassified_rg_it != std::end(rg_to_attrs_lut)) {
+            auto [read_group_id, read_attrs] = *unclassified_rg_it;
+            auto rg_data = id_to_rg_lut.at(read_group_id);
+            const auto& kit_info_map = barcode_kits::get_kit_infos();
+            const auto& kit_info = kit_info_map.at(*m_kit_name);
+            auto last_read_group_id = read_group_id;
+            for (const auto& barcode_name : kit_info.barcodes) {
+                const auto normalized_barcode_name =
+                        barcode_kits::normalize_barcode_name(barcode_name);
+                const auto standard_barcode_name =
+                        barcode_kits::generate_standard_barcode_name(*m_kit_name, barcode_name);
+                std::string alias;
+                if (m_sample_sheet) {
+                    if (!m_sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
+                        continue;
+                    }
+                    alias = m_sample_sheet->get_alias(
+                            read_attrs.flowcell_id, read_attrs.position_id,
+                            read_attrs.experiment_id, normalized_barcode_name);
+                    read_attrs.barcode_alias = alias;
+                    rg_data.barcode_alias = alias;
+                }
+
+                read_attrs.barcode_alias = alias;
+                rg_data.barcode_alias = alias.empty() ? normalized_barcode_name : alias;
+
+                rg_data.barcode_id = normalized_barcode_name;
+                read_attrs.barcode_id = normalized_barcode_name;
+
+                auto& merged_header_ptr = merged_headers[read_attrs];
+                if (!merged_header_ptr) {
+                    merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+                }
+
+                auto new_read_group_id =
+                        read_group_id + "_" + (alias.empty() ? standard_barcode_name : alias);
+                std::map<std::string, std::string> kv_pairs = {
+                        {"bk", m_kit_name.value()},
+                        {"SM", normalized_barcode_name},
+                        {"al", alias.empty() ? normalized_barcode_name : alias},
+                        {"BC", get_barcode_sequence(barcode_name)},
+                };
+                merged_header_ptr->add_rg(new_read_group_id, rg_data, kv_pairs);
+                rg_to_attrs_lut[new_read_group_id] = read_attrs;
+            }
+        }
     }
 
     // Add the new read attrs and merge the headers for each output
     // file only including the read groups that will be used.
-    SamHdrPtr hdr(sam_hdr_init());
     for (const auto& [read_group_id, read_attrs] : rg_to_attrs_lut) {
-        (*m_read_group_to_attributes)[read_group_id] = read_attrs;
+        m_read_group_to_attributes[read_group_id] = read_attrs;
         merged_headers[read_attrs]->add_header(hdr.get(), path.string(), read_group_id);
     }
 }
@@ -294,22 +373,6 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
         throw std::runtime_error("Could not open header for mapping");
     }
 
-    {
-        KString tag_wrapper(100000);
-        auto& tag_value = tag_wrapper.get();
-        int num_rg_lines = sam_hdr_count_lines(header.get(), "RG");
-        for (int i = 0; i < num_rg_lines; ++i) {
-            if (sam_hdr_find_tag_pos(header.get(), "RG", i, "SM", &tag_value) == 0) {
-                m_has_barcodes = true;
-                break;
-            }
-            if (sam_hdr_find_tag_pos(header.get(), "RG", i, "al", &tag_value) == 0) {
-                m_has_barcodes = true;
-                break;
-            }
-        }
-    }
-
     const auto header_lines = utils::parse_header(*header.get(), {utils::HeaderLineType::RG});
 
     // Map read group ids to ReadAttributes (struct containing file naming parameters)
@@ -325,14 +388,87 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
 
     // Add the new read attrs and merge the headers for each output
     // file only including the read groups that will be used.
-    for (const auto& [read_group_id, read_attrs] : rg_to_attrs_lut) {
-        (*m_read_group_to_attributes)[read_group_id] = read_attrs;
-
-        auto& merged_header_ptr = merged_headers[read_attrs];
-        if (!merged_header_ptr) {
-            merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+    for (auto [read_group_id, read_attrs] : rg_to_attrs_lut) {
+        if (m_kit_name.has_value()) {
+            if (read_attrs.barcode_id.empty()) {
+                read_attrs.barcode_id = "unclassified";
+            }
         }
-        merged_header_ptr->add_header(header.get(), path.string(), read_group_id);
+        m_read_group_to_attributes[read_group_id] = read_attrs;
+        m_has_barcodes |= !read_attrs.barcode_id.empty();
+        m_has_barcodes |= !read_attrs.barcode_alias.empty();
+        {
+            auto& merged_header_ptr = merged_headers[read_attrs];
+            if (!merged_header_ptr) {
+                merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+            }
+            merged_header_ptr->add_header(header.get(), path.string(), read_group_id);
+        }
+    }
+
+    if (!m_kit_name.has_value()) {
+        return;
+    }
+
+    auto unclassified_rg_it =
+            std::find_if(std::begin(m_read_group_to_attributes),
+                         std::end(m_read_group_to_attributes), [](const auto& rg_attr_pair) {
+                             return rg_attr_pair.second.barcode_id == "unclassified";
+                         });
+    if (unclassified_rg_it == std::end(m_read_group_to_attributes)) {
+        return;
+    }
+
+    KString rg_line_wrapper(100000);
+    auto& rg_line = rg_line_wrapper.get();
+
+    auto [read_group_id, read_attrs] = *unclassified_rg_it;
+    const auto& kit_info_map = barcode_kits::get_kit_infos();
+    auto kit_info = kit_info_map.find(*m_kit_name);
+    auto last_read_group_id = read_group_id;
+    for (const auto& barcode_name : kit_info->second.barcodes) {
+        const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
+        read_attrs.barcode_id = normalized_barcode_name;
+
+        const auto standard_barcode_name =
+                barcode_kits::generate_standard_barcode_name(*m_kit_name, barcode_name);
+        std::string alias;
+        if (m_sample_sheet) {
+            if (!m_sample_sheet->barcode_is_permitted(normalized_barcode_name)) {
+                continue;
+            }
+            alias = m_sample_sheet->get_alias(read_attrs.flowcell_id, read_attrs.position_id,
+                                              read_attrs.experiment_id, normalized_barcode_name);
+            read_attrs.barcode_alias = alias;
+        }
+        auto new_read_group_id =
+                read_group_id + "_" + (alias.empty() ? standard_barcode_name : alias);
+        if (sam_hdr_find_line_id(header.get(), "RG", "ID", new_read_group_id.c_str(), &rg_line) ==
+            0) {
+            continue;
+        }
+        sam_hdr_update_line(header.get(), "RG", "ID", last_read_group_id.c_str(), "SM",
+                            normalized_barcode_name.c_str(), "al",
+                            alias.empty() ? normalized_barcode_name.c_str() : alias.c_str(), "ID",
+                            new_read_group_id.c_str(), "bk", m_kit_name->c_str(), "BC",
+                            get_barcode_sequence(barcode_name).c_str(), nullptr);
+        last_read_group_id = new_read_group_id;
+
+        m_read_group_to_attributes[new_read_group_id] = read_attrs;
+        {
+            auto& merged_header_ptr = merged_headers[read_attrs];
+            if (!merged_header_ptr) {
+                merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
+            }
+            merged_header_ptr->add_header(header.get(), path.string(), new_read_group_id);
+        }
+    }
+}
+
+void HeaderMapper::finalize_merge() {
+    // Finalize the headers
+    for (const auto& [_, merged_header_ptr] : *m_merged_headers_map) {
+        merged_header_ptr->finalize_merge();
     }
 }
 
@@ -377,6 +513,12 @@ std::unordered_map<std::string, HtsData::ReadAttributes> HeaderMapper::get_read_
         assign_not_empty(attrs.sample_id, get_tag("LB", tags));
         assign_not_empty(attrs.barcode_id, get_tag("SM", tags));
         assign_not_empty(attrs.barcode_alias, get_tag("al", tags));
+        if (attrs.barcode_alias == attrs.barcode_id) {
+            // File headers may have both the barcode and alias set to the same value
+            // But when we classify we leave the alias blank if it is unused, so clear it here to match
+            attrs.barcode_alias.clear();
+        }
+
         // TODO: position_id is not in the specification yet
 
         const auto& tag_it = tags.find("DS");
@@ -404,8 +546,8 @@ const HtsData::ReadAttributes& HeaderMapper::get_read_attributes(const bam1_t* r
     }
 
     // Lookup the ReadAttributes for this read_group
-    const auto attr_it = m_read_group_to_attributes->find(read_group);
-    if (attr_it == m_read_group_to_attributes->cend()) {
+    const auto attr_it = m_read_group_to_attributes.find(read_group);
+    if (attr_it == m_read_group_to_attributes.cend()) {
         return m_fallback_read_attrs;
     }
 

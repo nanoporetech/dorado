@@ -256,7 +256,8 @@ int aligner(int argc, char* argv[]) {
     bool strip_input_alignments = true;
     std::unique_ptr<utils::HeaderMapper> header_mapper;
     if (!reads.empty()) {
-        header_mapper = std::make_unique<utils::HeaderMapper>(all_files, strip_input_alignments);
+        header_mapper = std::make_unique<utils::HeaderMapper>(all_files, std::nullopt, nullptr,
+                                                              strip_input_alignments);
         has_barcoding = header_mapper->has_barcodes();
     }
 

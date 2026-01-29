@@ -100,8 +100,8 @@ CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
             {"0a73e955b30dc4b0182e1abb710bca268b16d689_dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
              expected_test_data_attr}};
 
-    utils::HeaderMapper mapper({sam, bam}, false);
-    const auto &result_attrs_map = *mapper.get_read_attributes_map();
+    utils::HeaderMapper mapper({sam, bam}, std::nullopt, nullptr, false);
+    const auto &result_attrs_map = mapper.get_read_attributes_map();
     CATCH_CHECK(result_attrs_map.size() == expected.size());
 
     for (const auto &[expected_id, expected_attrs] : expected) {
@@ -122,7 +122,7 @@ CATCH_TEST_CASE(TEST_GROUP " fallback for BAM without RG lines", TEST_GROUP) {
     auto temp_dir = dorado::tests::make_temp_dir("header_mapper_no_rg");
     auto bam_path = write_bam_without_rg(temp_dir.m_path, "no_rg.bam");
 
-    utils::HeaderMapper mapper({bam_path}, false);
+    utils::HeaderMapper mapper({bam_path}, std::nullopt, nullptr, false);
     HtsReader reader(bam_path.string(), std::nullopt);
     CATCH_REQUIRE(reader.read());
 
@@ -141,7 +141,7 @@ CATCH_TEST_CASE(TEST_GROUP " fallback merges multiple BAMs without RG lines", TE
     auto second_bam = write_bam_without_rg(temp_dir.m_path, "no_rg_two.bam");
 
     // Map headers for both files
-    utils::HeaderMapper mapper({first_bam, second_bam}, false);
+    utils::HeaderMapper mapper({first_bam, second_bam}, std::nullopt, nullptr, false);
 
     // Load attrs and headers of each
     HtsReader first_reader(first_bam.string(), std::nullopt);

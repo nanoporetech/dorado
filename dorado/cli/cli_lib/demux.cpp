@@ -303,20 +303,16 @@ int demuxer(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    auto header_mapper = utils::HeaderMapper(all_files, strip_alignment);
+    std::optional<std::string> barcode_kit;
+    const utils::SampleSheet* sample_sheet = nullptr;
+    if (barcoding_info) {
+        barcode_kit = barcoding_info->kit_name;
+        sample_sheet = barcoding_info->sample_sheet.get();
+    }
+    auto header_mapper = utils::HeaderMapper(all_files, barcode_kit, sample_sheet, strip_alignment);
     auto add_pg_hdr = utils::HeaderMapper::Modifier(
             [&args](sam_hdr_t* hdr) { cli::add_pg_hdr(hdr, "demux", args, "cpu"); });
-    auto update_barcode_rg_groups = utils::HeaderMapper::Modifier([&](sam_hdr_t* hdr) {
-        if (!barcoding_info) {
-            return;
-        }
-
-        auto found_read_groups = utils::parse_read_groups(hdr);
-        utils::add_rg_headers_with_barcode_kit(hdr, found_read_groups, barcoding_info->kit_name,
-                                               barcoding_info->sample_sheet.get());
-    });
     header_mapper.modify_headers(add_pg_hdr);
-    header_mapper.modify_headers(update_barcode_rg_groups);
 
     // Set the dynamic header map
     pipeline->get_node_ref<WriterNode>(writer_node)
