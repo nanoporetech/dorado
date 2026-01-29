@@ -78,7 +78,7 @@ private:
 
     void process_bam(const std::filesystem::path& path);
     void process_fastx(const std::filesystem::path& path);
-
+    void add_barcodes();
     void finalize_merge();
 
     AttributeMap get_read_attrs_by_id(const std::vector<utils::HeaderLineData>& header_lines);
