@@ -111,6 +111,10 @@ HeaderMapper::HeaderMapper(std::optional<std::string> kit_name,
           m_sample_sheet(sample_sheet),
           m_strip_alignment(strip_alignment),
           m_merged_headers_map(std::make_shared<HeaderMapper::HeaderMap>()) {
+    if (m_kit_name.has_value()) {
+        m_fallback_read_attrs.barcode_id = "unclassified";
+        m_read_group_to_attributes[""] = m_fallback_read_attrs;
+    }
     m_merged_headers_map->emplace(m_fallback_read_attrs,
                                   std::make_unique<MergeHeaders>(m_strip_alignment));
 }
@@ -348,13 +352,14 @@ void HeaderMapper::add_barcodes() {
             SamHdrPtr header(sam_hdr_dup(base_header->get_merged_header()));
             auto new_read_group_id =
                     read_group_id + "_" + (alias.empty() ? standard_barcode_name : alias);
-            sam_hdr_update_line(header.get(), "RG", "ID", last_read_group_id.c_str(), "SM",
-                                normalized_barcode_name.c_str(), "al",
-                                alias.empty() ? normalized_barcode_name.c_str() : alias.c_str(),
-                                "ID", new_read_group_id.c_str(), "bk", m_kit_name->c_str(), "BC",
-                                get_barcode_sequence(barcode_name).c_str(), nullptr);
+            if (!read_group_id.empty()) {
+                sam_hdr_update_line(header.get(), "RG", "ID", last_read_group_id.c_str(), "SM",
+                                    normalized_barcode_name.c_str(), "al",
+                                    alias.empty() ? normalized_barcode_name.c_str() : alias.c_str(),
+                                    "ID", new_read_group_id.c_str(), "bk", m_kit_name->c_str(),
+                                    "BC", get_barcode_sequence(barcode_name).c_str(), nullptr);
+            }
             last_read_group_id = new_read_group_id;
-
             rg_to_attrs_lut[new_read_group_id] = read_attrs;
 
             merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);

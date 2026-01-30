@@ -85,7 +85,7 @@ private:
 
     // Store this fallback for when we don't find a read group
     // This can happen when a FASTQ has no header metadata
-    const HtsData::ReadAttributes m_fallback_read_attrs{};
+    HtsData::ReadAttributes m_fallback_read_attrs{};
 
     const std::optional<std::string> m_kit_name;
     const utils::SampleSheet* const m_sample_sheet;
