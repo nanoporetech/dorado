@@ -100,167 +100,55 @@ CATCH_TEST_CASE("convert_variants", TEST_GROUP) {
 
     // clang-format off
     const std::vector<TestCase> test_cases {
+        TestCase{"Empty input", {}, 0, 2, 3.0f, {}},
         TestCase{
-            .name = "Empty input",
-            .kadayashi_variants = {},
-            .seq_id = 0,
-            .ploidy = 2,
-            .pass_min_qual = 3.0f,
-            .expected = {},
-        },
-        TestCase{
-            .name = "Single hom variant",
-            .kadayashi_variants = {
-                kadayashi::variant_dorado_style_t{
-                    .is_confident = true,
-                    .is_phased = true,
-                    .pos = 5,
-                    .qual = 60,
-                    .ref = "A",
-                    .alts = {"T"},
-                    .genotype = {1, 1},
-                },
+            "Single hom variant",
+            {
+                kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}},
             },
-            .seq_id = 123,
-            .ploidy = 2,
-            .pass_min_qual = 3.0f,
-            .expected = {
-                secondary::Variant {
-                    .seq_id = 123,
-                    .pos = 5,
-                    .ref = "A",
-                    .alts = {"T"},
-                    .filter = "PASS",
-                    .info = {},
-                    .qual = 60.0f,
-                    .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
-                    .rstart = 0,
-                    .rend = 0,
-                },
+            123, 2, 3.0f,
+            {
+                secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}}, 0, 0},
             },
         },
         TestCase{
-            .name = "Single het variant where one alt matches the ref",
-            .kadayashi_variants = {
-                kadayashi::variant_dorado_style_t{
-                    .is_confident = true,
-                    .is_phased = true,
-                    .pos = 5,
-                    .qual = 60,
-                    .ref = "A",
-                    .alts = {"T"},
-                    .genotype = {0, 1},
-                },
+            "Single het variant where one alt matches the ref",
+            {
+                kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1} },
             },
-            .seq_id = 123,
-            .ploidy = 2,
-            .pass_min_qual = 3.0f,
-            .expected = {
-                secondary::Variant {
-                    .seq_id = 123,
-                    .pos = 5,
-                    .ref = "A",
-                    .alts = {"T"},
-                    .filter = "PASS",
-                    .info = {},
-                    .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}},
-                    .rstart = 0,
-                    .rend = 0,
-                },
+            123, 2, 3.0f,
+            {
+                secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}}, 0, 0},
             },
         },
         TestCase{
-            .name = "Single het variant where both alts differ from ref",
-            .kadayashi_variants = {
-                kadayashi::variant_dorado_style_t{
-                    .is_confident = true,
-                    .is_phased = true,
-                    .pos = 5,
-                    .qual = 60,
-                    .ref = "A",
-                    .alts = {"T", "C"},
-                    .genotype = {0, 1},
-                },
+            "Single het variant where both alts differ from ref",
+            {
+                kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}},
             },
-            .seq_id = 123,
-            .ploidy = 2,
-            .pass_min_qual = 3.0f,
-            .expected = {
-                secondary::Variant {
-                    .seq_id = 123,
-                    .pos = 5,
-                    .ref = "A",
-                    .alts = {"C", "T"},
-                    .filter = "PASS",
-                    .info = {},
-                    .qual = 60.0f,
-                    .genotype = {{"GT", "1/2"}, {"GQ", "60"}},
-                    .rstart = 0,
-                    .rend = 0,
-                },
+            123, 2, 3.0f,
+            {
+                secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}}, 0, 0},
             },
         },
         TestCase{
-            .name = "Malformed input, there are no alts. Return a '.' as the alt and the filter so this variant can be filtered out later.",
-            .kadayashi_variants = {
-                kadayashi::variant_dorado_style_t{
-                    .is_confident = true,
-                    .is_phased = true,
-                    .pos = 5,
-                    .qual = 60,
-                    .ref = "A",
-                    .alts = {},
-                    .genotype = {0, 1},
-                },
+            "Malformed input, there are no alts. Return a '.' as the alt and the filter so this variant can be filtered out later.",
+            {
+                kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}},
             },
-            .seq_id = 123,
-            .ploidy = 2,
-            .pass_min_qual = 3.0f,
-            .expected = {
-                secondary::Variant {
-                    .seq_id = 123,
-                    .pos = 5,
-                    .ref = "A",
-                    .alts = {"."},
-                    .filter = ".",
-                    .info = {},
-                    .qual = 60.0f,
-                    .genotype = {{"GT", "0"}, {"GQ", "60"}},
-                    .rstart = 0,
-                    .rend = 0,
-                },
+            123, 2, 3.0f,
+            {
+                secondary::Variant{123, 5, "A", {"."}, ".", {}, 60.0f, {{"GT", "0"}, {"GQ", "60"}}, 0, 0},
             },
         },
         TestCase{
-            .name = "Check that is_confident and is_phased play no impact on conversion (they should be ignored). Otherwise, same as the hom test ase above.",
-            .kadayashi_variants = {
-                kadayashi::variant_dorado_style_t{
-                    .is_confident = false,
-                    .is_phased = false,
-                    .pos = 5,
-                    .qual = 60,
-                    .ref = "A",
-                    .alts = {"T"},
-                    .genotype = {1, 1},
-                },
+            "Check that is_confident and is_phased play no impact on conversion (they should be ignored). Otherwise, same as the hom test ase above.",
+            {
+                kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}},
             },
-            .seq_id = 123,
-            .ploidy = 2,
-            .pass_min_qual = 3.0f,
-            .expected = {
-                secondary::Variant {
-                    .seq_id = 123,
-                    .pos = 5,
-                    .ref = "A",
-                    .alts = {"T"},
-                    .filter = "PASS",
-                    .info = {},
-                    .qual = 60.0f,
-                    .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
-                    .rstart = 0,
-                    .rend = 0,
-                },
+            123, 2, 3.0f,
+            {
+                secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}}, 0, 0},
             },
         },
     };
@@ -303,76 +191,26 @@ CATCH_TEST_CASE("haplotag_regions_in_parallel", TEST_GROUP) {
 
     // clang-format off
     const std::vector<TestCase> test_cases {
+        TestCase{"Empty input, empty output", {}, {}, 1, 2, 2, 3.0f, {}, false},
+        TestCase{"Zero encoders, should throw", {}, {}, 0, 2, 2, 3.0f, {}, true},
+        TestCase{"Zero threads, should throw", {}, {}, 2, 0, 2, 3.0f, {}, true},
+        TestCase{"Zero ploidy, should throw", {}, {}, 2, 2, 0, 3.0f, {}, true},
         TestCase{
-                .name = "Empty input, empty output",
-                .regions = {},
-                .draft_lens = {},
-                .num_encoders = 1,
-                .num_threads = 2,
-                .ploidy = 2,
-                .pass_min_qual = 3.0f,
-                .expected = {},
-                .expect_throw = false,
-        },
-        TestCase{
-                .name = "Zero encoders, should throw",
-                .regions = {},
-                .draft_lens = {},
-                .num_encoders = 0,
-                .num_threads = 2,
-                .ploidy = 2,
-                .pass_min_qual = 3.0f,
-                .expected = {},
-                .expect_throw = true,
-        },
-        TestCase{
-                .name = "Zero threads, should throw",
-                .regions = {},
-                .draft_lens = {},
-                .num_encoders = 2,
-                .num_threads = 0,
-                .ploidy = 2,
-                .pass_min_qual = 3.0f,
-                .expected = {},
-                .expect_throw = true,
-        },
-        TestCase{
-                .name = "Zero ploidy, should throw",
-                .regions = {},
-                .draft_lens = {},
-                .num_encoders = 2,
-                .num_threads = 2,
-                .ploidy = 0,
-                .pass_min_qual = 3.0f,
-                .expected = {},
-                .expect_throw = true,
-        },
-        TestCase{
-                .name = "Normal case",
-                .regions = {
+                "Normal case",
+                {
                     secondary::Window{
-                        .seq_id = 0,
-                        .start = 0,
-                        .end = 300,
+                        /*seq_id*/ 0, 10000, /*start*/ 0, /*end*/ 300, 0, 0, -1
                     },
                     secondary::Window{
-                        .seq_id = 0,
-                        .start = 1000,
-                        .end = 1800,
+                        /*seq_id*/ 0, 10000, /*start*/ 1000, /*end*/ 1800, 0, 0, -1
                     },
                     secondary::Window{
-                        .seq_id = 0,
-                        .start = 7000,
-                        .end = 7500,
+                        /*seq_id*/ 0, 10000, /*start*/ 7000, /*end*/ 7500, 0, 0, -1
                     },
                 },
-                .draft_lens = loaded_draft_lens,
-                .num_encoders = 2,
-                .num_threads = 2,
-                .ploidy = 2,
-                .pass_min_qual = 3.0f,
-                .expected = {
-                    .region_haplotags = {
+                loaded_draft_lens, 2, 2, 2, 3.0f,
+                {
+                    /*.region_haplotags =*/ {
                         {
                             {"563ecca1-30dd-4dd9-991a-d417d827c803", 1},
                             {"02551418-20c9-4b4b-9d1b-9bee36342895", 2},
@@ -440,41 +278,30 @@ CATCH_TEST_CASE("haplotag_regions_in_parallel", TEST_GROUP) {
                             {"dbe9785a-fa25-454c-9960-fd65fb99a040", 2},
                         },
                     },
-                    .candidate_sites = {{"chr20", {1002, 1613, 1619}}},
-                    .merged_pass_variants = {
+                    /*.candidate_sites =*/ {{"chr20", {1002, 1613, 1619}}},
+                    /*.merged_pass_variants =*/ {
                         secondary::Variant{0,   93, "C", {"T"}, {"PASS"}, {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}}, 0, 0},
                         secondary::Variant{0, 1471, "T", {"G"}, {"PASS"}, {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}}, 0, 0},
                         secondary::Variant{0, 7429, "C", {"T"}, {"PASS"}, {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}}, 0, 0},
                     },
                 },
-                .expect_throw = false,
+                false,
         },
         TestCase{
-                .name = "Sequence ID out of bounds for one region, should throw",
-                .regions = {
+                "Sequence ID out of bounds for one region, should throw",
+                {
                     secondary::Window{
-                        .seq_id = 0,
-                        .start = 0,
-                        .end = 300,
+                        /*seq_id*/ 0, 10000, /*start*/ 0, /*end*/ 300, 0, 0, -1
                     },
                     secondary::Window{
-                        .seq_id = 0,
-                        .start = 1000,
-                        .end = 1800,
+                        /*seq_id*/ 0, 10000, /*start*/ 1000, /*end*/ 1800, 0, 0, -1
                     },
+                    // There is only one draft sequence, but specified seq_id = 5 here.
                     secondary::Window{
-                        .seq_id = 5,            // There is only one draft sequence, but specified seq_id = 5 here.
-                        .start = 7000,
-                        .end = 7500,
+                        /*seq_id*/ 5, 10000, /*start*/ 7000, /*end*/ 7500, 0, 0, -1
                     },
                 },
-                .draft_lens = loaded_draft_lens,
-                .num_encoders = 2,
-                .num_threads = 2,
-                .ploidy = 2,
-                .pass_min_qual = 3.0f,
-                .expected = {},
-                .expect_throw = true,
+                loaded_draft_lens, 2, 2, 2, 3.0f, {}, true,
         },
     };
     // clang-format on
