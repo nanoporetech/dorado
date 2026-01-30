@@ -451,6 +451,24 @@ ReadAlignmentData calculate_read_alignment(
             const auto it = read_map.find(qname);
             int32_t read_i = (it == std::end(read_map)) ? -1 : it->second;
             if (read_i < 0) {
+                // Try to determine position to insert this read.
+                const int32_t array_size = static_cast<int32_t>(std::size(read_array));
+                if (!row_per_read) {
+                    for (read_i = 0; read_i < array_size; ++read_i) {
+                        if (pos >= (read_array[read_i].ref_end + MIN_GAP)) {
+                            read_array[read_i] = {};
+                            break;
+                        }
+                    }
+                } else {
+                    // Always append if row_per_read is true.
+                    read_i = array_size;
+                }
+                if (read_i >= pileup.buffer_reads) {
+                    // No space to include this read in the pileup so skip it.
+                    continue;
+                }
+
                 // get dtype tag
                 int32_t dtype = 0;
                 bool failed = false;
@@ -509,27 +527,12 @@ ReadAlignmentData calculate_read_alignment(
                         .dwells = std::move(dwells),
                 };
 
-                // insert read into read_array in place of a read that's already completed
-                const int32_t array_size = static_cast<int32_t>(std::size(read_array));
-                if (!row_per_read) {
-                    for (read_i = 0; read_i < array_size; ++read_i) {
-                        const Read &current_read = read_array[read_i];
-                        if (pos >= (current_read.ref_end + MIN_GAP)) {
-                            read_array[read_i] = std::move(read);
-                            read_map[qname] = read_i;
-                            break;
-                        }
-                    }
+                // Insert read into read_array at position read_i, or append.
+                read_map[qname] = read_i;
+                if (read_i < array_size) {
+                    read_array[read_i] = std::move(read);
                 } else {
-                    read_i = array_size;
-                }
-
-                // no completed reads, append instead
-                if (read_i == array_size) {
-                    if (read_i < pileup.buffer_reads) {
-                        read_array.emplace_back(std::move(read));
-                    }
-                    read_map[qname] = read_i;
+                    read_array.emplace_back(std::move(read));
                 }
             }
 
