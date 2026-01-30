@@ -526,12 +526,12 @@ void validate_options(const Options& opt) {
     }
     if (!std::filesystem::exists(opt.in_aln_bam_fn) ||
         std::filesystem::is_empty(opt.in_aln_bam_fn)) {
-        spdlog::error("Input file {} does not exist or is empty.", opt.in_aln_bam_fn.string());
+        spdlog::error("Input file '{}' does not exist or is empty.", opt.in_aln_bam_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_ref_fastx_fn) ||
         std::filesystem::is_empty(opt.in_ref_fastx_fn)) {
-        spdlog::error("Input file {} does not exist or is empty.", opt.in_ref_fastx_fn.string());
+        spdlog::error("Input file '{}' does not exist or is empty.", opt.in_ref_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (opt.batch_size < 0) {
@@ -586,7 +586,7 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.phasing_bin_path && !std::filesystem::exists(*opt.phasing_bin_path)) {
-        spdlog::error("Phasing bin path file {} does not exist.", opt.phasing_bin_path->string());
+        spdlog::error("Phasing bin path file '{}' does not exist.", opt.phasing_bin_path->string());
         std::exit(EXIT_FAILURE);
     }
 
@@ -599,7 +599,7 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
-        spdlog::error("Candidate site file {} does not exist.",
+        spdlog::error("Candidate site file '{}' does not exist.",
                       opt.candidate_variants_path->string());
         std::exit(EXIT_FAILURE);
     }
@@ -633,7 +633,7 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
-        spdlog::error("Candidate site file {} does not exist.",
+        spdlog::error("Candidate site file '{}' does not exist.",
                       opt.candidate_variants_path->string());
         std::exit(EXIT_FAILURE);
     }
@@ -643,7 +643,7 @@ std::filesystem::path download_model(const std::string& model_name) {
     const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
     const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
     if (!success) {
-        spdlog::error("Could not download model: {}", model_name);
+        spdlog::error("Could not download model: '{}'", model_name);
         std::exit(EXIT_FAILURE);
     }
     return (tmp_dir / model_name);
@@ -738,19 +738,19 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0
         const std::string model_name = determine_model_name(basecaller_model);
 
-        spdlog::debug("Resolved model from input data: {}", model_name);
+        spdlog::debug("Resolved model from input data: '{}'", model_name);
 
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
     } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
-        spdlog::debug("Resolved model from user-specified path: {}", model_str);
+        spdlog::debug("Resolved model from user-specified path: '{}'", model_str);
         spdlog::info("Model specified by path: '{}'", model_str);
         model_dir = model_str;
 
     } else if (count_model_hits(models::variant_models(), model_str) == 1) {
         const std::string& model_name = model_str;
-        spdlog::debug("Resolved model from user-specified variant calling model name: {}",
+        spdlog::debug("Resolved model from user-specified variant calling model name: '{}'",
                       model_name);
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
@@ -762,7 +762,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0
         const std::string model_name = determine_model_name(basecaller_model);
 
-        spdlog::debug("Resolved model from user-specified basecaller model name: {}", model_name);
+        spdlog::debug("Resolved model from user-specified basecaller model name: '{}'", model_name);
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
@@ -771,7 +771,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     }
 
     // Load the model.
-    spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
+    spdlog::info("Parsing the model config: '{}'", (model_dir / "config.toml").string());
     const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
     secondary::ModelConfig model_config =
             secondary::parse_model_config(model_dir / "config.toml", model_file);
