@@ -959,9 +959,7 @@ std::vector<secondary::Variant> merge_variants(
         new_variants.emplace_back(var);
     }
 
-    std::sort(std::begin(new_variants), std::end(new_variants), [](const auto& a, const auto& b) {
-        return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
-    });
+    std::sort(std::begin(new_variants), std::end(new_variants));
 
     return new_variants;
 }
@@ -1272,17 +1270,12 @@ void run_variant_calling(const Options& opt,
                           std::size(variants), std::size(haplotag_results.merged_pass_variants));
 
             // Sort variants from inference.
-            std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
-                return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
-            });
+            std::sort(std::begin(variants), std::end(variants));
 
             if (opt.candidate_filtering) {
                 // Sort variants from Kadayashi.
                 std::sort(std::begin(haplotag_results.merged_pass_variants),
-                          std::end(haplotag_results.merged_pass_variants),
-                          [](const auto& a, const auto& b) {
-                              return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
-                          });
+                          std::end(haplotag_results.merged_pass_variants));
             }
 
             // Write and sort the Kadayashi variants separately.
@@ -1320,9 +1313,7 @@ void run_variant_calling(const Options& opt,
             }
 
             // Sort variants from inference.
-            std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
-                return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
-            });
+            std::sort(std::begin(variants), std::end(variants));
 
             // Write the VCF file.
             for (const secondary::Variant& variant : variants) {
