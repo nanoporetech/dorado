@@ -40,6 +40,10 @@ bool operator==(const Variant& lhs, const Variant& rhs) {
                                           rhs.info, rhs.qual, rhs.genotype, rhs.rstart, rhs.rend);
 }
 
+bool operator<(const Variant& lhs, const Variant& rhs) {
+    return std::tie(lhs.seq_id, lhs.pos) < std::tie(rhs.seq_id, rhs.pos);
+}
+
 bool is_valid(const Variant& var) {
     if (std::empty(var.ref)) {
         return false;
