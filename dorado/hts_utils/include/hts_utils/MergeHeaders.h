@@ -66,7 +66,7 @@ public:
      */
     bool add_rg(const std::string& read_group_id,
                 const ReadGroup& read_group,
-                std::map<std::string, std::string> additional_tags);
+                const std::map<std::string, std::string>& additional_tags);
 
     // Call this when you have added all the headers.
     void finalize_merge();

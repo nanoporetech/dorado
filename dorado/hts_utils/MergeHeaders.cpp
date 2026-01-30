@@ -25,7 +25,9 @@ std::string kv_to_tag_string(const std::map<std::string, std::string>& additiona
     std::string result;
     for (const auto& [key, value] : additional_tags) {
         result.append("\t");
-        result.append(key + ":" + value);
+        result.append(key);
+        result.append(":");
+        result.append(value);
     }
     return result;
 }
@@ -300,7 +302,7 @@ bool MergeHeaders::add_rg(const std::string& read_group_id, std::string read_gro
 
 bool MergeHeaders::add_rg(const std::string& read_group_id,
                           const ReadGroup& read_group,
-                          std::map<std::string, std::string> additional_tags) {
+                          const std::map<std::string, std::string>& additional_tags) {
     auto additional_tag_str = kv_to_tag_string(additional_tags);
     return add_rg(read_group_id, utils::format_read_group_header_line(read_group, read_group_id,
                                                                       additional_tag_str));
