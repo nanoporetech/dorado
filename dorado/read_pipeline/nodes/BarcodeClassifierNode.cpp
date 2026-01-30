@@ -139,7 +139,7 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     read.read_attrs.barcode_id =
             barcode_kits::normalize_barcode_name(read.barcoding_result->barcode_name);
-    read.read_attrs.barcode_alias = bc_res.alias;
+    read.read_attrs.barcode_alias = read.barcoding_result->alias;
     utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
     if (bc != UNCLASSIFIED_BARCODE) {
         bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
