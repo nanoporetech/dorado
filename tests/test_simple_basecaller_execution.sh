@@ -672,6 +672,12 @@ test_barcoding_read_groups() (
             echo "Barcoding read group '${barcode}' has incorrect number of reads. '${bam}': ${num_read_groups} != ${expected}"
             exit 1
         fi
+
+        num_rg_lines=$(samtools view -H ${bam} | grep "@RG" | wc -l)
+        if [[ $num_rg_lines -ne 1 ]]; then
+            echo "Barcoding read group '${barcode}' has incorrect number of RG headers. '${bam}': ${num_rg_lines} != 1"
+            exit 1
+        fi
         exit 0
     )
 
