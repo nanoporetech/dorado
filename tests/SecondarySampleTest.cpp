@@ -187,4 +187,103 @@ CATCH_TEST_CASE("slice_sample: error, wrong length of the positions_minor vector
     CATCH_CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
 }
 
+CATCH_TEST_CASE("find_max_depth", TEST_GROUP) {
+    // Create a mock sample.
+    Sample sample;
+    sample.seq_id = 1;
+    sample.features = torch::tensor({{1, 2, 3, 4, 5},
+                                     {6, 7, 8, 9, 10},
+                                     {11, 12, 13, 14, 15},
+                                     {16, 17, 18, 19, 20},
+                                     {21, 22, 23, 24, 25},
+                                     {26, 27, 28, 29, 30},
+                                     {31, 32, 33, 34, 35},
+                                     {36, 37, 38, 39, 40},
+                                     {41, 42, 43, 44, 45},
+                                     {46, 47, 48, 49, 50}},
+                                    torch::kInt32);
+    sample.positions_major = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
+    sample.positions_minor = {10, 11, 12, 13, 14, 15, 16, 17, 18, 19};
+    sample.depth = torch::tensor({1, 2, 2, 3, 2, 5, 2, 1, 0, 11}, torch::kInt64);
+
+    CATCH_SECTION("Throws. Entire range") {
+        // Inputs.i
+        const int64_t idx_start = 0;
+        const int64_t idx_end = 10;
+
+        // Run.
+        const int64_t result = sample.find_max_depth(idx_start, idx_end);
+
+        // Expected results.
+        constexpr int64_t EXPECTED = 11;
+
+        // Evaluate.
+        CATCH_CHECK(result == EXPECTED);
+    }
+
+    CATCH_SECTION("Subrange") {
+        // Inputs.i
+        const int64_t idx_start = 6;
+        const int64_t idx_end = 9;
+
+        // Run.
+        const int64_t result = sample.find_max_depth(idx_start, idx_end);
+
+        // Expected results.
+        constexpr int64_t EXPECTED = 2;
+
+        // Evaluate.
+        CATCH_CHECK(result == EXPECTED);
+    }
+
+    CATCH_SECTION(
+            "Throws. Float depth data type. This should throw because depth should be integral.") {
+        // Inputs.i
+        Sample sample2 = sample;
+        sample2.depth = torch::tensor({1.0f, 2.0f, 2.0f, 3.0f, 2.0f, 5.0f, 2.0f, 1.0f, 0.0f, 11.0f},
+                                      torch::kFloat);
+        const int64_t idx_start = 0;
+        const int64_t idx_end = 10;
+
+        // Run.
+        CATCH_CHECK_THROWS(sample2.find_max_depth(idx_start, idx_end));
+    }
+
+    CATCH_SECTION("Throws. Start index < 0") {
+        // Inputs.i
+        const int64_t idx_start = -1;
+        const int64_t idx_end = 9;
+
+        // Run.
+        CATCH_CHECK_THROWS(sample.find_max_depth(idx_start, idx_end));
+    }
+
+    CATCH_SECTION("Throws. Emd index < start index") {
+        // Inputs.i
+        const int64_t idx_start = 5;
+        const int64_t idx_end = 4;
+
+        // Run.
+        CATCH_CHECK_THROWS(sample.find_max_depth(idx_start, idx_end));
+    }
+
+    CATCH_SECTION("Throws. Emd index == start index") {
+        // Inputs.i
+        const int64_t idx_start = 5;
+        const int64_t idx_end = 5;
+
+        // Run.
+        CATCH_CHECK_THROWS(sample.find_max_depth(idx_start, idx_end));
+    }
+
+    CATCH_SECTION("Throws. End index > length.") {
+        // Inputs.i
+        const int64_t idx_start = 5;
+        const int64_t idx_end = 11;
+
+        // Run.
+        CATCH_CHECK_THROWS(sample.find_max_depth(idx_start, idx_end));
+    }
+}
+
 }  // namespace dorado::secondary::sample::tests
