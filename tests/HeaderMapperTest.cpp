@@ -241,6 +241,10 @@ CATCH_TEST_CASE(TEST_GROUP " barcode kit adds barcoded read groups headers", TES
     CATCH_REQUIRE(merged_headers_map != nullptr);
     CATCH_CHECK(merged_headers_map->size() ==
                 75);  // (2 read groups + fallback) * (24 barcodes + unclassified) = 3 * 25
+
+    auto merged_header = mapper.get_shared_merged_header(true);
+    int num_read_groups = sam_hdr_count_lines(merged_header.get(), "RG");
+    CATCH_CHECK(num_read_groups == 50);  // no fallback
 }
 
 };  // namespace dorado::utils::test
