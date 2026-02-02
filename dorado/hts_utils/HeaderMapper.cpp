@@ -324,7 +324,6 @@ void HeaderMapper::add_barcodes() {
         const auto& base_header = merged_headers[read_attrs];
         const auto& kit_info_map = barcode_kits::get_kit_infos();
         const auto& kit_info = kit_info_map.at(*m_kit_name);
-        auto last_read_group_id = read_group_id;
         for (const auto& barcode_name : kit_info.barcodes) {
             const auto normalized_barcode_name = barcode_kits::normalize_barcode_name(barcode_name);
             const auto standard_barcode_name =
@@ -353,13 +352,12 @@ void HeaderMapper::add_barcodes() {
             auto new_read_group_id =
                     read_group_id + "_" + (alias.empty() ? standard_barcode_name : alias);
             if (!read_group_id.empty()) {
-                sam_hdr_update_line(header.get(), "RG", "ID", last_read_group_id.c_str(), "SM",
+                sam_hdr_update_line(header.get(), "RG", "ID", read_group_id.c_str(), "SM",
                                     normalized_barcode_name.c_str(), "al",
                                     alias.empty() ? normalized_barcode_name.c_str() : alias.c_str(),
                                     "ID", new_read_group_id.c_str(), "bk", m_kit_name->c_str(),
                                     "BC", get_barcode_sequence(barcode_name).c_str(), nullptr);
             }
-            last_read_group_id = new_read_group_id;
             rg_to_attrs_lut[new_read_group_id] = read_attrs;
 
             merged_header_ptr = std::make_unique<MergeHeaders>(m_strip_alignment);
