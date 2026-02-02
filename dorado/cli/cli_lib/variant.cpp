@@ -13,6 +13,7 @@
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/features/haplotag_source.h"
+#include "secondary/features/variant_candidate_source.h"
 #include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
@@ -105,7 +106,6 @@ struct Options {
 
     secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
     std::optional<std::filesystem::path> phasing_bin_path;
-    std::optional<std::filesystem::path> candidate_variants_path;
     bool hp_tag_from_bam = false;
     bool unphased = false;
 
@@ -118,7 +118,16 @@ struct Options {
     int32_t tiled_ext_min_cov = 3;  // Minimum deletion coverage to trigger the extension.
     float tiled_ext_cov_fract = 0.25f;  // Fraction of deletion coverage to trigger the heuristic.
 
+    // Candidate region filtering based on candidate variants.
+    // The `candidate_filtering` enables candidate region selection (computed internally by default, or loaded from candidate_variants_path if specified).
+    bool candidate_filtering = false;
+    std::optional<std::filesystem::path> candidate_variants_path;
+    secondary::VariantCandidateSource variant_candidate_source =
+            secondary::VariantCandidateSource::COMPUTE;
+    int32_t flank_trim_len = 5;
+
     secondary::KadayashiOptions kadayashi_opt;
+    bool dump_variants = false;
 };
 
 /// \brief Define the CLI options.
@@ -283,6 +292,11 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .scan<'g', float>();
 
         // Candidate region selection options.
+        parser.add_argument("--candidate-filtering")
+                .help("Enable candidate region selection to improve runtime. If haplotag_source == "
+                      "COMPUTE, computed internally, otherwise 'phasing_bin_path' is loaded.")
+                .flag()
+                .default_value(false);
         parser.add_argument("--candidates")
                 .hidden()
                 .help("Path to a tab-separated file containing coordinates of variant candidate "
@@ -320,6 +334,13 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                       "extension heuristic.")
                 .default_value(0.25f)
                 .scan<'g', float>();
+        parser.add_argument("--flank-trim-len")
+                .hidden()
+                .help("Removes inference variants within this many bases from every edge of every "
+                      "processed region. Only applied when simple variants are computed and merged "
+                      "internally (i.e. no `--candidates` path is specified).")
+                .default_value(3)
+                .scan<'i', int>();
 
         // Kadayashi options.
         parser.add_argument("--kada-disable-interval-exp")
@@ -365,6 +386,11 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
         parser.add_argument("--kada-use-dvr")
                 .hidden()
                 .help("Use DVR for phasing for Kadayashi haplotagging/variant calling.")
+                .flag();
+        parser.add_argument("--dump-variants")
+                .hidden()
+                .help("Write individual Kadayashi and inference variants if the output is to a "
+                      "folder.")
                 .flag();
     }
 }
@@ -453,19 +479,28 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
 
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
-    opt.phasing_bin_path = parser.present<std::string>("phasing-bin");
     opt.candidate_variants_path = parser.present<std::string>("candidates");
+    opt.candidate_filtering = parser.get<bool>("candidate-filtering");
+    opt.variant_candidate_source =
+            (!opt.candidate_filtering)      ? secondary::VariantCandidateSource::NONE
+            : (opt.candidate_variants_path) ? secondary::VariantCandidateSource::FILE
+                                            : secondary::VariantCandidateSource::COMPUTE;
+
+    opt.phasing_bin_path = parser.present<std::string>("phasing-bin");
     opt.hp_tag_from_bam = parser.get<bool>("hp-tag");
     opt.unphased = parser.get<bool>("unphased");
     opt.haplotag_source = (opt.phasing_bin_path)  ? secondary::HaplotagSource::BIN_FILE
                           : (opt.hp_tag_from_bam) ? secondary::HaplotagSource::BAM_HAP_TAG
                           : (opt.unphased)        ? secondary::HaplotagSource::UNPHASED
                                                   : secondary::HaplotagSource::COMPUTE;
+
     opt.tiled_regions = parser.get<bool>("tiled-regions");
     opt.tiled_ext_flanks = parser.get<bool>("tiled-ext-flanks");
     opt.tiled_ext_major = parser.get<int>("tiled-ext-major");
     opt.tiled_ext_min_cov = parser.get<int>("tiled-ext-min-cov");
     opt.tiled_ext_cov_fract = parser.get<float>("tiled-ext-cov-fract");
+
+    opt.flank_trim_len = parser.get<int>("flank-trim-len");
 
     opt.min_snp_accuracy = parser.get<float>("min-snp-acc");
 
@@ -479,6 +514,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.kadayashi_opt.max_gapcompressed_seqdiv = parser.get<float>("kada-max-gapcomp-seq-div");
     opt.kadayashi_opt.use_dvr_for_phasing = parser.get<bool>("kada-use-dvr");
 
+    opt.dump_variants = parser.get<bool>("dump-variants");
+
     return opt;
 }
 
@@ -489,12 +526,12 @@ void validate_options(const Options& opt) {
     }
     if (!std::filesystem::exists(opt.in_aln_bam_fn) ||
         std::filesystem::is_empty(opt.in_aln_bam_fn)) {
-        spdlog::error("Input file {} does not exist or is empty.", opt.in_aln_bam_fn.string());
+        spdlog::error("Input file '{}' does not exist or is empty.", opt.in_aln_bam_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_ref_fastx_fn) ||
         std::filesystem::is_empty(opt.in_ref_fastx_fn)) {
-        spdlog::error("Input file {} does not exist or is empty.", opt.in_ref_fastx_fn.string());
+        spdlog::error("Input file '{}' does not exist or is empty.", opt.in_ref_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (opt.batch_size < 0) {
@@ -549,7 +586,7 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.phasing_bin_path && !std::filesystem::exists(*opt.phasing_bin_path)) {
-        spdlog::error("Phasing bin path file {} does not exist.", opt.phasing_bin_path->string());
+        spdlog::error("Phasing bin path file '{}' does not exist.", opt.phasing_bin_path->string());
         std::exit(EXIT_FAILURE);
     }
 
@@ -561,13 +598,42 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
 
+    if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
+        spdlog::error("Candidate site file '{}' does not exist.",
+                      opt.candidate_variants_path->string());
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (opt.candidate_filtering &&
+        (opt.variant_candidate_source == secondary::VariantCandidateSource::FILE) &&
+        !opt.candidate_variants_path) {
+        spdlog::error(
+                "Variant candidate source is set to FILE, but the input candidates file is not "
+                "specified.");
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (!opt.candidate_filtering && opt.candidate_variants_path) {
+        spdlog::error(
+                "Candidate variants path is specified as a source ('--candidates'), but candidate "
+                "filtering is not turned on ('--candidate-filtering').");
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (opt.dump_variants && std::empty(opt.output_dir)) {
+        spdlog::error(
+                "The --dump-variants option only works when the output is to a directory, but the "
+                "output directory is not specified.");
+        std::exit(EXIT_FAILURE);
+    }
+
     if ((opt.min_snp_accuracy < 0.0) || (opt.min_snp_accuracy > 1.0)) {
         spdlog::error("The --min-snp-acc value needs to be in range [0.0, 1.0]. Specified: '{}'.",
                       opt.min_snp_accuracy);
     }
 
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
-        spdlog::error("Candidate site file {} does not exist.",
+        spdlog::error("Candidate site file '{}' does not exist.",
                       opt.candidate_variants_path->string());
         std::exit(EXIT_FAILURE);
     }
@@ -577,7 +643,7 @@ std::filesystem::path download_model(const std::string& model_name) {
     const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
     const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
     if (!success) {
-        spdlog::error("Could not download model: {}", model_name);
+        spdlog::error("Could not download model: '{}'", model_name);
         std::exit(EXIT_FAILURE);
     }
     return (tmp_dir / model_name);
@@ -672,19 +738,19 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0
         const std::string model_name = determine_model_name(basecaller_model);
 
-        spdlog::debug("Resolved model from input data: {}", model_name);
+        spdlog::debug("Resolved model from input data: '{}'", model_name);
 
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
     } else if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
-        spdlog::debug("Resolved model from user-specified path: {}", model_str);
+        spdlog::debug("Resolved model from user-specified path: '{}'", model_str);
         spdlog::info("Model specified by path: '{}'", model_str);
         model_dir = model_str;
 
     } else if (count_model_hits(models::variant_models(), model_str) == 1) {
         const std::string& model_name = model_str;
-        spdlog::debug("Resolved model from user-specified variant calling model name: {}",
+        spdlog::debug("Resolved model from user-specified variant calling model name: '{}'",
                       model_name);
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
@@ -696,7 +762,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0
         const std::string model_name = determine_model_name(basecaller_model);
 
-        spdlog::debug("Resolved model from user-specified basecaller model name: {}", model_name);
+        spdlog::debug("Resolved model from user-specified basecaller model name: '{}'", model_name);
         spdlog::info("Downloading model: '{}'", model_name);
         model_dir = download_model(model_name);
 
@@ -705,7 +771,7 @@ const secondary::ModelConfig resolve_model(const secondary::BamInfo& bam_info,
     }
 
     // Load the model.
-    spdlog::info("Parsing the model config: {}", (model_dir / "config.toml").string());
+    spdlog::info("Parsing the model config: '{}'", (model_dir / "config.toml").string());
     const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
     secondary::ModelConfig model_config =
             secondary::parse_model_config(model_dir / "config.toml", model_file);
@@ -829,7 +895,77 @@ create_candidate_interval_trees(
             std::move(trees));
 }
 
+std::unordered_map<int32_t, polisher::IntervalTreeInt64> create_sample_interval_trees(
+        const std::vector<secondary::VariantCallingSample>& vc_input_data,
+        const int64_t trim_len) {
+    using IntervalInt64 = interval_tree::Interval<int64_t, int64_t>;
+
+    // Collect all the intervals.
+    std::unordered_map<int32_t, std::vector<IntervalInt64>> all_intervals;
+    for (const auto& vc_sample : vc_input_data) {
+        std::vector<IntervalInt64>& intervals = all_intervals[vc_sample.seq_id];
+        const int64_t start = vc_sample.start() + trim_len;
+        const int64_t end = vc_sample.end() - trim_len - 1;
+        if (start >= end) {
+            continue;
+        }
+        intervals.emplace_back(start, end, 0);
+    }
+
+    // Construct the trees from the intervals.
+    std::unordered_map<int32_t, polisher::IntervalTreeInt64> trees;
+    for (auto& [key, intervals] : all_intervals) {
+        trees[key] = polisher::IntervalTreeInt64(std::move(intervals));
+    }
+
+    return trees;
+}
+
+std::vector<secondary::Variant> merge_variants(
+        const std::vector<secondary::Variant>& inference_variants,
+        const std::vector<secondary::Variant>& simple_variants,
+        const std::unordered_map<int32_t, polisher::IntervalTreeInt64>& processed_regions) {
+    std::vector<secondary::Variant> new_variants;
+    new_variants.reserve(std::size(inference_variants) + std::size(simple_variants));
+
+    // Keep inference variants which are within the processed_regions.
+    for (const secondary::Variant& var : inference_variants) {
+        const auto it_seq_id = processed_regions.find(var.seq_id);
+        if (it_seq_id == std::cend(processed_regions)) {
+            continue;
+        }
+        const auto& tree = it_seq_id->second;
+        const std::vector<interval_tree::Interval<int64_t, int64_t>> region_hits =
+                tree.findOverlapping(var.pos, var.pos);
+        if (std::empty(region_hits)) {
+            continue;
+        }
+        new_variants.emplace_back(var);
+    }
+
+    // Keep Kadayashi variants which are not within the processed_regions.
+    for (const secondary::Variant& var : simple_variants) {
+        const auto it_seq_id = processed_regions.find(var.seq_id);
+        if (it_seq_id == std::cend(processed_regions)) {
+            continue;
+        }
+        const auto& tree = it_seq_id->second;
+        const std::vector<interval_tree::Interval<int64_t, int64_t>> region_hits =
+                tree.findOverlapping(var.pos, var.pos);
+        // IMPORTANT difference to the above block - negative test.
+        if (!std::empty(region_hits)) {
+            continue;
+        }
+        new_variants.emplace_back(var);
+    }
+
+    std::sort(std::begin(new_variants), std::end(new_variants));
+
+    return new_variants;
+}
+
 void run_variant_calling(const Options& opt,
+                         const secondary::ModelConfig& model_config,
                          polisher::PolisherResources& resources,
                          variant::VariantProgressTracker& tracker,
                          secondary::Stats& stats) {
@@ -864,8 +1000,9 @@ void run_variant_calling(const Options& opt,
             load_candidate_sites(opt.candidate_variants_path);
 
     // Create interval trees from candidate variant locations.
-    const std::optional<polisher::IntervalTreesInt64Map> candidate_trees =
-            opt.candidate_variants_path
+    // The opt.variant_candidate_source can be NONE, which means no candidate filtering is applied.
+    const std::optional<polisher::IntervalTreesInt64Map> candidate_trees_from_file =
+            (opt.variant_candidate_source == secondary::VariantCandidateSource::FILE)
                     ? create_candidate_interval_trees(candidate_sites, draft_lookup)
                     : std::nullopt;
 
@@ -898,9 +1035,6 @@ void run_variant_calling(const Options& opt,
     const std::filesystem::path out_vcf_fn =
             (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
 
-    // VCF writer, nullptr unless variant calling is run.
-    std::unique_ptr<secondary::VCFWriter> vcf_writer;
-
     std::ofstream ofs_regions;
     if (!std::empty(opt.output_dir)) {
         const std::filesystem::path out_regions_fn = opt.output_dir / "processed_regions.bed";
@@ -908,15 +1042,30 @@ void run_variant_calling(const Options& opt,
     }
 
     // Initialize the header of the output VCF file.
-    {
-        // These are the only available FILTER options.
-        const std::vector<std::pair<std::string, std::string>> filters{
-                {"PASS", "All filters passed"},
-                {"LowQual", "Variant quality is below threshold"},
-                {".", "Non-variant position"},
-        };
+    // These are the only available FILTER options.
+    const std::vector<std::pair<std::string, std::string>> vcf_filters{
+            {"PASS", "All filters passed"},
+            {"LowQual", "Variant quality is below threshold"},
+            {".", "Non-variant position"},
+    };
 
-        vcf_writer = std::make_unique<secondary::VCFWriter>(out_vcf_fn, filters, draft_lens);
+    // VCF writer, nullptr unless variant calling is run.
+    std::unique_ptr<secondary::VCFWriter> vcf_writer =
+            std::make_unique<secondary::VCFWriter>(out_vcf_fn, vcf_filters, draft_lens);
+
+    // Optionally write Kadayashi variants.
+    std::unique_ptr<secondary::VCFWriter> vcf_writer_kadayashi;
+    std::unique_ptr<secondary::VCFWriter> vcf_writer_inference;
+    if (opt.candidate_filtering && opt.dump_variants) {
+        const std::string out_vcf_kadayashi_fn =
+                (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf").string();
+        vcf_writer_kadayashi = std::make_unique<secondary::VCFWriter>(out_vcf_kadayashi_fn,
+                                                                      vcf_filters, draft_lens);
+
+        const std::string out_vcf_inference_fn =
+                (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf").string();
+        vcf_writer_inference = std::make_unique<secondary::VCFWriter>(out_vcf_inference_fn,
+                                                                      vcf_filters, draft_lens);
     }
 
     // Prepare regions for processing.
@@ -969,6 +1118,9 @@ void run_variant_calling(const Options& opt,
     int64_t total_batch_bases = 0;
     std::atomic<bool> worker_terminate{false};
 
+    const int32_t ploidy = secondary::label_scheme_type_to_ploidy(
+            secondary::parse_label_scheme_type(model_config.label_scheme_type));
+
     // Process the draft sequences in batches of user-specified size.
     for (const auto& batch_interval : region_batches) {
         // Get the regions for this interval.
@@ -994,6 +1146,7 @@ void run_variant_calling(const Options& opt,
 
         std::vector<std::vector<secondary::ConsensusResult>> all_results_cons;
         std::vector<secondary::VariantCallingSample> vc_input_data;
+        polisher::HaplotagResults haplotag_results;
 
         // Inference.
         try {
@@ -1023,23 +1176,21 @@ void run_variant_calling(const Options& opt,
                     tracker.set_description("Processing sequences: " + oss.str());
                 }
 
-                // Haplotag the BAM regions if needed.
-                std::vector<std::unordered_map<std::string, int32_t>> bam_region_haplotags;
-                if ((opt.haplotag_source == secondary::HaplotagSource::COMPUTE) ||
-                    (opt.haplotag_source == secondary::HaplotagSource::BIN_FILE)) {
-                    std::vector<kadayashi::varcall_result_t> varcalls =
-                            polisher::haplotag_regions_in_parallel(bam_regions, draft_lens,
-                                                                   resources.encoders, opt.threads);
+                haplotag_results = polisher::haplotag_regions_in_parallel(
+                        resources.encoders, bam_regions, draft_lens, opt.threads, ploidy,
+                        opt.pass_min_qual);
 
-                    // Convert the regions.
-                    bam_region_haplotags.resize(std::size(varcalls));
-                    for (int64_t i = 0; i < std::ssize(varcalls); ++i) {
-                        bam_region_haplotags[i] = std::move(varcalls[i].qname2hp);
-                        // Increment the haplotag from 0/1 -> 1/2 because the model was trained on that.
-                        for (auto& [key, val] : bam_region_haplotags[i]) {
-                            ++val;
-                        }
-                    }
+                // Candidate variants, if needed.
+                std::optional<polisher::IntervalTreesInt64Map> candidate_trees;
+                if (opt.variant_candidate_source == secondary::VariantCandidateSource::FILE) {
+                    // There are no simple variants to merge in this case, merging should be handled outside.
+                    spdlog::debug("Using candidate sites from an input file.");
+                    candidate_trees = candidate_trees_from_file;
+
+                } else if (opt.variant_candidate_source ==
+                           secondary::VariantCandidateSource::COMPUTE) {
+                    candidate_trees = create_candidate_interval_trees(
+                            haplotag_results.candidate_sites, draft_lookup);
                 }
 
                 // Each item is one batch for inference.
@@ -1048,20 +1199,19 @@ void run_variant_calling(const Options& opt,
 
                 // Create a thread for the sample producer.
                 polisher::WorkerReturnStatus wrs_sample_producer;
-                auto thread_sample_producer =
-                        utils::jthread([&resources, &bam_regions, &draft_lens, &candidate_trees,
-                                        &opt, &usable_mem, &batch_queue, &worker_terminate,
-                                        &wrs_sample_producer, &bam_region_haplotags] {
+                auto thread_sample_producer = utils::jthread(
+                        [&resources, &bam_regions, &draft_lens, &candidate_trees, &opt, &usable_mem,
+                         &batch_queue, &worker_terminate, &wrs_sample_producer, &haplotag_results] {
                             utils::set_thread_name("variant_produce");
                             polisher::sample_producer(
-                                    resources, bam_regions, draft_lens, bam_region_haplotags,
-                                    candidate_trees, opt.threads, opt.batch_size,
-                                    opt.encoding_batch_size, opt.window_len, opt.window_overlap,
-                                    opt.variant_flanking_bases, opt.bam_subchunk, usable_mem,
-                                    opt.continue_on_error, opt.tiled_regions, opt.tiled_ext_flanks,
-                                    opt.tiled_ext_major, opt.tiled_ext_min_cov,
-                                    opt.tiled_ext_cov_fract, batch_queue, worker_terminate,
-                                    wrs_sample_producer);
+                                    resources, bam_regions, draft_lens,
+                                    haplotag_results.region_haplotags, candidate_trees, opt.threads,
+                                    opt.batch_size, opt.encoding_batch_size, opt.window_len,
+                                    opt.window_overlap, opt.variant_flanking_bases,
+                                    opt.bam_subchunk, usable_mem, opt.continue_on_error,
+                                    opt.tiled_regions, opt.tiled_ext_flanks, opt.tiled_ext_major,
+                                    opt.tiled_ext_min_cov, opt.tiled_ext_cov_fract, batch_queue,
+                                    worker_terminate, wrs_sample_producer);
                         });
 
                 // Create a thread for the sample decoder.
@@ -1116,15 +1266,61 @@ void run_variant_calling(const Options& opt,
                     opt.out_format == VariantCallingFormatEnum::GVCF, opt.threads,
                     opt.continue_on_error);
 
-            std::sort(std::begin(variants), std::end(variants), [](const auto& a, const auto& b) {
-                return std::tie(a.seq_id, a.pos) < std::tie(b.seq_id, b.pos);
-            });
+            spdlog::debug("Inference variants: {}, Kadayashi confident variants: {}",
+                          std::size(variants), std::size(haplotag_results.merged_pass_variants));
+
+            // Sort variants from inference.
+            std::sort(std::begin(variants), std::end(variants));
+
+            if (opt.candidate_filtering) {
+                // Sort variants from Kadayashi.
+                std::sort(std::begin(haplotag_results.merged_pass_variants),
+                          std::end(haplotag_results.merged_pass_variants));
+            }
+
+            // Write and sort the Kadayashi variants separately.
+            // Debug output. Write the inference and Kadayashi variants separately.
+            if (opt.candidate_filtering && opt.dump_variants) {
+                // Write Kadayashi VCF.
+                if (vcf_writer_kadayashi) {
+                    for (const secondary::Variant& variant :
+                         haplotag_results.merged_pass_variants) {
+                        vcf_writer_kadayashi->write_variant(variant);
+                    }
+                }
+
+                // Write the inference VCF file.
+                if (vcf_writer_inference) {
+                    for (const secondary::Variant& variant : variants) {
+                        vcf_writer_inference->write_variant(variant);
+                    }
+                }
+            }
+
+            // Merge the variants from two sources.
+            if (opt.candidate_filtering) {
+                // Do not trim variants on inference region flanks if the input is from a file. This should be done outside.
+                const int32_t flank_trim_len =
+                        (opt.variant_candidate_source == secondary::VariantCandidateSource::FILE)
+                                ? 0
+                                : opt.flank_trim_len;
+
+                const std::unordered_map<int32_t, polisher::IntervalTreeInt64> processed_regions =
+                        create_sample_interval_trees(vc_input_data, flank_trim_len);
+
+                variants = merge_variants(variants, haplotag_results.merged_pass_variants,
+                                          processed_regions);
+            }
+
+            // Sort variants from inference.
+            std::sort(std::begin(variants), std::end(variants));
 
             // Write the VCF file.
             for (const secondary::Variant& variant : variants) {
                 vcf_writer->write_variant(variant);
             }
 
+            // Write the processed_regions.bed.
             if (ofs_regions.is_open()) {
                 for (const auto& vc_sample : vc_input_data) {
                     const std::string_view seq_name = draft_lens[vc_sample.seq_id].first;
@@ -1262,7 +1458,7 @@ int variant_caller(int argc, char* argv[]) {
         }
 #endif
 
-        run_variant_calling(opt, resources, tracker, stats);
+        run_variant_calling(opt, model_config, resources, tracker, stats);
 
         tracker.finalize();
         stats_sampler->terminate();

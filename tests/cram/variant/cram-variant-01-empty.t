@@ -10,7 +10,7 @@ Input BAM and Draft are empty.
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/^.*error] //g'
   Exit code: 1
-  Input file out/in.aln.bam does not exist or is empty.
+  Input file 'out/in.aln.bam' does not exist or is empty.
 
 Input BAM is not empty, but Draft is empty.
   $ rm -rf out; mkdir -p out
@@ -23,4 +23,4 @@ Input BAM is not empty, but Draft is empty.
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/^.*error] //g'
   Exit code: 1
-  Input file out/in.draft.fasta does not exist or is empty.
+  Input file 'out/in.draft.fasta' does not exist or is empty.

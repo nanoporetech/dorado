@@ -1227,56 +1227,224 @@ std::vector<secondary::Window> create_windows_from_regions(
     return windows;
 }
 
-std::vector<kadayashi::varcall_result_t> haplotag_regions_in_parallel(
+std::vector<secondary::Variant> convert_variants(
+        const std::vector<kadayashi::variant_dorado_style_t>& kadayashi_variants,
+        const int32_t seq_id,
+        const int32_t ploidy,
+        const float pass_min_qual) {
+    std::vector<secondary::Variant> ret;
+    ret.reserve(std::ssize(kadayashi_variants));
+
+    for (int64_t j = 0; j < std::ssize(kadayashi_variants); ++j) {
+        const kadayashi::variant_dorado_style_t& var = kadayashi_variants[j];
+
+        secondary::Variant new_var = secondary::Variant{
+                .seq_id = seq_id,
+                .pos = static_cast<int64_t>(var.pos),
+                .ref = var.ref,
+                .alts = var.alts,
+                .filter = "",
+                .info = {},
+                .qual = static_cast<float>(var.qual),
+                .genotype = {},
+                .rstart = 0,
+                .rend = 0,
+        };
+
+        // Kadayashi does not output an alt for every haplotype.
+        // Alts which match the reference are added here.
+        while (!std::empty(new_var.alts) && (std::ssize(new_var.alts) < ploidy)) {
+            if (var.genotype.first != var.genotype.second) {
+                // The alt matches the ref (het variant).
+                new_var.alts.emplace_back(new_var.ref);
+            } else {
+                // Hom variant.
+                new_var.alts.emplace_back(new_var.alts.front());
+            }
+        }
+
+        new_var = secondary::normalize_genotype(new_var, ploidy, pass_min_qual);
+
+        ret.emplace_back(std::move(new_var));
+    }
+
+    return ret;
+}
+
+HaplotagResults haplotag_regions_in_parallel(
+        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
         const std::vector<secondary::Window>& regions,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
-        std::vector<std::unique_ptr<secondary::EncoderBase>>& encoders,
-        const int32_t num_threads) {
+        const int32_t num_threads,
+        const int32_t ploidy,
+        const float pass_min_qual) {
     if (std::empty(encoders)) {
+        throw std::runtime_error{"No encoders are provided to haplotag the regions."};
+    }
+    if (num_threads <= 0) {
+        throw std::runtime_error{"Number of threads should be >= 1 for haplotagging, given: " +
+                                 std::to_string(num_threads)};
+    }
+    if (ploidy <= 0) {
+        throw std::runtime_error{"Ploidy should be >= 1 for haplotagging, given: " +
+                                 std::to_string(ploidy)};
+    }
+    if (std::empty(regions)) {
         return {};
     }
 
-    // Result data.
-    std::vector<kadayashi::varcall_result_t> region_haplotags(std::size(regions));
-
-    // Counters to process the queue.
-    const int64_t num_regions = std::ssize(regions);
-    std::atomic<int64_t> num_processed{0};
-
-    const auto worker = [&](const int32_t thread_id) {
-        auto& encoder = *encoders[thread_id];
-
-        while (true) {
-            // Fetch next job.
-            const int64_t region_id = num_processed.fetch_add(1, std::memory_order_relaxed);
-            if (region_id >= num_regions) {
-                break;
-            }
-
-            // Get the region info.
-            const secondary::Window& region = regions[region_id];
-            const std::string& ref_name = draft_lens[region.seq_id].first;
-
-            // Haplotag.
-            region_haplotags[region_id] =
-                    (encoder.produce_haplotags(ref_name, region.start, region.end));
-        }
-    };
-
-    // Thread pool.
     const size_t final_num_threads =
             std::min(static_cast<size_t>(num_threads), std::size(encoders));
-    cxxpool::thread_pool pool{final_num_threads};
-    std::vector<std::future<void>> futures;
-    futures.reserve(num_threads);
-    for (int32_t tid = 0; tid < static_cast<int32_t>(final_num_threads); ++tid) {
-        futures.emplace_back(pool.push(worker, tid));
-    }
-    for (auto& f : futures) {
-        f.get();
+
+    // Result data.
+    HaplotagResults ret;
+    std::vector<std::vector<secondary::Variant>> region_pass_variants(std::size(regions));
+
+    // Compute haplotags and collect results.
+    {
+        ret.region_haplotags.resize(std::size(regions));
+
+        // To enable merging by reference name.
+        std::vector<std::mutex> ref_mutexes(std::size(draft_lens));
+
+        // Counters to process the queue.
+        const int64_t num_regions = std::ssize(regions);
+        std::atomic<int64_t> num_processed{0};
+
+        const auto worker = [&](const int32_t thread_id) {
+            auto& encoder = *encoders[thread_id];
+
+            std::vector<int64_t> candidate_sites;
+
+            while (true) {
+                // Fetch next job.
+                const int64_t region_id = num_processed.fetch_add(1, std::memory_order_relaxed);
+                if (region_id >= num_regions) {
+                    break;
+                }
+
+                // Get the region info.
+                const secondary::Window& region = regions[region_id];
+
+                // Sanity check.
+                if (region.seq_id >= std::ssize(draft_lens)) {
+                    throw std::runtime_error{
+                            "Region sequence ID is larger than the number of available input draft "
+                            "sequences when haplotagging. seq_id = " +
+                            std::to_string(region.seq_id) +
+                            ", draft_lens.size = " + std::to_string(std::ssize(draft_lens))};
+                }
+
+                const std::string& ref_name = draft_lens[region.seq_id].first;
+
+                // Run haplotagging/simple variant calling.
+                kadayashi::varcall_result_t kadayashi_result =
+                        encoder.produce_haplotags(ref_name, region.start, region.end);
+
+                // Move the haplotags to their spot.
+                ret.region_haplotags[region_id] = std::move(kadayashi_result.qname2hp);
+
+                // Increment the haplotag from 0/1 -> 1/2 because the model was trained on that.
+                for (auto& [key, val] : ret.region_haplotags[region_id]) {
+                    ++val;
+                }
+
+                // Convert variants.
+                std::vector<secondary::Variant> variants = convert_variants(
+                        kadayashi_result.variants, region.seq_id, ploidy, pass_min_qual);
+
+                std::vector<secondary::Variant>& ret_variants = region_pass_variants[region_id];
+
+                // Clear the thread-local buffer.
+                candidate_sites.clear();
+                candidate_sites.reserve(std::size(variants));
+
+                // Extract the set of candidate variant sites (low-qual variants) and PASS variants.
+                for (secondary::Variant& var : variants) {
+                    if (var.qual < pass_min_qual) {
+                        candidate_sites.emplace_back(var.pos);
+                    } else {
+                        ret_variants.emplace_back(std::move(var));
+                    }
+                }
+
+                // Merge all candidates for each reference.
+                {
+                    std::lock_guard<std::mutex> lock(ref_mutexes[region.seq_id]);
+                    std::vector<int64_t>& ret_sites = ret.candidate_sites[ref_name];
+                    ret_sites.insert(std::end(ret_sites), std::begin(candidate_sites),
+                                     std::end(candidate_sites));
+                }
+            }
+        };
+
+        cxxpool::thread_pool pool{final_num_threads};
+
+        std::vector<std::future<void>> futures;
+        futures.reserve(num_threads);
+
+        for (int32_t tid = 0; tid < static_cast<int32_t>(final_num_threads); ++tid) {
+            futures.emplace_back(pool.push(worker, tid));
+        }
+
+        for (auto& f : futures) {
+            f.get();
+        }
     }
 
-    return region_haplotags;
+    // Merge PASS variants from simple variant calling.
+    {
+        int64_t num_variants = 0;
+        for (const auto& vars : region_pass_variants) {
+            num_variants += std::size(vars);
+        }
+        ret.merged_pass_variants.clear();
+        ret.merged_pass_variants.reserve(num_variants);
+        for (auto& vars : region_pass_variants) {
+            ret.merged_pass_variants.insert(std::end(ret.merged_pass_variants),
+                                            std::make_move_iterator(std::begin(vars)),
+                                            std::make_move_iterator(std::end(vars)));
+        }
+    }
+
+    {  // Sort candidate sites and keep unique, in parallel.
+
+        const auto worker = [&](const std::string& key) {
+            // Find the item.
+            auto it = ret.candidate_sites.find(key);
+            if (it == std::end(ret.candidate_sites)) {
+                return;
+            }
+            auto& vals = it->second;
+            if (std::empty(vals)) {
+                return;
+            }
+            // Sort the values.
+            std::sort(std::begin(vals), std::end(vals));
+            // Deduplicate.
+            int64_t src = 0;
+            for (int64_t dest = 1; dest < std::ssize(vals); ++dest) {
+                if (vals[dest] != vals[src]) {
+                    ++src;
+                    vals[src] = vals[dest];
+                }
+            }
+            vals.resize(src + 1);
+        };
+
+        // Run on all references.
+        cxxpool::thread_pool pool{final_num_threads};
+        std::vector<std::future<void>> futures;
+        futures.reserve(std::size(ret.candidate_sites));
+        for (auto& [key, vals] : ret.candidate_sites) {
+            futures.emplace_back(pool.push(worker, key));
+        }
+        for (auto& f : futures) {
+            f.get();
+        }
+    }
+
+    return ret;
 }
 
 void sample_producer(

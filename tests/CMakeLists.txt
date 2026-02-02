@@ -57,6 +57,7 @@ add_executable(dorado_tests
     PairingNodeTest.cpp
     PipelineTest.cpp
     Pod5DataLoaderTest.cpp
+    PolishImplTest.cpp
     PolyACalculatorTest.cpp
     PostConditionTest.cpp
     priority_task_queue_test.cpp
@@ -149,8 +150,10 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             dorado_model_downloader_lib
             dorado_models_lib
             dorado_nn
+            dorado_polish
             dorado_secondary
             dorado_tests_common
+            intervaltree
             minimap2
             toml11::toml11
             ${ZLIB_LIBRARIES}

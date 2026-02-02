@@ -79,4 +79,9 @@ std::vector<std::vector<secondary::ConsensusResult>> decode_batch_bases_impl(
 
 std::string label_scheme_symbols(const LabelSchemeType label_scheme_type);
 
+/**
+ * \brief Returns a numerical ploidy value for the given label scheme type.
+ */
+int32_t label_scheme_type_to_ploidy(const LabelSchemeType label_scheme_type);
+
 }  // namespace dorado::secondary

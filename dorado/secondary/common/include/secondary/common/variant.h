@@ -26,6 +26,8 @@ std::ostream& operator<<(std::ostream& os, const Variant& v);
 
 bool operator==(const Variant& lhs, const Variant& rhs);
 
+bool operator<(const Variant& lhs, const Variant& rhs);
+
 bool is_valid(const Variant& var);
 
 }  // namespace dorado::secondary

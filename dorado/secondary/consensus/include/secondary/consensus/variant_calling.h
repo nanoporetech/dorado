@@ -17,6 +17,17 @@
 namespace dorado::secondary {
 
 /**
+ * \brief Utility function to normalize the genotype information of a variant.
+ *          For a given variant, it deduplicates and enumerates alt alleles, creates the
+ *          GT and GQ tags and sets the filter tag.
+ * \param var Input variant for normalization.
+ * \param ploidy The ploidy of the dataset, needed to sanity check the number of alts.
+ * \param min_qual Minimum variant quality to mark the variant as PASS.
+ * \returns New variant with normalized genotyping information.
+ */
+Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual);
+
+/**
  * \brief Normalizes the input variant (pushes it to the left). Stops normalization when another
  *          variant is reached, or until it can no longer be normalized.
  * \param ref_with_gaps Reference (or draft) sequence for the region specified by positions_major.

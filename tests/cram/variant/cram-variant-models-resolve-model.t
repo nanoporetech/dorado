@@ -20,7 +20,7 @@ HAC. Auto-resolve the `dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0` model
   > in_ref=${in_dir}/in.ref.fasta.gz
   > ${DORADO_BIN} variant --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
-  > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
+  > grep "Resolved model from input data: 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0'" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
@@ -40,7 +40,7 @@ Attempt to download a model which is not available.
   > in_ref=${in_dir}/in.ref.fasta.gz
   > ${DORADO_BIN} variant --device cpu ${in_bam} ${in_ref} -t 4 -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
-  > grep "Resolved model from input data: dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
+  > grep "Resolved model from input data: 'dna_r10.4.1_e8.2_400bps_sup@v5.0.0_variant_mv@v1.0'" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
@@ -63,7 +63,7 @@ Resolve the model from a Basecaller model name `dna_r10.4.1_e8.2_400bps_hac@v5.0
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0"
   > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4  --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
-  > grep "Resolved model from user-specified basecaller model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
+  > grep "Resolved model from user-specified basecaller model name: 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0'" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
@@ -80,7 +80,7 @@ Resolve the model from an exact Variant Calling model name.
   > model="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0"
   > ${DORADO_BIN} variant --model ${model} --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" -v > out/out.vcf 2> out/out.stderr
   > echo "Exit code: $?"
-  > grep "Resolved model from user-specified variant calling model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
+  > grep "Resolved model from user-specified variant calling model name: 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0'" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "Downloading model" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
@@ -125,7 +125,7 @@ Negative test: no dwells in data, but the model uses them for polishing.
   > ${DORADO_BIN} variant --model "${model}" --device cpu ${in_bam} ${in_ref} -t 4 --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "Resolved model from user-specified variant calling model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
+  > grep "Resolved model from user-specified variant calling model name: 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0'" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
@@ -170,7 +170,7 @@ Using `--skip-model-compatibility-check`.
   > ${DORADO_BIN} variant --model "${model}" --skip-model-compatibility-check --device cpu ${in_bam} ${in_ref} -t 4 --regions "chr20:1-100" --infer-threads 1 -vv > out/out.vcf 2> out/out.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "Resolved model from user-specified variant calling model name: dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0" out/out.stderr | wc -l | awk '{ print $1 }'
+  > grep "Resolved model from user-specified variant calling model name: 'dna_r10.4.1_e8.2_400bps_hac@v5.0.0_variant_mv@v1.0'" out/out.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
