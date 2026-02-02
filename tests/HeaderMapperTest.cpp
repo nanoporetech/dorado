@@ -169,4 +169,78 @@ CATCH_TEST_CASE(TEST_GROUP " fallback merges multiple BAMs without RG lines", TE
     CATCH_CHECK(first_header.get_sq_mapping(second_bam.string()).size() == 1);
 }
 
+CATCH_TEST_CASE(TEST_GROUP " maps read groups to attributes", TEST_GROUP) {
+    std::unordered_map<std::string, ReadGroup> read_groups;
+
+    ReadGroup rg_one{};
+    rg_one.run_id = "run-1";
+    rg_one.flowcell_id = "flow-1";
+    rg_one.position_id = "pos-1";
+    rg_one.sample_id = "sample-1";
+    rg_one.experiment_id = "exp-1";
+    rg_one.exp_start_time = "2022-04-27T16:47:57.305+00:00";
+    read_groups.emplace("rg-one", rg_one);
+
+    ReadGroup rg_two{};
+    rg_two.flowcell_id = "flow-2";
+    rg_two.sample_id = "sample-2";
+    read_groups.emplace("rg-two", rg_two);
+
+    utils::HeaderMapper mapper(read_groups, std::nullopt, nullptr);
+    const auto &result_attrs_map = mapper.get_read_attributes_map();
+    CATCH_REQUIRE(result_attrs_map.size() == 2);
+
+    const HtsData::ReadAttributes expected_one{
+            "",
+            "exp-1",
+            "sample-1",
+            "pos-1",
+            "flow-1",
+            "run-1",
+            "0000000000000000000000000000000000000000",
+            "",
+            "",
+            1651078077305,
+            0,
+            true,
+    };
+    const HtsData::ReadAttributes expected_two{
+            "",
+            "",
+            "sample-2",
+            "0",
+            "flow-2",
+            "00000000-0000-0000-0000-000000000000",
+            "0000000000000000000000000000000000000000",
+            "",
+            "",
+            0,
+            0,
+            true,
+    };
+
+    CATCH_REQUIRE(result_attrs_map.contains("rg-one"));
+    check_read_attrs(result_attrs_map.at("rg-one"), expected_one);
+    CATCH_REQUIRE(result_attrs_map.contains("rg-two"));
+    check_read_attrs(result_attrs_map.at("rg-two"), expected_two);
+}
+
+CATCH_TEST_CASE(TEST_GROUP " barcode kit adds barcoded read groups headers", TEST_GROUP) {
+    std::unordered_map<std::string, ReadGroup> read_groups;
+
+    ReadGroup rg_one{};
+    rg_one.sample_id = "sample-1";
+    read_groups.emplace("rg-one", rg_one);
+
+    ReadGroup rg_two{};
+    rg_two.sample_id = "sample-2";
+    read_groups.emplace("rg-two", rg_two);
+
+    utils::HeaderMapper mapper(read_groups, "SQK-RBK114-24", nullptr);
+    const auto merged_headers_map = mapper.get_merged_headers_map();
+    CATCH_REQUIRE(merged_headers_map != nullptr);
+    CATCH_CHECK(merged_headers_map->size() ==
+                75);  // (2 read groups + fallback) * (24 barcodes + unclassified) = 3 * 25
+}
+
 };  // namespace dorado::utils::test
