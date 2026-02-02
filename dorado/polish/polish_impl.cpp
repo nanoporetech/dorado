@@ -655,7 +655,8 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         ///         counts (above `max(cov * cov_fraction, min_abs_cov)`).
         static constexpr int8_t DEL_VAL = 5;  // Value representing deletion in base channel.
 
-        const int64_t cov = sample.features.size(1);
+        // Find maximum non-padded coverage of this sample.
+        const int64_t cov = sample.find_max_depth(start_idx, end_idx);
         const int64_t min_count = std::max(min_abs_cov, static_cast<int64_t>(cov * cov_fraction));
 
         if (!reverse) {

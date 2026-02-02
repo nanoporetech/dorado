@@ -6,6 +6,7 @@
 #include <torch/types.h>
 
 #include <ostream>
+#include <span>
 
 namespace dorado::secondary {
 
@@ -30,6 +31,26 @@ void Sample::validate() const {
                 ", depth.size(0) = " + std::to_string(depth.size(0)) +
                 ", features.size(0) = " + std::to_string(features.size(0)));
     }
+}
+
+int64_t Sample::find_max_depth(const int64_t start_idx, const int64_t end_idx) const {
+    if (!depth.defined()) {
+        throw std::runtime_error{
+                "Cannot compute max depth because Sample::depth tensor is not defined!"};
+    }
+    if ((start_idx < 0) || (end_idx <= start_idx) || (end_idx > depth.size(0))) {
+        throw std::runtime_error{
+                "Cannot compute max depth because start_idx/end_idx out of range. start_idx = " +
+                std::to_string(start_idx) + ", end_idx = " + std::to_string(end_idx) +
+                ", depth.shape = " + utils::tensor_shape_as_string(depth)};
+    }
+    const std::span<int64_t> depth_vals(depth.data_ptr<int64_t>(),
+                                        static_cast<size_t>(depth.size(0)));
+    int64_t ret = depth_vals[start_idx];
+    for (int64_t i = start_idx; i < end_idx; ++i) {
+        ret = std::max(ret, depth_vals[i]);
+    }
+    return ret;
 }
 
 Sample slice_sample(const Sample& sample,
