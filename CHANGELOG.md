@@ -2,6 +2,13 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.3.2] (17 February 2026)
+
+This release of Dorado introduces a minor bugfix to Dorado `demux`.
+
+* 64967d855a83a519b6e2af67a6e6ceaccf68c9f0 Fix crash when Dorado `demux` is provided read records with a blank "sample_id".
+
+
 # [1.3.1] (12 January 2026)
 
 This release of Dorado updates summary files and the output structure of Dorado `aligner` to comply with the [Oxford Nanopore Output Specifications (26.01)](https://nanoporetech.github.io/ont-output-specifications/26.01/). Changes to the file outputs include:
