@@ -29,6 +29,64 @@ void check_read_attrs(const dorado::HtsData::ReadAttributes &result,
     CATCH_CHECK(result.protocol_start_time_ms == expected.protocol_start_time_ms);
     CATCH_CHECK(result.subread_id == expected.subread_id);
     CATCH_CHECK(result.is_status_pass == expected.is_status_pass);
+    CATCH_CHECK(result.barcode_id == expected.barcode_id);
+    CATCH_CHECK(result.barcode_alias == expected.barcode_alias);
+}
+
+fs::path write_file_with_barcode_tags(const fs::path &output_dir,
+                                      const std::string &filename,
+                                      const std::string &alias,
+                                      const std::string &format) {
+    auto bam_path = output_dir / filename;
+    dorado::HtsFilePtr file(hts_open(bam_path.string().c_str(), format.c_str()));
+    CATCH_REQUIRE(file != nullptr);
+
+    constexpr std::array fastq_aux_tags{"RG", "PU", "DT", "SM", "al", "LB"};
+    for (const auto &tag : fastq_aux_tags) {
+        hts_set_opt(file.get(), FASTQ_OPT_AUX, tag);
+    }
+
+    dorado::SamHdrPtr header(sam_hdr_init());
+    const std::string read_group = format + "_with_barcodes" + alias;
+    const std::string barcode_id = "barcode01";
+    const std::string flowcell_id = "PAK21298";
+    CATCH_REQUIRE(header != nullptr);
+    CATCH_REQUIRE(sam_hdr_add_line(header.get(), "HD", "VN", "1.6", "SO", "unknown", nullptr) == 0);
+    CATCH_REQUIRE(sam_hdr_add_line(
+                          header.get(), "RG", "ID", read_group.c_str(), "PU", flowcell_id.c_str(),
+                          "PM", "PAPAP48", "LB", format.c_str(), "SM", barcode_id.c_str(), "al",
+                          alias.empty() ? barcode_id.c_str() : alias.c_str(), nullptr) == 0);
+    CATCH_REQUIRE(sam_hdr_write(file.get(), header.get()) == 0);
+
+    dorado::BamPtr record(bam_init1());
+    const std::string qname{"read1"};
+    bam_set1(record.get(), qname.size(), qname.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0, 1, "*",
+             "*", 0);
+    bam_aux_update_str(record.get(), "RG", static_cast<int>(read_group.length() + 1),
+                       read_group.c_str());
+    bam_aux_update_str(record.get(), "PU", static_cast<int>(flowcell_id.length() + 1),
+                       flowcell_id.c_str());
+    bam_aux_update_str(record.get(), "LB", static_cast<int>(format.length() + 1), format.c_str());
+    bam_aux_update_str(record.get(), "SM", static_cast<int>(barcode_id.length() + 1),
+                       barcode_id.c_str());
+    const std::string &alias_tag = alias.empty() ? barcode_id : alias;
+    bam_aux_update_str(record.get(), "al", static_cast<int>(alias_tag.length() + 1),
+                       alias_tag.c_str());
+    CATCH_REQUIRE(sam_write1(file.get(), header.get(), record.get()) >= 0);
+
+    return bam_path;
+}
+
+fs::path write_bam_with_barcode_tags(const fs::path &output_dir,
+                                     const std::string &filename,
+                                     const std::string &alias) {
+    return write_file_with_barcode_tags(output_dir, filename, alias, "wb");
+}
+
+fs::path write_fastq_with_barcode_tags(const fs::path &output_dir,
+                                       const std::string &filename,
+                                       const std::string &alias) {
+    return write_file_with_barcode_tags(output_dir, filename, alias, "wf");
 }
 
 fs::path write_bam_without_rg(const fs::path &output_dir, const std::string &filename) {
@@ -57,6 +115,11 @@ namespace dorado::utils::test {
 CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
     auto sam = fs::path(get_data_dir("aligner_test")) / "basecall.sam";
     auto bam = fs::path(get_data_dir("hts_file")) / "test_data.bam";
+    auto temp_dir = dorado::tests::make_temp_dir("header_mapper_inputs");
+    auto fastq_barcodes = write_fastq_with_barcode_tags(temp_dir.m_path, "with_barcodes.fastq", "");
+    auto bam_barcodes = write_bam_with_barcode_tags(temp_dir.m_path, "with_barcodes.bam", "");
+    auto bam_alias = write_bam_with_barcode_tags(temp_dir.m_path, "with_barcodes_and_alias.bam",
+                                                 "_and_alias");
 
     // @RG	ID:a16f403b6a3655419511bf356ce3b40b65abfae4_dna_r9.4.1_e8_hac@v3.3	PU:PAK21298	PM:PAPAP48
     // DT:2022-04-27T16:47:57.305+00:00	PL:ONT	DS:basecall_model=dna_r9.4.1_e8_hac@v3.3 modbase_models=dna_r9.4.1_e8_hac@v3.3_5mCG@v0.1
@@ -69,7 +132,7 @@ CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
             "PAK21298",
             "a16f403b6a3655419511bf356ce3b40b65abfae4",
             "0000000000000000000000000000000000000000",
-            "",
+            "no_sample",
             "",
             1651078077305,
             0,
@@ -87,9 +150,54 @@ CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
             "PAO83395",
             "0a73e955b30dc4b0182e1abb710bca268b16d689",
             "0000000000000000000000000000000000000000",
-            "",
+            "PrePCR",
             "",
             1682784400107,
+            0,
+            true,
+    };
+
+    const HtsData::ReadAttributes expected_barcodes_attr{
+            "",
+            "",
+            "wb",
+            "0",
+            "PAK21298",
+            "00000000-0000-0000-0000-000000000000",
+            "0000000000000000000000000000000000000000",
+            "barcode01",
+            "",
+            0,
+            0,
+            true,
+    };
+
+    const HtsData::ReadAttributes expected_alias_attr{
+            "",
+            "",
+            "wb",
+            "0",
+            "PAK21298",
+            "00000000-0000-0000-0000-000000000000",
+            "0000000000000000000000000000000000000000",
+            "barcode01",
+            "_and_alias",
+            0,
+            0,
+            true,
+    };
+
+    const HtsData::ReadAttributes expected_fastq_attr{
+            "",
+            "",
+            "wf",
+            "0",
+            "PAK21298",
+            "00000000-0000-0000-0000-000000000000",
+            "0000000000000000000000000000000000000000",
+            "barcode01",
+            "",
+            0,
             0,
             true,
     };
@@ -98,9 +206,14 @@ CATCH_TEST_CASE(TEST_GROUP " parse multiple inputs", TEST_GROUP) {
             {"a16f403b6a3655419511bf356ce3b40b65abfae4_dna_r9.4.1_e8_hac@v3.3",
              expected_basecall_attr},
             {"0a73e955b30dc4b0182e1abb710bca268b16d689_dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
-             expected_test_data_attr}};
+             expected_test_data_attr},
+            {"wb_with_barcodes", expected_barcodes_attr},
+            {"wb_with_barcodes_and_alias", expected_alias_attr},
+            {"wf_with_barcodes", expected_fastq_attr},
+    };
 
-    utils::HeaderMapper mapper({sam, bam}, std::nullopt, nullptr, false);
+    utils::HeaderMapper mapper({sam, bam, bam_barcodes, bam_alias, fastq_barcodes}, std::nullopt,
+                               nullptr, false);
     const auto &result_attrs_map = mapper.get_read_attributes_map();
     CATCH_CHECK(result_attrs_map.size() == expected.size());
 
