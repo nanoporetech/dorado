@@ -24,11 +24,11 @@ If you encounter any problems building or running Dorado, please [report an issu
 
 First, download the relevant installer for your platform:
 
- - [dorado-1.3.1-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.1-linux-x64.tar.gz)
- - [dorado-1.3.1-linux-arm64-cuda12 - Orin only](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.1-linux-arm64.tar.gz)
- - [dorado-1.3.1-linux-arm64-cuda13 - Jetson Thor / DGX Spark](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.1-linux-arm64-cuda-13.0.tar.gz)
- - [dorado-1.3.1-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.1-osx-arm64.zip)
- - [dorado-1.3.1-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.1-win64.zip)
+ - [dorado-1.3.2-linux-x64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.2-linux-x64.tar.gz)
+ - [dorado-1.3.2-linux-arm64-cuda12 - Orin only](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.2-linux-arm64.tar.gz)
+ - [dorado-1.3.2-linux-arm64-cuda13 - Jetson Thor / DGX Spark](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.2-linux-arm64-cuda-13.0.tar.gz)
+ - [dorado-1.3.2-osx-arm64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.2-osx-arm64.zip)
+ - [dorado-1.3.2-win64](https://cdn.oxfordnanoportal.com/software/analysis/dorado-1.3.2-win64.zip)
 
 Once the relevant `.tar.gz` or `.zip` archive is downloaded, extract the archive to your desired location.
 
