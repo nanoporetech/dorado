@@ -4,6 +4,7 @@
 #include "demux/Trimmer.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/read_utils.h"
+#include "utils/types.h"
 
 #include <ATen/TensorIndexing.h>
 #include <catch2/catch_test_macros.hpp>
@@ -11,7 +12,9 @@
 #include <catch2/matchers/catch_matchers_all.hpp>
 #include <htslib/sam.h>
 
+#include <algorithm>
 #include <filesystem>
+#include <numeric>
 #include <random>
 #include <string>
 #include <vector>
@@ -38,7 +41,7 @@ CATCH_TEST_CASE("Test trim signal", TEST_GROUP) {
         signal[i] += 5;
     }
 
-    auto signal_tensor = at::from_blob(const_cast<float *>(signal.data()), {signal_len});
+    auto signal_tensor = at::from_blob(const_cast<float*>(signal.data()), {signal_len});
 
     CATCH_SECTION("Default trim") {
         int pos = utils::trim(signal_tensor, utils::DEFAULT_TRIM_THRESHOLD,
@@ -190,7 +193,7 @@ CATCH_TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
     const auto bam_file = data_dir / "reverse_strand_record.bam";
     HtsReader reader(bam_file.string(), std::nullopt);
     reader.read();
-    auto &record = reader.record;
+    auto& record = reader.record;
 
     Trimmer trimmer;
     const std::pair<int, int> trim_interval = {72, 647};
@@ -208,7 +211,7 @@ CATCH_TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {
     const auto bam_file = data_dir / "reverse_strand_record.bam";
     HtsReader reader(bam_file.string(), std::nullopt);
     reader.read();
-    auto &record = reader.record;
+    auto& record = reader.record;
 
     Trimmer trimmer;
     const std::pair<int, int> trim_interval = {72, 647};
@@ -228,6 +231,41 @@ static std::string to_qstr(std::vector<int8_t> qscore) {
         qstr += static_cast<char>(qscore[i] + 33);
     }
     return qstr;
+}
+
+static SimplexReadPtr make_simplex_read(const std::string& seq,
+                                        const std::vector<uint8_t>& moves,
+                                        int stride,
+                                        std::vector<uint8_t>& base_mod_probs_out,
+                                        std::vector<bool>& motif_hits_out) {
+    auto read = std::make_unique<SimplexRead>();
+    read->read_common.seq = seq;
+    read->read_common.qstring.reserve(seq.length());
+    for (size_t i = 0; i < seq.length(); ++i) {
+        read->read_common.qstring.push_back(static_cast<char>('a' + (i % 26)));
+    }
+    read->read_common.moves = moves;
+    read->read_common.attributes.model_stride = stride;
+    read->read_common.num_trimmed_samples = 3;
+    read->read_common.mod_base_info = std::make_shared<ModBaseInfo>(
+            std::vector<std::string>{"A", "C", "m", "G", "T"}, std::string{}, std::string{});
+
+    const size_t signal_len = read->read_common.moves.size() * stride;
+    std::vector<float> signal(signal_len);
+    std::iota(signal.begin(), signal.end(), 0.0f);
+    read->read_common.raw_data =
+            at::from_blob(signal.data(), {static_cast<long long>(signal_len)}).clone();
+
+    base_mod_probs_out.resize(seq.length() * read->read_common.mod_base_info->alphabet.size());
+    std::iota(base_mod_probs_out.begin(), base_mod_probs_out.end(), 0);
+    read->read_common.base_mod_probs = base_mod_probs_out;
+
+    motif_hits_out.resize(seq.length());
+    for (size_t i = 0; i < motif_hits_out.size(); ++i) {
+        motif_hits_out[i] = (i % 2) == 0;
+    }
+    read->read_common.base_mod_simplex_motif_hits = motif_hits_out;
+    return read;
 }
 
 CATCH_TEST_CASE("Test find_mux_change_trim_seq_index", TEST_GROUP) {
@@ -288,4 +326,82 @@ CATCH_TEST_CASE("Test determine_trim_interval (BC)", TEST_GROUP) {
 
     auto interval = dorado::Trimmer::determine_trim_interval(bc_res, 100);
     CATCH_CHECK(interval == expected);
+}
+
+CATCH_TEST_CASE("Test trim sequence for SimplexRead", TEST_GROUP) {
+    const std::string seq = "ACGTACGTAA";
+    constexpr int stride = 2;
+    const std::vector<uint8_t> moves = {
+            1, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0, 1, 0, 1, 0, 1,
+    };
+    const std::vector<uint8_t> expected_moves_dna = {
+            1, 0, 0, 1, 0, 1, 0, 0, 1, 1, 0,
+    };
+    const std::vector<uint8_t> expected_moves_rna = {
+            1, 0, 1, 0, 0, 1, 1, 0, 1, 0,
+    };
+
+    CATCH_SECTION("DNA trim interval") {
+        std::vector<uint8_t> base_mod_probs;
+        std::vector<bool> motif_hits;
+        auto read = make_simplex_read(seq, moves, stride, base_mod_probs, motif_hits);
+        const std::pair<int, int> trim_interval{2, 7};
+        const std::string expected_qstring = "cdefg";
+
+        Trimmer::trim_sequence(*read, trim_interval, false);
+
+        CATCH_CHECK(read->read_common.seq == "GTACG");
+        CATCH_CHECK(read->read_common.qstring == expected_qstring);
+        CATCH_CHECK(read->read_common.moves == expected_moves_dna);
+        CATCH_CHECK(read->read_common.raw_data.size(0) == 22);
+        CATCH_CHECK(read->read_common.num_trimmed_samples == 11);
+        CATCH_CHECK(read->read_common.base_mod_probs.size() == 25);
+        CATCH_CHECK(read->read_common.base_mod_probs.front() == base_mod_probs[10]);
+        CATCH_CHECK(read->read_common.base_mod_probs.back() == base_mod_probs[34]);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits.size() == 5);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits.front() == motif_hits[2]);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits.back() == motif_hits[6]);
+    }
+
+    CATCH_SECTION("RNA trim interval") {
+        std::vector<uint8_t> base_mod_probs;
+        std::vector<bool> motif_hits;
+        auto read = make_simplex_read(seq, moves, stride, base_mod_probs, motif_hits);
+        const std::pair<int, int> trim_interval{2, 7};
+        const std::string expected_qstring = "cdefg";
+
+        Trimmer::trim_sequence(*read, trim_interval, true);
+
+        CATCH_CHECK(read->read_common.seq == "GTACG");
+        CATCH_CHECK(read->read_common.qstring == expected_qstring);
+        CATCH_CHECK(read->read_common.moves == expected_moves_rna);
+        CATCH_CHECK(read->read_common.raw_data.size(0) == 20);
+        CATCH_CHECK(read->read_common.num_trimmed_samples == 17);
+        CATCH_CHECK(read->read_common.base_mod_probs.size() == 25);
+        CATCH_CHECK(read->read_common.base_mod_probs.front() == base_mod_probs[10]);
+        CATCH_CHECK(read->read_common.base_mod_probs.back() == base_mod_probs[34]);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits.size() == 5);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits.front() == motif_hits[2]);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits.back() == motif_hits[6]);
+    }
+
+    CATCH_SECTION("Trim interval spans full sequence") {
+        std::vector<uint8_t> base_mod_probs;
+        std::vector<bool> motif_hits;
+        auto read = make_simplex_read(seq, moves, stride, base_mod_probs, motif_hits);
+        const std::pair<int, int> trim_interval{0, static_cast<int>(seq.length())};
+        const std::string expected_qstring = "abcdefghij";
+
+        Trimmer::trim_sequence(*read, trim_interval, false);
+
+        CATCH_CHECK(read->read_common.seq == seq);
+        CATCH_CHECK(read->read_common.qstring == expected_qstring);
+        CATCH_CHECK(read->read_common.moves.size() == 20);
+        CATCH_CHECK(read->read_common.moves.front() == 1);
+        CATCH_CHECK_THAT(read->read_common.moves, Equals(moves));
+        CATCH_CHECK(read->read_common.raw_data.size(0) == 40);
+        CATCH_CHECK(read->read_common.num_trimmed_samples == 3);
+        CATCH_CHECK(read->read_common.base_mod_probs == base_mod_probs);
+        CATCH_CHECK(read->read_common.base_mod_simplex_motif_hits == motif_hits);
+    }
 }
