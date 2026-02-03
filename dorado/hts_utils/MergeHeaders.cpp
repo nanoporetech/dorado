@@ -303,7 +303,7 @@ bool MergeHeaders::add_rg(const std::string& read_group_id, std::string read_gro
 bool MergeHeaders::add_rg(const std::string& read_group_id,
                           const ReadGroup& read_group,
                           const std::map<std::string, std::string>& additional_tags) {
-    auto additional_tag_str = kv_to_tag_string(additional_tags);
+    const auto additional_tag_str = kv_to_tag_string(additional_tags);
     return add_rg(read_group_id, utils::format_read_group_header_line(read_group, read_group_id,
                                                                       additional_tag_str));
 }

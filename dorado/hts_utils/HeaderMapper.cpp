@@ -25,8 +25,8 @@ using namespace dorado;
 
 std::string get_barcode_sequence(const std::string& barcode_name) {
     const auto& barcode_sequences = barcode_kits::get_barcodes();
-    auto sequence_itr = barcode_sequences.find(barcode_name);
-    if (sequence_itr != barcode_sequences.end()) {
+    const auto sequence_itr = barcode_sequences.find(barcode_name);
+    if (sequence_itr != barcode_sequences.cend()) {
         return sequence_itr->second;
     }
     throw std::runtime_error("Unrecognised barcode name: " + barcode_name);
@@ -111,7 +111,7 @@ HeaderMapper::HeaderMapper(std::optional<std::string> kit_name,
           m_sample_sheet(sample_sheet),
           m_strip_alignment(strip_alignment),
           m_merged_headers_map(std::make_shared<HeaderMapper::HeaderMap>()) {
-    if (m_kit_name.has_value()) {
+    if (m_kit_name) {
         m_fallback_read_attrs.barcode_id = "unclassified";
         m_read_group_to_attributes[""] = m_fallback_read_attrs;
     }
@@ -130,7 +130,7 @@ void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& rea
         assign_not_empty(attrs.protocol_run_id, read_group.run_id);
         assign_not_empty(attrs.experiment_id, read_group.experiment_id);
 
-        if (m_kit_name.has_value()) {
+        if (m_kit_name) {
             read_group.barcode_id = "unclassified";
             attrs.barcode_id = "unclassified";
             read_group.barcode_alias = "";
@@ -227,7 +227,7 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
                     utils::get_unix_time_ms_from_string_timestamp(rg_data.data.exp_start_time);
         }
 
-        if (m_kit_name.has_value()) {
+        if (m_kit_name) {
             if (attrs.barcode_id.empty()) {
                 rg_data.data.barcode_id = "unclassified";
                 attrs.barcode_id = "unclassified";
@@ -292,7 +292,7 @@ void HeaderMapper::process_bam(const std::filesystem::path& path) {
     // Add the new read attrs and merge the headers for each output
     // file only including the read groups that will be used.
     for (auto [read_group_id, read_attrs] : rg_to_attrs_lut) {
-        if (m_kit_name.has_value()) {
+        if (m_kit_name) {
             if (read_attrs.barcode_id.empty()) {
                 read_attrs.barcode_id = "unclassified";
             }
@@ -380,7 +380,7 @@ void HeaderMapper::finalize_merge() {
         merged_header_ptr->finalize_merge();
     }
 
-    if (m_kit_name.has_value()) {
+    if (m_kit_name) {
         add_barcodes();
     }
 }
