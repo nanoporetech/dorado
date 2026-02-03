@@ -194,7 +194,7 @@ CATCH_TEST_CASE("Test trim of reverse strand record in BAM", TEST_GROUP) {
 
     Trimmer trimmer;
     const std::pair<int, int> trim_interval = {72, 647};
-    auto trimmed_record = trimmer.trim_sequence(record.get(), trim_interval);
+    auto trimmed_record = trimmer.trim_sequence(record.get(), trim_interval, false);
     auto seqlen = trimmed_record->core.l_qseq;
 
     CATCH_CHECK(seqlen == (trim_interval.second - trim_interval.first));
@@ -212,7 +212,7 @@ CATCH_TEST_CASE("Test trim removes all alignment information", TEST_GROUP) {
 
     Trimmer trimmer;
     const std::pair<int, int> trim_interval = {72, 647};
-    auto trimmed_record = trimmer.trim_sequence(record.get(), trim_interval);
+    auto trimmed_record = trimmer.trim_sequence(record.get(), trim_interval, false);
 
     CATCH_CHECK(trimmed_record->core.pos == -1);
     CATCH_CHECK(trimmed_record->core.tid == -1);

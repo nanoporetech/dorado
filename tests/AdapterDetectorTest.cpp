@@ -511,7 +511,7 @@ CATCH_TEST_CASE(
     dorado::PipelineDescriptor pipeline_desc;
     std::vector<dorado::Message> messages;
     auto sink = pipeline_desc.add_node<MessageSinkToVector>({}, 100, messages);
-    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1, false);
     pipeline_desc.add_node<AdapterDetectorNode>({trimmer}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);

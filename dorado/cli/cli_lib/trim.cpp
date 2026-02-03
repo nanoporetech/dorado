@@ -67,14 +67,11 @@ int trim(int argc, char* argv[]) {
             .nargs(0)
             .action([&](const auto&) { ++verbosity; })
             .append();
-    parser.add_argument("--emit-fastq")
-            .help("Output in fastq format. Default is BAM.")
-            .default_value(false)
-            .implicit_value(true);
+    parser.add_argument("--emit-fastq").help("Output in fastq format. Default is BAM.").flag();
     parser.add_argument("--no-trim-primers")
             .help("Skip primer detection and trimming. Only adapters will be detected and trimmed.")
-            .default_value(false)
-            .implicit_value(true);
+            .flag();
+    parser.add_argument("--rna").help("Treat reads as RNA for trimming.").flag();
 
     try {
         parser.parse_args(argc, argv);
@@ -153,7 +150,7 @@ int trim(int argc, char* argv[]) {
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<HtsWriterNode>({}, hts_file, "");
 
-    auto trimmer = pipeline_desc.add_node<TrimmerNode>({hts_writer}, 1);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({hts_writer}, 1, parser.get<bool>("--rna"));
 
     auto adapter_info = std::make_shared<demux::AdapterInfo>();
     adapter_info->trim_adapters = true;

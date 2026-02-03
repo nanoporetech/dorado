@@ -69,7 +69,8 @@ std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_in
 namespace dorado {
 
 // This Node is responsible for trimming adapters, primers, and barcodes.
-TrimmerNode::TrimmerNode(int threads) : MessageSink(10000, threads) {}
+TrimmerNode::TrimmerNode(int threads, bool is_rna)
+        : MessageSink(10000, threads), m_is_rna(is_rna) {}
 
 TrimmerNode::~TrimmerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }
 
@@ -116,7 +117,7 @@ void TrimmerNode::process_read(BamMessage& bam_message) {
                               read.barcode_trim_interval, bam_get_qname(irecord));
 
     if (trim_adapter || trim_barcodes) {
-        read.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval);
+        read.bam_ptr = Trimmer::trim_sequence(irecord, trim_interval, m_is_rna);
         if (read.primer_classification.orientation != StrandOrientation::UNKNOWN) {
             auto sense_data = uint8_t(to_char(read.primer_classification.orientation));
             bam_aux_append(read.bam_ptr.get(), "TS", 'A', 1, &sense_data);
@@ -147,7 +148,7 @@ void TrimmerNode::process_read(SimplexRead& read) {
             read.read_common.barcode_trim_interval, read.read_common.read_id);
 
     if (trim_adapter || trim_barcodes) {
-        Trimmer::trim_sequence(read, trim_interval);
+        Trimmer::trim_sequence(read, trim_interval, m_is_rna);
         Trimmer::check_and_update_barcoding(read);
     } else {
         read.read_common.adapter_trim_interval = {0, 0};
