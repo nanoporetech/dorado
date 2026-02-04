@@ -87,7 +87,7 @@ int summary(int argc, char *argv[]) {
     }
 
     if (!reads.empty()) {
-        utils::HeaderMapper header_mapper(all_files, false);
+        utils::HeaderMapper header_mapper(all_files, std::nullopt, nullptr, false);
         pipeline->get_node_ref<WriterNode>(writer_node)
                 .set_dynamic_header(header_mapper.get_merged_headers_map());
     } else {

@@ -87,11 +87,11 @@ ReadGroupData parse_rg_from_hts_tags(const std::string_view tag_str) {
             ret.found = true;
         } else if (token.starts_with(KEY_BARCODE_ID)) {
             // Example: SM:Z:barcode01
-            ret.has_barcodes = true;
+            ret.data.barcode_id = val;
             ret.found = true;
         } else if (token.starts_with(KEY_ALIAS_ID)) {
             // Example: al:Z:patient_1
-            ret.has_barcodes = true;
+            ret.data.barcode_alias = val;
             ret.found = true;
         }
     }

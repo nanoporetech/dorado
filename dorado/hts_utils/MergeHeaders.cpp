@@ -21,6 +21,17 @@ void update_and_add_pg_line(sam_hdr_t* hdr, const std::string& key, std::string 
     sam_hdr_add_lines(hdr, line.c_str(), 0);
 }
 
+std::string kv_to_tag_string(const std::map<std::string, std::string>& additional_tags) {
+    std::string result;
+    for (const auto& [key, value] : additional_tags) {
+        result.append("\t");
+        result.append(key);
+        result.append(":");
+        result.append(value);
+    }
+    return result;
+}
+
 }  // anonymous namespace
 
 namespace dorado::utils {
@@ -289,9 +300,12 @@ bool MergeHeaders::add_rg(const std::string& read_group_id, std::string read_gro
     return true;
 };
 
-bool MergeHeaders::add_rg(const std::string& read_group_id, const ReadGroup& read_group) {
-    return add_rg(read_group_id,
-                  utils::format_read_group_header_line(read_group, read_group_id, {}));
+bool MergeHeaders::add_rg(const std::string& read_group_id,
+                          const ReadGroup& read_group,
+                          const std::map<std::string, std::string>& additional_tags) {
+    const auto additional_tag_str = kv_to_tag_string(additional_tags);
+    return add_rg(read_group_id, utils::format_read_group_header_line(read_group, read_group_id,
+                                                                      additional_tag_str));
 }
 
 }  // namespace dorado::utils

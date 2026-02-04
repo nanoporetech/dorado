@@ -34,14 +34,12 @@ bool HtsData::ReadAttributesCoreComparator::operator()(
         const dorado::HtsData::ReadAttributes& lhs,
         const dorado::HtsData::ReadAttributes& rhs) const {
     // Only using a subset ReadAttributes fields to index the core directory paths
-    // clang-format off
-    return  lhs.experiment_id == rhs.experiment_id &&
-        lhs.sample_id == rhs.sample_id &&
-        lhs.position_id == rhs.position_id &&
-        lhs.flowcell_id == rhs.flowcell_id &&
-        lhs.protocol_run_id == rhs.protocol_run_id &&
-        lhs.protocol_start_time_ms == rhs.protocol_start_time_ms;
-    // clang-format on
+    return std::tie(lhs.experiment_id, lhs.sample_id, lhs.position_id, lhs.flowcell_id,
+                    lhs.protocol_run_id, lhs.protocol_start_time_ms, lhs.barcode_id,
+                    lhs.barcode_alias) == std::tie(rhs.experiment_id, rhs.sample_id,
+                                                   rhs.position_id, rhs.flowcell_id,
+                                                   rhs.protocol_run_id, rhs.protocol_start_time_ms,
+                                                   rhs.barcode_id, rhs.barcode_alias);
 };
 
 template <typename T>
@@ -59,6 +57,8 @@ size_t HtsData::ReadAttributesCoreHasher::operator()(
     hash_combine(seed, attr.flowcell_id);
     hash_combine(seed, attr.protocol_run_id);
     hash_combine(seed, attr.protocol_start_time_ms);
+    hash_combine(seed, attr.barcode_id);
+    hash_combine(seed, attr.barcode_alias);
     return seed;
 };
 
@@ -76,7 +76,9 @@ std::string to_string(const HtsData::ReadAttributes& a) {
         << "', ";
     oss << "st:'" << a.protocol_start_time_ms << "', ";
     oss << "subread:'" << a.subread_id << "', ";
-    oss << "status:'" << a.is_status_pass << "'";
+    oss << "status:'" << a.is_status_pass << "', ";
+    oss << "barcode_id:'" << (a.barcode_id.empty() ? "NONE" : a.barcode_id) << "', ";
+    oss << "barcode_alias:'" << (a.barcode_alias.empty() ? "NONE" : a.barcode_alias) << "'";
     oss << " }";
     return oss.str();
 }

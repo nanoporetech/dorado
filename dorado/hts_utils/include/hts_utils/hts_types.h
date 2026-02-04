@@ -105,6 +105,8 @@ struct ReadGroup {
     std::string position_id{};
     std::string experiment_id{};
     std::string acq_start_time{};
+    std::string barcode_id{};
+    std::string barcode_alias{};
     int model_stride{};
 };
 
@@ -118,6 +120,8 @@ public:
         std::string flowcell_id{"UNKNOWN"};
         std::string protocol_run_id{"00000000-0000-0000-0000-000000000000"};
         std::string acquisition_id{"0000000000000000000000000000000000000000"};
+        std::string barcode_id{};
+        std::string barcode_alias{};
         int64_t protocol_start_time_ms{0};
         std::size_t subread_id{0};
         bool is_status_pass{true};

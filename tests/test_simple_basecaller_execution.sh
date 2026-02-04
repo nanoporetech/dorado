@@ -55,7 +55,7 @@ fi
 
 echo dorado download models
 $dorado_bin download --list
-$dorado_bin download --list-structured | $PYTHON ./${test_dir}/validate_json.py -
+$dorado_bin download --list-structured | $PYTHON ${test_dir}/validate_json.py -
 $dorado_bin download --model ${model_name_5k} ${models_directory_arg}
 model_5k=${models_directory}/${model_name_5k}
 $dorado_bin download --model ${model_name_5k_v43} ${models_directory_arg}
@@ -65,7 +65,7 @@ model_rna004=${models_directory}/${model_name_rna004}
 
 dorado_check_bam_not_empty() {
     if [[ "${VALIDATE_BAM}" -eq "1" ]]; then
-        $PYTHON ./${test_dir}/validate_bam.py $output_dir/calls.bam $SPECIFICATION_FILE
+        $PYTHON ${test_dir}/validate_bam.py $output_dir/calls.bam $SPECIFICATION_FILE
     fi
 
     if [[ -n "$SAMTOOLS_UNAVAILABLE" ]]; then
@@ -88,7 +88,7 @@ echo dorado basecaller test stage
 # Not included models_directory_arg here to test temporary model download and delete.
 $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq > $output_dir/ref.fq
 if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
-    $PYTHON ./${test_dir}/validate_fastq.py $output_dir/ref.fq $SPECIFICATION_FILE
+    $PYTHON ${test_dir}/validate_fastq.py $output_dir/ref.fq $SPECIFICATION_FILE
 fi
 $dorado_bin basecaller ${model_5k} $pod5_data ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam
 dorado_check_bam_not_empty
@@ -670,6 +670,12 @@ test_barcoding_read_groups() (
         num_read_groups=$(samtools view -c ${bam})
         if [[ $num_read_groups -ne $expected ]]; then
             echo "Barcoding read group '${barcode}' has incorrect number of reads. '${bam}': ${num_read_groups} != ${expected}"
+            exit 1
+        fi
+
+        num_rg_lines=$(samtools view -H ${bam} | grep "@RG" | wc -l)
+        if [[ $num_rg_lines -ne 1 ]]; then
+            echo "Barcoding read group '${barcode}' has incorrect number of RG headers. '${bam}': ${num_rg_lines} != 1"
             exit 1
         fi
         exit 0

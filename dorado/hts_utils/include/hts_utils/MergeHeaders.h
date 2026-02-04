@@ -61,9 +61,12 @@ public:
     /** Add a ReadGroup header line.
      *  @param read_group_id The read group id to add.
      *  @param read_group The ReadGroup to add.
+     *  @param additional_tags Key-value pairs of additional tags to add to the RG header line
      *  @return bool
      */
-    bool add_rg(const std::string& read_group_id, const ReadGroup& read_group);
+    bool add_rg(const std::string& read_group_id,
+                const ReadGroup& read_group,
+                const std::map<std::string, std::string>& additional_tags);
 
     // Call this when you have added all the headers.
     void finalize_merge();
