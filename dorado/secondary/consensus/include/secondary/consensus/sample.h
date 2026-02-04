@@ -36,6 +36,8 @@ struct Sample {
         return get_position(static_cast<int64_t>(std::size(positions_major)) - 1);
     }
 
+    int64_t find_max_depth(int64_t start_idx, int64_t end_idx) const;
+
     void validate() const;
 };
 
