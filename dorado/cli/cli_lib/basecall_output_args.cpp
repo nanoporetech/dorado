@@ -23,7 +23,9 @@ void add_emit_hts_types(argparse::ArgumentParser& parser) {
     auto& emit_mutex = parser.add_mutually_exclusive_group();
     emit_mutex.add_argument(EMIT_FASTQ_ARG).help("Output in FASTQ format.").flag();
     emit_mutex.add_argument(EMIT_SAM_ARG).help("Output in SAM format.").flag();
-    emit_mutex.add_argument(EMIT_CRAM_ARG).help("Output in CRAM format.").flag();
+    emit_mutex.add_argument(EMIT_CRAM_ARG)
+            .help("Output in CRAM format. If set, reference must be FASTA(.gz).")
+            .flag();
 }
 
 const std::string emit_summary_help_text =
