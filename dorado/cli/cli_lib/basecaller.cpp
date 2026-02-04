@@ -342,6 +342,10 @@ void setup(const std::vector<std::string>& args,
            const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
            const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info,
            const int run_for_arg) {
+    if (cli::emit_cram_with_mmi_reference(emit, ref)) {
+        std::exit(EXIT_FAILURE);
+    }
+
     const BasecallModelConfig& model_config = models.get_simplex_config();
     spdlog::trace(model_config.to_string());
     spdlog::trace(modbase_params.to_string());

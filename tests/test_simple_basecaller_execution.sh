@@ -64,16 +64,18 @@ $dorado_bin download --model ${model_name_rna004} ${models_directory_arg}
 model_rna004=${models_directory}/${model_name_rna004}
 
 dorado_check_bam_not_empty() {
+    local htslib_file="${1:-"${output_dir}/calls.bam"}"
+
     if [[ "${VALIDATE_BAM}" -eq "1" ]]; then
-        $PYTHON ${test_dir}/validate_bam.py $output_dir/calls.bam $SPECIFICATION_FILE
+        $PYTHON ${test_dir}/validate_bam.py ${htslib_file} $SPECIFICATION_FILE
     fi
 
     if [[ -n "$SAMTOOLS_UNAVAILABLE" ]]; then
         echo "Skipping dorado_check_bam_not_empty as SAMTOOLS_UNAVAILABLE is set"
         return 0
     fi
-    samtools quickcheck -u $output_dir/calls.bam
-    samtools view -h $output_dir/calls.bam > $output_dir/calls.sam
+    samtools quickcheck -u ${htslib_file}
+    samtools view -h ${htslib_file} > $output_dir/calls.sam
     num_lines=$(wc -l $output_dir/calls.sam | awk '{print $1}')
     if [[ ${num_lines} -eq "0" ]]; then
         echo "Error: empty bam file"
@@ -96,6 +98,69 @@ $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -x cpu --
 dorado_check_bam_not_empty
 
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ ${models_directory_arg} -b ${batch} --emit-moves > $output_dir/calls.bam
+
+
+dorado_check_sq_m5_headers() {
+    if [[ -n "$SAMTOOLS_UNAVAILABLE" ]]; then
+        echo "Skipping dorado_check_sq_m5_headers as SAMTOOLS_UNAVAILABLE is set"
+        return 0
+    fi
+
+    local cram_path=$1
+    local ref_path=$2
+    local expected_m5=$3
+    local header_path=$4
+
+    if [[ -n "${ref_path}" ]]; then
+        # We should be able to open the a CRAM without explicitly adding 
+        # the reference path with `samtools view -T ${ref_path} ...` because we set SQ UR tag.
+        samtools view -H  "${cram_path}" > "${header_path}"
+        if [[ -n "${expected_m5}" ]]; then
+            local observed_m5
+            observed_m5=$(grep -E "^@SQ" "${header_path}" | awk -F'\t' '{for (i=1;i<=NF;i++) if ($i ~ /^M5:/) {print substr($i,4); exit}}')
+            if [[ "${observed_m5}" != ${expected_m5} ]]; then
+                echo "Header SQ M5 mismatch: expected ${expected_m5}, got ${observed_m5}"
+                exit 1
+            fi
+        else
+            if ! grep -q $'\tM5:' "${header_path}"; then
+                echo "Header missing M5 tag"
+                exit 1
+            fi
+        fi
+        if ! grep -q $'\tUR:' "${header_path}"; then
+            echo "Header missing UR tag"
+            exit 1
+        fi
+    else
+        samtools view -H "${cram_path}" > "${header_path}"
+    fi
+}
+
+dorado_emit_cram_iupac_reference() {
+    # Extract the expeted M5 tag from the samtools dict file
+    local ref_dict=$data_dir/../cram/single_read/chr1_MAT_iupac.dict
+    local expected_m5
+    expected_m5=$(grep -E "^@SQ" "${ref_dict}" | awk -F'\t' '{for (i=1;i<=NF;i++) if ($i ~ /^M5:/) {print substr($i,4); exit}}')
+    if [[ -z "${expected_m5}" ]]; then
+        echo "Failed to extract expected M5 from ${ref_dict}"
+        exit 1
+    fi
+
+    # IUPAC doped FASTA file and a single read which should align to it.
+    local ref_fasta=$data_dir/../cram/single_read/chr1_MAT_iupac.fasta
+    local pod5_single=$data_dir/../cram/single_read/chr1_MAT.pod5
+
+    local cram_out=$output_dir/calls.cram
+    local header_out=$output_dir/header.txt
+
+    $dorado_bin basecaller ${model_5k} ${pod5_single} ${models_directory_arg} -b ${batch} --emit-cram --reference "${ref_fasta}" > "${cram_out}"
+    dorado_check_sq_m5_headers "${cram_out}" "${ref_fasta}" "${expected_m5}" "${header_out}"
+    dorado_check_bam_not_empty "${cram_out}"
+}
+
+dorado_emit_cram_iupac_reference
+
 
 # Check that the read group has the required model info in its header
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
@@ -202,9 +267,6 @@ dorado_check_bam_not_empty
 $dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq > $output_dir/calls.bam
 dorado_check_bam_not_empty
 
-# Check CRAM file format
-$dorado_bin basecaller ${model_5k} $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG --reference $output_dir/ref.fq --emit-cram > $output_dir/calls.cram
-dorado_check_bam_not_empty
 
 # Check that the aligner strips old alignment tags
 $dorado_bin aligner $data_dir/aligner_test/5mers_rand_ref.fa $data_dir/aligner_test/prealigned.sam > $output_dir/realigned.bam

@@ -292,6 +292,9 @@ int duplex(int argc, char* argv[]) {
         }
 
         const cli::EmitArgs emit = cli::get_emit_args(parser);
+        if (cli::emit_cram_with_mmi_reference(emit, ref)) {
+            return EXIT_FAILURE;
+        }
 
         if (parser.get<std::string>("--reference").empty() &&
             !parser.get<std::string>("--bed-file").empty()) {

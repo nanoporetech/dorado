@@ -190,12 +190,6 @@ float mean_qscore_from_qstring(std::string_view qstring) {
     return std::clamp(mean_qscore, 1.0f, 50.0f);
 }
 
-std::string int_sequence_to_string(const std::vector<uint8_t>& int_seq) {
-    std::string seq(int_seq.size(), '\0');
-    std::transform(int_seq.cbegin(), int_seq.cend(), seq.begin(), utils::int_to_base);
-    return seq;
-}
-
 std::vector<int> sequence_to_ints(const std::string& sequence) {
     NVTX3_FUNC_RANGE();
     std::vector<int> sequence_ints(sequence.size());

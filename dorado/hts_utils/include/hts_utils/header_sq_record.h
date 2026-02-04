@@ -27,7 +27,6 @@ public:
     ~MD5Generator();
 
     void get_sequence_md5(MD5Hex& hex, const std::string& sequence);
-    void get_sequence_md5(MD5Hex& hex, const std::vector<uint8_t>& int_sequence);
 
 private:
     hts_md5_context* m_ctx;

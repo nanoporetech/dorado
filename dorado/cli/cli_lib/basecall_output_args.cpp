@@ -1,6 +1,9 @@
 #include "basecall_output_args.h"
 
+#include "utils/string_utils.h"
+
 #include <argparse/argparse.hpp>
+#include <spdlog/spdlog.h>
 
 #include <ctime>
 #include <optional>
@@ -106,4 +109,23 @@ std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser
     return parser.present<std::string>(OUTPUT_DIR_ARG);
 }
 
+bool emit_cram_with_mmi_reference(const EmitArgs& emit, const std::optional<std::string>& ref) {
+    if (!emit.cram || !ref.has_value()) {
+        return false;
+    }
+
+    std::string lower(ref.value());
+    std::transform(lower.begin(), lower.end(), lower.begin(),
+                   [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    const bool is_mmi = dorado::utils::ends_with(lower, ".mmi");
+
+    if (!is_mmi) {
+        return false;
+    }
+
+    spdlog::error(
+            "--emit-cram requires a FASTA reference. Prebuilt .mmi indexes are not "
+            "supported for CRAM output.");
+    return true;
+}
 }  // namespace dorado::cli

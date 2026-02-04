@@ -185,6 +185,10 @@ int aligner(int argc, char* argv[]) {
     const auto sort_requested = !parser.get<bool>("--no-sort");
     const cli::EmitArgs emit = cli::get_emit_args(parser);
 
+    if (cli::emit_cram_with_mmi_reference(emit, parser.get<std::string>("index"))) {
+        return EXIT_FAILURE;
+    }
+
     auto threads(parser.get<int>("threads"));
     std::size_t max_reads(parser.get<int>("max-reads"));
 

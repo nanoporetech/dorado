@@ -27,4 +27,7 @@ void add_aligner_output_arguments(argparse::ArgumentParser& parser);
 
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser);
 
+// True if `--emit-cram` is set and the ref path ends in `.mmi`
+bool emit_cram_with_mmi_reference(const EmitArgs& emit, const std::optional<std::string>& ref);
+
 }  // namespace dorado::cli
