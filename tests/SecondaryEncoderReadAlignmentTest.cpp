@@ -1516,4 +1516,178 @@ CATCH_TEST_CASE("synthetic_test_05-haplotags", TEST_GROUP) {
     }
 }
 
+CATCH_TEST_CASE("synthetic_test_06-calculate_read_alignment_fix_for_high_coverage_missing_reads",
+                TEST_GROUP) {
+    /**
+     * Maximum number of pileup rows is set to 3x (max_reads = 3), but there are 4x of reads available.
+     * Once read_03 exits, read_04 should be added after a 5-column gap (because we have hardcoded MIN_GAP = 5).
+     *
+     * Pileup matrix:
+     *      Major       0   1   2   3   4   5   6   7   8   9   MAPQ
+     *      Minor       0   0   0   0   0   0   0   0   0   0
+     *      read_01     A   C   T   G   A   A   C   T   G   A   51
+     *      read_02     A   C   T   G   A                       52
+     *      read_03     A   C   T                               53
+     *      read_04         C   T   G   A   A   C   T   G   A   54      <- Before the bugfix, this read would be ignored on major positions 8 and 9.
+     */
+
+    const auto temp_dir = make_temp_dir("encoder_read_aln_test");
+    const auto temp_in_ref_fn = temp_dir.m_path / "in.ref.fasta";
+    const auto temp_in_bam_fn = temp_dir.m_path / "in.aln.bam";
+
+    // Create the input test BAM/ref FASTA.
+    {
+        // clang-format off
+        const std::vector<std::pair<std::string, std::string>> targets{
+                {"contig_1", "ACTGAACTGA"},
+        };
+        const std::vector<BamRecord> records{
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 51 /*mapq*/, "10M" /*cigar*/, "ACTGAACTGA" /*seq*/, "" /*qual*/, {} /*dwell*/, {} /*hp*/, 0 /*NM*/},                           // Full-span.
+            {"read_02", 0 /*tid*/, 0 /*pos*/, 16 /*flag*/, 52 /*mapq*/, "5M", "ACTGA", "", {}, 3, 1},                                  // Left-flank only. Reverse. NM = 1 and cigar = 5M make snp_qv = 6.98.
+            {"read_03", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 53 /*mapq*/, "3M", "ACT", "", {5, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 5, 2},  // This should share the row with the next one. NM = 2 and cigar = 3M make snp_qv = 1.76.
+            {"read_04", 0 /*tid*/, 1 /*pos*/, 0  /*flag*/, 54 /*mapq*/, "9M", "CTGAACTGA", "123456789", {}, {}, 3},                    // Contained. Has quals. NM = 3 and cigar = 9M make snp_qv = 4.77.
+        };
+        // clang-format on
+
+        write_bam(temp_in_bam_fn, targets, records);
+        write_ref(temp_in_ref_fn, targets);
+    }
+
+    // Expected results.
+    // clang-format off
+    const Sample expected_total {
+        .seq_id = 123,
+        // Features tensor shape: [pos, coverage, features] -> [10, 5, 7]
+        // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+        .features = torch::tensor(
+            {
+                // (0,.,.)
+                {{1, 0, 1, 51, 0, 0, 60},       // read_01
+                 {1, 0, 0, 52, 0, 3, 7},        // read_02
+                 {1, 0, 1, 53, 4, 5, 2},        // read_03
+                },
+
+                // (1,.,.)
+                {{2, 0,  1, 51, 0, 0, 60},
+                 {2, 0,  0, 52, 0, 3,  7},
+                 {2, 0,  1, 53, 5, 5,  2},
+                },
+
+                // (2,.,.)
+                {{4, 0,  1, 51, 0, 0, 60},
+                 {4, 0,  0, 52, 0, 3, 7},
+                 {4, 0,  1, 53, 2, 5, 2},
+                },
+
+                // (3,.,.)
+                {{3, 0,  1, 51, 0, 0, 60},
+                 {3, 0,  0, 52, 0, 3,  7},
+                 {0, 0,  0,  0, 0, 0,  0}       // read_03 exits
+                },
+
+                // (4,.,.)
+                {{1,  0,  1, 51, 0, 0, 60},
+                 {1,  0,  0, 52, 0, 3,  7},
+                 {0,  0,  0,  0, 0, 0,  0},
+                },
+
+                // (5,.,.)
+                {{1, 0,  1, 51, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},      // read_02 exits
+                 {0, 0,  0,  0, 0, 0,  0},
+                },
+
+                // (6,.,.)
+                {{2, 0,  1, 51, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                },
+
+                // (7,.,.)
+                {{4, 0,  1,51, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                },
+
+                // (8,.,.)
+                {{3, 0,  1, 51, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 56,  1, 54, 0, 0,  5},      // Remainder of read_04 enters on the last row because read_03 exited MIN_GAP=5 columns ago.
+                },
+
+                // (9,.,.)
+                {{1, 0, 1, 51, 0, 0, 60},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 57, 1, 54, 0, 0, 5},
+                },
+
+            }, torch::dtype(torch::kInt8)
+        ),
+        .positions_major = {
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+        },
+        .positions_minor = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        },
+        .depth = torch::tensor(
+            {3, 3, 3, 2, 2, 1, 1, 1, 2, 2},
+            torch::dtype(torch::kInt32)
+        ),
+        .read_ids_left = {
+            "read_01",
+            "read_02",
+            "read_03",
+        },
+        .read_ids_right = {
+            "read_01",
+            "__blank_1",
+            "read_04",
+        },
+    };
+    // clang-format on
+
+    // Parameters, fixed for this test.
+    const std::vector<std::string> dtypes{};
+    const std::string tag_name{};
+    const int32_t tag_value{0};
+    const bool tag_keep_missing{false};
+    const std::string read_group{};
+    const int32_t min_mapq{1};
+    const bool row_per_read{false};
+    const double min_snp_accuracy{0.0};
+    const bool right_align_insertions{false};
+    const std::optional<std::filesystem::path> phasing_bin{};
+    const std::string ref_name{"contig_1"};
+    const int32_t ref_id = 123;
+    const int64_t ref_start = 0;
+    const int64_t ref_end = 10;
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
+    const bool include_dwells{true};
+    const bool include_haplotype_column{true};
+    const bool include_snp_qv_column{true};
+    const HaplotagSource hap_source{HaplotagSource::BAM_HAP_TAG};
+    const bool clip_to_zero{true};
+
+    CATCH_SECTION("Limit coverage to 3x. read_04 should enter 5 columns after read_03 exits.") {
+        // Test specific parameters.
+        const int32_t max_reads{3};
+
+        // Expected results for this test, including the dwell and the haplotag columns. add a column of zeros for the haplotype for each read.
+        const Sample& expected = expected_total;
+
+        // Run UUT.
+        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
+                                     tag_keep_missing, read_group, min_mapq, max_reads,
+                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                                     right_align_insertions, include_haplotype_column, hap_source,
+                                     phasing_bin, include_snp_qv_column, kadayashi_opt);
+
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
+
+        eval_sample(expected, result);
+    }
+}
+
 }  // namespace dorado::secondary::tests
