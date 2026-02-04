@@ -25,7 +25,7 @@ namespace {
 #if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
 __attribute__((optimize("O0")))
 #endif
-void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t,uint64_t> sample_trim_interval) {
+void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t, uint64_t> sample_trim_interval) {
     // Note - Duplex signal/read trimming is not supported yet.
     if (raw_data.sizes().size() > 1) {
         throw std::runtime_error("Read trimming is not supported for duplex reads");
@@ -123,7 +123,9 @@ std::pair<int, int> Trimmer::determine_trim_interval(AdapterScoreResult& res, in
     return trim_interval;
 }
 
-BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_interval) {
+BamPtr Trimmer::trim_sequence(bam1_t* input_record,
+                              std::pair<int, int> trim_interval,
+                              bool is_rna) {
     bool is_seq_reversed = input_record->core.flag & BAM_FREVERSE;
 
     // Fetch components that need to be trimmed.
@@ -140,9 +142,22 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
         std::reverse(std::begin(qual), std::end(qual));
     }
 
+    const int untrimmed_sequence_length = static_cast<int>(seq.length());
+
     // Actually trim components.
     auto trimmed_seq = utils::trim_sequence(seq, trim_interval);
     auto trimmed_qual = utils::trim_vector(qual, trim_interval);
+
+    auto [trimmed_modbase_str, trimmed_modbase_probs] =
+            utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
+
+    if (is_rna) {
+        // move table is stored 3'->5' for RNA but the trim interval
+        // is determined on the sequence in 5'->3' order, so we need to reverse the indices
+        trim_interval = std::make_pair(untrimmed_sequence_length - trim_interval.second,
+                                       untrimmed_sequence_length - trim_interval.first);
+    }
+
     auto [positions_trimmed, trimmed_moves] = utils::trim_move_table(move_vals, trim_interval);
 
     if (move_vals.empty()) {
@@ -161,9 +176,6 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
             ns = int(trimmed_moves.size() * stride) + std::max(0, ts);
         }
     }
-
-    auto [trimmed_modbase_str, trimmed_modbase_probs] =
-            utils::trim_modbase_info(seq, modbase_str, modbase_probs, trim_interval);
 
     // Create a new bam record to hold the trimmed read.
     BamPtr output(utils::new_unmapped_record(input_record, trimmed_seq, trimmed_qual));
@@ -202,13 +214,33 @@ BamPtr Trimmer::trim_sequence(bam1_t* input_record, std::pair<int, int> trim_int
     return output;
 }
 
-void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval) {
+void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval, bool is_rna) {
     if (trim_interval.second - trim_interval.first == int(read.read_common.seq.length())) {
         return;
     }
 
+    const int untrimmed_sequence_length = static_cast<int>(read.read_common.seq.length());
     read.read_common.seq = utils::trim_sequence(read.read_common.seq, trim_interval);
     read.read_common.qstring = utils::trim_sequence(read.read_common.qstring, trim_interval);
+
+    if (read.read_common.mod_base_info) {
+        const int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
+        // The modbase probs table consists of the probability per channel per base. So when
+        // trimming, we just shift everything by skipped bases * number of channels.
+        const std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
+                                                      trim_interval.second * num_modbase_channels};
+        read.read_common.base_mod_probs =
+                utils::trim_vector(read.read_common.base_mod_probs, modbase_interval);
+        read.read_common.base_mod_simplex_motif_hits =
+                utils::trim_vector(read.read_common.base_mod_simplex_motif_hits, trim_interval);
+    }
+
+    if (is_rna) {
+        // move table and modbase info is stored 3'->5' for RNA but the trim interval
+        // is determined on the sequence in 5'->3' order, so we need to reverse the indices
+        trim_interval = std::make_pair(untrimmed_sequence_length - trim_interval.second,
+                                       untrimmed_sequence_length - trim_interval.first);
+    }
 
     auto [leading_mv_positions_trimmed, trimmed_moves] =
             utils::trim_move_table(read.read_common.moves, trim_interval);
@@ -230,18 +262,6 @@ void Trimmer::trim_sequence(SimplexRead& read, std::pair<int, int> trim_interval
             {num_leading_samples_trimmed, num_leading_samples_trimmed + num_samples_from_mv_table});
 
     read.read_common.moves = std::move(trimmed_moves);
-
-    if (read.read_common.mod_base_info) {
-        const int num_modbase_channels = int(read.read_common.mod_base_info->alphabet.size());
-        // The modbase probs table consists of the probability per channel per base. So when
-        // trimming, we just shift everything by skipped bases * number of channels.
-        const std::pair<int, int> modbase_interval = {trim_interval.first * num_modbase_channels,
-                                                      trim_interval.second * num_modbase_channels};
-        read.read_common.base_mod_probs =
-                utils::trim_vector(read.read_common.base_mod_probs, modbase_interval);
-        read.read_common.base_mod_simplex_motif_hits =
-                utils::trim_vector(read.read_common.base_mod_simplex_motif_hits, trim_interval);
-    }
 }
 
 void Trimmer::check_and_update_barcoding(SimplexRead& read) {

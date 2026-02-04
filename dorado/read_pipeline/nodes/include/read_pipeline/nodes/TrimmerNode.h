@@ -9,7 +9,7 @@ namespace dorado {
 
 class TrimmerNode : public MessageSink {
 public:
-    TrimmerNode(int threads);
+    TrimmerNode(int threads, bool is_rna);
     ~TrimmerNode() override;
 
     std::string get_name() const override;
@@ -19,6 +19,7 @@ public:
 
 private:
     std::atomic<int> m_num_records{0};
+    const bool m_is_rna;
 
     void input_thread_fn();
     void process_read(BamMessage& bam_message);

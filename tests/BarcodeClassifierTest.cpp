@@ -239,7 +239,7 @@ CATCH_TEST_CASE(
     const bool barcode_both_ends = GENERATE(true, false);
     CATCH_CAPTURE(barcode_both_ends);
     constexpr bool no_trim = false;
-    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1, false);
     pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);
@@ -398,7 +398,7 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     std::string kit = "SQK-16S024";
     bool barcode_both_ends = false;
     bool no_trim = false;
-    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1);
+    auto trimmer = pipeline_desc.add_node<TrimmerNode>({sink}, 1, false);
     pipeline_desc.add_node<BarcodeClassifierNode>({trimmer}, 8);
 
     auto pipeline = dorado::Pipeline::create(std::move(pipeline_desc), nullptr);

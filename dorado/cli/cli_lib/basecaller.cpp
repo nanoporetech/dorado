@@ -545,7 +545,8 @@ void setup(const std::vector<std::string>& args,
     }
 
     if ((barcoding_info && barcoding_info->trim) || adapter_trimming_enabled) {
-        current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1);
+        current_sink_node = pipeline_desc.add_node<TrimmerNode>({current_sink_node}, 1,
+                                                                is_rna_model(model_config));
     }
 
     const bool is_rna_adapter =

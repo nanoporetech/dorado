@@ -2,6 +2,7 @@
 #include "basecall_output_args.h"
 #include "cli/cli.h"
 #include "cli/utils/cli_utils.h"
+#include "demux/KitInfoProvider.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
 #include "dorado_version.h"
@@ -290,7 +291,10 @@ int demuxer(int argc, char* argv[]) {
         client_info->contexts().register_context<const demux::BarcodingInfo>(barcoding_info);
         auto current_node = writer_node;
         if (!no_trim) {
-            current_node = pipeline_desc.add_node<TrimmerNode>({writer_node}, 1);
+            demux::KitInfoProvider provider(barcoding_info->kit_name);
+            const barcode_kits::KitInfo& kit_info = provider.get_kit_info(barcoding_info->kit_name);
+            current_node =
+                    pipeline_desc.add_node<TrimmerNode>({writer_node}, 1, kit_info.rna_barcodes);
         }
         pipeline_desc.add_node<BarcodeClassifierNode>({current_node}, demux_threads);
     }
