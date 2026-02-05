@@ -6,12 +6,12 @@
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
 #include <barrier>
 #include <chrono>
-#include <format>
 #include <random>
 #include <thread>
 
@@ -234,7 +234,7 @@ DEFINE_TEST("Benchmark") {
     }
 
     auto benchmark_name =
-            std::format("ResourceLimiter: num_waiters={}, max_size={}", num_waiters, max_size);
+            fmt::format("ResourceLimiter: num_waiters={}, max_size={}", num_waiters, max_size);
     CATCH_BENCHMARK(std::move(benchmark_name)) {
         // Start the threads and wait for them.
         start.arrive_and_wait();
