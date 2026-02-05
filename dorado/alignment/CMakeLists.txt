@@ -12,6 +12,7 @@ dorado_add_library(
         minimap2_wrappers.h
         Minimap2Index.h
         Minimap2IndexSupportTypes.h
+        Minimap2MemoryLimiter.h
         Minimap2Options.h
         sam_utils.h # only public for unit tests
     SOURCES_PRIVATE
@@ -20,6 +21,7 @@ dorado_add_library(
         IndexFileAccess.cpp
         minimap2_args.cpp
         Minimap2Index.cpp
+        Minimap2MemoryLimiter.cpp
         Minimap2Options.cpp
         sam_utils.cpp
     DEPENDS_PUBLIC
