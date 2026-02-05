@@ -248,6 +248,7 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
         throw;
     }
 
+    spdlog::debug("Computing SQ M5 hashes.");
     // Lookup each sequence by name and compute the MD5 hash.
     utils::MD5Generator md5gen;
     for (uint32_t j = 0; j < index.n_seq; ++j) {
@@ -268,6 +269,8 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
         md5gen.get_sequence_md5(record.md5, seq);
         m_header_records_cache.emplace_back(std::move(record));
     }
+
+    spdlog::debug("Finished computing SQ M5 hashes.");
 }
 
 const mm_idxopt_t& Minimap2Index::index_options() const {

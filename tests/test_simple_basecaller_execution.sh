@@ -36,9 +36,11 @@ SPECIFICATION_URL="${ONT_OUTPUT_SPEC_REPO}-/archive/${ONT_OUTPUT_SPEC_REF}/ont-o
 SPECIFICATION_FILE="ont_output_spec.zip"
 VALIDATOR_COMMIT="156b6e2ebbe0c832f9f568166797205758b83a73"
 
+source $(dirname -- "${BASH_SOURCE[0]}")/test_utils.sh
+
 # Set up the output specification validator so we can check output file formats
 if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
-    echo "Enabling validation of output files against spec from ${SPECIFICATION_URL}"
+    title "Enabling validation of output files against spec from ${SPECIFICATION_URL}"
     $PYTHON --version
     $PYTHON -m venv venv
     source ./venv/*/activate
@@ -53,7 +55,10 @@ if [[ "${VALIDATE_FASTQ}" -eq "1" || "${VALIDATE_BAM}" -eq "1" ]]; then
     curl -LfsS ${SPECIFICATION_URL} > ${SPECIFICATION_FILE}
 fi
 
-echo dorado download models
+pod5_data=$data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz
+echo using pod5_data: $pod5_data
+
+title dorado download models
 $dorado_bin download --list
 $dorado_bin download --list-structured | $PYTHON ${test_dir}/validate_json.py -
 $dorado_bin download --model ${model_name_5k} ${models_directory_arg}
@@ -83,10 +88,7 @@ dorado_check_bam_not_empty() {
     fi
 }
 
-pod5_data=$data_dir/pod5/dna_r10.4.1_e8.2_400bps_5khz
-echo using pod5_data: $pod5_data
-
-echo dorado basecaller test stage
+title dorado basecaller test stage
 # Not included models_directory_arg here to test temporary model download and delete.
 $dorado_bin basecaller ${model_5k} $pod5_data -b ${batch} --emit-fastq > $output_dir/ref.fq
 if [[ "${VALIDATE_FASTQ}" -eq "1" ]]; then
@@ -99,6 +101,17 @@ dorado_check_bam_not_empty
 
 $dorado_bin basecaller $model_complex,5mCG_5hmCG $pod5_data/ ${models_directory_arg} -b ${batch} --emit-moves > $output_dir/calls.bam
 
+# Check that the read group has the required model info in its header
+if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+    if ! grep -q "basecall_model=${model_name_5k}" $output_dir/calls.sam; then
+        echo "Output SAM file does not contain basecall model name in header!"
+        exit 1
+    fi
+    if ! grep -q "modbase_models=${model_name_5k}_5mCG_5hmCG" $output_dir/calls.sam; then
+        echo "Output SAM file does not contain modbase model name in header!"
+        exit 1
+    fi
+fi
 
 dorado_check_sq_m5_headers() {
     if [[ -n "$SAMTOOLS_UNAVAILABLE" ]]; then
@@ -112,7 +125,7 @@ dorado_check_sq_m5_headers() {
     local header_path=$4
 
     if [[ -n "${ref_path}" ]]; then
-        # We should be able to open the a CRAM without explicitly adding 
+        # We should be able to open the a CRAM without explicitly adding
         # the reference path with `samtools view -T ${ref_path} ...` because we set SQ UR tag.
         samtools view -H  "${cram_path}" > "${header_path}"
         if [[ -n "${expected_m5}" ]]; then
@@ -138,6 +151,8 @@ dorado_check_sq_m5_headers() {
 }
 
 dorado_emit_cram_iupac_reference() {
+    title "dorado emit cram with iupac reference"
+
     # Extract the expeted M5 tag from the samtools dict file
     local ref_dict=$data_dir/../cram/single_read/chr1_MAT_iupac.dict
     local expected_m5
@@ -162,19 +177,7 @@ dorado_emit_cram_iupac_reference() {
 dorado_emit_cram_iupac_reference
 
 
-# Check that the read group has the required model info in its header
-if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    if ! grep -q "basecall_model=${model_name_5k}" $output_dir/calls.sam; then
-        echo "Output SAM file does not contain basecall model name in header!"
-        exit 1
-    fi
-    if ! grep -q "modbase_models=${model_name_5k}_5mCG_5hmCG" $output_dir/calls.sam; then
-        echo "Output SAM file does not contain modbase model name in header!"
-        exit 1
-    fi
-fi
-
-echo dorado basecaller mixed model complex and --modified-bases
+title dorado basecaller mixed model complex and --modified-bases
 $dorado_bin basecaller $model_complex $pod5_data/ ${models_directory_arg} -b ${batch} --modified-bases 5mCG_5hmCG -vv > $output_dir/calls.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools view -h $output_dir/calls.bam | grep "ML:B:C,"
@@ -205,7 +208,7 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
 
 {
     set +e
-    echo "Testing split read without '--disable-read-splitting'"
+    title "Testing split read without '--disable-read-splitting'"
     mkdir -p $output_dir/read_splitting
     $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read > $output_dir/read_splitting/calls.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
@@ -221,7 +224,7 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
         fi
     fi
 
-    echo "Testing split read with '--disable-read-splitting'"
+    title "Testing split read with '--disable-read-splitting'"
     $dorado_bin basecaller ${model_5k} ${data_dir}/single_split_read --disable-read-splitting > $output_dir/read_splitting/calls-no-split.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         num_sam_records=$(samtools view $output_dir/read_splitting/calls-no-split.bam | wc -l | awk '{print $1}')
@@ -238,19 +241,20 @@ $dorado_bin basecaller $model_5k_v43 $data_dir/pod5/degenerate/overtrim.pod5 ${m
     set -e
 }
 
-echo dorado summary test stage
+title dorado summary test stage
 $dorado_bin summary $output_dir/read_splitting/calls.bam > /dev/null
 $dorado_bin summary -r $output_dir/read_splitting > /dev/null
 $dorado_bin basecaller $model_complex $pod5_data/ -b ${batch} | $dorado_bin summary > /dev/null
 $dorado_bin summary $output_dir/not_a_real_file.txt
 
-echo redirecting stderr to stdout: check output is still valid
+
+title redirecting stderr to stdout: check output is still valid
 # The debug layer prints to stderr to say that it's enabled, so disable it for this test.
 env -u MTL_DEBUG_LAYER $dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves > $output_dir/calls.bam 2>&1
 dorado_check_bam_not_empty
 
-echo dorado aligner test stage
 
+title dorado aligner test stage
 # Make a sam file to use as input
 $dorado_bin basecaller ${model_5k} $pod5_data/ -b ${batch} --modified-bases 5mCG_5hmCG --emit-moves --emit-sam > $output_dir/calls.sam
 
@@ -279,7 +283,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     fi
 fi
 
-echo dorado aligner options test stage
+title dorado aligner options test stage
 dorado_aligner_options_test() (
     set +e
     set +x
@@ -357,7 +361,7 @@ function dorado_aligner_secondary_supplementary_test {
     set +e
     set +x
 
-    echo "Testing Dorado Aligner - realigning a BAM with secondary/supplementary alignments"
+    title "Testing Dorado Aligner - realigning a BAM with secondary/supplementary alignments"
 
     local in_all_reads="${data_dir}/aligner_test/dataset.fastq"
     local in_all_ref="${data_dir}/aligner_test/lambda_ecoli.fasta"
@@ -439,7 +443,7 @@ function dorado_aligner_realigning_and_unmapped {
     set +e
     set +x
 
-    echo "Testing Dorado Aligner - realigning a BAM with secondary/supplementary alignments"
+    title "Testing Dorado Aligner - realigning a BAM with secondary/supplementary alignments"
 
     local in_all_reads="${data_dir}/aligner_test/dataset.fastq"
     local in_all_ref="${data_dir}/aligner_test/lambda_ecoli.fasta"
@@ -487,10 +491,10 @@ fi
 
 # Skip duplex tests if NO_TEST_DUPLEX is set.
 if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
-    echo dorado duplex basespace test stage
+    title dorado duplex basespace test stage
     $dorado_bin duplex basespace $data_dir/basespace/pairs.bam ${models_directory_arg} --threads 1 --pairs $data_dir/basespace/pairs.txt > $output_dir/calls.bam
 
-    echo dorado in-line duplex test stage - model name
+    title dorado in-line duplex test stage - model name
     $dorado_bin duplex $model_5k $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         samtools quickcheck -u $output_dir/duplex_calls.bam
@@ -501,7 +505,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
         fi
     fi
 
-    echo dorado in-line duplex test stage - complex
+    title dorado in-line duplex test stage - complex
     $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         samtools quickcheck -u $output_dir/duplex_calls.bam
@@ -512,7 +516,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
         fi
     fi
 
-    echo dorado pairs file based duplex test stage - model name
+    title dorado pairs file based duplex test stage - model name
     $dorado_bin duplex $model_5k $data_dir/duplex/pod5 ${models_directory_arg} --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         samtools quickcheck -u $output_dir/duplex_calls.bam
@@ -523,7 +527,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
         fi
     fi
 
-    echo dorado pairs file based duplex test stage - complex
+    title dorado pairs file based duplex test stage - complex
     $dorado_bin duplex ${model_complex} $data_dir/duplex/pod5 ${models_directory_arg} --pairs $data_dir/duplex/pairs.txt > $output_dir/duplex_calls.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         samtools quickcheck -u $output_dir/duplex_calls.bam
@@ -534,7 +538,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
         fi
     fi
 
-    echo dorado in-line modbase duplex from model complex
+    title dorado in-line modbase duplex from model complex
     $dorado_bin duplex ${model_complex},5mCG_5hmCG $data_dir/duplex/pod5 ${models_directory_arg} > $output_dir/duplex_calls_mods.bam
     if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         samtools quickcheck -u $output_dir/duplex_calls_mods.bam
@@ -547,7 +551,7 @@ if [[ "${NO_TEST_DUPLEX}" -ne "1" ]]; then
 fi
 
 if command -v truncate > /dev/null; then
-    echo dorado basecaller resume feature
+    title dorado basecaller resume feature
     # n.b. some of these options (--skip, --mm2-opts) won't affect the basecall but are included to test that we can resume with them present
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/multi_read_pod5 --mm2-opts "-k 15 -w 10" --skip-model-compatibility-check > $output_dir/tmp.bam
     truncate -s 20K $output_dir/tmp.bam
@@ -562,7 +566,7 @@ if command -v truncate > /dev/null; then
     fi
 fi
 
-echo dorado aligner output directory test stage
+title dorado aligner output directory test stage
 $dorado_bin aligner $data_dir/aligner_test/basecall_target.fa $data_dir/aligner_test/basecall.sam --output-dir $output_dir/aligned --emit-summary
 num_summary_lines=$(wc -l < $output_dir/aligned/sequencing_summary.txt)
 if [[ $num_summary_lines -ne "2" ]]; then
@@ -598,7 +602,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     check_add_fastq_rg_header_count 1 $output_dir/aligned/rg/PCR_zymo/20221018_1018_0_PAM93185_4524e8b9/bam_pass/alias_for_bc03/PAM93185_pass_alias_for_bc03_4524e8b9_00000000_0.bam "includes RG header lines"
 fi
 
-echo dorado demux test stage
+title dorado demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end_variant/EXP-PBC096_BC04.fastq --kit-name EXP-PBC096 --output-dir $output_dir/demux --emit-summary
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     expected_path="$output_dir/demux/no_sample/19700101_0000_0_UNKNOWN_00000000/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
@@ -621,7 +625,7 @@ if [[ $num_summary_lines -ne "4" ]]; then
     exit 1
 fi
 
-echo dorado custom demux test stage
+title dorado custom demux test stage
 $dorado_bin demux $data_dir/barcode_demux/double_end/SQK-RPB004_BC01.fastq --output-dir $output_dir/custom_demux --kit-name CUSTOM-SQK-RPB004 --barcode-arrangement $data_dir/barcode_demux/custom_barcodes/RPB004.toml --barcode-sequences $data_dir/barcode_demux/custom_barcodes/RPB004_sequences.fasta
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     expected_path="$output_dir/custom_demux/no_sample/19700101_0000_0_UNKNOWN_00000000/bam_pass/barcode01/UNKNOWN_pass_barcode01_00000000_00000000_0.bam"
@@ -633,7 +637,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     fi
 fi
 
-echo dorado demux doesnt crash on an empty input directory
+title dorado demux doesnt crash on an empty input directory
 rm -rf empty_dir
 mkdir empty_dir
 $dorado_bin demux empty_dir --kit-name EXP-PBC096 --output-dir $output_dir/empty_dir
@@ -642,7 +646,7 @@ if [[ $? -ne "0" ]]; then
     exit 1
 fi
 
-echo dorado trim test stage
+title dorado trim test stage
 file1=$data_dir/adapter_trim/lsk110_single_read.fastq
 file2=$output_dir/lsk110_single_read_trimmed.fastq
 $dorado_bin trim --sequencing-kit SQK-LSK114 --emit-fastq $file1 > $file2
@@ -651,7 +655,7 @@ if cmp --silent -- "$file1" "$file2"; then
     exit 1
 fi
 
-echo "dorado test poly(A) tail estimation"
+title "dorado test poly(A) tail estimation"
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a > $output_dir/cdna_polya.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools quickcheck -u $output_dir/cdna_polya.bam
@@ -662,6 +666,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     fi
 fi
 
+title "dorado test poly(A) tail estimation no_detect_cdna_polya"
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya.toml > $output_dir/no_detect_cdna_polya.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools quickcheck -u $output_dir/no_detect_cdna_polya.bam
@@ -669,9 +674,10 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     if [[ $num_estimated_reads -ne "2" ]]; then
         echo "2 poly(A) estimated reads expected. Found ${num_estimated_reads}"
         exit 1
-    fi    
+    fi
 fi
 
+title "dorado test poly(A) tail estimation disabled_cdna_polya"
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} $data_dir/poly_a/r10_4_1_5khz_cdna_pod5/ --kit-name SQK-PCB114-24 --estimate-poly-a --poly-a-config $data_dir/poly_a/configs/polya_bc01_disabled.toml > $output_dir/disabled_cdna_polya.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools quickcheck -u $output_dir/disabled_cdna_polya.bam
@@ -680,9 +686,10 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
      if [[ $num_estimated_reads -ne "0" ]]; then
          echo "0 poly(A) estimated reads expected. Found ${num_estimated_reads}"
          exit 1
-     fi   
+     fi
 fi
 
+title "dorado test poly(A) tail estimation rna_polya"
 $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_rna004} $data_dir/poly_a/rna004_pod5/ --estimate-poly-a > $output_dir/rna_polya.bam
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools quickcheck -u $output_dir/rna_polya.bam
@@ -693,7 +700,7 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     fi
 fi
 
-echo dorado basecaller barcoding read groups
+
 test_barcoding_read_groups() (
     while (("$#" >= 2 )); do
         barcode=$1
@@ -773,8 +780,11 @@ test_barcoding_read_groups() (
 
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     # There should be 4 reads with BC01, 2 with BC04, and 1 unclassified groups.
+    title dorado basecaller barcoding read groups
     test_barcoding_read_groups barcode01 4 barcode04 2 unclassified 1
+
     # There should be 4 reads with BC01 aliased to patient_id_1, and 3 unclassified groups.
+    title dorado basecaller barcoding read groups with sample sheet
     test_barcoding_read_groups patient_id_1 4 unclassified 3 $data_dir/barcode_demux/sample_sheet.csv
 fi
 

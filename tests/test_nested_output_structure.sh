@@ -39,6 +39,8 @@ split_data=${data_dir}/single_split_read
 basic_args="-b ${batch} --models-directory ${models_directory} -v"
 common_args=" basecaller ${model} ${demux_data} ${basic_args} "
 
+source $(dirname -- "${BASH_SOURCE[0]}")/test_utils.sh
+
 check_structure() {
     set +x
     # check_structure {root_directory} {[expected_paths]}
@@ -55,7 +57,7 @@ check_structure() {
     # Check each expected file
     for relative_path in "${expected_paths[@]}"; do
         local full_path="${root_directory%/}/$relative_path"
-        if [ ! -e "$full_path" ]; then 
+        if [ ! -e "$full_path" ]; then
             if [ $failed -eq 0 ]; then
                 echo "Error - Missing expected files:"
                 failed=1
@@ -84,7 +86,7 @@ check_structure() {
     fi
 
     # Quickcheck sam/bam/cram files
-    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then 
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
         for relative_path in "${expected_paths[@]}"; do
             local full_path="${root_directory%/}/$relative_path"
             if [[ ${full_path} =~ \.(bam|sam|cram)$  ]]; then
@@ -97,17 +99,6 @@ check_structure() {
 
     set -x
     return $failed
-}
-
-
-title() {
-    set +x 
-    echo ""
-    echo ""
-    echo "====================================================================="
-    echo $1
-    echo "====================================================================="
-    set -x
 }
 
 RUN_TESTS_INLINE_DEMUX=1
@@ -123,7 +114,7 @@ if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ] || [ $RUN_TESTS_ALIGNER -eq 1 ]; then
 fi
 
 # Testing for inline demux where we have basecall, barcode and demux at once
-if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then 
+if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then
 {
     # No demultiplexing
     title "Testing basic nested output structure baseline"
@@ -218,7 +209,7 @@ if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then
     check_structure ${dest} "${expected[@]}"
 }
 {
-    # Inline demultiplexing split reads 
+    # Inline demultiplexing split reads
     title "Testing nested output structure with inline demux and split reads"
     dest="${output_dir}/demux_split_read"
     core="E8p2p1_400bps/no_sample/20231121_1559_5B_PAS14411_76cd574f"
@@ -226,7 +217,7 @@ if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then
         "${core}/bam_pass/PAS14411_pass_76cd574f_f78e5963_0.bam"
     )
 
-    $dorado_bin basecaller ${model} ${split_data} ${basic_args} --output-dir ${dest} 
+    $dorado_bin basecaller ${model} ${split_data} ${basic_args} --output-dir ${dest}
     check_structure ${dest} "${expected[@]}"
 }
 {
@@ -238,7 +229,7 @@ if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then
         "${core}/bam_pass/TEST_pass_4524e8b9_test_0.bam"
         "${core}/bam_pass/TEST_pass_4524e8b9_test_0.bam.bai"
     )
-    
+
     $dorado_bin basecaller ${model} ${align_data} ${basic_args} --output-dir ${dest} --reference $align_data_ref
     check_structure ${dest} "${expected[@]}"
 }
@@ -246,10 +237,10 @@ fi # RUN_TESTS_INLINE_DEMUX
 
 
 # Testing for post-run demux where we have untrimmed basecalls and run barcode classification
-if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then 
+if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then
 {
     postrun_output_dir="${output_dir}/postrun_demux"
-    mkdir -p $postrun_output_dir    
+    mkdir -p $postrun_output_dir
 }
 {
      title "Test untrimmed basecalls post-run demux with barcode classification into BAM"
@@ -302,11 +293,11 @@ if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then
 fi # RUN_TESTS_POSTRUN_DEMUX
 
 # Testing for post-run demux where we have untrimmed basecalls and run barcode classification
-if [ $RUN_TESTS_ALIGNER -eq 1 ]; then 
+if [ $RUN_TESTS_ALIGNER -eq 1 ]; then
 {
     title "Preparing test reference"
     aligner_output_dir="${output_dir}/aligner"
-    mkdir -p $aligner_output_dir    
+    mkdir -p $aligner_output_dir
 
     calls_bam="${aligner_output_dir}/calls.bam"
     $dorado_bin basecaller ${model} ${align_data} ${basic_args} > $calls_bam
@@ -338,7 +329,7 @@ if [ $RUN_TESTS_ALIGNER -eq 1 ]; then
 {
     title "Test aligner demux into SAM"
     dest=${aligner_output_dir}/sam
-    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --emit-sam 
+    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --emit-sam
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
     core="test/test/20231125_1913_0_TEST_4524e8b9"
     expected=(
@@ -349,7 +340,7 @@ if [ $RUN_TESTS_ALIGNER -eq 1 ]; then
 {
     title "Test aligner demux into CRAM unsorted"
     dest=${aligner_output_dir}/cram
-    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --no-sort --emit-cram 
+    $dorado_bin aligner ${align_data_ref} ${calls_bam} --output-dir ${dest} --no-sort --emit-cram
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
     core="/test/test/20231125_1913_0_TEST_4524e8b9"
     expected=(
