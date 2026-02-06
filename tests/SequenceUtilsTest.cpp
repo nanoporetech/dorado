@@ -1,5 +1,3 @@
-#include "hts_utils/bam_utils.h"
-#include "hts_utils/hts_types.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
@@ -49,19 +47,6 @@ CATCH_TEST_CASE(TEST_GROUP ": Test compute_overlap", TEST_GROUP) {
         CATCH_CHECK(overlap->target_start == 5);
         CATCH_CHECK(overlap->target_end == static_cast<int>(query.size()) - 1);
     }
-}
-
-CATCH_TEST_CASE(TEST_GROUP ": Test int_to_base", TEST_GROUP) {
-    CATCH_CHECK(int_to_base(0) == 'A');
-    CATCH_CHECK(int_to_base(1) == 'C');
-    CATCH_CHECK(int_to_base(2) == 'G');
-    CATCH_CHECK(int_to_base(3) == 'T');
-}
-
-CATCH_TEST_CASE(TEST_GROUP ": Test int_sequence_to_string", TEST_GROUP) {
-    const std::vector<uint8_t> seq4 = {0, 1, 2, 3, 3, 2, 1, 0, 0, 3, 3, 1, 1, 2, 2};
-    const std::string seq = int_sequence_to_string(seq4);
-    CATCH_CHECK(seq == "ACGTTGCAATTCCGG");
 }
 
 CATCH_TEST_CASE(TEST_GROUP ": Test base_to_int", TEST_GROUP) {

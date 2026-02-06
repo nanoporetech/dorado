@@ -28,6 +28,7 @@ Makefile
 
 # Ignore test output directories
 /tests/test_simple_basecaller_output_[0-9]*/
+/tests/data/aligner_test/*.fai
 
 # If running regression tests, the regression_test_data project is downloaded into
 # the dorado folder. We don't want it to be accidentally committed.

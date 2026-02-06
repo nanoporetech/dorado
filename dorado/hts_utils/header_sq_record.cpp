@@ -34,8 +34,4 @@ void MD5Generator::get_sequence_md5(MD5Hex& hex, const std::string& sequence) {
     hts_md5_hex(hex, digest);
 }
 
-void MD5Generator::get_sequence_md5(MD5Hex& hex, const std::vector<uint8_t>& int_sequence) {
-    return get_sequence_md5(hex, int_sequence_to_string(int_sequence));
-}
-
 }  // namespace dorado::utils

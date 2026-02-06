@@ -1,7 +1,10 @@
 #include "alignment/Minimap2Index.h"
 
 #include "alignment/minimap2_wrappers.h"
+#include "hts_utils/FastxRandomReader.h"
+#include "hts_utils/fai_utils.h"
 #include "hts_utils/header_sq_record.h"
+#include "hts_utils/sequence_file_format.h"
 
 #include <spdlog/spdlog.h>
 
@@ -200,18 +203,74 @@ const utils::HeaderSQRecords& Minimap2Index::get_sequence_records_for_header() c
 }
 
 void Minimap2Index::cache_header_records(const mm_idx_t& index) {
+    m_header_records_cache.reserve(m_header_records_cache.size() + index.n_seq);
+    const std::filesystem::path reference_path = m_index_reader.file;
+
+    // Try to open the FASTA reference extract the reference sequences for encoding
+    // into SQ M5 hashes. If the file isn't a FASTA we omit the M5 and UR tags because
+    // the FASTA references can be any string (IUPAC+) while minimap stores the lossy
+    // seq4 (ACGTN) encoding.
+    // Because htslib doesn't support loading mmi indexes and the lossy seq4 encoding,
+    // htslib will either crash or error with `SQ header M5 tag discrepancy for reference X`
+    {
+        const auto ref_fmt = hts_io::parse_sequence_format(reference_path);
+        const bool is_fasta = ref_fmt == hts_io::SequenceFormatType::FASTA;
+
+        if (!is_fasta) {
+            // Index not supported by htslib (likely mmi or fastq) - do not add SQ M5 or UR tags.
+            spdlog::debug("Omitting SQ M5/UR tags as reference is not FASTA '{}'.",
+                          reference_path.string());
+            for (uint32_t j = 0; j < index.n_seq; ++j) {
+                utils::HeaderSQRecord record{std::string(index.seq[j].name), index.seq[j].len};
+                m_header_records_cache.emplace_back(std::move(record));
+            }
+            return;
+        }
+    }
+
+    // Resolve the path for the UR tag.
     const std::shared_ptr<const std::string> uri = std::make_shared<std::string>(
             "file://" + std::filesystem::weakly_canonical(m_index_reader.file).string());
 
+    // Create a FAI (likely already created / re-used by another process)
+    if (!utils::check_fai_exists(reference_path) && !utils::create_fai_index(reference_path)) {
+        spdlog::error("Failed to create a .fai index for reference '{}'.", reference_path.string());
+        throw std::runtime_error("Failed to create .fai index for reference.");
+    }
+
+    // Open the FASTA Reader
+    std::unique_ptr<hts_io::FastxRandomReader> fasta_reader;
+    try {
+        fasta_reader = std::make_unique<hts_io::FastxRandomReader>(reference_path);
+    } catch (const std::exception& exc) {
+        spdlog::error("Failed to open FASTA reference '{}' for SQ M5 calculation: '{}'.",
+                      reference_path.string(), exc.what());
+        throw;
+    }
+
+    spdlog::debug("Computing SQ M5 hashes.");
+    // Lookup each sequence by name and compute the MD5 hash.
     utils::MD5Generator md5gen;
-    m_header_records_cache.reserve(m_header_records_cache.size() + index.n_seq);
     for (uint32_t j = 0; j < index.n_seq; ++j) {
         utils::HeaderSQRecord record{std::string(index.seq[j].name), index.seq[j].len, uri};
-        std::vector<uint8_t> seq(record.length);
-        mm_idx_getseq(&index, j, 0, record.length, seq.data());
+
+        const std::string seq = fasta_reader->fetch_seq(record.sequence_name);
+        if (seq.empty()) {
+            spdlog::error("Reference sequence '{}' not found in '{}'.", record.sequence_name,
+                          reference_path.string());
+            throw std::runtime_error("Reference sequence missing from FASTA.");
+        }
+        if (seq.size() != record.length) {
+            spdlog::error("Reference sequence '{}' length mismatch for '{}': expected {}, got {}.",
+                          record.sequence_name, reference_path.string(), record.length, seq.size());
+            throw std::runtime_error("Reference sequence length mismatch.");
+        }
+
         md5gen.get_sequence_md5(record.md5, seq);
         m_header_records_cache.emplace_back(std::move(record));
     }
+
+    spdlog::debug("Finished computing SQ M5 hashes.");
 }
 
 const mm_idxopt_t& Minimap2Index::index_options() const {

@@ -35,6 +35,8 @@ RUN_TESTS_DOWNLOADER_VARIANT=1
 RUN_TESTS_BASECALLER=1
 RUN_TESTS_BASECALLER_PATH=1
 
+source $(dirname -- "${BASH_SOURCE[0]}")/test_utils.sh
+
 check_exists() {
     set +x
     local search_directory="$1"
@@ -46,9 +48,9 @@ check_exists() {
     for expected in "${expected_paths[@]}"; do
         echo "Checking ${search_directory} for ${expected}"
         local full_path="${search_directory%/}/$expected"
-        
-        if [ ! -e "$full_path" ]; then 
-            echo "Error - Missing expected file: ${expected}"  
+
+        if [ ! -e "$full_path" ]; then
+            echo "Error - Missing expected file: ${expected}"
             exit 1
         fi
     done;
@@ -57,18 +59,8 @@ check_exists() {
     return 0
 }
 
-title() {
-    set +x 
-    echo ""
-    echo ""
-    echo "====================================================================="
-    echo $1
-    echo "====================================================================="
-    set -x
-}
-
 # Testing dorado downloader
-if [ $RUN_TESTS_DOWNLOADER_NAMED -eq 1 ]; then 
+if [ $RUN_TESTS_DOWNLOADER_NAMED -eq 1 ]; then
 {
     title "Test we can download a named model"
     simplex_name="rna004_130bps_fast@v5.2.0"
@@ -118,7 +110,7 @@ if [ $RUN_TESTS_DOWNLOADER_NAMED -eq 1 ]; then
 }
 fi # RUN_TESTS_DOWNLOADER_NAMED
 
-if [ $RUN_TESTS_DOWNLOADER_VARIANT -eq 1 ]; then 
+if [ $RUN_TESTS_DOWNLOADER_VARIANT -eq 1 ]; then
 {
     title "Test we can download using a model complex"
     local_dir="${output_dir}/download_complex"
@@ -148,7 +140,7 @@ if [ $RUN_TESTS_DOWNLOADER_VARIANT -eq 1 ]; then
 fi # RUN_TESTS_DOWNLOADER_VARIANT
 
 
-if [ $RUN_TESTS_BASECALLER -eq 1 ]; then 
+if [ $RUN_TESTS_BASECALLER -eq 1 ]; then
 {
     title "Test we can auto download using a model complex which is then cleaned up"
     local_dir="${output_dir}/basecaller_variant_complex_temporary"
@@ -167,7 +159,7 @@ if [ $RUN_TESTS_BASECALLER -eq 1 ]; then
         fi
 
         # Check that the temporary model was deleted
-        if [ -e "${local_dir}/${expected}" ]; then 
+        if [ -e "${local_dir}/${expected}" ]; then
             echo "Expected temporary model '${expected}' to be deleted"
             exit 1
         fi
@@ -248,7 +240,7 @@ if [ $RUN_TESTS_BASECALLER -eq 1 ]; then
                 exit 1
             fi
         done;
-        
+
         check_exists ${local_dir}/models "${expected[@]}"
     popd
 }
@@ -268,7 +260,7 @@ if [ $RUN_TESTS_BASECALLER -eq 1 ]; then
 }
 fi # RUN_TESTS_BASECALLER
 
-if [ $RUN_TESTS_BASECALLER_PATH -eq 1 ]; then 
+if [ $RUN_TESTS_BASECALLER_PATH -eq 1 ]; then
 {
     title "Test we can use a model by path"
     local_dir="${output_dir}/basecaller_path"
