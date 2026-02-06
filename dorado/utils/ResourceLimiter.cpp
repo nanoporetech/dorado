@@ -78,6 +78,15 @@ void ResourceLimiter::release(WaiterState &waiter) {
     }
 }
 
+ResourceLimiter::Stats ResourceLimiter::sample_stats() {
+    std::lock_guard lock(m_mutex);
+    Stats stats{};
+    stats.capacity = m_max_size;
+    stats.used = m_reserved;
+    stats.num_waiting = m_waiting.size();
+    return stats;
+}
+
 bool ResourceLimiter::can_reserve(std::size_t size) const {
     // Special case used==0, ie nothing else is running, even if it uses
     // more memory than available otherwise it'll get stuck forever.

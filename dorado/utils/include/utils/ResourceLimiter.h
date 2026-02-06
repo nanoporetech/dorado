@@ -31,6 +31,14 @@ public:
     // Release the elements held by |waiter|.
     void release(WaiterState& waiter);
 
+    // Grab a snapshot of the current stats.
+    struct Stats {
+        std::size_t capacity;
+        std::size_t used;
+        std::size_t num_waiting;
+    };
+    Stats sample_stats();
+
     // RAII helper to scope a reservation.
     class ScopedReservation {
         ResourceLimiter& m_limiter;

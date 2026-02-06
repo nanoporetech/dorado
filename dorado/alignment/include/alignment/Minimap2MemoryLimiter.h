@@ -1,5 +1,7 @@
 #pragma once
 
+#include "utils/stats.h"
+
 #include <cstddef>
 
 namespace dorado::alignment {
@@ -14,5 +16,8 @@ namespace dorado::alignment {
 // if it's the only thread using minimap2, and loading of an index
 // doesn't count towards this limit.
 bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_workers);
+
+// Query the current stats of the limiter.
+stats::NamedStats mm2_limiter_stats();
 
 }  // namespace dorado::alignment

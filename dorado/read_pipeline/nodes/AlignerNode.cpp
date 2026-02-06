@@ -2,6 +2,7 @@
 
 #include "aligner/Minimap2Aligner.h"
 #include "alignment/Minimap2Index.h"
+#include "alignment/Minimap2MemoryLimiter.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
 #include "read_pipeline/base/ClientInfo.h"
@@ -243,6 +244,7 @@ std::string AlignerNode::get_name() const { return "AlignerNode"; }
 
 stats::NamedStats AlignerNode::sample_stats() const {
     stats::NamedStats stats = MessageSink::sample_stats();
+    stats.merge(alignment::mm2_limiter_stats());
     stats["queued_tasks"] = double(m_task_executor.num_tasks_in_flight());
     return stats;
 }

@@ -51,7 +51,7 @@ DEFINE_TEST("Waiters are ordered") {
     // Signal the threads but take all the resources so that they're blocked on us.
     {
         ResourceLimiter::ScopedReservation scope(limiter, main_waiter, 1);
-        for (auto & flag : ready) {
+        for (auto &flag : ready) {
             // This *should* make them wait in order, but might not if the thread is woken up
             // and immediately context switches, so wait a bit too.
             flag.signal();
@@ -59,6 +59,7 @@ DEFINE_TEST("Waiters are ordered") {
         }
 
         // All threads should still be blocked.
+        CATCH_CHECK(limiter.sample_stats().num_waiting == num_waiters);
         for (std::size_t i = 0; i < num_waiters; i++) {
             CATCH_CAPTURE(i);
             CATCH_CHECK(ordering[i] == 0);
@@ -66,7 +67,7 @@ DEFINE_TEST("Waiters are ordered") {
     }
 
     // Wait for them to finish.
-    for (auto & thread : threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 
@@ -111,10 +112,11 @@ DEFINE_TEST("Multiple waiters can acquire at the same time") {
         // None of the threads should be able to make a reservation until we release ours.
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
         CATCH_CHECK_FALSE(did_reserve.load(std::memory_order_relaxed));
+        CATCH_CHECK(limiter.sample_stats().num_waiting == num_waiters);
     }
 
     // Wait for them to finish.
-    for (auto & thread : threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 }
@@ -170,7 +172,7 @@ DEFINE_TEST("Limits are imposed") {
 
     // Kick off the threads and wait for them to finish.
     flag.signal();
-    for (auto & thread : threads) {
+    for (auto &thread : threads) {
         thread.join();
     }
 
@@ -188,6 +190,72 @@ DEFINE_TEST("Empty allocation is safe") {
     ResourceLimiter::WaiterState waiter;
     ResourceLimiter limiter(1);
     ResourceLimiter::ScopedReservation scope(limiter, waiter, 0);
+}
+
+DEFINE_TEST("Stats report correctly") {
+    ResourceLimiter::WaiterState waiters[2], main_waiter;
+    ResourceLimiter limiter(10);
+
+    auto check = [&limiter](std::size_t used, std::size_t num_waiting) {
+        const auto stats = limiter.sample_stats();
+        CATCH_CHECK(stats.capacity == 10);
+        CATCH_CHECK(stats.used == used);
+        CATCH_CHECK(stats.num_waiting == num_waiting);
+    };
+
+    CATCH_SECTION("Used count") {
+        check(0, 0);
+        limiter.acquire(waiters[0], 3);  // w0 +3 (3)
+        check(3, 0);
+        limiter.acquire(waiters[1], 5);  // w1 +5 (8)
+        check(8, 0);
+        limiter.release(waiters[0]);  // w0 -3 (5)
+        check(5, 0);
+        limiter.release(waiters[1]);  // w1 -5 (0)
+        check(0, 0);
+    }
+
+    CATCH_SECTION("Blocked waiters") {
+        enum class State { Waiting, Running };
+        utils::concurrency::Flag ready, done;
+        utils::jthread threads[2];
+        for (std::size_t i = 0; i < 2; i++) {
+            threads[i] = utils::jthread([&, i] {
+                // Wait to be signalled.
+                ready.wait();
+                // Take an allocation.
+                ResourceLimiter::ScopedReservation scope1(limiter, waiters[i], 8);
+                // Wait to be signalled again.
+                done.wait();
+            });
+        }
+
+        // Nothing waiting.
+        check(0, 0);
+
+        {
+            // This blocks the threads from continuing after they've woken up.
+            ResourceLimiter::ScopedReservation scope1(limiter, main_waiter, 9);
+            check(9, 0);
+            ready.signal();
+
+            // There's no guarantee that the threads will be blocked by our allocation
+            // yet, so wait a bit before checking.
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            check(9, 2);
+        }
+
+        // After releasing our allocation, one should have made it through and
+        // the other should still be waiting.
+        check(8, 1);
+
+        // Stop the threads.
+        done.signal();
+        for (auto &thread : threads) {
+            thread.join();
+        }
+        check(0, 0);
+    }
 }
 
 #if DORADO_ENABLE_BENCHMARK_TESTS

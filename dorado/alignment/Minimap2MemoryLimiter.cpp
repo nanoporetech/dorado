@@ -3,12 +3,27 @@
 #include "utils/ResourceLimiter.h"
 
 #include <minimap.h>
+#include <spdlog/spdlog.h>
 
 namespace dorado::alignment {
 
+namespace {
+
+struct Limiters {
+    explicit Limiters(std::size_t big_queue_size, std::size_t small_queue_size)
+            : big_queue(big_queue_size), small_queue(small_queue_size) {}
+
+    utils::ResourceLimiter big_queue;
+    utils::ResourceLimiter small_queue;
+};
+
+std::unique_ptr<Limiters> s_limiters;
+
+}  // namespace
+
 bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_threads) {
     // If something's already installed then we don't want to replace it.
-    if (dorado_mm2_reserve || dorado_mm2_release) {
+    if (dorado_mm2_reserve || dorado_mm2_release || s_limiters) {
         return false;
     }
 
@@ -36,15 +51,14 @@ bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_
     }
 
     // Create the limiters and our per-thread waiters.
-    static utils::ResourceLimiter big_queue(total_queue_size - small_queue_size);
-    static utils::ResourceLimiter small_queue(small_queue_size);
+    s_limiters = std::make_unique<Limiters>(total_queue_size - small_queue_size, small_queue_size);
     thread_local utils::ResourceLimiter::WaiterState waiter;
 
     static constexpr auto queue_for_size = [](std::size_t size) -> utils::ResourceLimiter & {
         if (size > split_point) {
-            return big_queue;
+            return s_limiters->big_queue;
         } else {
-            return small_queue;
+            return s_limiters->small_queue;
         }
     };
 
@@ -65,6 +79,23 @@ bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_
         queue_for_size(size).release(waiter);
     };
     return true;
+}
+
+stats::NamedStats mm2_limiter_stats() {
+    stats::NamedStats stats;
+    if (s_limiters) {
+        auto add_stats = [&stats](std::string_view prefix, utils::ResourceLimiter &limiter) {
+            const auto limiter_stats = limiter.sample_stats();
+            stats[fmt::format("{}_capacity", prefix)] = static_cast<double>(limiter_stats.capacity);
+            stats[fmt::format("{}_used", prefix)] = static_cast<double>(limiter_stats.used);
+            stats[fmt::format("{}_num_waiting", prefix)] =
+                    static_cast<double>(limiter_stats.num_waiting);
+        };
+
+        add_stats("mm2_big_queue", s_limiters->big_queue);
+        add_stats("mm2_small_queue", s_limiters->small_queue);
+    }
+    return stats;
 }
 
 }  // namespace dorado::alignment
