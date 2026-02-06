@@ -13,6 +13,6 @@ namespace dorado::alignment {
 // doesn't stop minimap2 from allocating more than this on one thread
 // if it's the only thread using minimap2, and loading of an index
 // doesn't count towards this limit.
-bool install_mm2_limiter_hooks(std::size_t max_memory_limit);
+bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_workers);
 
 }  // namespace dorado::alignment
