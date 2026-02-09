@@ -1,8 +1,8 @@
 #include "encoder_read_alignment.h"
 
-#include "encoder_utils.h"
 #include "local_haplotagging.h"
 #include "medaka_read_matrix.h"
+#include "secondary/features/encoder_utils.h"
 #include "secondary/features/kadayashi_utils.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
@@ -360,6 +360,11 @@ secondary::Sample EncoderReadAlignment::encode_region(
                       region);
         return {};
     }
+
+    // Remove empty minor columns.
+    std::tie(tensors.counts, tensors.positions_major, tensors.positions_minor) =
+            filter_empty_minor_columns(tensors.counts, tensors.positions_major,
+                                       tensors.positions_minor);
 
     at::Tensor depth = (tensors.counts.index({"...", 0}) != 0).sum(/*dim=*/1);
 
