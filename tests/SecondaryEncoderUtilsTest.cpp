@@ -1,4 +1,4 @@
-#include "../dorado/secondary/features/encoder_utils.h"
+#include "secondary/features/encoder_utils.h"
 
 #include <ATen/ATen.h>
 #include <catch2/catch_test_macros.hpp>
@@ -278,6 +278,521 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
         CATCH_CHECK(test_case.expected_reordered_chunk.equal(result_reordered_chunk));
         CATCH_CHECK(test_case.expected_out_ids == result_out_ids);
     }
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-01-normal_input_nothing_to_filter", TEST_GROUP) {
+    /**
+     * \brief Should remove the empty minor column (2, 1) and relabel the remaining minor columns for the same major
+     *          to remove the gap.
+    */
+    // clang-format off
+    // Features tensor shape: [pos, coverage, features]
+    // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+    const at::Tensor features = torch::tensor(
+        {
+            // (0,.,.)  Position: (0, 0)
+            {{1, 0, 1, 51, 0, 0, 60},       // read_01
+             {1, 0, 0, 52, 0, 3, 7},        // read_02
+             {1, 0, 1, 53, 4, 5, 2},        // read_03
+            },
+
+            // (1,.,.)  Position: (1, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {2, 0,  0, 52, 0, 3,  7},
+             {2, 0,  1, 53, 5, 5,  2},
+            },
+
+            // (2,.,.)  Position: (2, 0)
+            {{4, 0,  1, 51, 0, 0, 60},
+             {4, 0,  0, 52, 0, 3, 7},
+             {4, 0,  1, 53, 2, 5, 2},
+            },
+
+            // (3,.,.)  Position: (2, 1)
+            {{3, 0,  1, 51, 0, 0, 60},
+             {3, 0,  0, 52, 0, 3,  7},
+             {3, 0,  0,  0, 0, 0,  0}       // read_03 exits
+            },
+
+            // (4,.,.)  Position: (2, 2)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (5,.,.)  Position: (3, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},      // read_02 exits
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (6,.,.)  Position: (4, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> positions_major {
+        0, 1, 2, 2, 2, 3, 4,
+    };
+    const std::vector<int64_t> positions_minor {
+        0, 0, 0, 1, 2, 0, 0,
+    };
+    // clang-format on
+
+    const auto [result_features, result_positions_major, result_positions_minor] =
+            filter_empty_minor_columns(features, positions_major, positions_minor);
+
+    CATCH_CHECK(result_features.equal(features));
+    CATCH_CHECK(result_positions_major == positions_major);
+    CATCH_CHECK(result_positions_minor == positions_minor);
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-02-empty_input_throws", TEST_GROUP) {
+    /**
+     * \brief Empty input tensor should throw.
+    */
+    const at::Tensor features = torch::tensor({}, torch::dtype(torch::kInt8));
+    const std::vector<int64_t> positions_major{};
+    const std::vector<int64_t> positions_minor{};
+
+    CATCH_CHECK_THROWS(filter_empty_minor_columns(features, positions_major, positions_minor));
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-03-uninitialized_input_tensor", TEST_GROUP) {
+    /**
+     * \brief Uninitialized input tensor should throw.
+    */
+    const at::Tensor features;
+    const std::vector<int64_t> positions_major{};
+    const std::vector<int64_t> positions_minor{};
+
+    CATCH_CHECK_THROWS(filter_empty_minor_columns(features, positions_major, positions_minor));
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-04-position_length_mismatch", TEST_GROUP) {
+    /**
+     * \brief Mismatch in length of the number of positions in the input tensor and the lengths of the
+     *          positions_major, positions_minor.
+    */
+    // clang-format off
+    // Features tensor shape: [pos, coverage, features]
+    // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+    const at::Tensor features = torch::tensor(
+        {
+            // (0,.,.)  Position: (0, 0)
+            {{1, 0, 1, 51, 0, 0, 60},       // read_01
+             {1, 0, 0, 52, 0, 3, 7},        // read_02
+             {1, 0, 1, 53, 4, 5, 2},        // read_03
+            },
+
+            // (1,.,.)  Position: (1, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {2, 0,  0, 52, 0, 3,  7},
+             {2, 0,  1, 53, 5, 5,  2},
+            },
+        }, torch::dtype(torch::kInt8)
+    );
+    // clang-format on
+
+    CATCH_SECTION("normal case, everything matches, should pass") {
+        // clang-format off
+        const std::vector<int64_t> positions_major {
+            0, 1,
+        };
+        const std::vector<int64_t> positions_minor {
+            0, 0,
+        };
+        // clang-format on
+
+        const auto [result_features, result_positions_major, result_positions_minor] =
+                filter_empty_minor_columns(features, positions_major, positions_minor);
+
+        CATCH_CHECK(result_features.equal(features));
+        CATCH_CHECK(result_positions_major == positions_major);
+        CATCH_CHECK(result_positions_minor == positions_minor);
+    }
+
+    CATCH_SECTION("positions_major are of wrong length") {
+        // clang-format off
+        const std::vector<int64_t> positions_major {
+            0,
+        };
+        const std::vector<int64_t> positions_minor {
+            0, 0,
+        };
+        // clang-format on
+
+        CATCH_CHECK_THROWS(filter_empty_minor_columns(features, positions_major, positions_minor));
+    }
+
+    CATCH_SECTION("positions_minor are of wrong length") {
+        // clang-format off
+        const std::vector<int64_t> positions_major {
+            0, 1,
+        };
+        const std::vector<int64_t> positions_minor {
+            0,
+        };
+        // clang-format on
+
+        CATCH_CHECK_THROWS(filter_empty_minor_columns(features, positions_major, positions_minor));
+    }
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-05-minor_internal_left_aligned", TEST_GROUP) {
+    /**
+     * \brief Should remove the empty minor column (2, 1) and relabel the remaining minor columns for the same major
+     *          to remove the gap.
+    */
+    // clang-format off
+    // Features tensor shape: [pos, coverage, features]
+    // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+    const at::Tensor features = torch::tensor(
+        {
+            // (0,.,.)  Position: (0, 0)
+            {{1, 0, 1, 51, 0, 0, 60},       // read_01
+             {1, 0, 0, 52, 0, 3, 7},        // read_02
+             {1, 0, 1, 53, 4, 5, 2},        // read_03
+            },
+
+            // (1,.,.)  Position: (1, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {2, 0,  0, 52, 0, 3,  7},
+             {2, 0,  1, 53, 5, 5,  2},
+            },
+
+            // (2,.,.)  Position: (2, 0)
+            {{4, 0,  1, 51, 0, 0, 60},
+             {4, 0,  0, 52, 0, 3, 7},
+             {4, 0,  1, 53, 2, 5, 2},
+            },
+
+            // (3,.,.)  Position: (2, 1)
+            {{0, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0, 52, 0, 3,  7},
+             {0, 0,  0,  0, 0, 0,  0}       // read_03 exits
+            },
+
+            // (4,.,.)  Position: (2, 2)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (5,.,.)  Position: (3, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},      // read_02 exits
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (6,.,.)  Position: (4, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> positions_major {
+        0, 1, 2, 2, 2, 3, 4,
+    };
+    const std::vector<int64_t> positions_minor {
+        0, 0, 0, 1, 2, 0, 0,
+    };
+    // clang-format on
+
+    // clang-format off
+    const at::Tensor expected_features = torch::tensor(
+        {
+            // (0,.,.)  Position: (0, 0)
+            {{1, 0, 1, 51, 0, 0, 60},           // read_01
+             {1, 0, 0, 52, 0, 3, 7},            // read_02
+             {1, 0, 1, 53, 4, 5, 2},            // read_03
+            },
+
+            // (1,.,.)  Position: (1, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {2, 0,  0, 52, 0, 3,  7},
+             {2, 0,  1, 53, 5, 5,  2},
+            },
+
+            // (2,.,.)  Position: (2, 0)
+            {{4, 0,  1, 51, 0, 0, 60},
+             {4, 0,  0, 52, 0, 3, 7},
+             {4, 0,  1, 53, 2, 5, 2},
+            },
+
+            // // (3,.,.)  Position: (2, 1)
+            // {{0, 0,  1, 51, 0, 0, 60},
+            //  {0, 0,  0, 52, 0, 3,  7},
+            //  {0, 0,  0,  0, 0, 0,  0}        // read_03 exits
+            // },
+
+            // (3,.,.)  Position: (2, 2)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (4,.,.)  Position: (3, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},          // read_02 exits
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (5,.,.)  Position: (4, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> expected_positions_major {
+        0, 1, 2, 2, 3, 4,
+    };
+    const std::vector<int64_t> expected_positions_minor {
+        0, 0, 0, 1, 0, 0,
+    };
+    // clang-format on
+
+    const auto [result_features, result_positions_major, result_positions_minor] =
+            filter_empty_minor_columns(features, positions_major, positions_minor);
+
+    CATCH_CHECK(result_features.equal(expected_features));
+    CATCH_CHECK(result_positions_major == expected_positions_major);
+    CATCH_CHECK(result_positions_minor == expected_positions_minor);
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-06-minor_first_position", TEST_GROUP) {
+    /**
+     * \brief Should remove the minor column at the very beginning of the window.
+     *          Window begins in the middle of a minor position stretch (major = 5, minor = 2) and this column should be removed
+     *          because all bases are equal to 0.
+     *          When the first column is removed, the minor positions need to be relabeled, otherwise the window will
+     *          begin on a different minor and may potentially not be merged with the previous window.
+     */
+    // clang-format off
+    // Features tensor shape: [pos, coverage, features]
+    // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+    const at::Tensor features = torch::tensor(
+        {
+            // (0,.,.)  Position: (5, 2)    <- Feature tensor begins on a minor position
+            {{0, 0, 1, 51, 0, 0, 60},
+             {0, 0, 0, 52, 0, 3, 7},
+             {0, 0, 1, 53, 4, 5, 2},
+            },
+
+            // (1,.,.)  Position: (5, 3)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {2, 0,  0, 52, 0, 3,  7},
+             {2, 0,  1, 53, 5, 5,  2},
+            },
+
+            // (2,.,.)  Position: (5, 4)
+            {{4, 0,  1, 51, 0, 0, 60},
+             {4, 0,  0, 52, 0, 3, 7},
+             {4, 0,  1, 53, 2, 5, 2},
+            },
+
+            // (4,.,.)  Position: (6, 0)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (5,.,.)  Position: (7, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (6,.,.)  Position: (8, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> positions_major {
+        5, 5, 5, 6, 7, 8,
+    };
+    const std::vector<int64_t> positions_minor {
+        2, 3, 4, 0, 0, 0,
+    };
+    // clang-format on
+
+    // clang-format off
+    const at::Tensor expected_features = torch::tensor(
+        {
+            // // (0,.,.)  Position: (5, 2) <- Feature tensor begins on a minor position
+            // {{1, 0, 1, 51, 0, 0, 60},
+            //  {1, 0, 0, 52, 0, 3, 7},
+            //  {1, 0, 1, 53, 4, 5, 2},
+            // },
+
+            // (0,.,.)  Position: (5, 2)    <- Feature tensor begins on a minor position
+            {{2, 0,  1, 51, 0, 0, 60},
+             {2, 0,  0, 52, 0, 3,  7},
+             {2, 0,  1, 53, 5, 5,  2},
+            },
+
+            // (1,.,.)  Position: (5, 3)
+            {{4, 0,  1, 51, 0, 0, 60},
+             {4, 0,  0, 52, 0, 3, 7},
+             {4, 0,  1, 53, 2, 5, 2},
+            },
+
+            // (2,.,.)  Position: (6, 0)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (3,.,.)  Position: (7, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (4,.,.)  Position: (8, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> expected_positions_major {
+        5, 5, 6, 7, 8,
+    };
+    const std::vector<int64_t> expected_positions_minor {
+        2, 3, 0, 0, 0,
+    };
+    // clang-format on
+
+    const auto [result_features, result_positions_major, result_positions_minor] =
+            filter_empty_minor_columns(features, positions_major, positions_minor);
+
+    CATCH_CHECK(result_features.equal(expected_features));
+    CATCH_CHECK(result_positions_major == expected_positions_major);
+    CATCH_CHECK(result_positions_minor == expected_positions_minor);
+}
+
+CATCH_TEST_CASE("filter_empty_minor_columns-07-multiple_minor_first_positions", TEST_GROUP) {
+    /**
+     * \brief Should remove all minor columns at the very beginning of the window.
+     *          After this, the window should now begin with another major and should not be relabeled.
+     *          This is a test for an edge case.
+     *          Window begins in the middle of a minor position stretch (major = 5, minor = 2).
+     */
+    // clang-format off
+    // Features tensor shape: [pos, coverage, features]
+    // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+    const at::Tensor features = torch::tensor(
+        {
+            // (0,.,.)  Position: (5, 2)    <- Feature tensor begins on a minor position
+            {{0, 0, 1, 51, 0, 0, 60},
+             {0, 0, 0, 52, 0, 3, 7},
+             {0, 0, 1, 53, 4, 5, 2},
+            },
+
+            // (1,.,.)  Position: (5, 3)
+            {{0, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0, 52, 0, 3,  7},
+             {0, 0,  1, 53, 5, 5,  2},
+            },
+
+            // (2,.,.)  Position: (5, 4)
+            {{0, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0, 52, 0, 3, 7},
+             {0, 0,  1, 53, 2, 5, 2},
+            },
+
+            // (4,.,.)  Position: (6, 0)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (5,.,.)  Position: (7, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (6,.,.)  Position: (8, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> positions_major {
+        5, 5, 5, 6, 7, 8,
+    };
+    const std::vector<int64_t> positions_minor {
+        2, 3, 4, 0, 0, 0,
+    };
+    // clang-format on
+
+    // clang-format off
+    const at::Tensor expected_features = torch::tensor(
+        {
+            // // (0,.,.)  Position: (5, 2)    <- Feature tensor begins on a minor position
+            // {{0, 0, 1, 51, 0, 0, 60},
+            //  {0, 0, 0, 52, 0, 3, 7},
+            //  {0, 0, 1, 53, 4, 5, 2},
+            // },
+
+            // // (1,.,.)  Position: (5, 3)
+            // {{0, 0,  1, 51, 0, 0, 60},
+            //  {0, 0,  0, 52, 0, 3,  7},
+            //  {0, 0,  1, 53, 5, 5,  2},
+            // },
+
+            // // (2,.,.)  Position: (5, 4)
+            // {{0, 0,  1, 51, 0, 0, 60},
+            //  {0, 0,  0, 52, 0, 3, 7},
+            //  {0, 0,  1, 53, 2, 5, 2},
+            // },
+
+            // (4,.,.)  Position: (6, 0)
+            {{1,  0,  1, 51, 0, 0, 60},
+             {1,  0,  0, 52, 0, 3,  7},
+             {0,  0,  0,  0, 0, 0,  0},
+            },
+
+            // (5,.,.)  Position: (7, 0)
+            {{1, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+
+            // (6,.,.)  Position: (8, 0)
+            {{2, 0,  1, 51, 0, 0, 60},
+             {0, 0,  0,  0, 0, 0,  0},
+             {0, 0,  0,  0, 0, 0,  0},
+            },
+        }, torch::dtype(torch::kInt8)
+    );
+    const std::vector<int64_t> expected_positions_major {
+        6, 7, 8,
+    };
+    const std::vector<int64_t> expected_positions_minor {
+        0, 0, 0,
+    };
+    // clang-format on
+
+    const auto [result_features, result_positions_major, result_positions_minor] =
+            filter_empty_minor_columns(features, positions_major, positions_minor);
+
+    CATCH_CHECK(result_features.equal(expected_features));
+    CATCH_CHECK(result_positions_major == expected_positions_major);
+    CATCH_CHECK(result_positions_minor == expected_positions_minor);
 }
 
 }  // namespace dorado::secondary::tests

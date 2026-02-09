@@ -6,6 +6,7 @@ target_sources(dorado_secondary
         ${PUBLIC_BASE}/decoder_factory.h
         ${PUBLIC_BASE}/encoder_base.h
         ${PUBLIC_BASE}/encoder_factory.h
+        ${PUBLIC_BASE}/encoder_utils.h
         ${PUBLIC_BASE}/haplotag_source.h
         ${PUBLIC_BASE}/kadayashi_options.h
         ${PUBLIC_BASE}/kadayashi_utils.h
@@ -19,7 +20,6 @@ target_sources(dorado_secondary
         encoder_read_alignment.cpp
         encoder_read_alignment.h
         encoder_utils.cpp
-        encoder_utils.h
         kadayashi_utils.cpp
         medaka_bamiter.cpp
         medaka_bamiter.h
