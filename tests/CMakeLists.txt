@@ -65,6 +65,7 @@ add_executable(dorado_tests
     ReadForwarderNodeTest.cpp
     ReadTest.cpp
     RealignMovesTest.cpp
+    ResourceLimiterTest.cpp
     ResumeLoaderTest.cpp
     RleTest.cpp
     RNASplitTest.cpp

@@ -33,6 +33,7 @@ dorado_add_library(
         paf_utils.h
         parameters.h
         PostCondition.h
+        ResourceLimiter.h
         rle.h
         SampleSheet.h
         scoped_trace_log.h
@@ -69,6 +70,7 @@ dorado_add_library(
         memory_utils.cpp
         paf_utils.cpp
         parameters.cpp
+        ResourceLimiter.cpp
         SampleSheet.cpp
         scoped_trace_log.cpp
         sequence_utils.cpp
