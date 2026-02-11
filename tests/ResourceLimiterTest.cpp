@@ -1,7 +1,6 @@
 #include "utils/ResourceLimiter.h"
 
 #include "utils/concurrency/synchronisation.h"
-#include "utils/jthread.h"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -33,9 +32,9 @@ DEFINE_TEST("Waiters are ordered") {
     std::size_t ordering[num_waiters] = {};
 
     utils::concurrency::Flag ready[num_waiters];
-    utils::jthread threads[num_waiters];
+    std::jthread threads[num_waiters];
     for (std::size_t i = 0; i < num_waiters; i++) {
-        threads[i] = utils::jthread([&, i] {
+        threads[i] = std::jthread([&, i] {
             // Wait for this thread to be signalled.
             ready[i].wait();
 
@@ -87,9 +86,9 @@ DEFINE_TEST("Multiple waiters can acquire at the same time") {
     utils::concurrency::Latch done(num_waiters);
     std::atomic_bool did_reserve = false;
 
-    utils::jthread threads[num_waiters];
+    std::jthread threads[num_waiters];
     for (std::size_t i = 0; i < num_waiters; i++) {
-        threads[i] = utils::jthread([&, i] {
+        threads[i] = std::jthread([&, i] {
             // Wait for the signal.
             flag.wait();
 
@@ -138,9 +137,9 @@ DEFINE_TEST("Limits are imposed") {
     std::atomic<std::size_t> currently_reserved = 0;
     std::atomic<std::size_t> max_reserved = 0;
 
-    utils::jthread threads[num_waiters];
+    std::jthread threads[num_waiters];
     for (std::size_t i = 0; i < num_waiters; i++) {
-        threads[i] = utils::jthread([&, i] {
+        threads[i] = std::jthread([&, i] {
             // Wait for the signal.
             flag.wait();
 
@@ -218,9 +217,9 @@ DEFINE_TEST("Stats report correctly") {
     CATCH_SECTION("Blocked waiters") {
         enum class State { Waiting, Running };
         utils::concurrency::Flag ready, done;
-        utils::jthread threads[2];
+        std::jthread threads[2];
         for (std::size_t i = 0; i < 2; i++) {
-            threads[i] = utils::jthread([&, i] {
+            threads[i] = std::jthread([&, i] {
                 // Wait to be signalled.
                 ready.wait();
                 // Take an allocation.
@@ -280,9 +279,9 @@ DEFINE_TEST("Benchmark") {
     std::barrier<> start(num_waiters + 1);
     std::barrier<> stop(num_waiters + 1);
     std::atomic_bool finished = false;
-    std::vector<utils::jthread> threads(num_waiters);
+    std::vector<std::jthread> threads(num_waiters);
     for (std::size_t i = 0; i < num_waiters; i++) {
-        threads[i] = utils::jthread([&, i] {
+        threads[i] = std::jthread([&, i] {
             while (true) {
                 // Wait for the signal.
                 start.arrive_and_wait();
