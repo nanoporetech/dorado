@@ -5,6 +5,8 @@
 #include <minimap.h>
 #include <spdlog/spdlog.h>
 
+#include <memory>
+
 namespace dorado::alignment {
 
 namespace {
