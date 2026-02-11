@@ -1,6 +1,7 @@
 #include "utils/AsyncQueue.h"
 
 #include "utils/concurrency/synchronisation.h"
+#include "utils/jthread.h"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -103,7 +104,7 @@ CATCH_TEST_CASE(TEST_GROUP ": PopFromOtherThread") {
     std::atomic_bool thread_started{false};
     AsyncQueueStatus pop_status;
 
-    auto popping_thread = std::jthread([&]() {
+    auto popping_thread = dorado::utils::jthread([&]() {
         thread_started.store(true);
         int val = -1;
         // catch2 isn't thread safe so we have to check this on the main thread
@@ -130,7 +131,7 @@ CATCH_TEST_CASE(TEST_GROUP ": TerminateFromOtherThread") {
     std::atomic_bool thread_started{false};
     AsyncQueueStatus pop_status;
 
-    auto popping_thread = std::jthread([&]() {
+    auto popping_thread = dorado::utils::jthread([&]() {
         thread_started.store(true);
         int val = -1;
         // catch2 isn't thread safe so we have to check this on the main thread
@@ -201,7 +202,7 @@ CATCH_TEST_CASE(TEST_GROUP ": benchmarks") {
     std::vector<std::size_t> processed_counts(num_consumers);
 
     // Start the threads.
-    std::vector<std::jthread> threads;
+    std::vector<dorado::utils::jthread> threads;
     threads.reserve(num_producers + num_consumers);
     for (int i = 0; i < num_producers; i++) {
         threads.emplace_back([&latch, &queue] {

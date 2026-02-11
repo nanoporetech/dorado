@@ -21,6 +21,7 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/io_utils.h"
+#include "utils/jthread.h"
 #include "utils/log_utils.h"
 #include "utils/ssize.h"
 #include "utils/string_utils.h"
@@ -1048,8 +1049,8 @@ void run_polishing(const Options& opt,
                 // Create a thread for the sample producer.
                 polisher::WorkerReturnStatus wrs_sample_producer;
                 auto thread_sample_producer =
-                        std::jthread([&resources, &bam_regions, &draft_lens, &opt, &usable_mem,
-                                      &batch_queue, &worker_terminate, &wrs_sample_producer] {
+                        utils::jthread([&resources, &bam_regions, &draft_lens, &opt, &usable_mem,
+                                        &batch_queue, &worker_terminate, &wrs_sample_producer] {
                             utils::set_thread_name("polish_produce");
                             polisher::sample_producer(
                                     resources, bam_regions, draft_lens, {}, std::nullopt,
@@ -1062,8 +1063,8 @@ void run_polishing(const Options& opt,
                 // Create a thread for the sample decoder.
                 polisher::WorkerReturnStatus wrs_decoder;
                 auto thread_sample_decoder =
-                        std::jthread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
-                                      &resources, &opt, &worker_terminate, &wrs_decoder] {
+                        utils::jthread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
+                                        &resources, &opt, &worker_terminate, &wrs_decoder] {
                             utils::set_thread_name("polish_decode");
                             polisher::decode_samples_in_parallel(
                                     all_results_cons, vc_input_data, decode_queue, stats,
