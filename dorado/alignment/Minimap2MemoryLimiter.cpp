@@ -41,12 +41,12 @@ bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_
     // Empirical testing on a random dataset suggests that the majority of
     // allocations are less than 5MB, so use that as the split point.
     //
-    static constexpr std::size_t split_point = 5 * 1024 * 1024;
+    static constexpr std::size_t SPLIT_POINT = 5 * 1024 * 1024;
 
     // The small queue should be able to process 1 element per alignment worker,
     // which is going to be a few hundred MB at most. The max memory limit will
     // be multiple GB so this should be safe.
-    const std::size_t small_queue_size = split_point * num_threads;
+    const std::size_t small_queue_size = SPLIT_POINT * num_threads;
     const std::size_t total_queue_size = max_memory_limit_GB * 1024 * 1024 * 1024;
     if (total_queue_size <= small_queue_size) {
         return false;
@@ -57,7 +57,7 @@ bool install_mm2_limiter_hooks(std::size_t max_memory_limit_GB, std::size_t num_
     thread_local utils::ResourceLimiter::WaiterState waiter;
 
     static constexpr auto queue_for_size = [](std::size_t size) -> utils::ResourceLimiter & {
-        if (size > split_point) {
+        if (size > SPLIT_POINT) {
             return s_limiters->big_queue;
         } else {
             return s_limiters->small_queue;
