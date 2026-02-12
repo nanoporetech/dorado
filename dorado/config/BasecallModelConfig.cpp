@@ -429,6 +429,7 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
     config.basecaller.update(path);
 
     parse_qscore_params(config, config_toml);
+    parse_polya_coefficients(config, config_toml);
 
     const TxEncoderParams tx_encoder = parse_tx_encoder_params(config_toml);
     const LinearUpsampleParams upsample = parse_encoder_upsample_params(config_toml);
