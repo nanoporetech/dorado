@@ -39,13 +39,13 @@ done
 
 if [[ $type == "dorado" ]] ; then
     # Assuming the current script is in .gitlab/
-  source_dir=$(dirname $(dirname $0))
+  source_dir=$(dirname $(dirname $(readlink -f $0)))
   if [[ -n $preset ]] ; then
     echo "Presets are not currently supported in dorado. This parameter will be ignored."
   fi
 elif [[ $type == "ont_core_cpp" ]] ; then
     # Assuming the current script is in dorado/.gitlab/
-  source_dir=$(dirname $(dirname $(dirname $0)))
+  source_dir=$(dirname $(dirname $(dirname $(readlink -f $0))))
   if [[ -z $preset ]] ; then
     echo "A preset is required for ont_core_cpp. Please provide a supported preset value -p".
     exit 1
