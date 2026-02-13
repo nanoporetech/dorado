@@ -37,15 +37,16 @@ while getopts "j:B:fc:t:p:" opt; do
   esac
 done
 
+script_dir="$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd -P)"
 if [[ $type == "dorado" ]] ; then
     # Assuming the current script is in .gitlab/
-  source_dir=$(dirname $(dirname $(readlink -f $0)))
+  source_dir=$(dirname $script_dir)
   if [[ -n $preset ]] ; then
     echo "Presets are not currently supported in dorado. This parameter will be ignored."
   fi
 elif [[ $type == "ont_core_cpp" ]] ; then
     # Assuming the current script is in dorado/.gitlab/
-  source_dir=$(dirname $(dirname $(dirname $(readlink -f $0))))
+  source_dir=$(dirname $(dirname $script_dir))
   if [[ -z $preset ]] ; then
     echo "A preset is required for ont_core_cpp. Please provide a supported preset value -p".
     exit 1
