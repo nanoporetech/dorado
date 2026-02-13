@@ -3,6 +3,7 @@
 #include "NVIDIA_A100_80GB_PCIe.h"
 #include "NVIDIA_H100_NVL.h"
 #include "NVIDIA_RTX_A6000.h"
+#include "NVIDIA_RTX_PRO_5000_Blackwell.h"
 #include "NVIDIA_RTX_PRO_6000_Blackwell_Max-Q_Workstation_Edition.h"
 #include "Orin.h"
 #include "Quadro_GV100.h"
@@ -14,6 +15,7 @@ CudaChunkBenchmarks::CudaChunkBenchmarks() {
     AddNVIDIA_A100_80GB_PCIeBenchmarks(m_chunk_benchmarks);
     AddNVIDIA_H100_NVLBenchmarks(m_chunk_benchmarks);
     AddNVIDIA_RTX_A6000Benchmarks(m_chunk_benchmarks);
+    AddNVIDIA_RTX_PRO_5000_BlackwellBenchmarks(m_chunk_benchmarks);
     AddNVIDIA_RTX_PRO_6000_Blackwell_Max_Q_Workstation_EditionBenchmarks(m_chunk_benchmarks);
     AddOrinBenchmarks(m_chunk_benchmarks);
     AddQuadro_GV100Benchmarks(m_chunk_benchmarks);
@@ -34,6 +36,7 @@ CudaChunkBenchmarks::get_chunk_timings_internal(const GPUName& gpu_name,
             {"NVIDIA A100-PCIE-40GB", "NVIDIA A100 80GB PCIe"},
             {"NVIDIA A800 80GB PCIe", "NVIDIA A100 80GB PCIe"},
             {"NVIDIA H100 PCIe", "NVIDIA H100 NVL"},
+            {"NVIDIA RTX PRO 4500 Blackwell", "NVIDIA RTX PRO 5000 Blackwell"},
             {"NVIDIA RTX PRO 6000 Blackwell Workstation Edition",
              "NVIDIA RTX PRO 6000 Blackwell Max-Q Workstation Edition"},
     };

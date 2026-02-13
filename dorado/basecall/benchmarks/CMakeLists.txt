@@ -5,6 +5,8 @@ add_library(dorado_benchmarks STATIC
     NVIDIA_A100_80GB_PCIe.h
     NVIDIA_RTX_A6000.cpp
     NVIDIA_RTX_A6000.h
+    NVIDIA_RTX_PRO_5000_Blackwell.cpp
+    NVIDIA_RTX_PRO_5000_Blackwell.h
     NVIDIA_RTX_PRO_6000_Blackwell_Max-Q_Workstation_Edition.cpp
     NVIDIA_RTX_PRO_6000_Blackwell_Max-Q_Workstation_Edition.h
     Orin.cpp
