@@ -22,34 +22,30 @@ public:
      *  @param hdr The header to add.
      *  @param filename The name that should be reported if any errors
      *         occur while trying to merge in the header data.
-     *  @return An error string indicating what went wrong. If the header
-     *          was successfully merged this will be empty.
      * 
      *  The HD line from the first header added will be used
      *  as the HD line for the merged header.
      * 
      *  If any RG or SQ lines conflict with ones that have already been
-     *  merged, this will result in an error.
+     *  merged, this will throw a runtime error.
      */
-    std::string add_header(sam_hdr_t* hdr, const std::string& filename);
+    void add_header(sam_hdr_t* hdr, const std::string& filename);
 
     /** Add a header.
      *  @param hdr The header to add.
      *  @param filename The name that should be reported if any errors
      *         occur while trying to merge in the header data.
      *  @param read_group_selection A read group to filter on - other are ignored
-     *  @return An error string indicating what went wrong. If the header
-     *          was successfully merged this will be empty.
-     * 
+     *
      *  The HD line from the first header added will be used
      *  as the HD line for the merged header.
      * 
      *  If any RG or SQ lines conflict with ones that have already been
-     *  merged, this will result in an error.
+     *  merged, this will throw a runtime error.
      */
-    std::string add_header(sam_hdr_t* hdr,
-                           const std::string& filename,
-                           const std::string& read_group_selection);
+    void add_header(sam_hdr_t* hdr,
+                    const std::string& filename,
+                    const std::string& read_group_selection);
 
     /** Add a ReadGroup header line.
      *  @param read_group_id The read group id to add.

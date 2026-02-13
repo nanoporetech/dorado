@@ -3,7 +3,10 @@
 #include "TestUtils.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
 #include <htslib/sam.h>
+
+#include <stdexcept>
 
 #define TEST_GROUP "[merge_headers]"
 
@@ -25,12 +28,10 @@ CATCH_TEST_CASE("MergeHeadersTest: incompatible RG lines", TEST_GROUP) {
             "@SQ\tSN:ref1\tLN:1000\n";
     SamHdrPtr header1(sam_hdr_parse(hdr1_txt.size(), hdr1_txt.c_str()));
     SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
-
     MergeHeaders merger(true);
-    auto res1 = merger.add_header(header1.get(), "header1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2");
-    CATCH_CHECK(res2 == std::string("Error merging header header2. RG lines are incompatible."));
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1"));
+    CATCH_CHECK_THROWS_WITH(merger.add_header(header2.get(), "header2"),
+                            "Error merging header header2. RG lines are incompatible.");
 }
 
 CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines", TEST_GROUP) {
@@ -50,10 +51,9 @@ CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines", TEST_GROUP) {
     SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
 
     MergeHeaders merger(false);
-    auto res1 = merger.add_header(header1.get(), "header1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2");
-    CATCH_CHECK(res2 == std::string("Error merging header header2. SQ lines are incompatible."));
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1"));
+    CATCH_CHECK_THROWS_WITH(merger.add_header(header2.get(), "header2"),
+                            "Error merging header header2. SQ lines are incompatible.");
 }
 
 CATCH_TEST_CASE("MergeHeadersTest: compatible SQ lines with different UR tags", TEST_GROUP) {
@@ -73,10 +73,8 @@ CATCH_TEST_CASE("MergeHeadersTest: compatible SQ lines with different UR tags", 
     SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
 
     MergeHeaders merger(false);
-    auto res1 = merger.add_header(header1.get(), "header1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2");
-    CATCH_CHECK(res2.empty());
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1"));
+    CATCH_CHECK_NOTHROW(merger.add_header(header2.get(), "header2"));
 }
 
 CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines with different M5 tags", TEST_GROUP) {
@@ -96,10 +94,9 @@ CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines with different M5 tags"
     SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
 
     MergeHeaders merger(false);
-    auto res1 = merger.add_header(header1.get(), "header1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2");
-    CATCH_CHECK(res2 == std::string("Error merging header header2. SQ lines are incompatible."));
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1"));
+    CATCH_CHECK_THROWS_WITH(merger.add_header(header2.get(), "header2"),
+                            "Error merging header header2. SQ lines are incompatible.");
 }
 
 CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST_GROUP) {
@@ -119,10 +116,8 @@ CATCH_TEST_CASE("MergeHeadersTest: incompatible SQ lines, strip alignment", TEST
     SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
 
     MergeHeaders merger(true);
-    auto res1 = merger.add_header(header1.get(), "header1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2");
-    CATCH_CHECK(res2.empty());
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1"));
+    CATCH_CHECK_NOTHROW(merger.add_header(header2.get(), "header2"));
 
     merger.finalize_merge();
     auto merged_hdr = merger.get_merged_header();
@@ -160,12 +155,9 @@ CATCH_TEST_CASE("MergeHeadersTest: compatible header merge", TEST_GROUP) {
     SamHdrPtr header3(sam_hdr_parse(hdr3_txt.size(), hdr3_txt.c_str()));
 
     MergeHeaders merger(false);
-    auto res1 = merger.add_header(header1.get(), "header1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2");
-    CATCH_CHECK(res2.empty());
-    auto res3 = merger.add_header(header3.get(), "header3");
-    CATCH_CHECK(res3.empty());
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1"));
+    CATCH_CHECK_NOTHROW(merger.add_header(header2.get(), "header2"));
+    CATCH_CHECK_NOTHROW(merger.add_header(header3.get(), "header3"));
 
     merger.finalize_merge();
     auto merged_hdr = merger.get_merged_header();
@@ -214,10 +206,8 @@ CATCH_TEST_CASE("MergeHeadersTest: strip alignment, filtered", TEST_GROUP) {
     SamHdrPtr header2(sam_hdr_parse(hdr2_txt.size(), hdr2_txt.c_str()));
 
     MergeHeaders merger(true);
-    auto res1 = merger.add_header(header1.get(), "header1", "run1_model1");
-    CATCH_CHECK(res1.empty());
-    auto res2 = merger.add_header(header2.get(), "header2", "run1_model1");
-    CATCH_CHECK(res2.empty());
+    CATCH_CHECK_NOTHROW(merger.add_header(header1.get(), "header1", "run1_model1"));
+    CATCH_CHECK_NOTHROW(merger.add_header(header2.get(), "header2", "run1_model1"));
 
     merger.finalize_merge();
     auto merged_hdr = merger.get_merged_header();
