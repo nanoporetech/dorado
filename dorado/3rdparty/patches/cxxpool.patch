@@ -1,8 +1,16 @@
 diff --git a/src/cxxpool.h b/src/cxxpool.h
-index 36ce36b..39d4141 100644
+index 36ce36b..5d6eedb 100644
 --- a/src/cxxpool.h
 +++ b/src/cxxpool.h
-@@ -23,7 +23,7 @@ namespace detail {
+@@ -11,6 +11,7 @@
+ #include <queue>
+ #include <utility>
+ #include <functional>
++#include <tuple>
+ #include <vector>
+ #include <chrono>
+ #include <cstddef>
+@@ -23,10 +24,30 @@ namespace detail {
  template<typename Iterator>
  struct future_info {
      typedef typename std::iterator_traits<Iterator>::value_type future_type;
@@ -11,7 +19,30 @@ index 36ce36b..39d4141 100644
      static constexpr bool is_void = std::is_void<value_type>::value;
  };
  
-@@ -211,14 +211,15 @@ public:
++template<typename Functor, typename Tuple, std::size_t... I>
++auto apply_tuple_impl(Functor&& functor, Tuple&& args, std::index_sequence<I...>)
++        -> decltype(std::invoke(std::forward<Functor>(functor),
++                                std::get<I>(std::forward<Tuple>(args))...)) {
++    return std::invoke(std::forward<Functor>(functor),
++                       std::get<I>(std::forward<Tuple>(args))...);
++}
++
++template<typename Functor, typename Tuple>
++auto apply_tuple(Functor&& functor, Tuple&& args)
++        -> decltype(apply_tuple_impl(
++                std::forward<Functor>(functor),
++                std::forward<Tuple>(args),
++                std::make_index_sequence<
++                        std::tuple_size<typename std::decay<Tuple>::type>::value>{})) {
++    return apply_tuple_impl(std::forward<Functor>(functor), std::forward<Tuple>(args),
++                            std::make_index_sequence<
++                                    std::tuple_size<typename std::decay<Tuple>::type>::value>{});
++}
++
+ 
+ } // detail
+ 
+@@ -211,14 +232,15 @@ public:
      // Constructor. No threads are launched
      thread_pool()
      : done_{false}, paused_{false}, threads_{}, tasks_{}, task_counter_{},
@@ -29,7 +60,7 @@ index 36ce36b..39d4141 100644
          if (n_threads > 0) {
              std::lock_guard<std::mutex> thread_lock(thread_mutex_);
              const auto n_target = threads_.size() + n_threads;
-@@ -241,6 +242,10 @@ public:
+@@ -241,6 +263,10 @@ public:
          }
      }
  
@@ -40,7 +71,53 @@ index 36ce36b..39d4141 100644
      // Destructor. Joins all threads launched. Waits for all running tasks
      // to complete
      ~thread_pool() {
-@@ -339,6 +344,8 @@ public:
+@@ -290,17 +316,33 @@ public:
+     // Pushes a new task into the thread pool and returns the associated future.
+     // The task will have a priority of 0
+     template<typename Functor, typename... Args>
+-    auto push(Functor&& functor, Args&&... args) -> std::future<decltype(functor(args...))> {
+-        return push(0, std::forward<Functor>(functor), std::forward<Args>(args)...);
++    auto push(Functor&& functor, Args&&... args)
++            -> std::future<decltype(functor(args...))> {
++        return push_impl(static_cast<std::size_t>(0), std::forward<Functor>(functor),
++                         std::forward<Args>(args)...);
+     }
+ 
+     // Pushes a new task into the thread pool while providing a priority and
+     // returns the associated future. Higher priorities are processed first
+     template<typename Functor, typename... Args>
+-    auto push(std::size_t priority, Functor&& functor, Args&&... args) -> std::future<decltype(functor(args...))> {
++    auto push(std::size_t priority, Functor&& functor, Args&&... args)
++            -> std::future<decltype(functor(args...))> {
++        return push_impl(priority, std::forward<Functor>(functor), std::forward<Args>(args)...);
++    }
++
++private:
++    template<typename Functor, typename... Args>
++    auto push_impl(std::size_t priority, Functor&& functor, Args&&... args)
++            -> std::future<decltype(functor(args...))> {
+         typedef decltype(functor(args...)) result_type;
++        using functor_type = typename std::decay<Functor>::type;
++        using args_tuple_type = std::tuple<typename std::decay<Args>::type...>;
++        auto bound_functor = functor_type(std::forward<Functor>(functor));
++        auto bound_args = args_tuple_type(std::forward<Args>(args)...);
+         auto pack_task = std::make_shared<std::packaged_task<result_type()>>(
+-                std::bind(std::forward<Functor>(functor), std::forward<Args>(args)...));
++                [bound_functor = std::move(bound_functor), bound_args = std::move(bound_args)]() mutable -> result_type {
++                    return cxxpool::detail::apply_tuple(bound_functor, std::move(bound_args));
++                });
+         auto future = pack_task->get_future();
+         {
+             std::lock_guard<std::mutex> task_lock(task_mutex_);
+@@ -312,6 +354,7 @@ public:
+         return future;
+     }
+ 
++public:
+     // Returns the current number of queued tasks
+     std::size_t n_tasks() const {
+         std::lock_guard<std::mutex> task_lock(task_mutex_);
+@@ -339,6 +382,8 @@ public:
  private:
  
      void worker() {
@@ -49,7 +126,7 @@ index 36ce36b..39d4141 100644
          for (;;) {
              cxxpool::detail::priority_task task;
              {
-@@ -376,6 +383,7 @@ private:
+@@ -376,6 +421,7 @@ private:
      std::condition_variable task_cond_var_;
      mutable std::mutex task_mutex_;
      mutable std::mutex thread_mutex_;

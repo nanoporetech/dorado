@@ -8,7 +8,9 @@ build_dir=build-tidy
 num_jobs=$(( $( command -v nproc > /dev/null && nproc || sysctl -n hw.physicalcpu ) / 2 ))
 apply_fixits=
 cache_dir=
-while getopts "j:B:fc:" opt; do
+type=
+preset=
+while getopts "j:B:fc:t:p:" opt; do
   case $opt in
     j) # Number of jobs to use during build/analysis
        num_jobs="$OPTARG"
@@ -22,12 +24,37 @@ while getopts "j:B:fc:" opt; do
     c) # Location of download cache
        cache_dir="$OPTARG"
        ;;
-    ?) echo "Usage $0 [-j jobs] [-B build_dir] [-f]"
+    t) # Project type to run
+       type="$OPTARG"
+       ;;
+    p) # CMake preset to use for configuration
+       preset="$OPTARG"
+       ;;
+    ?) echo "Usage $0 [-j jobs] [-B build_dir] [-f] -t (ont_core_cpp|dorado) [-p preset]"
        grep " .) #" $0 | grep -v grep
        exit 1
        ;;
   esac
 done
+
+script_dir="$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd -P)"
+if [[ $type == "dorado" ]] ; then
+    # Assuming the current script is in .gitlab/
+  source_dir=$(dirname $script_dir)
+  if [[ -n $preset ]] ; then
+    echo "Presets are not currently supported in dorado. This parameter will be ignored."
+  fi
+elif [[ $type == "ont_core_cpp" ]] ; then
+    # Assuming the current script is in dorado/.gitlab/
+  source_dir=$(dirname $(dirname $script_dir))
+  if [[ -z $preset ]] ; then
+    echo "A preset is required for ont_core_cpp. Please provide a supported preset value -p".
+    exit 1
+  fi  
+else
+  echo "Invalid type argument: -t $type. Expects 'ont_core_cpp' or 'dorado'"
+  exit 1
+fi
 
 # Check that we can actually find clang-tidy.
 if ! command -v clang-tidy || ! command -v run-clang-tidy || ! command -v clang || ! command -v clang++ ; then
@@ -39,14 +66,12 @@ fi
 export CC=clang
 export CXX=clang++
 
-# Assuming the current script is in /scripts.
-source_dir=$(dirname $(dirname $0))
-
 # Make a new build folder to analyse.
 cmake \
   -S ${source_dir} \
   -B ${build_dir} \
   ${cache_dir:+-D DORADO_3RD_PARTY_DOWNLOAD=${cache_dir}} \
+  ${preset:+--preset ${preset}} \
   -D CMAKE_EXPORT_COMPILE_COMMANDS=ON
 
 # Build dependencies so that their headers get installed, otherwise
@@ -56,8 +81,18 @@ cmake \
   --target htslib_project \
   -j ${num_jobs}
 
-# Remove any 3rdparty .clang-tidy's otherwise we check them for errors.
-find ${source_dir}/dorado/3rdparty/* -name .clang-tidy -delete
+if [[ $type == "dorado" ]] ; then
+  # Remove any 3rdparty .clang-tidy's otherwise we check them for errors.
+  find ${source_dir}/dorado/3rdparty/* -name .clang-tidy -delete
+else
+  cmake \
+    --build ${build_dir} \
+    --target guppy_ipc_schema \
+    -j ${num_jobs}
+  
+  find ${source_dir}/dorado/dorado/3rdparty/* -name .clang-tidy -delete
+  find ${source_dir}/third_party/* -name .clang-tidy -delete
+fi
 
 # Print the current config to make sure it parses correctly.
 clang-tidy --dump-config
