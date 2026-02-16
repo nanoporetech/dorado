@@ -150,6 +150,27 @@ dorado_check_sq_m5_headers() {
     fi
 }
 
+dorado_multiple_references() {
+    title "dorado align against unsorted reference with multiple sequences"
+    # reference is a cutdown version of na24385 with only 2 chromosomes
+    local ref_fasta=$data_dir/aligner_test/na24385_reduced.fasta
+    local pod5_single=$data_dir/pod5/single_na24385.pod5
+    local bam_out=$output_dir/calls_multi_ref.bam
+
+    $dorado_bin basecaller ${model_5k} ${pod5_single} ${models_directory_arg} -b ${batch} --reference "${ref_fasta}" --skip-model-compatibility-check > "${bam_out}"
+    dorado_check_bam_not_empty "${bam_out}"
+
+    if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
+        aligned_genome=$(samtools view ${bam_out} | cut -f 3)
+        if [[ ${aligned_genome} != "chr9_NA24385_paternal" ]]; then
+            echo "Incorrect genome from multi-ref alignment: got ${aligned_genome}, expected chr9_NA24385_paternal"
+            exit 1
+        fi
+    fi
+}
+
+dorado_multiple_references
+
 dorado_emit_cram_iupac_reference() {
     title "dorado emit cram with iupac reference"
 

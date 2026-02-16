@@ -38,41 +38,45 @@ namespace dorado::utils {
 
 MergeHeaders::MergeHeaders(bool strip_alignment) : m_strip_alignment(strip_alignment) {}
 
-std::string MergeHeaders::add_header(sam_hdr_t* hdr, const std::string& filename) {
+void MergeHeaders::add_header(sam_hdr_t* hdr, const std::string& filename) {
     return add_header(hdr, filename, "");
 }
 
-std::string MergeHeaders::add_header(sam_hdr_t* hdr,
-                                     const std::string& filename,
-                                     const std::string& read_group_selection) {
+void MergeHeaders::add_header(sam_hdr_t* hdr,
+                              const std::string& filename,
+                              const std::string& read_group_selection) {
     // Append the filepath to index into sq_mappings
     m_filepaths.push_back(filename);
 
     if (!m_strip_alignment) {
         auto res = check_and_add_ref_data(hdr);
         if (res == -1) {
-            return "Error merging header " + filename + ". Invalid SQ line in header.";
+            throw std::runtime_error("Error merging header " + filename +
+                                     ". Invalid SQ line in header.");
         }
         if (res == -2) {
-            return "Error merging header " + filename + ". SQ lines are incompatible.";
+            throw std::runtime_error("Error merging header " + filename +
+                                     ". SQ lines are incompatible.");
         }
     }
 
     auto res = check_and_add_rg_data(hdr, read_group_selection);
     if (res == -1) {
-        return "Error merging header " + filename + ". Invalid RG line in header.";
+        throw std::runtime_error("Error merging header " + filename +
+                                 ". Invalid RG line in header.");
     }
     if (res == -2) {
-        return "Error merging header " + filename + ". RG lines are incompatible.";
+        throw std::runtime_error("Error merging header " + filename +
+                                 ". RG lines are incompatible.");
     }
 
     res = add_pg_data(hdr);
     if (res < 0) {
-        return "Error merging header " + filename + ". Invalid PG line in header.";
+        throw std::runtime_error("Error merging header " + filename +
+                                 ". Invalid PG line in header.");
     }
 
     add_other_lines(hdr);
-    return std::string();
 }
 
 sam_hdr_t* MergeHeaders::get_merged_header() const {
