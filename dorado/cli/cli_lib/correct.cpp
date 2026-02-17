@@ -201,11 +201,11 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.device = parser.get<std::string>("device");
 
     if (opt.device == cli::AUTO_DETECT_DEVICE) {
-#if DORADO_METAL_BUILD
-        opt.device = "cpu";
-#else
         opt.device = utils::get_auto_detected_device();
-#endif
+    }
+    if (opt.device == "metal") {
+        // Torch doesn't have a "metal" device, but "mps" instead.
+        opt.device = "mps";
     }
 
     opt.verbosity = verbosity;

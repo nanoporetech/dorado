@@ -28,7 +28,7 @@ int calculate_batch_size(const std::string& device, float memory_fraction) {
     const float model_mem = 1.f;       // GB
     const float per_sample_mem = 1.f;  // GB
     float usable_memory = 0.f;
-    if (device == "cpu") {
+    if ((device == "cpu") || (device == "metal") || (device == "mps")) {
 #if DORADO_METAL_BUILD
         size_t physical_memory =
                 utils::get_apple_physical_memory_bytes() / dorado::utils::BYTES_PER_GB;
