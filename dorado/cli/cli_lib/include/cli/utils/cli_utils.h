@@ -160,7 +160,7 @@ inline bool validate_device_string(const std::string& device) {
         return true;
     }
 #if DORADO_METAL_BUILD
-    if (device == "metal") {
+    if ((device == "metal") || (device == "mps")) {
         return true;
     }
 #elif DORADO_CUDA_BUILD
