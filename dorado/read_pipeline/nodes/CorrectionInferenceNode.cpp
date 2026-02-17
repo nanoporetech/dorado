@@ -484,7 +484,7 @@ CorrectionInferenceNode::CorrectionInferenceNode(
     }
 
     std::vector<std::string> devices;
-    if (device == "cpu") {
+    if ((device == "cpu") || (device == "metal") || (device == "mps")) {
         infer_threads = 1;
         devices.push_back(device);
     }
