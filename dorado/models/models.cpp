@@ -401,6 +401,28 @@ const std::vector<ModelInfo> models = {
                 ModelType::SIMPLEX,
                 ModelVariantPair{ModelVariant::SUP, VV::v5_2_0},
         },
+        // RNA v5.3.0
+        ModelInfo{
+                "rna004_130bps_fast@v5.3.0",
+                "6274d1ba511218c6c63dbc8005c62c1dc03f4c652259e512704d1a741c19f226",
+                CC::RNA004_130BPS,
+                ModelType::SIMPLEX,
+                ModelVariantPair{ModelVariant::FAST, VV::v5_3_0},
+        },
+        ModelInfo{
+                "rna004_130bps_hac@v5.3.0",
+                "e24fc6ac7a9cd955af857870781b26031f8eef4c1f31c28ce07d2ddc7996d95f",
+                CC::RNA004_130BPS,
+                ModelType::SIMPLEX,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0, true},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.3.0",
+                "c0df03fb19bbfa128fcf8f7ce9c5814fb0aacee154bfb903ba5e97959b445bd9",
+                CC::RNA004_130BPS,
+                ModelType::SIMPLEX,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_3_0},
+        },
 };
 
 const std::vector<ModelInfo> deprecated = {
@@ -1270,6 +1292,86 @@ const std::vector<ModelInfo> models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v5_2_0},
                 ModsVariantPair{ModsVariant::M_pseU_2OmeU, VV::v1_0_0},
         },
+
+        // RNA004 v5.3.0
+        // 2OmeG - all context
+        ModelInfo{
+                "rna004_130bps_sup@v5.3.0_2OmeG@v1",
+                "3b05b4ba589c264ec8a865fcc42b4c127b9abc83e82c55e534bbdb7826a90800",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_2OmeG, VV::v1_0_0},
+        },
+        // m5C & m5C_2OmeC - all context
+        ModelInfo{
+                "rna004_130bps_hac@v5.3.0_m5C@v1",
+                "1cf10faa5f2ddd5382cfbd0bf67fb7f99c92ff5e8a7d688904001029106802e2",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_m5C, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.3.0_m5C_2OmeC@v1",
+                "7c7cd3e98cd7148570040a94157d080f0076634b9e9ba677ebb657a97a630e0c",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_m5C_2OmeC, VV::v1_0_0},
+        },
+        // inosine_m6A & inosine_m6A_2OmeA - all context
+        ModelInfo{
+                "rna004_130bps_hac@v5.3.0_inosine_m6A@v1",
+                "479044e9489a348d26cfd2a13132cd43a2097b7c44029c281999f145255d232f",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_inosine_m6A, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.3.0_inosine_m6A_2OmeA@v1",
+                "22fd49612bfe654eae202fefe1a4beea49a8c738c27e57891dae75a82d376859",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_inosine_m6A_2OmeA, VV::v1_0_0},
+        },
+        // m6A - DRACH
+        ModelInfo{
+                "rna004_130bps_hac@v5.3.0_m6A_DRACH@v1",
+                "8a4acbcccca5608dc6f0e7d9a110710cf12b21f052bf3b9f62ad9a142afad6d0",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.3.0_m6A_DRACH@v1",
+                "4a6872f8239a430b45e46ecb73860bf206ba8d505b268393417a47ef8212faec",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_m6A_DRACH, VV::v1_0_0},
+        },
+        // pseU & pseU_2OmeU - all context
+        ModelInfo{
+                "rna004_130bps_hac@v5.3.0_pseU@v1",
+                "396e2eaa7a1d00abf445c579413bb605ea6e9531a1e4bf291329cfe2ec39aa19",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_pseU, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_130bps_sup@v5.3.0_pseU_2OmeU@v1",
+                "96f2aba710b9b2995a292369c992ba64cc2e3e01ea7360b2ae66556b3db0a91a",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v5_3_0},
+                ModsVariantPair{ModsVariant::M_pseU_2OmeU, VV::v1_0_0},
+        },
+
 };
 
 std::vector<ModelInfo> deprecated = {

@@ -176,6 +176,7 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
         CATCH_CHECK(to_string(ModelVersion::v5_0_0) == "v5.0.0");
         CATCH_CHECK(to_string(ModelVersion::v5_1_0) == "v5.1.0");
         CATCH_CHECK(to_string(ModelVersion::v5_2_0) == "v5.2.0");
+        CATCH_CHECK(to_string(ModelVersion::v5_3_0) == "v5.3.0");
         CATCH_CHECK(to_string(ModelVersion::NONE) == "latest");
         CATCH_CHECK(vers.size() == static_cast<size_t>(ModelVersion::NONE) +
                                            1);  // +1 as "NONE" is included in the map
