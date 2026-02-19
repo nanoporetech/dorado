@@ -2,6 +2,31 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.4.0] (19 February 2026)
+
+This release of Dorado introduces new RNA v5.3.0 basecalling models, CRAM support, and a variety of other improvements and fixes.
+
+The new RNA models address an issue causing decreased coverage at the 3' end of reads in RNA v5.2.0 models.
+
+CRAM output is enabled using `--emit-cram`. Compression when using CRAM depends on the content of the output files. When basecalling with all-context modifications (5mC, 5hmC, 6mA) and `--emit-moves`, internal benchmarks showed ~35% smaller files with CRAM compared to BAM output.
+
+Other changes include improvements to local haplotagging in Dorado `variant`, enabling GPU acceleration for Dorado correct on macOS when available, and bug fixes for Dorado `demux` and `summary`.
+
+* 952de0b722928794410334c7981d847f1a9262a4 - RNA v5.3.0 basecalling models
+* 1cc38b62389b5bac164a7590d4d58426102f29e9 - Add CRAM support using `--emit-cram`
+* 735ef546ef3e8ed0c3a4f4823e21b71cbaf1fa85 - Updates and improvements to local haplotagging in Dorado `variant`
+* ccc6b947f8595ae05f28bd1793a81bb5946efda5 - Make the Dorado `polish` and `variant` config parameter `basecaller_model` optional
+* ea12c45aa527e8ff1d7e9c721bbf632c78a0d8ac - Dorado `correct` now uses GPU if available on MacOS
+* cce7969c384f94dd27e4cf214afa200b4826450c - Enable poly(A) calibration with Transformer-based models
+* cbbe6dc8aab00219c5444f3dce21801518cf66a0 - Fix move table output and metadata when performing sequence-based RNA trimming
+* 635fc9393e0db5f47a8cd1992dcdc20b83dedada - Update minimap2 build to use SSE4.1 optimisations
+* eb3aa6f4a113ff7ba0d3f9af5c92de81c4a3f618 - Add `TWIST-96B-UDI`, `TWIST-96C-UDI`, and `TWIST-96D-UDI` barcodes
+* 28176dd8083980c3f665c517d2eafa96068b894b - Report the number of midstrand barcodes detected in Dorado `demux` output summary
+* 190fd114217b15fa42084f2bf5c7c2d89267c465 - Fix crash in Dorado `demux` for BAMs without `RG` lines
+* 081a09e250a0fc941130d1ffd5a57aa0e7ff04b1 - Restrict `RG` header lines to just the read groups that can be emitted to the target file
+* 7213ebe48476957be98daf40cdec8174b8860d8d - Fix incorrect alignment genome in Dorado `summary` outputs when BAM file header contains multiple unordered `SQ` lines
+
+
 # [1.3.2] (17 February 2026)
 
 This release of Dorado introduces a minor bugfix to Dorado `demux`.
