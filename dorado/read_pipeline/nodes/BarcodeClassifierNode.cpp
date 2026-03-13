@@ -126,7 +126,8 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     }
 
     auto bc_res = barcoder->barcode(seq, barcoding_info->barcode_both_ends,
-                                    barcoding_info->allowed_barcodes);
+                                    barcoding_info->allowed_barcodes,
+                                    barcoding_info->max_barcode_errors);
     auto bc = generate_barcode_string(bc_res);
     if (barcoding_info->sample_sheet) {
         bc_res.alias = barcoding_info->sample_sheet->get_alias(bc);
@@ -207,7 +208,8 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
 
     // get the sequence to map from the record
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
-                                    barcoding_info->allowed_barcodes);
+                                    barcoding_info->allowed_barcodes,
+                                    barcoding_info->max_barcode_errors);
     read.read_common.barcode = generate_barcode_string(bc_res);
     utils::trace_log("Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);
     {

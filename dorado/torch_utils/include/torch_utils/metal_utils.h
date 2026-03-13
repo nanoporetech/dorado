@@ -2,10 +2,13 @@
 
 // Some NS types make use of tagged pointers which aren't aligned and trip up UBSan.
 // NS::SharedPtr also incorrectly uses the no_sanitize attribute since it should be on the inner class.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wignored-attributes"
 #pragma clang attribute push(__attribute__((no_sanitize("alignment"), no_sanitize("null"))), \
                              apply_to = function)
 #include <Metal/Metal.hpp>
 #pragma clang attribute pop
+#pragma clang diagnostic pop
 
 #include "utils/PostCondition.h"
 

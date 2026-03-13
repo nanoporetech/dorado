@@ -22,7 +22,8 @@ public:
 
     BarcodeScoreResult barcode(const std::string& seq,
                                bool barcode_both_ends,
-                               const BarcodeFilterSet& allowed_barcodes) const;
+                               const BarcodeFilterSet& allowed_barcodes,
+                               int max_barcode_errors = -1) const;
 
 private:
     const KitInfoProvider m_kit_info_provider;
@@ -54,6 +55,10 @@ private:
                                          const std::vector<BarcodeCandidateKit>& adapter,
                                          bool barcode_both_ends,
                                          const BarcodeFilterSet& allowed_barcodes) const;
+    BarcodeScoreResult barcode_fuzzy(const std::string& read_seq,
+                                     const std::vector<BarcodeCandidateKit>& candidates,
+                                     int max_errors,
+                                     const BarcodeFilterSet& allowed_barcodes) const;
 };
 
 }  // namespace demux

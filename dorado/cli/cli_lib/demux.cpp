@@ -56,6 +56,7 @@ std::shared_ptr<const dorado::demux::BarcodingInfo> get_barcoding_info(
     }
     result->barcode_both_ends = parser.get<bool>("--barcode-both-ends");
     result->trim = !parser.get<bool>("--no-trim");
+    result->max_barcode_errors = parser.get<int>("--max-barcode-errors");
     auto barcode_sample_sheet = parser.get<std::string>("--sample-sheet");
     if (!barcode_sample_sheet.empty()) {
         result->sample_sheet =
@@ -129,6 +130,12 @@ int demuxer(int argc, char* argv[]) {
                 .help("Path to file with custom barcode arrangement.");
         parser.add_argument("--barcode-sequences")
                 .help("Path to file with custom barcode sequences.");
+        parser.add_argument("--max-barcode-errors")
+                .help("Enable fuzzy barcode matching using edit distance. Accepts barcodes "
+                      "with up to this many errors (insertions, deletions, substitutions). "
+                      "Bypasses flank-based scoring. Use -1 to disable (default).")
+                .default_value(-1)
+                .scan<'i', int>();
     }
     {
         parser.add_group("Trimming arguments");
