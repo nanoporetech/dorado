@@ -189,10 +189,108 @@ BarcodeClassifier::~BarcodeClassifier() = default;
 
 BarcodeScoreResult BarcodeClassifier::barcode(const std::string& seq,
                                               bool barcode_both_ends,
-                                              const BarcodeFilterSet& allowed_barcodes) const {
+                                              const BarcodeFilterSet& allowed_barcodes,
+                                              int max_barcode_errors) const {
+    if (max_barcode_errors >= 0) {
+        return barcode_fuzzy(seq, m_barcode_candidates, max_barcode_errors, allowed_barcodes);
+    }
     auto best_barcode =
             find_best_barcode(seq, m_barcode_candidates, barcode_both_ends, allowed_barcodes);
     return best_barcode;
+}
+
+BarcodeScoreResult BarcodeClassifier::barcode_fuzzy(
+        const std::string& read_seq,
+        const std::vector<BarcodeCandidateKit>& candidates,
+        int max_errors,
+        const BarcodeFilterSet& allowed_barcodes) const {
+    if (read_seq.empty() || candidates.empty()) {
+        return UNCLASSIFIED;
+    }
+
+    const BarcodeCandidateKit& candidate = candidates[0];
+
+    auto edlib_config = edlibDefaultAlignConfig();
+    edlib_config.mode = EDLIB_MODE_HW;  // Semi-global: find barcode anywhere in read
+    edlib_config.task = EDLIB_TASK_LOC;
+
+    std::vector<BarcodeScoreResult> results;
+
+    for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
+        if (!barcode_is_permitted(allowed_barcodes, candidate.barcode_names[i])) {
+            continue;
+        }
+
+        const auto& barcode_fwd = candidate.barcodes1[i];
+        const auto& barcode_rev = candidate.barcodes1_rev[i];
+
+        // Try forward barcode against read
+        auto fwd_result = edlibAlign(barcode_fwd.data(), int(barcode_fwd.length()),
+                                     read_seq.data(), int(read_seq.length()), edlib_config);
+        int fwd_penalty = fwd_result.editDistance;
+        int fwd_start = (fwd_result.numLocations > 0) ? fwd_result.startLocations[0] : -1;
+        int fwd_end = (fwd_result.numLocations > 0) ? fwd_result.endLocations[0] + 1 : -1;
+        edlibFreeAlignResult(fwd_result);
+
+        // Try reverse complement barcode against read
+        auto rev_result = edlibAlign(barcode_rev.data(), int(barcode_rev.length()),
+                                     read_seq.data(), int(read_seq.length()), edlib_config);
+        int rev_penalty = rev_result.editDistance;
+        int rev_start = (rev_result.numLocations > 0) ? rev_result.startLocations[0] : -1;
+        int rev_end = (rev_result.numLocations > 0) ? rev_result.endLocations[0] + 1 : -1;
+        edlibFreeAlignResult(rev_result);
+
+        bool use_fwd = (fwd_penalty <= rev_penalty);
+        int best_penalty = use_fwd ? fwd_penalty : rev_penalty;
+
+        BarcodeScoreResult res;
+        res.barcode_name = candidate.barcode_names[i];
+        res.kit = candidate.kit;
+        res.barcode_kit = candidate.barcode_kit;
+        res.penalty = best_penalty;
+        res.barcode_score = (barcode_fwd.length() > 0)
+                                    ? 1.0f - float(best_penalty) / float(barcode_fwd.length())
+                                    : 0.0f;
+        res.flank_score = 1.0f;  // No flank scoring in fuzzy mode
+
+        if (use_fwd) {
+            res.top_barcode_pos = {fwd_start, fwd_end};
+            res.top_penalty = fwd_penalty;
+            res.top_barcode_score = res.barcode_score;
+        } else {
+            res.bottom_barcode_pos = {rev_start, rev_end};
+            res.bottom_penalty = rev_penalty;
+            res.bottom_barcode_score = res.barcode_score;
+        }
+        res.use_top = use_fwd;
+
+        results.push_back(std::move(res));
+    }
+
+    if (results.empty()) {
+        return UNCLASSIFIED;
+    }
+
+    // Sort by penalty (ascending)
+    std::sort(results.begin(), results.end(),
+              [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
+
+    const auto& best = results[0];
+
+    // Check if the best penalty is within the max errors threshold
+    if (best.penalty > max_errors) {
+        return UNCLASSIFIED;
+    }
+
+    // Require separation from second best to avoid ambiguous assignments
+    if (results.size() > 1) {
+        int penalty_dist = results[1].penalty - best.penalty;
+        if (penalty_dist < m_scoring_params.min_barcode_penalty_dist) {
+            return UNCLASSIFIED;
+        }
+    }
+
+    return best;
 }
 
 // Generate all possible barcode candidates. If kit name is passed
