@@ -27,7 +27,7 @@ using namespace dorado::model_resolution;
 namespace {
 
 void print_models(bool yaml) {
-    std::unordered_map<std::string_view, const std::vector<models::ModelInfo>& (*)()> all_models;
+    std::unordered_map<std::string_view, std::span<const models::ModelInfo> (*)()> all_models;
     all_models["simplex models"] = models::simplex_models;
     all_models["stereo models"] = models::stereo_models;
     all_models["modification models"] = models::modified_models;

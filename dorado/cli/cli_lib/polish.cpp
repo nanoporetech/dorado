@@ -614,7 +614,7 @@ std::string determine_model_name(const std::string& basecaller_model,
     return it->second + polish_model_suffix;
 }
 
-int32_t count_model_hits(const dorado::models::ModelList& model_list,
+int32_t count_model_hits(std::span<const dorado::models::ModelInfo> model_list,
                          const std::string& model_name) {
     int32_t num_found = 0;
     for (const auto& info : model_list) {

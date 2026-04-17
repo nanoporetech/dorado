@@ -61,7 +61,7 @@ void sort_versions(std::vector<ModelInfo>& infos) {
     std::sort(infos.begin(), infos.end(), cmp_version);
 }
 
-void suggest_models(const std::vector<ModelInfo>& models,
+void suggest_models(std::span<const ModelInfo> models,
                     const std::string& description,
                     const Chemistry& chemistry,
                     const ModelVariantPair& model,
@@ -135,7 +135,7 @@ std::string format_msg(const Chemistry& chemistry,
 
 }  // namespace
 
-ModelInfo find_model(const std::vector<ModelInfo>& models,
+ModelInfo find_model(std::span<const ModelInfo> models,
                      const std::string& description,
                      const Chemistry& chemistry,
                      const ModelVariantPair& model,
@@ -164,7 +164,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
     return selection;
 }
 
-std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
+std::vector<ModelInfo> find_models(std::span<const ModelInfo> models,
                                    const Chemistry& chemistry,
                                    const ModelVariantPair& model,
                                    const ModsVariantPair& mods) {
@@ -1898,17 +1898,17 @@ const std::vector<ModelInfo> models = {
 
 }  // namespace small_variant_caller
 
-const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
-const std::vector<ModelInfo>& simplex_deprecated_models() { return simplex::deprecated; }
-const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
-const std::vector<ModelInfo>& modified_models() { return modified::models; }
-const std::vector<ModelInfo>& modified_deprecated_models() { return modified::deprecated; }
-const std::vector<ModelInfo>& correction_models() { return correction::models; }
-const std::vector<ModelInfo>& polish_models() { return polisher::models; }
-const std::vector<ModelInfo>& variant_models() { return small_variant_caller::models; }
+std::span<const ModelInfo> simplex_models() { return simplex::models; }
+std::span<const ModelInfo> simplex_deprecated_models() { return simplex::deprecated; }
+std::span<const ModelInfo> stereo_models() { return stereo::models; }
+std::span<const ModelInfo> modified_models() { return modified::models; }
+std::span<const ModelInfo> modified_deprecated_models() { return modified::deprecated; }
+std::span<const ModelInfo> correction_models() { return correction::models; }
+std::span<const ModelInfo> polish_models() { return polisher::models; }
+std::span<const ModelInfo> variant_models() { return small_variant_caller::models; }
 
 namespace {
-std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
+std::vector<std::string> unpack_names(std::span<const ModelInfo> infos) {
     std::vector<std::string> v;
     v.reserve(infos.size());
     for (const auto& item : infos) {
