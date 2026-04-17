@@ -139,12 +139,12 @@ stats::NamedStats HtsFileWriter::sample_stats() const {
     return stats;
 }
 
-void HtsFileWriter::set_cram_reference(const std::string &reference) {
+void HtsFileWriter::set_cram_reference(std::string reference) {
     if (m_mode != OutputMode::CRAM) {
         throw std::logic_error("Invalid call to set_cram_reference when output mode is: '" +
                                to_string(m_mode) + "'");
     }
-    m_reference = reference;
+    m_reference = std::move(reference);
 };
 
 void HtsFileWriter::set_shared_header(SamHdrSharedPtr header) {
@@ -155,11 +155,11 @@ void HtsFileWriter::set_shared_header(SamHdrSharedPtr header) {
 };
 
 void HtsFileWriter::set_dynamic_header(
-        const std::shared_ptr<const utils::HeaderMapper::HeaderMap> &header_map) {
+        std::shared_ptr<const utils::HeaderMapper::HeaderMap> header_map) {
     if (m_shared_header != nullptr) {
         throw std::logic_error("set_dynamic_header is incompatible with set_shared_header.");
     }
-    m_dynamic_header = header_map;
+    m_dynamic_header = std::move(header_map);
 };
 
 }  // namespace hts_writer
