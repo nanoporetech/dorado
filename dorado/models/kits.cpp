@@ -2,6 +2,8 @@
 
 #include "utils/string_utils.h"
 
+#include <spdlog/fmt/bundled/format.h>
+
 #include <algorithm>
 #include <array>
 #include <stdexcept>
@@ -26,12 +28,12 @@ Code get_code(std::string name, Code default_value, const std::unordered_map<Cod
 
 template <typename Code, typename Info>
 Info get_info(const Code& code,
-              const std::string& description,
+              std::string_view description,
               const std::unordered_map<Code, Info>& codes) {
     auto it = codes.find(code);
     if (it == std::end(codes)) {
-        throw std::logic_error("Unknown " + description +
-                               " enum: " + std::to_string(static_cast<int>(code)));
+        throw std::logic_error(
+                fmt::format("Unknown {} enum: {}", description, fmt::underlying(code)));
     }
     return it->second;
 }

@@ -1,5 +1,7 @@
 #include "models/metadata.h"
 
+#include <spdlog/fmt/bundled/format.h>
+
 #include <algorithm>
 #include <ostream>
 #include <stdexcept>
@@ -111,14 +113,14 @@ Variant get_variant(const std::string& variant,
 
 template <typename Variant>
 std::string to_string(const Variant& variant,
-                      const std::string& description,
+                      std::string_view description,
                       const std::unordered_map<std::string, Variant>& variants) {
     auto it = std::find_if(std::begin(variants), std::end(variants),
                            [&variant](auto&& kv) { return kv.second == variant; });
 
     if (it == std::end(variants)) {
-        throw std::logic_error("Unknown + " + description +
-                               " enum: " + std::to_string(static_cast<int>(variant)));
+        throw std::logic_error(
+                fmt::format("Unknown {} enum: {}", description, fmt::underlying(variant)));
     }
     return it->first;
 }
