@@ -1914,7 +1914,7 @@ std::vector<std::string> unpack_names(std::span<const ModelInfo> infos) {
     std::vector<std::string> v;
     v.reserve(infos.size());
     for (const auto& item : infos) {
-        v.push_back(std::string(item.name));
+        v.push_back(item.name);
     }
     return v;
 }
