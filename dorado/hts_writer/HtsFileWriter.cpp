@@ -1,7 +1,6 @@
 #include "hts_writer/HtsFileWriter.h"
 
 #include "hts_utils/bam_utils.h"
-#include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
 #include "utils/time_utils.h"
 

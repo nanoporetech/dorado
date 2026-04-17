@@ -3,7 +3,6 @@
 #include "kits.h"
 
 #include <iosfwd>
-#include <set>
 
 namespace dorado::models {
 
