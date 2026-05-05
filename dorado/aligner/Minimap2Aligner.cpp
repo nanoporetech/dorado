@@ -51,7 +51,7 @@ void add_sa_tag(bam1_t* record,
         clip5 = r->rev ? l_seq - r->qe : r->qs;
         clip3 = r->rev ? r->qs : l_seq - r->qe;
 
-        ss << std::string(idx->seq[r->rid].name) << ",";
+        ss << idx->seq[r->rid].name << ",";
         ss << r->rs + 1 << ",";
         ss << "+-"[r->rev] << ",";
         if (clip5) {

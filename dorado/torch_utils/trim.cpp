@@ -175,7 +175,7 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
                 }
                 mod.remove_prefix(std::min(comma_pos + 1, mod.length()));  // No comma at the end.
             }
-            trimmed_modbase_str << std::string(prefix) << counts.str() << ";";
+            trimmed_modbase_str << prefix << counts.str() << ";";
         }
     }
     return {trimmed_modbase_str.str(), trimmed_modbase_probs};
