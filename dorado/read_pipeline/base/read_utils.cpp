@@ -8,7 +8,6 @@
 #include <ATen/TensorIndexing.h>
 #include <spdlog/spdlog.h>
 
-#include <cmath>
 #include <cstdint>
 
 using Slice = at::indexing::Slice;
@@ -127,7 +126,7 @@ void mux_change_trim_read(ReadCommon& read_common) {
     const int64_t trim_seq_idx = find_mux_change_trim_seq_index(read_common.qstring);
 
     // Excessive trimming - do nothing
-    if (trim_seq_idx < std::floor(sequence_size * 0.3f)) {
+    if (trim_seq_idx < sequence_size * 3 / 10) {
         trace_log("mux_change_trimming {} - size: {} trim: {} excessive trimming",
                   read_common.read_id, sequence_size, trim_seq_idx);
         return;
