@@ -88,7 +88,7 @@ int64_t find_mux_change_trim_seq_index(const std::string& qstring) {
 
     for (int64_t i = size - 1; i >= 0; --i) {
         // Cast the qstring char to qscore. -33 is skipped by adding 33 to thresholds
-        const int qs = static_cast<int>(qstring[i]);
+        const int qs = static_cast<unsigned char>(qstring[i]);
 
         if (qs <= kLowThreshold) {
             cum_sum += kLowScore;

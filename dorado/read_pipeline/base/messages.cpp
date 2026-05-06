@@ -179,7 +179,7 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
             m[idx + 1] = static_cast<uint8_t>(moves[idx]);
         }
 
-        bam_aux_update_array(aln, "mv", 'c', int(m.size()), (uint8_t *)m.data());
+        bam_aux_update_array(aln, "mv", 'c', int(m.size()), m.data());
     }
 
     if (rna_poly_tail_length != ReadCommon::POLY_TAIL_NOT_ENABLED) {
