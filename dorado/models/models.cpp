@@ -205,6 +205,8 @@ ModelInfo get_modbase_model_simplex_parent(const ModelInfo& modbase) {
     throw std::logic_error("Failed to find modbase model parent '" + modbase.name + "'");
 }
 
+namespace {
+
 using CC = Chemistry;
 using VV = ModelVersion;
 
@@ -1899,6 +1901,8 @@ const std::array models = {
 };
 
 }  // namespace small_variant_caller
+
+}  // namespace
 
 std::span<const ModelInfo> simplex_models() { return simplex::models; }
 std::span<const ModelInfo> simplex_deprecated_models() { return simplex::deprecated; }
