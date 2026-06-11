@@ -802,15 +802,13 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
     if (test_case.expect_throw) {
         CATCH_CHECK_THROWS(general_decode_variants(
-                decoder, vc_sample.seq_id, vc_sample.positions_major, vc_sample.positions_minor,
-                vc_sample.logits, draft, test_case.pass_min_qual, test_case.ambig_ref,
+                decoder, vc_sample, draft, test_case.pass_min_qual, test_case.ambig_ref,
                 test_case.return_all, test_case.normalize, test_case.merge_overlapping,
                 test_case.merge_adjacent, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS));
 
     } else {
         const std::vector<Variant> result = general_decode_variants(
-                decoder, vc_sample.seq_id, vc_sample.positions_major, vc_sample.positions_minor,
-                vc_sample.logits, draft, test_case.pass_min_qual, test_case.ambig_ref,
+                decoder, vc_sample, draft, test_case.pass_min_qual, test_case.ambig_ref,
                 test_case.return_all, test_case.normalize, test_case.merge_overlapping,
                 test_case.merge_adjacent, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
 

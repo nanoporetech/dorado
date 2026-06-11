@@ -1069,10 +1069,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 
 std::vector<Variant> general_decode_variants(
         const DecoderBase& decoder,
-        const int32_t seq_id,
-        const std::vector<int64_t>& positions_major,
-        const std::vector<int64_t>& positions_minor,
-        const at::Tensor& probs,  // Probabilities for a single sample (not batch).
+        const VariantCallingSample& vc_sample,
         const std::string_view draft,
         const float pass_min_qual,
         const bool ambig_ref,
@@ -1081,34 +1078,13 @@ std::vector<Variant> general_decode_variants(
         const bool merge_overlapping,
         const bool merge_adjacent,
         const std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins) {
-    const int64_t num_columns = std::ssize(positions_major);
-
     // Validate inputs.
-    if (seq_id < 0) {
-        throw std::runtime_error("Sequence ID is negative in general_decode_variants: " +
-                                 std::to_string(seq_id));
-    }
-    if (std::size(positions_major) != std::size(positions_minor)) {
-        std::ostringstream oss;
-        oss << "Size of positions_major (" << std::size(positions_major)
-            << ") and positions_minor (" << std::size(positions_minor)
-            << ") differs in general_decode_variants.";
-        throw std::runtime_error(oss.str());
-    }
-    if (!probs.defined()) {
-        throw std::runtime_error(
-                "The tensor of probabilities is not defined in general_decode_variants.");
-    }
-    if (probs.size(0) != num_columns) {
-        std::ostringstream oss;
-        oss << "Input probs tensor is of incorrect size. probs.size = " << probs.size(0)
-            << ", num_columns = " << num_columns;
-        throw std::runtime_error(oss.str());
-    }
-    if ((std::size(probs.sizes()) < 2) || (std::size(probs.sizes()) > 3)) {
-        throw std::runtime_error("Input probs tensor is of unexpected size. Tensor dimensions: " +
-                                 std::to_string(probs.sizes().size()) + ", expected 2 or 3.");
-    }
+    vc_sample.validate();
+
+    const int32_t seq_id = vc_sample.seq_id;
+    const std::vector<int64_t>& positions_major = vc_sample.positions_major;
+    const std::vector<int64_t>& positions_minor = vc_sample.positions_minor;
+    const at::Tensor probs = vc_sample.logits;
 
     // No work to do.
     if (std::empty(positions_major)) {
