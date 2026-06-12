@@ -289,6 +289,7 @@ struct variant_dorado_style_t {
     std::string ref;
     std::vector<std::string> alts;
     std::pair<char, char> genotype;
+    int depth;
 };
 
 std::string variant_dorado_style_to_string(const variant_dorado_style_t &v);

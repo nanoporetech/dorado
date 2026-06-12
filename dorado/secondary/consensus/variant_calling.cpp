@@ -649,6 +649,25 @@ bool append_ref_base(Variant& var,
     return true;
 }
 
+Variant add_depth(const Variant& var, const at::Tensor& depth) {
+    Variant ret = var;
+
+    if (depth.size(0) == 0) {
+        ret.genotype.push_back(std::make_pair("DP", "."));
+        ret.genotype.push_back(std::make_pair("MIN_DP", "."));
+    } else {
+        ret.genotype.push_back(std::make_pair(
+                "DP",
+                std::to_string(at::median(depth.index({at::indexing::Slice(ret.rstart, ret.rend)}))
+                                       .item<int64_t>())));
+        ret.genotype.push_back(std::make_pair(
+                "MIN_DP",
+                std::to_string(at::min(depth.index({at::indexing::Slice(ret.rstart, ret.rend)}))
+                                       .item<int64_t>())));
+    }
+    return ret;
+}
+
 }  // namespace
 
 Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual) {
@@ -1335,8 +1354,9 @@ std::vector<Variant> general_decode_variants(
         if (const auto it = new_var.info.find("END");
             (new_var.filter == ".") && (it != std::cend(new_var.info))) {
             set_gvcf_reference_block_end(new_var, std::stoll(it->second));
+        } else {
+            new_var = add_depth(new_var, vc_sample.depth);
         }
-
         // Sanity check.
         if (is_valid(new_var)) {
             normalized_variants.emplace_back(std::move(new_var));

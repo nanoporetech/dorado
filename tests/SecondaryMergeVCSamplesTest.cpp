@@ -36,6 +36,7 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {195447, 195447, 195447, 195447},
                     {},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
                 },
             },
             {
@@ -50,12 +51,14 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3},
                     {0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
                 },
                 {
                     0,
                     {4, 5, 6, 7, 8},
                     {0, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
                 },
             },
             {
@@ -64,6 +67,7 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3, 4, 5, 6, 7, 8},
                     {0, 0, 0, 0, 0, 0, 0, 0, 0,},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::tensor({1, 1, 1, 1, 2, 2, 2, 2, 2}, at::kInt),
                 },
             },
             false,
@@ -76,12 +80,14 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {195447, 195447, 195447, 195447},
                     {0, 1, 2, 3},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
                 },
                 {
                     0,
                     {195447, 195448, 195449, 195450, 195451},
                     {4, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
                 },
             },
             {
@@ -90,6 +96,7 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {195447, 195447, 195447, 195447, 195447, 195448, 195449, 195450, 195451},
                     {0, 1, 2, 3, 4, 0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::tensor({1, 1, 1, 1, 2, 2, 2, 2, 2}, at::kInt),
                 },
             },
             false,
@@ -102,12 +109,14 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3},
                     {0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
                 },
                 {
                     0,
                     {5, 6, 7, 8},
                     {0, 0, 0, 0},
                     at::tensor({5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({4}, 2, at::kInt),
                 },
             },
             {
@@ -116,12 +125,14 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3},
                     {0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
                 },
                 {
                     0,
                     {5, 6, 7, 8},
                     {0, 0, 0, 0},
                     at::tensor({5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({4}, 2, at::kInt),
                 },
             },
             false,
@@ -134,12 +145,14 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3, 4, 4},
                     {0, 0, 0, 0, 0, 1},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 3.1, 3.2}, at::kFloat),
+                    at::ones({6}, at::kInt),
                 },
                 {
                     0,
                     {4, 5, 6, 7, 8},
                     {5, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
                 },
             },
             {
@@ -148,12 +161,14 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3, 4, 4},
                     {0, 0, 0, 0, 0, 1},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 3.1, 3.2}, at::kFloat),
+                    at::ones({6}, at::kInt),
                 },
                 {
                     0,
                     {4, 5, 6, 7, 8},
                     {5, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
                 },
             },
             false,
@@ -172,18 +187,22 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
 }
 
 CATCH_TEST_CASE("variant_calling_sample_less orders by full start coordinate", TEST_GROUP) {
+    // clang-format off
     const VariantCallingSample major_start_only{
             0,
             {195447, 195447, 195448},
             {1, 2, 0},
             at::ones({3, 1}, at::kFloat),
+            at::ones({3}, at::kInt),
     };
     const VariantCallingSample true_predecessor{
             0,
             {195447, 195448},
             {0, 0},
             at::ones({2, 1}, at::kFloat),
+            at::full({2}, 2, at::kInt),
     };
+    // clang-format on
 
     CATCH_CHECK(variant_calling_sample_less(true_predecessor, major_start_only));
     CATCH_CHECK_FALSE(variant_calling_sample_less(major_start_only, true_predecessor));
@@ -191,18 +210,22 @@ CATCH_TEST_CASE("variant_calling_sample_less orders by full start coordinate", T
 
 CATCH_TEST_CASE("variant_calling_sample_less prefers longer sample for identical starts",
                 TEST_GROUP) {
+    // clang-format off
     const VariantCallingSample longer{
             0,
             {195447, 195447, 195448},
             {0, 1, 0},
             at::ones({3, 1}, at::kFloat),
+            at::ones({3}, at::kInt),
     };
     const VariantCallingSample shorter{
             0,
             {195447, 195448},
             {0, 0},
             at::ones({2, 1}, at::kFloat),
+            at::full({2}, 2, at::kInt),
     };
+    // clang-format on
 
     CATCH_CHECK(variant_calling_sample_less(longer, shorter));
     CATCH_CHECK_FALSE(variant_calling_sample_less(shorter, longer));

@@ -255,6 +255,8 @@ std::vector<secondary::Variant> convert_variants(
         }
 
         new_var = secondary::normalize_genotype(new_var, ploidy, pass_min_qual);
+        new_var.genotype.emplace_back(std::make_pair("DP", "."));
+        new_var.genotype.emplace_back(std::make_pair("MIN_DP", "."));
 
         ret.emplace_back(std::move(new_var));
     }
@@ -1174,7 +1176,8 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                 for (int64_t i = 0; i < std::ssize(item.samples); ++i) {
                     out_queue.try_push(secondary::VariantCallingSample{
                             item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                            std::move(item.samples[i].positions_minor), split_logits[i]});
+                            std::move(item.samples[i].positions_minor), split_logits[i],
+                            item.samples[i].depth});
                 }
                 spdlog::trace("[separate_decode_data {}] Pushed {} items to vc_data_queue.", tid,
                               std::ssize(item.samples));

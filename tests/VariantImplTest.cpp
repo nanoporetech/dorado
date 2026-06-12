@@ -373,6 +373,7 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                         .ref = "A",
                         .alts = {"T"},
                         .genotype = {'0', '1'},
+                        .depth = 10,
                 },
                 {
                         .is_confident = false,
@@ -382,6 +383,7 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                         .ref = "C",
                         .alts = {"G"},
                         .genotype = {'1', '1'},
+                        .depth = 1,
                 },
                 {
                         .is_confident = true,
@@ -391,17 +393,18 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                         .ref = "A",
                         .alts = {"T", "C"},
                         .genotype = {'1', '2'},
+                        .depth = 4,
                 },
         };
 
         // clang-format off
         const std::vector<secondary::Variant> expected{
                 secondary::Variant{7, 4, "A", {"T"}, "PASS", {}, 60.0f,
-                                   {{"GT", "0/1"}, {"GQ", "60"}}, 0, 0},
+                                   {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
                 secondary::Variant{7, 8, "C", {"G"}, "LowQual", {}, 10.0f,
-                                   {{"GT", "1/1"}, {"GQ", "10"}}, 0, 0},
+                                   {{"GT", "1/1"}, {"GQ", "10"}, {"DP", "1"}}, 0, 0},
                 secondary::Variant{7, 12, "A", {"C", "T"}, "PASS", {}, 50.0f,
-                                   {{"GT", "1/2"}, {"GQ", "50"}}, 0, 0},
+                                   {{"GT", "1/2"}, {"GQ", "50"}, {"DP", "4"}}, 0, 0},
         };
         // clang-format on
 
@@ -427,51 +430,51 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Single hom variant",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}, 1},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}}, 0, 0},
                 },
             },
             TestCase{
                 "Single het variant where one alt matches the ref",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1}},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1}, 2},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "2"}}, 0, 0},
                 },
             },
             TestCase{
                 "Single het variant where both alts differ from ref",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}, 3},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "3"}}, 0, 0},
                 },
             },
             TestCase{
                 "Malformed input without alts falls back to a filtered placeholder",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}, 4},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "4"}}, 0, 0},
                 },
             },
             TestCase{
                 "Confidence and phasing flags are ignored during conversion",
                 {
-                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}},
+                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}, 5},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "5"}}, 0, 0},
                 },
             },
         };
@@ -727,6 +730,7 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
                 .ref = "A",
                 .alts = {"T"},
                 .genotype = {'1', '1'},
+                .depth = -1,
         };
     };
     const kadayashi::variant_dorado_style_t left_overlap_variant = make_simple_variant(1);
@@ -839,6 +843,7 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
             .ref = "A",
             .alts = {"T"},
             .genotype = {'0', '1'},
+            .depth = -1,
     };
 
     const std::vector<secondary::Variant> expected_variants =
@@ -1180,7 +1185,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}},
+                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1192,7 +1197,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}},
+                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1204,7 +1209,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}},
+                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1268,7 +1273,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
+            .genotype = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1280,7 +1285,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .filter = "PASS",
             .info = {},
             .qual = 50.0f,
-            .genotype = {{"GT", "0/1"}, {"GQ", "50"}},
+            .genotype = {{"GT", "0/1"}, {"GQ", "50"}, {"DP", "."}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1292,7 +1297,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .filter = "PASS",
             .info = {},
             .qual = 40.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "40"}},
+            .genotype = {{"GT", "1/1"}, {"GQ", "40"}, {"DP", "10"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1386,6 +1391,7 @@ CATCH_TEST_CASE(
             .positions_minor = {0, 0},
             .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(), {"AA", "AA"},
                                            {0.999f, 0.999f}),
+            .depth = at::ones({2}, at::kInt),
     };
     const secondary::Variant simple_variant{
             .seq_id = 0,
@@ -1395,7 +1401,7 @@ CATCH_TEST_CASE(
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
+            .genotype = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "."}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1487,7 +1493,7 @@ CATCH_TEST_CASE(
             .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(),
                                            {"AAAAAACCGGGGG", "AAAAAACCGGGGG"},
                                            {0.999999f, 0.999999f}),
-    };
+            .depth = at::ones({13}, at::kInt)};
 
     const auto make_simple_snp = [](const int64_t pos, const std::string& ref,
                                     const std::string& alt) {
@@ -1499,7 +1505,7 @@ CATCH_TEST_CASE(
                 .filter = "PASS",
                 .info = {},
                 .qual = 60.0f,
-                .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
+                .genotype = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
                 .rstart = 0,
                 .rend = 0,
         };
@@ -1550,8 +1556,16 @@ CATCH_TEST_CASE(
     CATCH_REQUIRE(!worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
-            secondary::Variant{
-                    0, 5, "TT", {"AC"}, "PASS", {}, 53.922f, {{"GT", "1/1"}, {"GQ", "54"}}, 0, 2},
+            secondary::Variant{0,
+                               5,
+                               "TT",
+                               {"AC"},
+                               "PASS",
+                               {},
+                               53.922f,
+                               {{"GT", "1/1"}, {"GQ", "54"}, {"DP", "1"}},
+                               0,
+                               2},
     };
 
     std::vector<secondary::Variant> expected_merged_variants = expected_inference_variants;
@@ -1605,7 +1619,7 @@ CATCH_TEST_CASE(
             .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(),
                                            {"AAAAAACCGGGGGGAA", "AAAAAACCGGGGGGAA"},
                                            {0.999999f, 0.999999f}),
-    };
+            .depth = at::arange(16, at::kInt)};
     const secondary::Variant long_simple_variant{
             .seq_id = 0,
             .pos = 2,
@@ -1658,8 +1672,16 @@ CATCH_TEST_CASE(
     CATCH_REQUIRE(!worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
-            secondary::Variant{
-                    0, 8, "CCC", {"GGG"}, "PASS", {}, 52.161f, {{"GT", "1/1"}, {"GQ", "52"}}, 0, 3},
+            secondary::Variant{0,
+                               8,
+                               "CCC",
+                               {"GGG"},
+                               "PASS",
+                               {},
+                               52.161f,
+                               {{"GT", "1/1"}, {"GQ", "52"}, {"DP", "9"}, {"MIN_DP", "8"}},
+                               0,
+                               3},
     };
     const std::vector<secondary::Variant> expected_merged_variants{
             long_simple_variant, expected_inference_variants.front()};
@@ -1702,6 +1724,7 @@ CATCH_TEST_CASE(
             .positions_minor = {0, 0},
             .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(), {"AA", "AA"},
                                            {0.999f, 0.999f}),
+            .depth = at::ones({2}, at::kInt),
     };
 
     // Define the chrom_reduce_data and mark it as ready for reduction with only one sample to expect.

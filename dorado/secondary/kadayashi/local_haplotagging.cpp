@@ -1587,7 +1587,8 @@ variant_dorado_style_t convert_fullinfo_var_to_dorado_style(const variant_fullin
             .ref = std::string(ref),
             .alts = var.is_multi_allele ? std::vector<std::string>{alt0, alt1}
                                         : std::vector<std::string>{alt0},
-            .genotype = genotype};
+            .genotype = genotype,
+            .depth = -1};
 }
 
 variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
@@ -2433,10 +2434,10 @@ std::string variant_fullinfo_to_string(const variant_fullinfo_t &v) {
 }
 
 std::string variant_dorado_style_to_string(const variant_dorado_style_t &v) {
-    return fmt::format("conf={} phased={} pos={} qual={} ref={} alt={},{} geno={:c},{:c}",
+    return fmt::format("conf={} phased={} pos={} qual={} ref={} alt={},{} geno={:c},{:c} depth=",
                        v.is_confident ? "true" : "false", v.is_phased ? "true" : "false", v.pos,
                        v.qual, v.ref, v.alts[0], v.alts.size() > 1 ? v.alts[1] : "",
-                       v.genotype.first, v.genotype.second);
+                       v.genotype.first, v.genotype.second, v.depth);
 }
 
 bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
@@ -2451,8 +2452,9 @@ bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
 };
 
 bool operator==(const variant_dorado_style_t &a, const variant_dorado_style_t &b) {
-    return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype) ==
-           std::tie(b.is_confident, b.is_phased, b.pos, b.qual, b.ref, b.alts, b.genotype);
+    return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype,
+                    a.depth) ==
+           std::tie(b.is_confident, b.is_phased, b.pos, b.qual, b.ref, b.alts, b.genotype, b.depth);
 };
 
 std::ostream &operator<<(std::ostream &os, const variant_dorado_style_t &v) {

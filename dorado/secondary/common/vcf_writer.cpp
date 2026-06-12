@@ -103,6 +103,10 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
                    "##FORMAT=<ID=GT,Number=1,Type=String,Description=\"Genotype\">");
     bcf_hdr_append(m_header.get(),
                    "##FORMAT=<ID=GQ,Number=1,Type=Integer,Description=\"Genotype quality score\">");
+    bcf_hdr_append(m_header.get(),
+                   "##FORMAT=<ID=DP,Number=1,Type=Integer,Description=\"Read depth\">");
+    bcf_hdr_append(m_header.get(),
+                   "##FORMAT=<ID=MIN_DP,Number=1,Type=Integer,Description=\"Minimum read depth\">");
 
     if (bcf_hdr_add_sample(m_header.get(), "SAMPLE") != 0) {
         throw std::runtime_error("Failed to add sample: SAMPLE");

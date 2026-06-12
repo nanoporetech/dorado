@@ -1442,8 +1442,8 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                     for (std::size_t i = 0; i < std::size(item.samples); ++i) {
                         thread_vc_data.emplace_back(secondary::VariantCallingSample{
                                 item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                                std::move(item.samples[i].positions_minor),
-                                split_logits[i].clone()});
+                                std::move(item.samples[i].positions_minor), split_logits[i].clone(),
+                                item.samples[i].depth.clone()});
                     }
                 }
 
