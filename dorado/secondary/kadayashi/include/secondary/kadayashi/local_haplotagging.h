@@ -255,6 +255,8 @@ struct variant_fullinfo_t {
     bool is_valid{true};
     bool is_confident{true};
     bool is_multi_allele{false};
+    int min_depth{0};
+    int median_depth{0};
 
     uint32_t pos0{0};  // 0-index
     uint8_t qual0{60};
@@ -289,7 +291,9 @@ struct variant_dorado_style_t {
     std::string ref;
     std::vector<std::string> alts;
     std::pair<char, char> genotype;
-    int depth;
+
+    int min_depth{0};
+    int median_depth{0};
 };
 
 std::string variant_dorado_style_to_string(const variant_dorado_style_t &v);

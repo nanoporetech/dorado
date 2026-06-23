@@ -255,8 +255,10 @@ std::vector<secondary::Variant> convert_variants(
         }
 
         new_var = secondary::normalize_genotype(new_var, ploidy, pass_min_qual);
-        new_var.genotype.emplace_back(std::make_pair("DP", "."));
-        new_var.genotype.emplace_back(std::make_pair("MIN_DP", "."));
+        new_var.genotype.emplace_back(std::make_pair("DP", std::to_string(var.median_depth)));
+        if ((var.min_depth != var.median_depth) && (new_var.ref.length() > 1)) {
+            new_var.genotype.emplace_back(std::make_pair("MIN_DP", std::to_string(var.min_depth)));
+        }
 
         ret.emplace_back(std::move(new_var));
     }

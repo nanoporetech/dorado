@@ -62,14 +62,14 @@ chr20	1959	1
   chr20 1714 2001
   chr20 1860 2145
   20
-  chr20 1000 . G <*> . END=1345 GT:GQ:LEN 0/0:60:346
-  chr20 1346 . G <*> . END=1471 GT:GQ:LEN 0/0:60:126
-  chr20 1472 . T G,<*> PASS . GT:GQ 0/1:42
-  chr20 1473 . C <*> . END=1555 GT:GQ:LEN 0/0:60:83
-  chr20 1556 . C <*> . END=1557 GT:GQ:LEN 0/0:50:2
-  chr20 1615 . C <*> . END=1615 GT:GQ:LEN 0/0:54:1
-  chr20 1472 . T G,<*> PASS . GT:GQ 0/1:42
-  chr20 1959 . T G,<*> PASS . GT:GQ 0/1:44
+  chr20 1000 . G <*> . END=1345 GT:GQ:LEN:MIN_DP 0/0:60:346:20
+  chr20 1346 . G <*> . END=1471 GT:GQ:LEN:MIN_DP 0/0:60:126:20
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP 0/1:42:20
+  chr20 1473 . C <*> . END=1555 GT:GQ:LEN:MIN_DP 0/0:60:83:20
+  chr20 1556 . C <*> . END=1557 GT:GQ:LEN:MIN_DP 0/0:50:2:20
+  chr20 1615 . C <*> . END=1615 GT:GQ:LEN:MIN_DP 0/0:54:1:20
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP 0/1:42:20
+  chr20 1959 . T G,<*> PASS . GT:GQ:DP 0/1:44:19
 
 Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   $ rm -rf out; mkdir -p out
@@ -89,7 +89,7 @@ Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   1
-  chr20 1 T <*> . END=10000 GT:GQ:LEN 0/0:60:10000
+  chr20 1 T <*> . END=10000 GT:GQ:LEN:MIN_DP 0/0:60:10000:15
 
 Candidate-filtered gVCF handles a region with an omitted end.
   $ rm -rf out; mkdir -p out
@@ -109,4 +109,4 @@ Candidate-filtered gVCF handles a region with an omitted end.
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   1
-  chr20 9991 A <*> . END=10000 GT:GQ:LEN 0/0:60:10
+  chr20 9991 A <*> . END=10000 GT:GQ:LEN:MIN_DP 0/0:60:10:15

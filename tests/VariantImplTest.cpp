@@ -373,7 +373,8 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                         .ref = "A",
                         .alts = {"T"},
                         .genotype = {'0', '1'},
-                        .depth = 10,
+                        .min_depth = 10,
+                        .median_depth = 10,
                 },
                 {
                         .is_confident = false,
@@ -383,7 +384,8 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                         .ref = "C",
                         .alts = {"G"},
                         .genotype = {'1', '1'},
-                        .depth = 1,
+                        .min_depth = 1,
+                        .median_depth = 1,
                 },
                 {
                         .is_confident = true,
@@ -393,7 +395,8 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                         .ref = "A",
                         .alts = {"T", "C"},
                         .genotype = {'1', '2'},
-                        .depth = 4,
+                        .min_depth = 15,
+                        .median_depth = 15,
                 },
         };
 
@@ -404,7 +407,7 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                 secondary::Variant{7, 8, "C", {"G"}, "LowQual", {}, 10.0f,
                                    {{"GT", "1/1"}, {"GQ", "10"}, {"DP", "1"}}, 0, 0},
                 secondary::Variant{7, 12, "A", {"C", "T"}, "PASS", {}, 50.0f,
-                                   {{"GT", "1/2"}, {"GQ", "50"}, {"DP", "4"}}, 0, 0},
+                                   {{"GT", "1/2"}, {"GQ", "50"}, {"DP", "15"}}, 0, 0},
         };
         // clang-format on
 
@@ -430,37 +433,37 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Single hom variant",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}, 1},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}, 7, 7},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "7"}}, 0, 0},
                 },
             },
             TestCase{
                 "Single het variant where one alt matches the ref",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1}, 2},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1}, 20, 20},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "2"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}}, 0, 0},
                 },
             },
             TestCase{
                 "Single het variant where both alts differ from ref",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}, 3},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}, 9, 10},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "3"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
                 },
             },
             TestCase{
                 "Malformed input without alts falls back to a filtered placeholder",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}, 4},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}, 4, 4},
                 },
                 123, 2, 3.0f,
                 {
@@ -470,11 +473,11 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Confidence and phasing flags are ignored during conversion",
                 {
-                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}, 5},
+                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}, 15, 15},
                 },
                 123, 2, 3.0f,
                 {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "5"}}, 0, 0},
+                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "15"}}, 0, 0},
                 },
             },
         };
@@ -730,7 +733,7 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
                 .ref = "A",
                 .alts = {"T"},
                 .genotype = {'1', '1'},
-                .depth = -1,
+                .median_depth = -1,
         };
     };
     const kadayashi::variant_dorado_style_t left_overlap_variant = make_simple_variant(1);
@@ -843,7 +846,7 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
             .ref = "A",
             .alts = {"T"},
             .genotype = {'0', '1'},
-            .depth = -1,
+            .median_depth = -1,
     };
 
     const std::vector<secondary::Variant> expected_variants =
@@ -1185,7 +1188,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
+                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1197,7 +1200,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
+                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1209,7 +1212,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
+                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "15"}},
                     .rstart = 0,
                     .rend = 0,
             },
