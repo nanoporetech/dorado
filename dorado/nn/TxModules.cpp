@@ -166,12 +166,41 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
         : dim(dim_), max_seq_len(max_seq_len_), theta(theta_), options(options_) {
     const at::Tensor inv_freq = get_inv_freqs();
 
-    // freqs.shape := {max_seq_len, 1, 1, dim/2}
-    const at::Tensor freqs =
-            torch::arange(max_seq_len, options).reshape({max_seq_len, 1, 1, 1}) * inv_freq;
+    at::Tensor cos_freqs, sin_freqs;
+    bool rope_init_iter = utils::get_dev_opt<bool>("rope_init_iter", true);
+    if (rope_init_iter) {
+        // Initialise sin/cos buffers by iteratively rotating. This is much more numerically
+        // stable than computing sin/cos from the frequencies directly (as in the else path below).
+        // We might accumulate some drift in the angles over the sequence length, but this doesn't
+        // matter since only the relative angles between Q and K positions matter, and windowed
+        // attention limits the distance between the two.
+        auto opts_f64 = torch::TensorOptions().dtype(torch::kDouble);
+        cos_freqs = torch::empty({max_seq_len, 1, 1, dim / 2}, opts_f64);
+        sin_freqs = torch::empty({max_seq_len, 1, 1, dim / 2}, opts_f64);
+        cos_freqs[0] = 1;
+        sin_freqs[0] = 0;
+        cos_freqs[1] = torch::cos(inv_freq);
+        sin_freqs[1] = torch::sin(inv_freq);
+        int renorm_step = utils::get_dev_opt<int>("rope_init_renorm_step", 16);
+        for (int i = 2; i < max_seq_len; ++i) {
+            cos_freqs[i] = cos_freqs[i - 1] * cos_freqs[1] - sin_freqs[i - 1] * sin_freqs[1];
+            sin_freqs[i] = sin_freqs[i - 1] * cos_freqs[1] + cos_freqs[i - 1] * sin_freqs[1];
+            if (i % renorm_step == 0) {
+                auto norm = cos_freqs[i] * cos_freqs[i] + sin_freqs[i] * sin_freqs[i];
+                cos_freqs[i].div_(norm);
+                sin_freqs[i].div_(norm);
+            }
+        }
+    } else {
+        // freqs.shape := {max_seq_len, 1, 1, dim/2}
+        const at::Tensor freqs =
+                torch::arange(max_seq_len, options).reshape({max_seq_len, 1, 1, 1}) * inv_freq;
+        cos_freqs = torch::cos(freqs);
+        sin_freqs = torch::sin(freqs);
+    }
 
-    register_buffer("cos_freqs", torch::cos(freqs).to(options));
-    register_buffer("sin_freqs", torch::sin(freqs).to(options));
+    register_buffer("cos_freqs", cos_freqs.to(options));
+    register_buffer("sin_freqs", sin_freqs.to(options));
 };
 
 at::Tensor RotaryEmbeddingImpl::get_inv_freqs() const {
