@@ -167,10 +167,10 @@ RotaryEmbeddingImpl::RotaryEmbeddingImpl(int dim_,
     at::Tensor inv_freq = get_inv_freqs();
 
     at::Tensor cos_freqs, sin_freqs;
-    // The older method (`else` path) works fine for max_seq_len <= 1024 (i.e. default chunksize),
+    // The older method (`else` path) works fine for max_seq_len <= 2048 (i.e. previous maximum),
     // so in that case we stick with what's tried and tested. For larger chunksizes, however,
     // the old method can produce large errors. Override via `--devopts rope_init_iter=[0|1]`
-    bool rope_init_iter = utils::get_dev_opt<bool>("rope_init_iter", max_seq_len > 1024);
+    bool rope_init_iter = utils::get_dev_opt<bool>("rope_init_iter", max_seq_len > 2048);
     if (rope_init_iter) {
         // Initialise sin/cos buffers by iteratively rotating. This is much more numerically
         // stable than computing sin/cos from the frequencies directly (as in the else path below).
