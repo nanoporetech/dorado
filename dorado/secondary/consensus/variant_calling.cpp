@@ -323,10 +323,26 @@ Variant construct_variant(const std::string_view draft,
 #ifdef DEBUG_NORMALIZE_VARIANT
         std::cerr << "[construct_variant] After normalization.  var = " << var << '\n';
 #endif
+
+        // Check whether the ALT field is still empty. This can happen when a deletion is
+        // flanked by unreachable positions on both ends. If so, force prepend a base and
+        // retry normalisation without the ambig_ref constraint.
+        const bool any_empty =
+                std::any_of(std::cbegin(var.alts), std::cend(var.alts),
+                            [](const std::string_view val) { return std::empty(val); });
+        // retry normalisation without the ambig_ref constraint
+        if (any_empty && !ambig_ref) {
+            if (var.pos != 0 && var.rstart != 0) {
+                --var.rstart;
+                prepend_major_ref_base(var);
+            }
+            var = normalize_variant(ref_seq_with_gaps, cons_view, positions_major, positions_minor,
+                                    symbol_set, var, true);
+        }
     }
 
-    // If the ALT field is still is empty, set it to a '.'. This can happen when a deletion is
-    // flanked by unreachable positions on both ends.
+    // Check whether the ALT field is still empty. If so, mark the alleles as "."
+    // and move on.
     const bool any_empty = std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                                        [](const std::string_view val) { return std::empty(val); });
     if (std::empty(var.alts) || any_empty) {
@@ -803,6 +819,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                         [&variant](const std::string_view s) { return s == variant.ref; });
 
     if (all_same_as_ref) {
+        spdlog::debug("[normalize_variant] all_same_as_ref");
         return variant;
     }
 
