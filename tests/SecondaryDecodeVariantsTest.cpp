@@ -127,7 +127,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Return all reference positions (gVCF), one haplotype emits haploid reference genotype.",
             "AC", {"AC"}, {0, 1}, {0, 0}, 3.0f, false, true, true, false, false,
             {
-                Variant{0, 0, "A", {"<*>"}, ".", {{"END", "2"}}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}}, 0, 2},
+                Variant{0, 0, "A", {"<*>"}, ".", {{"END", "2"}}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 0, 2},
             },
             false,
         },
@@ -136,9 +136,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Return all reference positions (gVCF), diploid non-ACGT reference bases emit missing genotype.",
             "ANCT", {"A*CT", "A*CT"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, true, true, false, false,
             {
-                Variant{0, 0, "A", {"<*>"}, ".", {{"END", "1"}}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}}, 0, 1},
-                Variant{0, 1, "N", {"<*>"}, ".", {{"END", "2"}}, -1.0f, {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}}, 1, 2},
-                Variant{0, 2, "C", {"<*>"}, ".", {{"END", "4"}}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}}, 2, 4},
+                Variant{0, 0, "A", {"<*>"}, ".", {{"END", "1"}}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "10"}}, 0, 1},
+                Variant{0, 1, "N", {"<*>"}, ".", {{"END", "2"}}, -1.0f, {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}, {"MIN_DP", "10"}}, 1, 2},
+                Variant{0, 2, "C", {"<*>"}, ".", {{"END", "4"}}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 2, 4},
             },
             false,
         },
@@ -208,7 +208,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "No normalization. One deletion variant, one haplotype. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
             "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
             {
-                Variant{0, 2, "A", {"."}, ".", {}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"DP", "10"}}, 2, 3},
+                Variant{0, 2, "A", {"."}, ".", {}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 2, 3},
             },
             false,
         },
@@ -226,7 +226,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. Single reference base which is deleted in the alt. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
             "A", {"*"}, {0}, {0}, 3.0f, false, false, true, false, false,
             {
-                Variant{0, 0, "A", {"."}, ".", {}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"DP", "10"}}, 0, 1},
+                Variant{0, 0, "A", {"."}, ".", {}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 1},
             },
             false,
         },
@@ -235,9 +235,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Return all reference positions (gVCF), skipping positions covered by variants.",
             "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, true, true, false, false,
             {
-                Variant{0, 0, "A", {"<*>"}, ".", {{"END", "2"}}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}}, 0, 2},
+                Variant{0, 0, "A", {"<*>"}, ".", {{"END", "2"}}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 0, 2},
                 Variant{0, 2, "T", {"A"}, "PASS", {}, 60.0f, {{"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 3},
-                Variant{0, 3, "G", {"<*>"}, ".", {{"END", "5"}}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}}, 3, 5},
+                Variant{0, 3, "G", {"<*>"}, ".", {{"END", "5"}}, 60.0f, {{"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 3, 5},
             },
             false,
         },
@@ -329,7 +329,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, false, false, false,
             {
-                Variant{0, 1, "AGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 1, 8},
+                Variant{0, 1, "AGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 1, 8},
             },
             false,
         },
@@ -343,7 +343,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, false, false, false,
             {
-                Variant{0, 0, "AGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 0, 7},
+                Variant{0, 0, "AGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 7},
             },
             false,
         },
@@ -357,7 +357,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, false, false, false,
             {
-                Variant{0, 6, "AGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 6, 13},
+                Variant{0, 6, "AGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 6, 13},
             },
             false,
         },
@@ -371,7 +371,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, true, false, false, false, false,
             {
-                Variant{0, 1, "NNNNNAGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 1, 13},
+                Variant{0, 1, "NNNNNAGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 1, 13},
             },
             false,
         },
@@ -385,7 +385,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, true, false, false, false, false,
             {
-                Variant{0, 0, "NNNNNAGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 0, 12},
+                Variant{0, 0, "NNNNNAGCCATT", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 12},
             },
             false,
         },
@@ -530,9 +530,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, false, false, false,
             {
-                Variant{0, 3, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 5, 8},          // V2
-                Variant{0, 8, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 9, 10},          // V3
+                Variant{0, 3, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 3, 4},           // V1
+                Variant{0, 5, "AA", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 5, 8},          // V2
+                Variant{0, 8, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 9, 10},          // V3
             },
             false,
         },
@@ -602,9 +602,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, false, false, false,
             {
-                Variant{0, 3, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 5, 8},          // V2
-                Variant{0, 8, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 9, 10},          // V3
+                Variant{0, 3, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 3, 4},           // V1
+                Variant{0, 5, "AA", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 5, 8},          // V2
+                Variant{0, 8, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 9, 10},          // V3
             },
             false,
         },
@@ -694,9 +694,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, false, false, false,
             {
-                Variant{0, 3, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 3, 4},       // V1
-                Variant{0, 5, "AA", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 5, 8},      // V2
-                Variant{0, 8, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "10"}}, 9, 10},      // V3
+                Variant{0, 3, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 3, 4},       // V1
+                Variant{0, 5, "AA", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 5, 8},      // V2
+                Variant{0, 8, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 9, 10},      // V3
             },
             false,
         },

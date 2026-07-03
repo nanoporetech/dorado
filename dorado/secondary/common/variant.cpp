@@ -92,7 +92,6 @@ bool variant_covers_position(const Variant& var, const int32_t seq_id, const int
 
 void set_gvcf_reference_block_end(Variant& var, const int64_t end) {
     var.alts = {"<*>"};
-    var.rend = end;
     var.info["END"] = std::to_string(end);
 
     auto it_len = std::find_if(std::begin(var.genotype), std::end(var.genotype),

@@ -128,6 +128,7 @@ void VCFWriter::write_variant(const Variant& variant) {
     ensure_record_buffers_initialized(*record);
 
     std::vector<std::string> alts = variant.alts;
+    std::vector<std::pair<std::string, std::string>> genotype = variant.genotype;
 
     // Add "<*>" to non-reference records in gVCF output.
     if (m_include_gvcf_headers) {

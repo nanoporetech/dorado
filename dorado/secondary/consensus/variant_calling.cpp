@@ -649,23 +649,29 @@ bool append_ref_base(Variant& var,
     return true;
 }
 
-Variant add_depth(const Variant& var, const at::Tensor& depth) {
-    Variant ret = var;
-
-    if (depth.size(0) == 0) {
-        ret.genotype.push_back(std::make_pair("DP", "."));
-        ret.genotype.push_back(std::make_pair("MIN_DP", "."));
-    } else {
-        ret.genotype.push_back(std::make_pair(
-                "DP",
-                std::to_string(at::median(depth.index({at::indexing::Slice(ret.rstart, ret.rend)}))
-                                       .item<int64_t>())));
-        ret.genotype.push_back(std::make_pair(
-                "MIN_DP",
-                std::to_string(at::min(depth.index({at::indexing::Slice(ret.rstart, ret.rend)}))
-                                       .item<int64_t>())));
+void add_depth(Variant& var, const at::Tensor& depth) {
+    // missing depth information
+    if ((!depth.defined()) || (depth.size(0) == 0)) {
+        return;
     }
-    return ret;
+
+    const auto depth_span = depth.index({at::indexing::Slice(var.rstart, var.rend)});
+    // reference block, output MIN_DP
+    if (is_reference_record(var)) {
+        const int64_t dp = at::min(depth_span).item<int64_t>();
+        var.genotype.push_back(std::make_pair("MIN_DP", std::to_string(dp)));
+        return;
+    }
+
+    // default case, output DP and MIN_DP if multi-site and different
+    const int64_t med_dp = at::median(depth_span).item<int64_t>();
+    var.genotype.push_back(std::make_pair("DP", std::to_string(med_dp)));
+    if ((var.rend - var.rstart) > 1) {
+        const int64_t min_dp = at::min(depth_span).item<int64_t>();
+        if (min_dp != med_dp) {
+            var.genotype.push_back(std::make_pair("MIN_DP", std::to_string(min_dp)));
+        }
+    }
 }
 
 }  // namespace
@@ -1354,9 +1360,8 @@ std::vector<Variant> general_decode_variants(
         if (const auto it = new_var.info.find("END");
             (new_var.filter == ".") && (it != std::cend(new_var.info))) {
             set_gvcf_reference_block_end(new_var, std::stoll(it->second));
-        } else {
-            new_var = add_depth(new_var, vc_sample.depth);
         }
+        add_depth(new_var, vc_sample.depth);
         // Sanity check.
         if (is_valid(new_var)) {
             normalized_variants.emplace_back(std::move(new_var));

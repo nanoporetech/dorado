@@ -34,6 +34,9 @@ void VariantCallingSample::validate() const {
     if (!logits.defined()) {
         throw std::runtime_error("VariantCallingSample::logits tensor is not defined!");
     }
+    if (!depth.defined()) {
+        throw std::runtime_error("VariantCallingSample::depth tensor is not defined!");
+    }
 
     const int64_t num_columns = std::ssize(positions_major);
 

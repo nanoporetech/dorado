@@ -1883,6 +1883,7 @@ CATCH_TEST_CASE(
             .positions_minor = {0, 0},
             .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(), {"AA", "AA"},
                                            {0.999f, 0.999f}),
+            .depth = at::tensor({4, 3}),
     };
     const secondary::Variant simple_variant{
             .seq_id = 0,
@@ -1986,6 +1987,7 @@ CATCH_TEST_CASE(
             .positions_minor = {0, 0},
             .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(), {"AA", "AA"},
                                            {0.999f, 0.999f}),
+            .depth = at::tensor({4, 3}),
     };
     const secondary::Variant simple_variant{
             .seq_id = 0,
