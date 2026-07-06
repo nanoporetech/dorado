@@ -1162,6 +1162,7 @@ void run_variant_calling(const Options& opt,
             // PASS is added automatically by bcf_hdr
             // {"PASS", "All filters passed"},
             {"LowQual", "Variant quality is below threshold"},
+            {"IncompatZyg", "Predicted zygosity incompatible with ploidy"},
             {".", "Non-variant position"},
     };
 

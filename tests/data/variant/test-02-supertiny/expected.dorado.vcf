@@ -1,6 +1,7 @@
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##FILTER=<ID=LowQual,Description="Variant quality is below threshold">
+##FILTER=<ID=IncompatZyg,Description="Predicted zygosity incompatible with ploidy">
 ##FILTER=<ID=.,Description="Non-variant position">
 ##contig=<ID=chr20,length=10000>
 ##dorado_version=0.0.0+32f1a6620
