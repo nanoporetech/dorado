@@ -498,12 +498,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 namespace {
 
 // Calculates the input queue size.
-size_t CalcMaxChunksIn(const std::vector<basecall::RunnerPtr> &model_runners) {
+size_t CalcMaxChunksIn(const std::vector<basecall::RunnerPtr> &model_runners,
+                       const bool variable_chunk_sizes) {
     // Allow 2 batches per model runner on the chunks_in queue
     size_t max_chunks_in = 0;
     // Allows optimal batch size to be used for every GPU
     for (auto &runner : model_runners) {
-        max_chunks_in += runner->batch_size() * 2;
+        max_chunks_in += runner->batch_size() * (2 + (variable_chunk_sizes ? 2 : 0));
     }
     return max_chunks_in;
 }
@@ -526,7 +527,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
           m_is_tx_model(m_model_runners.front()->config().is_tx_model()),
           m_chunk_size_granularity(m_model_runners.front()->config().chunk_size_granularity()),
           m_variable_chunk_sizes(m_model_runners.front()->variable_chunk_sizes()),
-          m_processed_chunks(CalcMaxChunksIn(m_model_runners)),
+          m_processed_chunks(CalcMaxChunksIn(m_model_runners, m_variable_chunk_sizes)),
           m_node_name(std::move(node_name)) {
     for (auto &runner_ptr : m_model_runners) {
         if (m_variable_chunk_sizes != runner_ptr->variable_chunk_sizes()) {
@@ -553,7 +554,8 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
     }
 
     m_processed_chunks.set_name("processed_chunks");
-    auto chunk_queue_size = CalcMaxChunksIn(m_model_runners) / m_chunk_sizes.size();
+    const size_t chunk_queue_size =
+            CalcMaxChunksIn(m_model_runners, m_variable_chunk_sizes) / m_chunk_sizes.size();
     for (auto s : m_chunk_sizes) {
         auto &queue = m_chunk_in_queues.emplace_back(
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<BasecallingChunk>>>(

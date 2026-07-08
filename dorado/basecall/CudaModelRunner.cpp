@@ -28,7 +28,13 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     if (m_caller->variable_chunk_sizes()) {
         // Tx VCS Input is of shape (C_in, N * T)
         // LSTM VCS Input is of shape (1, C_in, N * T)
-        m_input.narrow(-1, m_chunk_offset, chunk.size(1)).copy_(chunk);
+        if ((m_input.size(1) == 1) && (m_input.dtype() == at::kHalf)) {
+            assert(chunk.dtype() == at::kHalf);
+            std::memcpy(m_input.data_ptr<at::Half>() + m_chunk_offset, chunk.data_ptr(),
+                        chunk.size(1) * sizeof(at::Half));
+        } else {
+            m_input.narrow(-1, m_chunk_offset, chunk.size(1)).copy_(chunk);
+        }
         m_chunk_sizes.emplace_back(chunk.size(1));
         m_chunk_offset += m_chunk_sizes.back();
         if (config().is_tx_model()) {
