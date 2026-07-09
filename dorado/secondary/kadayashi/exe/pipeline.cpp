@@ -1,14 +1,14 @@
 #include "pipeline.h"
 
-#include "bam_record_parsing.h"
+#include "../string_utils.h"
+#include "../variant_graph.h"
 #include "bam_tagging.h"
-#include "haplotag_lib/string_utils.h"
-#include "haplotag_lib/variant_graph.h"
 #include "hts_utils/FastxRandomReader.h"
 #include "kadayashi_utils.h"
 #include "resources.h"
-#include "sequence_utility.h"
-#include "types.h"
+#include "secondary/kadayashi/bam_record_parsing.h"
+#include "secondary/kadayashi/sequence_utility.h"
+#include "secondary/kadayashi/types.h"
 
 #include <cxxpool.h>
 #include <htslib/bgzf.h>

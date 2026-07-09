@@ -113,7 +113,8 @@ apply_3rdparty_patch(toml11)
 set(TOML11_PRECOMPILE ON)
 add_subdirectory(toml11 EXCLUDE_FROM_ALL)
 
-# kadayashi
-set(BUILD_KADAYASHI_TESTS OFF)
-set(BUILD_KADAYASHI_AS_SUBPROJECT ON)
-add_subdirectory(kadayashi EXCLUDE_FROM_ALL)
+# klib
+add_library(klib INTERFACE)
+target_include_directories(klib SYSTEM INTERFACE
+    ${DORADO_3RD_PARTY_SOURCE}/klib
+)

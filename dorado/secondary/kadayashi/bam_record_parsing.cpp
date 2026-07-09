@@ -1,6 +1,6 @@
-#include "bam_record_parsing.h"
+#include "secondary/kadayashi/bam_record_parsing.h"
 
-#include "sequence_utility.h"
+#include "secondary/kadayashi/sequence_utility.h"
 
 #include <htslib/sam.h>
 #include <spdlog/fmt/bundled/format.h>

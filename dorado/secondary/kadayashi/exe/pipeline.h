@@ -1,7 +1,7 @@
 #pragma once
 
-#include "local_haplotagging.h"
 #include "secondary/common/bam_file.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 
 #include <cstdint>
 #include <filesystem>

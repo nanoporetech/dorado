@@ -1,9 +1,9 @@
 #include "encoder_read_alignment.h"
 
-#include "local_haplotagging.h"
 #include "secondary/features/encoder_utils.h"
 #include "secondary/features/kadayashi_utils.h"
 #include "secondary/features/medaka_read_matrix.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"

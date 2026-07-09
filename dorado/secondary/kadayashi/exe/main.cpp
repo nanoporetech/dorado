@@ -1,12 +1,12 @@
+#include "../string_utils.h"
 #include "bam_tagging.h"
 #include "cli.h"
-#include "faidx_utils.h"
-#include "haplotag_lib/string_utils.h"
 #include "kadayashi_utils.h"
-#include "local_haplotagging.h"
 #include "pipeline.h"
 #include "resources.h"
 #include "secondary/common/bam_file.h"
+#include "secondary/kadayashi/faidx_utils.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>

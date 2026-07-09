@@ -1,6 +1,5 @@
 #pragma once
 
-#include "local_haplotagging.h"
 #include "polish/decode_data.h"
 #include "polish/inference_data.h"
 #include "polish/polisher_resources.h"
@@ -20,6 +19,7 @@
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
 #include "secondary/features/kadayashi_options.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 #include "utils/AsyncQueue.h"
 
 #include <cstdint>

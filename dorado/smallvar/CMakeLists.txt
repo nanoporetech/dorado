@@ -20,5 +20,4 @@ dorado_add_library(
         intervaltree
         htslib
         spdlog::spdlog
-        kadayashi::haplotag_lib
 )

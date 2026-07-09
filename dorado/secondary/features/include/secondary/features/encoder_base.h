@@ -1,7 +1,7 @@
 #pragma once
 
-#include "local_haplotagging.h"
 #include "secondary/consensus/sample.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 
 #include <ATen/ATen.h>
 

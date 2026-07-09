@@ -163,7 +163,6 @@ foreach(TEST_BIN dorado_tests dorado_smoke_tests)
             dorado_tests_common
             dorado_variant
             intervaltree
-            kadayashi::haplotag_lib
             minimap2
             toml11::toml11
             ${ZLIB_LIBRARIES}

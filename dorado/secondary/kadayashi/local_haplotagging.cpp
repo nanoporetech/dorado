@@ -1,11 +1,11 @@
-#include "local_haplotagging.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 
-#include "bam_record_parsing.h"
-#include "blocked_bloom_filter.h"
-#include "faidx_utils.h"
-#include "hts_types.h"
 #include "hts_utils/bam_utils.h"
-#include "sequence_utility.h"
+#include "secondary/kadayashi/bam_record_parsing.h"
+#include "secondary/kadayashi/blocked_bloom_filter.h"
+#include "secondary/kadayashi/faidx_utils.h"
+#include "secondary/kadayashi/hts_types.h"
+#include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
 #include "variant_graph.h"
 
@@ -1261,7 +1261,7 @@ std::pair<std::string, std::string> ta_t_reconstruct_haplotypes_for_del_absorbti
         uint32_t range_start,  // inclusive
         uint32_t range_end,    // exclusive
         const std::string &ref_seq_substring,
-        const std::vector<uint32_t> var_indices) {
+        const std::vector<uint32_t> &var_indices) {
     // Helper routine to ck_absorb_variants_covered_by_deletion_run_on_other_hap.
     // Given a range and variants selected within the range,
     // produce the full sequence of the haplotypes.
@@ -1357,7 +1357,7 @@ std::pair<std::string, std::string> ta_t_reconstruct_haplotypes_for_del_absorbti
 
 void ck_absorb_variants_covered_by_deletion_run_on_other_hap(
         chunk_t &ck,
-        const std::unordered_map<uint32_t, uint8_t> phasing_breakpoints,
+        const std::unordered_map<uint32_t, uint8_t> &phasing_breakpoints,
         const std::string &ref_seq_substring) {
     // Consider the following dummy case:
     //  pos   123456789012
@@ -3830,7 +3830,7 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
 MedakaFeatureMatrix gen_medaka_feature_matrix_wrapper(
         dorado::secondary::BamFile &bam_file,
-        std::string refname,
+        const std::string &refname,
         uint32_t itvl_start,
         uint32_t itvl_end,
         const std::unordered_map<std::string, int32_t> &qname2hp,
