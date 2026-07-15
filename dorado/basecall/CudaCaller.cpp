@@ -239,7 +239,18 @@ int64_t CudaCaller::get_gpu_mem_limit(c10::Device device, float memory_limit_fra
     }
 
     // Apply limit fraction.
-    return static_cast<int64_t>(available * memory_limit_fraction);
+    int64_t gpu_mem_limit = static_cast<int64_t>(available * memory_limit_fraction);
+
+    // Allow 1GB for model weights, etc.
+    gpu_mem_limit -= GB;
+    // Torch and CUDA internals reserve about another GB.
+    gpu_mem_limit -= GB;
+
+    if (gpu_mem_limit < 0) {
+        throw std::runtime_error(
+                "Failed to determine safe batch size. Less than 1GB GPU memory available.");
+    }
+    return gpu_mem_limit;
 }
 
 std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
@@ -470,12 +481,7 @@ CudaCaller::BatchDimsAndMaxSizes CudaCaller::calculate_batch_sizes(
         });
     }
 
-    // Allow 1GB for model weights, etc.
-    const int64_t gpu_mem_limit = get_gpu_mem_limit(device, memory_limit_fraction) - GB;
-    if (gpu_mem_limit < 0) {
-        spdlog::warn("Failed to determine safe batch size. Less than 1GB GPU memory available.");
-        return result;
-    }
+    const int64_t gpu_mem_limit = get_gpu_mem_limit(device, memory_limit_fraction);
     spdlog::debug("{} memory limit {:.2f}GB", device.str(), gpu_mem_limit / GB);
 
     auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = calculate_memory_requirements(model_config);
