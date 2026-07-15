@@ -2170,7 +2170,7 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
 
     {
         std::ofstream ref_out(reference_fasta);
-        ref_out << ">chr1\nACGT\n";
+        ref_out << ">chr1\nACGTG\n";
     }
 
     // clang-format off
@@ -2179,15 +2179,27 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
         ChromosomeReduceData& data = chrom_reduce_data[0];
         data.seq_id = 0;
         data.seq_name = "chr1";
-        data.seq_len = 4;
-        data.progress_target = 4;
+        data.seq_len = 5;
+        data.progress_target = 5;
         data.ready = true;
         data.num_samples = 0;
-        data.selected_regions = {secondary::RegionInt{0, 0, 4}};
+        data.selected_regions = {secondary::RegionInt{0, 0, 5}};
         data.variants_simple = {secondary::Variant{0, 1, "C", {"A"}, "PASS", {}, 41.0f,
                                                    {{"GT", "1/1"}, {"GQ", "41"}}, 0, 0},
                                 secondary::Variant{0, 2, "G", {"T"}, "PASS", {}, 42.0f,
                                                    {{"GT", "1/1"}, {"GQ", "42"}}, 0, 0}};
+        data.read_endpoints = {
+            {0, 1},
+            {0, 2},
+            {0, 3},
+            {0, 5},
+            {1, 2},
+            {1, 3},
+            {1, 5},
+            {2, 3},
+            {2, 5},
+            {3, 4}
+        };
     }
     // clang-format on
 
@@ -2197,7 +2209,7 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     fastx_readers.emplace_back(std::make_unique<hts_io::FastxRandomReader>(reference_fasta));
 
     const std::vector<std::pair<std::string, int64_t>> draft_lens{
-            {"chr1", 4},
+            {"chr1", 5},
     };
 
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
@@ -2221,17 +2233,17 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     CATCH_REQUIRE(chrom_reduce_data[0].variants_merged ==
                   std::vector{secondary::Variant{0, 0, "A", {"<*>"}, ".",
                                                  {{"END", "1"}}, 60.0f,
-                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}}, 0,
+                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, 0,
                                                  1},
                               secondary::Variant{0, 1, "C", {"A"}, "PASS", {}, 41.0f,
                                                  {{"GT", "1/1"}, {"GQ", "41"}}, 0, 0},
                               secondary::Variant{0, 2, "G", {"T"}, "PASS", {}, 42.0f,
                                                  {{"GT", "1/1"}, {"GQ", "42"}}, 0, 0},
                               secondary::Variant{0, 3, "T", {"<*>"}, ".",
-                                                 {{"END", "4"}}, 60.0f,
-                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}}, 3,
-                                                 4}});
-    CATCH_CHECK(stats.get_stats().at("processed") == 4.0);
+                                                 {{"END", "5"}}, 60.0f,
+                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, 3,
+                                                 5}});
+    CATCH_CHECK(stats.get_stats().at("processed") == 5.0);
     CATCH_CHECK(std::size(output_queue) == 1);
     // clang-format on
 }

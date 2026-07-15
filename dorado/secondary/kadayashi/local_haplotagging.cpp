@@ -2748,18 +2748,31 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
             max_gapcompressed_seqdiv, use_dvr_for_phasing, ambig_ref);
     chunk_t &ck = ck_and_vr.ck;
 
-    if (!ck.is_valid || ck.varcalls.empty()) {
+    if (!ck.is_valid) {
         return {.qname2hp = std::move(ck_and_vr.vr.qname2hp), .variants = {}};
     }
 
+    std::vector<std::pair<uint32_t, uint32_t>> read_endpoints;
+    read_endpoints.reserve(std::size(ck.reads));
+    for (const auto &read : ck.reads) {
+        // limit read spans to the phasing interval so we don't double count reads spanning
+        // the ends of the interval
+        read_endpoints.emplace_back(std::make_pair(std::max(read.start_pos, ck.abs_start),
+                                                   std::min(read.end_pos, ck.abs_end)));
+    }
+    std::sort(read_endpoints.begin(), read_endpoints.end());
+
     varcall_result_t ret{.qname2hp = ck_and_vr.vr.qname2hp,
                          .variants = {},
-                         .phasing_breakpoints = ck_and_vr.vr.phasing_breakpoints};
+                         .phasing_breakpoints = ck_and_vr.vr.phasing_breakpoints,
+                         .read_endpoints = read_endpoints};
 
-    for (const variant_fullinfo_t &var :
-         ck_and_vr.vr.variants) {  // return variants in dorado style
-        if (var.is_valid) {
-            ret.variants.push_back(convert_fullinfo_var_to_dorado_style(var));
+    if (!ck.varcalls.empty()) {
+        for (const variant_fullinfo_t &var :
+             ck_and_vr.vr.variants) {  // return variants in dorado style
+            if (var.is_valid) {
+                ret.variants.push_back(convert_fullinfo_var_to_dorado_style(var));
+            }
         }
     }
 

@@ -312,6 +312,7 @@ struct varcall_result_t {
     std::unordered_map<std::string, int> qname2hp{};  // 0-index
     std::vector<variant_dorado_style_t> variants{};   // 0-index, for VCF
     std::unordered_map<uint32_t, uint8_t> phasing_breakpoints{};
+    std::vector<std::pair<uint32_t, uint32_t>> read_endpoints{};
 };
 
 struct ck_and_varcall_result_t {

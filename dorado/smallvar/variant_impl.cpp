@@ -276,8 +276,13 @@ secondary::IntervalTreeInt64 build_interval_tree(const std::vector<int64_t>& in_
     return secondary::IntervalTreeInt64(std::move(intervals));
 }
 
-std::pair<std::vector<secondary::Sample>, std::vector<secondary::Variant>>
-process_single_bam_window(
+struct BamWindowResult {
+    std::vector<secondary::Sample> samples;
+    std::vector<secondary::Variant> variants;
+    std::vector<std::pair<uint32_t, uint32_t>> read_endpoints;
+};
+
+BamWindowResult process_single_bam_window(
         const secondary::Window& bam_window,
         secondary::EncoderBase& encoder,
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
@@ -367,8 +372,7 @@ process_single_bam_window(
             secondary::sample_to_string(sample));
 
     if (std::empty(sample.positions_major)) {
-        return std::pair<std::vector<secondary::Sample>, std::vector<secondary::Variant>>(
-                std::vector<secondary::Sample>{}, std::move(pass_variants));
+        return {{}, std::move(pass_variants), std::move(kadayashi_result.read_endpoints)};
     }
 
     // Split on coordinate gaps and exclude low-coverage columns before inference.
@@ -400,7 +404,7 @@ process_single_bam_window(
 
         const auto it = candidate_trees_from_file->find(bam_window.seq_id);
         if (it == std::cend(*candidate_trees_from_file)) {
-            return {};
+            return {{}, {}, std::move(kadayashi_result.read_endpoints)};
         }
 
         // TODO: This makes a copy. Consider a more efficient way.
@@ -441,8 +445,8 @@ process_single_bam_window(
             "local_samples.size = {}",
             tid, ref_name, (bam_window.start + 1), bam_window.end, std::size(local_samples));
 
-    return std::pair<std::vector<secondary::Sample>, std::vector<secondary::Variant>>(
-            std::move(local_samples), std::move(pass_variants));
+    return {std::move(local_samples), std::move(pass_variants),
+            std::move(kadayashi_result.read_endpoints)};
 }
 }  // namespace
 
@@ -502,7 +506,7 @@ void worker_sample_producer(
 
             bool reduce_data_updated = false;
             try {
-                auto [local_samples, simple_variants] = process_single_bam_window(
+                const BamWindowResult bam_window_result = process_single_bam_window(
                         bam_window, *resources.encoders[tid], draft_lens, draft_seqs,
                         candidate_source, candidate_trees_from_file, ploidy, pass_min_qual,
                         window_len, window_overlap, variant_flanking_bases, tiled_regions,
@@ -511,9 +515,9 @@ void worker_sample_producer(
                 stats.add("processed",
                           static_cast<double>(std::max<int64_t>(
                                   0, bam_window.end_no_overlap - bam_window.start_no_overlap)));
-                const int64_t num_outgoing_samples =
-                        std::count_if(std::cbegin(local_samples), std::cend(local_samples),
-                                      sample_has_inference_features);
+                const int64_t num_outgoing_samples = std::count_if(
+                        std::cbegin(bam_window_result.samples),
+                        std::cend(bam_window_result.samples), sample_has_inference_features);
 
                 // Update the info needed to reduce the results.
                 {
@@ -547,20 +551,29 @@ void worker_sample_producer(
 
                     // Add the simple variants to the results for this chromosome.
                     rd.variants_simple.reserve(std::size(rd.variants_simple) +
-                                               std::size(simple_variants));
-                    rd.variants_simple.insert(std::end(rd.variants_simple),
-                                              std::make_move_iterator(std::begin(simple_variants)),
-                                              std::make_move_iterator(std::end(simple_variants)));
+                                               std::size(bam_window_result.variants));
+                    rd.variants_simple.insert(
+                            std::end(rd.variants_simple),
+                            std::make_move_iterator(std::begin(bam_window_result.variants)),
+                            std::make_move_iterator(std::end(bam_window_result.variants)));
+
+                    // Add the read endpoints to the results for this chromosome.
+                    rd.read_endpoints.reserve(std::size(rd.read_endpoints) +
+                                              std::size(bam_window_result.read_endpoints));
+                    rd.read_endpoints.insert(
+                            std::end(rd.read_endpoints),
+                            std::make_move_iterator(std::begin(bam_window_result.read_endpoints)),
+                            std::make_move_iterator(std::end(bam_window_result.read_endpoints)));
                 }
 
                 // Create single-element InferenceData items of samples.
-                for (int64_t i = 0; i < std::ssize(local_samples); ++i) {
-                    auto& sample = local_samples[i];
+                for (int64_t i = 0; i < std::ssize(bam_window_result.samples); ++i) {
+                    auto& sample = bam_window_result.samples[i];
                     if (!sample_has_inference_features(sample)) {
                         continue;
                     }
                     InferenceData item{
-                            .samples = {std::move(sample)},
+                            .samples = {sample},
                     };
                     output_queue.try_push(std::move(item));
                 }
@@ -1570,7 +1583,8 @@ secondary::Variant make_gvcf_reference_record(const int32_t seq_id,
                                               const int64_t pos,
                                               const char ref_base,
                                               const int64_t end,
-                                              const int32_t ploidy) {
+                                              const int32_t ploidy,
+                                              const int32_t min_depth) {
     const float qual = utils::is_canonical_base(ref_base) ? secondary::VCF_MAX_GQ_CAP : 0.0f;
     const secondary::Variant ref_var{
             .seq_id = seq_id,
@@ -1589,6 +1603,8 @@ secondary::Variant make_gvcf_reference_record(const int32_t seq_id,
             secondary::normalize_genotype(ref_var, ploidy, secondary::VCF_MAX_GQ_CAP);
 
     secondary::set_gvcf_reference_block_end(ret, end);
+    const std::string depth_str = (min_depth >= 0) ? std::to_string(min_depth) : ".";
+    ret.genotype.emplace_back(std::make_pair("MIN_DP", depth_str));
 
     return ret;
 }
@@ -1635,6 +1651,31 @@ std::vector<secondary::Variant> compact_gvcf_reference_records(
         }
     };
 
+    const auto set_dp = [](secondary::Variant& var, const int32_t dp) {
+        const std::string dp_str = std::to_string(dp);
+        auto val = std::rbegin(var.genotype);
+        while (val != std::rend(var.genotype)) {
+            if (val->first == "MIN_DP") {
+                val->second = dp_str;
+                break;
+            }
+            ++val;
+        }
+        if (val == std::rend(var.genotype)) {
+            var.genotype.emplace_back(std::make_pair("MIN_DP", std::to_string(dp)));
+        }
+    };
+
+    const auto get_dp = [](const secondary::Variant& var) {
+        const auto depth_record =
+                std::find_if(var.genotype.cbegin(), var.genotype.cend(),
+                             [](const auto& gt) { return gt.second == "MIN_DP"; });
+        if (depth_record == var.genotype.cend()) {
+            return -1;
+        }
+        return static_cast<int32_t>(std::stoi(depth_record->second));
+    };
+
     std::vector<secondary::Variant> compacted;
     compacted.reserve(std::size(variants));
 
@@ -1650,6 +1691,8 @@ std::vector<secondary::Variant> compact_gvcf_reference_records(
         const float gq_margin =
                 secondary::get_gvcf_reference_record_gq_margin(first_gq, gq_margins);
         float min_gq = first_gq;
+        const int32_t first_dp = get_dp(variants[i]);
+        int32_t min_dp = first_dp;
 
         std::size_t j = i + 1;
         while ((j < std::size(variants)) && is_single_base_gvcf_reference_record(variants[j]) &&
@@ -1661,12 +1704,19 @@ std::vector<secondary::Variant> compact_gvcf_reference_records(
                 break;
             }
             min_gq = std::min(min_gq, current_gq);
+            const int32_t current_dp = get_dp(variants[j]);
+            if ((min_dp == -1) || (current_dp < min_dp)) {
+                min_dp = current_dp;
+            }
             ++j;
         }
 
         secondary::Variant block = variants[i];
         secondary::set_gvcf_reference_block_end(block, variants[j - 1].pos + 1);
         set_gq(block, min_gq);
+        if (min_dp != -1) {
+            set_dp(block, min_dp);
+        }
         compacted.emplace_back(std::move(block));
         i = j;
     }
@@ -1679,11 +1729,41 @@ void add_gvcf_reference_records_for_unprocessed_regions(
         const int32_t seq_id,
         const std::string& draft,
         const std::vector<secondary::RegionInt>& selected_regions,
-        const int32_t ploidy) {
+        const int32_t ploidy,
+        const std::vector<std::pair<uint32_t, uint32_t>>& read_endpoints) {
     const int64_t seq_len = std::ssize(draft);
     const std::vector<secondary::Interval64> selected = merge_intervals(selected_regions, seq_len);
     const std::size_t num_existing_variants = std::size(variants);
     std::size_t variant_idx = 0;
+
+    // generate sorted read ends (read_endpoints is already sorted by start)
+    std::vector<uint32_t> read_ends;
+    read_ends.reserve(std::size(read_endpoints));
+    for (const auto& pair : read_endpoints) {
+        read_ends.emplace_back(pair.second);
+    }
+    std::sort(std::begin(read_ends), std::end(read_ends));
+
+    // indices into start and end arrays
+    size_t start_idx = 0;
+    size_t end_idx = 0;
+    // running depth counter
+    int32_t depth = 0;
+
+    const auto advance_depth_to = [&read_endpoints, &read_ends](const int64_t pos,
+                                                                size_t start_idx_, size_t end_idx_,
+                                                                int32_t depth_) {
+        while ((end_idx_ < std::size(read_ends)) && (read_ends[end_idx_] <= pos)) {
+            --depth_;
+            ++end_idx_;
+        }
+        while ((start_idx_ < std::size(read_endpoints)) &&
+               (read_endpoints[start_idx_].first <= pos)) {
+            ++depth_;
+            ++start_idx_;
+        }
+        return std::make_tuple(start_idx_, end_idx_, depth_);
+    };
 
     for (const secondary::Interval64& selected_interval : selected) {
         int64_t pos = selected_interval.start;
@@ -1719,9 +1799,31 @@ void add_gvcf_reference_records_for_unprocessed_regions(
                 }
             }
 
+            // find any positions in the range [block_start, pos) where depth changes
+            // iterate through these and find min_depth
+            std::tie(start_idx, end_idx, depth) =
+                    advance_depth_to(block_start, start_idx, end_idx, depth);
+            int32_t min_depth = depth;
+            while (true) {
+                const int64_t next_start =
+                        (start_idx < std::size(read_endpoints))
+                                ? static_cast<int64_t>(read_endpoints[start_idx].first)
+                                : std::numeric_limits<int64_t>::max();
+                const int64_t next_end = (end_idx < std::size(read_ends))
+                                                 ? static_cast<int64_t>(read_ends[end_idx])
+                                                 : std::numeric_limits<int64_t>::max();
+                const int64_t next_event_pos = std::min(next_start, next_end);
+                if (next_event_pos >= pos) {
+                    break;
+                }
+                std::tie(start_idx, end_idx, depth) =
+                        advance_depth_to(next_event_pos, start_idx, end_idx, depth);
+                min_depth = std::min(min_depth, depth);
+            }
+
             variants.emplace_back(make_gvcf_reference_record(
-                    seq_id, block_start, draft[static_cast<std::size_t>(block_start)], pos,
-                    ploidy));
+                    seq_id, block_start, draft[static_cast<std::size_t>(block_start)], pos, ploidy,
+                    (std::size(read_endpoints) > 0) ? min_depth : -1));
         }
     }
 }
@@ -1901,9 +2003,11 @@ void worker_variant_calling_reduce(
         if (gvcf) {
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));
+            std::stable_sort(std::begin(reduce_data.read_endpoints),
+                             std::end(reduce_data.read_endpoints));
             add_gvcf_reference_records_for_unprocessed_regions(reduce_data.variants_merged, seq_id,
                                                                *draft, reduce_data.selected_regions,
-                                                               ploidy);
+                                                               ploidy, reduce_data.read_endpoints);
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));
             reduce_data.variants_merged = compact_gvcf_reference_records(
@@ -2152,6 +2256,7 @@ void worker_variant_writer(
                     std::vector<secondary::Variant>{}.swap(results.variants_inference);
                     std::vector<secondary::RegionInt>{}.swap(results.selected_regions);
                     std::vector<secondary::IntervalInt64>{}.swap(results.processed_regions);
+                    std::vector<std::pair<uint32_t, uint32_t>>{}.swap(results.read_endpoints);
                 }
 
             } catch (const std::exception& e) {

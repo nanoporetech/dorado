@@ -55,6 +55,7 @@ struct ChromosomeReduceData {
     std::vector<secondary::Variant> variants_merged;
     std::vector<secondary::RegionInt> selected_regions;
     std::vector<secondary::IntervalInt64> processed_regions;
+    std::vector<std::pair<uint32_t, uint32_t>> read_endpoints;
 };
 // clang-format on
 

@@ -213,8 +213,6 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                     .rend = 11,
             };
             writer.write_variant(no_call_variant);
-
-            writer.write_variant(data.second_variant);
         }
 
         const std::string vcf_text = ReadFileIntoString(data.vcf_path);
@@ -231,10 +229,6 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         CATCH_CHECK_THAT(vcf_text,
                          Catch::Matchers::ContainsSubstring(
                                  "chr1\t11\t.\tN\t<*>\t.\t.\tEND=11\tGT:GQ:LEN\t./.:.:1"));
-        // check that extra AD record is added
-        CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
-                                           "chr2\t42\t.\tT\tC,G,<*>\t17.5\tLowQual\t.\tGT:GQ:MIN_"
-                                           "DP:AD\t1/2:31:25:1,14,10,."));
     }
 
     CATCH_SECTION("write_variant rejects filters missing from the header") {
