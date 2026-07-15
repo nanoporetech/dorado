@@ -727,7 +727,7 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
                         (int)ck.reads[i_max_var].start_pos, (int)ck.reads[i_max_var].end_pos,
                         max_var, (int)ck.reads[i_max_var].vars.size());
                 for (int tmpi = 0; tmpi < std::ssize(ck.reads[i_max_var].vars); tmpi++) {
-                    LOG_TRACE("[kdys::{}] qn {} range {}-{}, variant#{} pos={} char=%c", __func__,
+                    LOG_TRACE("[kdys::{}] qn {} range {}-{}, variant#{} pos={} char={}", __func__,
                               ck.qnames[i_max_var], ck.reads[i_max_var].start_pos,
                               ck.reads[i_max_var].end_pos, tmpi, ck.reads[i_max_var].vars[tmpi].pos,
                               "ACGT_R"[ck.reads[i_max_var].vars[tmpi].allele[0]]);

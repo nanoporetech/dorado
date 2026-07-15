@@ -19,7 +19,7 @@ if (BUILD_KADAYASHI_EXE)
             htslib
             ${ZLIB_LIBRARIES}
             spdlog::spdlog
-            klib
+            argparse::argparse
     )
 
     install(TARGETS kadayashi DESTINATION bin)
