@@ -1,10 +1,10 @@
 #include "secondary/features/medaka_read_matrix.h"
 
 #include "hts_utils/bam_utils.h"
-#include "local_haplotagging.h"
 #include "medaka_bamiter.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/features/kadayashi_utils.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 
 #include <htslib/faidx.h>

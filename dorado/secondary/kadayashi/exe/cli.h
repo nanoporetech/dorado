@@ -1,6 +1,6 @@
 #pragma once
 
-#include "types.h"
+#include "secondary/kadayashi/types.h"
 
 #include <cstdint>
 #include <filesystem>

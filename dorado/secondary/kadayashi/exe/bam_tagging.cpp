@@ -1,9 +1,9 @@
 #include "bam_tagging.h"
 
 #include "kadayashi_utils.h"
-#include "local_haplotagging.h"
 #include "pipeline.h"
 #include "secondary/common/bam_file.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/hts.h>

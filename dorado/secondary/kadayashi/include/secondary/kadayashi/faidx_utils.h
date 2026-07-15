@@ -1,6 +1,6 @@
 #pragma once
 
-#include "hts_types.h"
+#include "secondary/kadayashi/hts_types.h"
 
 #include <cstdint>
 #include <string>

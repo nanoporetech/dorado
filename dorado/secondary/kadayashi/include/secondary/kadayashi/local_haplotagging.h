@@ -489,7 +489,7 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
  */
 MedakaFeatureMatrix gen_medaka_feature_matrix_wrapper(
         dorado::secondary::BamFile &bam_file,
-        std::string refname,
+        const std::string &refname,
         uint32_t itvl_start,
         uint32_t itvl_end,
         const std::unordered_map<std::string, int32_t> &qname2hp,

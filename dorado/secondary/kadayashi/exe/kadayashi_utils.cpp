@@ -1,6 +1,6 @@
 #include "kadayashi_utils.h"
 
-#include "types.h"
+#include "secondary/kadayashi/types.h"
 
 #include <spdlog/spdlog.h>
 

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "hts_utils/FastxRandomReader.h"
-#include "local_haplotagging.h"
 #include "secondary/architectures/model_config.h"
 #include "secondary/architectures/model_torch_base.h"
 #include "secondary/common/batched_data.h"
@@ -20,6 +19,7 @@
 #include "secondary/features/encoder_factory.h"
 #include "secondary/features/kadayashi_options.h"
 #include "secondary/features/variant_candidate_source.h"
+#include "secondary/kadayashi/local_haplotagging.h"
 #include "utils/AsyncQueue.h"
 #include "variant/decode_data.h"
 #include "variant/inference_data.h"

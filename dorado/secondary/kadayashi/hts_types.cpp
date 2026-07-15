@@ -1,4 +1,4 @@
-#include "hts_types.h"
+#include "secondary/kadayashi/hts_types.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>

@@ -1,13 +1,13 @@
 #include "TestUtils.h"
-#include "blocked_bloom_filter.h"
 #include "hts_utils/FastxRandomReader.h"
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
-#include "local_haplotagging.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/features/medaka_read_matrix.h"
-#include "sequence_utility.h"
-#include "types.h"
+#include "secondary/kadayashi/blocked_bloom_filter.h"
+#include "secondary/kadayashi/local_haplotagging.h"
+#include "secondary/kadayashi/sequence_utility.h"
+#include "secondary/kadayashi/types.h"
 #include "utils/cigar.h"
 
 #include <catch2/catch_test_macros.hpp>

@@ -1,6 +1,6 @@
 #include "variant_graph.h"
 
-#include "sequence_utility.h"
+#include "secondary/kadayashi/sequence_utility.h"
 
 #include <spdlog/fmt/bundled/format.h>
 #include <spdlog/spdlog.h>

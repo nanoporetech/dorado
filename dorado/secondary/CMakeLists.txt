@@ -6,6 +6,7 @@ dorado_add_library(
         secondary/common
         secondary/consensus
         secondary/features
+        secondary/kadayashi
     DEPENDS_PUBLIC
         dorado_hts_utils
         dorado_torch_utils
@@ -17,7 +18,6 @@ dorado_add_library(
         dorado_flashattention3
         htslib
         intervaltree
-        kadayashi::haplotag_lib
         spdlog::spdlog
         toml11::toml11
 )
@@ -26,3 +26,4 @@ add_subdirectory(architectures)
 add_subdirectory(consensus)
 add_subdirectory(features)
 add_subdirectory(common)
+add_subdirectory(kadayashi)
