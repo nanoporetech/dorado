@@ -45,6 +45,7 @@ class Benchmarker(object):
         args = [
             dorado_exe,
             "basecaller",
+            "-v",
             model,
             self.input_file,
             "--device",
