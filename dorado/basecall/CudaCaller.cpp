@@ -516,7 +516,7 @@ CudaCaller::BatchDimsAndMaxSizes CudaCaller::calculate_batch_sizes(
                         "{}: Requested batch size {} exceeds maximum safe estimated batch size {}.",
                         device.str(), requested_batch_size, max_batch_size);
             }
-            batch_dim.N = std::min(requested_batch_size, max_batch_size);
+            batch_dim.N = requested_batch_size;
         }
     }
 
