@@ -288,6 +288,7 @@ class TestDorado(unittest.TestCase):
         args.extend(
             [
                 "basecaller",
+                "-v",
                 model,
                 str(input_path),
                 "--device",
