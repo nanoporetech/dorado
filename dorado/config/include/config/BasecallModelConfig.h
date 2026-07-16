@@ -58,10 +58,8 @@ struct TxEncoderParams {
     float deepnorm_alpha{1.0};
     // MHA RoPE theta value
     float theta{10000.0f};
-    // MHA RoPE maximum sequence length
-    // TODO: Tx VCS supports arbitrarily large chunk_size, study
-    // TODO: behaviour of max_seq_len and accuracy
-    int max_seq_len{4096};
+    // MHA RoPE maximum sequence length. Initialised in `TxModelImpl::TxModelImpl`
+    int max_seq_len{0};
     std::string to_string() const;
 };
 
