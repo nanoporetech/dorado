@@ -451,7 +451,7 @@ CudaCaller::BatchDimsAndMaxSizes CudaCaller::calculate_batch_sizes(
                 T_outs.insert(calculate_T_out(std::atoi(env_string.c_str() + start)));
                 end = env_string.find(SEPARATOR, start);
             }
-        } else if (!(variable_chunk_sizes && model_config.is_tx_model())) {
+        } else if (!variable_chunk_sizes) {
             // Use other chunk sizes as a fraction of the requested one
             // TODO: determine the best set of chunk sizes
             for (float fraction : {0.5f}) {
