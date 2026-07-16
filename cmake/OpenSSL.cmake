@@ -9,19 +9,19 @@ else()
 endif()
 
 if(NOT DEFINED OPENSSL_ROOT_DIR)
-    set(OPENSSL_VERSION 3.5.5)
+    set(OPENSSL_VERSION 3.5.7)
     if(APPLE)
         download_and_extract(
             ${DORADO_CDN_URL}/openssl-${OPENSSL_VERSION}-macos-aarch64.zip
             openssl-${OPENSSL_VERSION}-macos-aarch64
-            "afba0cc43232833343db607d2ed999cfd9af43df1e889b8edb2ebd6766844ae2"
+            "a445b60441f86e19211b2b743d34e22c3fc2128e0a02911118b8f871309f35ac"
         )
         set(OPENSSL_ROOT_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/openssl-${OPENSSL_VERSION}-macos-aarch64)
     elseif(WIN32)
         download_and_extract(
             ${DORADO_CDN_URL}/openssl-${OPENSSL_VERSION}-win.zip
             openssl-${OPENSSL_VERSION}-win
-            "200bd6d518c58b74d30319a382df32673ce8b3f28aa527f4dccb46bf3bfd2392"
+            "15b0221b56cdcab0f6b842c063d7f154e6b1e17f6ceb7a7ab8f777411a05eab3"
         )
         set(OPENSSL_ROOT_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/openssl-${OPENSSL_VERSION}-win)
     elseif(CMAKE_SYSTEM_NAME STREQUAL "Linux")
@@ -29,14 +29,14 @@ if(NOT DEFINED OPENSSL_ROOT_DIR)
             download_and_extract(
                 ${DORADO_CDN_URL}/openssl-${OPENSSL_VERSION}-linux-x86_64.zip
                 openssl-${OPENSSL_VERSION}-Linux-x86_64
-                "20d7e3caf86368e03f61071c67d152cc3e18865d8b38e369df74ae4c57d1421b"
+                "9c195f46bb8ad5c4ab336c089108d1cfb5f71b7e541a010154a1773fa2867188"
             )
             set(OPENSSL_ROOT_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/openssl-${OPENSSL_VERSION}-Linux-x86_64)
         elseif(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
             download_and_extract(
                 ${DORADO_CDN_URL}/openssl-${OPENSSL_VERSION}-linux-aarch64.zip
                 openssl-${OPENSSL_VERSION}-Linux-aarch64
-                "5d31d284e6f5734d390e7c36584e001f764613109111520420a9f84c4bd6fd2d"
+                "9e4b215fa73350ea6657f95a97b7d86987c205e70938086029a6fc4abdcd7b86"
             )
             set(OPENSSL_ROOT_DIR ${DORADO_3RD_PARTY_DOWNLOAD}/openssl-${OPENSSL_VERSION}-Linux-aarch64)
         endif()
