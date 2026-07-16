@@ -33,7 +33,7 @@ constexpr std::array FORMAT_FIELD_SPECS{
         FieldSpec{"DP", FieldType::INT_SCALAR, "1", "Read depth"},
         FieldSpec{"MIN_DP", FieldType::INT_SCALAR, "1", "Minimum read depth"},
         FieldSpec{"SRC", FieldType::STRING, "1", "Source of the variant"},
-        // FieldSpec{"AD", FieldType::INT_LIST, "R", "Allele read depth"},
+        FieldSpec{"AD", FieldType::INT_LIST, "R", "Allele read depth"},
 };
 
 constexpr std::array INFO_FIELD_SPECS{
@@ -304,7 +304,11 @@ void VCFWriter::write_variant(const Variant& variant) {
             }
 
             if (spec.type == FieldType::INT_LIST) {
-                const auto parsed_values = parse_vcf_int_list(value);
+                auto parsed_values = parse_vcf_int_list(value);
+                if (m_include_gvcf_headers && (spec.key == "AD")) {
+                    // Add extra missing entry corresponding to <*> allele
+                    parsed_values.push_back(bcf_int32_missing);
+                }
                 bcf_update_format_int32(m_header.get(), record.get(), spec.key.data(),
                                         parsed_values.data(), parsed_values.size());
                 continue;

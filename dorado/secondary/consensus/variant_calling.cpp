@@ -796,6 +796,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
     if (any_empty) {
         var.alts = {"."};
         var.format["GT"] = make_reference_gt(ploidy, '0');
+        var.format.erase("AD");
         var.filters = {Filters::NonVariant};
     }
 }

@@ -8,6 +8,7 @@
 #include "secondary/kadayashi/faidx_utils.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
+#include "utils/container_utils.h"
 #include "variant_graph.h"
 
 #include <htslib/faidx.h>
@@ -903,6 +904,28 @@ cov_extended_t variant_get_all_allele_coverage(const vc_variants1_val_t &var) {
     return ret;
 }
 
+void set_variant_depth(ta_t &var, const int depth) {
+    var.min_depth = depth;
+    var.median_depth = depth;
+}
+
+int get_ref_depth(const vc_variants1_val_t &var) {
+    int ref_depth = 0;
+    for (const vc_allele_t &allele : var.alleles) {
+        if (std::empty(allele.allele)) {
+            continue;
+        }
+        if ((allele.allele[0] == SENTINEL_REF_ALLELE_INT) && (allele.allele.back() == VAR_OP_X)) {
+            ref_depth += allele.cov.cov_tot_all;
+        }
+    }
+    return ref_depth;
+}
+
+int get_allele_depth_or_zero(const std::vector<int> &allele_depths, const size_t idx) {
+    return (idx < std::size(allele_depths)) ? allele_depths[idx] : 0;
+}
+
 void set_merged_variant_depth(ta_t &var, std::vector<int> depths) {
     assert(!depths.empty());
     std::sort(depths.begin(), depths.end());
@@ -914,6 +937,74 @@ void set_merged_variant_depth(ta_t &var, std::vector<int> depths) {
     } else {
         var.median_depth = depths[mid];
     }
+}
+
+uint32_t get_expected_allele_idx_for_haplotype(const ta_t &var, const uint32_t hap_idx) {
+    assert(hap_idx < 2);
+
+    if (var.type == TA_TYPE_HOM) {
+        return 0;
+    }
+
+    const char gt = var.genotype[hap_idx * 2];
+    assert((gt >= '0') && (gt <= '2'));
+    if (var.type == TA_TYPE_HET) {
+        const uint32_t ref_idx = (var.alleles[0][0] == SENTINEL_REF_ALLELE_INT) ? 0U : 1U;
+        const uint32_t alt_idx = (ref_idx == 0) ? 1U : 0U;
+        return (gt == '0') ? ref_idx : alt_idx;
+    }
+
+    return static_cast<uint32_t>(gt - '0');
+}
+
+int get_ref_allele_idx(const ta_t &var) {
+    for (size_t i = 0; i < std::size(var.alleles); ++i) {
+        if ((!std::empty(var.alleles[i])) && (var.alleles[i][0] == SENTINEL_REF_ALLELE_INT)) {
+            return static_cast<int>(i);
+        }
+    }
+    return -1;
+}
+
+bool read_supports_haplotype_across_variants(const read_t &read,
+                                             const chunk_t &ck,
+                                             std::span<const uint32_t> var_indices,
+                                             const uint32_t hap_idx) {
+    size_t i_read_var = 0;
+    for (const uint32_t var_idx : var_indices) {
+        while ((i_read_var < std::size(read.vars)) && (read.vars[i_read_var].var_idx < var_idx)) {
+            ++i_read_var;
+        }
+        if ((i_read_var >= std::size(read.vars)) || (read.vars[i_read_var].var_idx != var_idx)) {
+            return false;
+        }
+        const uint32_t expected_allele_idx =
+                get_expected_allele_idx_for_haplotype(ck.varcalls[var_idx], hap_idx);
+        if (read.vars[i_read_var].allele_idx != expected_allele_idx) {
+            return false;
+        }
+    }
+    return true;
+}
+
+bool read_supports_reference_across_variants(const read_t &read,
+                                             const chunk_t &ck,
+                                             std::span<const uint32_t> var_indices) {
+    size_t i_read_var = 0;
+    for (const uint32_t var_idx : var_indices) {
+        while ((i_read_var < std::size(read.vars)) && (read.vars[i_read_var].var_idx < var_idx)) {
+            ++i_read_var;
+        }
+        if ((i_read_var >= std::size(read.vars)) || (read.vars[i_read_var].var_idx != var_idx)) {
+            return false;
+        }
+        const int ref_allele_idx = get_ref_allele_idx(ck.varcalls[var_idx]);
+        if ((ref_allele_idx < 0) ||
+            (read.vars[i_read_var].allele_idx != static_cast<uint32_t>(ref_allele_idx))) {
+            return false;
+        }
+    }
+    return true;
 }
 
 var_classify_t classify_variant_phased(vc_variants1_val_t &var,
@@ -1438,6 +1529,26 @@ void ck_absorb_variants_covered_by_deletion_run_on_other_hap(
             //  should rarely exceed read boundary. And since genophase
             //  is already collected, `allele2readIDs` will be used
             //  by nobody.
+            std::array<int, 2> spanning_allele_depths{0, 0};
+            int spanning_ref_depth = 0;
+            {
+                std::span<const uint32_t> var_indices_span{var_indices};
+                for (const read_t &read : ck.reads) {
+                    if ((read.start_pos > range_start) || (read.end_pos < range_end)) {
+                        continue;
+                    }
+                    if (read_supports_reference_across_variants(read, ck, var_indices_span)) {
+                        ++spanning_ref_depth;
+                    }
+                    for (uint32_t hap_idx = 0; hap_idx < std::size(spanning_allele_depths);
+                         ++hap_idx) {
+                        if (read_supports_haplotype_across_variants(read, ck, var_indices_span,
+                                                                    hap_idx)) {
+                            ++spanning_allele_depths[hap_idx];
+                        }
+                    }
+                }
+            }
             if (var.type != TA_TYPE_HETMULTI) {
                 var.genotype[0] += 1;
                 var.genotype[2] += 1;
@@ -1448,6 +1559,8 @@ void ck_absorb_variants_covered_by_deletion_run_on_other_hap(
                 merged_depths.push_back(ck.varcalls[var_idx].median_depth);
             }
             set_merged_variant_depth(var, std::move(merged_depths));
+            var.ref_depth = spanning_ref_depth;
+            var.allele_depths = {spanning_allele_depths[0], spanning_allele_depths[1]};
             var.type = TA_TYPE_HETMULTI_CONSOLIDATED;
             var.ref_len = range_end - range_start;
             var.alleles[0] = seq2nt4seq(hap_recon.first);
@@ -1540,6 +1653,7 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
     //   - Variant position will be in 0-index.
     //   - Multi-allele variant should have genotypes 1 or 2.
     variant_fullinfo_t ret;
+    ret.ref_depth = var.ref_depth;
     ret.min_depth = var.min_depth;
     ret.median_depth = var.median_depth;
 
@@ -1581,11 +1695,13 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
     if (var.type == TA_TYPE_HOM) {
         if (var.alleles[0][0] != SENTINEL_REF_ALLELE_INT) {
             alt_s = nt4seq2seq(var.alleles[0]);
+            ret.alt_depth0 = get_allele_depth_or_zero(var.allele_depths, 0);
             is_del0 = var.alleles[0].back() == VAR_OP_D;
             is_ins0 = var.alleles[0].back() == VAR_OP_I;
         } else {
             assert(var.alleles.size() > 1);
             alt_s = nt4seq2seq(var.alleles[1]);
+            ret.alt_depth0 = get_allele_depth_or_zero(var.allele_depths, 1);
             is_del0 = var.alleles[1].back() == VAR_OP_D;
             is_ins0 = var.alleles[1].back() == VAR_OP_I;
         }
@@ -1594,6 +1710,8 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
             var.alleles[1][0] != SENTINEL_REF_ALLELE_INT) {  // multi-allele, need to write both
             alt_s = nt4seq2seq(var.alleles[0]);
             alt2_s = nt4seq2seq(var.alleles[1]);
+            ret.alt_depth0 = get_allele_depth_or_zero(var.allele_depths, 0);
+            ret.alt_depth1 = get_allele_depth_or_zero(var.allele_depths, 1);
             is_del0 = var.alleles[0].back() == VAR_OP_D;
             is_ins0 = var.alleles[0].back() == VAR_OP_I;
             if (var.alleles.size() > 1) {
@@ -1603,10 +1721,12 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
         } else {  // (regular case)
             if (var.alleles[0][0] != SENTINEL_REF_ALLELE_INT) {
                 alt_s = nt4seq2seq(var.alleles[0]);
+                ret.alt_depth0 = get_allele_depth_or_zero(var.allele_depths, 0);
                 is_del0 = var.alleles[0].back() == VAR_OP_D;
                 is_ins0 = var.alleles[0].back() == VAR_OP_I;
             } else {
                 alt_s = nt4seq2seq(var.alleles[1]);
+                ret.alt_depth0 = get_allele_depth_or_zero(var.allele_depths, 1);
                 is_del0 = var.alleles[1].back() == VAR_OP_D;
                 is_ins0 = var.alleles[1].back() == VAR_OP_I;
             }
@@ -1749,6 +1869,8 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
     std::pair<char, char> genotype;
     std::string_view ref = var.ref_allele_seq0;
     std::vector<std::string> alts;
+    std::vector<int> alt_depths;
+    int ref_depth = var.ref_depth;
 
     const auto make_gt_string = [&keep_phasing, &genotype](const bool is_phased) {
         const char delimiter = (keep_phasing && is_phased) ? '|' : '/';
@@ -1777,24 +1899,43 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
             return {};
         } else if (alt0 == ref) {
             alts = {std::move(alt1)};
+            alt_depths = {var.alt_depth1};
+            ref_depth += var.alt_depth0;
             genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'1', '0'}
                                                              : std::pair<char, char>{'0', '1'};
         } else if (alt1 == ref) {
             alts = {std::move(alt0)};
+            alt_depths = {var.alt_depth0};
+            ref_depth += var.alt_depth1;
             genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'0', '1'}
                                                              : std::pair<char, char>{'1', '0'};
         } else {
             alts = {std::move(alt0), std::move(alt1)};
+            alt_depths = {var.alt_depth0, var.alt_depth1};
         }
     } else {
         genotype = {var.genotype0[0], var.genotype0[2]};
         alts = {var.alt_allele_seq0};
+        alt_depths = {var.alt_depth0};
     }
     if (!(var.is_phased0 && keep_phasing)) {
         if (genotype.first > genotype.second) {
             std::swap(genotype.first, genotype.second);
         }
-        std::sort(alts.begin(), alts.end());
+        const bool needs_sort = !std::is_sorted(std::begin(alts), std::end(alts));
+        if (needs_sort) {
+            if (std::size(alts) == 2) {
+                std::swap(alts[0], alts[1]);
+                if (std::size(alt_depths) == 2) {
+                    std::swap(alt_depths[0], alt_depths[1]);
+                }
+            } else {
+                spdlog::debug(
+                        "[convert_fullinfo_var_to_dorado_style] Not sorting variant record at {} "
+                        "with {}!=2 alts",
+                        var.pos0, std::size(alts));
+            }
+        }
     }
 
     const float qual = var.is_confident ? dorado::secondary::VCF_MAX_GQ_CAP : 0.0f;
@@ -1811,7 +1952,10 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
                        {"GQ", dorado::secondary::gq_from_qual(qual)},
                        {"DP", std::to_string(var.median_depth)},
                        {dorado::secondary::FORMAT_TAG_VARIANT_SOURCE,
-                        dorado::secondary::VARIANT_SOURCE_KADAYASHI}},
+                        dorado::secondary::VARIANT_SOURCE_KADAYASHI},
+                       {"AD",
+                        std::to_string(ref_depth) + "," +
+                                dorado::utils::print_container_as_string(alt_depths, ",", false)}},
             .rstart = 0,
             .rend = 0,
     };
@@ -2348,17 +2492,17 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
     }
     for (const valid_pos_t pos_stat : valid_poss) {
         const uint32_t pos = pos_stat.pos;
+        const vc_variants1_val_t &var = ht[pos];
         const uint8_t var_stat = pos_stat.stat;
-        const uint8_t var_type = ht[pos].type;
+        const uint8_t var_type = var.type;
         if (var_stat != FLAG_VARSTAT_ACCEPTED && var_stat != FLAG_VARSTAT_UNSURE) {
             continue;
         }
 
         ck.varcalls.push_back(ta_t{});
         ck.varcalls.back().pos = pos;
-        const int32_t depth = variant_get_all_allele_coverage(ht[pos]).cov.cov_tot_all;
-        ck.varcalls.back().min_depth = depth;
-        ck.varcalls.back().median_depth = depth;
+        ck.varcalls.back().ref_depth = get_ref_depth(var);
+        set_variant_depth(ck.varcalls.back(), variant_get_all_allele_coverage(var).cov.cov_tot_all);
 
         if (var_stat == FLAG_VARSTAT_ACCEPTED) {
             ck.varcalls.back().is_used = TA_STAT_ACCEPTED;
@@ -2367,8 +2511,9 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         }
 
         if (var_stat == FLAG_VARSTAT_UNSURE) {  // save all alleles
-            for (const vc_allele_t &_ : ht[pos].alleles) {
-                ck.varcalls.back().alleles.push_back(_.allele);
+            for (const vc_allele_t &candidate : var.alleles) {
+                ck.varcalls.back().alleles.push_back(candidate.allele);
+                ck.varcalls.back().allele_depths.push_back(candidate.cov.cov_tot_all);
             }
             if (var_type == FLAG_VAR_MULTHET) {
                 ck.varcalls.back().type = TA_TYPE_HETMULTI;
@@ -2382,20 +2527,25 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         } else {
             if (var_type != FLAG_VAR_MULTHET) {
                 if (var_type == FLAG_VAR_HOM) {
-                    assert(ht[pos].alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT);
-                    ck.varcalls.back().alleles.push_back(ht[pos].alleles[0].allele);
+                    assert(var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT);
+                    ck.varcalls.back().alleles.push_back(var.alleles[0].allele);
+                    ck.varcalls.back().allele_depths.push_back(var.alleles[0].cov.cov_tot_all);
                     ck.varcalls.back().type = TA_TYPE_HOM;
                 } else {
                     assert(var_type == FLAG_VAR_HET);
-                    ck.varcalls.back().alleles.push_back(ht[pos].alleles[0].allele);
-                    ck.varcalls.back().alleles.push_back(ht[pos].alleles[1].allele);
+                    ck.varcalls.back().alleles.push_back(var.alleles[0].allele);
+                    ck.varcalls.back().alleles.push_back(var.alleles[1].allele);
+                    ck.varcalls.back().allele_depths.push_back(var.alleles[0].cov.cov_tot_all);
+                    ck.varcalls.back().allele_depths.push_back(var.alleles[1].cov.cov_tot_all);
                     ck.varcalls.back().type = TA_TYPE_HET;
                 }
             } else {
-                assert(ht[pos].alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT);
-                assert(ht[pos].alleles[1].allele[0] != SENTINEL_REF_ALLELE_INT);
-                ck.varcalls.back().alleles.push_back(ht[pos].alleles[0].allele);
-                ck.varcalls.back().alleles.push_back(ht[pos].alleles[1].allele);
+                assert(var.alleles[0].allele[0] != SENTINEL_REF_ALLELE_INT);
+                assert(var.alleles[1].allele[0] != SENTINEL_REF_ALLELE_INT);
+                ck.varcalls.back().alleles.push_back(var.alleles[0].allele);
+                ck.varcalls.back().alleles.push_back(var.alleles[1].allele);
+                ck.varcalls.back().allele_depths.push_back(var.alleles[0].cov.cov_tot_all);
+                ck.varcalls.back().allele_depths.push_back(var.alleles[1].cov.cov_tot_all);
                 ck.varcalls.back().type = TA_TYPE_HETMULTI;
             }
         }
@@ -2458,25 +2608,25 @@ std::unordered_map<std::string, int> kadayashi_local_haptagging_gen_ht(chunk_t &
 std::string variant_fullinfo_to_string(const variant_fullinfo_t &v) {
     return fmt::format(
             "valid={} conf={} phased={},{} pos={},{} qual={},{} ref={},{} alt={},{} geno={},{} "
-            "min_depth={} median_depth={}",
+            "ref_depth={} alt_depths={},{} min_depth={} median_depth={}",
             v.is_valid ? "true" : "false", v.is_confident ? "true" : "false",
             v.is_phased0 ? "true" : "false", v.is_phased1 ? "true" : "false", v.pos0, v.pos1,
             v.qual0, v.qual1, v.ref_allele_seq0, v.ref_allele_seq1, v.alt_allele_seq0,
             v.alt_allele_seq1, std::string(v.genotype0, 3), std::string(v.genotype1, 3),
-            v.min_depth, v.median_depth);
+            v.ref_depth, v.alt_depth0, v.alt_depth1, v.min_depth, v.median_depth);
 }
 
 bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
-    return std::tie(a.is_confident, a.is_multi_allele, a.min_depth, a.median_depth, a.pos0, a.qual0,
-                    a.ref_allele_seq0, a.alt_allele_seq0, a.is_phased0, a.genotype0[0],
-                    a.genotype0[1], a.genotype0[2], a.pos1, a.qual1, a.ref_allele_seq1,
-                    a.alt_allele_seq1, a.is_phased1, a.genotype1[0], a.genotype1[1],
-                    a.genotype1[2]) == std::tie(b.is_confident, b.is_multi_allele, b.min_depth,
-                                                b.median_depth, b.pos0, b.qual0, b.ref_allele_seq0,
-                                                b.alt_allele_seq0, b.is_phased0, b.genotype0[0],
-                                                b.genotype0[1], b.genotype0[2], b.pos1, b.qual1,
-                                                b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1,
-                                                b.genotype1[0], b.genotype1[1], b.genotype1[2]);
+    return std::tie(a.is_confident, a.is_multi_allele, a.ref_depth, a.min_depth, a.median_depth,
+                    a.pos0, a.qual0, a.ref_allele_seq0, a.alt_allele_seq0, a.is_phased0,
+                    a.genotype0[0], a.genotype0[1], a.genotype0[2], a.alt_depth0, a.pos1, a.qual1,
+                    a.ref_allele_seq1, a.alt_allele_seq1, a.is_phased1, a.genotype1[0],
+                    a.genotype1[1], a.genotype1[2], a.alt_depth1) ==
+           std::tie(b.is_confident, b.is_multi_allele, b.ref_depth, b.min_depth, b.median_depth,
+                    b.pos0, b.qual0, b.ref_allele_seq0, b.alt_allele_seq0, b.is_phased0,
+                    b.genotype0[0], b.genotype0[1], b.genotype0[2], b.alt_depth0, b.pos1, b.qual1,
+                    b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1, b.genotype1[0],
+                    b.genotype1[1], b.genotype1[2], b.alt_depth1);
 };
 
 phase_return_t kadayashi_local_haptagging_simple_single_region(samFile *fp_bam,
