@@ -325,8 +325,8 @@ Variant construct_variant(const std::string_view draft,
 #endif
     }
 
-    // If the ALT field is still is empty, set it to a '.'. This can happen when a deletion is
-    // flanked by unreachable positions on both ends.
+    // Check whether the ALT field is still empty. If so, mark the alleles as "."
+    // and move on.
     const bool any_empty = std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                                        [](const std::string_view val) { return std::empty(val); });
     if (std::empty(var.alts) || any_empty) {
@@ -803,6 +803,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                         [&variant](const std::string_view s) { return s == variant.ref; });
 
     if (all_same_as_ref) {
+        spdlog::debug("[normalize_variant] all_same_as_ref");
         return variant;
     }
 
@@ -863,7 +864,8 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
-                                     &positions_minor, &symbol_set, &ambig_ref](Variant& var) {
+                                     &positions_minor,
+                                     &symbol_set](Variant& var, const bool ambig_ref_local) {
         const auto reset_var = [](const Variant& v) {
 #ifdef DEBUG_NORMALIZE_VARIANT
             std::cerr << "[normalize_variant]    [trim_end_and_align] Resetting var.\n";
@@ -929,13 +931,13 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
             if (any_empty) {
                 bool used_right_extend = false;
                 changed = prepend_ref_base(var, ref_with_gaps, cons_seqs_with_gaps, positions_major,
-                                           positions_minor, symbol_set, ambig_ref);
+                                           positions_minor, symbol_set, ambig_ref_local);
 
                 if (!changed) {
                     // std::tie(var, seqs) = reset_var(var_before_change);
                     changed = append_ref_base(var, ref_with_gaps, cons_seqs_with_gaps,
                                               positions_major, positions_minor, symbol_set,
-                                              ambig_ref);
+                                              ambig_ref_local);
                     used_right_extend = true;
                 }
 
@@ -970,70 +972,98 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 #endif
     };
 
-    Variant ret = variant;
+    const auto normalize_variant_core = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
+                                         &positions_minor, &trim_start, &trim_end_and_align](
+                                                const Variant& var, const bool ambig_ref_local) {
+        Variant ret = var;
 
-    // Normalize the start of the variant. For example, if the input variant represents a region like this:
-    // - POS  :      43499195    43499196
-    //               v           v
-    // - REF  : CCTAG************TTATTATT
-    // - HAP 0: CCTAG*********TT**T*TTATT
-    // - HAP 1: CCTAG*********T*AT*ATTATT
-    // - VAR  : 0000011111111111111100000
-    // - MARK :      ^
-    //
-    // it is possible that the input variant.pos was set to the pos_major of the beginning of the variant
-    // (in this case, on a minor position which does not contain a reference base).
-    //
-    // Here we try to move the start position to the first major base left, then right.
-    int32_t new_rstart = ret.rstart;
-    while ((new_rstart > 0) && (positions_minor[new_rstart] != 0)) {
-        --new_rstart;
-    }
-    if (positions_minor[new_rstart] != 0) {
-        new_rstart = ret.rstart + 1;
-        while ((new_rstart < ret.rend) && (positions_minor[new_rstart] != 0)) {
-            ++new_rstart;
+        // Normalize the start of the variant. For example, if the input variant represents a region like this:
+        // - POS  :      43499195    43499196
+        //               v           v
+        // - REF  : CCTAG************TTATTATT
+        // - HAP 0: CCTAG*********TT**T*TTATT
+        // - HAP 1: CCTAG*********T*AT*ATTATT
+        // - VAR  : 0000011111111111111100000
+        // - MARK :      ^
+        //
+        // it is possible that the input variant.pos was set to the pos_major of the beginning of the variant
+        // (in this case, on a minor position which does not contain a reference base).
+        //
+        // Here we try to move the start position to the first major base left, then right.
+        int32_t new_rstart = ret.rstart;
+        while ((new_rstart > 0) && (positions_minor[new_rstart] != 0)) {
+            --new_rstart;
         }
-    }
-    if (new_rstart >= ret.rend) {
-        return {};
-    }
-    if (new_rstart != ret.rstart) {
-        ret.rstart = new_rstart;
-        ret.pos = positions_major[ret.rstart];
-        ret.ref = remove_gaps(ref_with_gaps.substr(ret.rstart, ret.rend - ret.rstart));
-        ret.alts = {};
-        for (const auto& s : cons_seqs_with_gaps) {
-            ret.alts.emplace_back(remove_gaps(s.substr(ret.rstart, ret.rend - ret.rstart)));
+        if (positions_minor[new_rstart] != 0) {
+            new_rstart = ret.rstart + 1;
+            while ((new_rstart < ret.rend) && (positions_minor[new_rstart] != 0)) {
+                ++new_rstart;
+            }
         }
+        if (new_rstart >= ret.rend) {
+            return Variant();
+        }
+        if (new_rstart != ret.rstart) {
+            ret.rstart = new_rstart;
+            ret.pos = positions_major[ret.rstart];
+            ret.ref = remove_gaps(ref_with_gaps.substr(ret.rstart, ret.rend - ret.rstart));
+            ret.alts = {};
+            for (const auto& s : cons_seqs_with_gaps) {
+                ret.alts.emplace_back(remove_gaps(s.substr(ret.rstart, ret.rend - ret.rstart)));
+            }
+        }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Entry variant: " << variant << '\n';
+#endif
+
+        if (std::empty(ref_with_gaps)) {
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant] Before trim_start 1: " << ret << '\n';
+#endif
+            trim_start(ret, true);
+        } else {
+#ifdef DEBUG_NORMALIZE_VARIANT
+            std::cerr << "[normalize_variant] Before trim_end_and_align: " << ret << '\n';
+#endif
+            trim_end_and_align(ret, ambig_ref_local);
+        }
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Before trim_start 2:" << ret << '\n';
+#endif
+
+        trim_start(ret, false);
+
+#ifdef DEBUG_NORMALIZE_VARIANT
+        std::cerr << "[normalize_variant] Final variant: " << ret << '\n';
+#endif
+
+        return ret;
+    };
+
+    Variant ret = normalize_variant_core(variant, ambig_ref);
+
+    // Check whether the ALT field is still empty. This can happen when a deletion is
+    // flanked by unreachable positions on both ends. If so, force prepend a base and
+    // retry normalisation without the ambig_ref constraint.
+    const bool any_empty = std::any_of(std::cbegin(ret.alts), std::cend(ret.alts),
+                                       [](const std::string_view val) { return std::empty(val); });
+    if (any_empty && !ambig_ref) {
+        const auto [can_go_left, new_rstart, new_ref_pos] =
+                find_previous_ref_pos(positions_major, positions_minor, ret.rstart);
+
+        if (can_go_left) {
+            ret.pos = new_ref_pos;
+            ret.rstart = new_rstart;
+            const char base = ref_with_gaps[new_rstart];
+            ret.ref = base + ret.ref;
+            for (size_t i = 0; i < std::size(ret.alts); ++i) {
+                ret.alts[i] = base + ret.alts[i];
+            }
+        }
+        ret = normalize_variant_core(ret, true);
     }
-
-#ifdef DEBUG_NORMALIZE_VARIANT
-    std::cerr << "[normalize_variant] Entry variant: " << variant << '\n';
-#endif
-
-    if (std::empty(ref_with_gaps)) {
-#ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[normalize_variant] Before trim_start 1: " << ret << '\n';
-#endif
-        trim_start(ret, true);
-    } else {
-#ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[normalize_variant] Before trim_end_and_align: " << ret << '\n';
-#endif
-        trim_end_and_align(ret);
-    }
-
-#ifdef DEBUG_NORMALIZE_VARIANT
-    std::cerr << "[normalize_variant] Before trim_start 2:" << ret << '\n';
-#endif
-
-    trim_start(ret, false);
-
-#ifdef DEBUG_NORMALIZE_VARIANT
-    std::cerr << "[normalize_variant] Final variant: " << ret << '\n';
-#endif
-
     return ret;
 }
 

@@ -276,6 +276,15 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
             Variant{0, 43499197, "TA", {"TT", "ATA"}, {}, {}, 3.0f, {}, 4, 25},
             false,
         },
+        TestCase{
+            "[DOR-1700] handle edge case of an empty alt due to invalid flanking positions",
+            "GGGGNATGGGG", {"GGG******GG"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            Variant{0, 5, "ATG", {""}, {}, {}, 30.0f, {}, 5, 8},
+            Variant{0, 4, "NATG", {"N"}, {}, {}, 30.0f, {}, 4, 8},
+            false,
+        },
     }));
     // clang-format on
 
