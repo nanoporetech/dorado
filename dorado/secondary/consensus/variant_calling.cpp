@@ -608,6 +608,125 @@ std::vector<float> compute_allele_logprobs_array(const at::Tensor& probs_3D,
     return allele_logprobs;
 }
 
+// Lookup table for ordering of genotype (Number="G") records as specified in VCF spec.
+// See https://samtools.github.io/hts-specs/VCFv4.4.pdf
+// Outer dimension of ALLELE_SETS is ploidy. Depending on the number of alleles
+// we select a number of elements as specified in NUM_ELEMENTS. Each element
+// shows the corresponding set of alleles contributing to the GL value at that
+// position.
+// Currently only enumerated up to num_alleles=3 (alts=2) for ploidy=1 and
+// and num_alleles=4 (alts=3) for ploidy=2.
+// clang-format off
+const std::vector<std::vector<std::string_view>> ALLELE_SETS = {
+    /*ploidy=1*/ {"0", "1", "2"},
+    /*ploidy=2*/ {"00", "01", "11", "02", "12", "22", "03", "13", "23", "33"},
+};
+const std::vector<std::vector<int64_t>> NUM_ELEMENTS = {
+    /*ploidy=1*/ {1, 2, 3},
+    /*ploidy=2*/ {1, 3, 6, 10},
+};
+// clang-format on
+
+/**
+ * \brief Lookup genotypes list with bounds checking.
+ */
+std::span<const std::string_view> lookup_gts(const int64_t ploidy, const int64_t num_alleles) {
+    if ((ploidy <= 0) || (ploidy > std::ssize(ALLELE_SETS))) {
+        throw std::runtime_error{"GL calculation for ploidy " + std::to_string(ploidy) +
+                                 " not implemented"};
+    }
+    const std::vector<std::string_view>& genotype_order = ALLELE_SETS[ploidy - 1];
+    if ((num_alleles <= 0) || (num_alleles > std::ssize(genotype_order))) {
+        throw std::runtime_error{"GL calculation for " + std::to_string(num_alleles) +
+                                 " alleles not implemented"};
+    }
+    int64_t num_elements = NUM_ELEMENTS[ploidy - 1][num_alleles - 1];
+    return {std::cbegin(genotype_order), static_cast<size_t>(num_elements)};
+}
+
+/**
+ * \brief Calculate total log-probability for all possible permutations of a single genotype.
+ */
+float compute_total_genotype_likelihood(const std::vector<float>& hap_allele_logprobs,
+                                        const std::string_view genotype,
+                                        const int64_t num_haplotypes) {
+    if (std::empty(hap_allele_logprobs)) {
+        throw std::runtime_error{"[compute_total_genotype_likelihood] Empty log probs"};
+    }
+    if (std::empty(genotype)) {
+        return NEGINF;
+    }
+    const int64_t num_alleles = std::ssize(hap_allele_logprobs) / num_haplotypes;
+    std::vector<int32_t> gt;
+    gt.reserve(num_haplotypes);
+    for (const char c : genotype) {
+        if ((c < '0') || (c > '9')) {
+            throw std::runtime_error{
+                    "[compute_total_genotype_likelihood] Genotype contains a non-integer allele: " +
+                    std::string(1, c)};
+        }
+        const int32_t index = static_cast<int32_t>(c - '0');
+        if ((index < 0) || (index >= num_alleles)) {
+            throw std::runtime_error{"[compute_total_genotype_likelihood] Genotype " +
+                                     std::to_string(index) + " out of range for " +
+                                     std::to_string(num_alleles) + " alleles"};
+        }
+        gt.emplace_back(index);
+    }
+    if (std::ssize(gt) != num_haplotypes) {
+        throw std::runtime_error{
+                "[compute_total_genotype_likelihood] Number of genotype entries " +
+                std::to_string(std::ssize(gt)) +
+                "doesn't match expected number of alleles: " + std::to_string(num_haplotypes)};
+    }
+    float total_logprobs = NEGINF;
+    do {
+        float perm_logprobs = 0.f;
+        for (int64_t i = 0; i < std::ssize(gt); ++i) {
+            perm_logprobs += hap_allele_logprobs[gt[i] * num_haplotypes + i];
+        }
+        total_logprobs = logaddexp(total_logprobs, perm_logprobs);
+    } while (std::next_permutation(std::begin(gt), std::end(gt)));
+    return total_logprobs;
+}
+
+/**
+ * \brief Compute an array of GL values from tensor of per-haplotype per-allele log-probabilities.
+ */
+std::vector<float> compute_GLs(const std::vector<float>& hap_allele_logprobs,
+                               const int64_t num_haplotypes) {
+    const int64_t num_alleles = std::ssize(hap_allele_logprobs) / num_haplotypes;
+    const std::span<const std::string_view> genotype_order =
+            lookup_gts(num_haplotypes, num_alleles);
+    const int64_t num_elements = std::ssize(genotype_order);
+
+    std::vector<float> genotype_likelihoods(num_elements, NEGINF);
+    for (int64_t gt = 0; gt < num_elements; ++gt) {
+        genotype_likelihoods[gt] = compute_total_genotype_likelihood(
+                hap_allele_logprobs, genotype_order[gt], num_haplotypes);
+    }
+    return genotype_likelihoods;
+}
+
+/**
+ * \brief Construct PL string from array of GL values.
+ */
+std::string construct_PL_string(const std::vector<float>& genotype_logprobs) {
+    if (std::empty(genotype_logprobs)) {
+        return {};
+    }
+    const int64_t num_genotypes = std::ssize(genotype_logprobs);
+    const float max_gl =
+            *std::max_element(std::cbegin(genotype_logprobs), std::cend(genotype_logprobs));
+    std::vector<int32_t> pl_values;
+    pl_values.reserve(num_genotypes);
+    for (const float gl : genotype_logprobs) {
+        pl_values.emplace_back(
+                static_cast<int32_t>(std::round(phred_from_log(gl - max_gl, VCF_MAX_PL_CAP))));
+    }
+    return utils::print_container_as_string(pl_values, ",", false);
+}
+
 Variant construct_variant(const std::string_view draft,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
@@ -640,6 +759,8 @@ Variant construct_variant(const std::string_view draft,
         return {};
     }
 
+    const int64_t num_haplotypes = std::ssize(cons_seqs_with_gaps);
+
     // Get the reference and the predictions for the variant stretch.
     const std::string_view var_ref_with_gaps(std::data(ref_seq_with_gaps) + rstart,
                                              static_cast<size_t>(rend - rstart));
@@ -648,7 +769,7 @@ Variant construct_variant(const std::string_view draft,
     std::string var_ref = remove_gaps(var_ref_with_gaps);
 
     std::vector<std::string> var_preds;
-    for (int64_t hap_id = 0; hap_id < std::ssize(cons_seqs_with_gaps); ++hap_id) {
+    for (int64_t hap_id = 0; hap_id < num_haplotypes; ++hap_id) {
         const std::string_view var_pred_with_gaps(
                 std::data(cons_seqs_with_gaps[hap_id].seq) + rstart,
                 static_cast<size_t>(rend - rstart));
@@ -671,6 +792,13 @@ Variant construct_variant(const std::string_view draft,
 
     const std::vector<std::string> alts_out = construct_alts_out(alleles_lookup);
     const std::string gt = make_variant_gt(var_preds, alleles_lookup);
+
+    // Compute likelihood matrix for alleles across haplotypes
+    const std::vector<float> hap_allele_likelihoods =
+            compute_allele_logprobs_array(probs_3D, alleles_lookup, symbol_lookup, rstart, rend);
+    const std::vector<float> genotype_likelihoods =
+            compute_GLs(hap_allele_likelihoods, num_haplotypes);
+    const std::string pl_str = construct_PL_string(genotype_likelihoods);
 
     Variant var{
             .seq_id = seq_id,
@@ -715,7 +843,7 @@ Variant construct_variant(const std::string_view draft,
     if (normalize) {
         // Create a vector of views for normalize_variant.
         std::vector<std::string_view> cons_view;
-        cons_view.reserve(std::size(cons_seqs_with_gaps));
+        cons_view.reserve(num_haplotypes);
         for (const ConsensusResult& val : cons_seqs_with_gaps) {
             cons_view.emplace_back(val.seq);
         }
@@ -733,8 +861,11 @@ Variant construct_variant(const std::string_view draft,
                                                      var.rstart, var.rend),
                            3);
     var.format["GQ"] = gq_from_qual(var.qual);
+    if (!std::empty(pl_str)) {
+        var.format["PL"] = pl_str;
+    }
 
-    sanitize_empty_alts(var, std::ssize(cons_seqs_with_gaps));
+    sanitize_empty_alts(var, num_haplotypes);
 
     return var;
 }
@@ -1216,6 +1347,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
         var.format["GT"] = make_reference_gt(ploidy, '0');
         var.format.erase("AD");
         var.format.erase("VAF");
+        var.format.erase("PL");
         var.filters = {Filters::NonVariant};
     }
 }

@@ -22,6 +22,7 @@
 namespace dorado::secondary {
 
 constexpr float VCF_MAX_GQ_CAP = 60.0f;
+constexpr float VCF_MAX_PL_CAP = 990.0f;
 constexpr int32_t VAF_DP = 2;
 constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS{
         {{0, 0.5f}, {10, 5.0f}}};

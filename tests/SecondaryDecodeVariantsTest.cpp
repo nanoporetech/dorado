@@ -394,7 +394,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "One variant, one haplotype. No normalization.",
             "ACTG", {"AGTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
             {
-                Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 1, 2},
+                Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0"}}, 1, 2},
             },
             false,
         },
@@ -403,7 +403,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "One variant, two haplotype. No normalization. The genotype information and the alleles are always normalized so they are valid, however.",
             "ACTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
             {
-                Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 1, 2},
+                Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 1, 2},
             },
             false,
         },
@@ -412,8 +412,8 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Two variants, two haplotypes. No normalization.",
             "ACATG", {"AGATG", "ACAAG"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, false, false, false, false,
             {
-                Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 1, 2},
-                Variant{0, 3, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 3, 4},
+                Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 1, 2},
+                Variant{0, 3, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 3, 4},
             },
             false,
         },
@@ -422,7 +422,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Multi-base SNP variant, two haplotypes. No normalization.",
             "ACTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
             {
-                Variant{0, 1, "CT", {"CA", "GT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 1, 3},
+                Variant{0, 1, "CT", {"CA", "GT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "200,100,200,100,0,200"}}, 1, 3},
             },
             false,
         },
@@ -432,7 +432,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. One SNP variant, one haplotype. No effect, SNPs cannot be normalized.",
             "AAAA", {"ACAA"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, true, false, false,
             {
-                Variant{0, 1, "A", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 1, 2},
+                Variant{0, 1, "A", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0"}}, 1, 2},
             },
             false,
         },
@@ -441,7 +441,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. One deletion variant, one haplotype.",
             "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, true, false, false,
             {
-                Variant{0, 0, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 3},
+                Variant{0, 0, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0"}}, 0, 3},
             },
             false,
         },
@@ -459,7 +459,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Normalization. One deletion variant at position 0, one haplotype. Deletion is the first event, cannot left-extend. Extend to the right with one reference base instead.",
             "ATAC", {"*TAC"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, true, false, false,
             {
-                Variant{0, 0, "AT", {"T"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 2},
+                Variant{0, 0, "AT", {"T"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0"}}, 0, 2},
             },
             false,
         },
@@ -478,7 +478,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, true, true, false, false,
             {
                 Variant{0, 0, "A", {"<*>"}, {Filters::NonVariant}, {{"END", "2"}}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 0, 2},
-                Variant{0, 2, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 3},
+                Variant{0, 2, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0"}}, 2, 3},
                 Variant{0, 3, "G", {"<*>"}, {Filters::NonVariant}, {{"END", "5"}}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 3, 5},
             },
             false,
@@ -488,7 +488,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Prepending with a reference base because the entire variant is in an insertion.",
             "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, 3.0f, false, false, true, false, false,
             {
-                Variant{0, 2, "T", {"TAAA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 6},
+                Variant{0, 2, "T", {"TAAA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "300,0"}}, 2, 6},
             },
             false,
         },
@@ -502,7 +502,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 6, "A", {"TC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}}, 4, 18},
+                Variant{0, 6, "A", {"TC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "195,0"}}, 4, 18},
             },
             false,
         },
@@ -517,7 +517,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, true, true,
             {
-                Variant{0, 6, "TA", {"ATA", "TT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 4, 20},
+                Variant{0, 6, "TA", {"ATA", "TT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "200,100,200,100,0,197"}}, 4, 20},
             },
             false,
         },
@@ -534,7 +534,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Ambiguous reference IS allowed. Single base SNP is reported even though the reference has an N base.",
             "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, true, false, false, false, false,
             {
-                Variant{0, 1, "N", {"C", "G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 1, 2},
+                Variant{0, 1, "N", {"C", "G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "200,100,100,100,0,100"}}, 1, 2},
             },
             false,
         },
@@ -543,7 +543,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Ambiguous reference - variants not allowed. 2-base SNP extends into an N reference region. Only one base should be reported.",
             "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
             {
-                Variant{0, 2, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 3},
+                Variant{0, 2, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 2, 3},
             },
             false,
         },
@@ -552,7 +552,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             "Ambiguous reference IS allowed. 2-base SNP extends into an N reference region.",
             "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, true, false, false, false, false,
             {
-                Variant{0, 1, "NT", {"CA", "GT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 1, 3},
+                Variant{0, 1, "NT", {"CA", "GT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "300,100,200,200,0,200"}}, 1, 3},
             },
             false,
         },
@@ -642,7 +642,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 0, "AAGCCATT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 8},
+                Variant{0, 0, "AAGCCATT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "990,697,0"}}, 0, 8},
             },
             false,
         },
@@ -656,7 +656,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 0, "AGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 8},
+                Variant{0, 0, "AGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "990,697,0"}}, 0, 8},
             },
             false,
         },
@@ -670,7 +670,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 6, "AGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 6, 14},
+                Variant{0, 6, "AGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "990,697,0"}}, 6, 14},
             },
             false,
         },
@@ -685,7 +685,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, true, false, true, false, false,
             {
-                Variant{0, 0, "ANNNNNAGCCATT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 13},
+                Variant{0, 0, "ANNNNNAGCCATT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "990,697,0"}}, 0, 13},
             },
             false,
         },
@@ -699,7 +699,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, true, false, true, false, false,
             {
-                Variant{0, 0, "NNNNNAGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 13},
+                Variant{0, 0, "NNNNNAGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "990,697,0"}}, 0, 13},
             },
             false,
         },
@@ -713,7 +713,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             80.0f, false, false, true, false, false,
             {
-                Variant{0, 0, "AAGCCATT", {"A"}, {Filters::LowQual}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 8},
+                Variant{0, 0, "AAGCCATT", {"A"}, {Filters::LowQual}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "990,697,0"}}, 0, 8},
             },
             false,
         },
@@ -788,9 +788,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 4},             // V1
-                Variant{0, 4, "AAA", {"A", "ACC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 4, 8},     // V2
-                Variant{0, 7, "AA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 8, 10},            // V3
+                Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "200,97,0"}}, 2, 4},             // V1
+                Variant{0, 4, "AAA", {"A", "ACC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "395,200,200,195,0,195"}}, 4, 8},     // V2
+                Variant{0, 7, "AA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 8, 10},            // V3
             },
             false,
         },
@@ -804,7 +804,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, true, true,
             {
-                Variant{0, 4, "AAAA", {"A", "CC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 2, 10},
+                Variant{0, 4, "AAAA", {"A", "CC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "689,395,197,294,0,195"}}, 2, 10},
             },
             false,
         },
@@ -862,9 +862,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 4},             // V1
-                Variant{0, 4, "AAA", {"A", "AAC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 4, 8},     // V2
-                Variant{0, 7, "AA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 8, 10},            // V3
+                Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "200,97,0"}}, 2, 4},             // V1
+                Variant{0, 4, "AAA", {"A", "AAC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "295,100,200,195,0,195"}}, 4, 8},     // V2
+                Variant{0, 7, "AA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 8, 10},            // V3
             },
             false,
         },
@@ -878,7 +878,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, true, true,
             {
-                Variant{0, 4, "AAAA", {"A", "AC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 2, 10},
+                Variant{0, 4, "AAAA", {"A", "AC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "589,295,100,294,0,194"}}, 2, 10},
             },
             false,
         },
@@ -953,9 +953,9 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}}, 2, 4},     // V1
-                Variant{0, 4, "AAA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 4, 8},    // V2
-                Variant{0, 7, "AA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 8, 10},    // V3
+                Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "200,97,0"}}, 2, 4},     // V1
+                Variant{0, 4, "AAA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "195,0,200"}}, 4, 8},    // V2
+                Variant{0, 7, "AA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "100,0,100"}}, 8, 10},    // V3
             },
             false,
         },
@@ -969,7 +969,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, false, true,
             {
-                Variant{0, 2, "CAAA", {"C", "CA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 2, 10},
+                Variant{0, 2, "CAAA", {"C", "CA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "489,195,94,288,0,94"}}, 2, 10},
             },
             false,
         },
@@ -983,7 +983,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
             3.0f, false, false, true, true, true,
             {
-                Variant{0, 2, "CAAA", {"C", "CA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 2, 10},
+                Variant{0, 2, "CAAA", {"C", "CA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "489,195,94,288,0,94"}}, 2, 10},
             },
             false,
         },
@@ -1000,7 +1000,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, true, true,
             {
-                Variant{0, 0, "TTCCCATT", {"T"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 18},
+                Variant{0, 0, "TTCCCATT", {"T"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}, {"PL", "671,0,700"}}, 0, 18},
             },
             false,
         },
