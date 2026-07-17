@@ -391,21 +391,25 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             continue;
         }
 
+        if (furthest_rend != v1.rend) {
 #ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[merge_sorted_variants] Constructing new_var.\n";
+            std::cerr << "[merge_sorted_variants] Constructing new_var.\n";
 #endif
 
-        Variant new_var = construct_variant(
-                draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
-                variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
-                probs_3D, symbol_set, symbol_lookup);
+            Variant new_var = construct_variant(
+                    draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
+                    variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
+                    probs_3D, symbol_set, symbol_lookup);
 
 #ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[merge_sorted_variants] new_var = " << new_var << '\n';
+            std::cerr << "[merge_sorted_variants] new_var = " << new_var << '\n';
 #endif
 
-        if (is_valid(new_var)) {
-            filtered.emplace_back(std::move(new_var));
+            if (is_valid(new_var)) {
+                filtered.emplace_back(std::move(new_var));
+            }
+        } else {
+            filtered.push_back(v1);
         }
 
         furthest_rend = v2.rend;
@@ -415,13 +419,17 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
     std::cerr << "[merge_sorted_variants] ----------------------------------\n";
 #endif
     {  // Remaining.
-        Variant new_var = construct_variant(
-                draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
-                variants[prev_i].seq_id, variants[prev_i].rstart, furthest_rend, true, ambig_ref,
-                normalize, probs_3D, symbol_set, symbol_lookup);
+        if (furthest_rend != variants[prev_i].rend) {
+            Variant new_var = construct_variant(
+                    draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
+                    variants[prev_i].seq_id, variants[prev_i].rstart, furthest_rend, true,
+                    ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
 
-        if (is_valid(new_var)) {
-            filtered.emplace_back(std::move(new_var));
+            if (is_valid(new_var)) {
+                filtered.emplace_back(std::move(new_var));
+            }
+        } else {
+            filtered.push_back(variants[prev_i]);
         }
     }
 #ifdef DEBUG_NORMALIZE_VARIANT
