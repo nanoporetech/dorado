@@ -501,8 +501,6 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         CATCH_REQUIRE(std::size(decoded_batch.samples) == 2);
         CATCH_CHECK(decoded_batch.samples[0].positions_major == sample_a.positions_major);
         CATCH_CHECK(decoded_batch.samples[1].positions_major == sample_b.positions_major);
-        CATCH_CHECK(!decoded_batch.samples[0].features.defined());
-        CATCH_CHECK(!decoded_batch.samples[1].features.defined());
 
         const at::Tensor expected_logits =
                 at::stack(std::vector<at::Tensor>{sample_a.features, sample_b.features}) +
@@ -537,7 +535,7 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         ////////////////////////////////////////
         /// Run the unit under test.         ///
         ////////////////////////////////////////
-        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status,
+        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status, {},
                                     /*num_threads=*/1, /*continue_on_exception=*/false);
 
         ////////////////////////////////////////
@@ -564,6 +562,145 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         secondary::VariantCallingSample exhausted_variant_calling_sample;
         CATCH_CHECK(output_queue.try_pop(exhausted_variant_calling_sample) ==
                     utils::AsyncQueueStatus::Terminate);
+    }
+}
+
+CATCH_TEST_CASE("worker_separate_decode_data handles basecall fields from feature tensors",
+                TEST_GROUP) {
+    secondary::Sample sample = make_sample(0, {0, 1, 2, 3}, 0.0f);
+    sample.features = at::arange(16, at::kChar).reshape({4, 2, 2});
+    sample.read_ids_left = {"left_0", "left_1"};
+    sample.read_ids_right = {"right_0", "right_1"};
+
+    std::atomic<bool> worker_terminate{false};
+    secondary::WorkerReturnStatus ret_status;
+
+    CATCH_SECTION("Valid features populates sample basecalls") {
+        const secondary::FeatureColumnMap feature_column_map{{secondary::FeatureColumns::BASE, 0},
+                                                             {secondary::FeatureColumns::QUAL, 1}};
+        DecodeData decode_data;
+        decode_data.samples = {sample};
+        decode_data.logits = at::ones({1, 4, 2}, at::kFloat);
+
+        utils::AsyncQueue<DecodeData> input_queue{1};
+        utils::AsyncQueue<secondary::VariantCallingSample> output_queue{1};
+        const auto queued_status = input_queue.try_push(std::move(decode_data));
+        CATCH_REQUIRE(queued_status == utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status,
+                                    feature_column_map, /*num_threads=*/1,
+                                    /*continue_on_exception=*/false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(std::size(output_queue) == 1);
+
+        secondary::VariantCallingSample result;
+        CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
+        CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
+        CATCH_CHECK(result.basecalls.defined());
+        CATCH_CHECK(result.basecalls.is_contiguous());
+        CATCH_CHECK(result.basecalls.equal(sample.features.select(-1, 0)));
+    }
+
+    CATCH_SECTION("Features out of range gives empty basecalls") {
+        const secondary::FeatureColumnMap feature_column_map{{secondary::FeatureColumns::MAPQ, 0},
+                                                             {secondary::FeatureColumns::QUAL, 1},
+                                                             {secondary::FeatureColumns::BASE, 2}};
+        DecodeData decode_data;
+        decode_data.samples = {sample};
+        decode_data.logits = at::ones({1, 4, 2}, at::kFloat);
+
+        utils::AsyncQueue<DecodeData> input_queue{1};
+        utils::AsyncQueue<secondary::VariantCallingSample> output_queue{1};
+        const auto queued_status = input_queue.try_push(std::move(decode_data));
+        CATCH_REQUIRE(queued_status == utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status,
+                                    feature_column_map, /*num_threads=*/1,
+                                    /*continue_on_exception=*/false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(std::size(output_queue) == 1);
+
+        secondary::VariantCallingSample result;
+        CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
+        CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
+        CATCH_CHECK(!result.basecalls.defined());
+    }
+
+    CATCH_SECTION("Feature map missing basecalls column throws") {
+        const secondary::FeatureColumnMap feature_column_map{{secondary::FeatureColumns::MAPQ, 0},
+                                                             {secondary::FeatureColumns::QUAL, 1}};
+        DecodeData decode_data;
+        decode_data.samples = {sample};
+        decode_data.logits = at::ones({1, 4, 2}, at::kFloat);
+
+        utils::AsyncQueue<DecodeData> input_queue{1};
+        utils::AsyncQueue<secondary::VariantCallingSample> output_queue{1};
+        const auto queued_status = input_queue.try_push(std::move(decode_data));
+        CATCH_REQUIRE(queued_status == utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status,
+                                    feature_column_map, /*num_threads=*/1,
+                                    /*continue_on_exception=*/false);
+
+        CATCH_REQUIRE(ret_status.exception_thrown);
+    }
+
+    CATCH_SECTION("Misshaped features gives empty basecalls") {
+        const secondary::FeatureColumnMap feature_column_map{{secondary::FeatureColumns::BASE, 0},
+                                                             {secondary::FeatureColumns::QUAL, 1}};
+        DecodeData decode_data;
+        decode_data.samples = {sample};
+        decode_data.samples.front().features = sample.features.reshape({4, 4});
+
+        decode_data.logits = at::ones({1, 4, 2}, at::kFloat);
+
+        utils::AsyncQueue<DecodeData> input_queue{1};
+        utils::AsyncQueue<secondary::VariantCallingSample> output_queue{1};
+        const auto queued_status = input_queue.try_push(std::move(decode_data));
+        CATCH_REQUIRE(queued_status == utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status,
+                                    feature_column_map, /*num_threads=*/1,
+                                    /*continue_on_exception=*/false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(std::size(output_queue) == 1);
+
+        secondary::VariantCallingSample result;
+        CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
+        CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
+        CATCH_CHECK(!result.basecalls.defined());
+    }
+
+    CATCH_SECTION("Empty features map gives empty basecalls") {
+        const secondary::FeatureColumnMap feature_column_map{};
+        DecodeData decode_data;
+        decode_data.samples = {sample};
+
+        decode_data.logits = at::ones({1, 4, 2}, at::kFloat);
+
+        utils::AsyncQueue<DecodeData> input_queue{1};
+        utils::AsyncQueue<secondary::VariantCallingSample> output_queue{1};
+        const auto queued_status = input_queue.try_push(std::move(decode_data));
+        CATCH_REQUIRE(queued_status == utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        worker_separate_decode_data(input_queue, output_queue, worker_terminate, ret_status,
+                                    feature_column_map, /*num_threads=*/1,
+                                    /*continue_on_exception=*/false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(std::size(output_queue) == 1);
+
+        secondary::VariantCallingSample result;
+        CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
+        CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
+        CATCH_CHECK(!result.basecalls.defined());
     }
 }
 

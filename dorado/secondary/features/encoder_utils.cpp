@@ -29,6 +29,10 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
         return {};
     }
 
+    if (prev_rids_out == rids_in) {
+        return {chunk, rids_out};
+    }
+
     LOG_TRACE(
             "[reorder_chunk] prev_rids_out.size() = {}, rids_in.size() = {}, "
             "chunk.shape = [{}]",

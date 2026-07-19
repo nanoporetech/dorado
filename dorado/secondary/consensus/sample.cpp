@@ -55,6 +55,15 @@ int64_t Sample::find_max_depth(const int64_t start_idx, const int64_t end_idx) c
     return ret;
 }
 
+// Helper function to generate placeholder read IDs for read level models.
+std::vector<std::string> placeholder_read_ids(const int64_t n) {
+    std::vector<std::string> placeholder_ids(n);
+    for (int64_t i = 0; i < n; ++i) {
+        placeholder_ids[i] = "__placeholder_" + std::to_string(i);
+    }
+    return placeholder_ids;
+}
+
 Sample slice_sample(const Sample& sample,
                     const int64_t idx_start,
                     const int64_t idx_end,
@@ -71,6 +80,11 @@ Sample slice_sample(const Sample& sample,
                 ", num_columns = " + std::to_string(num_columns));
     }
 
+    std::vector<std::string> placeholder_rids =
+            ((idx_start > 0) || (idx_end < num_columns))
+                    ? placeholder_read_ids(std::ssize(sample.read_ids_left))
+                    : std::vector<std::string>{};
+
     // Create the sliced Sample.
     Sample ret{
             .seq_id = sample.seq_id,
@@ -80,8 +94,8 @@ Sample slice_sample(const Sample& sample,
             .positions_minor = std::vector<int64_t>(std::begin(sample.positions_minor) + idx_start,
                                                     std::begin(sample.positions_minor) + idx_end),
             .depth = sample.depth.index({at::indexing::Slice(idx_start, idx_end)}),
-            .read_ids_left = {},
-            .read_ids_right = {},
+            .read_ids_left = (idx_start == 0) ? sample.read_ids_left : placeholder_rids,
+            .read_ids_right = (idx_end == num_columns) ? sample.read_ids_right : placeholder_rids,
     };
 
     if (clone) {
@@ -182,9 +196,8 @@ void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
     lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
                               std::end(rh.positions_minor));
 
-    // Invalidate read IDs.
-    lh.read_ids_left.clear();
-    lh.read_ids_right.clear();
+    // Propagate read IDs.
+    lh.read_ids_right = rh.read_ids_right;
 }
 
 std::vector<secondary::Sample> split_samples(std::vector<Sample> samples,
@@ -634,18 +647,6 @@ std::vector<secondary::Interval64> find_sample_intervals(const secondary::Sample
     return intervals;
 }
 
-namespace {
-
-// Helper function to generate placeholder read IDs for read level models.
-std::vector<std::string> placeholder_read_ids(const int64_t n) {
-    std::vector<std::string> placeholder_ids(n);
-    for (int64_t i = 0; i < n; ++i) {
-        placeholder_ids[i] = "__placeholder_" + std::to_string(i);
-    }
-    return placeholder_ids;
-}
-}  // namespace
-
 std::vector<secondary::Sample> split_sample_on_intervals(
         const secondary::Sample& sample,
         const std::vector<secondary::Interval64>& intervals) {
@@ -669,16 +670,9 @@ std::vector<secondary::Sample> split_sample_on_intervals(
                     "), sample_len = " + std::to_string(std::size(sample.positions_major)));
         }
 
-        // Generate the sample slice. This produces empty read_ids_left and read_ids_right.
+        // Generate the sample slice. This propagates read_ids_left and read_ids_right
+        // from the original samples.
         Sample new_sample = slice_sample(sample, iv.start, iv.end);
-
-        std::vector<std::string> read_ids_left = (i == 0) ? sample.read_ids_left : placeholder_ids;
-
-        std::vector<std::string> read_ids_right =
-                ((i + 1) == std::ssize(intervals)) ? sample.read_ids_right : placeholder_ids;
-
-        new_sample.read_ids_left = std::move(read_ids_left);
-        new_sample.read_ids_right = std::move(read_ids_right);
 
         ret.emplace_back(std::move(new_sample));
     }

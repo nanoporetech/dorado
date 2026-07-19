@@ -44,6 +44,8 @@ struct Sample {
     void validate() const;
 };
 
+std::vector<std::string> placeholder_read_ids(const int64_t n);
+
 Sample slice_sample(const Sample& sample,
                     const int64_t idx_start,
                     const int64_t idx_end,

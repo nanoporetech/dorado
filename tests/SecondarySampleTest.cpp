@@ -165,6 +165,59 @@ CATCH_TEST_CASE("slice_sample: Basic slicing", TEST_GROUP) {
     }
 }
 
+CATCH_TEST_CASE("slice_sample: Preserves non-empty boundary read IDs", TEST_GROUP) {
+    Sample sample = make_linear_sample(1, {0, 1, 2, 3, 4});
+    const std::vector<std::string> placeholders = placeholder_read_ids(2);
+
+    CATCH_SECTION("Interior slice uses placeholders on both sides") {
+        const Sample sliced_sample = slice_sample(sample, 1, 4);
+
+        CATCH_CHECK(sliced_sample.read_ids_left == placeholders);
+        CATCH_CHECK(sliced_sample.read_ids_right == placeholders);
+    }
+
+    CATCH_SECTION("Full slice preserves both boundary ID vectors") {
+        const Sample sliced_sample = slice_sample(sample, 0, 5);
+
+        CATCH_CHECK(sliced_sample.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(sliced_sample.read_ids_right == sample.read_ids_right);
+    }
+
+    CATCH_SECTION("Slice at the left boundary preserves only left IDs") {
+        const Sample sliced_sample = slice_sample(sample, 0, 2);
+
+        CATCH_CHECK(sliced_sample.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(sliced_sample.read_ids_right == placeholders);
+    }
+
+    CATCH_SECTION("Slice at the right boundary preserves only right IDs") {
+        const Sample sliced_sample = slice_sample(sample, 3, 5);
+
+        CATCH_CHECK(sliced_sample.read_ids_left == placeholders);
+        CATCH_CHECK(sliced_sample.read_ids_right == sample.read_ids_right);
+    }
+}
+
+CATCH_TEST_CASE("merge_adjacent_samples_in_place: Propagates boundary read IDs", TEST_GROUP) {
+    Sample left = make_linear_sample(1, {0, 1});
+    left.read_ids_left = {"left_0", "left_1"};
+    left.read_ids_right = {"middle_0", "middle_1"};
+
+    const Sample right = [&] {
+        Sample sample = make_linear_sample(1, {1, 2});
+        sample.read_ids_left = {"middle_0", "middle_1"};
+        sample.read_ids_right = {"right_0", "right_1"};
+        return sample;
+    }();
+
+    merge_adjacent_samples_in_place(left, right);
+
+    CATCH_CHECK(left.read_ids_left == std::vector<std::string>{"left_0", "left_1"});
+    CATCH_CHECK(left.read_ids_right == std::vector<std::string>{"right_0", "right_1"});
+    CATCH_CHECK(left.positions_major == std::vector<int64_t>{0, 1, 1, 2});
+    CATCH_CHECK(left.positions_minor == std::vector<int64_t>{0, 0, 0, 0});
+}
+
 CATCH_TEST_CASE("slice_sample: Error conditions", TEST_GROUP) {
     Sample sample;
     sample.seq_id = 1;
@@ -430,8 +483,8 @@ CATCH_TEST_CASE("split_samples_around_positions: candidate-driven chunking and e
                                                             {35, 36, 37, 38, 39}},
                                                            torch::kInt64)));
         CATCH_CHECK(result[0].depth.equal(torch::ones({7}, torch::kInt64)));
-        CATCH_CHECK(std::empty(result[0].read_ids_left));
-        CATCH_CHECK(std::empty(result[0].read_ids_right));
+        CATCH_CHECK(result[0].read_ids_left == placeholder_read_ids(2));
+        CATCH_CHECK(result[0].read_ids_right == placeholder_read_ids(2));
     }
 
     CATCH_SECTION("Invalid flanking_bases throws") {

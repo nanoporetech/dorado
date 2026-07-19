@@ -5,6 +5,7 @@
 #include "secondary/common/region.h"
 #include "secondary/consensus/sample_collate_utils.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/features/encoder_base.h"
 #include "secondary/features/encoder_utils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -870,10 +871,9 @@ void worker_infer_samples_in_parallel(
             }
             spdlog::trace("Post-batching, batch has refs: {}", batched_data.refseqs ? true : false);
 
-            // Decoding only needs positions and depth. Release the source tensors once their
+            // Decoding does not need draft_seq. Release the source tensor once their
             // collated representations own the inference input data.
             for (auto& sample : batch.samples) {
-                sample.features = at::Tensor{};
                 sample.draft_seq.reset();
             }
 
@@ -1103,6 +1103,7 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                                  utils::AsyncQueue<secondary::VariantCallingSample>& out_queue,
                                  std::atomic<bool>& worker_terminate,
                                  secondary::WorkerReturnStatus& ret_status,
+                                 const secondary::FeatureColumnMap& feature_column_map,
                                  const int32_t num_threads,
                                  const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("separate_decode_data", 2);
@@ -1149,14 +1150,34 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                             ", split_logits.size = " + std::to_string(std::size(split_logits)));
                 }
 
+                const int64_t base_column =
+                        (std::size(feature_column_map) > 0)
+                                ? secondary::get_feature_column_or_throw(
+                                          feature_column_map, secondary::FeatureColumns::BASE)
+                                : -1;
+
                 // Create the variant calling data.
                 spdlog::trace("[separate_decode_data {}] About to push {} items to vc_data_queue.",
                               tid, std::ssize(item.samples));
                 for (int64_t i = 0; i < std::ssize(item.samples); ++i) {
                     out_queue.try_push(secondary::VariantCallingSample{
-                            item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                            std::move(item.samples[i].positions_minor), std::move(split_logits[i]),
-                            std::move(item.samples[i].depth)});
+                            .seq_id = item.samples[i].seq_id,
+                            .positions_major = std::move(item.samples[i].positions_major),
+                            .positions_minor = std::move(item.samples[i].positions_minor),
+                            .logits = std::move(split_logits[i]),
+                            .depth = std::move(item.samples[i].depth),
+                            .read_ids_left = std::move(item.samples[i].read_ids_left),
+                            .read_ids_right = std::move(item.samples[i].read_ids_right),
+                            // if we've somehow got here with counts features, don't store basecalls
+                            .basecalls =
+                                    ((!item.samples[i].features.defined()) ||
+                                     (item.samples[i].features.dim() != 3) || (base_column < 0) ||
+                                     (base_column >= item.samples[i].features.size(-1)))
+                                            ? at::Tensor{}
+                                            : item.samples[i]
+                                                      .features.select(/*dim=*/-1, base_column)
+                                                      .contiguous(),
+                                                    });
                 }
                 spdlog::trace("[separate_decode_data {}] Pushed {} items to vc_data_queue.", tid,
                               std::ssize(item.samples));

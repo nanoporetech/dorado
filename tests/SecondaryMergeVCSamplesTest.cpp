@@ -1,3 +1,4 @@
+#include "secondary/consensus/sample.h"
 #include "secondary/consensus/variant_calling_sample.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -9,6 +10,82 @@
 namespace dorado::secondary::consensus::tests {
 
 #define TEST_GROUP "[SecondaryConsensus]"
+
+CATCH_TEST_CASE("VariantCallingSample::validate checks basecalls and read IDs", TEST_GROUP) {
+    const auto make_sample = [](const at::Tensor& basecalls, std::vector<std::string> read_ids_left,
+                                std::vector<std::string> read_ids_right) {
+        return VariantCallingSample{
+                .seq_id = 0,
+                .positions_major = {0, 1, 2},
+                .positions_minor = {0, 0, 0},
+                .logits = at::ones({3, 1}, at::kFloat),
+                .depth = at::ones({3}, at::kInt),
+                .read_ids_left = std::move(read_ids_left),
+                .read_ids_right = std::move(read_ids_right),
+                .basecalls = basecalls,
+        };
+    };
+
+    CATCH_SECTION("valid rank-3 basecalls and matching read IDs") {
+        auto sample = make_sample(at::ones({3, 2}, at::kChar), {"left_0", "left_1"},
+                                  {"right_0", "right_1"});
+        CATCH_REQUIRE_NOTHROW(sample.validate());
+    }
+
+    CATCH_SECTION("basecall length mismatch") {
+        auto sample_too_short = make_sample(at::ones({1, 2}, at::kChar), {"left_0", "left_1"},
+                                            {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(sample_too_short.validate());
+        auto sample_too_long = make_sample(at::ones({4, 2}, at::kChar), {"left_0", "left_1"},
+                                           {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(sample_too_long.validate());
+    }
+
+    CATCH_SECTION("empty left read IDs") {
+        auto sample = make_sample(at::ones({3, 2}, at::kChar), {}, {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(sample.validate());
+    }
+
+    CATCH_SECTION("empty right read IDs") {
+        auto sample = make_sample(at::ones({3, 2}, at::kChar), {"left_0", "left_1"}, {});
+        CATCH_REQUIRE_THROWS(sample.validate());
+    }
+
+    CATCH_SECTION("undersized and oversized left read IDs") {
+        auto undersized =
+                make_sample(at::ones({3, 2}, at::kChar), {"left_0"}, {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(undersized.validate());
+
+        auto oversized = make_sample(at::ones({3, 2}, at::kChar), {"left_0", "left_1", "left_2"},
+                                     {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(oversized.validate());
+    }
+
+    CATCH_SECTION("undersized and oversized right read IDs") {
+        auto undersized =
+                make_sample(at::ones({3, 2}, at::kChar), {"left_0", "left_1"}, {"right_0"});
+        CATCH_REQUIRE_THROWS(undersized.validate());
+
+        auto oversized = make_sample(at::ones({3, 2}, at::kChar), {"left_0", "left_1"},
+                                     {"right_0", "right_1", "right_2"});
+        CATCH_REQUIRE_THROWS(oversized.validate());
+    }
+
+    CATCH_SECTION("basecalls wrong dimensions") {
+        auto sample1d =
+                make_sample(at::ones({3}, at::kChar), {"left_0", "left_1"}, {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(sample1d.validate());
+
+        auto sample3d = make_sample(at::ones({3, 2, 1}, at::kChar), {"left_0", "left_1"},
+                                    {"right_0", "right_1"});
+        CATCH_REQUIRE_THROWS(sample3d.validate());
+    }
+
+    CATCH_SECTION("undefined basecalls and empty read IDs") {
+        auto sample = make_sample(at::Tensor{}, {}, {});
+        CATCH_REQUIRE_NOTHROW(sample.validate());
+    }
+}
 
 CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
     struct TestCase {
@@ -33,11 +110,41 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
                     at::ones({4}, at::kInt),
+                    {},
+                    {}
                 },
             },
             {
             },
             true,
+        },
+        TestCase{
+            "Valid single sample with basecalls is returned unchanged",
+            {
+                {
+                    0,
+                    {0, 1},
+                    {0, 0},
+                    at::tensor({0.0f, 1.0f}, at::kFloat),
+                    at::ones({2}, at::kInt),
+                    {"left_0", "left_1"},
+                    {"right_0", "right_1"},
+                    at::arange(4, at::kChar).reshape({2, 2}),
+                },
+            },
+            {
+                {
+                    0,
+                    {0, 1},
+                    {0, 0},
+                    at::tensor({0.0f, 1.0f}, at::kFloat),
+                    at::ones({2}, at::kInt),
+                    {"left_0", "left_1"},
+                    {"right_0", "right_1"},
+                    at::arange(4, at::kChar).reshape({2, 2}),
+                },
+            },
+            false,
         },
         TestCase{
             "Merge adjacent samples split on regular major positions",
@@ -48,6 +155,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
                     at::ones({4}, at::kInt),
+                    {"left_read_1", "left_read_2"},
+                    {"right_read_1", "right_read_2"},
                 },
                 {
                     0,
@@ -55,6 +164,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::full({5}, 2, at::kInt),
+                    {"left_read_3", "left_read_4"},
+                    {"right_read_3", "right_read_4"},
                 },
             },
             {
@@ -64,6 +175,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0, 0, 0, 0, 0, 0,},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::tensor({1, 1, 1, 1, 2, 2, 2, 2, 2}, at::kInt),
+                    {"left_read_1", "left_read_2"},
+                    {"right_read_3", "right_read_4"},
                 },
             },
             false,
@@ -77,6 +190,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
                     at::ones({4}, at::kInt),
+                    {"left_read_1", "left_read_2"},
+                    {"mid_read_1", "mid_read_2"},
                 },
                 {
                     0,
@@ -84,6 +199,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {4, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::full({5}, 2, at::kInt),
+                    {"mid_read_1", "mid_read_2"},
+                    {"right_read_3", "right_read_4"},
                 },
             },
             {
@@ -93,6 +210,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 1, 2, 3, 4, 0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::tensor({1, 1, 1, 1, 2, 2, 2, 2, 2}, at::kInt),
+                    {"left_read_1", "left_read_2"},
+                    {"right_read_3", "right_read_4"},
                 },
             },
             false,
@@ -106,6 +225,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
                     at::ones({4}, at::kInt),
+                    {"read_id1"},
+                    {"read_id2"}
                 },
                 {
                     0,
@@ -113,6 +234,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0},
                     at::tensor({5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::full({4}, 2, at::kInt),
+                    {"read_id3"},
+                    {"read_id4"}
                 },
             },
             {
@@ -122,6 +245,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
                     at::ones({4}, at::kInt),
+                    {"read_id1"},
+                    {"read_id2"}
                 },
                 {
                     0,
@@ -129,6 +254,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0},
                     at::tensor({5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::full({4}, 2, at::kInt),
+                    {"read_id3"},
+                    {"read_id4"}
                 },
             },
             false,
@@ -178,6 +305,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0, 0, 1},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 3.1, 3.2}, at::kFloat),
                     at::ones({6}, at::kInt),
+                    {},
+                    {},
                 },
                 {
                     0,
@@ -185,6 +314,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {5, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::full({5}, 2, at::kInt),
+                    {},
+                    {},
                 },
             },
             {
@@ -194,6 +325,8 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {0, 0, 0, 0, 0, 1},
                     at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 3.1, 3.2}, at::kFloat),
                     at::ones({6}, at::kInt),
+                    {},
+                    {},
                 },
                 {
                     0,
@@ -201,9 +334,253 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
                     {5, 0, 0, 0, 0},
                     at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
                     at::full({5}, 2, at::kInt),
+                    {},
+                    {},
                 },
             },
             false,
+        },
+        TestCase{
+            "Merge adjacent basecalls with matching read IDs and no padding",
+            {
+                {
+                    0,
+                    {0, 1},
+                    {0, 0},
+                    at::tensor({0.0f, 1.0f}, at::kFloat),
+                    at::ones({2}, at::kInt),
+                    {"left_0", "left_1"},
+                    {"middle_0", "middle_1"},
+                    at::arange(4, at::kChar).reshape({2, 2}),
+                },
+                {
+                    0,
+                    {2, 3},
+                    {0, 0},
+                    at::tensor({2.0f, 3.0f}, at::kFloat),
+                    at::full({2}, 2, at::kInt),
+                    {"middle_0", "middle_1"},
+                    {"right_0", "right_1"},
+                    at::arange(4, 8, at::kChar).reshape({2, 2}),
+                },
+            },
+            {
+                {
+                    0,
+                    {0, 1, 2, 3},
+                    {0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::tensor({1, 1, 2, 2}, at::kInt),
+                    {"left_0", "left_1"},
+                    {"right_0", "right_1"},
+                    at::arange(8, at::kChar).reshape({4, 2}),
+                },
+            },
+            false,
+        },
+        TestCase{
+            "Merge adjacent basecalls with reorders based on read IDs, no padding",
+            {
+                {
+                    0,
+                    {0, 1},
+                    {0, 0},
+                    at::tensor({0.0f, 1.0f}, at::kFloat),
+                    at::ones({2}, at::kInt),
+                    {"left_0", "left_1"},
+                    {"middle_0", "middle_1"},
+                    at::arange(4, at::kChar).reshape({2, 2}),
+                },
+                {
+                    0,
+                    {2, 3},
+                    {0, 0},
+                    at::tensor({2.0f, 3.0f}, at::kFloat),
+                    at::full({2}, 2, at::kInt),
+                    {"middle_1", "middle_0"},
+                    {"right_0", "right_1"},
+                    at::arange(4, 8, at::kChar).reshape({2, 2}),
+                },
+            },
+            {
+                {
+                    0,
+                    {0, 1, 2, 3},
+                    {0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::tensor({1, 1, 2, 2}, at::kInt),
+                    {"left_0", "left_1"},
+                    {"right_1", "right_0"},
+                    at::tensor({0, 1, 2, 3, 5, 4, 7, 6}, at::kChar).reshape({4, 2}),
+                },
+            },
+            false,
+        },
+        TestCase{
+            "Merge adjacent samples re-orders basecalls arrays and pads, right depth > left depth",
+            {
+                {
+                    0,
+                    {0, 1, 2, 3},
+                    {0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
+                    {"read_id1", "read_id2"},
+                    {"read_id3", "read_id4"},
+                    at::arange(8, at::kChar).reshape({4, 2}),
+                },
+                {
+                    0,
+                    {4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0},
+                    at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
+                    {"read_id3", "read_id4", "read_id5"},
+                    {"read_id6", "read_id7", "read_id5"},
+                    at::arange(15, at::kChar).reshape({5, 3}),
+                },
+            },
+            {
+                {
+                    0,
+                    {0, 1, 2, 3, 4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0, 0, 0, 0, 0,},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::tensor({1, 1, 1, 1, 2, 2, 2, 2, 2}, at::kInt),
+                    {"read_id1", "read_id2", "__inserted_0"},
+                    {"read_id6", "read_id7", "read_id5"},
+                    at::tensor({ 0,  1,  0,
+                                 2,  3,  0,
+                                 4,  5,  0,
+                                 6,  7,  0,
+                                 0,  1,  2,
+                                 3,  4,  5,
+                                 6,  7,  8,
+                                 9, 10, 11,
+                                12, 13, 14}, at::kChar).reshape({9, 3}),
+                },
+            },
+            false,
+        },
+        TestCase{
+            "Merge adjacent samples re-orders basecalls arrays and pads, right depth < left depth",
+            {
+                {
+                    0,
+                    {0, 1, 2, 3},
+                    {0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::full({4}, 3, at::kInt),
+                    {"read_id1", "read_id2", "read_id3"},
+                    {"read_id1", "read_id2", "read_id3"},
+                    at::arange(12, at::kChar).reshape({4, 3}),
+                },
+                {
+                    0,
+                    {4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0},
+                    at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
+                    {"read_id2", "read_id3"},
+                    {"read_id4", "read_id5"},
+                    at::arange(10, at::kChar).reshape({5, 2}),
+                },
+            },
+            {
+                {
+                    0,
+                    {0, 1, 2, 3, 4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::tensor({3, 3, 3, 3, 2, 2, 2, 2, 2}, at::kInt),
+                    {"read_id1", "read_id2", "read_id3"},
+                    {"__inserted_0", "read_id4", "read_id5"},
+                    at::tensor({ 0,  1,  2,
+                                 3,  4,  5,
+                                 6,  7,  8,
+                                 9, 10, 11,
+                                 0,  0,  1,
+                                 0,  2,  3,
+                                 0,  4,  5,
+                                 0,  6,  7,
+                                 0,  8,  9}, at::kChar).reshape({9, 3}),
+                },
+            },
+            false,
+        },
+        TestCase{
+            "Merge adjacent samples re-orders basecalls arrays based on read ids",
+            {
+                {
+                    0,
+                    {0, 1, 2, 3},
+                    {0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
+                    {"read_id1", "read_id2"},
+                    {"read_id3", "read_id4"},
+                    at::arange(8, at::kChar).reshape({4, 2}),
+                },
+                {
+                    0,
+                    {4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0},
+                    at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
+                    {"read_id4", "read_id5", "read_id3"},
+                    {"read_id6", "read_id5", "read_id7"},
+                    at::arange(15, at::kChar).reshape({5, 3}),
+                },
+            },
+            {
+                {
+                    0,
+                    {0, 1, 2, 3, 4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0, 0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f, 4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::tensor({1, 1, 1, 1, 2, 2, 2, 2, 2}, at::kInt),
+                    {"read_id1", "read_id2", "__inserted_0"},
+                    {"read_id7", "read_id6", "read_id5"},
+                    at::tensor({ 0,  1,  0,
+                                 2,  3,  0,
+                                 4,  5,  0,
+                                 6,  7,  0,
+                                 2,  0,  1,
+                                 5,  3,  4,
+                                 8,  6,  7,
+                                11,  9, 10,
+                                14, 12, 13}, at::kChar).reshape({9, 3}),
+                },
+            },
+            false,
+        },
+        TestCase{
+            "Invalid combination of basecall arrays, raises",
+            {
+                {
+                    0,
+                    {0, 1, 2, 3},
+                    {0, 0, 0, 0},
+                    at::tensor({0.0f, 1.0f, 2.0f, 3.0f}, at::kFloat),
+                    at::ones({4}, at::kInt),
+                    {"read1", "read2", "read3", "read4"},
+                    {"read1", "read2", "read3", "read4"},
+                    at::ones({4, 4}, at::kChar),
+                },
+                {
+                    0,
+                    {4, 5, 6, 7, 8},
+                    {0, 0, 0, 0, 0},
+                    at::tensor({4.0f, 5.0f, 6.0f, 7.0f, 8.0f}, at::kFloat),
+                    at::full({5}, 2, at::kInt),
+                    {},
+                    {},
+                    at::empty({}, at::kChar),
+                },
+            },
+            {
+            },
+            true,
         },
     }));
     // clang-format on
@@ -215,6 +592,44 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
     } else {
         const std::vector<VariantCallingSample> result = merge_vc_samples(test_case.in_samples);
         CATCH_CHECK(test_case.expected == result);
+    }
+}
+
+CATCH_TEST_CASE("slice_vc_sample preserves boundary IDs and basecalls", TEST_GROUP) {
+    const VariantCallingSample sample{
+            .seq_id = 0,
+            .positions_major = {0, 1, 2, 3},
+            .positions_minor = {0, 0, 0, 0},
+            .logits = at::arange(8, at::kFloat).reshape({4, 2}),
+            .depth = at::tensor({1, 2, 3, 4}, at::kInt),
+            .read_ids_left = {"left_0", "left_1"},
+            .read_ids_right = {"right_0", "right_1"},
+            .basecalls = at::arange(8, at::kChar).reshape({4, 2}),
+    };
+    const std::vector<std::string> placeholder_ids = placeholder_read_ids(2);
+
+    CATCH_SECTION("internal slice") {
+        const VariantCallingSample result = slice_vc_sample(sample, 1, 3);
+
+        CATCH_CHECK(result.read_ids_left == placeholder_ids);
+        CATCH_CHECK(result.read_ids_right == placeholder_ids);
+        CATCH_CHECK(result.basecalls.equal(sample.basecalls.slice(0, 1, 3)));
+    }
+
+    CATCH_SECTION("left boundary slice") {
+        const VariantCallingSample result = slice_vc_sample(sample, 0, 2);
+
+        CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
+        CATCH_CHECK(result.read_ids_right == placeholder_ids);
+        CATCH_CHECK(result.basecalls.equal(sample.basecalls.slice(0, 0, 2)));
+    }
+
+    CATCH_SECTION("right boundary slice") {
+        const VariantCallingSample result = slice_vc_sample(sample, 2, 4);
+
+        CATCH_CHECK(result.read_ids_left == placeholder_ids);
+        CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
+        CATCH_CHECK(result.basecalls.equal(sample.basecalls.slice(0, 2, 4)));
     }
 }
 

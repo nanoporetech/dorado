@@ -4,6 +4,8 @@
 #include "secondary/consensus/sample.h"
 #include "secondary/consensus/sample_trimming.h"
 #include "secondary/features/decoder_base.h"
+#include "secondary/features/encoder_utils.h"
+#include "torch_utils/tensor_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -53,6 +55,39 @@ void VariantCallingSample::validate() const {
             << ", num_columns = " << num_columns;
         throw std::runtime_error(oss.str());
     }
+
+    // Basecalls may be absent; if present, they are [positions, reads, features].
+    if (basecalls.defined()) {
+        if (basecalls.dim() != 2) {
+            std::ostringstream oss;
+            oss << "VariantCallingSample::basecalls must be rank 2 with shape [positions, reads]. "
+                   "Got shape = "
+                << utils::tensor_shape_as_string(basecalls);
+            throw std::runtime_error(oss.str());
+        }
+
+        if (basecalls.size(0) != num_columns) {
+            std::ostringstream oss;
+            oss << "VariantCallingSample::basecalls is of incorrect size. basecalls.shape = "
+                << utils::tensor_shape_as_string(basecalls) << ", num_columns = " << num_columns;
+            throw std::runtime_error(oss.str());
+        }
+
+        const int64_t num_reads = basecalls.size(1);
+        if (std::ssize(read_ids_left) != num_reads) {
+            std::ostringstream oss;
+            oss << "VariantCallingSample::read_ids_left has incorrect size. read_ids_left.size = "
+                << std::size(read_ids_left) << ", expected size = " << num_reads;
+            throw std::runtime_error(oss.str());
+        }
+
+        if (std::ssize(read_ids_right) != num_reads) {
+            std::ostringstream oss;
+            oss << "VariantCallingSample::read_ids_right has incorrect size. read_ids_right.size = "
+                << std::size(read_ids_right) << ", expected size = " << num_reads;
+            throw std::runtime_error(oss.str());
+        }
+    }
 }
 
 int64_t VariantCallingSample::start() const {
@@ -90,6 +125,8 @@ void debug_print(std::ostream& os,
         os.flush();
     }
     os << "], size = " << std::size(vc_sample.positions_major);
+    os << ", basecalls.size() = "
+       << (vc_sample.basecalls.defined() ? vc_sample.basecalls.size(0) : 0);
     os.flush();
 
     if (detailed) {
@@ -114,10 +151,19 @@ std::ostream& operator<<(std::ostream& os, const VariantCallingSample& vc_sample
 }
 
 bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs) {
+    const auto bcs_equal = [&lhs, &rhs]() {
+        if (lhs.basecalls.defined() != rhs.basecalls.defined()) {
+            return false;
+        }
+        if (lhs.basecalls.defined()) {
+            return lhs.basecalls.equal(rhs.basecalls);
+        }
+        return true;
+    };
     return (lhs.logits.equal(rhs.logits)) &&
            (std::tie(lhs.seq_id, lhs.positions_major, lhs.positions_minor) ==
             std::tie(rhs.seq_id, rhs.positions_major, rhs.positions_minor)) &&
-           (lhs.depth.equal(rhs.depth));
+           (lhs.depth.equal(rhs.depth)) && bcs_equal();
 }
 
 namespace {
@@ -162,15 +208,28 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                 ", num_columns = " + std::to_string(num_columns));
     }
 
+    std::vector<std::string> placeholder_rids =
+            placeholder_read_ids(std::ssize(vc_sample.read_ids_left));
+
     // Slice.
     return VariantCallingSample{
-            vc_sample.seq_id,
-            std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
-                                 std::begin(vc_sample.positions_major) + idx_end),
-            std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
-                                 std::begin(vc_sample.positions_minor) + idx_end),
-            vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
-            vc_sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
+            .seq_id = vc_sample.seq_id,
+            .positions_major =
+                    std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
+                                         std::begin(vc_sample.positions_major) + idx_end),
+            .positions_minor =
+                    std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
+                                         std::begin(vc_sample.positions_minor) + idx_end),
+            .logits = vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
+            .depth = vc_sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
+            .read_ids_left = (idx_start == 0) ? vc_sample.read_ids_left : placeholder_rids,
+            .read_ids_right =
+                    (idx_end == num_columns) ? vc_sample.read_ids_right : placeholder_rids,
+            .basecalls =
+                    vc_sample.basecalls.defined()
+                            ? vc_sample.basecalls.index({at::indexing::Slice(idx_start, idx_end)})
+                                      .clone()
+                            : at::Tensor{}};
 }
 
 VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& vc_sample,
@@ -211,21 +270,129 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
 }
 
 std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples) {
-    const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
-                                                    const VariantCallingSample& rh) {
-        const size_t width = std::size(lh.positions_major);
+    // modified from secondary/features/encoder_read_alignment.cpp
+    const auto cat_vectors_in_place = [](std::vector<int64_t>& v1, const std::vector<int64_t>& v2) {
+        v1.reserve(std::size(v1) + std::size(v2));
+        v1.insert(std::end(v1), std::cbegin(v2), std::cend(v2));
+    };
 
+    const auto pad_reads = [](std::vector<at::Tensor> chunks, int64_t target_depth) {
+        // Determine the target depth if not provided
+        if (target_depth < 0) {
+            target_depth = 0;
+            for (const auto& chunk : chunks) {
+                target_depth = std::max(target_depth, chunk.size(1));
+            }
+        }
+
+        bool needs_padding = false;
+        for (const auto& chunk : chunks) {
+            if (chunk.size(1) < target_depth) {
+                needs_padding = true;
+                break;
+            }
+        }
+        if (!needs_padding) {
+            return chunks;
+        }
+
+        // Pad each chunk to match the target depth
+        std::vector<at::Tensor> padded_chunks;
+        for (auto& chunk : chunks) {
+            const int64_t pad_depth = target_depth - chunk.size(1);
+            if (pad_depth > 0) {
+                auto padding = at::zeros({chunk.size(0), pad_depth}, chunk.options());
+                auto concated = at::cat({std::move(chunk), std::move(padding)}, 1);
+                padded_chunks.emplace_back(std::move(concated));
+            } else {
+                padded_chunks.emplace_back(std::move(chunk));
+            }
+        }
+
+        return padded_chunks;
+    };
+
+    /**
+     * \brief This lambda reorders reads in the chunk tensors, because some rows (reads) may be missing
+     *          between neighboring samples (e.g. some reads end/begin).
+     */
+    const auto reorder_reads = [](std::vector<at::Tensor> chunks,
+                                  const std::vector<std::vector<std::string>>& read_ids_in,
+                                  const std::vector<std::vector<std::string>>& read_ids_out) {
+        if (std::size(chunks) < 2) {
+            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
+                              std::vector<std::string>>{std::move(chunks), read_ids_in.front(),
+                                                        read_ids_out.back()};
+        }
+
+        bool already_ordered = true;
+        for (std::size_t n = 1; n < std::size(chunks); ++n) {
+            if (read_ids_out[n - 1] != read_ids_in[n]) {
+                already_ordered = false;
+                break;
+            }
+        }
+        if (already_ordered) {
+            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
+                              std::vector<std::string>>{std::move(chunks), read_ids_in.front(),
+                                                        read_ids_out.back()};
+        }
+
+        std::vector<at::Tensor> reordered_chunks;
+        reordered_chunks.reserve(std::ssize(chunks));
+        reordered_chunks.emplace_back(std::move(chunks.front()));
+
+        std::vector<std::string> new_left_rids = read_ids_in.front();
+        std::vector<std::string> new_right_rids = read_ids_out.front();
+
+        for (std::size_t n = 1; n < std::size(chunks); ++n) {
+            // reorder_chunk expects 3-dim inputs, so expand the dimension and then
+            // squeeze again
+            auto [reordered_chunk, next_rids_out] = reorder_chunk(
+                    chunks[n].unsqueeze(-1), new_right_rids, read_ids_in[n], read_ids_out[n]);
+            reordered_chunks.emplace_back(reordered_chunk.squeeze(-1));
+            new_right_rids = std::move(next_rids_out);
+        }
+
+        if (std::size(new_left_rids) < std::size(new_right_rids)) {
+            const size_t num_to_insert = std::size(new_right_rids) - std::size(new_left_rids);
+            new_left_rids.reserve(std::size(new_right_rids));
+            for (size_t i = 0; i < num_to_insert; ++i) {
+                new_left_rids.emplace_back("__inserted_" + std::to_string(i));
+            }
+        }
+
+        return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
+                          std::vector<std::string>>{
+                std::move(reordered_chunks), std::move(new_left_rids), std::move(new_right_rids)};
+    };
+
+    const auto merge_adjacent_samples_in_place = [&cat_vectors_in_place, &pad_reads,
+                                                  &reorder_reads](VariantCallingSample& lh,
+                                                                  const VariantCallingSample& rh) {
         // Insert positions vectors.
-        lh.positions_major.reserve(width + std::size(rh.positions_major));
-        lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
-                                  std::end(rh.positions_major));
-        lh.positions_minor.reserve(width + std::size(rh.positions_minor));
-        lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
-                                  std::end(rh.positions_minor));
-
+        cat_vectors_in_place(lh.positions_major, rh.positions_major);
+        cat_vectors_in_place(lh.positions_minor, rh.positions_minor);
         // Merge the tensors.
         lh.logits = at::cat({std::move(lh.logits), rh.logits});
         lh.depth = at::cat({std::move(lh.depth), rh.depth});
+        // Merge basecall arrays
+        if (lh.basecalls.defined() != rh.basecalls.defined()) {
+            throw std::runtime_error{
+                    "Inconsistent basecall definitions when merging VariantCallingSamples"};
+        }
+        if (lh.basecalls.defined() && rh.basecalls.defined()) {
+            auto [reordered_reads, reordered_read_ids_left, reordered_read_ids_right] =
+                    reorder_reads({std::move(lh.basecalls), rh.basecalls},
+                                  {std::move(lh.read_ids_left), rh.read_ids_left},
+                                  {std::move(lh.read_ids_right), rh.read_ids_right});
+            lh.basecalls = at::cat(pad_reads(std::move(reordered_reads), -1));
+            lh.read_ids_left = std::move(reordered_read_ids_left);
+            lh.read_ids_right = std::move(reordered_read_ids_right);
+        }
+
+        // Validate the result. This can throw.
+        lh.validate();
     };
 
     if (std::empty(vc_samples)) {
@@ -381,8 +548,8 @@ std::vector<VariantCallingSample> trim_vc_samples(
                                           .positions_major = vc_sample.positions_major,
                                           .positions_minor = vc_sample.positions_minor,
                                           .depth = vc_sample.depth,
-                                          .read_ids_left = {},
-                                          .read_ids_right = {}});
+                                          .read_ids_left = vc_sample.read_ids_left,
+                                          .read_ids_right = vc_sample.read_ids_right});
     }
 
     // Compute trimming of all samples for this group.
