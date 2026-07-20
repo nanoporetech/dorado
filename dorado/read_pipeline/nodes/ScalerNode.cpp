@@ -114,30 +114,6 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     return break_point;
 }
 
-constexpr float pore_level_kit14_prom = 199.21f;
-constexpr float pore_level_kit14_min = 197.61f;
-constexpr float pore_level_rna004_prom = 194.97f;
-constexpr float pore_level_rna004_min = 195.50f;
-constexpr float pore_level_flongle = 200.0f;
-
-using FC = dorado::models::Flowcell;
-std::unordered_map<FC, float> flowcell_expected_pore_levels{
-        {FC::FLO_FLG114, pore_level_flongle},      {FC::FLO_FLG114HD, pore_level_flongle},
-        {FC::FLO_MIN004RA, pore_level_rna004_min}, {FC::FLO_PRO004RA, pore_level_rna004_prom},
-        {FC::FLO_MIN114, pore_level_kit14_min},    {FC::FLO_MIN114HD, pore_level_kit14_min},
-        {FC::FLO_PRO114, pore_level_kit14_prom},   {FC::FLO_PRO114HD, pore_level_kit14_prom},
-        {FC::FLO_PRO114M, pore_level_kit14_prom},
-};
-
-std::optional<float> get_expected_open_pore_level(const std::string& flow_cell_code) {
-    auto pore_level =
-            flowcell_expected_pore_levels.find(dorado::models::flowcell_code(flow_cell_code));
-    if (pore_level == flowcell_expected_pore_levels.end()) {
-        return std::nullopt;
-    }
-    return pore_level->second;
-}
-
 }  // anonymous namespace
 
 namespace dorado {
@@ -189,7 +165,7 @@ void ScalerNode::input_thread_fn() {
         float open_pore_adjustment = 0.0f;
 
         read->read_common.scaling_method = to_string(m_scaling_params.strategy);
-        if (m_scaling_params.strategy == ScalingStrategy::PA) {
+        if (is_pa_strategy(m_scaling_params.strategy)) {
             // We want to keep the scaling formula `(x - shift) / scale` consistent between
             // quantile and pA methods as this affects downstream tools.
             const auto& stdn = m_scaling_params.standardisation;
@@ -206,13 +182,23 @@ void ScalerNode::input_thread_fn() {
                 shift = -1.f * read->offset;
             }
 
-            if (!std::isnan(read->open_pore_level)) {
-                std::optional<float> expected_open_pore_level =
-                        get_expected_open_pore_level(read->read_common.flow_cell_product_code);
-                if (expected_open_pore_level.has_value() && *expected_open_pore_level != 0) {
-                    open_pore_adjustment =
-                            (read->open_pore_level - *expected_open_pore_level) / read->scaling;
+            auto should_apply_open_pore_adjustment = [&params = m_scaling_params, &read] {
+                if (params.strategy != ScalingStrategy::PA_OFFSET ||
+                    !params.standardisation.offset_threshold_min ||
+                    !params.standardisation.offset_threshold_max ||
+                    std::isnan(read->open_pore_level) || std::isnan(read->selected_read_level) ||
+                    std::isnan(read->expected_open_pore_level)) {
+                    return false;
                 }
+
+                auto gap = std::abs(read->selected_read_level - read->open_pore_level);
+                return std::clamp(gap, *params.standardisation.offset_threshold_min,
+                                  *params.standardisation.offset_threshold_max) == gap;
+            };
+            if (should_apply_open_pore_adjustment()) {
+                open_pore_adjustment =
+                        std::max(0.f, (read->open_pore_level - read->expected_open_pore_level) /
+                                              read->scaling);
             }
         } else {
             // Ignore the RNA adapter. If this is DNA or we've already trimmed the adapter, this will be zero
