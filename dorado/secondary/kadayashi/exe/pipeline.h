@@ -7,7 +7,6 @@
 #include <filesystem>
 #include <string>
 #include <string_view>
-#include <unordered_map>
 #include <vector>
 
 namespace kadayashi {
@@ -42,8 +41,7 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                        const int n_threads,
                        const int n_bam_threads,
                        const int n_chunks_per_batch,
-                       const std::filesystem::path &fn_out_tsv,
-                       const bool use_simple_phasing);
+                       const std::filesystem::path &fn_out_tsv);
 
 str2int_t kadayashi_global_phasing_simple_modify_vcf(const std::filesystem::path &fn_ref,
                                                      const std::filesystem::path &fn_bam,
@@ -68,7 +66,6 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
                                                     const float max_gapcompressed_seqdiv,
                                                     const bool ambig_ref,
                                                     const bool disable_interval_expansion,
-                                                    const int use_dvr_for_phasing,
                                                     const int bed_flanking);
 
 intervals_t region_strings_to_intervals(dorado::secondary::BamFile &hf,

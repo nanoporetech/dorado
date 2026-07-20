@@ -31,48 +31,15 @@ constexpr int DOWNSAMPLE_READCAP = 200;  // target 200x
 std::unordered_map<std::string, int> kadayashi_local_haptagging_gen_ht(chunk_t &ck);
 
 /**
- * @brief Perform phasing for a query region with the deepvariant replica method,
- *        return all info (read haptags, the chunk, and phasing breakpoints).
- *
- * This function is exposed for CLI use. To obtain only the read haptags,
- * use `kadayashi_dvr_single_region_wrapper` instead.
- *
- * @par Thread safety
- * Seeking the BAM file from other threads with htslib *itr_query methods
- * will produce unpredictable behavior.
- *
- * @param fp_bam    BAM file. Must present.
- * @param fp_bai    BAM index file. Must present.
- * @param fp_header BAM header. Must present.
- * @param fai       The reference genome. Must present if `pp` does not set
- *                  `disable_low_complexity_masking` to true.
- * @param ref_name  The reference sequence's name.
- * @param ref_start Query interval's start position on the reference sequence.
- *                  0-index, inclusive.
- * @param ref_end   Query interval's end position on the reference sequence.
- *                  0-index, exclusive.
- * @param pp        Parameters used for filtering variants during pileup.
- */
-phase_return_t kadayashi_local_haptagging_dvr_single_region(samFile *fp_bam,
-                                                            hts_idx_t *fp_bai,
-                                                            sam_hdr_t *fp_header,
-                                                            const faidx_t *fai,
-                                                            const std::string_view ref_name,
-                                                            const uint32_t ref_start,
-                                                            const uint32_t ref_end,
-                                                            const pileup_pars_t &pp);
-
-/**
  * @brief Perform phasing for a query region with the simple phasing method (flip-flop),
  *        return all info (read haptags, the chunk, and phasing breakpoints).
  *
- * Like `kadayashi_local_haptagging_dvr_single_region`, this function
- * is exposed for CLI use. To obtain only the read haptags, use
+ * This function is exposed for CLI use. To obtain only the read haptags, use
  * `kadayashi_simple_single_region_wrapper` instead.
  *
- * @par Thread safety
- * Seeking the BAM file from other threads with htslib *itr_query methods
- * will produce unpredictable behavior.
+ * @remarks
+ * Thread safety: Seeking the BAM file from other threads with
+ * htslib *itr_query methods will produce unpredictable behavior.
  *
  * @param fp_bam    BAM file. Must present.
  * @param fp_bai    BAM index file. Must present.
@@ -180,8 +147,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
 
 /**
  * @brief Phase reads in a query region. Produces a hashtable mapping
- *        from read names to their haptags in 0-index.
-
+ *        from read names to their haptags in 0-index via the heuristics of
+ *        iterative update of haptags of variants and reads.
  * @par Thread safety
  * BAM file.
  *
@@ -209,28 +176,6 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
  * @param max_clipping Filter out reads with clippings at least this long.
  * @param max_gapcompressed_seqdiv If `de:f` tag exists in BAM records,
  *                     filter out reads with values at least this large.
- */
-std::unordered_map<std::string, int> kadayashi_dvr_single_region_wrapper(
-        samFile *fp_bam,
-        hts_idx_t *fp_bai,
-        sam_hdr_t *fp_header,
-        const faidx_t *fai,
-        const std::string_view ref_name,
-        const uint32_t ref_start,
-        const uint32_t ref_end,
-        const std::string_view readgroup,
-        const bool disable_interval_expansion,
-        const int min_base_quality,
-        const int min_varcall_coverage,
-        const float min_varcall_fraction,
-        const int max_clipping,
-        const int min_strand_cov,
-        const float min_strand_cov_frac,
-        const float max_gapcompressed_seqdiv);
-
-/** Same as `kadayashi_dvr_single_region_wrapper` except for that
- * phasing is performed with the simple phasing method (flip-flop)
- * instead of deepvariant replica.
  */
 std::unordered_map<std::string, int> kadayashi_simple_single_region_wrapper(
         samFile *fp_bam,
@@ -337,7 +282,6 @@ ck_and_varcall_result_t kadayashi_phase_and_varcall(samFile *fp_bam,
                                                     const int min_strand_cov,
                                                     const float min_strand_cov_frac,
                                                     const float max_gapcompressed_seqdiv,
-                                                    const bool use_dvr_for_phasing,
                                                     const bool ambig_ref);
 
 /**
@@ -370,9 +314,6 @@ ck_and_varcall_result_t kadayashi_phase_and_varcall(samFile *fp_bam,
  * @param max_clipping Filter out reads with clippings at least this long.
  * @param max_gapcompressed_seqdiv If `de:f` tag exists in BAM records,
  *                     filter out reads with values at least this large.
- * @param use_dvr_for_phasing If set, use deepvariant replica phasing method.
- *                            Otherwise, the simple phasing method (flip-flop)
- *                            will be used.
  * @param ambig_ref  If set, include variants containing ambiguity bases.
  *                   Otherwise, no variants containing ambiguity codes in the
  *                   ref or alt alleles will be returned.
@@ -393,7 +334,6 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
                                                      const int min_strand_cov,
                                                      const float min_strand_cov_frac,
                                                      const float max_gapcompressed_seqdiv,
-                                                     const bool use_dvr_for_phasing,
                                                      const bool ambig_ref);
 
 typedef dorado::secondary::ReadAlignmentData MedakaFeatureMatrix;

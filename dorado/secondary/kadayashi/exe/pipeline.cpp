@@ -362,7 +362,6 @@ struct worker_2a2p_pl {  // pipeline
     int n_threads;
     int n_chunks_per_batch;
     pileup_pars_t pp;
-    bool use_simple_phasing;
     std::filesystem::path fn_bam;  // hts_itr_query needs lock when multithreading.
                                    // easier way is to just let each thread open the
                                    // bam file. This means the input cannot be
@@ -411,20 +410,11 @@ void local_haplotagging_callback(void *data, int job_i) {
     }
 
     int success = 0;
-    if (d->pl->use_simple_phasing) {
-        const bool variant_graph_ok = variant_graph_gen(ck);
-        if (variant_graph_ok) {
-            const int n_iter = std::max(10, static_cast<int>(ref_end - ref_start) / 10000);
-            variant_graph_do_simple_haptag(ck, n_iter);
-            success = 1;
-        }
-    } else {  // dvr
-        const bool variant_graph_ok = variant_graph_gen(ck);
-        if (variant_graph_ok) {
-            variant_graph_propogate(ck);
-            success = variant_graph_check_if_phasing_succeeded(ck);
-            variant_graph_haptag_reads(ck);
-        }
+    const bool variant_graph_ok = variant_graph_gen(ck);
+    if (variant_graph_ok) {
+        const int n_iter = std::max(10, static_cast<int>(ref_end - ref_start) / 10000);
+        variant_graph_do_simple_haptag(ck, n_iter);
+        success = 1;
     }
     d->success[job_i] = success;
 
@@ -1630,7 +1620,6 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
         const int min_strand_cov,
         const float min_strand_cov_frac,
         const float max_gapcompressed_seqdiv,
-        const bool use_dvr_for_phasing,
         const bool ambig_ref) {
     // Note: `n_workers` is the apprent # of workers; each worker's
     //       bam parsing will use n_bam_threads (>=1).
@@ -1666,8 +1655,7 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
                         hf.fp(), hf.idx(), hf.hdr(), fp_fai.get_raw_faidx_ptr(), ref_name,
                         ref_start, ref_end, readgroup, disable_interval_expansion, min_base_quality,
                         min_varcall_coverage, min_varcall_fraction, max_clipping, min_strand_cov,
-                        min_strand_cov_frac, max_gapcompressed_seqdiv, use_dvr_for_phasing,
-                        ambig_ref);
+                        min_strand_cov_frac, max_gapcompressed_seqdiv, ambig_ref);
                 ck_and_vrs[jobID] = std::move(tmp);
             }
         }
@@ -1929,8 +1917,7 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                        const int n_threads,
                        const int n_bam_threads,
                        const int n_chunks_per_batch,
-                       const std::filesystem::path &fn_out_tsv,
-                       const bool use_simple_phasing) {
+                       const std::filesystem::path &fn_out_tsv) {
     // return : 0 if all ok, 1 if error
 
     // open output files
@@ -1962,7 +1949,6 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                 .n_threads = n_threads,
                 .n_chunks_per_batch = n_chunks_per_batch,
                 .pp = pp,
-                .use_simple_phasing = use_simple_phasing,
                 .fn_bam = fn_bam,
                 .fn_ref = fn_ref,
                 .ht_refvars = fn_vcf.native().empty() ? ht_refvars_empty : refvars[refname],
@@ -2129,7 +2115,6 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
                                                     const float max_gapcompressed_seqdiv,
                                                     const bool ambig_ref,
                                                     const bool disable_interval_expansion,
-                                                    const int use_dvr_for_phasing,
                                                     const int bed_flanking) {
     // prep input files and inputs
     dorado::secondary::BamFile hf{fn_bam, 1};
@@ -2187,8 +2172,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
                         fn_ref, fn_bam, n_threads_job, n_threads_inner, chrom, query_intervals,
                         readgroup, disable_interval_expansion, min_base_quality,
                         min_varcall_coverage, min_varcall_fraction, max_clipping, min_strand_cov,
-                        min_strand_cov_frac, max_gapcompressed_seqdiv, use_dvr_for_phasing,
-                        ambig_ref);
+                        min_strand_cov_frac, max_gapcompressed_seqdiv, ambig_ref);
 
         // helper: convert phasing breakpoints into a sorted array
         // which will be queried for phaseblock IDs.
