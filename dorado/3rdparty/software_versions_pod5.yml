@@ -13,7 +13,7 @@ arrow:
 flatbuffers:
     description: >
         Efficient cross platform serialization library.
-    version: "2.0.0"
+    version: "2.0.8"
     url: http://google.github.io/flatbuffers
     license: <pod5>/licenses/flatbuffers/licenses/LICENSE.txt
     files:
@@ -40,7 +40,7 @@ xsimd:
         A unified means for using SIMD features for library authors.
     version: "13.0.0"
     url: https://github.com/xtensor-stack/xsimd
-    license: <pod5>/licenses/xsimd/licenses/LICENSE
+    license: PATH_NOT_AVAILABLE
     files:
         - PATH_NOT_AVAILABLE
 zstd:
@@ -54,7 +54,7 @@ zstd:
 zlib:
     description: >
         zlib data compression library.
-    version: "1.3.1"
+    version: "1.3.2"
     url: https://github.com/madler/zlib
     license: <pod5>/licenses/zlib/licenses/LICENSE
     files:
