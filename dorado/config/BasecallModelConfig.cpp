@@ -610,10 +610,8 @@ std::string SignalNormalisationParams::to_string() const {
         << " strategy:" + config::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
         oss << " " + quantile.to_string();
-    } else if ((strategy == ScalingStrategy::PA || strategy == ScalingStrategy::PA_OFFSET)) {
-        if (standardisation.standardise) {
-            oss << " " + standardisation.to_string();
-        }
+    } else if (is_pa_strategy(strategy) && standardisation.standardise) {
+        oss << " " + standardisation.to_string();
     }
     oss << " }";
     return std::move(oss).str();
