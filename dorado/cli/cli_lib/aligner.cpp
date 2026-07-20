@@ -177,7 +177,7 @@ int aligner(int argc, char* argv[]) {
     const auto sort_requested = !parser.get<bool>("--no-sort");
     const cli::EmitArgs emit = cli::get_emit_args(parser);
 
-    if (parser.present<bool>("--no-sort") && !parser.present<bool>("--output-dir")) {
+    if (parser.is_used("--no-sort") && !parser.is_used("--output-dir")) {
         spdlog::error(
                 "--no-sort can only be used with --output-dir. Streamed output is always "
                 "unsorted.");
