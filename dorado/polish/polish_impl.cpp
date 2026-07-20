@@ -1442,8 +1442,8 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                     for (std::size_t i = 0; i < std::size(item.samples); ++i) {
                         thread_vc_data.emplace_back(secondary::VariantCallingSample{
                                 item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                                std::move(item.samples[i].positions_minor),
-                                split_logits[i].clone()});
+                                std::move(item.samples[i].positions_minor), split_logits[i].clone(),
+                                item.samples[i].depth.clone()});
                     }
                 }
 
@@ -1676,10 +1676,8 @@ std::vector<secondary::Variant> call_variants(
 
                 for (const auto& vc_sample : joined_samples) {
                     std::vector<secondary::Variant> variants = secondary::general_decode_variants(
-                            decoder, vc_sample.seq_id, vc_sample.positions_major,
-                            vc_sample.positions_minor, vc_sample.logits, draft, pass_min_qual,
-                            ambig_ref, gvcf, true, true, true,
-                            secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                            decoder, vc_sample, draft, pass_min_qual, ambig_ref, gvcf, true, true,
+                            true, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
 
                     ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
 

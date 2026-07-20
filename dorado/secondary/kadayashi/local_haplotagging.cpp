@@ -905,6 +905,19 @@ cov_extended_t variant_get_all_allele_coverage(const vc_variants1_val_t &var) {
     return ret;
 }
 
+void set_merged_variant_depth(ta_t &var, std::vector<int> depths) {
+    assert(!depths.empty());
+    std::sort(depths.begin(), depths.end());
+
+    var.min_depth = depths.front();
+    const size_t mid = depths.size() / 2;
+    if ((depths.size() % 2) == 0) {
+        var.median_depth = (depths[mid - 1] + depths[mid]) / 2;
+    } else {
+        var.median_depth = depths[mid];
+    }
+}
+
 var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                                        const uint32_t pos,
                                        const char *refseq,
@@ -1465,6 +1478,12 @@ void ck_absorb_variants_covered_by_deletion_run_on_other_hap(
                 var.genotype[0] += 1;
                 var.genotype[2] += 1;
             }
+            std::vector<int> merged_depths;
+            merged_depths.reserve(var_indices.size());
+            for (const uint32_t var_idx : var_indices) {
+                merged_depths.push_back(ck.varcalls[var_idx].median_depth);
+            }
+            set_merged_variant_depth(var, std::move(merged_depths));
             var.type = TA_TYPE_HETMULTI_CONSOLIDATED;
             var.ref_len = range_end - range_start;
             var.alleles[0] = seq2nt4seq(hap_recon.first);
@@ -1587,7 +1606,9 @@ variant_dorado_style_t convert_fullinfo_var_to_dorado_style(const variant_fullin
             .ref = std::string(ref),
             .alts = var.is_multi_allele ? std::vector<std::string>{alt0, alt1}
                                         : std::vector<std::string>{alt0},
-            .genotype = genotype};
+            .genotype = genotype,
+            .min_depth = var.min_depth,
+            .median_depth = var.median_depth};
 }
 
 variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
@@ -1598,6 +1619,8 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
     //   - Variant position will be in 0-index.
     //   - Multi-allele variant should have genotypes 1 or 2.
     variant_fullinfo_t ret;
+    ret.min_depth = var.min_depth;
+    ret.median_depth = var.median_depth;
 
     std::string ref_s;
     std::string ref_consolidatedmultiallel_s;
@@ -2327,6 +2350,9 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
 
         ck.varcalls.push_back(ta_t{});
         ck.varcalls.back().pos = pos;
+        const int32_t depth = variant_get_all_allele_coverage(ht[pos]).cov.cov_tot_all;
+        ck.varcalls.back().min_depth = depth;
+        ck.varcalls.back().median_depth = depth;
 
         if (var_stat == FLAG_VARSTAT_ACCEPTED) {
             ck.varcalls.back().is_used = TA_STAT_ACCEPTED;
@@ -2425,34 +2451,42 @@ std::unordered_map<std::string, int> kadayashi_local_haptagging_gen_ht(chunk_t &
 
 std::string variant_fullinfo_to_string(const variant_fullinfo_t &v) {
     return fmt::format(
-            "valid={} conf={} phased={},{} pos={},{} qual={},{} ref={},{} alt={},{} geno={},{}",
+            "valid={} conf={} phased={},{} pos={},{} qual={},{} ref={},{} alt={},{} geno={},{} "
+            "min_depth={} median_depth={}",
             v.is_valid ? "true" : "false", v.is_confident ? "true" : "false",
             v.is_phased0 ? "true" : "false", v.is_phased1 ? "true" : "false", v.pos0, v.pos1,
             v.qual0, v.qual1, v.ref_allele_seq0, v.ref_allele_seq1, v.alt_allele_seq0,
-            v.alt_allele_seq1, std::string(v.genotype0, 3), std::string(v.genotype1, 3));
+            v.alt_allele_seq1, std::string(v.genotype0, 3), std::string(v.genotype1, 3),
+            v.min_depth, v.median_depth);
 }
 
 std::string variant_dorado_style_to_string(const variant_dorado_style_t &v) {
-    return fmt::format("conf={} phased={} pos={} qual={} ref={} alt={},{} geno={:c},{:c}",
-                       v.is_confident ? "true" : "false", v.is_phased ? "true" : "false", v.pos,
-                       v.qual, v.ref, v.alts[0], v.alts.size() > 1 ? v.alts[1] : "",
-                       v.genotype.first, v.genotype.second);
+    return fmt::format(
+            "conf={} phased={} pos={} qual={} ref={} alt={},{} "
+            "geno={:c},{:c} min_depth={} median_depth={}",
+            v.is_confident ? "true" : "false", v.is_phased ? "true" : "false", v.pos, v.qual, v.ref,
+            v.alts[0], v.alts.size() > 1 ? v.alts[1] : "", v.genotype.first, v.genotype.second,
+            v.min_depth, v.median_depth);
 }
 
 bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
-    return std::tie(a.is_confident, a.is_multi_allele, a.pos0, a.qual0, a.ref_allele_seq0,
-                    a.alt_allele_seq0, a.is_phased0, a.genotype0[0], a.genotype0[1], a.genotype0[2],
-                    a.pos1, a.qual1, a.ref_allele_seq1, a.alt_allele_seq1, a.is_phased1,
-                    a.genotype1[0], a.genotype1[1], a.genotype1[2]) ==
-           std::tie(b.is_confident, b.is_multi_allele, b.pos0, b.qual0, b.ref_allele_seq0,
-                    b.alt_allele_seq0, b.is_phased0, b.genotype0[0], b.genotype0[1], b.genotype0[2],
-                    b.pos1, b.qual1, b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1,
-                    b.genotype1[0], b.genotype1[1], b.genotype1[2]);
+    return std::tie(a.is_confident, a.is_multi_allele, a.min_depth, a.median_depth, a.pos0, a.qual0,
+                    a.ref_allele_seq0, a.alt_allele_seq0, a.is_phased0, a.genotype0[0],
+                    a.genotype0[1], a.genotype0[2], a.pos1, a.qual1, a.ref_allele_seq1,
+                    a.alt_allele_seq1, a.is_phased1, a.genotype1[0], a.genotype1[1],
+                    a.genotype1[2]) == std::tie(b.is_confident, b.is_multi_allele, b.min_depth,
+                                                b.median_depth, b.pos0, b.qual0, b.ref_allele_seq0,
+                                                b.alt_allele_seq0, b.is_phased0, b.genotype0[0],
+                                                b.genotype0[1], b.genotype0[2], b.pos1, b.qual1,
+                                                b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1,
+                                                b.genotype1[0], b.genotype1[1], b.genotype1[2]);
 };
 
 bool operator==(const variant_dorado_style_t &a, const variant_dorado_style_t &b) {
-    return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype) ==
-           std::tie(b.is_confident, b.is_phased, b.pos, b.qual, b.ref, b.alts, b.genotype);
+    return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype,
+                    a.min_depth, a.median_depth) == std::tie(b.is_confident, b.is_phased, b.pos,
+                                                             b.qual, b.ref, b.alts, b.genotype,
+                                                             b.min_depth, b.median_depth);
 };
 
 std::ostream &operator<<(std::ostream &os, const variant_dorado_style_t &v) {
@@ -2714,18 +2748,31 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
             max_gapcompressed_seqdiv, use_dvr_for_phasing, ambig_ref);
     chunk_t &ck = ck_and_vr.ck;
 
-    if (!ck.is_valid || ck.varcalls.empty()) {
+    if (!ck.is_valid) {
         return {.qname2hp = std::move(ck_and_vr.vr.qname2hp), .variants = {}};
     }
 
+    std::vector<std::pair<uint32_t, uint32_t>> read_endpoints;
+    read_endpoints.reserve(std::size(ck.reads));
+    for (const auto &read : ck.reads) {
+        // limit read spans to the phasing interval so we don't double count reads spanning
+        // the ends of the interval
+        read_endpoints.emplace_back(std::make_pair(std::max(read.start_pos, ck.abs_start),
+                                                   std::min(read.end_pos, ck.abs_end)));
+    }
+    std::sort(read_endpoints.begin(), read_endpoints.end());
+
     varcall_result_t ret{.qname2hp = ck_and_vr.vr.qname2hp,
                          .variants = {},
-                         .phasing_breakpoints = ck_and_vr.vr.phasing_breakpoints};
+                         .phasing_breakpoints = ck_and_vr.vr.phasing_breakpoints,
+                         .read_endpoints = read_endpoints};
 
-    for (const variant_fullinfo_t &var :
-         ck_and_vr.vr.variants) {  // return variants in dorado style
-        if (var.is_valid) {
-            ret.variants.push_back(convert_fullinfo_var_to_dorado_style(var));
+    if (!ck.varcalls.empty()) {
+        for (const variant_fullinfo_t &var :
+             ck_and_vr.vr.variants) {  // return variants in dorado style
+            if (var.is_valid) {
+                ret.variants.push_back(convert_fullinfo_var_to_dorado_style(var));
+            }
         }
     }
 

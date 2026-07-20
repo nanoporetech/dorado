@@ -34,12 +34,22 @@ void VariantCallingSample::validate() const {
     if (!logits.defined()) {
         throw std::runtime_error("VariantCallingSample::logits tensor is not defined!");
     }
+    if (!depth.defined()) {
+        throw std::runtime_error("VariantCallingSample::depth tensor is not defined!");
+    }
 
     const int64_t num_columns = std::ssize(positions_major);
 
     if (logits.size(0) != num_columns) {
         std::ostringstream oss;
         oss << "VariantCallingSample::logits is of incorrect size. logits.size = " << logits.size(0)
+            << ", num_columns = " << num_columns;
+        throw std::runtime_error(oss.str());
+    }
+
+    if (depth.size(0) != num_columns) {
+        std::ostringstream oss;
+        oss << "VariantCallingSample::depth is of incorrect size. depth.size = " << depth.size(0)
             << ", num_columns = " << num_columns;
         throw std::runtime_error(oss.str());
     }
@@ -106,7 +116,8 @@ std::ostream& operator<<(std::ostream& os, const VariantCallingSample& vc_sample
 bool operator==(const VariantCallingSample& lhs, const VariantCallingSample& rhs) {
     return (lhs.logits.equal(rhs.logits)) &&
            (std::tie(lhs.seq_id, lhs.positions_major, lhs.positions_minor) ==
-            std::tie(rhs.seq_id, rhs.positions_major, rhs.positions_minor));
+            std::tie(rhs.seq_id, rhs.positions_major, rhs.positions_minor)) &&
+           (lhs.depth.equal(rhs.depth));
 }
 
 namespace {
@@ -158,7 +169,8 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                  std::begin(vc_sample.positions_major) + idx_end),
             std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
                                  std::begin(vc_sample.positions_minor) + idx_end),
-            vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
+            vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
+            vc_sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone()};
 }
 
 VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& vc_sample,
@@ -214,6 +226,7 @@ std::vector<VariantCallingSample> merge_vc_samples(
 
         // Merge the tensors.
         lh.logits = at::cat({std::move(lh.logits), rh.logits});
+        lh.depth = at::cat({std::move(lh.depth), rh.depth});
     };
 
     if (std::empty(vc_samples)) {
@@ -361,7 +374,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
                                           .features = {},
                                           .positions_major = vc_sample.positions_major,
                                           .positions_minor = vc_sample.positions_minor,
-                                          .depth = {},
+                                          .depth = vc_sample.depth,
                                           .read_ids_left = {},
                                           .read_ids_right = {}});
     }
@@ -397,13 +410,14 @@ std::vector<VariantCallingSample> trim_vc_samples(
         }
 
         // Add a new trimmed sample.
-        trimmed_samples.emplace_back(VariantCallingSample{
-                s.seq_id,
-                std::vector<int64_t>(std::begin(s.positions_major) + t.start,
-                                     std::begin(s.positions_major) + t.end),
-                std::vector<int64_t>(std::begin(s.positions_minor) + t.start,
-                                     std::begin(s.positions_minor) + t.end),
-                s.logits.index({at::indexing::Slice(t.start, t.end)}).clone()});
+        trimmed_samples.emplace_back(
+                VariantCallingSample{s.seq_id,
+                                     std::vector<int64_t>(std::begin(s.positions_major) + t.start,
+                                                          std::begin(s.positions_major) + t.end),
+                                     std::vector<int64_t>(std::begin(s.positions_minor) + t.start,
+                                                          std::begin(s.positions_minor) + t.end),
+                                     s.logits.index({at::indexing::Slice(t.start, t.end)}).clone(),
+                                     s.depth.index({at::indexing::Slice(t.start, t.end)}).clone()});
     }
 
     return trimmed_samples;

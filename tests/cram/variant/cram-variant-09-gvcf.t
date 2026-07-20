@@ -19,7 +19,7 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the reference block">
   ##FORMAT=<ID=LEN,Number=1,Type=Integer,Description="Length of <*> reference block">
   1
-  chr20 1 T <*> . END=100 GT:GQ:LEN 0/0:60:100
+  chr20 1 T <*> . END=100 GT:GQ:LEN:MIN_DP 0/0:60:100:20
 
 Candidate-filtered gVCF emits inferred variants and reference records for a targeted region.
 The `in.varcall.unsr.list` has the first candidate on position 1614. The variant calling is started at position 1000 to encompass non-inferred regions too.
@@ -62,14 +62,14 @@ chr20	1959	1
   chr20 1714 2001
   chr20 1860 2145
   20
-  chr20 1000 . G <*> . END=1345 GT:GQ:LEN 0/0:60:346
-  chr20 1346 . G <*> . END=1471 GT:GQ:LEN 0/0:60:126
-  chr20 1472 . T G,<*> PASS . GT:GQ 0/1:42
-  chr20 1473 . C <*> . END=1555 GT:GQ:LEN 0/0:60:83
-  chr20 1556 . C <*> . END=1557 GT:GQ:LEN 0/0:50:2
-  chr20 1615 . C <*> . END=1615 GT:GQ:LEN 0/0:54:1
-  chr20 1472 . T G,<*> PASS . GT:GQ 0/1:42
-  chr20 1959 . T G,<*> PASS . GT:GQ 0/1:44
+  chr20 1000 . G <*> . END=1345 GT:GQ:LEN:MIN_DP 0/0:60:346:20
+  chr20 1346 . G <*> . END=1471 GT:GQ:LEN:MIN_DP 0/0:60:126:20
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP 0/1:42:20
+  chr20 1473 . C <*> . END=1555 GT:GQ:LEN:MIN_DP 0/0:60:83:20
+  chr20 1556 . C <*> . END=1557 GT:GQ:LEN:MIN_DP 0/0:50:2:20
+  chr20 1615 . C <*> . END=1615 GT:GQ:LEN:MIN_DP 0/0:54:1:20
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP 0/1:42:20
+  chr20 1959 . T G,<*> PASS . GT:GQ:DP 0/1:44:19
 
 Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   $ rm -rf out; mkdir -p out
@@ -89,9 +89,10 @@ Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   1
-  chr20 1 T <*> . END=10000 GT:GQ:LEN 0/0:60:10000
+  chr20 1 T <*> . END=10000 GT:GQ:LEN:MIN_DP 0/0:60:10000:15
 
 Candidate-filtered gVCF handles a region with an omitted end.
+In this region, all reads are dropped by kadayashi, so depth information is empty.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > in_bam=${in_dir}/in.aln.bam
@@ -109,4 +110,4 @@ Candidate-filtered gVCF handles a region with an omitted end.
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   1
-  chr20 9991 A <*> . END=10000 GT:GQ:LEN 0/0:60:10
+  chr20 9991 A <*> . END=10000 GT:GQ:LEN:MIN_DP 0/0:60:10:.

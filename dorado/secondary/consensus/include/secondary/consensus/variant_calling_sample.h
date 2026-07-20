@@ -22,6 +22,7 @@ struct VariantCallingSample {
     std::vector<int64_t> positions_major;
     std::vector<int64_t> positions_minor;
     at::Tensor logits;
+    at::Tensor depth;
 
     void validate() const;
     int64_t start() const;

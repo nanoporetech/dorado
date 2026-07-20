@@ -671,38 +671,45 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
                             {"3d7a9813-67be-4b84-b66a-0269aa108340", 1},
                             {"d5560893-59c8-417c-a929-d62b4d19a1ca", 1},
                     },
-            .variants = {
-                    // 0-index
-                    {true, true, 93, 60, "C", {"T"}, {'1', '0'}},
-                    {true, true, 305, 60, "G", {"A"}, {'1', '0'}},
-                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}},
-                    {false, false, 809, 0, "AC", {"A"}, {'0', '1'}},
-                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}},
-                    {true, true, 1471, 60, "T", {"G"}, {'0', '1'}},
-                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}},
-                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}},
-                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}},
-                    {true, true, 2101, 60, "A", {"G"}, {'0', '1'}},
-                    {true, true, 2125, 60, "C", {"G"}, {'0', '1'}},
-                    {true, true, 2437, 60, "T", {"C"}, {'0', '1'}},
-                    {true, true, 2445, 60, "G", {"A"}, {'0', '1'}},
-                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}},
-                    {true, true, 3175, 60, "G", {"T"}, {'0', '1'}},
-                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}},
-                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}},
-                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}},
-                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}},
-                    {false, false, 4999, 0, "AAAAT", {"AAAATAAAT", "A"}, {'2', '1'}},
-                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {true, true, 5386, 60, "C", {"G"}, {'0', '1'}},
-                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}},
-                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}},
-                    {true, true, 7429, 60, "C", {"T"}, {'0', '1'}},
-                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}},
-                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}},
-                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}},
-            }};
+            .variants =
+                    {
+                            // clang-format off
+                            // 0-index
+                            {true, true, 93, 60, "C", {"T"}, {'1', '0'}, 20, 20},
+                            {true, true, 305, 60, "G", {"A"}, {'1', '0'}, 20, 20},
+                            {false, false, 775, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
+                            {false, false, 809, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
+                            {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
+                            {true, true, 1471, 60, "T", {"G"}, {'0', '1'}, 20, 20},
+                            {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
+                            {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}, 20, 20},
+                            {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}, 20, 20},
+                            {false, false, 1958, 0, "T", {"G"}, {'0', '1'}, 19, 19},
+                            {true, true, 2101, 60, "A", {"G"}, {'0', '1'}, 19, 19},
+                            {true, true, 2125, 60, "C", {"G"}, {'0', '1'}, 19, 19},
+                            {true, true, 2437, 60, "T", {"C"}, {'0', '1'}, 19, 19},
+                            {true, true, 2445, 60, "G", {"A"}, {'0', '1'}, 19, 19},
+                            {true, false, 2966, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                            {true, true, 3175, 60, "G", {"T"}, {'0', '1'}, 18, 18},
+                            {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}, 18, 18},
+                            {true, false, 3734, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                            {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}, 18, 18},
+                            {false, false, 4695, 0, "A", {"T"}, {'0', '1'}, 18, 18},
+                            {false, false, 4999, 0, "AAAAT", {"AAAATAAAT", "A"}, {'2', '1'}, 18, 18},
+                            {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}, 18, 18},
+                            {true, true, 5386, 60, "C", {"G"}, {'0', '1'}, 17, 17},
+                            {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}, 17, 17},
+                            {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}, 15, 15},
+                            {true, true, 7429, 60, "C", {"T"}, {'0', '1'}, 15, 15},
+                            {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}, 15, 15},
+                            {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}, 15, 15},
+                            {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}, 15, 15},
+                            // clang-format on
+                    },
+            .read_endpoints = {{0, 1897},  {0, 2452},  {0, 5143},  {0, 6234},  {0, 6518},
+                               {0, 10000}, {0, 10000}, {0, 10000}, {0, 10000}, {0, 10000},
+                               {0, 10000}, {0, 10000}, {0, 10000}, {0, 10000}, {0, 10000},
+                               {0, 10000}, {0, 10000}, {0, 10000}, {0, 10000}, {0, 10000}}};
 
     // Open the input files.
     dorado::secondary::BamFile bam_reader(fn_bam, 1);
@@ -718,37 +725,56 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
     CATCH_SECTION("simple phasing varcall") {
         const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 9999, "" /*readgroup*/,
+                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 10000, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
                 pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected.qname2hp));
         CATCH_CHECK(result.variants == expected.variants);
+        CATCH_CHECK(result.read_endpoints == expected.read_endpoints);
     }
 
     // Check that the first variant is returned correctly if the chunk starts on a variant
     CATCH_SECTION("simple phasing varcall, variant at chunk start") {
         const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                fastx_reader.get_raw_faidx_ptr(), "chr20", 93, 9999, "" /*readgroup*/,
+                fastx_reader.get_raw_faidx_ptr(), "chr20", 93, 10000, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
                 pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected.qname2hp));
         CATCH_CHECK(result.variants == expected.variants);
+        {
+            std::vector<std::pair<uint32_t, uint32_t>> this_endpoints;
+            this_endpoints.reserve(std::size(expected.read_endpoints));
+            for (const auto &pair : expected.read_endpoints) {
+                this_endpoints.emplace_back(std::make_pair<uint32_t>(93, pair.second));
+            }
+            CATCH_CHECK(result.read_endpoints == this_endpoints);
+        }
     }
 
     // Check that the last variant is returned correctly if the chunk ends on a variant
+    // The expected behaviour is that if a deletion spans the end of the chunk, the entire
+    // deletion is reported
     CATCH_SECTION("simple phasing varcall, variant at chunk end") {
         const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 8321 /*end-inclusive*/,
-                "" /*readgroup*/, pp.disable_region_expansion, pp.min_base_quality,
-                pp.min_varcall_coverage, pp.min_varcall_fraction, pp.max_clipping,
-                1 /*min strand cov*/, 0.033f, pp.max_gapcompressed_seqdiv, false,
-                false /*ambig_ref*/);
+                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 8321, "" /*readgroup*/,
+                pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
+                pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
+                pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected.qname2hp));
         CATCH_CHECK(result.variants == expected.variants);
+        {
+            std::vector<std::pair<uint32_t, uint32_t>> this_endpoints;
+            this_endpoints.reserve(std::size(expected.read_endpoints));
+            for (const auto &pair : expected.read_endpoints) {
+                this_endpoints.emplace_back(
+                        std::make_pair(0, std::min<uint32_t>(pair.second, 8321)));
+            }
+            CATCH_CHECK(result.read_endpoints == this_endpoints);
+        }
     }
 
     const kadayashi::varcall_result_t expected_dvr{
@@ -777,35 +803,35 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
                     },
             .variants = {
                     // 0-index
-                    {true, true, 93, 60, "C", {"T"}, {'0', '1'}},
-                    {true, true, 305, 60, "G", {"A"}, {'0', '1'}},
-                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}},
-                    {false, false, 809, 0, "AC", {"A"}, {'0', '1'}},
-                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}},
-                    {true, true, 1471, 60, "T", {"G"}, {'1', '0'}},
-                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}},
-                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}},
-                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}},
-                    {true, true, 2101, 60, "A", {"G"}, {'1', '0'}},
-                    {true, true, 2125, 60, "C", {"G"}, {'1', '0'}},
-                    {true, true, 2437, 60, "T", {"C"}, {'1', '0'}},
-                    {true, true, 2445, 60, "G", {"A"}, {'1', '0'}},
-                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}},
-                    {true, true, 3175, 60, "G", {"T"}, {'1', '0'}},
-                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}},
-                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}},
-                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}},
-                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}},
-                    {false, false, 4999, 0, "AAAAT", {"AAAATAAAT", "A"}, {'2', '1'}},
-                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {true, true, 5386, 60, "C", {"G"}, {'1', '0'}},
-                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}},
-                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}},
-                    {true, true, 7429, 60, "C", {"T"}, {'1', '0'}},
-                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}},
-                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}},
-                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}},
+                    {true, true, 93, 60, "C", {"T"}, {'0', '1'}, 20, 20},
+                    {true, true, 305, 60, "G", {"A"}, {'0', '1'}, 20, 20},
+                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
+                    {false, false, 809, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
+                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
+                    {true, true, 1471, 60, "T", {"G"}, {'1', '0'}, 20, 20},
+                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
+                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}, 20, 20},
+                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}, 20, 20},
+                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2101, 60, "A", {"G"}, {'1', '0'}, 19, 19},
+                    {true, true, 2125, 60, "C", {"G"}, {'1', '0'}, 19, 19},
+                    {true, true, 2437, 60, "T", {"C"}, {'1', '0'}, 19, 19},
+                    {true, true, 2445, 60, "G", {"A"}, {'1', '0'}, 19, 19},
+                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                    {true, true, 3175, 60, "G", {"T"}, {'1', '0'}, 18, 18},
+                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}, 18, 18},
+                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}, 18, 18},
+                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}, 18, 18},
+                    {false, false, 4999, 0, "AAAAT", {"AAAATAAAT", "A"}, {'2', '1'}, 18, 18},
+                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}, 18, 18},
+                    {true, true, 5386, 60, "C", {"G"}, {'1', '0'}, 17, 17},
+                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}, 17, 17},
+                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}, 15, 15},
+                    {true, true, 7429, 60, "C", {"T"}, {'1', '0'}, 15, 15},
+                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}, 15, 15},
+                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}, 15, 15},
+                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}, 15, 15},
             }};
     CATCH_SECTION("dvr phasing") {
         // dvr and simple phasing share the same variant calling step
@@ -827,6 +853,7 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
                 pp.min_varcall_fraction, 100, 1 /*min strand cov*/, 0.033f,
                 pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
         CATCH_CHECK(result3.variants.empty());
+        CATCH_CHECK(result3.read_endpoints.empty());
     }
 }
 CATCH_TEST_CASE("kadayashi_varcall normal case2", TEST_GROUP) {
@@ -906,43 +933,43 @@ CATCH_TEST_CASE("kadayashi_varcall ambig-ref", TEST_GROUP) {
                     },
             .variants = {
                     // 0-index
-                    {true, true, 93, 60, "C", {"T"}, {'1', '0'}},
-                    {true, true, 305, 60, "Y", {"G", "A"}, {'1', '2'}},
-                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}},
+                    {true, true, 93, 60, "C", {"T"}, {'1', '0'}, 20, 20},
+                    {true, true, 305, 60, "Y", {"G", "A"}, {'1', '2'}, 20, 20},
+                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
                     //unconfident variant is not consolidated
-                    {false, false, 809, 0, "AN", {"A"}, {'0', '1'}},
-                    {false, false, 810, 0, "S", {"C"}, {'0', '1'}},
+                    {false, false, 809, 0, "AN", {"A"}, {'0', '1'}, 20, 20},
+                    {false, false, 810, 0, "S", {"C"}, {'0', '1'}, 20, 20},
                     //
-                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}},
-                    {true, true, 1471, 60, "T", {"G"}, {'0', '1'}},
-                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}},
-                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}},
-                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}},
-                    {true, true, 2101, 60, "A", {"G"}, {'0', '1'}},
-                    {true, true, 2125, 60, "C", {"G"}, {'0', '1'}},
-                    {true, true, 2437, 60, "T", {"C"}, {'0', '1'}},
-                    {true, true, 2445, 60, "B", {"A", "G"}, {'1', '2'}},
-                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}},
-                    {true, true, 3175, 60, "G", {"T"}, {'0', '1'}},
-                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}},
-                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}},
-                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}},
-                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}},
+                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
+                    {true, true, 1471, 60, "T", {"G"}, {'0', '1'}, 20, 20},
+                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
+                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}, 20, 20},
+                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}, 20, 20},
+                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2101, 60, "A", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2125, 60, "C", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2437, 60, "T", {"C"}, {'0', '1'}, 19, 19},
+                    {true, true, 2445, 60, "B", {"A", "G"}, {'1', '2'}, 19, 19},
+                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                    {true, true, 3175, 60, "G", {"T"}, {'0', '1'}, 18, 18},
+                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}, 18, 18},
+                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}, 18, 18},
+                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}, 18, 18},
                     //unconfident variant is not consolidated
-                    {false, false, 4999, 0, "ANNNT", {"AAAATNNNT", "A"}, {'1', '2'}},
-                    {false, false, 5000, 0, "K", {"A"}, {'0', '1'}},
-                    {false, false, 5001, 0, "K", {"A"}, {'0', '1'}},
-                    {false, false, 5002, 0, "K", {"A"}, {'0', '1'}},
+                    {false, false, 4999, 0, "ANNNT", {"AAAATNNNT", "A"}, {'1', '2'}, 18, 18},
+                    {false, false, 5000, 0, "K", {"A"}, {'0', '1'}, 18, 18},
+                    {false, false, 5001, 0, "K", {"A"}, {'0', '1'}, 18, 18},
+                    {false, false, 5002, 0, "K", {"A"}, {'0', '1'}, 18, 18},
                     //
-                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {true, true, 5386, 60, "C", {"G"}, {'0', '1'}},
-                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}},
-                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}},
-                    {true, true, 7429, 60, "C", {"T"}, {'0', '1'}},
-                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}},
-                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}},
-                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}},
+                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}, 18, 18},
+                    {true, true, 5386, 60, "C", {"G"}, {'0', '1'}, 17, 17},
+                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}, 17, 17},
+                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}, 15, 15},
+                    {true, true, 7429, 60, "C", {"T"}, {'0', '1'}, 15, 15},
+                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}, 15, 15},
+                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}, 15, 15},
+                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}, 15, 15},
             }};
 
     // Expected output when ambig_ref is false.
@@ -973,44 +1000,44 @@ CATCH_TEST_CASE("kadayashi_varcall ambig-ref", TEST_GROUP) {
             .variants = {
                     // 0-index
                     // some genotypes are flipped wrt above
-                    {true, true, 93, 60, "C", {"T"}, {'0', '1'}},
-                    // {true, true, 305, 60, "Y", {"A", "G"}, {'1', '2'}},
-                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}},
+                    {true, true, 93, 60, "C", {"T"}, {'0', '1'}, 20, 20},
+                    // {true, true, 305, 60, "Y", {"G", "A"}, {'1', '2'}, 20, 20},
+                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
                     //unconfident variant is not consolidated
-                    // {false, false, 809, 0, "AN", {"A"}, {'0', '1'}},
-                    // {false, false, 810, 0, "S", {"C"}, {'0', '1'}},
+                    // {false, false, 809, 0, "AN", {"A"}, {'0', '1'}, 20, 20},
+                    // {false, false, 810, 0, "S", {"C"}, {'0', '1'}, 20, 20},
                     //
-                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}},
-                    {true, true, 1471, 60, "T", {"G"}, {'1', '0'}},
-                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}},
-                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}},
-                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}},
+                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
+                    {true, true, 1471, 60, "T", {"G"}, {'1', '0'}, 20, 20},
+                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
+                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}, 20, 20},
+                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}, 20, 20},
+                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}, 19, 19},
                     //changed from confident to unconfident
-                    {false, false, 2101, 0, "A", {"G"}, {'0', '1'}},
-                    {true, true, 2125, 60, "C", {"G"}, {'1', '0'}},
-                    {true, true, 2437, 60, "T", {"C"}, {'1', '0'}},
-                    // {true, true, 2445, 60, "B", {"A", "G"}, {'1', '2'}},
-                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}},
-                    {true, true, 3175, 60, "G", {"T"}, {'1', '0'}},
-                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}},
-                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}},
-                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}},
-                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}},
+                    {false, false, 2101, 0, "A", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2125, 60, "C", {"G"}, {'1', '0'}, 19, 19},
+                    {true, true, 2437, 60, "T", {"C"}, {'1', '0'}, 19, 19},
+                    // {true, true, 2445, 60, "B", {"A", "G"}, {'1', '2'}, 19, 19},
+                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                    {true, true, 3175, 60, "G", {"T"}, {'1', '0'}, 18, 18},
+                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}, 18, 18},
+                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}, 18, 18},
+                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}, 18, 18},
+                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}, 18, 18},
                     //unconfident variant is not consolidated
-                    // {false, false, 4999, 0, "ANNNT", {"AAAATNNNT", "A"}, {'1', '2'}},
-                    // {false, false, 5000, 0, "K", {"A"}, {'0', '1'}},
-                    // {false, false, 5001, 0, "K", {"A"}, {'0', '1'}},
-                    // {false, false, 5002, 0, "K", {"A"}, {'0', '1'}},
+                    // {false, false, 4999, 0, "ANNNT", {"AAAATNNNT", "A"}, {'1', '2'}, 18, 18},
+                    // {false, false, 5000, 0, "K", {"A"}, {'0', '1'}, 18, 18},
+                    // {false, false, 5001, 0, "K", {"A"}, {'0', '1'}, 18, 18},
+                    // {false, false, 5002, 0, "K", {"A"}, {'0', '1'}, 18, 18},
                     //
-                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}},
-                    {true, true, 5386, 60, "C", {"G"}, {'1', '0'}},
-                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}},
-                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}},
-                    {true, true, 7429, 60, "C", {"T"}, {'1', '0'}},
-                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}},
-                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}},
-                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}},
+                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}, 18, 18},
+                    {true, true, 5386, 60, "C", {"G"}, {'1', '0'}, 17, 17},
+                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}, 17, 17},
+                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}, 15, 15},
+                    {true, true, 7429, 60, "C", {"T"}, {'1', '0'}, 15, 15},
+                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}, 15, 15},
+                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}, 15, 15},
+                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}, 15, 15},
             }};
 
     // Open the input files.
