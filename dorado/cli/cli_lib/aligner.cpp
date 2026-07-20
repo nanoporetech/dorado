@@ -121,7 +121,9 @@ int aligner(int argc, char* argv[]) {
     }
     {
         parser.add_group("Output arguments");
-        parser.add_argument("--no-sort").help("Disable sorting of output files.").flag();
+        parser.add_argument("--no-sort")
+                .help("Disable sorting of output files. Only valid with --output-dir.")
+                .flag();
         cli::add_aligner_output_arguments(parser);
     }
     {
@@ -174,6 +176,13 @@ int aligner(int argc, char* argv[]) {
 
     const auto sort_requested = !parser.get<bool>("--no-sort");
     const cli::EmitArgs emit = cli::get_emit_args(parser);
+
+    if (parser.is_used("--no-sort") && !parser.is_used("--output-dir")) {
+        spdlog::error(
+                "--no-sort can only be used with --output-dir. Streamed output is always "
+                "unsorted.");
+        return EXIT_FAILURE;
+    }
 
     if (cli::emit_cram_with_mmi_reference(emit, parser.get<std::string>("index"))) {
         return EXIT_FAILURE;
