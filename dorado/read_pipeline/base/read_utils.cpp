@@ -22,6 +22,8 @@ SimplexReadPtr shallow_copy_read(const SimplexRead& read) {
     copy->range = read.range;
     copy->offset = read.offset;
     copy->open_pore_level = read.open_pore_level;
+    copy->selected_read_level = read.selected_read_level;
+    copy->expected_open_pore_level = read.expected_open_pore_level;
 
     copy->read_common.scaling_method = read.read_common.scaling_method;
     copy->read_common.shift = read.read_common.shift;
