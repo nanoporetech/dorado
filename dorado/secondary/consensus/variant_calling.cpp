@@ -659,17 +659,17 @@ void add_depth(Variant& var, const at::Tensor& depth) {
     // reference block, output MIN_DP
     if (is_reference_record(var)) {
         const int64_t dp = at::min(depth_span).item<int64_t>();
-        var.genotype.push_back(std::make_pair("MIN_DP", std::to_string(dp)));
+        var.format["MIN_DP"] = std::to_string(dp);
         return;
     }
 
     // default case, output DP and MIN_DP if multi-site and different
     const int64_t med_dp = at::median(depth_span).item<int64_t>();
-    var.genotype.push_back(std::make_pair("DP", std::to_string(med_dp)));
+    var.format["DP"] = std::to_string(med_dp);
     if ((var.rend - var.rstart) > 1) {
         const int64_t min_dp = at::min(depth_span).item<int64_t>();
         if (min_dp != med_dp) {
-            var.genotype.push_back(std::make_pair("MIN_DP", std::to_string(min_dp)));
+            var.format["MIN_DP"] = std::to_string(min_dp);
         }
     }
 }
@@ -704,7 +704,8 @@ Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float
         if (is_missing_call) {
             ret.qual = -1.0f;
         }
-        ret.genotype = {{"GT", make_reference_gt(ploidy, genotype_allele)}, {"GQ", gq_str}};
+        ret.format["GT"] = make_reference_gt(ploidy, genotype_allele);
+        ret.format["GQ"] = gq_str;
         ret.filter = ".";
         return ret;
     }
@@ -744,7 +745,8 @@ Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float
         oss_gt << alleles[i];
     }
 
-    ret.genotype = {{"GT", oss_gt.str()}, {"GQ", std::to_string(gq)}};
+    ret.format["GT"] = oss_gt.str();
+    ret.format["GQ"] = std::to_string(gq);
     ret.filter = (var.qual >= min_qual) ? "PASS" : "LowQual";
 
     return ret;
@@ -754,17 +756,14 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     Variant ret = var;
 
     // Find GT and GQ records for later
-    auto it_gt = std::find_if(ret.genotype.begin(), ret.genotype.end(),
-                              [](const auto& gt) { return gt.first == "GT"; });
-    if (it_gt == ret.genotype.end()) {
+    auto it_gt = ret.format.find("GT");
+    if (it_gt == ret.format.end()) {
         spdlog::warn("Failed to find GT record for variant at ({}, {})", ret.seq_id, ret.pos);
         ret.alts.clear();
         return ret;
     }
-
-    auto it_gq = std::find_if(ret.genotype.begin(), ret.genotype.end(),
-                              [](const auto& gt) { return gt.first == "GQ"; });
-    if (it_gq == ret.genotype.end()) {
+    auto it_gq = ret.format.find("GQ");
+    if (it_gq == ret.format.end()) {
         spdlog::warn("Failed to find GQ record for variant at ({}, {})", ret.seq_id, ret.pos);
         ret.alts.clear();
         return ret;

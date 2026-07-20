@@ -26,7 +26,7 @@ std::ostream& operator<<(std::ostream& os, const Variant& v) {
     utils::print_container(os, v.alts, ",", true);
     os << "}\t" << v.filter << '\t' << v.qual << '\t' << v.rstart << '\t' << v.rend;
     os << '\t';
-    print_map("gt", v.genotype);
+    print_map("gt", v.format);
     os << '\t';
     print_map("info", v.info);
 
@@ -35,9 +35,9 @@ std::ostream& operator<<(std::ostream& os, const Variant& v) {
 
 bool operator==(const Variant& lhs, const Variant& rhs) {
     return std::tie(lhs.seq_id, lhs.pos, lhs.ref, lhs.alts, lhs.filter, lhs.info, lhs.qual,
-                    lhs.genotype, lhs.rstart,
+                    lhs.format, lhs.rstart,
                     lhs.rend) == std::tie(rhs.seq_id, rhs.pos, rhs.ref, rhs.alts, rhs.filter,
-                                          rhs.info, rhs.qual, rhs.genotype, rhs.rstart, rhs.rend);
+                                          rhs.info, rhs.qual, rhs.format, rhs.rstart, rhs.rend);
 }
 
 bool operator<(const Variant& lhs, const Variant& rhs) {
@@ -73,10 +73,8 @@ int64_t variant_end(const Variant& var) {
     if (const auto it = var.info.find("END"); it != std::cend(var.info)) {
         return static_cast<int64_t>(std::stoll(it->second));
     }
-    for (auto it = std::crbegin(var.genotype); it != std::crend(var.genotype); ++it) {
-        if (it->first == "LEN") {
-            return var.pos + static_cast<int64_t>(std::stoll(it->second));
-        }
+    if (const auto it = var.format.find("LEN"); it != var.format.cend()) {
+        return var.pos + static_cast<int64_t>(std::stoll(it->second));
     }
     return var.pos + std::max<int64_t>(1, std::ssize(var.ref));
 }
@@ -93,14 +91,7 @@ bool variant_covers_position(const Variant& var, const int32_t seq_id, const int
 void set_gvcf_reference_block_end(Variant& var, const int64_t end) {
     var.alts = {"<*>"};
     var.info["END"] = std::to_string(end);
-
-    auto it_len = std::find_if(std::begin(var.genotype), std::end(var.genotype),
-                               [](const auto& val) { return val.first == "LEN"; });
-    if (it_len == std::end(var.genotype)) {
-        var.genotype.emplace_back("LEN", std::to_string(end - var.pos));
-    } else {
-        it_len->second = std::to_string(end - var.pos);
-    }
+    var.format["LEN"] = std::to_string(end - var.pos);
 }
 
 float get_gvcf_reference_record_gq_margin(

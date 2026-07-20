@@ -243,7 +243,7 @@ void VCFWriter::write_variant(const Variant& variant) {
     {
         std::vector<int32_t> genotype_values;
 
-        for (const auto& [key, value] : variant.genotype) {
+        for (const auto& [key, value] : variant.format) {
             const auto& spec = get_format_field_spec(key);
             if (spec.type == FieldType::GENOTYPE) {
                 std::istringstream ss(value);
@@ -278,7 +278,7 @@ void VCFWriter::write_variant(const Variant& variant) {
 
         // Update the genotype.
         if (std::empty(genotype_values)) {
-            throw std::runtime_error("No genotype information found in variant.genotype!");
+            throw std::runtime_error("No genotype information found in variant.format!");
         }
         bcf_update_genotypes(m_header.get(), record.get(), std::data(genotype_values),
                              std::size(genotype_values));

@@ -237,7 +237,7 @@ std::vector<secondary::Variant> convert_variants(
                 .filter = "",
                 .info = {},
                 .qual = static_cast<float>(var.qual),
-                .genotype = {},
+                .format = {},
                 .rstart = 0,
                 .rend = 0,
         };
@@ -255,9 +255,9 @@ std::vector<secondary::Variant> convert_variants(
         }
 
         new_var = secondary::normalize_genotype(new_var, ploidy, pass_min_qual);
-        new_var.genotype.emplace_back(std::make_pair("DP", std::to_string(var.median_depth)));
+        new_var.format["DP"] = std::to_string(var.median_depth);
         if ((var.min_depth != var.median_depth) && (new_var.ref.length() > 1)) {
-            new_var.genotype.emplace_back(std::make_pair("MIN_DP", std::to_string(var.min_depth)));
+            new_var.format["MIN_DP"] = std::to_string(var.min_depth);
         }
 
         ret.emplace_back(std::move(new_var));
@@ -1594,7 +1594,7 @@ secondary::Variant make_gvcf_reference_record(const int32_t seq_id,
             .filter = ".",
             .info = {},
             .qual = qual,
-            .genotype = {},
+            .format = {},
             .rstart = pos,
             .rend = end,
     };
@@ -1604,7 +1604,7 @@ secondary::Variant make_gvcf_reference_record(const int32_t seq_id,
 
     secondary::set_gvcf_reference_block_end(ret, end);
     const std::string depth_str = (min_depth >= 0) ? std::to_string(min_depth) : ".";
-    ret.genotype.emplace_back(std::make_pair("MIN_DP", depth_str));
+    ret.format["MIN_DP"] = depth_str;
 
     return ret;
 }
