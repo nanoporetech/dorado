@@ -9,7 +9,7 @@ set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
 # also forces us to link to libarrow which causes issues with std::vector due to parts of the
 # implementation being inlined with different instrumentation settings.
 # See https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow#false-positives
-if(ECM_ENABLE_SANITIZERS MATCHES "address")
+if(ECM_ENABLE_SANITIZERS MATCHES "address" OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*"))
     set(POD5_STATIC FALSE)
 else()
     set(POD5_STATIC TRUE)
