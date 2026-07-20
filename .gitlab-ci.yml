@@ -245,6 +245,7 @@ variables:
     # in trying to compress it further.
     ARTIFACT_COMPRESSION_LEVEL: "fastest"
   script:
+    - export BUILD_OPTIONS="${BUILD_OPTIONS} -DPOD5_STATIC=OFF"
     - !reference [.create_venv]
     - !reference [.run_dorado_cmake_build]
     - !reference [.run_dorado_cmake_cpack]
@@ -442,7 +443,7 @@ build:linux:x86:clang_tidy:
 build:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
   variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON -DPOD5_STATIC=OFF"
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
   extends:
     - .linux_build_dependencies
@@ -523,8 +524,7 @@ build:macos:arm:no_ccache:
     - .on_nightly_or_manual
   artifacts: null
 
-build_archive:linux:arm64:jammy:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+.build_archive:linux:arm64:
   variables:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
   extends:
@@ -533,15 +533,15 @@ build_archive:linux:arm64:jammy:
     - .build_dorado_archive
     - .on_nightly_or_manual
 
+build_archive:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  extends:
+    - .build_archive:linux:arm64
+
 build_archive:linux:arm64:cuda13:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
-  variables:
-    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
   extends:
-    - .linux_build_dependencies
-    - .linux_arm64_runner
-    - .build_dorado_archive
-    - .on_nightly_or_manual
+    - .build_archive:linux:arm64
 
 .build_archive:linux:x86:
   image: ${DORADO_DOCKER_ROOT}/dorado-rocky8-cuda-${CUDA}.0:1.1

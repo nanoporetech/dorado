@@ -5,6 +5,7 @@
 #include "models/kits.h"
 
 #include <cmath>
+#include <cstdint>
 #include <filesystem>
 #include <optional>
 #include <string>
@@ -13,7 +14,10 @@
 
 namespace dorado::config {
 
-enum class ScalingStrategy : std::uint8_t { MED_MAD, QUANTILE, PA };
+enum class ScalingStrategy : std::uint8_t { MED_MAD, QUANTILE, PA, PA_OFFSET };
+inline bool is_pa_strategy(ScalingStrategy strategy) {
+    return strategy == ScalingStrategy::PA || strategy == ScalingStrategy::PA_OFFSET;
+}
 std::string to_string(const ScalingStrategy& strategy);
 ScalingStrategy scaling_strategy_from_string(const std::string& strategy);
 
@@ -21,6 +25,8 @@ struct StandardisationScalingParams {
     bool standardise = false;
     float mean = 0.0f;
     float stdev = 1.0f;
+    std::optional<float> offset_threshold_min = std::nullopt;
+    std::optional<float> offset_threshold_max = std::nullopt;
 
     std::string to_string() const;
 };

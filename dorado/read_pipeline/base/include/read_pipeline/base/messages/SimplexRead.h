@@ -41,6 +41,9 @@ public:
 
     // Loaded from V4+ pod5 files
     float open_pore_level{std::numeric_limits<float>::quiet_NaN()};
+    // Loaded from V5+ pod5 files
+    float expected_open_pore_level{std::numeric_limits<float>::quiet_NaN()};
+    float selected_read_level{std::numeric_limits<float>::quiet_NaN()};
 };
 
 using SimplexReadPtr = std::unique_ptr<SimplexRead>;

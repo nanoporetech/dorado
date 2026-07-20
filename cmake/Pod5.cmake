@@ -1,28 +1,28 @@
 # CMake errors out if we try to create the pod5_libs target twice, which happens in ont_core.
 include_guard(GLOBAL)
 
-set(POD5_VERSION 0.3.39)
+set(POD5_VERSION 0.3.44)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
+
+option(POD5_STATIC "Statically link the pod5 library" ON)
 
 # If we're building with ASAN enabled then we don't want to statically link to POD5 since that
 # also forces us to link to libarrow which causes issues with std::vector due to parts of the
 # implementation being inlined with different instrumentation settings.
 # See https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow#false-positives
 if(ECM_ENABLE_SANITIZERS MATCHES "address")
-    set(POD5_STATIC FALSE)
-else()
-    set(POD5_STATIC TRUE)
+    set(POD5_STATIC OFF)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
-    set(LIB_DIR "lib64")
+    set(LIB_DIR "lib")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
         set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-arm64.tar.gz")
-        set(POD5_HASH "04902f353a9a8d642ba6d58b1c063e002dfd481c35f47e7f189035bb9ecc9baa")
+        set(POD5_HASH "b75521c9e51d5f2ef0957216bdbbf9f9a4c823667a3c282a2e313a5068e63ad8")
     else()
         set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-x64.tar.gz")
-        set(POD5_HASH "7fcf1d9f1da6f1bd13167782e900462fbadb0db57c666911bdba9bbdfd4e7e06")
+        set(POD5_HASH "0f5c9fc56dcddf6893e3ff5cfec39f8d279c9b947fe422af9022ce3d395cde89")
     endif()
     if(POD5_STATIC)
         set(POD5_LIBRARIES
@@ -36,7 +36,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 elseif(APPLE)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-osx-14.0-arm64.tar.gz")
-    set(POD5_HASH "710db33a00ca041094588b7c7b5355ad45611e6160e2e3ec8763e8be34f4ac91")
+    set(POD5_HASH "4a9193d072aac3c1d8a6c060eaf98bfba00c8299c3063ad206e6d75da921a847")
     if(POD5_STATIC)
         set(POD5_LIBRARIES
             ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.a
@@ -48,7 +48,7 @@ elseif(APPLE)
     endif()
 elseif(WIN32)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-win-x64.tar.gz")
-    set(POD5_HASH "e034cb86e10fa64ce23969c47f84d06ecd13da07992593a92c743bc82c09bb5a")
+    set(POD5_HASH "a9e4ca48daf5c6d9c5bbda56022a9b4a972286ce742c831e32533b2c9410213c")
     set(POD5_LIBRARIES
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/arrow_static.lib
@@ -72,8 +72,15 @@ target_link_libraries(pod5_libs INTERFACE pod5_deps)
 
 # We need the libraries installed if they're not static.
 if (NOT POD5_STATIC)
-    install(
-        FILES ${POD5_LIBRARIES}
-        DESTINATION lib
-    )
+    if(WIN32)
+        install(
+            FILES ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/bin/pod5_format.dll
+            DESTINATION bin
+        )
+    else()
+        install(
+            FILES ${POD5_LIBRARIES}
+            DESTINATION lib
+        )
+    endif()
 endif()

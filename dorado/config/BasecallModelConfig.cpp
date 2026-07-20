@@ -180,11 +180,41 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
         if (params.standardisation.standardise) {
             params.standardisation.mean = toml::find<float>(norm, "mean");
             params.standardisation.stdev = toml::find<float>(norm, "stdev");
+            if (norm.contains("offset_threshold_min") || norm.contains("offset_threshold_max")) {
+                if (!(norm.contains("offset_threshold_min") &&
+                      norm.contains("offset_threshold_max"))) {
+                    throw std::runtime_error(
+                            "model config error - must contain both "
+                            "'standardisation.offset_threshold_min' and "
+                            "'standardisation.offset_threshold_max' or neither.");
+                }
+                params.standardisation.offset_threshold_min =
+                        toml::find<float>(norm, "offset_threshold_min");
+                params.standardisation.offset_threshold_max =
+                        toml::find<float>(norm, "offset_threshold_max");
+            }
+            if (params.strategy == ScalingStrategy::PA_OFFSET &&
+                !(params.standardisation.offset_threshold_min &&
+                  params.standardisation.offset_threshold_max)) {
+                throw std::runtime_error(
+                        "model config error - 'standardise.offset_threshold_min' and "
+                        "'standardise.offset_threshold_max' "
+                        "must be provided for scaling strategy 'pa_offset'.");
+            }
         }
 
-        if (params.standardisation.standardise && params.strategy != ScalingStrategy::PA) {
+        if (params.strategy != ScalingStrategy::PA_OFFSET &&
+            (params.standardisation.offset_threshold_min ||
+             params.standardisation.offset_threshold_max)) {
             throw std::runtime_error(
-                    "Signal standardisation is implemented only for `scaling.strategy = pa`");
+                    "offset_threshold_* parameters are only used when `scaling.strategy = "
+                    "pa_offset`");
+        }
+
+        if (params.standardisation.standardise && !is_pa_strategy(params.strategy)) {
+            throw std::runtime_error(
+                    "Signal standardisation is implemented only for `scaling.strategy = pa and "
+                    "pa_offset`");
         }
 
         if (params.standardisation.stdev <= 0.0f) {
@@ -315,7 +345,8 @@ BasecallModelConfig load_lstm_model_config(const std::filesystem::path &path) {
     }
     if (config.convs[0].size != 4 && config.convs[0].size != 16) {
         throw std::runtime_error(
-                "Invalid CRF model configuration - first convolution layer must be size 4 or 16. "
+                "Invalid CRF model configuration - first convolution layer must be size 4 or "
+                "16. "
                 "Got: " +
                 std::to_string(config.convs[0].size));
     }
@@ -521,6 +552,8 @@ std::string to_string(const ScalingStrategy &strategy) {
         return std::string("quantile");
     case ScalingStrategy::PA:
         return std::string("pa");
+    case ScalingStrategy::PA_OFFSET:
+        return std::string("pa_offset");
     };
     throw std::runtime_error("Unknown scaling strategy");
 }
@@ -535,6 +568,9 @@ ScalingStrategy scaling_strategy_from_string(const std::string &strategy) {
     if (strategy == "pa") {
         return ScalingStrategy::PA;
     }
+    if (strategy == "pa_offset") {
+        return ScalingStrategy::PA_OFFSET;
+    }
     throw std::runtime_error("Unknown scaling strategy: `" + strategy + "`");
 }
 
@@ -544,7 +580,14 @@ std::string StandardisationScalingParams::to_string() const {
     oss << "StandardisationScalingParams {"
         << " standardise:" << standardise
         << " mean:"        << mean
-        << " stdev:"       << stdev << "}";
+        << " stdev:"       << stdev;
+    if (offset_threshold_min) {
+        oss << " offset_threshold_min:" << *offset_threshold_min;
+    }
+    if (offset_threshold_max) {
+        oss << " offset_threshold_max:" << *offset_threshold_max;
+    }
+    oss << "}";
     return std::move(oss).str();
     // clang-format on
 }
@@ -567,7 +610,7 @@ std::string SignalNormalisationParams::to_string() const {
         << " strategy:" + config::to_string(strategy);
     if (strategy == ScalingStrategy::QUANTILE) {
         oss << " " + quantile.to_string();
-    } else if (strategy == ScalingStrategy::PA && standardisation.standardise) {
+    } else if (is_pa_strategy(strategy) && standardisation.standardise) {
         oss << " " + standardisation.to_string();
     }
     oss << " }";
