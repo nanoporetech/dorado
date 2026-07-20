@@ -5,14 +5,14 @@ set(POD5_VERSION 0.3.44)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
 
+option(POD5_STATIC "Statically link the pod5 library" ON)
+
 # If we're building with ASAN enabled then we don't want to statically link to POD5 since that
 # also forces us to link to libarrow which causes issues with std::vector due to parts of the
 # implementation being inlined with different instrumentation settings.
 # See https://github.com/google/sanitizers/wiki/AddressSanitizerContainerOverflow#false-positives
-if(ECM_ENABLE_SANITIZERS MATCHES "address" OR (CMAKE_SYSTEM_NAME STREQUAL "Linux" AND CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*"))
-    set(POD5_STATIC FALSE)
-else()
-    set(POD5_STATIC TRUE)
+if(ECM_ENABLE_SANITIZERS MATCHES "address")
+    set(POD5_STATIC OFF)
 endif()
 
 if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
