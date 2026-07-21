@@ -68,6 +68,20 @@
     - on-prem
     - gpu-v100
 
+.windows_regression_runner_a6000:
+  tags:
+    - windows
+    - cuda-${CUDA}
+    - on-prem
+    - gpu-a6000
+
+.windows_regression_runner_5070ti:
+  tags:
+    - windows
+    - cuda-${CUDA}
+    - on-prem
+    - gpu-5070ti
+
 .linux_benchmark_runner_p48:
   tags:
     - benchmark-p48
@@ -81,19 +95,6 @@
     - gpu-rtx6000pro
     - ubuntu-24.04
 
-.windows_benchmark_runner_a6000:
-  tags:
-    - windows
-    - cuda-${CUDA}
-    - on-prem
-    - gpu-a6000
-
-.windows_benchmark_runner_5070_ti:
-  tags:
-    - windows
-    - cuda-${CUDA}
-    - on-prem
-    - gpu-5070ti
 
 
 ######################
@@ -348,19 +349,19 @@ regression_tests:speed:windows:A6000:
     GPU_DEVICE_NAME: "A6000"
   extends:
     - .windows_regression_dependencies
-    - .windows_benchmark_runner_a6000
+    - .windows_regression_runner_a6000
     - .speed_regression_test
   needs:
     - build_archive:windows:cuda12
 
-regression_tests:speed:windows:5070_ti:
+regression_tests:speed:windows:5070ti:
   variables:
     BUILD_TYPE: Release
     BUILD_CUDA: 1
     GPU_DEVICE_NAME: "5070TI"
   extends:
     - .windows_regression_dependencies
-    - .windows_benchmark_runner_5070_ti
+    - .windows_regression_runner_5070ti
     - .speed_regression_test
   needs:
     - build_archive:windows:cuda12
