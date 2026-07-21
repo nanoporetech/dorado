@@ -687,7 +687,6 @@ test:windows:
   tags:
     # We currently pin to v100 runners as the results are not the same on blackwell runners.
     - windows
-    - VS2022
     - cuda-${CUDA}
     - on-prem
     - gpu-v100
@@ -807,7 +806,7 @@ test_archive:windows:cpu:
   extends:
     - .test_archive
   tags:
-    - windows-11
+    - windows
     - no-gpu
   needs:
     - build_archive:windows:cuda12
