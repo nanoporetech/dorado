@@ -2,6 +2,15 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.3.3] (22 July 2026)
+
+This release of Dorado adds support for PromethION Plus (FLO-PRO114P) Flow Cells. Note that this support is not yet included in later releases. This release also contains bug fix backports.  Dorado 1.3.3 is the version included in the MinKNOW 26.01 Long Term Support (LTS) release.
+
+* 77337755266c833338fe7ae75df6899487199aaa - Update OpenSSL to 3.5.7.
+* 7213ebe48476957be98daf40cdec8174b8860d8d - Fix incorrect alignment genome in Dorado `summary` outputs when BAM file header contains multiple unordered `SQ` lines.
+* 3ad7bdd1e333f6f4fbd23c586049bcfb90a411fc - Fix crash when running Dorado `demux` on input BAM files without RG lines.
+* 5edc3439850fbda6fdfae33f17909f27ce7dd053 - Add Fast, HAC and 5mCG/5hmCG models for FLO-PRO114P flowcells.
+
 # [2.1.0] (13 July 2026)
 
 This version of Dorado introduces performance improvements for v6.0.0 HAC models on Blackwell GPUs. Performance of v5.0.0+ SUP models has also been improved, especially for short reads. This release also contains a collection of feature improvements and bug fixes for Dorado `smallvar`, including initial gVCF support.
