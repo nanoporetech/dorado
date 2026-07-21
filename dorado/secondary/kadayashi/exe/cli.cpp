@@ -124,12 +124,6 @@ void parse_cli_phase_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pack)
             });
     p.add_argument("-i").help("Specify an interval string.");
     p.add_argument("--chrom").help("Debug option: will only look within the given reference.");
-    p.add_argument("--use-simple")
-            .flag()
-            .help("Use simple phasing (the second impl) rather than dvr (the first impl).")
-            .action([func = __func__](const std::string &_) {
-                spdlog::info("[kdys::{}] use simple phasing.", func);
-            });
 
     p.add_group("Others:");
     p.add_argument("-c")
@@ -213,7 +207,6 @@ void parse_cli_phase_fill(const argparse::ArgumentParser &p, clio_pack_t &clio_p
     clio.slice_in_bed = p.get<bool>("--slice-in-bed");
     clio.write_dbg_bam = p.get<bool>("--write-dbg-bam");
     clio.pp.disable_region_expansion = p.get<bool>("--strict-intervals");
-    clio.use_simple = p.get<bool>("--use-simple");
     kadayashi::KDY_VERBOSE = p.get<bool>("--verbose");
 
     throws_sancheck_cliopt_phase(clio);
@@ -453,13 +446,6 @@ void parse_cli_varcall_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pac
             .action([func = __func__](const std::string &_) {
                 spdlog::info("[kdys::{}] will not expand intervals during phasing.", func);
             });
-    p.add_argument("--use-dvr")
-            .flag()
-            .help("Set to use dvr phasing method of simpel phasing.")
-            .action([func = __func__](const std::string &_) {
-                spdlog::info("[kdys::{}] will use deepvariant replica phasing for read phasing",
-                             func);
-            });
     p.add_argument("--ambig-ref")
             .flag()
             .help("Set to allow the output vcf to contain")
@@ -518,7 +504,6 @@ void parse_cli_varcall_fill(const argparse::ArgumentParser &p, clio_pack_t &clio
     }
     clio.write_dbg_bam = p.get<bool>("-b");
     clio.pp.disable_region_expansion = p.get<bool>("--strict-intervals");
-    clio.varcall_use_dvr = p.get<bool>("--use-dvr");
     clio.ambig_ref = p.get<bool>("--ambig-ref");
     kadayashi::KDY_VERBOSE = p.get<bool>("--verbose");
 

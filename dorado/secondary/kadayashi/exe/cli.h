@@ -32,9 +32,6 @@ struct cliopt_t {
     // unphased pileup varcall hyperparameters
     kadayashi::pileup_pars_t pp;
 
-    // not-dvr phasing methods
-    bool use_simple = false;  // toggle for: use simple phasing rather than dv reimpl
-
     std::string interval_str;
     std::filesystem::path fn_tsv;  // not used by `phase`
 };
@@ -60,7 +57,6 @@ struct cliopt_varcall_t {
     kadayashi::pileup_pars_t pp{};
 
     // varcall
-    bool varcall_use_dvr{false};
     std::vector<std::string> varcall_regions{};
     int varcall_w{1'000'000};
     float max_gapcompressed_seqdiv{0.1f};

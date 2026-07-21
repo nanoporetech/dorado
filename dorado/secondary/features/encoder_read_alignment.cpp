@@ -332,7 +332,7 @@ kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
                 m_read_group, opt.disable_interval_expansion, opt.min_base_quality,
                 opt.min_varcall_coverage, opt.min_varcall_fraction, opt.max_clipping,
                 opt.min_strand_cov, opt.min_strand_cov_frac, opt.max_gapcompressed_seqdiv,
-                opt.use_dvr_for_phasing, opt.ambig_ref);
+                opt.ambig_ref);
 
         LOG_TRACE("Kadayashi done on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
 

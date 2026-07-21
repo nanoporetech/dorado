@@ -382,10 +382,6 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Maximum gapcompressed seqdiv for Kadayashi haplotagging/variant calling.")
                 .default_value(0.1f)
                 .scan<'g', float>();
-        parser.add_argument("--kada-use-dvr")
-                .hidden()
-                .help("Use DVR for phasing for Kadayashi haplotagging/variant calling.")
-                .flag();
         parser.add_argument("--dump-variants")
                 .hidden()
                 .help("Write individual Kadayashi and inference variants if the output is to a "
@@ -504,7 +500,6 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.kadayashi_opt.min_strand_cov = parser.get<int>("kada-min-strand-cov");
     opt.kadayashi_opt.min_strand_cov_frac = parser.get<float>("kada-min-strand-cov-fract");
     opt.kadayashi_opt.max_gapcompressed_seqdiv = parser.get<float>("kada-max-gapcomp-seq-div");
-    opt.kadayashi_opt.use_dvr_for_phasing = parser.get<bool>("kada-use-dvr");
     opt.kadayashi_opt.ambig_ref = opt.ambig_ref;
 
     opt.dump_variants = parser.get<bool>("dump-variants");

@@ -447,7 +447,7 @@ CATCH_TEST_CASE("kadayashi phasing and varcall pileup readgroup filtering", TEST
     CATCH_CHECK(result_both.reads.size() == NUM_READS * 2);
 }
 
-CATCH_TEST_CASE("kadayashi dvr and simple, normal case", TEST_GROUP) {
+CATCH_TEST_CASE("kadayashi phasing, normal case", TEST_GROUP) {
     // Input data.
     const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-02-supertiny";
     const std::filesystem::path fn_bam = test_data_dir / "in.aln.bam";
@@ -494,17 +494,6 @@ CATCH_TEST_CASE("kadayashi dvr and simple, normal case", TEST_GROUP) {
     constexpr float MIN_STRAND_COV_FRAC = 0.03f;
     constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
 
-    CATCH_SECTION("kadayashi_dvr_single_region_wrapper") {
-        const std::unordered_map<std::string, int32_t> result =
-                kadayashi::kadayashi_dvr_single_region_wrapper(
-                        bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                        fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 9999, "" /*readgroup*/,
-                        DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
-                        MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
-                        MAX_GAPCOMPRESSED_SEQDIV);
-        CATCH_CHECK(compare_haptags(result, expected));
-    }
-
     CATCH_SECTION("kadayashi_simple_single_region_wrapper") {
         const std::unordered_map<std::string, int32_t> result =
                 kadayashi::kadayashi_simple_single_region_wrapper(
@@ -517,7 +506,7 @@ CATCH_TEST_CASE("kadayashi dvr and simple, normal case", TEST_GROUP) {
     }
 }
 
-CATCH_TEST_CASE("kadayashi dvr and simple, empty region", TEST_GROUP) {
+CATCH_TEST_CASE("kadayashi phasing, empty region", TEST_GROUP) {
     // Input data.
     const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-02-supertiny";
     const std::filesystem::path fn_bam = test_data_dir / "in.aln.bam";
@@ -542,30 +531,6 @@ CATCH_TEST_CASE("kadayashi dvr and simple, empty region", TEST_GROUP) {
     constexpr int32_t MIN_STRAND_COV = 3;
     constexpr float MIN_STRAND_COV_FRAC = 0.03f;
     constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
-
-    CATCH_SECTION("kadayashi_dvr_single_region_wrapper empty region") {
-        // UUT.
-        const std::unordered_map<std::string, int32_t> result =
-                kadayashi::kadayashi_dvr_single_region_wrapper(
-                        bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                        fastx_reader.get_raw_faidx_ptr(), "chr20", 200000, 200001, "" /*readgroup*/,
-                        DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
-                        MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
-                        MAX_GAPCOMPRESSED_SEQDIV);
-        CATCH_CHECK(compare_haptags(result, expected));
-    }
-
-    CATCH_SECTION("kadayashi_dvr_single_region_wrapper bad coordinate span") {
-        // UUT.
-        const std::unordered_map<std::string, int32_t> result =
-                kadayashi::kadayashi_dvr_single_region_wrapper(
-                        bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                        fastx_reader.get_raw_faidx_ptr(), "chr20", 200000, 199999, "" /*readgroup*/,
-                        DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY, MIN_VARCALL_COVERAGE,
-                        MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV, MIN_STRAND_COV_FRAC,
-                        MAX_GAPCOMPRESSED_SEQDIV);
-        CATCH_CHECK(compare_haptags(result, expected));
-    }
 
     CATCH_SECTION("kadayashi_simple_single_region_wrapper empty region") {
         // UUT.
@@ -592,7 +557,7 @@ CATCH_TEST_CASE("kadayashi dvr and simple, empty region", TEST_GROUP) {
     }
 }
 
-CATCH_TEST_CASE("kadayashi dvr and simple nonexistent chromosome", TEST_GROUP) {
+CATCH_TEST_CASE("kadayashi phasing nonexistent chromosome", TEST_GROUP) {
     // Input data.
     const std::filesystem::path test_data_dir = get_data_dir("variant") / "test-02-supertiny";
     const std::filesystem::path fn_bam = test_data_dir / "in.aln.bam";
@@ -617,17 +582,6 @@ CATCH_TEST_CASE("kadayashi dvr and simple nonexistent chromosome", TEST_GROUP) {
     constexpr int32_t MIN_STRAND_COV = 3;
     constexpr float MIN_STRAND_COV_FRAC = 0.03f;
     constexpr float MAX_GAPCOMPRESSED_SEQDIV = 0.1f;
-
-    CATCH_SECTION("kadayashi_dvr_single_region_wrapper empty region") {
-        const std::unordered_map<std::string, int32_t> result =
-                kadayashi::kadayashi_dvr_single_region_wrapper(
-                        bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                        fastx_reader.get_raw_faidx_ptr(), "Nonexistent", 200000, 200001,
-                        "" /*readgroup*/, DISABLE_INTERVAL_EXPANSION, MIN_BASE_QUALITY,
-                        MIN_VARCALL_COVERAGE, MIN_VARCALL_FRACTION, MAX_CLIPPING, MIN_STRAND_COV,
-                        MIN_STRAND_COV_FRAC, MAX_GAPCOMPRESSED_SEQDIV);
-        CATCH_CHECK(compare_haptags(result, expected));
-    }
 
     CATCH_SECTION("kadayashi_simple_single_region_wrapper empty region") {
         const std::unordered_map<std::string, int32_t> result =
@@ -728,7 +682,7 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
                 fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 10000, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
+                pp.max_gapcompressed_seqdiv, false /*ambig_ref*/);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected.qname2hp));
         CATCH_CHECK(result.variants == expected.variants);
         CATCH_CHECK(result.read_endpoints == expected.read_endpoints);
@@ -741,7 +695,7 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
                 fastx_reader.get_raw_faidx_ptr(), "chr20", 93, 10000, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
+                pp.max_gapcompressed_seqdiv, false /*ambig_ref*/);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected.qname2hp));
         CATCH_CHECK(result.variants == expected.variants);
         {
@@ -760,10 +714,10 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
     CATCH_SECTION("simple phasing varcall, variant at chunk end") {
         const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 8321, "" /*readgroup*/,
-                pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
-                pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
+                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 8321 /*end-inclusive*/,
+                "" /*readgroup*/, pp.disable_region_expansion, pp.min_base_quality,
+                pp.min_varcall_coverage, pp.min_varcall_fraction, pp.max_clipping,
+                1 /*min strand cov*/, 0.033f, pp.max_gapcompressed_seqdiv, false /*ambig_ref*/);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected.qname2hp));
         CATCH_CHECK(result.variants == expected.variants);
         {
@@ -777,81 +731,13 @@ CATCH_TEST_CASE("kadayashi_varcall normal case", TEST_GROUP) {
         }
     }
 
-    const kadayashi::varcall_result_t expected_dvr{
-            .qname2hp =
-                    {
-                            {"1e70cda3-c41f-4d19-9c14-94d8d64e619c", 1},
-                            {"61ab09d6-072f-4ab2-b14b-b0a1e38a3419", 1},
-                            {"563ecca1-30dd-4dd9-991a-d417d827c803", 0},
-                            {"4fd81aa2-cb77-4994-a8a5-70e6228f255e", 0},
-                            {"a27cad27-2297-40d4-8666-40a4742eb2ed", 1},
-                            {"e0af6c87-8655-4603-97b7-0ad5ba860df2", 0},
-                            {"7d23577c-5c93-4d41-83bd-b652e687deee", 0},
-                            {"627ea9e1-5204-4a2c-ae54-1e1be8bbbbe6", 1},
-                            {"ac863a7d-932e-42fa-91c1-7814d7f810f9", 1},
-                            {"b4139858-e420-4780-94e6-375542c2d2e8", 0},
-                            {"dbe9785a-fa25-454c-9960-fd65fb99a040", 1},
-                            {"3fdc1b9b-7186-411e-af92-e93a1086754c", 1},
-                            {"7b2095d4-08f7-448d-aa9d-55c9568fb49d", 1},
-                            {"c488f4c5-1639-4be1-92f6-948f29b7d822", 1},
-                            {"02551418-20c9-4b4b-9d1b-9bee36342895", 1},
-                            {"de45db56-e704-4524-af88-06a2f98c270e", 1},
-                            {"49b05d0d-97ac-449e-804b-35b35e05ce28", 0},
-                            {"e7e27cb5-1144-49dd-8ec4-09a75937a091", 0},
-                            {"3d7a9813-67be-4b84-b66a-0269aa108340", 1},
-                            {"d5560893-59c8-417c-a929-d62b4d19a1ca", 1},
-                    },
-            .variants = {
-                    // 0-index
-                    {true, true, 93, 60, "C", {"T"}, {'0', '1'}, 20, 20},
-                    {true, true, 305, 60, "G", {"A"}, {'0', '1'}, 20, 20},
-                    {false, false, 775, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
-                    {false, false, 809, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
-                    {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
-                    {true, true, 1471, 60, "T", {"G"}, {'1', '0'}, 20, 20},
-                    {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
-                    {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}, 20, 20},
-                    {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}, 20, 20},
-                    {false, false, 1958, 0, "T", {"G"}, {'0', '1'}, 19, 19},
-                    {true, true, 2101, 60, "A", {"G"}, {'1', '0'}, 19, 19},
-                    {true, true, 2125, 60, "C", {"G"}, {'1', '0'}, 19, 19},
-                    {true, true, 2437, 60, "T", {"C"}, {'1', '0'}, 19, 19},
-                    {true, true, 2445, 60, "G", {"A"}, {'1', '0'}, 19, 19},
-                    {true, false, 2966, 60, "G", {"C"}, {'1', '1'}, 18, 18},
-                    {true, true, 3175, 60, "G", {"T"}, {'1', '0'}, 18, 18},
-                    {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}, 18, 18},
-                    {true, false, 3734, 60, "G", {"C"}, {'1', '1'}, 18, 18},
-                    {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}, 18, 18},
-                    {false, false, 4695, 0, "A", {"T"}, {'0', '1'}, 18, 18},
-                    {false, false, 4999, 0, "AAAAT", {"AAAATAAAT", "A"}, {'2', '1'}, 18, 18},
-                    {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}, 18, 18},
-                    {true, true, 5386, 60, "C", {"G"}, {'1', '0'}, 17, 17},
-                    {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}, 17, 17},
-                    {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}, 15, 15},
-                    {true, true, 7429, 60, "C", {"T"}, {'1', '0'}, 15, 15},
-                    {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}, 15, 15},
-                    {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}, 15, 15},
-                    {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}, 15, 15},
-            }};
-    CATCH_SECTION("dvr phasing") {
-        // dvr and simple phasing share the same variant calling step
-        const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
-                bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
-                fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 9999, "" /*readgroup*/,
-                pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
-                pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, true, false /*ambig_ref*/);
-        CATCH_CHECK(compare_haptags(result.qname2hp, expected_dvr.qname2hp));
-        CATCH_CHECK(result.variants == expected_dvr.variants);
-    }
-
     CATCH_SECTION("use wrong clipping threshold") {
         const kadayashi::varcall_result_t result3 = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
                 fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 9999, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, 100, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
+                pp.max_gapcompressed_seqdiv, false /*ambig_ref*/);
         CATCH_CHECK(result3.variants.empty());
         CATCH_CHECK(result3.read_endpoints.empty());
     }
@@ -878,7 +764,7 @@ CATCH_TEST_CASE("kadayashi_varcall normal case2", TEST_GROUP) {
             bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(), fastx_reader.get_raw_faidx_ptr(),
             "chr1:23935672-23936360", 0, 700, "" /*readgroup*/, pp.disable_region_expansion,
             pp.min_base_quality, pp.min_varcall_coverage, pp.min_varcall_fraction, pp.max_clipping,
-            1 /*min strand cov*/, 0.033f, pp.max_gapcompressed_seqdiv, false, false /*ambig_ref*/);
+            1 /*min strand cov*/, 0.033f, pp.max_gapcompressed_seqdiv, false /*ambig_ref*/);
 
     int passed = 0;
     for (const variant_dorado_style_t &var : result.variants) {
@@ -986,7 +872,7 @@ CATCH_TEST_CASE("kadayashi_varcall ambig-ref", TEST_GROUP) {
                             {"627ea9e1-5204-4a2c-ae54-1e1be8bbbbe6", 1},
                             {"ac863a7d-932e-42fa-91c1-7814d7f810f9", 1},
                             {"b4139858-e420-4780-94e6-375542c2d2e8", 0},
-                            {"dbe9785a-fa25-454c-9960-fd65fb99a040", 0},  // flipped wrt above
+                            {"dbe9785a-fa25-454c-9960-fd65fb99a040", 1},
                             {"3fdc1b9b-7186-411e-af92-e93a1086754c", 1},
                             {"7b2095d4-08f7-448d-aa9d-55c9568fb49d", 1},
                             {"c488f4c5-1639-4be1-92f6-948f29b7d822", 1},
@@ -1000,26 +886,25 @@ CATCH_TEST_CASE("kadayashi_varcall ambig-ref", TEST_GROUP) {
             .variants = {
                     // 0-index
                     // some genotypes are flipped wrt above
-                    {true, true, 93, 60, "C", {"T"}, {'0', '1'}, 20, 20},
-                    // {true, true, 305, 60, "Y", {"G", "A"}, {'1', '2'}, 20, 20},
+                    {true, true, 93, 60, "C", {"T"}, {'1', '0'}, 20, 20},
+                    // {true, true, 305, 60, "Y", {"A", "G"}, {'1', '2'}, 20, 20},
                     {false, false, 775, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
                     //unconfident variant is not consolidated
                     // {false, false, 809, 0, "AN", {"A"}, {'0', '1'}, 20, 20},
                     // {false, false, 810, 0, "S", {"C"}, {'0', '1'}, 20, 20},
                     //
                     {false, false, 1002, 0, "AC", {"A"}, {'0', '1'}, 20, 20},
-                    {true, true, 1471, 60, "T", {"G"}, {'1', '0'}, 20, 20},
+                    {true, true, 1471, 60, "T", {"G"}, {'0', '1'}, 20, 20},
                     {false, false, 1613, 0, "TC", {"T"}, {'0', '1'}, 20, 20},
                     {false, false, 1619, 0, "CG", {"C"}, {'0', '1'}, 20, 20},
                     {false, false, 1829, 0, "CTTT", {"C"}, {'0', '1'}, 20, 20},
                     {false, false, 1958, 0, "T", {"G"}, {'0', '1'}, 19, 19},
-                    //changed from confident to unconfident
-                    {false, false, 2101, 0, "A", {"G"}, {'0', '1'}, 19, 19},
-                    {true, true, 2125, 60, "C", {"G"}, {'1', '0'}, 19, 19},
-                    {true, true, 2437, 60, "T", {"C"}, {'1', '0'}, 19, 19},
+                    {true, true, 2101, 60, "A", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2125, 60, "C", {"G"}, {'0', '1'}, 19, 19},
+                    {true, true, 2437, 60, "T", {"C"}, {'0', '1'}, 19, 19},
                     // {true, true, 2445, 60, "B", {"A", "G"}, {'1', '2'}, 19, 19},
                     {true, false, 2966, 60, "G", {"C"}, {'1', '1'}, 18, 18},
-                    {true, true, 3175, 60, "G", {"T"}, {'1', '0'}, 18, 18},
+                    {true, true, 3175, 60, "G", {"T"}, {'0', '1'}, 18, 18},
                     {false, false, 3514, 0, "CT", {"C"}, {'0', '1'}, 18, 18},
                     {true, false, 3734, 60, "G", {"C"}, {'1', '1'}, 18, 18},
                     {false, false, 3961, 0, "A", {"AC"}, {'0', '1'}, 18, 18},
@@ -1031,10 +916,10 @@ CATCH_TEST_CASE("kadayashi_varcall ambig-ref", TEST_GROUP) {
                     // {false, false, 5002, 0, "K", {"A"}, {'0', '1'}, 18, 18},
                     //
                     {false, false, 5125, 0, "CTTT", {"C"}, {'0', '1'}, 18, 18},
-                    {true, true, 5386, 60, "C", {"G"}, {'1', '0'}, 17, 17},
+                    {true, true, 5386, 60, "C", {"G"}, {'0', '1'}, 17, 17},
                     {false, false, 5985, 0, "CA", {"C"}, {'0', '1'}, 17, 17},
                     {false, false, 6947, 0, "CGTGT", {"C"}, {'0', '1'}, 15, 15},
-                    {true, true, 7429, 60, "C", {"T"}, {'1', '0'}, 15, 15},
+                    {true, true, 7429, 60, "C", {"T"}, {'0', '1'}, 15, 15},
                     {false, false, 7690, 0, "TCC", {"T"}, {'0', '1'}, 15, 15},
                     {false, false, 7912, 0, "C", {"CT"}, {'0', '1'}, 15, 15},
                     {false, false, 8319, 0, "GAA", {"G"}, {'0', '1'}, 15, 15},
@@ -1057,19 +942,18 @@ CATCH_TEST_CASE("kadayashi_varcall ambig-ref", TEST_GROUP) {
                 fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 9999, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, false, true);
+                pp.max_gapcompressed_seqdiv, true);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected_ambig_ref_true.qname2hp));
         CATCH_CHECK(result.variants == expected_ambig_ref_true.variants);
     }
 
     CATCH_SECTION("ambig-ref false") {
-        // dvr and simple phasing share the same variant calling step
         const kadayashi::varcall_result_t result = kadayashi::kadayashi_phase_and_varcall_wrapper(
                 bam_reader.fp(), bam_reader.idx(), bam_reader.hdr(),
                 fastx_reader.get_raw_faidx_ptr(), "chr20", 0, 9999, "" /*readgroup*/,
                 pp.disable_region_expansion, pp.min_base_quality, pp.min_varcall_coverage,
                 pp.min_varcall_fraction, pp.max_clipping, 1 /*min strand cov*/, 0.033f,
-                pp.max_gapcompressed_seqdiv, true, false);
+                pp.max_gapcompressed_seqdiv, false);
         CATCH_CHECK(compare_haptags(result.qname2hp, expected_ambig_ref_false.qname2hp));
         CATCH_CHECK(result.variants == expected_ambig_ref_false.variants);
     }

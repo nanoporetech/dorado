@@ -132,7 +132,7 @@ struct variant_graph_t {
     std::vector<vgnode_t> nodes{};
     std::vector<uint8_t> next_link_is_broken{};  // logs phasing breakpoints
     uint8_t has_breakpoints{0};
-};  // 2-allele diploid graph used by dvr method
+};  // 2-allele diploid graph
 
 struct chunk_t {
     bool is_valid;

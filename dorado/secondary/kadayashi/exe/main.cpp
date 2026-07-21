@@ -38,7 +38,7 @@ int main_phase(cliopt_t &clio) {
                                             clio.n_threads,  // threads
                                             BAM_THREAD_MULT,
                                             clio.n_threads * 2,  // chunk per batch
-                                            clio.fn_tsv, clio.use_simple);
+                                            clio.fn_tsv);
     return ret;
 }
 
@@ -246,7 +246,7 @@ int main(int argc, char *argv[]) {
                 clio.pp.min_varcall_coverage, clio.pp.min_varcall_fraction, clio.pp.max_clipping,
                 clio.pp.min_strand_cov, clio.pp.min_strand_cov_frac,
                 clio.pp.max_gapcompressed_seqdiv, clio.ambig_ref, clio.pp.disable_region_expansion,
-                clio.varcall_use_dvr, clio.bed_flanking);
+                clio.bed_flanking);
         spdlog::info("[kdys::{}] varcall main routine done, used {:.1f}s", __func__,
                      kadayashi::get_timestamp() - timestamp);
 
