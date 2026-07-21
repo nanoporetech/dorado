@@ -1,6 +1,7 @@
 ##fileformat=VCFv4.2
 ##FILTER=<ID=PASS,Description="All filters passed">
 ##FILTER=<ID=LowQual,Description="Variant quality is below threshold">
+##FILTER=<ID=IncompatZyg,Description="Predicted zygosity incompatible with ploidy">
 ##FILTER=<ID=.,Description="Non-variant position">
 ##contig=<ID=chr20,length=10000>
 ##dorado_version=0.0.0+32f1a6620
@@ -17,7 +18,9 @@ chr20	2126	.	C	G	31.325	PASS	.	GT:GQ	0/1:31
 chr20	2438	.	T	C	37.748	PASS	.	GT:GQ	0/1:38
 chr20	2446	.	G	A	44.466	PASS	.	GT:GQ	0/1:44
 chr20	2967	.	G	C	56.932	PASS	.	GT:GQ	1:57
+chr20	3176	.	G	T	0	IncompatZyg	.	GT:GQ	0:0
 chr20	3735	.	G	C	54.185	PASS	.	GT:GQ	1:54
+chr20	4696	.	A	T	0	IncompatZyg	.	GT:GQ	0:0
 chr20	5000	.	AAAAT	A,AAAATAAAT	27.655	PASS	.	GT:GQ	1/2:28
 chr20	5387	.	C	G	32.858	PASS	.	GT:GQ	0/1:33
 chr20	6948	.	CGTGT	C,CGTGTGT	11.879	PASS	.	GT:GQ	1/2:12

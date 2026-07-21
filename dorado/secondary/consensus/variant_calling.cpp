@@ -753,23 +753,37 @@ Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float
 Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     Variant ret = var;
 
+    // Find GT and GQ records for later
+    auto it_gt = std::find_if(ret.genotype.begin(), ret.genotype.end(),
+                              [](const auto& gt) { return gt.first == "GT"; });
+    if (it_gt == ret.genotype.end()) {
+        spdlog::warn("Failed to find GT record for variant at ({}, {})", ret.seq_id, ret.pos);
+        ret.alts.clear();
+        return ret;
+    }
+
+    auto it_gq = std::find_if(ret.genotype.begin(), ret.genotype.end(),
+                              [](const auto& gt) { return gt.first == "GQ"; });
+    if (it_gq == ret.genotype.end()) {
+        spdlog::warn("Failed to find GQ record for variant at ({}, {})", ret.seq_id, ret.pos);
+        ret.alts.clear();
+        return ret;
+    }
+
     // This is a gVCF record.
     if (is_reference_record(var)) {
         if (std::empty(ret.alts)) {
             ret.alts = {"."};
         }
+        ret.filter = ".";
         const bool is_missing_call =
                 (std::size(ret.ref) == 1) && !utils::is_canonical_base(ret.ref.front());
-        ret.filter = ".";
         if (is_missing_call) {
             ret.qual = -1.0f;
-        }
-        for (auto& val : ret.genotype) {
-            if (val.first == "GT") {
-                val.second = is_missing_call ? "." : "0";
-            } else if (is_missing_call && (val.first == "GQ")) {
-                val.second = ".";
-            }
+            it_gt->second = ".";
+            it_gq->second = ".";
+        } else {
+            it_gt->second = "0";
         }
         return ret;
     }
@@ -778,40 +792,25 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
             std::count_if(std::cbegin(var.alts), std::cend(var.alts),
                           [](const std::string& alt) { return alt != "<*>"; });
     if (num_called_alts > 1) {
-        spdlog::debug("Discarding variant with more than one alt in haploid region ({}, {}).",
+        spdlog::debug("Filtering variant with more than one alt in haploid region ({}, {}).",
                       var.seq_id, var.pos);
-        ret.alts.clear();
-        ret.filter = ".";
-        for (auto& it_gt : ret.genotype) {
-            if (it_gt.first == "GT") {
-                it_gt.second = "0";
-                break;
-            }
-        }
+        ret.filter = "IncompatZyg";
+        ret.qual = 0.0f;
+        it_gt->second = "0";
+        it_gq->second = "0";
         return ret;
     }
 
-    bool is_homozygous = true;
-    std::vector<std::pair<std::string, std::string>>::iterator it_gt;
-    for (it_gt = ret.genotype.begin(); it_gt != ret.genotype.end(); ++it_gt) {
-        if (it_gt->first == "GT") {
-            if (it_gt->second.find("0") != std::string::npos) {
-                is_homozygous = false;
-            }
-            break;
-        }
-    }
-    if (it_gt == ret.genotype.end()) {
-        spdlog::warn("Failed to find genotype record for variant at ({}, {})", ret.seq_id, ret.pos);
-        ret.alts.clear();
-    }
+    const bool is_homozygous = it_gt->second.find("0") == std::string::npos;
     if (is_homozygous || !require_hom) {
         it_gt->second = "1";
     } else {
-        ret.alts.clear();
-        it_gt->second = "0";
-        spdlog::debug("Discarding heterozygous variant ({}, {}) in haploid region.", ret.seq_id,
+        spdlog::debug("Filtering heterozygous variant ({}, {}) in haploid region.", ret.seq_id,
                       ret.pos);
+        ret.filter = "IncompatZyg";
+        ret.qual = 0.0f;
+        it_gt->second = "0";
+        it_gq->second = "0";
     }
     return ret;
 }

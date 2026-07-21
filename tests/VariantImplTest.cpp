@@ -2085,6 +2085,12 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
         {
             // collapsed because hom in hemizygous region
             .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+        }, {
+            // filtered because het-alt
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .genotype = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
+        }, {
+            // filtered because het
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .genotype = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }
     };
     // clang-format on
@@ -2119,7 +2125,7 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
             // unchanged because spans start of a hemizygous region
             .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
-            // discarded because het in a hemizygous region
+            // filtered because het in a hemizygous region
             .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans end of a hemizygous region
@@ -2142,6 +2148,9 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
         }, {
             // unchanged because spans start of a hemizygous region
             .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+        }, {
+            // filtered because het in a hemizygous region
+            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .genotype = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans end of a hemizygous region
             .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
