@@ -158,6 +158,7 @@ void ConvStackImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
 }
 
 at::Tensor ConvStackImpl::run_koi_vcs_tx(at::Tensor x, AuxiliaryData *const aux) {
+    x = x.squeeze(0);  // (1, C, N * T) -> (C, N * T)
     for (auto &layer : layers) {
         x = layer.run_koi_vcs_tx(x, aux);
     }

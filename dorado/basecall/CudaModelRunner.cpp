@@ -20,14 +20,14 @@ CudaModelRunner::CudaModelRunner(std::shared_ptr<CudaCaller> caller, size_t batc
     if (config().is_tx_model()) {
         m_first_conv_padding = m_caller->config().convs.front().winlen / 2;
         m_chunk_offset = m_first_conv_padding;
-        m_input.slice(1, 0, m_first_conv_padding).zero_();
+        m_input.narrow(-1, 0, m_first_conv_padding).zero_();
     }
 }
 
 void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
     if (m_caller->variable_chunk_sizes()) {
-        // Tx VCS Input is of shape (C_in, N * T)
-        // LSTM VCS Input is of shape (1, C_in, N * T)
+        assert(m_input.dim() == 3);
+        assert(m_input.size(0) == 1);
         if ((m_input.size(1) == 1) && (m_input.dtype() == chunk.dtype())) {
             assert(chunk.dim() == 2);
             assert(chunk.size(0) == 1);
@@ -41,7 +41,7 @@ void CudaModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
         m_chunk_offset += m_chunk_sizes.back();
         if (config().is_tx_model()) {
             // m_chunk_sizes contains raw data size without padding, as padding can be inferred
-            m_input.narrow(1, m_chunk_offset, m_first_conv_padding).zero_();
+            m_input.narrow(-1, m_chunk_offset, m_first_conv_padding).zero_();
             m_chunk_offset += m_first_conv_padding;
         }
     } else {
@@ -63,7 +63,7 @@ std::vector<decode::DecodedChunk> CudaModelRunner::call_chunks(int num_chunks) {
     auto decoded_chunks = m_caller->call_chunks(m_input, m_output, num_chunks, aux.get());
     if (m_caller->variable_chunk_sizes()) {
         m_chunk_sizes.clear();
-        m_input.narrow(1, 0, m_first_conv_padding).zero_();
+        m_input.narrow(-1, 0, m_first_conv_padding).zero_();
         m_chunk_offset = m_first_conv_padding;
     }
     return decoded_chunks;

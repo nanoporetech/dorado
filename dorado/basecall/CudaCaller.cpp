@@ -67,10 +67,11 @@ std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
     const std::int32_t max_chunk_size = config.basecaller.chunk_size();
     const bool is_tx_model = config.is_tx_model();
     if (is_tx_model) {
-        const int first_conv_padding = config.convs[0].winlen / 2U;
-        assert((T % chunk_size_granularity) == 0);
-        in = torch::empty({C, (N * T) + (N * (T / chunk_size_granularity) * first_conv_padding)},
-                          in_options);
+        int max_conv_padding = 0;
+        for (const auto &conv : config.convs) {
+            max_conv_padding = std::max(max_conv_padding, conv.winlen / 2);
+        }
+        in = torch::empty({1, C, (N * T) + ((N + 1) * max_conv_padding)}, in_options);
     } else {
         in = torch::empty({1, C, N * T}, in_options);
         auto workspace_options =
@@ -329,14 +330,9 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaCaller::create_input_output_t
     int64_t output_bytes = 3 * N * T_out;
     auto storage = torch::empty({std::max(input_bytes, output_bytes)}, opts.dtype(torch::kInt8));
     if (m_variable_chunk_sizes) {
-        auto input = storage.slice(0, 0, input_bytes).view(scalar_type).view({C_in, N * T_in});
-        std::int64_t aux_size;
-        if (m_config.is_tx_model()) {
-            // Tx AuxiliaryData worse-case scenario is if all chunks are of chunk_size_granularity
-            // 2 for chunk_table, 3 for luts, all being int32
-            aux_size = 5 * (N * (T_in / m_config.chunk_size_granularity()));
-        } else {
-            input = input.unsqueeze(0);
+        auto input = storage.slice(0, 0, input_bytes).view(scalar_type).view({1, C_in, N * T_in});
+        std::int64_t aux_size = 0;
+        if (m_config.is_lstm_model() || m_config.is_flstm_model()) {
             // for workspace size see koi/utils_lstm.h
             aux_size = 6 * (T_out + 3) * N;
         }
