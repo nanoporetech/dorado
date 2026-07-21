@@ -17,28 +17,18 @@
 #include <string>
 #include <string_view>
 
-void print_help_main() {
-    // clang-format off
-    fprintf(stdout, "kadayashi %s\n", KADAYASHI_VERSION);
-    fprintf(stdout, "Usage:\n");
-    fprintf(stdout, "  kadayashi phase -o prefix --ref ref.fa fn_bam 2>log\n");
-    fprintf(stdout, "  kadayashi modifytag --ref hg38.fa --readtags fn_tsv_0index -o out.bam [-i chrom:s-e] [-t threads] fn_bam #note: use 2-col tsv mapping qname to haptag (0-index), not kadayashi tsv\n");
-    fprintf(stdout, "  kadayashi tsv2bin -o out.bin in.tsv\n");
-    fprintf(stdout, "  kadayashi phaseglobal -r fn_ref [-o output.vcf] [-t threads] fn_bam fn_vcf\n");
-    fprintf(stdout, "  kadayashi varcall [--varcall-use-dvr] -o prefix [-t threads -b -r REGION -w window_size] fn_ref fn_bam 2>log\n");
-    fprintf(stdout, "  kadayashi featmatgen [-r ref:start-end -o fn_out -t threads] fn_ref fn_bam\n");
-    // clang-format on
-}
-
 void print_end_summary(int argc, char *argv[], double timestamp) {
-    fprintf(stdout, "\n[M::%s] ELAPSED: %.1fs , PeakRSS: %.1f GiB\n", __func__,
-            kadayashi::get_timestamp() - timestamp, kadayashi::get_peakrss());
-    fprintf(stdout, "[M::%s] kadayashi %s\n", __func__, KADAYASHI_VERSION);
-    fprintf(stdout, "[M::%s] CMD: ", __func__);
+    spdlog::info("\n[M::{}] ELAPSED: {:.1f}s , PeakRSS: {:.1f} GiB", __func__,
+                 kadayashi::get_timestamp() - timestamp, kadayashi::get_peakrss());
+    spdlog::info("[M::{}] kadayashi {}", __func__, KADAYASHI_VERSION);
+    std::string cmd = "[M::";
+    cmd += __func__;
+    cmd += "] CMD: ";
     for (int i = 0; i < argc; i++) {
-        fprintf(stdout, "%s ", argv[i]);
+        cmd += argv[i];
+        cmd += " ";
     }
-    fprintf(stdout, "\n");
+    spdlog::info(cmd);
 }
 
 int main_phase(cliopt_t &clio) {
@@ -90,8 +80,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                   mfm_options.min_snp_accuracy)
                         : kadayashi::gen_medaka_feature_matrix(hf_view, ref_name, ref_start,
                                                                ref_end, qname2hp, mfm_options);
-        fprintf(stdout, "[time::%s] feature matrix generation used %.2fs\n", __func__,
-                kadayashi::get_timestamp() - timestamp);
+        spdlog::info("[time::{}] feature matrix generation used {:.2f}s\n", __func__,
+                     kadayashi::get_timestamp() - timestamp);
 
         kadayashi::print_medaka_feature_matrix(fn_out, mfm);
     } else {  //  all of the bam file
@@ -113,7 +103,7 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
         }
 
         for (const std::string &chrom : ref_names) {
-            fprintf(stdout, "[dbg::%s] ---- at %s ----\n", __func__, chrom.c_str());
+            spdlog::debug("[dbg::{}] ---- at {} ----\n", __func__, chrom.c_str());
 
             const std::string refseq = kadayashi::hts_utils::fetch_seq(fai, chrom);
 
@@ -154,9 +144,9 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                         : kadayashi::gen_medaka_feature_matrix(
                                                   hf_view, chrom, ref_start, ref_end, qname2hp,
                                                   mfm_options);
-                        fprintf(stdout, "[dbg::%s] %s %d-%d done; junk %d\n", chrom.c_str(),
-                                __func__, (int)ref_start, (int)ref_end,
-                                mfm.matrix.size() > 0 ? (int)mfm.matrix[0] : -1);
+                        spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(), __func__,
+                                      (int)ref_start, (int)ref_end,
+                                      mfm.matrix.size() > 0 ? (int)mfm.matrix[0] : -1);
                     }
                 }
             };
@@ -170,8 +160,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                 th.join();
             }
         }
-        fprintf(stdout, "[time::%s] total: %.2fs\n", __func__,
-                kadayashi::get_timestamp() - timestamp);
+        spdlog::info("[M::{}] total time used: {:.2f}s\n", __func__,
+                     kadayashi::get_timestamp() - timestamp);
     }
 
     return 0;
@@ -183,20 +173,17 @@ int main(int argc, char *argv[]) {
 
     spdlog::set_level(spdlog::level::trace);
 
-    if (argc < 2) {
-        print_help_main();
+    clio_pack_t clio_pack = parse_cli_main(argc, argv);
+    if (!clio_pack.is_good) {
         return 1;
     }
 
     const std::string_view subcommand{argv[1]};
-
     if (subcommand == "phase") {
-        cliopt_t clio = parse_cli(argc - 1, argv + 1);
-        if ((!clio.is_valid) || clio.is_print_help) {
-            return 1;
-        }
+        cliopt_t &clio = clio_pack.clio_phase;
 
         ret = main_phase(clio);
+
         if (ret != 0) {
             spdlog::error("[kdys::{}] phasing failed; not generating bin file from tsv output",
                           __func__);
@@ -219,43 +206,21 @@ int main(int argc, char *argv[]) {
             }
         }
     } else if (subcommand == "modifytag") {
-        cliopt_t clio = parse_cli(argc - 1, argv + 1);
-        if ((!clio.is_valid) || clio.is_print_help) {
-            return 1;
-        }
-        if (clio.fn_tsv.empty()) {
-            spdlog::error("[kdys::{}] must provide read-haptag mapping file (2-col tsv, 0-index)",
-                          __func__);
-            return 1;
-        }
+        cliopt_t &clio = clio_pack.clio_phase;
         ret = kadayashi::util_modify_tag_given_tsv(clio.fn_bam, clio.fn_tsv, clio.interval_str,
                                                    clio.n_threads, BAM_THREAD_MULT,
                                                    clio.output_prefix);
     } else if (subcommand == "tsv2bin") {
-        cliopt_t clio = parse_cli_tsv2bin(argc - 1, argv + 1);
-        if (!clio.is_valid || clio.is_print_help) {
-            return 1;
-        }
-
-        if (clio.fn_tsv.empty()) {
-            spdlog::error("[kdys::{}] must provide tsv file name", __func__);
-        }
-
+        cliopt_t &clio = clio_pack.clio_phase;
         kadayashi::write_binary_given_tsv(clio.fn_tsv, clio.output_name);
     } else if (subcommand == "bin2bam") {
         // given bam, bin and an interval, output bam with modified haplotag. Debug util.
-        cliopt_t clio = parse_cli_bin2bam(argc - 1, argv + 1);
-        if (!clio.is_valid || clio.is_print_help) {
-            return 1;
-        }
+        cliopt_t &clio = clio_pack.clio_phase;
         ret = kadayashi::write_haptagged_bam_given_bin_and_itvl(
                 clio.fn_bam, clio.fn_bin, clio.one_region_str, clio.output_name, clio.n_threads,
                 BAM_THREAD_MULT);
     } else if (subcommand == "phaseglobal") {
-        cliopt_phaseglobal_t clio = parse_cli_phaseglobal(argc - 1, argv + 1);
-        if (!clio.is_valid || clio.is_print_help) {
-            return 1;
-        }
+        cliopt_phaseglobal_t &clio = clio_pack.clio_phaseglobal;
 
         spdlog::info("[kdys::{}] start phasing with {} threads...", __func__, clio.n_threads);
         auto qname2hp = kadayashi::kadayashi_global_phasing_simple_modify_vcf(
@@ -271,10 +236,7 @@ int main(int argc, char *argv[]) {
         }
         ret = 0;
     } else if (subcommand == "varcall") {
-        cliopt_varcall_t clio = parse_cli_varcall(argc - 1, argv + 1);
-        if (!clio.is_valid || clio.is_print_help) {
-            return 1;
-        }
+        cliopt_varcall_t &clio = clio_pack.clio_varcall;
 
         double timestamp = kadayashi::get_timestamp();
         std::string fn_out_vcf = clio.output_prefix.string() + ".vcf";
@@ -298,10 +260,7 @@ int main(int argc, char *argv[]) {
         }
         ret = 0;
     } else if (subcommand == "featmatgen") {
-        cliopt_featmatgen_t clio = parse_clio_featmatgen(argc - 1, argv + 1);
-        if ((!clio.is_valid) || clio.is_print_help) {
-            return 1;
-        }
+        cliopt_featmatgen_t &clio = clio_pack.clio_featmatgen;
         kadayashi::MedakaFeatureMatrixOptions mfm_options = {
                 .include_dwells = clio.include_dwells,
                 .include_haplotype_column = clio.include_haplotype_column,
@@ -320,13 +279,9 @@ int main(int argc, char *argv[]) {
                 .min_snp_accuracy = clio.min_snp_accuracy};
         ret = main_featmatgen(clio.fn_in_ref, clio.fn_in_bam, clio.fn_out, clio.itvl_str,
                               clio.n_threads, clio.is_use_medaka, mfm_options);
-    } else if (subcommand == "--version") {
-        fprintf(stdout, "kadayashi %s\n", KADAYASHI_VERSION);
-        ret = 0;
     } else {
-        fprintf(stdout, "[E::%s] unknown subcommand: %s\n", __func__, argv[1]);
-        print_help_main();
-        return 1;
+        // (should not reach here)
+        spdlog::error("[E::{}] unknown subcommand: {}", __func__, subcommand);
     }
 
     print_end_summary(argc, argv, timestamp);

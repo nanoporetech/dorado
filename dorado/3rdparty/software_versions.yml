@@ -163,12 +163,3 @@ zlib-ng:
     license: ont-minimap2/src/3rdparty/zlib-ng/LICENSE.md
     files:
         - ont-minimap2/src/3rdparty/zlib-ng
-klib:
-    description: >
-        A standalone and lightweight C library.
-    version: "97a0fcb790b43b9e5da8994f4671021fec036f19"
-    url: https://github.com/attractivechaos/klib
-    license: klib/LICENSE_klib.txt
-    files:
-        - klib/ketopt.h
-
