@@ -681,11 +681,10 @@ test:windows:
   extends:
     - .test_dorado_windows
   tags:
-    # We currently pin to v100 runners as the results are not the same on blackwell runners.
     - windows
     - cuda-${CUDA}
     - on-prem
-    - gpu-v100
+    - gpu-5070ti  # Pin to a specific GPU to keep output consistent
   needs:
     - build:windows
 
