@@ -1,6 +1,6 @@
 import unittest
 
-from data_paths import ROOT_DIR, REFERENCE_FOLDER
+from data_paths import REFERENCE_FOLDER
 from tetra.compare_platforms import PlatformCompare, SpecialCase, compare_platforms
 
 
