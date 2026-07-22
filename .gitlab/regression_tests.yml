@@ -431,17 +431,11 @@ run_rebase:
     - cd regression_test
     - $PYTHON -m unittest test_compare_platforms
         || (echo "Can't rebase since platforms do not compare equal" && false)
-    # We need to authenticate the -ci user
-    - eval $(ssh-agent -s)
-    - ssh-add <(echo "$OFAN_TESTER_KEY")
-    - mkdir -p ~/.ssh
-    - echo -e "Host *\n\tStrictHostKeyChecking no\n\n" > ~/.ssh/config
-    - git remote add dorado_remote ${DORADO_GITLAB_REPO}
-        || echo "Attempted to add remote, but it already exists. Continuing ..."
-    # Boilerplate complete; create a new branch if required
+    # Create a new branch if required
     - git add ref
     - git ${REBASE_USER_ID} commit -m "Update regression test references" -m "${CI_PIPELINE_URL}" # $USER_ID sets --author from secrets
-    - git push dorado_remote HEAD:${CI_COMMIT_REF_NAME}
+    # Authenticate the -ci user with a masked CI access token without persisting it in .git/config.
+    - git push "https://oauth2:${OFAN_TESTER_TOKEN}@git.oxfordnanolabs.local/machine-learning/dorado.git" HEAD:${CI_COMMIT_REF_NAME}
   artifacts:
     when: always
     paths:
