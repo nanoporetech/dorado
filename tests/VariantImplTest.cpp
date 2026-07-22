@@ -412,7 +412,7 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
         // clang-format on
 
         const std::vector<secondary::Variant> variants =
-                convert_variants(kadayashi_variants, 7, 2, 30.0f);
+                convert_variants(kadayashi_variants, 7, 2, 30.0f, false);
 
         CATCH_CHECK(variants == expected);
     }
@@ -424,18 +424,19 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             int32_t seq_id;
             int32_t ploidy;
             float pass_min_qual;
+            bool keep_phasing;
             std::vector<secondary::Variant> expected;
         };
 
         // clang-format off
         const std::vector<TestCase> test_cases{
-            TestCase{"Empty input", {}, 0, 2, 3.0f, {}},
+            TestCase{"Empty input", {}, 0, 2, 3.0f, false, {}},
             TestCase{
                 "Single hom variant",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}, 7, 7},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {'1', '1'}, 7, 7},
                 },
-                123, 2, 3.0f,
+                123, 2, 3.0f, false,
                 {
                     secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "7"}}, 0, 0},
                 },
@@ -443,9 +444,9 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Single het variant where one alt matches the ref",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1}, 20, 20},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {'0', '1'}, 20, 20},
                 },
-                123, 2, 3.0f,
+                123, 2, 3.0f, false,
                 {
                     secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}}, 0, 0},
                 },
@@ -453,9 +454,19 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Single het variant where both alts differ from ref",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}, 9, 10},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"C", "T"}, {'1', '2'}, 9, 10},
                 },
-                123, 2, 3.0f,
+                123, 2, 3.0f, false,
+                {
+                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
+                },
+            },
+            TestCase{
+                "Single het variant where both alts differ from ref, alts are sorted",
+                {
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {'2', '1'}, 9, 10},
+                },
+                123, 2, 3.0f, false,
                 {
                     secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
                 },
@@ -463,9 +474,9 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Malformed input without alts falls back to a filtered placeholder",
                 {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}, 4, 4},
+                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {'0', '1'}, 4, 4},
                 },
-                123, 2, 3.0f,
+                123, 2, 3.0f, false,
                 {
                     secondary::Variant{123, 5, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "4"}}, 0, 0},
                 },
@@ -473,9 +484,9 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
             TestCase{
                 "Confidence and phasing flags are ignored during conversion",
                 {
-                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}, 15, 15},
+                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {'1', '1'}, 15, 15},
                 },
-                123, 2, 3.0f,
+                123, 2, 3.0f, false,
                 {
                     secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "15"}}, 0, 0},
                 },
@@ -486,9 +497,9 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
         for (const auto& test_case : test_cases) {
             CATCH_CAPTURE(test_case.name);
 
-            const std::vector<secondary::Variant> result =
-                    convert_variants(test_case.kadayashi_variants, test_case.seq_id,
-                                     test_case.ploidy, test_case.pass_min_qual);
+            const std::vector<secondary::Variant> result = convert_variants(
+                    test_case.kadayashi_variants, test_case.seq_id, test_case.ploidy,
+                    test_case.pass_min_qual, test_case.keep_phasing);
 
             CATCH_CHECK(result == test_case.expected);
         }
@@ -741,7 +752,7 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
     const kadayashi::variant_dorado_style_t right_boundary_variant = make_simple_variant(8);
 
     const std::vector<secondary::Variant> expected_variants =
-            convert_variants({simple_variant}, bam_window.seq_id, 2, 30.0f);
+            convert_variants({simple_variant}, bam_window.seq_id, 2, 30.0f, false);
 
     const std::vector<std::vector<secondary::Window>> bam_regions{{bam_window}};
     const std::vector<std::pair<std::string, int64_t>> draft_lens{{"chr1", bam_window.seq_length}};
@@ -850,7 +861,7 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
     };
 
     const std::vector<secondary::Variant> expected_variants =
-            convert_variants({overlapping_variant}, first_window.seq_id, 2, 30.0f);
+            convert_variants({overlapping_variant}, first_window.seq_id, 2, 30.0f, false);
 
     const std::vector<std::vector<secondary::Window>> bam_regions{
             {first_window, second_window},
@@ -1178,7 +1189,6 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
     CATCH_CHECK(reduce_data.ready);
     CATCH_CHECK(reduce_data.remaining_bam_regions == 0);
 
-    // clang-format off
     const std::vector<secondary::Variant> expected_variants{
             secondary::Variant{
                     .seq_id = 0,
@@ -1217,7 +1227,6 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .rend = 0,
             },
     };
-    // clang-format on
 
     // Compare variants after sorting.
     std::vector<secondary::Variant> actual_variants = reduce_data.variants_simple;
@@ -1559,16 +1568,18 @@ CATCH_TEST_CASE(
     CATCH_REQUIRE(!worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
-            secondary::Variant{0,
-                               5,
-                               "TT",
-                               {"AC"},
-                               "PASS",
-                               {},
-                               53.922f,
-                               {{"GT", "1/1"}, {"GQ", "54"}, {"DP", "1"}},
-                               0,
-                               2},
+            secondary::Variant{
+                    .seq_id = 0,
+                    .pos = 5,
+                    .ref = "TT",
+                    .alts = {"AC"},
+                    .filter = "PASS",
+                    .info = {},
+                    .qual = 53.922f,
+                    .format = {{"GT", "1/1"}, {"GQ", "54"}, {"DP", "1"}},
+                    .rstart = 0,
+                    .rend = 2,
+            },
     };
 
     std::vector<secondary::Variant> expected_merged_variants = expected_inference_variants;
@@ -1675,16 +1686,18 @@ CATCH_TEST_CASE(
     CATCH_REQUIRE(!worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
-            secondary::Variant{0,
-                               8,
-                               "CCC",
-                               {"GGG"},
-                               "PASS",
-                               {},
-                               52.161f,
-                               {{"GT", "1/1"}, {"GQ", "52"}, {"DP", "9"}, {"MIN_DP", "8"}},
-                               0,
-                               3},
+            secondary::Variant{
+                    .seq_id = 0,
+                    .pos = 8,
+                    .ref = "CCC",
+                    .alts = {"GGG"},
+                    .filter = "PASS",
+                    .info = {},
+                    .qual = 52.161f,
+                    .format = {{"GT", "1/1"}, {"GQ", "52"}, {"DP", "9"}, {"MIN_DP", "8"}},
+                    .rstart = 0,
+                    .rend = 3,
+            },
     };
     const std::vector<secondary::Variant> expected_merged_variants{
             long_simple_variant, expected_inference_variants.front()};
@@ -2193,10 +2206,14 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
         data.ready = true;
         data.num_samples = 0;
         data.selected_regions = {secondary::RegionInt{0, 0, 5}};
-        data.variants_simple = {secondary::Variant{0, 1, "C", {"A"}, "PASS", {}, 41.0f,
-                                                   {{"GT", "1/1"}, {"GQ", "41"}}, 0, 0},
-                                secondary::Variant{0, 2, "G", {"T"}, "PASS", {}, 42.0f,
-                                                   {{"GT", "1/1"}, {"GQ", "42"}}, 0, 0}};
+        data.variants_simple = {secondary::Variant{.seq_id = 0, .pos = 1, .ref = "C", .alts = {"A"},
+                                                   .filter = "PASS", .info = {}, .qual = 41.0f,
+                                                   .format = {{"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0,
+                                                   .rend = 0},
+                                secondary::Variant{.seq_id = 0, .pos = 2, .ref = "G", .alts = {"T"},
+                                                   .filter = "PASS", .info = {}, .qual = 42.0f,
+                                                   .format = {{"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0,
+                                                   .rend = 0}};
         data.read_endpoints = {
             {0, 1},
             {0, 2},
@@ -2240,18 +2257,18 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     CATCH_REQUIRE(!ret_status.exception_thrown);
     CATCH_REQUIRE(!worker_terminate.load());
     CATCH_REQUIRE(chrom_reduce_data[0].variants_merged ==
-                  std::vector{secondary::Variant{0, 0, "A", {"<*>"}, ".",
-                                                 {{"END", "1"}}, 60.0f,
-                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, 0,
-                                                 1},
-                              secondary::Variant{0, 1, "C", {"A"}, "PASS", {}, 41.0f,
-                                                 {{"GT", "1/1"}, {"GQ", "41"}}, 0, 0},
-                              secondary::Variant{0, 2, "G", {"T"}, "PASS", {}, 42.0f,
-                                                 {{"GT", "1/1"}, {"GQ", "42"}}, 0, 0},
-                              secondary::Variant{0, 3, "T", {"<*>"}, ".",
-                                                 {{"END", "5"}}, 60.0f,
-                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, 3,
-                                                 5}});
+                  std::vector{secondary::Variant{.seq_id = 0, .pos = 0, .ref = "A", .alts = {"<*>"}, .filter = ".",
+                                                 .info = {{"END", "1"}}, .qual = 60.0f,
+                                                 .format = {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, .rstart = 0,
+                                                 .rend = 0},
+                              secondary::Variant{.seq_id = 0, .pos = 1, .ref = "C", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 41.0f,
+                                                 .format = {{"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0, .rend = 0},
+                              secondary::Variant{.seq_id = 0, .pos = 2, .ref = "G", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 42.0f,
+                                                 .format = {{"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0, .rend = 0},
+                              secondary::Variant{.seq_id = 0, .pos = 3, .ref = "T", .alts = {"<*>"}, .filter = ".",
+                                                 .info = {{"END", "5"}}, .qual = 60.0f,
+                                                 .format = {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, .rstart = 0,
+                                                 .rend = 0}});
     CATCH_CHECK(stats.get_stats().at("processed") == 5.0);
     CATCH_CHECK(std::size(output_queue) == 1);
     // clang-format on

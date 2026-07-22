@@ -25,15 +25,28 @@ constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_
         {{0, 0.5f}, {10, 5.0f}}};
 
 /**
- * \brief Utility function to normalize the genotype information of a variant.
- *          For a given variant, it deduplicates and enumerates alt alleles, creates the
- *          GT and GQ tags and sets the filter tag.
- * \param var Input variant for normalization.
- * \param ploidy The ploidy of the dataset, needed to sanity check the number of alts.
- * \param min_qual Minimum variant quality to mark the variant as PASS.
- * \returns New variant with normalized genotyping information.
+ * \brief Construct a gVCF reference block.
+ *        Handles setting end points and populating Variant::genotype fields.
+ *        Also sets GT and GQ values for non-canonical blocks.
+ * \param seq_id Reference sequence id.
+ * \param pos Reference position.
+ * \param ref_base Reference base at pos.
+ * \param qual Quality score.
+ * \param ploidy Number of haplotypes.
+ * \param min_depth Minimum read depth in the block; set to -1 to represent missing data.
+ * \param end Reference end position.
+ * \param rstart Span start in inference chunk coordinates.
+ * \param rend Span end in inference chunk coordinates.
  */
-Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual);
+Variant make_gvcf_reference_record(int32_t seq_id,
+                                   int64_t pos,
+                                   char ref_base,
+                                   float qual,
+                                   int32_t ploidy,
+                                   int32_t min_depth,
+                                   int64_t end,
+                                   int64_t rstart,
+                                   int64_t rend);
 
 /**
  * \brief Reduce a polyploid variant to haploid.

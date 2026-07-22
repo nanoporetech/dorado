@@ -3,8 +3,10 @@
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/consensus_utils.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/container_utils.h"
 #include "utils/rle.h"
 #include "utils/sequence_utils.h"
+#include "utils/string_utils.h"
 
 #include <ATen/ATen.h>
 #include <cxxpool.h>
@@ -14,6 +16,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <set>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -73,6 +76,16 @@ float phred(float err, const float cap) {
 }
 
 /**
+ * \brief Get GQ string from a quality value.
+ */
+std::string gq_from_qual(const float qual) {
+    if (qual < 0.0f) {
+        return ".";
+    }
+    return std::to_string(static_cast<int32_t>(std::round(qual)));
+}
+
+/**
  * \brief Create a lookup table of valid symbols.
  */
 std::array<int32_t, 256> create_symbol_lookup(const std::string_view symbols) {
@@ -82,6 +95,60 @@ std::array<int32_t, 256> create_symbol_lookup(const std::string_view symbols) {
         ret[static_cast<int32_t>(symbols[i])] = i;
     }
     return ret;
+}
+
+/**
+ * \brief Collect unique allele sequences.
+ * \param ref Gap-compressed reference sequence.
+ * \param preds Gap-compressed consensus sequence for each haplotype.
+ * \returns Map of unique alleles to index, reference=0 followed by sorted alts.
+ */
+std::vector<std::string> construct_alleles_lookup(const std::string_view ref,
+                                                  const std::span<const std::string> preds) {
+    // Create unique and sorted alts for the return variant.
+    std::set<std::string> unique_alts;
+    for (const std::string& alt : preds) {
+        if (alt != ref) {
+            unique_alts.emplace(alt);
+        }
+    }
+    std::vector<std::string> alleles_lookup;
+    alleles_lookup.reserve(std::size(unique_alts) + 1);
+    alleles_lookup.emplace_back(std::string(ref.data(), std::size(ref)));
+    alleles_lookup.insert(std::end(alleles_lookup), std::cbegin(unique_alts),
+                          std::cend(unique_alts));
+    return alleles_lookup;
+}
+
+std::vector<std::string> construct_alts_out(const std::span<const std::string> alleles) {
+    if (std::empty(alleles)) {
+        return {};
+    }
+    if (std::ssize(alleles) == 1) {
+        return {"."};
+    }
+    std::vector<std::string> alts;
+    alts.reserve(std::size(alleles) - 1);
+    for (size_t i = 1; i < std::size(alleles); ++i) {
+        alts.emplace_back(std::string(alleles[i]));
+    }
+    return alts;
+}
+
+std::string make_variant_gt(const std::span<const std::string> preds,
+                            const std::span<const std::string> alleles_lookup) {
+    std::vector<int32_t> indices;
+    indices.reserve(std::size(preds));
+    for (const auto& pred : preds) {
+        const auto idx = std::find(std::cbegin(alleles_lookup), std::cend(alleles_lookup), pred);
+        if (idx == std::cend(alleles_lookup)) {
+            throw std::runtime_error{"Allele " + pred + " not in unique alleles lookup"};
+        };
+        indices.emplace_back(std::distance(std::cbegin(alleles_lookup), idx));
+    }
+    std::sort(std::begin(indices), std::end(indices));
+
+    return utils::print_container_as_string(indices, "/", false);
 }
 
 /**
@@ -282,8 +349,9 @@ Variant construct_variant(const std::string_view draft,
         var_preds.emplace_back(remove_gaps(var_pred_with_gaps));
     }
 
-    if (is_var && std::all_of(std::cbegin(var_preds), std::cend(var_preds),
-                              [&var_ref](const std::string_view val) { return val == var_ref; })) {
+    const std::vector<std::string> alleles_lookup = construct_alleles_lookup(var_ref, var_preds);
+
+    if (is_var && (std::size(alleles_lookup) == 1)) {
 #ifdef DEBUG_NORMALIZE_VARIANT
         std::cerr << "[construct_variant] Returning empty variant, case 1!\n";
 #endif
@@ -295,9 +363,20 @@ Variant construct_variant(const std::string_view draft,
         return {};
     }
 
+    const std::vector<std::string> alts_out = construct_alts_out(alleles_lookup);
+    const std::string gt = make_variant_gt(var_preds, alleles_lookup);
+
     Variant var{
-            seq_id, positions_major[rstart],    var_ref, var_preds, "PASS", {},
-            0.0f,   {{"GT", "1"}, {"GQ", "0"}}, rstart,  rend,
+            .seq_id = seq_id,
+            .pos = positions_major[rstart],
+            .ref = var_ref,
+            .alts = alts_out,
+            .filter = "PASS",
+            .info = {},
+            .qual = 0.0f,
+            .format = {{"GT", gt}},
+            .rstart = rstart,
+            .rend = rend,
     };
 
     // Check if variant starts on insert, prepend previous ref base.
@@ -336,6 +415,7 @@ Variant construct_variant(const std::string_view draft,
     var.qual = round_float(compute_consensus_quality(probs_3D, cons_seqs_with_gaps, symbol_lookup,
                                                      var.rstart, var.rend),
                            3);
+    var.format["GQ"] = gq_from_qual(var.qual);
 
     return var;
 }
@@ -676,80 +756,38 @@ void add_depth(Variant& var, const at::Tensor& depth) {
 
 }  // namespace
 
-Variant normalize_genotype(const Variant& var, const int32_t ploidy, const float min_qual) {
-    Variant ret = var;
+Variant make_gvcf_reference_record(const int32_t seq_id,
+                                   const int64_t pos,
+                                   const char ref_base,
+                                   const float qual,
+                                   const int32_t ploidy,
+                                   const int32_t min_depth,
+                                   const int64_t end,
+                                   const int64_t rstart,
+                                   const int64_t rend) {
+    const bool is_callable = utils::is_canonical_base(ref_base);
+    const float qual_ = is_callable ? qual : -1.0f;
 
-    if (std::ssize(var.alts) > ploidy) {
-        spdlog::warn(
-                "Number of alts ({}) is larger than ploidy ({})! Marking this variant for removal.",
-                std::size(var.alts), ploidy);
-        ret.alts.clear();
-        return ret;
-    }
+    const std::string gt_str = make_reference_gt(ploidy, is_callable ? '0' : '.');
+    const std::string gq_str = gq_from_qual(qual_);
+    const std::string depth_str = (min_depth >= 0) ? std::to_string(min_depth) : ".";
+    Variant ref_var{
+            .seq_id = seq_id,
+            .pos = pos,
+            .ref = std::string(1, ref_base),
+            .alts = {"<*>"},
+            .filter = ".",
+            .info = {},
+            .qual = qual_,
+            .format = {{"GT", gt_str}, {"GQ", gq_str}},
+            .rstart = rstart,
+            .rend = rend,
+    };
+    set_gvcf_reference_block_end(ref_var, end);
+    // this is done last to preserve the previous order of fields
+    ref_var.format.emplace(std::make_pair("MIN_DP", depth_str));
 
-    const int32_t gq = static_cast<int32_t>(std::round(var.qual));
-
-    // This is a gVCF record.
-    if (is_reference_record(var)) {
-        const bool is_missing_call =
-                (std::size(var.ref) == 1) && !utils::is_canonical_base(var.ref.front());
-        const char genotype_allele = is_missing_call ? '.' : '0';
-
-        if (std::empty(ret.alts)) {
-            ret.alts = {"."};
-        }
-
-        const std::string gq_str = (genotype_allele == '.') ? "." : std::to_string(gq);
-
-        if (is_missing_call) {
-            ret.qual = -1.0f;
-        }
-        ret.format["GT"] = make_reference_gt(ploidy, genotype_allele);
-        ret.format["GQ"] = gq_str;
-        ret.filter = ".";
-        return ret;
-    }
-
-    // Create unique and sorted alts for the return variant.
-    std::unordered_set<std::string> unique_alts;
-    for (const std::string_view alt : var.alts) {
-        if (alt != var.ref) {
-            unique_alts.emplace(alt);
-        }
-    }
-    ret.alts = std::vector<std::string>(std::cbegin(unique_alts), std::cend(unique_alts));
-    std::stable_sort(std::begin(ret.alts), std::end(ret.alts));
-
-    // Look-up table: alt -> numeric ID. +1 is because ref is the zeroth allele.
-    std::unordered_map<std::string, int64_t> alt_dict;
-    for (int64_t i = 0; i < std::ssize(ret.alts); ++i) {
-        alt_dict[ret.alts[i]] = i + 1;
-    }
-    alt_dict[var.ref] = 0;
-
-    std::vector<int32_t> alleles(std::size(var.alts));
-    for (std::size_t i = 0; i < std::size(var.alts); ++i) {
-        const auto it = alt_dict.find(var.alts[i]);
-        if (it == std::cend(alt_dict)) {
-            continue;
-        }
-        alleles[i] = it->second;
-    }
-    std::sort(std::begin(alleles), std::end(alleles));
-
-    std::ostringstream oss_gt;
-    for (std::size_t i = 0; i < std::size(alleles); ++i) {
-        if (i > 0) {
-            oss_gt << '/';
-        }
-        oss_gt << alleles[i];
-    }
-
-    ret.format["GT"] = oss_gt.str();
-    ret.format["GQ"] = std::to_string(gq);
-    ret.filter = (var.qual >= min_qual) ? "PASS" : "LowQual";
-
-    return ret;
+    return ref_var;
 }
 
 Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
@@ -1328,22 +1366,9 @@ std::vector<Variant> general_decode_variants(
                 ++i;
             }
 
-            const std::string ref(1, draft[block_start_pos]);
-            Variant var{
-                    seq_id,
-                    block_start_pos,
-                    ref,
-                    {"."},
-                    ".",
-                    {},
-                    min_gq,
-                    {{"GT", "0"}, {"GQ", "0"}},
-                    block_start_idx,
-                    block_end_idx,
-            };
-
-            set_gvcf_reference_block_end(var, block_end_pos);
-
+            Variant var = make_gvcf_reference_record(
+                    seq_id, block_start_pos, draft[block_start_pos], min_gq, num_haplotypes,
+                    /*min_depth*/ -1, block_end_pos, block_start_idx, block_end_idx);
             variants.emplace_back(std::move(var));
         }
     }
@@ -1354,10 +1379,9 @@ std::vector<Variant> general_decode_variants(
     std::vector<Variant> normalized_variants;
     normalized_variants.reserve(std::size(variants));
     for (const Variant& var : variants) {
-        Variant new_var = normalize_genotype(var, num_haplotypes, pass_min_qual);
-        if (const auto it = new_var.info.find("END");
-            (new_var.filter == ".") && (it != std::cend(new_var.info))) {
-            set_gvcf_reference_block_end(new_var, std::stoll(it->second));
+        Variant new_var = var;
+        if (!is_reference_record(new_var) && (new_var.qual < pass_min_qual)) {
+            new_var.filter = "LowQual";
         }
         add_depth(new_var, vc_sample.depth);
         // Sanity check.
