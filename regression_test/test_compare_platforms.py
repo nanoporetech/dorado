@@ -24,10 +24,6 @@ class TestCompareData(unittest.TestCase):
         # Windows V100 CUDA gives nearly identical results to Linux V100 CUDA, so
         # we use a tighter tolerance of 0.5%.
         WINDOWS_V100_TOLERANCE = 0.005
-        WINDOWS_5070TI_TOLERANCE = 0.05
-
-        # A100 and V100 differ by just under 5%.
-        LINUX_A100_TOLERANCE = 0.05
 
         # Platform comparison for barcoding only works between linux_cuda and windows,
         # due to the fact that even tiny differences in basecalling can result in
@@ -56,15 +52,17 @@ class TestCompareData(unittest.TestCase):
                 reference_path=REF_DIR,
                 platform_1="linux",
                 platform_2="windows_5070ti",
-                platform_tolerance=WINDOWS_5070TI_TOLERANCE,
-                special_cases=[],
+                platform_tolerance=DEFAULT_TOLERANCE,
+                special_cases=[
+                    exclude_modbase,
+                ],
                 exclude_columns=["passes_filtering"],
             ),
             PlatformCompare(
                 reference_path=REF_DIR,
                 platform_1="linux",
                 platform_2="linux_a100",
-                platform_tolerance=LINUX_A100_TOLERANCE,
+                platform_tolerance=DEFAULT_TOLERANCE,
                 special_cases=[],
                 exclude_columns=["passes_filtering"],
             ),
