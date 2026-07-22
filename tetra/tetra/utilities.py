@@ -19,9 +19,7 @@ def get_platform() -> str:
     if platform_id == "linux":
         import distro
 
-        if distro.name().lower() == "centos":
-            return "manylinux"
-        elif (
+        if (
             platform.uname().machine == "aarch64"
             and "tegra" in platform.uname().release
             and distro.version() == "22.04"

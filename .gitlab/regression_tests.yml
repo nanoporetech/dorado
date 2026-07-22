@@ -56,7 +56,7 @@
 
 .linux_regression_runner_a100:
   tags:
-    - ubuntu-20.04
+    - ubuntu-24.04
     - nvidia-docker
     - on-prem
     - gpu-a100
@@ -183,7 +183,7 @@ regression_test:linux:arm64:jammy:
   except:
     - tags
 
-regression_test:linux:x86:cuda12:
+.regression_test:linux:x86:cuda12:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_TYPE: Release
@@ -191,12 +191,23 @@ regression_test:linux:x86:cuda12:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_313}
   extends:
     - .linux_regression_dependencies
-    - .linux_regression_runner_v100
     - .regression_test
   needs:
     - build_archive:linux:x86:cuda12
   except:
     - tags
+
+regression_test:linux:x86:cuda12:v100:
+  extends:
+    - .regression_test:linux:x86:cuda12
+    - .linux_regression_runner_v100
+
+regression_test:linux:x86:cuda12:a100:
+  variables:
+    PLATFORM_SUFFIX: "_a100"
+  extends:
+    - .regression_test:linux:x86:cuda12
+    - .linux_regression_runner_a100
 
 regression_test:macos:arm:
   variables:
@@ -445,7 +456,8 @@ rebase_dorado:
   stage: rebase
   interruptible: false
   needs:
-    - regression_test:linux:x86:cuda12
+    - regression_test:linux:x86:cuda12:a100
+    - regression_test:linux:x86:cuda12:v100
     - regression_test:linux:arm64:jammy
     - regression_test:macos:arm
     - regression_test:windows
