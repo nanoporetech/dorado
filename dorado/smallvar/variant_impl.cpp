@@ -259,6 +259,7 @@ std::vector<secondary::Variant> convert_variants(
             new_var.format["MIN_DP"] = std::to_string(var.min_depth);
         }
 
+        sanitize_empty_alts(new_var, ploidy);
         if (secondary::is_valid(new_var)) {
             ret.emplace_back(std::move(new_var));
         }

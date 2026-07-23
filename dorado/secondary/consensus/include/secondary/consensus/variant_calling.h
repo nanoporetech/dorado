@@ -49,6 +49,14 @@ Variant make_gvcf_reference_record(int32_t seq_id,
                                    int64_t rend);
 
 /**
+ * \brief Post-process variants with empty alts.
+ *        Sets the variant to a reference block with no filter.
+ * \param var Variant, modified in place.
+ * \param ploidy Number of haplotypes.
+ */
+void sanitize_empty_alts(Variant& var, int32_t ploidy);
+
+/**
  * \brief Reduce a polyploid variant to haploid.
  *          If require_hom is true, then the variant will be called if all alleles have the variant.
  *          Otherwise, the variant is called if any allele has the variant.

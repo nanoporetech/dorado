@@ -404,18 +404,12 @@ Variant construct_variant(const std::string_view draft,
 #endif
     }
 
-    // Check whether the ALT field is still empty. If so, mark the alleles as "."
-    // and move on.
-    const bool any_empty = std::any_of(std::cbegin(var.alts), std::cend(var.alts),
-                                       [](const std::string_view val) { return std::empty(val); });
-    if (std::empty(var.alts) || any_empty) {
-        var.alts = {"."};
-    }
-
     var.qual = round_float(compute_consensus_quality(probs_3D, cons_seqs_with_gaps, symbol_lookup,
                                                      var.rstart, var.rend),
                            3);
     var.format["GQ"] = gq_from_qual(var.qual);
+
+    sanitize_empty_alts(var, std::ssize(cons_seqs_with_gaps));
 
     return var;
 }
@@ -788,6 +782,17 @@ Variant make_gvcf_reference_record(const int32_t seq_id,
     ref_var.format.emplace(std::make_pair("MIN_DP", depth_str));
 
     return ref_var;
+}
+
+void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
+    const bool any_empty = std::empty(var.alts) ||
+                           std::any_of(std::cbegin(var.alts), std::cend(var.alts),
+                                       [](const std::string_view s) { return std::empty(s); });
+    if (any_empty) {
+        var.alts = {"."};
+        var.format["GT"] = make_reference_gt(ploidy, '0');
+        var.filter = ".";
+    }
 }
 
 Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
