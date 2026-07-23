@@ -160,10 +160,6 @@ variables:
   - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
 
 .create_venv:
-  # TODO(DOR-1735): workaround for CI picking the wrong python until runners are rebuilt
-  - if [[ $OSTYPE == 'darwin'* ]]; then
-  -   PATH="/opt/homebrew/bin:$PATH"
-  - fi
   # Determine where we're getting python from.
   - if [[ -n ${ONT_PYTHON_URL} ]]; then
   -   curl -LfsS ${ONT_PYTHON_URL} > ont_python.tar.gz
