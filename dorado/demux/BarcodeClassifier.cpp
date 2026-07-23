@@ -1440,6 +1440,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     // Sort the scores windows by their barcode score.
     std::sort(results.begin(), results.end(),
               [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
+    std::sort(results_inner.begin(), results_inner.end(),
+              [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
 
 #if ENABLE_PER_READ_TRACE
     {
@@ -1491,9 +1493,6 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
 
     // If the kit has dual barcodes, check them and add them into the result if it passes.
     if (dual_barcode) {
-        // Sort the scores windows by their barcode score.
-        std::sort(results_inner.begin(), results_inner.end(),
-                  [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
         auto best_result_inner = results_inner.begin();
         if (results.size() == 1) {
             if (!are_penalties_acceptable(*best_result_inner)) {
