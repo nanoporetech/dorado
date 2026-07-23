@@ -96,4 +96,6 @@ void set_gvcf_reference_block_end(Variant& var, int64_t end);
 float get_gvcf_reference_record_gq_margin(float gq,
                                           std::span<const std::pair<int64_t, float>> margins);
 
+std::vector<float> compute_VAF_from_AD(const Variant& var, int32_t decimal_places);
+
 }  // namespace dorado::secondary

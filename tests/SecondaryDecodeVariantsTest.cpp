@@ -1240,4 +1240,68 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
     }
 }
 
+CATCH_TEST_CASE("compute VAF from AD", TEST_GROUP) {
+    struct TestCase {
+        std::string test_name;
+        std::vector<std::string> alts;
+        std::unordered_map<std::string, std::string> format;
+        std::vector<float> expected;
+        int32_t decimal_places;
+    };
+
+    auto [test_case] = GENERATE_REF(table<TestCase>(
+            {TestCase{"calculates and rounds VAF values for all alternate alleles",
+                      {"T", "G"},
+                      {{"AD", "10,7,3"}, {"DP", "30"}},
+                      {0.23f, 0.1f},
+                      2},
+             TestCase{"rounding truncates to specified decimal places",
+                      {"T", "G"},
+                      {{"AD", "10,7,3"}, {"DP", "30"}},
+                      {0.233f, 0.1f},
+                      3},
+             TestCase{"prefers MIN_DP over DP",
+                      {"T"},
+                      {{"AD", "4,6"}, {"DP", "20"}, {"MIN_DP", "10"}},
+                      {0.6f},
+                      2},
+             TestCase{"returns empty for an empty alts", {}, {{"AD", "0"}, {"DP", "10"}}, {}, 2},
+             TestCase{"returns empty for a reference record",
+                      {"<*>"},
+                      {{"AD", "1"}, {"DP", "10"}},
+                      {},
+                      2},
+             TestCase{"returns empty when AD is missing", {"T", "G"}, {{"DP", "30"}}, {}, 2},
+             TestCase{"returns empty when depth is missing", {"T", "G"}, {{"AD", "10,7,3"}}, {}, 2},
+             TestCase{"returns empty for zero depth",
+                      {"T", "G"},
+                      {{"AD", "10,7,3"}, {"DP", "0"}},
+                      {},
+                      2},
+             TestCase{"returns empty for negative depth",
+                      {"T", "G"},
+                      {{"AD", "10,7,3"}, {"DP", "-1"}},
+                      {},
+                      2},
+             TestCase{"returns empty for too many AD values",
+                      {"T"},
+                      {{"AD", "10,7,3"}, {"DP", "20"}},
+                      {},
+                      2},
+             TestCase{"returns empty for too few AD values",
+                      {"T", "G"},
+                      {{"AD", "10,7"}, {"DP", "20"}},
+                      {},
+                      2}}));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    const Variant var{.ref = "A",
+                      .alts = test_case.alts,
+                      .filters = {Filters::Pass},
+                      .info = {},
+                      .format = test_case.format};
+    const std::vector<float> result = compute_VAF_from_AD(var, test_case.decimal_places);
+    CATCH_CHECK(result == test_case.expected);
+}
+
 }  // namespace dorado::secondary::tests

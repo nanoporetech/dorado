@@ -956,6 +956,15 @@ Variant make_gvcf_reference_record(const int32_t seq_id,
     return ref_var;
 }
 
+void add_VAF(Variant& var) {
+    const std::vector<float> vaf_values = compute_VAF_from_AD(var, VAF_DP);
+
+    if (std::empty(vaf_values)) {
+        return;
+    }
+    var.format["VAF"] = utils::print_container_as_string(vaf_values, ",", false);
+}
+
 void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
     const bool any_empty = std::empty(var.alts) ||
                            std::any_of(std::cbegin(var.alts), std::cend(var.alts),
@@ -964,6 +973,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
         var.alts = {"."};
         var.format["GT"] = make_reference_gt(ploidy, '0');
         var.format.erase("AD");
+        var.format.erase("VAF");
         var.filters = {Filters::NonVariant};
     }
 }
@@ -1564,6 +1574,7 @@ std::vector<Variant> general_decode_variants(
             new_var.filters.update(Filters::LowQual);
         }
         add_depth(new_var, vc_sample.depth);
+        add_VAF(new_var);
         // Sanity check.
         if (is_valid(new_var)) {
             normalized_variants.emplace_back(std::move(new_var));

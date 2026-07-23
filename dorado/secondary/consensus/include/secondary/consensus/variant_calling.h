@@ -22,6 +22,7 @@
 namespace dorado::secondary {
 
 constexpr float VCF_MAX_GQ_CAP = 60.0f;
+constexpr int32_t VAF_DP = 2;
 constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS{
         {{0, 0.5f}, {10, 5.0f}}};
 
@@ -82,6 +83,16 @@ Variant make_gvcf_reference_record(int32_t seq_id,
                                    int64_t rstart,
                                    int64_t rend,
                                    std::string_view variant_source);
+
+/**
+ * \brief Add VAF field to a variant.
+ *        The variant allele fraction is calculated from the alt AD values and depth
+ *        in var.format, provided both are present, and the VAF field is added. If
+ *        either AD or depth is missing, or the variant is a reference record with no
+ *        alts, no VAF record is added.
+ * \param var Variant, modified in place.
+ */
+void add_VAF(Variant& var);
 
 /**
  * \brief Post-process variants with empty alts.

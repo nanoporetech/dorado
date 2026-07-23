@@ -17,7 +17,7 @@ namespace dorado::secondary {
 
 namespace {
 
-enum class FieldType { GENOTYPE, INT_SCALAR, INT_LIST, STRING };
+enum class FieldType { GENOTYPE, INT_SCALAR, INT_LIST, FLOAT_SCALAR, FLOAT_LIST, STRING };
 
 struct FieldSpec {
     std::string_view key;
@@ -34,6 +34,7 @@ constexpr std::array FORMAT_FIELD_SPECS{
         FieldSpec{"MIN_DP", FieldType::INT_SCALAR, "1", "Minimum read depth"},
         FieldSpec{"SRC", FieldType::STRING, "1", "Source of the variant"},
         FieldSpec{"AD", FieldType::INT_LIST, "R", "Allele read depth"},
+        FieldSpec{"VAF", FieldType::FLOAT_LIST, "A", "Variant allele fraction"},
 };
 
 constexpr std::array INFO_FIELD_SPECS{
@@ -41,7 +42,13 @@ constexpr std::array INFO_FIELD_SPECS{
 };
 
 std::string_view format_field_type(const FieldType& type) {
-    return ((type == FieldType::GENOTYPE) || (type == FieldType::STRING)) ? "String" : "Integer";
+    if ((type == FieldType::INT_SCALAR) || (type == FieldType::INT_LIST)) {
+        return "Integer";
+    }
+    if ((type == FieldType::FLOAT_SCALAR) || (type == FieldType::FLOAT_LIST)) {
+        return "Float";
+    }
+    return "String";
 }
 
 void ensure_buffer_initialized(kstring_t& buffer) {
@@ -93,8 +100,28 @@ std::vector<int32_t> parse_vcf_int_list(const std::string_view value) {
     for (const auto token : tokens) {
         ret.push_back(parse_vcf_int(token));
     }
-    if (ret.empty()) {
+    if (std::empty(ret)) {
         throw std::runtime_error("FORMAT integer list is empty.");
+    }
+    return ret;
+}
+
+float parse_vcf_float(const std::string_view value) {
+    if (value == ".") {
+        return missing_bcf_float();
+    }
+    return utils::from_chars<float>(value).value();
+}
+
+std::vector<float> parse_vcf_float_list(const std::string_view value) {
+    const auto tokens = utils::split_view(value, ',');
+    std::vector<float> ret;
+    ret.reserve(std::size(tokens));
+    for (const auto token : tokens) {
+        ret.push_back(parse_vcf_float(token));
+    }
+    if (std::empty(ret)) {
+        throw std::runtime_error("FORMAT float list is empty.");
     }
     return ret;
 }
@@ -305,11 +332,29 @@ void VCFWriter::write_variant(const Variant& variant) {
 
             if (spec.type == FieldType::INT_LIST) {
                 auto parsed_values = parse_vcf_int_list(value);
-                if (m_include_gvcf_headers && (spec.key == "AD")) {
+                if (m_include_gvcf_headers && ((spec.number == "R") || (spec.number == "A"))) {
                     // Add extra missing entry corresponding to <*> allele
                     parsed_values.push_back(bcf_int32_missing);
                 }
                 bcf_update_format_int32(m_header.get(), record.get(), spec.key.data(),
+                                        parsed_values.data(), parsed_values.size());
+                continue;
+            }
+
+            if (spec.type == FieldType::FLOAT_SCALAR) {
+                const float parsed_value = parse_vcf_float(value);
+                bcf_update_format_float(m_header.get(), record.get(), spec.key.data(),
+                                        &parsed_value, 1);
+                continue;
+            }
+
+            if (spec.type == FieldType::FLOAT_LIST) {
+                auto parsed_values = parse_vcf_float_list(value);
+                if (m_include_gvcf_headers && ((spec.number == "R") || (spec.number == "A"))) {
+                    // Add extra missing entry corresponding to <*> allele
+                    parsed_values.push_back(missing_bcf_float());
+                }
+                bcf_update_format_float(m_header.get(), record.get(), spec.key.data(),
                                         parsed_values.data(), parsed_values.size());
                 continue;
             }

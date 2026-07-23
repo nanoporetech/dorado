@@ -1,6 +1,7 @@
 #include "secondary/common/variant.h"
 
 #include "utils/container_utils.h"
+#include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -163,6 +164,41 @@ float get_gvcf_reference_record_gq_margin(
         return it->second;
     }
     return std::prev(it)->second;
+}
+
+std::vector<float> compute_VAF_from_AD(const Variant& var, const int32_t decimal_places) {
+    if (std::empty(var.alts) || is_reference_record(var)) {
+        return {};
+    }
+    const auto it_ad = var.format.find("AD");
+    auto it_dp = var.format.find("MIN_DP");
+    if (it_dp == std::end(var.format)) {
+        it_dp = var.format.find("DP");
+    }
+    if ((it_ad == std::cend(var.format)) || (it_dp == std::end(var.format))) {
+        return {};
+    }
+    const float depth = std::stof(it_dp->second);
+    if (depth <= 0.0f) {
+        return {};
+    }
+    const std::vector<std::string_view> ad_str = utils::split_view(it_ad->second, ',');
+    if ((std::size(ad_str) != (std::size(var.alts) + 1)) || (std::size(ad_str) < 2)) {
+        return {};
+    }
+    std::vector<float> vaf_values(std::size(ad_str) - 1);
+
+    const auto round_float = [&decimal_places](float val) {
+        const float f = std::pow(10.0f, static_cast<float>(decimal_places));
+        val = std::round(val * f) / f;
+        return val;
+    };
+
+    for (size_t n = 0; n < std::size(vaf_values); ++n) {
+        vaf_values[n] = std::clamp(
+                round_float(utils::from_chars<float>(ad_str[n + 1]).value() / depth), 0.0f, 1.0f);
+    }
+    return vaf_values;
 }
 
 }  // namespace dorado::secondary
