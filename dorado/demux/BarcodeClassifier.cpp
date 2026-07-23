@@ -1376,7 +1376,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 
     const barcode_kits::KitInfo& kit = m_kit_info_provider.get_kit_info(candidate->kit);
-    bool dual_barcode = !kit.barcodes_inner1.empty();
+    const bool dual_barcode = !kit.barcodes_inner1.empty();
 
     // Detect presence of mid-strand barcode. If one is confident found, then
     // treat that read as unclassified since it's most likely an unsplit read.
@@ -1472,7 +1472,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         const int penalty_dist = second_best_result->penalty - best_result->penalty;
 
         // NB: this test will pass if _either_ barcode is close enough to the end of the read for a both ends kit.
-        bool barcode_proximity_ok =
+        const bool barcode_proximity_ok =
                 (best_result->top_barcode_pos.first >= 0 &&
                  best_result->top_barcode_pos.first <= m_scoring_params.barcode_end_proximity) ||
                 (best_result->bottom_barcode_pos.second >= 0 &&
