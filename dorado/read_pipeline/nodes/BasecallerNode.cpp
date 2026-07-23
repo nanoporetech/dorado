@@ -315,11 +315,10 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     const bool is_low_latency = m_model_runners[worker_id]->is_low_latency();
     const int chunk_queue_idx = worker_id % int(m_chunk_in_queues.size());
     auto &chunk_in_queue = *m_chunk_in_queues[chunk_queue_idx];
-    int max_conv_padding = -1;
-    for (auto conv_layer : m_model_runners[worker_id]->config().convs) {
-        max_conv_padding = std::max(max_conv_padding, conv_layer.winlen / 2);
+    int max_conv_padding = 0;
+    for (const auto &conv : m_model_runners[worker_id]->config().convs) {
+        max_conv_padding = std::max(max_conv_padding, conv.winlen / 2);
     }
-
     const size_t stride = m_model_runners[worker_id]->config().stride;
     const size_t max_worker_chunks_size = batch_size * ((chunk_size / stride) + 2);
     const size_t max_worker_chunks_size_part = 32 * ((chunk_size / stride) + 2);
@@ -451,9 +450,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                         current_batch.chunks_size = max_conv_padding;
                     }
                     current_batch.chunks_size += slice_size + max_conv_padding;
-                }
-
-                else {
+                } else {
                     const size_t slice_size = (input_slice.size(1) / stride) + 2;
                     if ((worker_chunks_size_part + slice_size) > max_worker_chunks_size_part) {
                         current_batch.chunks_size += max_worker_chunks_size_part;
