@@ -1484,6 +1484,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
              (penalty_dist >= m_scoring_params.min_separation_only_dist)) &&
             barcode_proximity_ok) {
             out = *best_result;
+        } else {
+            return UNCLASSIFIED;
         }
     }
 
