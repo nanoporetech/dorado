@@ -1609,121 +1609,6 @@ secondary::Variant make_gvcf_reference_record(const int32_t seq_id,
     return ret;
 }
 
-std::vector<secondary::Variant> compact_gvcf_reference_records(
-        const std::vector<secondary::Variant>& variants,
-        const std::span<const std::pair<int64_t, float>> gq_margins) {
-    const auto is_single_base_gvcf_reference_record = [](const secondary::Variant& var) {
-        return (var.filter == ".") && (std::size(var.alts) == 1) && (var.alts.front() == ".") &&
-               std::empty(var.info) && (std::size(var.ref) == 1);
-    };
-
-    const auto is_same_genotype = [](const secondary::Variant& lhs, const secondary::Variant& rhs) {
-        const std::string* lhs_gt = nullptr;
-        const std::string* rhs_gt = nullptr;
-
-        for (const auto& val : lhs.genotype) {
-            if (val.first == "GT") {
-                lhs_gt = &val.second;
-                break;
-            }
-        }
-        for (const auto& val : rhs.genotype) {
-            if (val.first == "GT") {
-                rhs_gt = &val.second;
-                break;
-            }
-        }
-
-        return lhs_gt && rhs_gt && (*lhs_gt == *rhs_gt);
-    };
-
-    const auto set_gq = [](secondary::Variant& var, const float gq) {
-        var.qual = gq;
-
-        const std::string gq_str = std::to_string(static_cast<int32_t>(std::round(gq)));
-        for (auto val = std::rbegin(var.genotype); val != std::rend(var.genotype); ++val) {
-            if (val->first == "GQ") {
-                if (val->second != ".") {
-                    val->second = gq_str;
-                }
-                break;
-            }
-        }
-    };
-
-    const auto set_dp = [](secondary::Variant& var, const int32_t dp) {
-        const std::string dp_str = std::to_string(dp);
-        auto val = std::rbegin(var.genotype);
-        while (val != std::rend(var.genotype)) {
-            if (val->first == "MIN_DP") {
-                val->second = dp_str;
-                break;
-            }
-            ++val;
-        }
-        if (val == std::rend(var.genotype)) {
-            var.genotype.emplace_back(std::make_pair("MIN_DP", std::to_string(dp)));
-        }
-    };
-
-    const auto get_dp = [](const secondary::Variant& var) {
-        const auto depth_record =
-                std::find_if(var.genotype.cbegin(), var.genotype.cend(),
-                             [](const auto& gt) { return gt.second == "MIN_DP"; });
-        if (depth_record == var.genotype.cend()) {
-            return -1;
-        }
-        return static_cast<int32_t>(std::stoi(depth_record->second));
-    };
-
-    std::vector<secondary::Variant> compacted;
-    compacted.reserve(std::size(variants));
-
-    std::size_t i = 0;
-    while (i < std::size(variants)) {
-        if (!is_single_base_gvcf_reference_record(variants[i])) {
-            compacted.emplace_back(variants[i]);
-            ++i;
-            continue;
-        }
-
-        const float first_gq = variants[i].qual;
-        const float gq_margin =
-                secondary::get_gvcf_reference_record_gq_margin(first_gq, gq_margins);
-        float min_gq = first_gq;
-        const int32_t first_dp = get_dp(variants[i]);
-        int32_t min_dp = first_dp;
-
-        std::size_t j = i + 1;
-        while ((j < std::size(variants)) && is_single_base_gvcf_reference_record(variants[j]) &&
-               (variants[j].seq_id == variants[i].seq_id) &&
-               (variants[j].pos == (variants[j - 1].pos + 1))) {
-            const float current_gq = variants[j].qual;
-            if ((std::fabs(current_gq - first_gq) > gq_margin) ||
-                !is_same_genotype(variants[j], variants[i])) {
-                break;
-            }
-            min_gq = std::min(min_gq, current_gq);
-            const int32_t current_dp = get_dp(variants[j]);
-            if ((min_dp == -1) || (current_dp < min_dp)) {
-                min_dp = current_dp;
-            }
-            ++j;
-        }
-
-        secondary::Variant block = variants[i];
-        secondary::set_gvcf_reference_block_end(block, variants[j - 1].pos + 1);
-        set_gq(block, min_gq);
-        if (min_dp != -1) {
-            set_dp(block, min_dp);
-        }
-        compacted.emplace_back(std::move(block));
-        i = j;
-    }
-
-    return compacted;
-}
-
 void add_gvcf_reference_records_for_unprocessed_regions(
         std::vector<secondary::Variant>& variants,
         const int32_t seq_id,
@@ -2010,9 +1895,6 @@ void worker_variant_calling_reduce(
                                                                ploidy, reduce_data.read_endpoints);
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));
-            reduce_data.variants_merged = compact_gvcf_reference_records(
-                    reduce_data.variants_merged,
-                    secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
         }
 
         if (!std::empty(hemizygous_regions)) {
