@@ -109,7 +109,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .filter = "PASS",
                             .info = {},
                             .qual = 60.0f,
-                            .genotype = {{"GT", "0/1"}, {"GQ", "45"}},
+                            .format = {{"GT", "0/1"}, {"GQ", "45"}},
                             .rstart = 0,
                             .rend = 0,
                     },
@@ -122,7 +122,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .filter = "LowQual",
                             .info = {},
                             .qual = 17.5f,
-                            .genotype = {{"GT", "1/2"}, {"GQ", "31"}, {"MIN_DP", "25"}},
+                            .format = {{"GT", "1/2"}, {"GQ", "31"}, {"MIN_DP", "25"}},
                             .rstart = 0,
                             .rend = 0,
                     },
@@ -208,7 +208,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                     .filter = ".",
                     .info = {{"END", "11"}},
                     .qual = -1.0f,
-                    .genotype = {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}},
+                    .format = {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}},
                     .rstart = 10,
                     .rend = 11,
             };
@@ -244,7 +244,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     CATCH_SECTION("write_variant requires GT genotype information") {
         VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
         Variant variant = data.first_variant;
-        variant.genotype = {{"GQ", "45"}};
+        variant.format = {{"GQ", "45"}};
 
         CATCH_CHECK_THROWS_WITH(
                 writer.write_variant(variant),

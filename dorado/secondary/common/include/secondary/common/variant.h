@@ -18,7 +18,7 @@ struct Variant {
     std::string filter;
     std::unordered_map<std::string, std::string> info;
     float qual = 0.0f;
-    std::vector<std::pair<std::string, std::string>> genotype;
+    std::unordered_map<std::string, std::string> format;
     int64_t rstart = 0;
     int64_t rend = 0;
 };

@@ -1188,7 +1188,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
+                    .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1200,7 +1200,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
+                    .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1212,7 +1212,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = "PASS",
                     .info = {},
                     .qual = 60.0f,
-                    .genotype = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "15"}},
+                    .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "15"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1276,7 +1276,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
+            .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1288,7 +1288,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .filter = "PASS",
             .info = {},
             .qual = 50.0f,
-            .genotype = {{"GT", "0/1"}, {"GQ", "50"}, {"DP", "."}},
+            .format = {{"GT", "0/1"}, {"GQ", "50"}, {"DP", "."}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1300,7 +1300,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .filter = "PASS",
             .info = {},
             .qual = 40.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "40"}, {"DP", "10"}},
+            .format = {{"GT", "1/1"}, {"GQ", "40"}, {"DP", "10"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1404,7 +1404,7 @@ CATCH_TEST_CASE(
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "."}},
+            .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "."}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1508,7 +1508,7 @@ CATCH_TEST_CASE(
                 .filter = "PASS",
                 .info = {},
                 .qual = 60.0f,
-                .genotype = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
+                .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
                 .rstart = 0,
                 .rend = 0,
         };
@@ -1631,7 +1631,7 @@ CATCH_TEST_CASE(
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
+            .format = {{"GT", "1/1"}, {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1896,7 +1896,7 @@ CATCH_TEST_CASE(
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
+            .format = {{"GT", "1/1"}, {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1908,7 +1908,7 @@ CATCH_TEST_CASE(
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1"}, {"GQ", "60"}},
+            .format = {{"GT", "1"}, {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -2000,7 +2000,7 @@ CATCH_TEST_CASE(
             .filter = "PASS",
             .info = {},
             .qual = 60.0f,
-            .genotype = {{"GT", "1/1"}, {"GQ", "60"}},
+            .format = {{"GT", "1/1"}, {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -2072,25 +2072,25 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
     const std::vector<secondary::Variant> chr1_variants = {
         {
             // collapsed because hom in hemizygous region
-            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het-alt
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }
     };
     const std::vector<secondary::Variant> expected_chr1_filtered_variants = {
         {
             // collapsed because hom in hemizygous region
-            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het-alt
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .genotype = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .genotype = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }
     };
     // clang-format on
@@ -2102,11 +2102,11 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
     // clang-format off
     const std::vector<secondary::Variant> chr2_variants = {
         {
-            .seq_id = 1, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 1, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
-            .seq_id = 1, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 1, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
-            .seq_id = 1, .pos = 10, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 1, .pos = 10, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }
     };
     // clang-format on
@@ -2120,49 +2120,49 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
     const std::vector<secondary::Variant> chr3_variants = {
         {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans start of a hemizygous region
-            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het in a hemizygous region
-            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans end of a hemizygous region
-            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // collapsed because hom inside a hemizygous region
-            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         },
     };
     const std::vector<secondary::Variant> expected_chr3_filtered_variants = {
         {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans start of a hemizygous region
-            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het in a hemizygous region
-            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .genotype = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans end of a hemizygous region
-            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // collapsed because hom inside a hemizygous region
-            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = "PASS", .info = {}, .qual = 60.0f, .genotype = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         },
     };
     // clang-format on
