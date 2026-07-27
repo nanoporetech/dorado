@@ -1,6 +1,7 @@
 #pragma once
 
 // TSan's init breaks the call to __cpu_indicator_init (which determines which implementation to take)
+// __clang__ doesn't support f16c in target multiversioning.
 #if defined(__GNUC__) && defined(__x86_64__) && !defined(__clang__) && !defined(__SANITIZE_THREAD__)
 #define ENABLE_AVX2_IMPL 1
 #include <x86intrin.h>
