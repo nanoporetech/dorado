@@ -119,9 +119,9 @@ if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then
     # No demultiplexing
     title "Testing basic nested output structure baseline"
     dest="${output_dir}/basic_structure"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/bam_pass/PAO25751_pass_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/NBD_POC_JM_pass_9bf51088_c2476b54_0.bam"
     )
 
     $dorado_bin ${common_args} --output-dir ${dest}
@@ -131,81 +131,81 @@ if [ $RUN_TESTS_INLINE_DEMUX -eq 1 ]; then
     # Inline demultiplexing without sample sheet into BAM
     title "Testing nested output structure with inline demux into BAM"
     dest="${output_dir}/dmx_struct_BAM"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/bam_pass/barcode01/PAO25751_pass_barcode01_0d85015e_9bf5b3eb_0.bam"
-        "${core}/bam_pass/barcode04/PAO25751_pass_barcode04_0d85015e_9bf5b3eb_0.bam"
-        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.bam"
+        "${core}/bam_pass/barcode37/NBD_POC_JM_pass_barcode37_9bf51088_c2476b54_0.bam"
+        "${core}/bam_pass/barcode42/NBD_POC_JM_pass_barcode42_9bf51088_c2476b54_0.bam"
+        "${core}/bam_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_c2476b54_0.bam"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-NBD114-96
     check_structure ${dest} "${expected[@]}"
 }
 {
     # Inline demultiplexing without sample sheet into FASTQ
     title "Testing nested output structure with inline demux into FASTQ"
     dest="${output_dir}/dmx_struct_FQ"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/fastq_pass/barcode01/PAO25751_pass_barcode01_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/barcode04/PAO25751_pass_barcode04_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/barcode37/NBD_POC_JM_pass_barcode37_9bf51088_c2476b54_0.fastq"
+        "${core}/fastq_pass/barcode42/NBD_POC_JM_pass_barcode42_9bf51088_c2476b54_0.fastq"
+        "${core}/fastq_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_c2476b54_0.fastq"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-fastq
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-NBD114-96 --emit-fastq
     check_structure ${dest} "${expected[@]}"
 }
 {
     # Inline demultiplexing without sample sheet into cram
     title "Testing nested output structure with inline demux into cram"
     dest="${output_dir}/dmx_struct_cram"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/bam_pass/barcode01/PAO25751_pass_barcode01_0d85015e_9bf5b3eb_0.cram"
-        "${core}/bam_pass/barcode04/PAO25751_pass_barcode04_0d85015e_9bf5b3eb_0.cram"
-        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.cram"
+        "${core}/bam_pass/barcode37/NBD_POC_JM_pass_barcode37_9bf51088_c2476b54_0.cram"
+        "${core}/bam_pass/barcode42/NBD_POC_JM_pass_barcode42_9bf51088_c2476b54_0.cram"
+        "${core}/bam_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_c2476b54_0.cram"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-cram
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-NBD114-96 --emit-cram
     check_structure ${dest} "${expected[@]}"
 }
 {
     # Inline demultiplexing with sample sheet into SAM
     title "Testing nested output structure with inline demux and sample sheet into SAM"
     dest="${output_dir}/dmx_ss_struct_SAM"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/bam_pass/patient_id_1/PAO25751_pass_patient_id_1_0d85015e_9bf5b3eb_0.sam"
-        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.sam"
+        "${core}/bam_pass/patient_id_1/NBD_POC_JM_pass_patient_id_1_9bf51088_c2476b54_0.sam"
+        "${core}/bam_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_c2476b54_0.sam"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-sam --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-NBD114-96 --emit-sam --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
     check_structure ${dest} "${expected[@]}"
 }
 {
     # Inline demultiplexing with sample sheet into CRAM
     title "Testing nested output structure with inline demux and sample sheet into CRAM"
     dest="${output_dir}/dmx_ss_struct_CRAM"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/bam_pass/patient_id_1/PAO25751_pass_patient_id_1_0d85015e_9bf5b3eb_0.cram"
-        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.cram"
+        "${core}/bam_pass/patient_id_1/NBD_POC_JM_pass_patient_id_1_9bf51088_c2476b54_0.cram"
+        "${core}/bam_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_c2476b54_0.cram"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --emit-cram --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-NBD114-96 --emit-cram --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv
     check_structure ${dest} "${expected[@]}"
 }
 {
     # Inline demultiplexing with sample sheet into FASTQ
     title "Testing nested output structure with inline demux and sample sheet into FASTQ"
     dest="${output_dir}/dmx_ss_struct_FQ"
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_2H_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_1A_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/fastq_pass/patient_id_1/PAO25751_pass_patient_id_1_0d85015e_9bf5b3eb_0.fastq"
-        "${core}/fastq_pass/unclassified/PAO25751_pass_unclassified_0d85015e_9bf5b3eb_0.fastq"
+        "${core}/fastq_pass/patient_id_1/NBD_POC_JM_pass_patient_id_1_9bf51088_c2476b54_0.fastq"
+        "${core}/fastq_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_c2476b54_0.fastq"
     )
 
-    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-RBK114-96 --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv --emit-fastq
+    $dorado_bin ${common_args} --output-dir ${dest} --kit-name SQK-NBD114-96 --sample-sheet ${data_dir}/barcode_demux/sample_sheet.csv --emit-fastq
     check_structure ${dest} "${expected[@]}"
 }
 {
@@ -243,18 +243,18 @@ if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then
     mkdir -p $postrun_output_dir
 }
 {
-     title "Test untrimmed basecalls post-run demux with barcode classification into BAM"
+    title "Test untrimmed basecalls post-run demux with barcode classification into BAM"
     calls_notrim_bam="${postrun_output_dir}/calls.no-trim.bam"
     $dorado_bin ${common_args} --no-trim > ${calls_notrim_bam}
 
     dest="${postrun_output_dir}/bam"
-    $dorado_bin demux ${calls_notrim_bam} --kit-name SQK-RBK114-96 --output-dir ${dest}
+    $dorado_bin demux ${calls_notrim_bam} --kit-name SQK-NBD114-96 --output-dir ${dest}
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
-    core="20230807_NA_RBK114_BARCODECONTAMINATION/no_sample/20230807_1018_0_PAO25751_0d85015e"
+    core="jm_test/NBD_POC_JM/20250211_1156_0_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/bam_pass/unclassified/PAO25751_pass_unclassified_0d85015e_00000000_0.bam"
-        "${core}/bam_pass/barcode01/PAO25751_pass_barcode01_0d85015e_00000000_0.bam"
-        "${core}/bam_pass/barcode04/PAO25751_pass_barcode04_0d85015e_00000000_0.bam"
+        "${core}/bam_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_00000000_0.bam"
+        "${core}/bam_pass/barcode37/NBD_POC_JM_pass_barcode37_9bf51088_00000000_0.bam"
+        "${core}/bam_pass/barcode42/NBD_POC_JM_pass_barcode42_9bf51088_00000000_0.bam"
     )
     check_structure ${dest} "${expected[@]}"
 }
@@ -264,14 +264,14 @@ if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then
     $dorado_bin ${common_args} --no-trim --emit-fastq > ${calls_notrim_fastq}
 
     dest="${postrun_output_dir}/fastq"
-    $dorado_bin demux ${calls_notrim_fastq} --kit-name SQK-RBK114-96 --output-dir ${dest} --emit-fastq
+    $dorado_bin demux ${calls_notrim_fastq} --kit-name SQK-NBD114-96 --output-dir ${dest} --emit-fastq
     # The position_id, acquisition_id are not currently available in FASTQ headers - their placeholders are used instead
     # protocol_group_id (experiment_name) is also not available in FASTQ headers - there is no defined placeholder for this, so it is empty
-    core="no_sample/20230807_1018_0_PAO25751_0d85015e"
+    core="no_sample/20250211_1156_0_NBD_POC_JM_9bf51088"
     expected=(
-        "${core}/fastq_pass/unclassified/PAO25751_pass_unclassified_0d85015e_00000000_0.fastq"
-        "${core}/fastq_pass/barcode01/PAO25751_pass_barcode01_0d85015e_00000000_0.fastq"
-        "${core}/fastq_pass/barcode04/PAO25751_pass_barcode04_0d85015e_00000000_0.fastq"
+        "${core}/fastq_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_00000000_0.fastq"
+        "${core}/fastq_pass/barcode37/NBD_POC_JM_pass_barcode37_9bf51088_00000000_0.fastq"
+        "${core}/fastq_pass/barcode42/NBD_POC_JM_pass_barcode42_9bf51088_00000000_0.fastq"
     )
     check_structure ${dest} "${expected[@]}"
 }
@@ -281,13 +281,13 @@ if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
     samtools view -h ${calls_notrim_bam} | grep -v '^@RG' > ${calls_notrim_no_rg_sam}
 
     dest="${postrun_output_dir}/no_rg_sam"
-    $dorado_bin demux ${calls_notrim_no_rg_sam} --kit-name SQK-RBK114-96 --output-dir ${dest}
+    $dorado_bin demux ${calls_notrim_no_rg_sam} --kit-name SQK-NBD114-96 --output-dir ${dest}
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
     core="no_sample/19700101_0000_0_UNKNOWN_00000000"
     expected=(
         "${core}/bam_pass/unclassified/UNKNOWN_pass_unclassified_00000000_00000000_0.bam"
-        "${core}/bam_pass/barcode01/UNKNOWN_pass_barcode01_00000000_00000000_0.bam"
-        "${core}/bam_pass/barcode04/UNKNOWN_pass_barcode04_00000000_00000000_0.bam"
+        "${core}/bam_pass/barcode37/UNKNOWN_pass_barcode37_00000000_00000000_0.bam"
+        "${core}/bam_pass/barcode42/UNKNOWN_pass_barcode42_00000000_00000000_0.bam"
     )
     check_structure ${dest} "${expected[@]}"
 fi # SAMTOOLS_UNAVAILABLE

@@ -1376,7 +1376,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 
     const barcode_kits::KitInfo& kit = m_kit_info_provider.get_kit_info(candidate->kit);
-    bool dual_barcode = !kit.barcodes_inner1.empty();
+    const bool dual_barcode = !kit.barcodes_inner1.empty();
 
     // Detect presence of mid-strand barcode. If one is confident found, then
     // treat that read as unclassified since it's most likely an unsplit read.
@@ -1440,6 +1440,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     // Sort the scores windows by their barcode score.
     std::sort(results.begin(), results.end(),
               [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
+    std::sort(results_inner.begin(), results_inner.end(),
+              [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
 
 #if ENABLE_PER_READ_TRACE
     {
@@ -1454,58 +1456,63 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 #endif
 
-    auto best_result = results.begin();
-    auto are_penalties_acceptable = [this](const auto& proposal) {
+    const auto are_penalties_acceptable = [this](const auto& proposal) {
         // If barcode penalty is 0, it's a perfect match. Consider it a pass.
         return (proposal.penalty == 0) ||
                ((proposal.penalty <= m_scoring_params.max_barcode_penalty) &&
                 (proposal.flank_score >= m_scoring_params.min_flank_score));
     };
+    const auto first_result_matches =
+            [this,
+             &are_penalties_acceptable](const std::vector<BarcodeScoreResult>& barcode_results) {
+                const BarcodeScoreResult& best_result = barcode_results.at(0);
+                const BarcodeScoreResult& second_best_result = barcode_results.at(1);
+                const int penalty_dist = second_best_result.penalty - best_result.penalty;
 
+                // If the first result is far enough ahead of the second and the penalty is low then it's a clear winner.
+                const bool first_is_clear_winner =
+                        penalty_dist >= m_scoring_params.min_barcode_penalty_dist &&
+                        are_penalties_acceptable(best_result);
+
+                // If the first isn't a clear winner but it's still ahead then it's still a winner.
+                const bool first_beats_second =
+                        penalty_dist >= m_scoring_params.min_separation_only_dist;
+
+                return first_is_clear_winner || first_beats_second;
+            };
+
+    auto best_result = results.begin();
     BarcodeScoreResult out = UNCLASSIFIED;
     if (results.size() == 1) {
         if (are_penalties_acceptable(*best_result)) {
             out = *best_result;
         }
     } else {
-        const auto& second_best_result = std::next(best_result);
-        const int penalty_dist = second_best_result->penalty - best_result->penalty;
-
         // NB: this test will pass if _either_ barcode is close enough to the end of the read for a both ends kit.
-        bool barcode_proximity_ok =
+        const bool barcode_proximity_ok =
                 (best_result->top_barcode_pos.first >= 0 &&
                  best_result->top_barcode_pos.first <= m_scoring_params.barcode_end_proximity) ||
                 (best_result->bottom_barcode_pos.second >= 0 &&
                  best_result->bottom_barcode_pos.second >=
                          int(read_seq.length() - m_scoring_params.barcode_end_proximity));
 
-        if (((penalty_dist >= m_scoring_params.min_barcode_penalty_dist &&
-              are_penalties_acceptable(*best_result)) ||
-             (penalty_dist >= m_scoring_params.min_separation_only_dist)) &&
-            barcode_proximity_ok) {
+        if (first_result_matches(results) && barcode_proximity_ok) {
             out = *best_result;
+        } else {
+            return UNCLASSIFIED;
         }
     }
 
     // If the kit has dual barcodes, check them and add them into the result if it passes.
     if (dual_barcode) {
-        // Sort the scores windows by their barcode score.
-        std::sort(results_inner.begin(), results_inner.end(),
-                  [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
         auto best_result_inner = results_inner.begin();
         if (results.size() == 1) {
             if (!are_penalties_acceptable(*best_result_inner)) {
                 return UNCLASSIFIED;
             }
         } else {
-            const auto& second_best_result_inner = std::next(best_result_inner);
-            const int penalty_dist_inner =
-                    second_best_result_inner->penalty - best_result_inner->penalty;
-
             // Note we do no additional checking around end proximity for the inner barcode.  We assume it's covered by the outer checks.
-            if (((penalty_dist_inner >= m_scoring_params.min_barcode_penalty_dist &&
-                  are_penalties_acceptable(*best_result_inner)) ||
-                 (penalty_dist_inner >= m_scoring_params.min_separation_only_dist))) {
+            if (first_result_matches(results_inner)) {
                 if (out.barcode_name != UNCLASSIFIED.barcode_name) {
                     if (best_result_inner->barcode_name == UNCLASSIFIED.barcode_name) {
                         return UNCLASSIFIED;

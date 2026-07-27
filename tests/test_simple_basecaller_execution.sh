@@ -904,14 +904,14 @@ test_barcoding_read_groups() (
     sample_sheet=$1
     output_name=read_group_test${sample_sheet:+_sample_sheet}
     demux_data=$data_dir/barcode_demux/read_group_test
-    $dorado_bin basecaller ${models_directory_arg} -b ${batch} --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} ${demux_data} --no-trim > $output_dir/${output_name}.bam
+    $dorado_bin basecaller ${models_directory_arg} -b ${batch} --kit-name SQK-NBD114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} ${model_5k} ${demux_data} --no-trim > $output_dir/${output_name}.bam
 
     samtools quickcheck -u $output_dir/${output_name}.bam
 
     check_barcodes() (
         bam=$1
         echo "Checking file: $bam"
-        if [[ $bam =~ _SQK-RBK114-96_(.+)\.bam ]]; then
+        if [[ $bam =~ _SQK-NBD114-96_(.+)\.bam ]]; then
             # Arrangement is |<kit>_<barcode>|, so find the barcode between the kit and the extension
             barcode=${BASH_REMATCH[1]}
         elif [[ $bam =~ _${model_name_5k}_(.+)\.bam ]]; then
@@ -960,7 +960,7 @@ test_barcoding_read_groups() (
 
     # check that we correctly barcode and demux a basecalled bam file
     $dorado_bin basecaller ${models_directory_arg} -b ${batch} ${model_5k} ${demux_data} --no-trim >$output_dir/${output_name}-demux.bam
-    $dorado_bin demux --no-trim --kit-name SQK-RBK114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
+    $dorado_bin demux --no-trim --kit-name SQK-NBD114-96 ${sample_sheet:+--sample-sheet ${sample_sheet}} --output-dir $output_dir/${output_name}-demux $output_dir/${output_name}-demux.bam
     for bam in $(find "$output_dir/${output_name}-demux/" -type f -iname "*.bam" ); do
         check_barcodes $bam
     done
@@ -973,17 +973,17 @@ test_barcoding_read_groups() (
 )
 
 if [[ -z "$SAMTOOLS_UNAVAILABLE" ]]; then
-    # There should be 4 reads with BC01, 2 with BC04, and 1 unclassified groups.
+    # There should be 2 reads with NB37, 2 with NB42, and 2 unclassified reads.
     title dorado basecaller barcoding read groups
-    test_barcoding_read_groups barcode01 4 barcode04 2 unclassified 1
+    test_barcoding_read_groups barcode37 2 barcode42 2 unclassified 2
 
-    # There should be 4 reads with BC01 aliased to patient_id_1, and 3 unclassified groups.
+    # There should be 2 reads with NB37 aliased to patient_id_1, and 4 unclassified reads.
     title dorado basecaller barcoding read groups with sample sheet
-    test_barcoding_read_groups patient_id_1 4 unclassified 3 $data_dir/barcode_demux/sample_sheet.csv
+    test_barcoding_read_groups patient_id_1 2 unclassified 4 $data_dir/barcode_demux/sample_sheet.csv
 fi
 
 title dorado demux previously demuxed files
-$dorado_bin basecaller ${models_directory_arg} --kit-name SQK-RBK114-96 --sample-sheet $data_dir/barcode_demux/sample_sheet.csv ${model_5k} $data_dir/barcode_demux/read_group_test --no-trim -o ${output_dir}/redemux
+$dorado_bin basecaller ${models_directory_arg} --kit-name SQK-NBD114-96 --sample-sheet $data_dir/barcode_demux/sample_sheet.csv ${model_5k} $data_dir/barcode_demux/read_group_test --no-trim -o ${output_dir}/redemux
 i=0
 mkdir ${output_dir}/red-in
 for f in $(find ${output_dir}/redemux -name "*.bam"); do
@@ -992,14 +992,14 @@ for f in $(find ${output_dir}/redemux -name "*.bam"); do
     i=$(( i+1 ))
     $dorado_bin demux \
         --no-trim \
-        --kit-name SQK-RBK114-96 \
+        --kit-name SQK-NBD114-96 \
         ${output_dir}/red-in/${basef} \
         -o ${output_dir}/red-${i}
 done
 
 $dorado_bin demux \
     --no-trim \
-    --kit-name SQK-RBK114-96 \
+    --kit-name SQK-NBD114-96 \
     -r ${output_dir}/red-in \
     -o ${output_dir}/red-all
 
