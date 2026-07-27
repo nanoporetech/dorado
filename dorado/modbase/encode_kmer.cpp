@@ -20,15 +20,15 @@ namespace {
 // -1(N)[0,0,0,0]; 0(A)[1,0,0,0]; 1(C)[0,1,0,0]; 2(G)[0,0,1,0] 3(T)[0,0,0,1].
 // The encoding is done by bit shifting a 1 by the numerical "magnitude" of the base giving:
 // Note: Bytes [ABCD] becomes [D,C,B,A] in LE systems which is why T is [0,0,0,1] not [1,0,0,0].
-inline uint32_t encode(int base) { return base == -1 ? uint32_t{0} : (uint32_t{1} << (base << 3)); }
+uint32_t encode(int base) { return base == -1 ? uint32_t{0} : (uint32_t{1} << (base << 3)); }
 
 // Write the kmer encoding into `output_ptr` whose size must be at least: `kmer_len * 4 * context_samples`
-inline void encode_kmer_generic(int8_t* output_ptr,
-                                const std::vector<int>& seq,
-                                const std::vector<uint64_t>& seq_mappings,
-                                const std::vector<bool>& base_skips,
-                                size_t context_seq_len,
-                                size_t kmer_len) {
+void encode_kmer_generic(int8_t* output_ptr,
+                         const std::vector<int>& seq,
+                         const std::vector<uint64_t>& seq_mappings,
+                         const std::vector<bool>& base_skips,
+                         size_t context_seq_len,
+                         size_t kmer_len) {
     const size_t seq_len = std::min(seq.size(), context_seq_len);
     for (size_t s = 0; s < seq_len; ++s) {
         const size_t count = seq_mappings[s + 1] - seq_mappings[s];
@@ -51,11 +51,11 @@ inline void encode_kmer_generic(int8_t* output_ptr,
 }
 
 // Fallback path for non-AVX / kmer lengths not specifically optimised.
-inline std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& seq,
-                                                       const std::vector<uint64_t>& seq_mappings,
-                                                       size_t bases_before,
-                                                       size_t bases_after,
-                                                       size_t context_samples) {
+std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& seq,
+                                                const std::vector<uint64_t>& seq_mappings,
+                                                size_t bases_before,
+                                                size_t bases_after,
+                                                size_t context_samples) {
     const size_t context_seq_len = seq.size() - bases_before - bases_after;
     const size_t kmer_len = bases_before + bases_after + 1;
     const size_t kmer_bytes = kmer_len * dorado::utils::BaseInfo::NUM_BASES;
