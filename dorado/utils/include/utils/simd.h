@@ -74,4 +74,37 @@ using Int16Register = __m128i;
 
 #endif
 
+// Helpers to emulate IFUNC on MSVC.
+//
+// Usage:
+//   namespace {
+//     IFUNC_DEFINE_DEFAULT(int, add_impl)(int x, int y) { return x + y; } // default impl
+//     IFUNC_DEFINE_OPTIMISED(int, add_impl, AVX2)(int x, int y) { return x + y; } // AVX2 impl
+//     IFUNC_DECLARE(add_impl, AVX2); // declare an IFUNC dispatcher (no-op on non-MSVC)
+//   }
+//   int add(int x, int y) { return IFUNC_GET(add_impl)(x, y); } // dispatch to the best IFUNC
+//
+#ifdef __GNUC__
+#define IFUNC_DEFINE_DEFAULT(ret, name) [[maybe_unused]] [[gnu::target("default")]] ret name
+#define IFUNC_DEFINE_OPTIMISED(ret, name, ext) [[maybe_unused]] IFUNC_EXT_##ext ret name
+#define IFUNC_DECLARE(name, ext) static_assert(true)
+#define IFUNC_GET(name) name
+#else
+#define IFUNC_DEFINE_DEFAULT(ret, name) ret name##_ifunc_default
+#define IFUNC_DEFINE_OPTIMISED(ret, name, ext) ret name##_ifunc_##ext
+#define IFUNC_DECLARE(name, ext) \
+    const auto name##_ifunc =    \
+            dorado::utils::simd::has_##ext ? name##_ifunc_##ext : name##_ifunc_default
+#define IFUNC_GET(name) name##_ifunc
+#endif
+
+// Supported IFUNC extensions.
+#if ENABLE_AVX2_IMPL
+#define IFUNC_EXT_AVX2 [[gnu::target("avx2")]]
+inline bool has_AVX2() { return false; }  // TODO
+
+#define IFUNC_EXT_AVX2_F16C [[gnu::target("avx2,f16c")]]
+inline bool has_AVX2_F16C() { return false; }  // TODO
+#endif
+
 }  // namespace dorado::utils::simd
