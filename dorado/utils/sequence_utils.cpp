@@ -20,11 +20,7 @@
 
 namespace {
 
-#if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("default")))
-#endif
-std::string
-reverse_complement_impl(std::string_view sequence) {
+IFUNC_DEFINE_DEFAULT(std::string, reverse_complement_impl)(std::string_view sequence) {
     if (sequence.empty()) {
         return {};
     }
@@ -47,8 +43,7 @@ reverse_complement_impl(std::string_view sequence) {
 // AVX2 implementation that does in-register lookups of 32 bases at once, using
 // PSHUFB. On strings with over several thousand bases this was measured to be about 10x the speed
 // of the default implementation on Skylake.
-[[maybe_unused]] __attribute__((target("avx2"))) std::string reverse_complement_impl(
-        std::string_view sequence) {
+IFUNC_DEFINE_OPTIMISED(std::string, reverse_complement_impl, AVX2)(std::string_view sequence) {
     const auto len = sequence.size();
     std::string rev_comp_sequence;
     rev_comp_sequence.resize(len);
@@ -128,6 +123,8 @@ reverse_complement_impl(std::string_view sequence) {
     return rev_comp_sequence;
 }
 #endif
+
+IFUNC_DECLARE(reverse_complement_impl, AVX2);
 
 }  // namespace
 
@@ -484,7 +481,7 @@ void reverse_seq_to_sig_map(std::vector<uint64_t>& seq_to_sig_map, size_t signal
 // version.
 std::string reverse_complement(std::string_view sequence) {
     NVTX3_FUNC_RANGE();
-    return reverse_complement_impl(sequence);
+    return IFUNC_GET(reverse_complement_impl)(sequence);
 }
 
 // Utility function for counting number of trailing bases of a particular type
