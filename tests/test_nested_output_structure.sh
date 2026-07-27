@@ -243,7 +243,7 @@ if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then
     mkdir -p $postrun_output_dir
 }
 {
-     title "Test untrimmed basecalls post-run demux with barcode classification into BAM"
+    title "Test untrimmed basecalls post-run demux with barcode classification into BAM"
     calls_notrim_bam="${postrun_output_dir}/calls.no-trim.bam"
     $dorado_bin ${common_args} --no-trim > ${calls_notrim_bam}
 
