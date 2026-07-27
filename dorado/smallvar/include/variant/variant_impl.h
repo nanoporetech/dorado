@@ -291,22 +291,6 @@ void worker_variant_writer(
         const bool continue_on_exception);
 
 /**
- * \brief Converts Kadayashi variants into Dorado's normalized secondary::Variant representation.
- * \param kadayashi_variants Input variants emitted by Kadayashi.
- * \param seq_id Sequence ID associated with the variants.
- * \param ploidy Ploidy used to normalize genotype information.
- * \param pass_min_qual Minimum QUAL required to mark a converted variant as PASS.
- * \param keep_phasing If true, keep phasing information if available; if false, return unphased variant.
- * \return Converted variants.
- */
-std::vector<secondary::Variant> convert_variants(
-        const std::vector<kadayashi::variant_dorado_style_t>& kadayashi_variants,
-        int32_t seq_id,
-        int32_t ploidy,
-        float pass_min_qual,
-        bool keep_phasing);
-
-/**
  * \brief Selects variants according to overlaps with hemizygous_regions and passes them to
           secondary::collapse_to_haploid.
  * \param variants Input variants for a single contig.

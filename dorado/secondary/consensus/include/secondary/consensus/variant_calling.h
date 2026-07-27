@@ -25,6 +25,12 @@ constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_
         {{0, 0.5f}, {10, 5.0f}}};
 
 /**
+ * \brief Get GQ string from a quality value.
+ * \param qual Float QUAL value.
+ */
+std::string gq_from_qual(float qual);
+
+/**
  * \brief Construct a gVCF reference block.
  *        Handles setting end points and populating Variant::genotype fields.
  *        Also sets GT and GQ values for non-canonical blocks.

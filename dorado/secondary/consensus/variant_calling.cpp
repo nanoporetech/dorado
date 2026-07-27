@@ -76,16 +76,6 @@ float phred(float err, const float cap) {
 }
 
 /**
- * \brief Get GQ string from a quality value.
- */
-std::string gq_from_qual(const float qual) {
-    if (qual < 0.0f) {
-        return ".";
-    }
-    return std::to_string(static_cast<int32_t>(std::round(qual)));
-}
-
-/**
  * \brief Create a lookup table of valid symbols.
  */
 std::array<int32_t, 256> create_symbol_lookup(const std::string_view symbols) {
@@ -749,6 +739,13 @@ void add_depth(Variant& var, const at::Tensor& depth) {
 }
 
 }  // namespace
+
+std::string gq_from_qual(const float qual) {
+    if (qual < 0.0f) {
+        return ".";
+    }
+    return std::to_string(static_cast<int32_t>(std::round(qual)));
+}
 
 Variant make_gvcf_reference_record(const int32_t seq_id,
                                    const int64_t pos,

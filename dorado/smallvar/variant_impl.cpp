@@ -218,56 +218,6 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
     return resources;
 }
 
-std::vector<secondary::Variant> convert_variants(
-        const std::vector<kadayashi::variant_dorado_style_t>& kadayashi_variants,
-        const int32_t seq_id,
-        [[maybe_unused]] const int32_t ploidy,
-        const float pass_min_qual,
-        const bool keep_phasing) {
-    std::vector<secondary::Variant> ret;
-    ret.reserve(std::ssize(kadayashi_variants));
-
-    for (int64_t j = 0; j < std::ssize(kadayashi_variants); ++j) {
-        const kadayashi::variant_dorado_style_t& var = kadayashi_variants[j];
-
-        std::vector<std::string> gt{std::string(1, var.genotype.first),
-                                    std::string(1, var.genotype.second)};
-        if ((!var.is_phased) || (!keep_phasing)) {
-            std::sort(gt.begin(), gt.end());
-        }
-        const std::string gt_str = utils::print_container_as_string(gt, "/", false);
-        const float qual_f = static_cast<float>(var.qual);
-
-        secondary::Variant new_var = secondary::Variant{
-                .seq_id = seq_id,
-                .pos = static_cast<int64_t>(var.pos),
-                .ref = var.ref,
-                .alts = var.alts,
-                .filter = (qual_f < pass_min_qual) ? "LowQual" : "PASS",
-                .info = {},
-                .qual = qual_f,
-                .format = {{"GT", gt_str}, {"GQ", std::to_string(var.qual)}},
-                .rstart = 0,
-                .rend = 0,
-        };
-        if ((!var.is_phased) || (!keep_phasing)) {
-            std::sort(new_var.alts.begin(), new_var.alts.end());
-        }
-
-        new_var.format["DP"] = std::to_string(var.median_depth);
-        if ((var.min_depth != var.median_depth) && (new_var.ref.length() > 1)) {
-            new_var.format["MIN_DP"] = std::to_string(var.min_depth);
-        }
-
-        sanitize_empty_alts(new_var, ploidy);
-        if (secondary::is_valid(new_var)) {
-            ret.emplace_back(std::move(new_var));
-        }
-    }
-
-    return ret;
-}
-
 namespace {
 secondary::IntervalTreeInt64 build_interval_tree(const std::vector<int64_t>& in_candidate_sites) {
     std::vector<interval_tree::Interval<int64_t, int64_t>> intervals;
@@ -332,9 +282,15 @@ BamWindowResult process_single_bam_window(
     std::vector<int64_t> candidate_sites;
 
     if (candidate_source == secondary::VariantCandidateSource::COMPUTE) {
-        // Convert all variants.
-        std::vector<secondary::Variant> all_variants = convert_variants(
-                kadayashi_result.variants, bam_window.seq_id, ploidy, pass_min_qual, false);
+        // Kadayashi now emits secondary::Variant directly.
+        std::vector<secondary::Variant> all_variants = std::move(kadayashi_result.variants);
+        for (secondary::Variant& var : all_variants) {
+            var.seq_id = bam_window.seq_id;
+            if (var.filter != ".") {
+                var.filter = (var.qual < pass_min_qual) ? "LowQual" : "PASS";
+            }
+            secondary::sanitize_empty_alts(var, ploidy);
+        }
 
         // Storage space for pass/candidate variants.
         pass_variants.reserve(std::size(all_variants));

@@ -339,11 +339,9 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
      * \brief Covers small worker-facing helpers that are easier to validate in isolation than
      *          through the full async pipeline.
      *
-     *          The sections below check three things:
-     *          signal_worker_terminate flips the shared stop flag, create_resources rejects
-     *          unsupported devices before model setup begins, and convert_variants produces the
-     *          normalized variant records expected by the rest of the workflow, including a few
-     *          legacy edge cases preserved from the older haplotagging path.
+     *          The sections below check two things:
+     *          - signal_worker_terminate flips the shared stop flag;
+     *          - create_resources rejects unsupported devices before model setup begins.
      */
     CATCH_SECTION("signal_worker_terminate sets the shared termination flag") {
         std::atomic<bool> worker_terminate{false};
@@ -361,148 +359,6 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                                  "metal", 1, 1, true, "", "", 0, 0.0, std::nullopt, std::nullopt,
                                  std::nullopt, std::nullopt, {}, false),
                 Catch::Matchers::ContainsSubstring("Unsupported device: metal"));
-    }
-
-    CATCH_SECTION("convert_variants normalizes diploid genotypes and filters") {
-        const std::vector<kadayashi::variant_dorado_style_t> kadayashi_variants{
-                {
-                        .is_confident = true,
-                        .is_phased = true,
-                        .pos = 4,
-                        .qual = 60,
-                        .ref = "A",
-                        .alts = {"T"},
-                        .genotype = {'0', '1'},
-                        .min_depth = 10,
-                        .median_depth = 10,
-                },
-                {
-                        .is_confident = false,
-                        .is_phased = false,
-                        .pos = 8,
-                        .qual = 10,
-                        .ref = "C",
-                        .alts = {"G"},
-                        .genotype = {'1', '1'},
-                        .min_depth = 1,
-                        .median_depth = 1,
-                },
-                {
-                        .is_confident = true,
-                        .is_phased = true,
-                        .pos = 12,
-                        .qual = 50,
-                        .ref = "A",
-                        .alts = {"T", "C"},
-                        .genotype = {'1', '2'},
-                        .min_depth = 15,
-                        .median_depth = 15,
-                },
-        };
-
-        // clang-format off
-        const std::vector<secondary::Variant> expected{
-                secondary::Variant{7, 4, "A", {"T"}, "PASS", {}, 60.0f,
-                                   {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
-                secondary::Variant{7, 8, "C", {"G"}, "LowQual", {}, 10.0f,
-                                   {{"GT", "1/1"}, {"GQ", "10"}, {"DP", "1"}}, 0, 0},
-                secondary::Variant{7, 12, "A", {"C", "T"}, "PASS", {}, 50.0f,
-                                   {{"GT", "1/2"}, {"GQ", "50"}, {"DP", "15"}}, 0, 0},
-        };
-        // clang-format on
-
-        const std::vector<secondary::Variant> variants =
-                convert_variants(kadayashi_variants, 7, 2, 30.0f, false);
-
-        CATCH_CHECK(variants == expected);
-    }
-
-    CATCH_SECTION("convert_variants preserves legacy haplotagging edge cases") {
-        struct TestCase {
-            std::string name;
-            std::vector<kadayashi::variant_dorado_style_t> kadayashi_variants;
-            int32_t seq_id;
-            int32_t ploidy;
-            float pass_min_qual;
-            bool keep_phasing;
-            std::vector<secondary::Variant> expected;
-        };
-
-        // clang-format off
-        const std::vector<TestCase> test_cases{
-            TestCase{"Empty input", {}, 0, 2, 3.0f, false, {}},
-            TestCase{
-                "Single hom variant",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {'1', '1'}, 7, 7},
-                },
-                123, 2, 3.0f, false,
-                {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "7"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Single het variant where one alt matches the ref",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {'0', '1'}, 20, 20},
-                },
-                123, 2, 3.0f, false,
-                {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Single het variant where both alts differ from ref",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"C", "T"}, {'1', '2'}, 9, 10},
-                },
-                123, 2, 3.0f, false,
-                {
-                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Single het variant where both alts differ from ref, alts are sorted",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {'2', '1'}, 9, 10},
-                },
-                123, 2, 3.0f, false,
-                {
-                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Malformed input without alts falls back to a filtered placeholder",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {'0', '1'}, 4, 4},
-                },
-                123, 2, 3.0f, false,
-                {
-                    secondary::Variant{123, 5, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "4"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Confidence and phasing flags are ignored during conversion",
-                {
-                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {'1', '1'}, 15, 15},
-                },
-                123, 2, 3.0f, false,
-                {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "15"}}, 0, 0},
-                },
-            },
-        };
-        // clang-format on
-
-        for (const auto& test_case : test_cases) {
-            CATCH_CAPTURE(test_case.name);
-
-            const std::vector<secondary::Variant> result = convert_variants(
-                    test_case.kadayashi_variants, test_case.seq_id, test_case.ploidy,
-                    test_case.pass_min_qual, test_case.keep_phasing);
-
-            CATCH_CHECK(result == test_case.expected);
-        }
     }
 }
 
@@ -735,24 +591,23 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
             .source_region_id = 0,
     };
 
-    const auto make_simple_variant = [](const uint32_t pos) {
-        return kadayashi::variant_dorado_style_t{
-                .is_confident = true,
-                .is_phased = true,
-                .pos = pos,
-                .qual = 60,
-                .ref = "A",
-                .alts = {"T"},
-                .genotype = {'1', '1'},
-                .median_depth = -1,
-        };
+    const auto make_simple_variant = [seq_id = bam_window.seq_id](const uint32_t pos) {
+        return secondary::Variant{.seq_id = seq_id,
+                                  .pos = pos,
+                                  .ref = "A",
+                                  .alts = {"T"},
+                                  .filter = "PASS",
+                                  .info = {},
+                                  .qual = 60.0f,
+                                  .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "-1"}},
+                                  .rstart = 0,
+                                  .rend = 0};
     };
-    const kadayashi::variant_dorado_style_t left_overlap_variant = make_simple_variant(1);
-    const kadayashi::variant_dorado_style_t simple_variant = make_simple_variant(4);
-    const kadayashi::variant_dorado_style_t right_boundary_variant = make_simple_variant(8);
+    const secondary::Variant left_overlap_variant = make_simple_variant(1);
+    const secondary::Variant simple_variant = make_simple_variant(4);
+    const secondary::Variant right_boundary_variant = make_simple_variant(8);
 
-    const std::vector<secondary::Variant> expected_variants =
-            convert_variants({simple_variant}, bam_window.seq_id, 2, 30.0f, false);
+    const std::vector<secondary::Variant> expected_variants{simple_variant};
 
     const std::vector<std::vector<secondary::Window>> bam_regions{{bam_window}};
     const std::vector<std::pair<std::string, int64_t>> draft_lens{{"chr1", bam_window.seq_length}};
@@ -849,19 +704,20 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
             .source_region_id = 0,
     };
 
-    const kadayashi::variant_dorado_style_t overlapping_variant{
-            .is_confident = true,
-            .is_phased = true,
+    const secondary::Variant overlapping_variant{
+            .seq_id = first_window.seq_id,
             .pos = 90,
-            .qual = 60,
             .ref = "A",
             .alts = {"T"},
-            .genotype = {'0', '1'},
-            .median_depth = -1,
+            .filter = "PASS",
+            .info = {},
+            .qual = 60.0f,
+            .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
+            .rstart = 0,
+            .rend = 0,
     };
 
-    const std::vector<secondary::Variant> expected_variants =
-            convert_variants({overlapping_variant}, first_window.seq_id, 2, 30.0f, false);
+    const std::vector<secondary::Variant> expected_variants{overlapping_variant};
 
     const std::vector<std::vector<secondary::Window>> bam_regions{
             {first_window, second_window},
