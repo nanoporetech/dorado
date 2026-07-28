@@ -281,7 +281,7 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
         // float32 -> float16 conversion.
         auto* const dest_ptr = dest_tensor.data_ptr<c10::Half>();
         const auto* const src_ptr = src_tensor.data_ptr<float>();
-        convert_f32_to_f16_impl(&dest_ptr[dest_offset], &src_ptr[src_offset], count);
+        convert_f32_to_f16(&dest_ptr[dest_offset], &src_ptr[src_offset], count);
     } else {
         // Slow fallback path for other conversions.
         using at::indexing::Slice;

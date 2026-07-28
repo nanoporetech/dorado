@@ -117,7 +117,7 @@ IFUNC_DEFINE_OPTIMISED(std::string, reverse_complement_impl, AVX2)(std::string_v
         const __m256i complement_base_upper_case =
                 _mm256_shuffle_epi8(kComplementTable, template_base);
         const __m256i complement_base = _mm256_or_si256(complement_base_upper_case, case_bit);
-        *complement_ptr++ = _mm256_extract_epi8(complement_base, 0);
+        *complement_ptr++ = static_cast<char>(_mm256_extract_epi8(complement_base, 0));
     }
 
     return rev_comp_sequence;
