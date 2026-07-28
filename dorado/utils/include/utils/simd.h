@@ -33,6 +33,8 @@ using Int16Register = int16x4_t;
 #define simd_load_f32(ptr) vld1q_f32(ptr)
 #define simd_load1_f32(ptr) vdupq_n_f32(*(ptr))
 #define simd_convert_f32_f16(reg) vcvt_f16_f32(reg)
+#define simd_sub_f32(regA, regB) ((regA) - (regB))
+#define simd_div_f32(regA, regB) ((regA) / (regB))
 #define simd_store_f32(ptr, reg) vst1q_f32(ptr, reg)
 #define simd_store1_f32(ptr, reg) *(ptr) = vgetq_lane_f32(reg, 0)
 
@@ -61,6 +63,8 @@ using Int16Register = __m128i;
 #define simd_load_f32(ptr) _mm256_loadu_ps(ptr)
 #define simd_load1_f32(ptr) _mm256_broadcast_ss(ptr)
 #define simd_convert_f32_f16(reg) _mm256_cvtps_ph(reg, dorado::utils::simd::kRoundNearestEven)
+#define simd_sub_f32(regA, regB) _mm256_sub_ps(regA, regB)
+#define simd_div_f32(regA, regB) _mm256_div_ps(regA, regB)
 
 #define simd_load_f16(ptr) _mm_loadu_si128(reinterpret_cast<const __m128i *>(ptr))
 #define simd_store_f16(ptr, reg) _mm_storeu_si128(reinterpret_cast<__m128i *>(ptr), reg)

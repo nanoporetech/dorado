@@ -117,7 +117,8 @@ void shift_scale_tensor_i16_to_f16_inplace_impl
         for (std::size_t unroll_i = 0; unroll_i < kUnrollFactor; unroll_i++) {
             const simd::Int16Register data_i16 = simd_load_i16(data);
             const simd::FloatRegister data_f32 = simd_convert_i16_f32(data_i16);
-            const simd::FloatRegister scaled_f32 = (data_f32 - shift_f32) / scale_f32;
+            const simd::FloatRegister scaled_f32 =
+                    simd_div_f32(simd_sub_f32(data_f32, shift_f32), scale_f32);
             const simd::HalfRegister scaled_f16 = simd_convert_f32_f16(scaled_f32);
             simd_store_f16(data, scaled_f16);
             data += simd::kFloatsPerRegister;
