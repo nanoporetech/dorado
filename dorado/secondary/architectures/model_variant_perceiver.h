@@ -162,11 +162,6 @@ private:
     EmbeddingWrapper m_q_embedding_wrap{nullptr};
     EmbeddingWrapper m_k_embedding_wrap{nullptr};
 
-    std::pair<at::Tensor, at::Tensor> flatten_tensor(
-            const at::Tensor& x,
-            const at::Tensor& depths,
-            const std::optional<at::Tensor>& pos_mask) const;
-
 #if ENABLE_LOCAL_ATTENTION_MASK
     /**
      * \brief Implements the following masking logic:
