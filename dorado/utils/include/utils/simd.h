@@ -83,7 +83,7 @@ using Int16Register = __m128i;
 //   int add(int x, int y) { return IFUNC_GET(add_impl)(x, y); } // dispatch to the best IFUNC
 //
 #ifdef __GNUC__
-#define IFUNC_DEFINE_DEFAULT(ret, name) [[maybe_unused]] [[gnu::target("default")]] ret name
+#define IFUNC_DEFINE_DEFAULT(ret, name) [[maybe_unused]] IFUNC_EXT_DEFAULT ret name
 #define IFUNC_DEFINE_OPTIMISED(ret, name, ext) [[maybe_unused]] IFUNC_EXT_##ext ret name
 #define IFUNC_DECLARE(name, ext) static_assert(true)
 #define IFUNC_GET(name) name
@@ -98,11 +98,17 @@ using Int16Register = __m128i;
 
 // Supported IFUNC extensions.
 #if ENABLE_AVX2_IMPL
+#define IFUNC_EXT_DEFAULT [[gnu::target("default")]]
+
 #define IFUNC_EXT_AVX2 [[gnu::target("avx2")]]
 inline bool has_AVX2() { return false; }  // TODO
 
 #define IFUNC_EXT_AVX2_F16C [[gnu::target("avx2,f16c")]]
 inline bool has_AVX2_F16C() { return false; }  // TODO
+
+#else
+// No multiversioning.
+#define IFUNC_EXT_DEFAULT
 #endif
 
 }  // namespace dorado::utils::simd
