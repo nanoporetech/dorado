@@ -68,7 +68,7 @@ std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& seq,
 }
 
 #if ENABLE_AVX2_IMPL
-[[gnu::target("avx2")]]
+GNU_TARGET_AVX2
 void avx2_encode_kmer_len9(std::byte* output_t_ptr,
                            const std::vector<int>& seq,
                            const std::vector<uint64_t>& seq_mappings,

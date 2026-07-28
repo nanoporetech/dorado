@@ -115,8 +115,8 @@ inline auto cpuid(unsigned int leaf, unsigned int subleaf) {
 //   int add(int x, int y) { return IFUNC_GET(add_impl)(x, y); } // dispatch to the best IFUNC
 //
 #ifdef __GNUC__
-#define IFUNC_DEFINE_DEFAULT(ret, name) [[maybe_unused]] IFUNC_EXT_DEFAULT ret name
-#define IFUNC_DEFINE_OPTIMISED(ret, name, ext) [[maybe_unused]] IFUNC_EXT_##ext ret name
+#define IFUNC_DEFINE_DEFAULT(ret, name) [[maybe_unused]] GNU_TARGET_DEFAULT ret name
+#define IFUNC_DEFINE_OPTIMISED(ret, name, ext) [[maybe_unused]] GNU_TARGET_##ext ret name
 #define IFUNC_DECLARE(name, ext) static_assert(true)
 #define IFUNC_GET(name) name
 #else
@@ -130,16 +130,23 @@ inline auto cpuid(unsigned int leaf, unsigned int subleaf) {
 
 // Supported IFUNC extensions.
 #if ENABLE_AVX2_IMPL
-#define IFUNC_EXT_DEFAULT [[gnu::target("default")]]
+// MSVC won't silently ignore these, so make them no-ops if not using GCC/clang.
+#ifdef __GNUC__
+#define GNU_TARGET_DEFAULT [[gnu::target("default")]]
+#define GNU_TARGET_AVX2 [[gnu::target("avx2")]]
+#define GNU_TARGET_AVX2_F16C [[gnu::target("avx2,f16c")]]
+#else
+#define GNU_TARGET_DEFAULT
+#define GNU_TARGET_AVX2
+#define GNU_TARGET_AVX2_F16C
+#endif
 
-#define IFUNC_EXT_AVX2 [[gnu::target("avx2")]]
 inline bool has_AVX2() {
     // CPUID.(EAX=7,ECX=0):EBX[5]
     static bool has_avx2 = cpuid(7, 0).ebx & (1U << 5);
     return has_avx2;
 }
 
-#define IFUNC_EXT_AVX2_F16C [[gnu::target("avx2,f16c")]]
 inline bool has_AVX2_F16C() {
     // CPUID.(EAX=1):ECX[29]
     static bool has_avx2_f16c = has_AVX2() && (cpuid(1, 0).ecx & (1U << 29));
@@ -148,7 +155,7 @@ inline bool has_AVX2_F16C() {
 
 #else
 // No multiversioning.
-#define IFUNC_EXT_DEFAULT
+#define GNU_TARGET_DEFAULT
 #endif
 
 }  // namespace dorado::utils::simd
