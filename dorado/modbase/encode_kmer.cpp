@@ -169,9 +169,9 @@ IFUNC_DEFINE_OPTIMISED(std::vector<int8_t>,
                        encode_kmer_context_len9,
                        AVX2)(const std::vector<int>& seq,
                              const std::vector<uint64_t>& seq_mappings,
-                             int bases_before,
-                             int bases_after,
-                             int context_samples) {
+                             size_t bases_before,
+                             size_t bases_after,
+                             size_t context_samples) {
     // These cannot change without a rewrite.
     constexpr int kKmerLen = 9;
     constexpr int kNumBases = 4;
