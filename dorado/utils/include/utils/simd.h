@@ -72,6 +72,34 @@ using Int16Register = __m128i;
 
 #endif
 
+#if ENABLE_AVX2_IMPL
+// cpuid wrapper, borrowed from POD5.
+inline auto cpuid(unsigned int leaf, unsigned int subleaf) {
+    struct CpuidResult {
+        unsigned int eax;
+        unsigned int ebx;
+        unsigned int ecx;
+        unsigned int edx;
+    };
+#ifdef _MSC_VER
+    int info[4];
+    __cpuidex(info, static_cast<int>(leaf), static_cast<int>(subleaf));
+    return CpuidResult{
+            static_cast<unsigned int>(info[0]),
+            static_cast<unsigned int>(info[1]),
+            static_cast<unsigned int>(info[2]),
+            static_cast<unsigned int>(info[3]),
+    };
+#else
+    CpuidResult info;
+    asm("cpuid\n\t"
+        : "=a"(info.eax), "=b"(info.ebx), "=c"(info.ecx), "=d"(info.edx)
+        : "0"(leaf), "2"(subleaf));
+    return info;
+#endif
+}
+#endif
+
 // Helpers to emulate IFUNC on MSVC.
 //
 // Usage:
@@ -92,7 +120,7 @@ using Int16Register = __m128i;
 #define IFUNC_DEFINE_OPTIMISED(ret, name, ext) ret name##_ifunc_##ext
 #define IFUNC_DECLARE(name, ext) \
     const auto name##_ifunc =    \
-            dorado::utils::simd::has_##ext ? name##_ifunc_##ext : name##_ifunc_default
+            dorado::utils::simd::has_##ext() ? name##_ifunc_##ext : name##_ifunc_default
 #define IFUNC_GET(name) name##_ifunc
 #endif
 
@@ -101,10 +129,18 @@ using Int16Register = __m128i;
 #define IFUNC_EXT_DEFAULT [[gnu::target("default")]]
 
 #define IFUNC_EXT_AVX2 [[gnu::target("avx2")]]
-inline bool has_AVX2() { return false; }  // TODO
+inline bool has_AVX2() {
+    // CPUID.(EAX=7,ECX=0):EBX[5]
+    static bool has_avx2 = cpuid(7, 0).ebx & (1U << 5);
+    return has_avx2;
+}
 
 #define IFUNC_EXT_AVX2_F16C [[gnu::target("avx2,f16c")]]
-inline bool has_AVX2_F16C() { return false; }  // TODO
+inline bool has_AVX2_F16C() {
+    // CPUID.(EAX=1):ECX[29]
+    static bool has_avx2_f16c = has_AVX2() && (cpuid(1, 0).ecx & (1U << 29));
+    return has_avx2_f16c;
+}
 
 #else
 // No multiversioning.
