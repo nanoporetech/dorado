@@ -14,18 +14,10 @@
 
 using Slice = at::indexing::Slice;
 
+namespace dorado {
+
 namespace {
 
-// This part of trimming is split out into its own unoptimised function since not doing so
-// causes binaries built by GCC8 with ASAN enabled to crash during static init.
-// Note that the cause of the crash doesn't appear to be specific to this bit of code, since
-// removing other parts from subread() also "fixes" the issue, but this is the smallest
-// snippet that works around the issue without potentially incurring performance issues.
-// This fix is copied from others parts of the code that exhibited similar errors
-// with ASAN.
-#if defined(__GNUC__) && defined(__SANITIZE_ADDRESS__)
-__attribute__((optimize("O0")))
-#endif
 void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t, uint64_t> sample_trim_interval) {
     // Note - Duplex signal/read trimming is not supported yet.
     if (raw_data.sizes().size() > 1) {
@@ -35,8 +27,6 @@ void trim_torch_tensor(at::Tensor& raw_data, std::pair<uint64_t, uint64_t> sampl
 }
 
 }  // namespace
-
-namespace dorado {
 
 std::pair<int, int> Trimmer::determine_trim_interval(const BarcodeScoreResult& res, int seqlen) {
     // Initialize interval to be the whole read. Note that the interval

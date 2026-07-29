@@ -20,15 +20,15 @@ namespace {
 // -1(N)[0,0,0,0]; 0(A)[1,0,0,0]; 1(C)[0,1,0,0]; 2(G)[0,0,1,0] 3(T)[0,0,0,1].
 // The encoding is done by bit shifting a 1 by the numerical "magnitude" of the base giving:
 // Note: Bytes [ABCD] becomes [D,C,B,A] in LE systems which is why T is [0,0,0,1] not [1,0,0,0].
-inline uint32_t encode(int base) { return base == -1 ? uint32_t{0} : (uint32_t{1} << (base << 3)); }
+uint32_t encode(int base) { return base == -1 ? uint32_t{0} : (uint32_t{1} << (base << 3)); }
 
 // Write the kmer encoding into `output_ptr` whose size must be at least: `kmer_len * 4 * context_samples`
-inline void encode_kmer_generic(int8_t* output_ptr,
-                                const std::vector<int>& seq,
-                                const std::vector<uint64_t>& seq_mappings,
-                                const std::vector<bool>& base_skips,
-                                size_t context_seq_len,
-                                size_t kmer_len) {
+void encode_kmer_generic(int8_t* output_ptr,
+                         const std::vector<int>& seq,
+                         const std::vector<uint64_t>& seq_mappings,
+                         const std::vector<bool>& base_skips,
+                         size_t context_seq_len,
+                         size_t kmer_len) {
     const size_t seq_len = std::min(seq.size(), context_seq_len);
     for (size_t s = 0; s < seq_len; ++s) {
         const size_t count = seq_mappings[s + 1] - seq_mappings[s];
@@ -51,11 +51,11 @@ inline void encode_kmer_generic(int8_t* output_ptr,
 }
 
 // Fallback path for non-AVX / kmer lengths not specifically optimised.
-inline std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& seq,
-                                                       const std::vector<uint64_t>& seq_mappings,
-                                                       size_t bases_before,
-                                                       size_t bases_after,
-                                                       size_t context_samples) {
+std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& seq,
+                                                const std::vector<uint64_t>& seq_mappings,
+                                                size_t bases_before,
+                                                size_t bases_after,
+                                                size_t context_samples) {
     const size_t context_seq_len = seq.size() - bases_before - bases_after;
     const size_t kmer_len = bases_before + bases_after + 1;
     const size_t kmer_bytes = kmer_len * dorado::utils::BaseInfo::NUM_BASES;
@@ -68,12 +68,12 @@ inline std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& s
 }
 
 #if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("avx2"))) void avx2_encode_kmer_len9(
-        std::byte* output_t_ptr,
-        const std::vector<int>& seq,
-        const std::vector<uint64_t>& seq_mappings,
-        const std::vector<bool>& base_skips,
-        size_t seq_len) {
+GNU_TARGET_AVX2
+void avx2_encode_kmer_len9(std::byte* output_t_ptr,
+                           const std::vector<int>& seq,
+                           const std::vector<uint64_t>& seq_mappings,
+                           const std::vector<bool>& base_skips,
+                           size_t seq_len) {
     const __m256i kOnes = _mm256_set_epi32(1, 1, 1, 1, 1, 1, 1, 1);
 
     // Permutations for rotations of 32 bit elements by 1, 2 and 3 elements.
@@ -154,26 +154,24 @@ inline std::vector<int8_t> encode_kmer_context_generic(const std::vector<int>& s
 #endif
 
 // For non-AVX we use the generic path that handles any kmer length.
-#if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("default")))
-#endif
-std::vector<int8_t>
-encode_kmer_context_len9(const std::vector<int>& seq,
-                         const std::vector<uint64_t>& seq_mappings,
-                         size_t bases_before,
-                         size_t bases_after,
-                         size_t context_samples) {
+IFUNC_DEFINE_DEFAULT(std::vector<int8_t>,
+                     encode_kmer_context_len9)(const std::vector<int>& seq,
+                                               const std::vector<uint64_t>& seq_mappings,
+                                               size_t bases_before,
+                                               size_t bases_after,
+                                               size_t context_samples) {
     return encode_kmer_context_generic(seq, seq_mappings, bases_before, bases_after,
                                        context_samples);
 }
 
 #if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_context_len9(
-        const std::vector<int>& seq,
-        const std::vector<uint64_t>& seq_mappings,
-        int bases_before,
-        int bases_after,
-        int context_samples) {
+IFUNC_DEFINE_OPTIMISED(std::vector<int8_t>,
+                       encode_kmer_context_len9,
+                       AVX2)(const std::vector<int>& seq,
+                             const std::vector<uint64_t>& seq_mappings,
+                             size_t bases_before,
+                             size_t bases_after,
+                             size_t context_samples) {
     // These cannot change without a rewrite.
     constexpr int kKmerLen = 9;
     constexpr int kNumBases = 4;
@@ -190,14 +188,16 @@ encode_kmer_context_len9(const std::vector<int>& seq,
 }
 #endif
 
+IFUNC_DECLARE(encode_kmer_context_len9, AVX2);
+
 // Fallback path for non-AVX / kmer lengths not specifically optimised.
-inline std::vector<int8_t> encode_kmer_chunk_generic(const std::vector<int>& seq,
-                                                     const std::vector<uint64_t>& seq_mappings,
-                                                     const std::vector<bool>& base_skips,
-                                                     size_t kmer_len,
-                                                     size_t context_samples,
-                                                     size_t padding_samples,
-                                                     bool kmer_centered) {
+std::vector<int8_t> encode_kmer_chunk_generic(const std::vector<int>& seq,
+                                              const std::vector<uint64_t>& seq_mappings,
+                                              const std::vector<bool>& base_skips,
+                                              size_t kmer_len,
+                                              size_t context_samples,
+                                              size_t padding_samples,
+                                              bool kmer_centered) {
     // Given sequence: ACGTAC
     // Uncentered 7mer: [ACGTACnnnnn] -> ACGTACn CGTACnn GTACnnn TACnnnn ACnnnnn Cnnnnnn
     // Centered 7mer:   [nnnACGTACnnn]-> nnnACGT nnACGTA nACGTAC ACGTACn CGTACnn GTACnnn
@@ -220,29 +220,27 @@ inline std::vector<int8_t> encode_kmer_chunk_generic(const std::vector<int>& seq
 }
 
 // For non-AVX we use the generic path that handles any kmer length.
-#if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("default")))
-#endif
-std::vector<int8_t>
-encode_kmer_chunk_len9(const std::vector<int>& seq,
-                       const std::vector<uint64_t>& seq_mappings,
-                       const std::vector<bool>& base_skips,
-                       size_t context_samples,
-                       size_t padding_samples,
-                       bool kmer_centered) {
+IFUNC_DEFINE_DEFAULT(std::vector<int8_t>,
+                     encode_kmer_chunk_len9)(const std::vector<int>& seq,
+                                             const std::vector<uint64_t>& seq_mappings,
+                                             const std::vector<bool>& base_skips,
+                                             size_t context_samples,
+                                             size_t padding_samples,
+                                             bool kmer_centered) {
     constexpr size_t kKmerLen = 9;
     return encode_kmer_chunk_generic(seq, seq_mappings, base_skips, kKmerLen, context_samples,
                                      padding_samples, kmer_centered);
 }
 
 #if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("avx2"))) std::vector<int8_t> encode_kmer_chunk_len9(
-        const std::vector<int>& seq,
-        const std::vector<uint64_t>& seq_mappings,
-        const std::vector<bool>& base_skips,
-        size_t context_samples,
-        size_t padding_samples,
-        bool kmer_centered) {
+IFUNC_DEFINE_OPTIMISED(std::vector<int8_t>,
+                       encode_kmer_chunk_len9,
+                       AVX2)(const std::vector<int>& seq,
+                             const std::vector<uint64_t>& seq_mappings,
+                             const std::vector<bool>& base_skips,
+                             size_t context_samples,
+                             size_t padding_samples,
+                             bool kmer_centered) {
     // These cannot change without a rewrite.
     constexpr int kKmerLen = 9;
     constexpr int kNumBases = 4;
@@ -263,6 +261,8 @@ encode_kmer_chunk_len9(const std::vector<int>& seq,
 }
 #endif
 
+IFUNC_DECLARE(encode_kmer_chunk_len9, AVX2);
+
 }  // namespace
 
 namespace dorado::modbase {
@@ -275,8 +275,8 @@ std::vector<int8_t> encode_kmer_context(const std::vector<int>& seq,
     // Specialised version for the case of kmer_len 9 that can be faster.
     const size_t kmer_len = bases_before + bases_after + 1;
     if (kmer_len == 9) {
-        return encode_kmer_context_len9(seq, seq_mappings, bases_before, bases_after,
-                                        context_samples);
+        return IFUNC_GET(encode_kmer_context_len9)(seq, seq_mappings, bases_before, bases_after,
+                                                   context_samples);
     }
     return encode_kmer_context_generic(seq, seq_mappings, bases_before, bases_after,
                                        context_samples);
@@ -293,8 +293,8 @@ std::vector<int8_t> encode_kmer_chunk(const std::vector<int>& seq,
                                       size_t padding_samples,
                                       bool kmer_centered) {
     if (kmer_len == 9) {
-        return encode_kmer_chunk_len9(seq, seq_mappings, base_skips, context_samples,
-                                      padding_samples, kmer_centered);
+        return IFUNC_GET(encode_kmer_chunk_len9)(seq, seq_mappings, base_skips, context_samples,
+                                                 padding_samples, kmer_centered);
     }
     return encode_kmer_chunk_generic(seq, seq_mappings, base_skips, kmer_len, context_samples,
                                      padding_samples, kmer_centered);

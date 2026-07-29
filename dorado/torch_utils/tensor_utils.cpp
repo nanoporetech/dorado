@@ -21,10 +21,9 @@ namespace dorado::utils {
 namespace {
 
 #if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
-#if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("default")))
-#endif
-void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
+IFUNC_DEFINE_DEFAULT(void, convert_f32_to_f16_impl)(c10::Half* const dest,
+                                                    const float* const src,
+                                                    std::size_t count) {
     auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int64_t>(count)});
     auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
@@ -33,11 +32,11 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 
 #if ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 #if ENABLE_AVX2_IMPL
-// We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
-// feature from AVX2.  All relevant CPUs have it.
-[[maybe_unused]] __attribute__((target("avx2,f16c")))
+IFUNC_DEFINE_OPTIMISED(void, convert_f32_to_f16_impl, AVX2_F16C)
+#else
+void convert_f32_to_f16_impl
 #endif
-void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std::size_t count) {
+(c10::Half* const dest, const float* const src, std::size_t count) {
     if (!count) {
         return;
     }
@@ -80,22 +79,23 @@ void convert_f32_to_f16_impl(c10::Half* const dest, const float* const src, std:
 }
 #endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 
+IFUNC_DECLARE(convert_f32_to_f16_impl, AVX2_F16C);
+
 #if !ENABLE_NEON_IMPL  // We only need the SIMD implementation when we have Neon support.
-#if ENABLE_AVX2_IMPL
-[[maybe_unused]] __attribute__((target("default")))
-#endif
-void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
+IFUNC_DEFINE_DEFAULT(void, shift_scale_tensor_i16_to_f16_inplace_impl)(at::Tensor& tensor,
+                                                                       float shift,
+                                                                       float scale) {
     tensor = tensor.to(at::ScalarType::Float).sub_(shift).div_(scale).to(at::ScalarType::Half);
 }
 #endif  // ENABLE_NEON_IMPL
 
 #if ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
 #if ENABLE_AVX2_IMPL
-// We have to specify f16c to have _mm256_cvtps_ph available, as strictly speaking it's a separate
-// feature from AVX2.  All relevant CPUs have it.
-[[maybe_unused]] __attribute__((target("avx2,f16c")))
+IFUNC_DEFINE_OPTIMISED(void, shift_scale_tensor_i16_to_f16_inplace_impl, AVX2_F16C)
+#else
+void shift_scale_tensor_i16_to_f16_inplace_impl
 #endif
-void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift, float scale) {
+(at::Tensor& tensor, float shift, float scale) {
 #if ENABLE_AVX2_IMPL
     // Unrolling a bit seems to give best performance (tested on a prom).
     constexpr std::size_t kUnrollFactor = 4;
@@ -117,7 +117,8 @@ void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift,
         for (std::size_t unroll_i = 0; unroll_i < kUnrollFactor; unroll_i++) {
             const simd::Int16Register data_i16 = simd_load_i16(data);
             const simd::FloatRegister data_f32 = simd_convert_i16_f32(data_i16);
-            const simd::FloatRegister scaled_f32 = (data_f32 - shift_f32) / scale_f32;
+            const simd::FloatRegister scaled_f32 =
+                    simd_div_f32(simd_sub_f32(data_f32, shift_f32), scale_f32);
             const simd::HalfRegister scaled_f16 = simd_convert_f32_f16(scaled_f32);
             simd_store_f16(data, scaled_f16);
             data += simd::kFloatsPerRegister;
@@ -139,6 +140,8 @@ void shift_scale_tensor_i16_to_f16_inplace_impl(at::Tensor& tensor, float shift,
     tensor = tensor.view(at::ScalarType::Half);
 }
 #endif  // ENABLE_AVX2_IMPL || ENABLE_NEON_IMPL
+
+IFUNC_DECLARE(shift_scale_tensor_i16_to_f16_inplace_impl, AVX2_F16C);
 
 }  // namespace
 
@@ -246,14 +249,14 @@ at::Tensor quantile_counting(const at::Tensor& t, const at::Tensor& q) {
 // boundary.  Without this wrapper, AVX machines still only execute the default
 // version.
 void convert_f32_to_f16(c10::Half* const dest, const float* const src, std::size_t count) {
-    return convert_f32_to_f16_impl(dest, src, count);
+    return IFUNC_GET(convert_f32_to_f16_impl)(dest, src, count);
 }
 
 void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& tensor, float shift, float scale) {
     assert(tensor.dtype() == at::ScalarType::Short);
     assert(tensor.is_contiguous());
     assert(tensor.element_size() == 2);
-    shift_scale_tensor_i16_to_f16_inplace_impl(tensor, shift, scale);
+    IFUNC_GET(shift_scale_tensor_i16_to_f16_inplace_impl)(tensor, shift, scale);
 }
 
 void copy_tensor_elems(at::Tensor& dest_tensor,
@@ -278,7 +281,7 @@ void copy_tensor_elems(at::Tensor& dest_tensor,
         // float32 -> float16 conversion.
         auto* const dest_ptr = dest_tensor.data_ptr<c10::Half>();
         const auto* const src_ptr = src_tensor.data_ptr<float>();
-        convert_f32_to_f16_impl(&dest_ptr[dest_offset], &src_ptr[src_offset], count);
+        convert_f32_to_f16(&dest_ptr[dest_offset], &src_ptr[src_offset], count);
     } else {
         // Slow fallback path for other conversions.
         using at::indexing::Slice;
