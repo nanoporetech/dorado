@@ -89,7 +89,14 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
     pipeline_desc.add_node_sink(current_node_handle, basecaller_node);
     current_node_handle = basecaller_node;
 
-    // For DNA, read splitting happens after basecall.
+    if (!modbase_runners.empty()) {
+        auto mod_base_caller_node = insert_modbase_node(pipeline_desc, std::move(modbase_runners),
+                                                        modbase_node_threads, model_config.stride);
+        pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
+        current_node_handle = mod_base_caller_node;
+    }
+
+    // For DNA, read splitting happens after mod calling.
     if (enable_read_splitter && !is_rna) {
         splitter::DuplexSplitSettings splitter_settings(model_config.signal_norm_params.strategy ==
                                                         config::ScalingStrategy::PA);
@@ -99,13 +106,6 @@ void create_simplex_pipeline(PipelineDescriptor& pipeline_desc,
                                                                        splitter_node_threads, 1000);
         pipeline_desc.add_node_sink(current_node_handle, dna_splitter_node);
         current_node_handle = dna_splitter_node;
-    }
-
-    if (!modbase_runners.empty()) {
-        auto mod_base_caller_node = insert_modbase_node(pipeline_desc, std::move(modbase_runners),
-                                                        modbase_node_threads, model_config.stride);
-        pipeline_desc.add_node_sink(current_node_handle, mod_base_caller_node);
-        current_node_handle = mod_base_caller_node;
     }
 
     // if we've been provided a source node, connect it to the start of our pipeline

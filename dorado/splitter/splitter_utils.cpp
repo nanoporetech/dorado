@@ -3,6 +3,7 @@
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "read_pipeline/base/read_utils.h"
 #include "utils/time_utils.h"
+#include "utils/types.h"
 
 #include <ATen/TensorIndexing.h>
 
@@ -26,12 +27,6 @@ namespace dorado::splitter {
 SimplexReadPtr subread(const SimplexRead& read,
                        std::optional<PosRange> seq_range,
                        std::pair<uint64_t, uint64_t> signal_range) {
-    //TODO support mods
-    if (read.read_common.mod_base_info != nullptr || !read.read_common.base_mod_probs.empty() ||
-        !read.read_common.base_mod_simplex_motif_hits.empty()) {
-        throw std::runtime_error(std::string("Read splitting doesn't support mods yet"));
-    }
-
     auto subread = utils::shallow_copy_read(read);
 
     // Unable to determine how the events were distributed, so zero out
@@ -69,6 +64,21 @@ SimplexReadPtr subread(const SimplexRead& read,
         assert(signal_range.second % stride == 0 ||
                (signal_range.second == read.read_common.get_raw_data_samples() &&
                 seq_range->second == read.read_common.seq.size()));
+
+        if (seq_range->first != 0 || seq_range->second != read.read_common.seq.size()) {
+            if (!read.read_common.base_mod_probs.empty()) {
+                const auto num_channels = read.read_common.mod_base_info->alphabet.size();
+                const auto first = read.read_common.base_mod_probs.cbegin();
+                subread->read_common.base_mod_probs =
+                        std::vector<uint8_t>(first + seq_range->first * num_channels,
+                                             first + seq_range->second * num_channels);
+            }
+            if (!read.read_common.base_mod_simplex_motif_hits.empty()) {
+                const auto first = read.read_common.base_mod_simplex_motif_hits.cbegin();
+                subread->read_common.base_mod_simplex_motif_hits =
+                        std::vector<bool>(first + seq_range->first, first + seq_range->second);
+            }
+        }
 
         subread->read_common.seq = subread->read_common.seq.substr(
                 seq_range->first, seq_range->second - seq_range->first);

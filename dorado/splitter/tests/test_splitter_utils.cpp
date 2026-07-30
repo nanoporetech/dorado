@@ -1,4 +1,6 @@
+#include "read_pipeline/base/messages/SimplexRead.h"
 #include "splitter_utils.h"
+#include "utils/types.h"
 
 #include <ATen/ops/from_blob.h>
 #include <catch2/benchmark/catch_benchmark.hpp>
@@ -8,6 +10,7 @@
 #include <spdlog/spdlog.h>
 
 #include <limits>
+#include <numeric>
 #include <random>
 #include <set>
 
@@ -41,6 +44,43 @@ constexpr at::ScalarType get_dtype() {
         return at::kFloat;
     } else {
         static_assert(std::is_same_v<T, void>);
+    }
+}
+
+DEFINE_TEST("subread() preserves and slices modified-base data") {
+    dorado::SimplexRead read;
+    read.read_common.seq = "ACGT";
+    read.read_common.qstring = "!!!!";
+    read.read_common.moves = {1, 1, 1, 1};
+    read.read_common.attributes.model_stride = 2;
+    read.read_common.attributes.sample_rate = 4000;
+
+    std::vector<float> signal(8);
+    std::iota(signal.begin(), signal.end(), 0.f);
+    read.read_common.raw_data = at::from_blob(signal.data(), signal.size()).clone();
+
+    read.read_common.mod_base_info =
+            std::make_shared<dorado::ModBaseInfo>(std::vector<std::string>{"A", "C", "m"}, "", "");
+    read.read_common.base_mod_probs = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11};
+    read.read_common.base_mod_simplex_motif_hits = {true, false, true, false};
+
+    CATCH_SECTION("partial range") {
+        auto result = subread(read, PosRange{1, 3}, PosRange{2, 6});
+
+        CATCH_CHECK(result->read_common.seq == "CG");
+        CATCH_CHECK(result->read_common.mod_base_info == read.read_common.mod_base_info);
+        CATCH_CHECK(result->read_common.base_mod_probs == std::vector<uint8_t>{3, 4, 5, 6, 7, 8});
+        CATCH_CHECK(result->read_common.base_mod_simplex_motif_hits ==
+                    std::vector<bool>{false, true});
+    }
+
+    CATCH_SECTION("full range") {
+        auto result = subread(read, PosRange{0, 4}, PosRange{0, 8});
+
+        CATCH_CHECK(result->read_common.mod_base_info == read.read_common.mod_base_info);
+        CATCH_CHECK(result->read_common.base_mod_probs == read.read_common.base_mod_probs);
+        CATCH_CHECK(result->read_common.base_mod_simplex_motif_hits ==
+                    read.read_common.base_mod_simplex_motif_hits);
     }
 }
 
