@@ -500,14 +500,18 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         {
             utils::ScopedProfileRange spr2("seq_copy", 2);
             const auto [Tin_seq, Cin_seq] = m_config.chunked_sequence_input_TC();
-            wm_seq.allocate_backing_tensor(seqs_NTC.device());
+            if (!wm_seq.backing_tensor.defined()) {
+                wm_seq.allocate_backing_tensor(seqs_NTC.device());
+            }
             auto wm_seq_in = wm_seq.next_TC(Tin_seq, Cin_seq, nn::TensorLayout::NTC);
             wm_seq_in.index({Slice()}) = seqs_NTC;
         }
         {
             utils::ScopedProfileRange spr2("sig_copy", 2);
             const auto [Tin_sig, Cin_sig] = m_config.chunked_signal_input_TC();
-            wm.allocate_backing_tensor(sigs_N1T.device());
+            if (!wm.backing_tensor.defined()) {
+                wm.allocate_backing_tensor(sigs_N1T.device());
+            }
             auto wm_in = wm.next_TC(Tin_sig, Cin_sig, nn::TensorLayout::NTC);
             // This transpose is free because C is 1
             wm_in.index({Slice()}) = sigs_N1T.transpose(1, 2);
