@@ -55,7 +55,7 @@ void check_record(const bcf_hdr_t* header,
 
     if (!std::empty(expected.filter)) {
         // Not a const ref because bcf_has_filter takes a non-const char pointer.
-        std::string filter_name = expected.filter;
+        std::string filter_name(expected.filter.data(), std::size(expected.filter));
         CATCH_CHECK(bcf_has_filter(header, record, filter_name.data()) == 1);
     }
 
@@ -81,7 +81,7 @@ void check_record(const bcf_hdr_t* header,
 CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", TEST_GROUP) {
     struct WriterTestData {
         std::filesystem::path vcf_path;
-        std::vector<std::pair<std::string, std::string>> filters;
+        std::vector<std::pair<std::string_view, std::string>> filters;
         std::vector<std::pair<std::string, int64_t>> contigs;
         Variant first_variant;
         Variant second_variant;
@@ -93,7 +93,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             .vcf_path = temp_dir.m_path / "variants.vcf",
             .filters =
                     {
-                            {"LowQual", "Low quality"},
+                            {VARIANT_LOWQUAL_FILTER, "Low quality"},
                     },
             .contigs =
                     {
@@ -106,7 +106,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .pos = 9,
                             .ref = "A",
                             .alts = {"C"},
-                            .filter = "PASS",
+                            .filter = VARIANT_PASS_FILTER,
                             .info = {},
                             .qual = 60.0f,
                             .format = {{"GT", "0/1"}, {"GQ", "45"}},
@@ -119,7 +119,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .pos = 41,
                             .ref = "T",
                             .alts = {"C", "G"},
-                            .filter = "LowQual",
+                            .filter = VARIANT_LOWQUAL_FILTER,
                             .info = {},
                             .qual = 17.5f,
                             .format = {{"GT", "1/2"}, {"GQ", "31"}, {"MIN_DP", "25"}},

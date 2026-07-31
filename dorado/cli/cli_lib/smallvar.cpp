@@ -10,6 +10,7 @@
 #include "secondary/common/bam_info.h"
 #include "secondary/common/region.h"
 #include "secondary/common/stats.h"
+#include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/window_utils.h"
 #include "secondary/features/haplotag_source.h"
@@ -1153,12 +1154,12 @@ void run_variant_calling(const Options& opt,
 
     // Initialize the header of the output VCF file.
     // These are the only available FILTER options.
-    const std::vector<std::pair<std::string, std::string>> vcf_filters{
+    const std::vector<std::pair<std::string_view, std::string>> vcf_filters{
             // PASS is added automatically by bcf_hdr
-            // {"PASS", "All filters passed"},
-            {"LowQual", "Variant quality is below threshold"},
-            {"IncompatZyg", "Predicted zygosity incompatible with ploidy"},
-            {".", "Non-variant position"},
+            // {secondary::VARIANT_PASS_FILTER, "All filters passed"},
+            {secondary::VARIANT_LOWQUAL_FILTER, "Variant quality is below threshold"},
+            {secondary::VARIANT_ZYGOSITY_FILTER, "Predicted zygosity incompatible with ploidy"},
+            {secondary::NO_VARIANT_FILTER, "Non-variant position"},
     };
 
     // VCF writer, nullptr unless variant calling is run.

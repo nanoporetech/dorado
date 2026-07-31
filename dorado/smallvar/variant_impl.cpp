@@ -286,8 +286,9 @@ BamWindowResult process_single_bam_window(
         std::vector<secondary::Variant> all_variants = std::move(kadayashi_result.variants);
         for (secondary::Variant& var : all_variants) {
             var.seq_id = bam_window.seq_id;
-            if (var.filter != ".") {
-                var.filter = (var.qual < pass_min_qual) ? "LowQual" : "PASS";
+            if (var.filter != secondary::NO_VARIANT_FILTER) {
+                var.filter = (var.qual < pass_min_qual) ? secondary::VARIANT_LOWQUAL_FILTER
+                                                        : secondary::VARIANT_PASS_FILTER;
             }
             secondary::sanitize_empty_alts(var, ploidy);
         }

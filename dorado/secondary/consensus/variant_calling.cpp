@@ -361,7 +361,7 @@ Variant construct_variant(const std::string_view draft,
             .pos = positions_major[rstart],
             .ref = var_ref,
             .alts = alts_out,
-            .filter = "PASS",
+            .filter = VARIANT_PASS_FILTER,
             .info = {},
             .qual = 0.0f,
             .format = {{"GT", gt}},
@@ -767,7 +767,7 @@ Variant make_gvcf_reference_record(const int32_t seq_id,
             .pos = pos,
             .ref = std::string(1, ref_base),
             .alts = {"<*>"},
-            .filter = ".",
+            .filter = NO_VARIANT_FILTER,
             .info = {},
             .qual = qual_,
             .format = {{"GT", gt_str}, {"GQ", gq_str}},
@@ -788,7 +788,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
     if (any_empty) {
         var.alts = {"."};
         var.format["GT"] = make_reference_gt(ploidy, '0');
-        var.filter = ".";
+        var.filter = NO_VARIANT_FILTER;
     }
 }
 
@@ -814,7 +814,7 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
         if (std::empty(ret.alts)) {
             ret.alts = {"."};
         }
-        ret.filter = ".";
+        ret.filter = NO_VARIANT_FILTER;
         const bool is_missing_call =
                 (std::size(ret.ref) == 1) && !utils::is_canonical_base(ret.ref.front());
         if (is_missing_call) {
@@ -833,7 +833,7 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     if (num_called_alts > 1) {
         spdlog::debug("Filtering variant with more than one alt in haploid region ({}, {}).",
                       var.seq_id, var.pos);
-        ret.filter = "IncompatZyg";
+        ret.filter = VARIANT_ZYGOSITY_FILTER;
         ret.qual = 0.0f;
         it_gt->second = "0";
         it_gq->second = "0";
@@ -846,7 +846,7 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     } else {
         spdlog::debug("Filtering heterozygous variant ({}, {}) in haploid region.", ret.seq_id,
                       ret.pos);
-        ret.filter = "IncompatZyg";
+        ret.filter = VARIANT_ZYGOSITY_FILTER;
         ret.qual = 0.0f;
         it_gt->second = "0";
         it_gq->second = "0";
@@ -1383,7 +1383,7 @@ std::vector<Variant> general_decode_variants(
     for (const Variant& var : variants) {
         Variant new_var = var;
         if (!is_reference_record(new_var) && (new_var.qual < pass_min_qual)) {
-            new_var.filter = "LowQual";
+            new_var.filter = VARIANT_LOWQUAL_FILTER;
         }
         add_depth(new_var, vc_sample.depth);
         // Sanity check.
