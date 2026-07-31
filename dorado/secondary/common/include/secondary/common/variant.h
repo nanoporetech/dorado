@@ -10,12 +10,19 @@
 
 namespace dorado::secondary {
 
+// "PASS" is a reserved filter string in the VCF specification, it should not be changed.
+// Other filter strings are locally defined in the VCF header so can be changed if needed.
+constexpr std::string_view VARIANT_PASS_FILTER{"PASS"};
+constexpr std::string_view VARIANT_LOWQUAL_FILTER{"LowQual"};
+constexpr std::string_view VARIANT_ZYGOSITY_FILTER{"IncompatZyg"};
+constexpr std::string_view NO_VARIANT_FILTER{"."};
+
 struct Variant {
     int32_t seq_id = -1;
     int64_t pos = -1;
     std::string ref;
     std::vector<std::string> alts;
-    std::string filter;
+    std::string_view filter;
     std::unordered_map<std::string, std::string> info;
     float qual = 0.0f;
     std::unordered_map<std::string, std::string> format;

@@ -1,6 +1,7 @@
 #include "secondary/kadayashi/local_haplotagging.h"
 
 #include "hts_utils/bam_utils.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/blocked_bloom_filter.h"
 #include "secondary/kadayashi/faidx_utils.h"
@@ -1533,49 +1534,6 @@ void ck_derive_variant_genophase_from_phased_read(chunk_t &ck) {
     }  // iter through variants
 }
 
-variant_dorado_style_t convert_fullinfo_var_to_dorado_style(const variant_fullinfo_t &var) {
-    std::pair<char, char> genotype;
-    std::string_view ref = var.ref_allele_seq0;
-    std::string alt0 = var.alt_allele_seq0;
-    std::string alt1 = var.is_multi_allele ? var.alt_allele_seq1 : "";
-    if (var.is_multi_allele) {
-        if (var.genotype0[0] < var.genotype0[2]) {
-            genotype = {'2', '1'};
-        } else {
-            genotype = {'1', '2'};
-        }
-        if (var.ref_allele_seq0 != var.ref_allele_seq1) {
-            if (var.ref_allele_seq0.size() > var.ref_allele_seq1.size()) {
-                // REF will simply be the longer one.
-                ref = var.ref_allele_seq0;
-
-                // Adjust the alt with the short ref allele.
-                const std::string &alt_raw = var.alt_allele_seq1;
-                alt1 = alt_raw;
-                alt1.append(ref.data() + 1, ref.size() - 1);
-            } else {
-                ref = var.ref_allele_seq1;
-                const std::string &alt_raw = var.alt_allele_seq0;
-                alt0 = alt_raw;
-                alt0.append(ref.data() + 1, ref.size() - 1);
-            }
-        }
-    } else {
-        genotype = {var.genotype0[0], var.genotype0[2]};
-    }
-
-    return {.is_confident = var.is_confident,
-            .is_phased = var.is_phased0,
-            .pos = var.pos0,
-            .qual = var.is_confident ? 60 : 0,
-            .ref = std::string(ref),
-            .alts = var.is_multi_allele ? std::vector<std::string>{alt0, alt1}
-                                        : std::vector<std::string>{alt0},
-            .genotype = genotype,
-            .min_depth = var.min_depth,
-            .median_depth = var.median_depth};
-}
-
 variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
                                                         const std::string_view refseq_substring,
                                                         const uint32_t ref_start,
@@ -1781,6 +1739,69 @@ bool read_downsampling_query_or_update_counter(read_downsampling_rw rw,
     return read_may_be_accepted;
 }
 }  // namespace
+
+dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fullinfo_t &var,
+                                                                const bool keep_phasing) {
+    if (!var.is_valid) {
+        return {};
+    }
+    std::pair<char, char> genotype;
+    std::string_view ref = var.ref_allele_seq0;
+    std::vector<std::string> alts;
+
+    const auto make_gt_string = [&keep_phasing, &genotype](const bool is_phased) {
+        const char delimiter = (keep_phasing && is_phased) ? '|' : '/';
+        return std::string{genotype.first, delimiter, genotype.second};
+    };
+
+    if (var.is_multi_allele) {
+        std::string alt0 = var.alt_allele_seq0;
+        std::string alt1 = var.alt_allele_seq1;
+        genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'2', '1'}
+                                                         : std::pair<char, char>{'1', '2'};
+        if (var.ref_allele_seq0 != var.ref_allele_seq1) {
+            if (var.ref_allele_seq0.size() > var.ref_allele_seq1.size()) {
+                ref = var.ref_allele_seq0;
+                alt1.append(ref.data() + 1, ref.size() - 1);
+            } else {
+                ref = var.ref_allele_seq1;
+                alt0.append(ref.data() + 1, ref.size() - 1);
+            }
+        }
+        alts = {std::move(alt0), std::move(alt1)};
+    } else {
+        genotype = {var.genotype0[0], var.genotype0[2]};
+        alts = {var.alt_allele_seq0};
+    }
+    if (!(var.is_phased0 && keep_phasing)) {
+        if (genotype.first > genotype.second) {
+            std::swap(genotype.first, genotype.second);
+        }
+        std::sort(alts.begin(), alts.end());
+    }
+
+    const float qual = var.is_confident ? dorado::secondary::VCF_MAX_GQ_CAP : 0.0f;
+    dorado::secondary::Variant ret{
+            .seq_id = -1,  // placeholder
+            .pos = var.pos0,
+            .ref = std::string(ref),
+            .alts = alts,
+            .filter = var.is_confident ? dorado::secondary::VARIANT_PASS_FILTER
+                                       : dorado::secondary::VARIANT_LOWQUAL_FILTER,
+            .info = {},
+            .qual = qual,
+            .format = {{"GT", make_gt_string(var.is_phased0)},
+                       {"GQ", dorado::secondary::gq_from_qual(qual)},
+                       {"DP", std::to_string(var.median_depth)}},
+            .rstart = 0,
+            .rend = 0,
+    };
+
+    if ((var.median_depth != var.min_depth) && (ret.ref.length() > 1)) {
+        ret.format["MIN_DP"] = std::to_string(var.min_depth);
+    }
+    return ret;
+}
 
 chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
                           const variants_t &ht_refvars,
@@ -2425,15 +2446,6 @@ std::string variant_fullinfo_to_string(const variant_fullinfo_t &v) {
             v.min_depth, v.median_depth);
 }
 
-std::string variant_dorado_style_to_string(const variant_dorado_style_t &v) {
-    return fmt::format(
-            "conf={} phased={} pos={} qual={} ref={} alt={},{} "
-            "geno={:c},{:c} min_depth={} median_depth={}",
-            v.is_confident ? "true" : "false", v.is_phased ? "true" : "false", v.pos, v.qual, v.ref,
-            v.alts[0], v.alts.size() > 1 ? v.alts[1] : "", v.genotype.first, v.genotype.second,
-            v.min_depth, v.median_depth);
-}
-
 bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
     return std::tie(a.is_confident, a.is_multi_allele, a.min_depth, a.median_depth, a.pos0, a.qual0,
                     a.ref_allele_seq0, a.alt_allele_seq0, a.is_phased0, a.genotype0[0],
@@ -2446,18 +2458,6 @@ bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b) {
                                                 b.ref_allele_seq1, b.alt_allele_seq1, b.is_phased1,
                                                 b.genotype1[0], b.genotype1[1], b.genotype1[2]);
 };
-
-bool operator==(const variant_dorado_style_t &a, const variant_dorado_style_t &b) {
-    return std::tie(a.is_confident, a.is_phased, a.pos, a.qual, a.ref, a.alts, a.genotype,
-                    a.min_depth, a.median_depth) == std::tie(b.is_confident, b.is_phased, b.pos,
-                                                             b.qual, b.ref, b.alts, b.genotype,
-                                                             b.min_depth, b.median_depth);
-};
-
-std::ostream &operator<<(std::ostream &os, const variant_dorado_style_t &v) {
-    os << variant_dorado_style_to_string(v);
-    return os;
-}
 
 phase_return_t kadayashi_local_haptagging_simple_single_region(samFile *fp_bam,
                                                                hts_idx_t *fp_bai,
@@ -2657,10 +2657,10 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
                          .read_endpoints = read_endpoints};
 
     if (!ck.varcalls.empty()) {
-        for (const variant_fullinfo_t &var :
-             ck_and_vr.vr.variants) {  // return variants in dorado style
+        ret.variants.reserve(std::size(ck_and_vr.vr.variants));
+        for (const variant_fullinfo_t &var : ck_and_vr.vr.variants) {  // return VCF-ready variants
             if (var.is_valid) {
-                ret.variants.push_back(convert_fullinfo_var_to_dorado_style(var));
+                ret.variants.emplace_back(convert_fullinfo_var_to_dorado_style(var, false));
             }
         }
     }

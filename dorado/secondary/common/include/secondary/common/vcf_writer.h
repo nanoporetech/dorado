@@ -20,7 +20,7 @@ public:
      * \param contigs A vector of header/length pairs for every contig which may appear in this VCF.
      */
     VCFWriter(const std::filesystem::path& filename,
-              const std::vector<std::pair<std::string, std::string>>& filters,
+              const std::vector<std::pair<std::string_view, std::string>>& filters,
               const std::vector<std::pair<std::string, int64_t>>& contigs,
               bool include_gvcf_headers);
 

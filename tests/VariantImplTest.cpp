@@ -339,11 +339,9 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
      * \brief Covers small worker-facing helpers that are easier to validate in isolation than
      *          through the full async pipeline.
      *
-     *          The sections below check three things:
-     *          signal_worker_terminate flips the shared stop flag, create_resources rejects
-     *          unsupported devices before model setup begins, and convert_variants produces the
-     *          normalized variant records expected by the rest of the workflow, including a few
-     *          legacy edge cases preserved from the older haplotagging path.
+     *          The sections below check two things:
+     *          - signal_worker_terminate flips the shared stop flag;
+     *          - create_resources rejects unsupported devices before model setup begins.
      */
     CATCH_SECTION("signal_worker_terminate sets the shared termination flag") {
         std::atomic<bool> worker_terminate{false};
@@ -361,137 +359,6 @@ CATCH_TEST_CASE("variant_impl workflow worker functions", TEST_GROUP) {
                                  "metal", 1, 1, true, "", "", 0, 0.0, std::nullopt, std::nullopt,
                                  std::nullopt, std::nullopt, {}, false),
                 Catch::Matchers::ContainsSubstring("Unsupported device: metal"));
-    }
-
-    CATCH_SECTION("convert_variants normalizes diploid genotypes and filters") {
-        const std::vector<kadayashi::variant_dorado_style_t> kadayashi_variants{
-                {
-                        .is_confident = true,
-                        .is_phased = true,
-                        .pos = 4,
-                        .qual = 60,
-                        .ref = "A",
-                        .alts = {"T"},
-                        .genotype = {'0', '1'},
-                        .min_depth = 10,
-                        .median_depth = 10,
-                },
-                {
-                        .is_confident = false,
-                        .is_phased = false,
-                        .pos = 8,
-                        .qual = 10,
-                        .ref = "C",
-                        .alts = {"G"},
-                        .genotype = {'1', '1'},
-                        .min_depth = 1,
-                        .median_depth = 1,
-                },
-                {
-                        .is_confident = true,
-                        .is_phased = true,
-                        .pos = 12,
-                        .qual = 50,
-                        .ref = "A",
-                        .alts = {"T", "C"},
-                        .genotype = {'1', '2'},
-                        .min_depth = 15,
-                        .median_depth = 15,
-                },
-        };
-
-        // clang-format off
-        const std::vector<secondary::Variant> expected{
-                secondary::Variant{7, 4, "A", {"T"}, "PASS", {}, 60.0f,
-                                   {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
-                secondary::Variant{7, 8, "C", {"G"}, "LowQual", {}, 10.0f,
-                                   {{"GT", "1/1"}, {"GQ", "10"}, {"DP", "1"}}, 0, 0},
-                secondary::Variant{7, 12, "A", {"C", "T"}, "PASS", {}, 50.0f,
-                                   {{"GT", "1/2"}, {"GQ", "50"}, {"DP", "15"}}, 0, 0},
-        };
-        // clang-format on
-
-        const std::vector<secondary::Variant> variants =
-                convert_variants(kadayashi_variants, 7, 2, 30.0f);
-
-        CATCH_CHECK(variants == expected);
-    }
-
-    CATCH_SECTION("convert_variants preserves legacy haplotagging edge cases") {
-        struct TestCase {
-            std::string name;
-            std::vector<kadayashi::variant_dorado_style_t> kadayashi_variants;
-            int32_t seq_id;
-            int32_t ploidy;
-            float pass_min_qual;
-            std::vector<secondary::Variant> expected;
-        };
-
-        // clang-format off
-        const std::vector<TestCase> test_cases{
-            TestCase{"Empty input", {}, 0, 2, 3.0f, {}},
-            TestCase{
-                "Single hom variant",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {1, 1}, 7, 7},
-                },
-                123, 2, 3.0f,
-                {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "7"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Single het variant where one alt matches the ref",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T"}, {0, 1}, 20, 20},
-                },
-                123, 2, 3.0f,
-                {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Single het variant where both alts differ from ref",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {"T", "C"}, {0, 1}, 9, 10},
-                },
-                123, 2, 3.0f,
-                {
-                    secondary::Variant{123, 5, "A", {"C", "T"}, "PASS", {}, 60.0f, {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "10"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Malformed input without alts falls back to a filtered placeholder",
-                {
-                    kadayashi::variant_dorado_style_t{true, true, 5, 60, "A", {}, {0, 1}, 4, 4},
-                },
-                123, 2, 3.0f,
-                {
-                    secondary::Variant{123, 5, "A", {"."}, ".", {}, 60.0f, {{"GT", "0/0"}, {"GQ", "60"}, {"DP", "4"}}, 0, 0},
-                },
-            },
-            TestCase{
-                "Confidence and phasing flags are ignored during conversion",
-                {
-                    kadayashi::variant_dorado_style_t{false, false, 5, 60, "A", {"T"}, {1, 1}, 15, 15},
-                },
-                123, 2, 3.0f,
-                {
-                    secondary::Variant{123, 5, "A", {"T"}, "PASS", {}, 60.0f, {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "15"}}, 0, 0},
-                },
-            },
-        };
-        // clang-format on
-
-        for (const auto& test_case : test_cases) {
-            CATCH_CAPTURE(test_case.name);
-
-            const std::vector<secondary::Variant> result =
-                    convert_variants(test_case.kadayashi_variants, test_case.seq_id,
-                                     test_case.ploidy, test_case.pass_min_qual);
-
-            CATCH_CHECK(result == test_case.expected);
-        }
     }
 }
 
@@ -724,24 +591,23 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
             .source_region_id = 0,
     };
 
-    const auto make_simple_variant = [](const uint32_t pos) {
-        return kadayashi::variant_dorado_style_t{
-                .is_confident = true,
-                .is_phased = true,
-                .pos = pos,
-                .qual = 60,
-                .ref = "A",
-                .alts = {"T"},
-                .genotype = {'1', '1'},
-                .median_depth = -1,
-        };
+    const auto make_simple_variant = [seq_id = bam_window.seq_id](const uint32_t pos) {
+        return secondary::Variant{.seq_id = seq_id,
+                                  .pos = pos,
+                                  .ref = "A",
+                                  .alts = {"T"},
+                                  .filter = secondary::VARIANT_PASS_FILTER,
+                                  .info = {},
+                                  .qual = 60.0f,
+                                  .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "-1"}},
+                                  .rstart = 0,
+                                  .rend = 0};
     };
-    const kadayashi::variant_dorado_style_t left_overlap_variant = make_simple_variant(1);
-    const kadayashi::variant_dorado_style_t simple_variant = make_simple_variant(4);
-    const kadayashi::variant_dorado_style_t right_boundary_variant = make_simple_variant(8);
+    const secondary::Variant left_overlap_variant = make_simple_variant(1);
+    const secondary::Variant simple_variant = make_simple_variant(4);
+    const secondary::Variant right_boundary_variant = make_simple_variant(8);
 
-    const std::vector<secondary::Variant> expected_variants =
-            convert_variants({simple_variant}, bam_window.seq_id, 2, 30.0f);
+    const std::vector<secondary::Variant> expected_variants{simple_variant};
 
     const std::vector<std::vector<secondary::Window>> bam_regions{{bam_window}};
     const std::vector<std::pair<std::string, int64_t>> draft_lens{{"chr1", bam_window.seq_length}};
@@ -838,19 +704,20 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
             .source_region_id = 0,
     };
 
-    const kadayashi::variant_dorado_style_t overlapping_variant{
-            .is_confident = true,
-            .is_phased = true,
+    const secondary::Variant overlapping_variant{
+            .seq_id = first_window.seq_id,
             .pos = 90,
-            .qual = 60,
             .ref = "A",
             .alts = {"T"},
-            .genotype = {'0', '1'},
-            .median_depth = -1,
+            .filter = secondary::VARIANT_PASS_FILTER,
+            .info = {},
+            .qual = 60.0f,
+            .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "-1"}},
+            .rstart = 0,
+            .rend = 0,
     };
 
-    const std::vector<secondary::Variant> expected_variants =
-            convert_variants({overlapping_variant}, first_window.seq_id, 2, 30.0f);
+    const std::vector<secondary::Variant> expected_variants{overlapping_variant};
 
     const std::vector<std::vector<secondary::Window>> bam_regions{
             {first_window, second_window},
@@ -1178,14 +1045,13 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
     CATCH_CHECK(reduce_data.ready);
     CATCH_CHECK(reduce_data.remaining_bam_regions == 0);
 
-    // clang-format off
     const std::vector<secondary::Variant> expected_variants{
             secondary::Variant{
                     .seq_id = 0,
                     .pos = 93,
                     .ref = "C",
                     .alts = {"T"},
-                    .filter = "PASS",
+                    .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 60.0f,
                     .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
@@ -1197,7 +1063,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .pos = 1471,
                     .ref = "T",
                     .alts = {"G"},
-                    .filter = "PASS",
+                    .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 60.0f,
                     .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
@@ -1209,7 +1075,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .pos = 7429,
                     .ref = "C",
                     .alts = {"T"},
-                    .filter = "PASS",
+                    .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 60.0f,
                     .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "15"}},
@@ -1217,7 +1083,6 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .rend = 0,
             },
     };
-    // clang-format on
 
     // Compare variants after sorting.
     std::vector<secondary::Variant> actual_variants = reduce_data.variants_simple;
@@ -1260,7 +1125,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
     const auto processed_regions_bed = temp_dir.m_path / "processed_regions.bed";
 
     // VCF filters.
-    const std::vector<std::pair<std::string, std::string>> filters{};
+    const std::vector<std::pair<std::string_view, std::string>> filters{};
 
     // Input reference sequences.
     const std::vector<std::pair<std::string, int64_t>> contigs = {
@@ -1273,7 +1138,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .pos = 10,
             .ref = "A",
             .alts = {"T"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
             .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
@@ -1285,7 +1150,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .pos = 20,
             .ref = "C",
             .alts = {"G"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 50.0f,
             .format = {{"GT", "0/1"}, {"GQ", "50"}, {"DP", "."}},
@@ -1297,7 +1162,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
             .pos = 30,
             .ref = "G",
             .alts = {"A"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 40.0f,
             .format = {{"GT", "1/1"}, {"GQ", "40"}, {"DP", "10"}},
@@ -1401,7 +1266,7 @@ CATCH_TEST_CASE(
             .pos = 4,
             .ref = "A",
             .alts = {"T"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
             .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "."}},
@@ -1505,7 +1370,7 @@ CATCH_TEST_CASE(
                 .pos = pos,
                 .ref = ref,
                 .alts = {alt},
-                .filter = "PASS",
+                .filter = secondary::VARIANT_PASS_FILTER,
                 .info = {},
                 .qual = 60.0f,
                 .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
@@ -1559,16 +1424,18 @@ CATCH_TEST_CASE(
     CATCH_REQUIRE(!worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
-            secondary::Variant{0,
-                               5,
-                               "TT",
-                               {"AC"},
-                               "PASS",
-                               {},
-                               53.922f,
-                               {{"GT", "1/1"}, {"GQ", "54"}, {"DP", "1"}},
-                               0,
-                               2},
+            secondary::Variant{
+                    .seq_id = 0,
+                    .pos = 5,
+                    .ref = "TT",
+                    .alts = {"AC"},
+                    .filter = secondary::VARIANT_PASS_FILTER,
+                    .info = {},
+                    .qual = 53.922f,
+                    .format = {{"GT", "1/1"}, {"GQ", "54"}, {"DP", "1"}},
+                    .rstart = 0,
+                    .rend = 2,
+            },
     };
 
     std::vector<secondary::Variant> expected_merged_variants = expected_inference_variants;
@@ -1628,7 +1495,7 @@ CATCH_TEST_CASE(
             .pos = 2,
             .ref = "AAATTT",
             .alts = {"CCCCCC"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
             .format = {{"GT", "1/1"}, {"GQ", "60"}},
@@ -1675,16 +1542,18 @@ CATCH_TEST_CASE(
     CATCH_REQUIRE(!worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
-            secondary::Variant{0,
-                               8,
-                               "CCC",
-                               {"GGG"},
-                               "PASS",
-                               {},
-                               52.161f,
-                               {{"GT", "1/1"}, {"GQ", "52"}, {"DP", "9"}, {"MIN_DP", "8"}},
-                               0,
-                               3},
+            secondary::Variant{
+                    .seq_id = 0,
+                    .pos = 8,
+                    .ref = "CCC",
+                    .alts = {"GGG"},
+                    .filter = secondary::VARIANT_PASS_FILTER,
+                    .info = {},
+                    .qual = 52.161f,
+                    .format = {{"GT", "1/1"}, {"GQ", "52"}, {"DP", "9"}, {"MIN_DP", "8"}},
+                    .rstart = 0,
+                    .rend = 3,
+            },
     };
     const std::vector<secondary::Variant> expected_merged_variants{
             long_simple_variant, expected_inference_variants.front()};
@@ -1893,7 +1762,7 @@ CATCH_TEST_CASE(
             .pos = 4,
             .ref = "A",
             .alts = {"T"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
             .format = {{"GT", "1/1"}, {"GQ", "60"}},
@@ -1905,7 +1774,7 @@ CATCH_TEST_CASE(
             .pos = 4,
             .ref = "A",
             .alts = {"T"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
             .format = {{"GT", "1"}, {"GQ", "60"}},
@@ -1997,7 +1866,7 @@ CATCH_TEST_CASE(
             .pos = 4,
             .ref = "A",
             .alts = {"T"},
-            .filter = "PASS",
+            .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
             .format = {{"GT", "1/1"}, {"GQ", "60"}},
@@ -2072,19 +1941,19 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
     const std::vector<secondary::Variant> chr1_variants = {
         {
             // collapsed because hom in hemizygous region
-            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het-alt
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }
     };
     const std::vector<secondary::Variant> expected_chr1_filtered_variants = {
         {
             // collapsed because hom in hemizygous region
-            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 0, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het-alt
             .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
@@ -2102,11 +1971,11 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
     // clang-format off
     const std::vector<secondary::Variant> chr2_variants = {
         {
-            .seq_id = 1, .pos = 0, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 1, .pos = 0, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
-            .seq_id = 1, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 1, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
-            .seq_id = 1, .pos = 10, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 1, .pos = 10, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }
     };
     // clang-format on
@@ -2120,49 +1989,49 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
     const std::vector<secondary::Variant> chr3_variants = {
         {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans start of a hemizygous region
-            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het in a hemizygous region
-            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans end of a hemizygous region
-            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // collapsed because hom inside a hemizygous region
-            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         },
     };
     const std::vector<secondary::Variant> expected_chr3_filtered_variants = {
         {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 1, .ref = "A", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans start of a hemizygous region
-            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 8, .ref = "ACCGTGT", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het in a hemizygous region
             .seq_id = 2, .pos = 16, .ref = "A", .alts = {"T"}, .filter = "IncompatZyg", .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because spans end of a hemizygous region
-            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 19, .ref = "AGAG", .alts = {"A"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 22, .ref = "A", .alts = {"C"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // collapsed because hom inside a hemizygous region
-            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 33, .ref = "ACC", .alts = {"A"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // unchanged because outside hemizygous region
-            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = "PASS", .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 2, .pos = 43, .ref = "G", .alts = {"GTTC"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 60.0f, .format = {{"GT", "1/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         },
     };
     // clang-format on
@@ -2193,10 +2062,14 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
         data.ready = true;
         data.num_samples = 0;
         data.selected_regions = {secondary::RegionInt{0, 0, 5}};
-        data.variants_simple = {secondary::Variant{0, 1, "C", {"A"}, "PASS", {}, 41.0f,
-                                                   {{"GT", "1/1"}, {"GQ", "41"}}, 0, 0},
-                                secondary::Variant{0, 2, "G", {"T"}, "PASS", {}, 42.0f,
-                                                   {{"GT", "1/1"}, {"GQ", "42"}}, 0, 0}};
+        data.variants_simple = {secondary::Variant{.seq_id = 0, .pos = 1, .ref = "C", .alts = {"A"},
+                                                   .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 41.0f,
+                                                   .format = {{"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0,
+                                                   .rend = 0},
+                                secondary::Variant{.seq_id = 0, .pos = 2, .ref = "G", .alts = {"T"},
+                                                   .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 42.0f,
+                                                   .format = {{"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0,
+                                                   .rend = 0}};
         data.read_endpoints = {
             {0, 1},
             {0, 2},
@@ -2240,18 +2113,18 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     CATCH_REQUIRE(!ret_status.exception_thrown);
     CATCH_REQUIRE(!worker_terminate.load());
     CATCH_REQUIRE(chrom_reduce_data[0].variants_merged ==
-                  std::vector{secondary::Variant{0, 0, "A", {"<*>"}, ".",
-                                                 {{"END", "1"}}, 60.0f,
-                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, 0,
-                                                 1},
-                              secondary::Variant{0, 1, "C", {"A"}, "PASS", {}, 41.0f,
-                                                 {{"GT", "1/1"}, {"GQ", "41"}}, 0, 0},
-                              secondary::Variant{0, 2, "G", {"T"}, "PASS", {}, 42.0f,
-                                                 {{"GT", "1/1"}, {"GQ", "42"}}, 0, 0},
-                              secondary::Variant{0, 3, "T", {"<*>"}, ".",
-                                                 {{"END", "5"}}, 60.0f,
-                                                 {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, 3,
-                                                 5}});
+                  std::vector{secondary::Variant{.seq_id = 0, .pos = 0, .ref = "A", .alts = {"<*>"}, .filter = secondary::NO_VARIANT_FILTER,
+                                                 .info = {{"END", "1"}}, .qual = 60.0f,
+                                                 .format = {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, .rstart = 0,
+                                                 .rend = 0},
+                              secondary::Variant{.seq_id = 0, .pos = 1, .ref = "C", .alts = {"A"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 41.0f,
+                                                 .format = {{"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0, .rend = 0},
+                              secondary::Variant{.seq_id = 0, .pos = 2, .ref = "G", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 42.0f,
+                                                 .format = {{"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0, .rend = 0},
+                              secondary::Variant{.seq_id = 0, .pos = 3, .ref = "T", .alts = {"<*>"}, .filter = secondary::NO_VARIANT_FILTER,
+                                                 .info = {{"END", "5"}}, .qual = 60.0f,
+                                                 .format = {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, .rstart = 0,
+                                                 .rend = 0}});
     CATCH_CHECK(stats.get_stats().at("processed") == 5.0);
     CATCH_CHECK(std::size(output_queue) == 1);
     // clang-format on

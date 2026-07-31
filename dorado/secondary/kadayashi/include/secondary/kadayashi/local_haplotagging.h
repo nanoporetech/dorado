@@ -1,6 +1,7 @@
 #pragma once
 
 #include "secondary/common/bam_file.h"
+#include "secondary/common/variant.h"
 #include "secondary/features/medaka_read_matrix.h"
 #include "types.h"
 
@@ -195,7 +196,7 @@ std::unordered_map<std::string, int> kadayashi_simple_single_region_wrapper(
         const float min_strand_cov_frac,
         const float max_gapcompressed_seqdiv);
 
-/// Exposed for CLI. Used `variant_dorado_style_t` instead.
+/// Exposed for CLI.
 struct variant_fullinfo_t {
     bool is_valid{true};
     bool is_confident{true};
@@ -220,32 +221,10 @@ struct variant_fullinfo_t {
 
 std::string variant_fullinfo_to_string(const variant_fullinfo_t &v);
 
-/** Variant information that can be directly used to compose
-* VCF line, except for `pos` which is in 0-index.
-*/
-struct variant_dorado_style_t {
-    bool is_confident;
-    bool is_phased;
-    uint32_t pos;
-
-    /** Currently a placeholder value: confident variant
-     * are assigned 60. Unsure variants are assigned 0.
-     */
-    int qual;
-
-    std::string ref;
-    std::vector<std::string> alts;
-    std::pair<char, char> genotype;
-
-    int min_depth{0};
-    int median_depth{0};
-};
-
-std::string variant_dorado_style_to_string(const variant_dorado_style_t &v);
+dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fullinfo_t &var,
+                                                                bool keep_phasing);
 
 bool operator==(const variant_fullinfo_t &a, const variant_fullinfo_t &b);
-bool operator==(const variant_dorado_style_t &a, const variant_dorado_style_t &b);
-std::ostream &operator<<(std::ostream &os, const variant_dorado_style_t &a);
 
 struct varcall_result_internal_t {
     std::unordered_map<std::string, int> qname2hp{};  // 0-index
@@ -254,8 +233,8 @@ struct varcall_result_internal_t {
 };
 
 struct varcall_result_t {
-    std::unordered_map<std::string, int> qname2hp{};  // 0-index
-    std::vector<variant_dorado_style_t> variants{};   // 0-index, for VCF
+    std::unordered_map<std::string, int> qname2hp{};     // 0-index
+    std::vector<dorado::secondary::Variant> variants{};  // 0-index, for VCF
     std::unordered_map<uint32_t, uint8_t> phasing_breakpoints{};
     std::vector<std::pair<uint32_t, uint32_t>> read_endpoints{};
 };

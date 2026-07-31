@@ -115,7 +115,7 @@ std::string format_header_line(const FieldSpec& spec, const std::string_view met
 }  // namespace
 
 VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
-                     const std::vector<std::pair<std::string, std::string>>& filters,
+                     const std::vector<std::pair<std::string_view, std::string>>& filters,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
                      const bool include_gvcf_headers)
         : m_vcf_fp{hts_open(in_fn.string().c_str(), "w"), HtsFileDestructor()},
@@ -212,10 +212,12 @@ void VCFWriter::write_variant(const Variant& variant) {
     }
 
     // Look up the FILTER ID in the header
-    if (!std::empty(variant.filter) && (variant.filter != ".")) {
-        int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, variant.filter.c_str());
+    if (!std::empty(variant.filter) && (variant.filter != secondary::NO_VARIANT_FILTER)) {
+        int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, variant.filter.data());
         if (filter_id < 0) {
-            throw std::runtime_error("VCF filter ID '" + variant.filter + "' not found in header.");
+            throw std::runtime_error("VCF filter ID '" +
+                                     std::string(variant.filter.data(), std::size(variant.filter)) +
+                                     "' not found in header.");
         }
         bcf_update_filter(m_header.get(), record.get(), &filter_id, 1);
     }

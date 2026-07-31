@@ -218,54 +218,6 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
     return resources;
 }
 
-std::vector<secondary::Variant> convert_variants(
-        const std::vector<kadayashi::variant_dorado_style_t>& kadayashi_variants,
-        const int32_t seq_id,
-        const int32_t ploidy,
-        const float pass_min_qual) {
-    std::vector<secondary::Variant> ret;
-    ret.reserve(std::ssize(kadayashi_variants));
-
-    for (int64_t j = 0; j < std::ssize(kadayashi_variants); ++j) {
-        const kadayashi::variant_dorado_style_t& var = kadayashi_variants[j];
-
-        secondary::Variant new_var = secondary::Variant{
-                .seq_id = seq_id,
-                .pos = static_cast<int64_t>(var.pos),
-                .ref = var.ref,
-                .alts = var.alts,
-                .filter = "",
-                .info = {},
-                .qual = static_cast<float>(var.qual),
-                .format = {},
-                .rstart = 0,
-                .rend = 0,
-        };
-
-        // Kadayashi does not output an alt for every haplotype.
-        // Alts which match the reference are added here.
-        while (!std::empty(new_var.alts) && (std::ssize(new_var.alts) < ploidy)) {
-            if (var.genotype.first != var.genotype.second) {
-                // The alt matches the ref (het variant).
-                new_var.alts.emplace_back(new_var.ref);
-            } else {
-                // Hom variant.
-                new_var.alts.emplace_back(new_var.alts.front());
-            }
-        }
-
-        new_var = secondary::normalize_genotype(new_var, ploidy, pass_min_qual);
-        new_var.format["DP"] = std::to_string(var.median_depth);
-        if ((var.min_depth != var.median_depth) && (new_var.ref.length() > 1)) {
-            new_var.format["MIN_DP"] = std::to_string(var.min_depth);
-        }
-
-        ret.emplace_back(std::move(new_var));
-    }
-
-    return ret;
-}
-
 namespace {
 secondary::IntervalTreeInt64 build_interval_tree(const std::vector<int64_t>& in_candidate_sites) {
     std::vector<interval_tree::Interval<int64_t, int64_t>> intervals;
@@ -330,9 +282,16 @@ BamWindowResult process_single_bam_window(
     std::vector<int64_t> candidate_sites;
 
     if (candidate_source == secondary::VariantCandidateSource::COMPUTE) {
-        // Convert all variants.
-        std::vector<secondary::Variant> all_variants = convert_variants(
-                kadayashi_result.variants, bam_window.seq_id, ploidy, pass_min_qual);
+        // Kadayashi now emits secondary::Variant directly.
+        std::vector<secondary::Variant> all_variants = std::move(kadayashi_result.variants);
+        for (secondary::Variant& var : all_variants) {
+            var.seq_id = bam_window.seq_id;
+            if (var.filter != secondary::NO_VARIANT_FILTER) {
+                var.filter = (var.qual < pass_min_qual) ? secondary::VARIANT_LOWQUAL_FILTER
+                                                        : secondary::VARIANT_PASS_FILTER;
+            }
+            secondary::sanitize_empty_alts(var, ploidy);
+        }
 
         // Storage space for pass/candidate variants.
         pass_variants.reserve(std::size(all_variants));
@@ -1579,36 +1538,6 @@ std::vector<secondary::Interval64> merge_intervals(
     return merged;
 }
 
-secondary::Variant make_gvcf_reference_record(const int32_t seq_id,
-                                              const int64_t pos,
-                                              const char ref_base,
-                                              const int64_t end,
-                                              const int32_t ploidy,
-                                              const int32_t min_depth) {
-    const float qual = utils::is_canonical_base(ref_base) ? secondary::VCF_MAX_GQ_CAP : 0.0f;
-    const secondary::Variant ref_var{
-            .seq_id = seq_id,
-            .pos = pos,
-            .ref = std::string(1, ref_base),
-            .alts = {"."},
-            .filter = ".",
-            .info = {},
-            .qual = qual,
-            .format = {},
-            .rstart = pos,
-            .rend = end,
-    };
-
-    secondary::Variant ret =
-            secondary::normalize_genotype(ref_var, ploidy, secondary::VCF_MAX_GQ_CAP);
-
-    secondary::set_gvcf_reference_block_end(ret, end);
-    const std::string depth_str = (min_depth >= 0) ? std::to_string(min_depth) : ".";
-    ret.format["MIN_DP"] = depth_str;
-
-    return ret;
-}
-
 void add_gvcf_reference_records_for_unprocessed_regions(
         std::vector<secondary::Variant>& variants,
         const int32_t seq_id,
@@ -1706,9 +1635,10 @@ void add_gvcf_reference_records_for_unprocessed_regions(
                 min_depth = std::min(min_depth, depth);
             }
 
-            variants.emplace_back(make_gvcf_reference_record(
-                    seq_id, block_start, draft[static_cast<std::size_t>(block_start)], pos, ploidy,
-                    (std::size(read_endpoints) > 0) ? min_depth : -1));
+            variants.emplace_back(secondary::make_gvcf_reference_record(
+                    seq_id, block_start, draft[static_cast<std::size_t>(block_start)],
+                    secondary::VCF_MAX_GQ_CAP, ploidy,
+                    (std::size(read_endpoints) > 0) ? min_depth : -1, pos, 0, 0));
         }
     }
 }

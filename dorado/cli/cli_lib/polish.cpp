@@ -14,6 +14,7 @@
 #include "secondary/common/batching.h"
 #include "secondary/common/region.h"
 #include "secondary/common/stats.h"
+#include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/consensus/window_utils.h"
@@ -923,11 +924,11 @@ void run_polishing(const Options& opt,
 
     if (opt.run_variant_calling) {
         // These are the only available FILTER options.
-        const std::vector<std::pair<std::string, std::string>> filters{
+        const std::vector<std::pair<std::string_view, std::string>> filters{
                 // PASS is added automatically by bcf_hdr
-                // {"PASS", "All filters passed"},
-                {"LowQual", "Variant quality is below threshold"},
-                {".", "Non-variant position"},
+                // {secondary::VARIANT_PASS_FILTER, "All filters passed"},
+                {secondary::VARIANT_LOWQUAL_FILTER, "Variant quality is below threshold"},
+                {secondary::NO_VARIANT_FILTER, "Non-variant position"},
         };
 
         vcf_writer = std::make_unique<secondary::VCFWriter>(
