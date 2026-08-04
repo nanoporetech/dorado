@@ -822,6 +822,10 @@ test:model_download:linux:x86:noble:
     - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 64
 
 test:model_download:macos:arm:
+  tags:
+    - osx_arm64
+    - on-prem
+    - m4 # Pinned to specific hardware. See DOR-1542
   extends:
     - .macos_arm_runner
     - .on_nightly_or_manual
