@@ -27,7 +27,7 @@ bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& 
 
 // BAM tags to add to the read header for fastx output
 constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs", "ch", "PU",
-                                    "DT", "mv", "SM", "al", "tm"};
+                                    "DT", "mv", "SM", "al", "tm", "LB"};
 
 void set_cram_opt(const dorado::HtsFilePtr& file, const std::string& reference) {
     if (hts_set_opt(file.get(), CRAM_OPT_REFERENCE, reference.c_str()) < 0) {
