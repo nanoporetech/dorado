@@ -267,7 +267,7 @@ if [ $RUN_TESTS_POSTRUN_DEMUX -eq 1 ]; then
     $dorado_bin demux ${calls_notrim_fastq} --kit-name SQK-NBD114-96 --output-dir ${dest} --emit-fastq
     # The position_id, acquisition_id are not currently available in FASTQ headers - their placeholders are used instead
     # protocol_group_id (experiment_name) is also not available in FASTQ headers - there is no defined placeholder for this, so it is empty
-    core="no_sample/20250211_1156_0_NBD_POC_JM_9bf51088"
+    core="NBD_POC_JM/20250211_1156_0_NBD_POC_JM_9bf51088"
     expected=(
         "${core}/fastq_pass/unclassified/NBD_POC_JM_pass_unclassified_9bf51088_00000000_0.fastq"
         "${core}/fastq_pass/barcode37/NBD_POC_JM_pass_barcode37_9bf51088_00000000_0.fastq"
@@ -356,7 +356,7 @@ if [ $RUN_TESTS_ALIGNER -eq 1 ]; then
     $dorado_bin aligner ${align_data_ref} ${align_data_ref} --output-dir ${dest}
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
     # Also have no_sample here because the sample id is not added to the FASTQ file spec yet.
-    core="./no_sample/20231125_1913_0_TEST_4524e8b9"
+    core="./test/20231125_1913_0_TEST_4524e8b9"
     expected=(
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam"
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.bam.bai"
@@ -370,7 +370,7 @@ if [ $RUN_TESTS_ALIGNER -eq 1 ]; then
     $dorado_bin aligner ${align_data_ref} ${align_data_ref} --output-dir ${dest} --emit-cram
     # The position_id and acquisition_id are not currently available in BAM files - their placeholders are used instead
     # Also have no_sample here because the sample id is not added to the FASTQ file spec yet.
-    core="./no_sample/20231125_1913_0_TEST_4524e8b9"
+    core="./test/20231125_1913_0_TEST_4524e8b9"
     expected=(
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.cram"
         "${core}/bam_pass/TEST_pass_4524e8b9_00000000_0.cram.crai"
