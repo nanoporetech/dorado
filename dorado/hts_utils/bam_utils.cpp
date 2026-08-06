@@ -69,7 +69,9 @@ std::string read_group_to_string(const dorado::ReadGroup& read_group) {
                                                 : (" experiment_id=" + read_group.experiment_id))
            << " acquisition_start_time=" << value_or_unknown(read_group.acq_start_time)
            << " model_stride=" << read_group.model_stride << "\t";
-        rg << "LB:" << value_or_unknown(read_group.sample_id) << "\t";
+        if (!read_group.sample_id.empty()) {
+            rg << "LB:" << read_group.sample_id << "\t";
+        }
         rg << "tm:" << to_string(read_group.trim_flags);
     }
     return rg.str();
