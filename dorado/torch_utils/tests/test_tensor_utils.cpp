@@ -241,7 +241,7 @@ DEFINE_TEST("flip_inplace") {
         };
 
         CATCH_BENCHMARK(fmt::format("our flip size={}, dim={}", num_elems, flip_dim)) {
-            dorado::utils::flip_inplace<float, sizes.size()>(input, flip_dim);
+            dorado::utils::flip_inplace<float, std::tuple_size_v<decltype(sizes)>>(input, flip_dim);
         };
     }
 #endif  // DORADO_ENABLE_BENCHMARK_TESTS

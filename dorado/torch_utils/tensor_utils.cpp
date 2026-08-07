@@ -345,7 +345,7 @@ void flip_inplace(at::Tensor& x, size_t dim) {
             // eg, [1, 2, 3] + dim=1 --> [1, 3]
             const auto make_array_with_dim_skip =
                     [sorted_dim](const std::array<int64_t, Dims>& array) {
-                        std::array<int64_t, Dims - 1> out;
+                        std::array<int64_t, Dims - 1> out{};
                         int64_t* ptr = out.data();
                         for (int64_t i = 0; i < sorted_dim; i++) {
                             *ptr++ = array.at(i);
