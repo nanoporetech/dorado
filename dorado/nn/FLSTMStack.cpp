@@ -127,7 +127,7 @@ void FLSTMStackImpl::forward_koi(WorkingMemory &wm, const AuxiliaryData *aux) {
         throw std::runtime_error(
                 "FLSTM stack error: unsupported first forward layer with variable chunks.");
     }
-    if (aux && ((std::size(layers_) / 2U) == 0)) {
+    if (aux && ((std::size(layers_) % 2U) == 0)) {
         throw std::runtime_error(
                 "FLSTM stack error: unsupported even number of layers with variable chunks.");
     }
