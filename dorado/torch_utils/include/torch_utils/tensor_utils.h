@@ -36,6 +36,10 @@ void convert_f32_to_f16(c10::Half* dest, const float* src, std::size_t count);
 // Shift and scale the i16 tensor |t| in f32, then convert to f16, all in-place.
 void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& t, float shift, float scale);
 
+// Faster and less memory hungry version of tensor.flip().
+template <typename T, size_t Dims>
+extern void flip_inplace(at::Tensor& x, size_t dim);
+
 // Copies count elements from src_offset elements into src to
 // dest_elements into dst.  The tensors must be contiguous.
 void copy_tensor_elems(at::Tensor& dest_tensor,

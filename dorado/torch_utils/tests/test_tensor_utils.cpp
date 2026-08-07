@@ -200,4 +200,51 @@ DEFINE_TEST("copy_tensor_elems") {
     }
 }
 
+template <typename Type, at::ScalarType ScalarT, int Dims>
+void flip_inplace_test() {
+    for (int flip_dim = 0; flip_dim < Dims; flip_dim++) {
+        for (int i = 0; i < 10; ++i) {
+            CATCH_CAPTURE(ScalarT, Dims, flip_dim, i);
+
+            std::array<int64_t, Dims> sizes;
+            for (int64_t & size : sizes) {
+                size = 1 + (rand() % 100);
+            }
+
+            auto input = at::rand(sizes, ScalarT);
+            const auto expected = input.flip(flip_dim);
+            // flip() should make a copy, otherwise we're comparing against itself.
+            CATCH_REQUIRE(expected.const_data_ptr() != input.const_data_ptr());
+            dorado::utils::flip_inplace<Type, Dims>(input, flip_dim);
+
+            CATCH_REQUIRE(at::equal(expected, input));
+        }
+    }
+}
+
+DEFINE_TEST("flip_inplace") {
+    at::manual_seed(42);
+    srand(42);
+
+    flip_inplace_test<float, at::kFloat, 2>();
+    flip_inplace_test<float, at::kFloat, 3>();
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+    {
+        const int64_t num_elems = GENERATE(10, 100, 500);
+        const auto flip_dim = GENERATE(0, 1, 2);
+        const std::array sizes{num_elems, num_elems, num_elems};
+        auto input = at::rand(sizes, at::kFloat);
+
+        CATCH_BENCHMARK(fmt::format("torch flip size={}, dim={}", num_elems, flip_dim)) {
+            input.flip(flip_dim);
+        };
+
+        CATCH_BENCHMARK(fmt::format("our flip size={}, dim={}", num_elems, flip_dim)) {
+            dorado::utils::flip_inplace<float, sizes.size()>(input, flip_dim);
+        };
+    }
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
+}
+
 }  // namespace

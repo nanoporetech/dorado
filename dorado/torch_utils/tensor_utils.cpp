@@ -9,6 +9,7 @@
 #include <cstring>
 #include <fstream>
 #include <ostream>
+#include <span>
 #include <sstream>
 #include <vector>
 
@@ -258,6 +259,138 @@ void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& tensor, float shift, floa
     assert(tensor.element_size() == 2);
     IFUNC_GET(shift_scale_tensor_i16_to_f16_inplace_impl)(tensor, shift, scale);
 }
+
+template <typename T, size_t Dims>
+void flip_inplace(at::Tensor& x, size_t dim) {
+    TORCH_CHECK(x.dim() == Dims, "flip_inplace() dimension mismatch: ", Dims, " != ", x.dim());
+
+    // Both CPU and MPS can access the data directly.
+    if (x.device() == at::DeviceType::CPU || x.device() == at::DeviceType::MPS) {
+        const auto make_array = [](const at::IntArrayRef& array) {
+            TORCH_CHECK(array.size() == Dims);
+            std::array<int64_t, Dims> out;
+            for (size_t i = 0; i < Dims; i++) {
+                out.at(i) = array.at(i);
+            }
+            return out;
+        };
+
+        // Sort them by stride for better cache usage.
+        std::array<int64_t, Dims> sorted_sizes = make_array(x.sizes());
+        std::array<int64_t, Dims> sorted_strides = make_array(x.strides());
+        int sorted_dim = dim;
+        // This is O(Dims^2), but Dims isn't going to be big.
+        for (int64_t pos = 0; pos < std::ssize(sorted_strides); pos++) {
+            const auto stride_iter = sorted_strides.begin() + pos;
+            const auto size_iter = sorted_sizes.begin() + pos;
+            // Find the smallest remaining stride.
+            const auto min_idx = std::min_element(stride_iter, sorted_strides.end()) - stride_iter;
+            // Move it into the current position.
+            std::iter_swap(stride_iter, stride_iter + min_idx);
+            std::iter_swap(size_iter, size_iter + min_idx);
+            // Update the dimension that we're flipping on.
+            if (sorted_dim == pos) {
+                sorted_dim = pos + min_idx;
+            } else if (sorted_dim == pos + min_idx) {
+                sorted_dim = pos;
+            }
+        }
+
+        auto* const data = x.mutable_data_ptr<T>();
+        if (sorted_dim == 0) {
+            // If the dimension we're flipping on is the innermost then we need
+            // to do the left/right calculation in the inner loop.
+            const int64_t inner_size = sorted_sizes.at(0);
+            const int64_t inner_stride = sorted_strides.at(0);
+            const std::span<const int64_t, Dims - 1> outer_sizes =
+                    std::span{sorted_sizes}.template subspan<1, Dims - 1>();
+            const std::span<const int64_t, Dims - 1> outer_strides =
+                    std::span{sorted_strides}.template subspan<1, Dims - 1>();
+
+            const auto swap_inner = [&](int64_t offset) {
+                auto* left = data + offset;
+                auto* right = data + offset + (inner_size - 1) * inner_stride;
+                for (int64_t inner = 0; inner < inner_size / 2; inner++) {
+                    std::iter_swap(left, right);
+                    left += inner_stride;
+                    right -= inner_stride;
+                }
+            };
+
+            // TODO: can we do some voodoo to generalise this?
+            if constexpr (Dims == 2) {
+                for (int64_t outer0 = 0; outer0 < outer_sizes[0]; outer0++) {
+                    const int64_t offset = outer0 * outer_strides[0];
+                    swap_inner(offset);
+                }
+            } else if constexpr (Dims == 3) {
+                for (int64_t outer1 = 0; outer1 < outer_sizes[1]; outer1++) {
+                    for (int64_t outer0 = 0; outer0 < outer_sizes[0]; outer0++) {
+                        const int64_t offset =
+                                outer0 * outer_strides[0] + outer1 * outer_strides[1];
+                        swap_inner(offset);
+                    }
+                }
+            } else {
+                static_assert(Dims != 0, "Unimplemented loop");
+            }
+
+        } else {
+            // If the dimension we're flipping on isn't the innermost one then
+            // it's more efficient to keep the inner loops as small as possible.
+            const int64_t outer_size = sorted_sizes.at(sorted_dim);
+            const int64_t outer_stride = sorted_strides.at(sorted_dim);
+
+            // Extract the elements of an array, skipping the dim that we're fliping on.
+            // eg, [1, 2, 3] + dim=1 --> [1, 3]
+            const auto make_array_with_dim_skip =
+                    [sorted_dim](const std::array<int64_t, Dims>& array) {
+                        std::array<int64_t, Dims - 1> out;
+                        int64_t* ptr = out.data();
+                        for (int64_t i = 0; i < sorted_dim; i++) {
+                            *ptr++ = array.at(i);
+                        }
+                        for (size_t i = sorted_dim + 1; i < Dims; i++) {
+                            *ptr++ = array.at(i);
+                        }
+                        return out;
+                    };
+            const std::array<int64_t, Dims - 1> inner_sizes =
+                    make_array_with_dim_skip(sorted_sizes);
+            const std::array<int64_t, Dims - 1> inner_strides =
+                    make_array_with_dim_skip(sorted_strides);
+
+            for (int64_t outer = 0; outer < outer_size / 2; outer++) {
+                auto* const left = data + outer * outer_stride;
+                auto* const right = data + (outer_size - outer - 1) * outer_stride;
+
+                // TODO: can we do some voodoo to generalise this?
+                if constexpr (Dims == 2) {
+                    for (int64_t inner0 = 0; inner0 < inner_sizes[0]; inner0++) {
+                        const int64_t offset = inner0 * inner_strides[0];
+                        std::swap(left[offset], right[offset]);
+                    }
+                } else if constexpr (Dims == 3) {
+                    for (int64_t inner1 = 0; inner1 < inner_sizes[1]; inner1++) {
+                        for (int64_t inner0 = 0; inner0 < inner_sizes[0]; inner0++) {
+                            const int64_t offset =
+                                    inner0 * inner_strides[0] + inner1 * inner_strides[1];
+                            std::swap(left[offset], right[offset]);
+                        }
+                    }
+                } else {
+                    static_assert(Dims != 0, "Unimplemented loop");
+                }
+            }
+        }
+    } else {
+        // TODO(DOR-1773): CUDA kernel
+        x = x.flip(dim);
+    }
+}
+// Explicit instantiations.
+template void flip_inplace<float, 2>(at::Tensor& x, size_t dim);
+template void flip_inplace<float, 3>(at::Tensor& x, size_t dim);
 
 void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t dest_offset,
