@@ -28,7 +28,7 @@ FLSTMLayerImpl::FLSTMLayerImpl(const int C, const int K, at::TensorOptions opts)
 at::Tensor FLSTMLayerImpl::forward(at::Tensor x) {
     const auto opts = x.options();
 
-    x = x.transpose(0, 1).contiguous();  // NTC -> TNC
+    x = x.transpose(0, 1);  // NTC -> TNC
     const int T = x.size(0);
     const int N = x.size(1);
 
@@ -59,7 +59,7 @@ at::Tensor FLSTMLayerImpl::forward(at::Tensor x) {
     }
 
     using namespace torch::indexing;
-    hh = hh.index({Slice(1, None), Slice(), Slice()}).transpose(0, 1).contiguous();
+    hh = hh.index({Slice(1, None), Slice(), Slice()}).transpose(0, 1);
 
     return hh;
 }
@@ -89,7 +89,7 @@ at::Tensor FLSTMStackImpl::forward(at::Tensor x) {
         }
         x = layers_[i]->forward(x);
     }
-    return is_reverse ? x.flip(1) : x;
+    return is_reverse ? x.flip(1) : x.contiguous();
 }
 
 #if DORADO_CUDA_BUILD
