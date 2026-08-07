@@ -24,6 +24,8 @@ dorado_add_library(
         tensor_utils.cpp
         torch_utils.cpp
         trim.cpp
+    SOURCES_TEST
+        test_tensor_utils.cpp
     DEPENDS_PUBLIC
         date::date
         edlib
