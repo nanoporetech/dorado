@@ -200,34 +200,36 @@ DEFINE_TEST("copy_tensor_elems") {
     }
 }
 
-template <typename Type, at::ScalarType ScalarT, int Dims>
-void flip_inplace_test() {
-    for (int flip_dim = 0; flip_dim < Dims; flip_dim++) {
-        for (int i = 0; i < 10; ++i) {
-            CATCH_CAPTURE(ScalarT, Dims, flip_dim, i);
-
-            std::array<int64_t, Dims> sizes;
-            for (int64_t & size : sizes) {
-                size = 1 + (rand() % 100);
-            }
-
-            auto input = at::rand(sizes, ScalarT);
-            const auto expected = input.flip(flip_dim);
-            // flip() should make a copy, otherwise we're comparing against itself.
-            CATCH_REQUIRE(expected.const_data_ptr() != input.const_data_ptr());
-            dorado::utils::flip_inplace<Type, Dims>(input, flip_dim);
-
-            CATCH_REQUIRE(at::equal(expected, input));
-        }
-    }
-}
-
 DEFINE_TEST("flip_inplace") {
     at::manual_seed(42);
     srand(42);
 
-    flip_inplace_test<float, at::kFloat, 2>();
-    flip_inplace_test<float, at::kFloat, 3>();
+    const auto flip_inplace_test = [](at::ScalarType type, int dims) {
+        for (int flip_dim = 0; flip_dim < dims; flip_dim++) {
+            for (int i = 0; i < 10; ++i) {
+                CATCH_CAPTURE(type, dims, flip_dim, i);
+
+                std::vector<int64_t> sizes(dims);
+                for (int64_t & size : sizes) {
+                    size = 1 + (rand() % 100);
+                }
+
+                auto input = at::rand(sizes, type);
+                const auto expected = input.flip(flip_dim);
+                CATCH_REQUIRE(expected.const_data_ptr() !=
+                              input.const_data_ptr());  // flip() should make a copy
+                dorado::utils::flip_inplace(input, flip_dim);
+
+                CATCH_REQUIRE(at::equal(expected, input));
+            }
+        }
+    };
+
+    for (at::ScalarType type : {at::kFloat, at::kHalf}) {
+        for (int dims : {2, 3}) {
+            flip_inplace_test(type, dims);
+        }
+    }
 
 #if DORADO_ENABLE_BENCHMARK_TESTS
     {
@@ -241,7 +243,7 @@ DEFINE_TEST("flip_inplace") {
         };
 
         CATCH_BENCHMARK(fmt::format("our flip size={}, dim={}", num_elems, flip_dim)) {
-            dorado::utils::flip_inplace<float, std::tuple_size_v<decltype(sizes)>>(input, flip_dim);
+            dorado::utils::flip_inplace(input, flip_dim);
         };
     }
 #endif  // DORADO_ENABLE_BENCHMARK_TESTS

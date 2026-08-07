@@ -261,7 +261,7 @@ void shift_scale_tensor_i16_to_f16_inplace(at::Tensor& tensor, float shift, floa
 }
 
 template <typename T, size_t Dims>
-void flip_inplace(at::Tensor& x, size_t dim) {
+static void flip_inplace_internal(at::Tensor& x, size_t dim) {
     TORCH_CHECK(x.dim() == Dims, "flip_inplace() dimension mismatch: ", Dims, " != ", x.dim());
 
     // Both CPU and MPS can access the data directly.
@@ -389,9 +389,34 @@ void flip_inplace(at::Tensor& x, size_t dim) {
         x = x.flip(dim);
     }
 }
-// Explicit instantiations.
-template void flip_inplace<float, 2>(at::Tensor& x, size_t dim);
-template void flip_inplace<float, 3>(at::Tensor& x, size_t dim);
+void flip_inplace(at::Tensor& x, size_t dim) {
+    const auto dispatch = [&]<typename T>() {
+        // An unsized specialisation (ie dims is a runtime constant) is about half as fast.
+        const int64_t dims = x.dim();
+        switch (dims) {
+        case 2:
+            flip_inplace_internal<T, 2>(x, dim);
+            break;
+        case 3:
+            flip_inplace_internal<T, 3>(x, dim);
+            break;
+        default:
+            throw std::runtime_error("Unhandled tensor size in flip_inplace()");
+        }
+    };
+
+    const at::ScalarType type = x.scalar_type();
+    switch (type) {
+    case at::ScalarType::Float:
+        dispatch.operator()<float>();
+        break;
+    case at::ScalarType::Half:
+        dispatch.operator()<c10::Half>();
+        break;
+    default:
+        throw std::runtime_error("Unhandled tensor type in flip_inplace()");
+    }
+}
 
 void copy_tensor_elems(at::Tensor& dest_tensor,
                        std::size_t dest_offset,
