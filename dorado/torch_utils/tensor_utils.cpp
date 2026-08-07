@@ -308,12 +308,13 @@ void flip_inplace(at::Tensor& x, size_t dim) {
                     std::span{sorted_strides}.template subspan<1, Dims - 1>();
 
             const auto swap_inner = [&](int64_t offset) {
-                auto* left = data + offset;
-                auto* right = data + offset + (inner_size - 1) * inner_stride;
                 for (int64_t inner = 0; inner < inner_size / 2; inner++) {
+                    // Recalculating left+right every time is 2x faster than
+                    // incrementing/decrementing by stride each iteration.
+                    // (Seen with tensors 10x10x10 to 500x500x500 on x86 with GCC).
+                    auto* left = data + offset + inner * inner_stride;
+                    auto* right = data + offset + (inner_size - 1 - inner) * inner_stride;
                     std::iter_swap(left, right);
-                    left += inner_stride;
-                    right -= inner_stride;
                 }
             };
 
