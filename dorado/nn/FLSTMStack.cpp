@@ -84,12 +84,15 @@ at::Tensor FLSTMStackImpl::forward(at::Tensor x) {
     bool is_reverse = !first_reverse_;
     for (int i = 0; i < std::ssize(layers_); ++i) {
         if ((i > 0) || first_reverse_) {
-            x = x.flip(1);
+            utils::flip_inplace(x, 1);
             is_reverse ^= 1;
         }
         x = layers_[i]->forward(x);
     }
-    return is_reverse ? x.flip(1) : x.contiguous();
+    if (is_reverse) {
+        utils::flip_inplace(x, 1);
+    }
+    return x.contiguous();
 }
 
 #if DORADO_CUDA_BUILD
