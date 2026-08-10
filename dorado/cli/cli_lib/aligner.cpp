@@ -338,8 +338,8 @@ int aligner(int argc, char* argv[]) {
 
     // Construct the output headers map
     const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner_node);
-    auto modify_hdr = utils::HeaderMapper::Modifier([&aligner_ref](sam_hdr_t* hdr) {
-        cli::add_aligner_pg_hdr(hdr);
+    auto modify_hdr = utils::HeaderMapper::Modifier([&aligner_ref, &argc, &argv](sam_hdr_t* hdr) {
+        cli::add_aligner_pg_hdr(hdr, argc, argv);
         utils::add_hd_header_line(hdr);
         utils::add_sq_hdr(hdr, aligner_ref.get_sequence_records_for_header());
     });
