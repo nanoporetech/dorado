@@ -90,6 +90,11 @@
   tags:
     - benchmark-a100
 
+.linux_benchmark_runner_rtx5000:
+  tags:
+    - gpu-rtx5000pro
+    - ubuntu-24.04
+
 .linux_benchmark_runner_rtx6000:
   tags:
     - gpu-rtx6000pro
@@ -343,6 +348,15 @@ regression_tests:speed:linux:x86:A100:
   extends:
     - .regression_tests:speed:linux:x86
     - .linux_benchmark_runner_a100
+
+regression_tests:speed:linux:x86:RTX5000PRO:
+  variables:
+    GPU_DEVICE_NAME: "RTX5000PRO"
+  needs:
+    - build_archive:linux:x86:cuda13
+  extends:
+    - .regression_tests:speed:linux:x86
+    - .linux_benchmark_runner_rtx5000
 
 regression_tests:speed:linux:x86:RTX6000PRO:
   variables:
