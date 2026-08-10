@@ -188,6 +188,7 @@ class BasecallingSpeedTestCases(abc.ABC):
         elif self.device in [
             "V100",
             "A6000",
+            "RTX5000PRO",  # RTX pro runner only has 1 GPU at the moment
             "RTX6000PRO",  # RTX pro runner only has 1 GPU at the moment
             "5070TI",
         ]:
