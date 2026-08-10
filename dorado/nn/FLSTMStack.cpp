@@ -42,13 +42,12 @@ at::Tensor FLSTMLayerImpl::forward(at::Tensor x) {
     };
     const auto tanh_hard = [](const at::Tensor &a) { return a.clamp_(-1.f, 1.f); };
 
-    const auto ih =
-            torch::matmul(torch::matmul(x, dn_weight_ih_.t()), up_weight_ih_.t()).add_(up_bias_ih_);
-
     for (int t = 0; t < T; ++t) {
+        auto ih_t = torch::matmul(torch::matmul(x[t], dn_weight_ih_.t()), up_weight_ih_.t())
+                            .add_(up_bias_ih_);
         auto gates = torch::matmul(torch::matmul(hh[t], dn_weight_hh_.t()), up_weight_hh_.t())
                              .add_(up_bias_hh_)
-                             .add_(ih[t])
+                             .add_(ih_t)
                              .chunk(4, 1);
         auto i = sigmoid_hard(gates[0]);
         auto f = sigmoid_hard(gates[1]);
