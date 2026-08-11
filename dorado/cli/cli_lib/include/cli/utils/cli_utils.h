@@ -60,6 +60,19 @@ inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_thre
     return std::make_pair(aligner_threads, writer_threads);
 }
 
+inline void add_aligner_pg_hdr(sam_hdr_t* hdr, int argc, char** argv) {
+    std::vector<std::string> args{argv, argv + argc};
+    // build the string ourselves rather than using htslib stringify_args
+    // as we need to quote the arguments to things like --mm2-opts
+    std::ostringstream cl;
+    cl << "dorado";
+    for (const auto& arg : args) {
+        cl << " " << std::quoted(arg);
+    }
+    sam_hdr_add_pg(hdr, "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION, "CL",
+                   cl.str().c_str(), nullptr);
+}
+
 inline void add_aligner_pg_hdr(sam_hdr_t* hdr) {
     sam_hdr_add_pg(hdr, "aligner", "PN", "dorado", "VN", DORADO_VERSION, "DS", MM_VERSION, nullptr);
 }
