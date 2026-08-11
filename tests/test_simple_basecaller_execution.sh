@@ -325,6 +325,10 @@ dorado_aligner_pg_header_test() {
         grep -E $'^@PG\t' "$1" | grep -F $'\tID:aligner' | grep -F $'\tPN:dorado' | sed -E $'s/\tPP:[^\t]*//g' | sed -E $'s/\tCL:[^\t]*//g' || true
     }
 
+    verify_aligner_pg_cl_tags() {
+        grep -E $'^@PG\t' "$1" | grep -F $'\tID:aligner' | grep -F $'\tPN:dorado' | grep -F $'\tCL:dorado'
+    }
+
     $dorado_bin basecaller ${model_5k} ${pod5_single} ${models_directory_arg} -b ${batch} -n 1 --emit-sam --skip-model-compatibility-check > "${out_unaligned_sam}"
     $dorado_bin basecaller ${model_5k} ${pod5_single} ${models_directory_arg} -b ${batch} -n 1 --emit-sam --reference "${ref_fasta}" --skip-model-compatibility-check > "${out_basecaller_aln_sam}"
     $dorado_bin aligner --emit-sam "${ref_fasta}" "${out_unaligned_sam}" > "${out_aligner_sam}"
@@ -349,6 +353,11 @@ dorado_aligner_pg_header_test() {
         echo "dorado basecaller and dorado aligner aligner @PG lines differ after removing PP and CL tags."
         exit 1
     fi
+    if ! verify_aligner_pg_cl_tags ${out_aligner_sam}; then
+        echo "dorado aligner emitted an aligner @PG line without a CL tag."
+        exit 1
+    fi
+
 }
 
 dorado_aligner_pg_header_test
@@ -606,6 +615,10 @@ dorado_duplex_aligner_pg_header_test() {
         grep -E $'^@PG\t' "$1" | grep -F $'\tID:aligner' | grep -F $'\tPN:dorado' | sed -E $'s/\tPP:[^\t]*//g' | sed -E $'s/\tCL:[^\t]*//g' || true
     }
 
+    verify_aligner_pg_cl_tags() {
+        grep -E $'^@PG\t' "$1" | grep -F $'\tID:aligner' | grep -F $'\tPN:dorado' | grep -F $'\tCL:dorado'
+    }
+
     printf ">ref\nACGTA\n" > "${ref_fasta}"
 
     $dorado_bin duplex ${model_5k} "${duplex_pod5}" ${models_directory_arg} --pairs "${pairs_file}" --emit-sam > "${out_unaligned_sam}"
@@ -632,6 +645,10 @@ dorado_duplex_aligner_pg_header_test() {
         echo "dorado duplex and dorado aligner aligner @PG lines differ after removing PP and CL tags."
         exit 1
     fi
+    if ! verify_aligner_pg_cl_tags ${out_aligner_sam}; then
+        echo "dorado aligner emitted an aligner @PG line without a CL tag."
+        exit 1
+    fi    
 }
 
 # Duplex tests.
