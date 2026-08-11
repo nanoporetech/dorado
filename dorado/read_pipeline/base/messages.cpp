@@ -7,6 +7,7 @@
 #include "read_pipeline/base/messages/ReadPair.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "stereo_features.h"
+#include "utils/barcode_kits.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -99,7 +100,7 @@ std::string ReadCommon::generate_read_group() const {
             read_group += model_name;
         }
         if (!barcode.empty() && barcode != UNCLASSIFIED) {
-            read_group += '_' + barcode;
+            read_group += '_' + barcode_kits::normalize_barcode_name(barcode);
         }
     }
     return read_group;
