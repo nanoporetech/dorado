@@ -134,7 +134,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *cons
         throw std::runtime_error(
                 "LSTM stack error: unsupported first forward layer with variable chunks.");
     }
-    if (aux && ((std::size(rnns) / 2U) == 0)) {
+    if (aux && ((std::size(rnns) % 2U) == 0)) {
         throw std::runtime_error(
                 "LSTM stack error: unsupported even number of layers with variable chunks.");
     }

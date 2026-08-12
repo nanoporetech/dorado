@@ -28,7 +28,7 @@ FLSTMLayerImpl::FLSTMLayerImpl(const int C, const int K, at::TensorOptions opts)
 at::Tensor FLSTMLayerImpl::forward(at::Tensor x) {
     const auto opts = x.options();
 
-    x = x.transpose(0, 1).contiguous();  // NTC -> TNC
+    x = x.transpose(0, 1);  // NTC -> TNC
     const int T = x.size(0);
     const int N = x.size(1);
 
@@ -58,7 +58,7 @@ at::Tensor FLSTMLayerImpl::forward(at::Tensor x) {
     }
 
     using namespace torch::indexing;
-    hh = hh.index({Slice(1, None), Slice(), Slice()}).transpose(0, 1).contiguous();
+    hh = hh.index({Slice(1, None), Slice(), Slice()}).transpose(0, 1);
 
     return hh;
 }
@@ -83,12 +83,15 @@ at::Tensor FLSTMStackImpl::forward(at::Tensor x) {
     bool is_reverse = !first_reverse_;
     for (int i = 0; i < std::ssize(layers_); ++i) {
         if ((i > 0) || first_reverse_) {
-            x = x.flip(1);
+            utils::flip_inplace(x, 1);
             is_reverse ^= 1;
         }
         x = layers_[i]->forward(x);
     }
-    return is_reverse ? x.flip(1) : x;
+    if (is_reverse) {
+        utils::flip_inplace(x, 1);
+    }
+    return x.contiguous();
 }
 
 #if DORADO_CUDA_BUILD
@@ -126,7 +129,7 @@ void FLSTMStackImpl::forward_koi(WorkingMemory &wm, const AuxiliaryData *aux) {
         throw std::runtime_error(
                 "FLSTM stack error: unsupported first forward layer with variable chunks.");
     }
-    if (aux && ((std::size(layers_) / 2U) == 0)) {
+    if (aux && ((std::size(layers_) % 2U) == 0)) {
         throw std::runtime_error(
                 "FLSTM stack error: unsupported even number of layers with variable chunks.");
     }

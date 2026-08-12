@@ -10,8 +10,11 @@
 #include <random>
 
 #define CUT_TAG "[TensorUtils]"
+#define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
-CATCH_TEST_CASE(CUT_TAG ": test quartiles", CUT_TAG) {
+namespace {
+
+DEFINE_TEST("test quartiles") {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.25, 0.5, 0.75}, {torch::kFloat});
 
@@ -21,7 +24,7 @@ CATCH_TEST_CASE(CUT_TAG ": test quartiles", CUT_TAG) {
     CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-CATCH_TEST_CASE(CUT_TAG ": test quartiles reversed", CUT_TAG) {
+DEFINE_TEST("test quartiles reversed") {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.75, 0.5, 0.25}, {torch::kFloat});
 
@@ -31,7 +34,7 @@ CATCH_TEST_CASE(CUT_TAG ": test quartiles reversed", CUT_TAG) {
     CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-CATCH_TEST_CASE(CUT_TAG ": test quantiles", CUT_TAG) {
+DEFINE_TEST("test quantiles") {
     auto in = torch::rand(1000, {torch::kFloat});
     auto q = torch::tensor({0.2, 0.9}, {torch::kFloat});
 
@@ -41,7 +44,7 @@ CATCH_TEST_CASE(CUT_TAG ": test quantiles", CUT_TAG) {
     CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-CATCH_TEST_CASE(CUT_TAG ": test quartiles_counting", CUT_TAG) {
+DEFINE_TEST("test quartiles_counting") {
     auto in = torch::randint(0, 2047, 1000);
     auto q = torch::tensor({0.25, 0.5, 0.75}, {torch::kFloat});
 
@@ -51,7 +54,7 @@ CATCH_TEST_CASE(CUT_TAG ": test quartiles_counting", CUT_TAG) {
     CATCH_REQUIRE(torch::equal(computed, expected));
 }
 
-CATCH_TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
+DEFINE_TEST("test quantiles_counting") {
     auto in = torch::randint(0, 2047, 1000);
     auto q = torch::tensor({0.2, 0.9}, {torch::kFloat});
 
@@ -62,7 +65,7 @@ CATCH_TEST_CASE(CUT_TAG ": test quantiles_counting", CUT_TAG) {
 }
 
 #if DORADO_ENABLE_BENCHMARK_TESTS
-CATCH_TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
+DEFINE_TEST("quantile benchmark") {
     const auto size = GENERATE(1000, 5000, 10000, 100000);
     CATCH_CAPTURE(size);
 
@@ -83,7 +86,7 @@ CATCH_TEST_CASE(CUT_TAG ": quantile benchmark", CUT_TAG) {
 }
 #endif  // DORADO_ENABLE_BENCHMARK_TESTS
 
-CATCH_TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
+DEFINE_TEST("convert_f32_to_f16") {
     torch::manual_seed(42);
     srand(42);
 
@@ -118,7 +121,7 @@ CATCH_TEST_CASE(CUT_TAG ": convert_f32_to_f16", CUT_TAG) {
 #endif  // DORADO_ENABLE_BENCHMARK_TESTS
 }
 
-CATCH_TEST_CASE(CUT_TAG ": shift_scale_tensor_i16_to_f16", CUT_TAG) {
+DEFINE_TEST("shift_scale_tensor_i16_to_f16") {
     torch::manual_seed(42);
     std::minstd_rand rng(42);
     std::uniform_real_distribution<float> dist;
@@ -163,7 +166,7 @@ CATCH_TEST_CASE(CUT_TAG ": shift_scale_tensor_i16_to_f16", CUT_TAG) {
 #endif  // DORADO_ENABLE_BENCHMARK_TESTS
 }
 
-CATCH_TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
+DEFINE_TEST("copy_tensor_elems") {
     torch::manual_seed(42);
     srand(42);
 
@@ -196,3 +199,54 @@ CATCH_TEST_CASE(CUT_TAG ": copy_tensor_elems", CUT_TAG) {
         }
     }
 }
+
+DEFINE_TEST("flip_inplace") {
+    at::manual_seed(42);
+    srand(42);
+
+    const auto flip_inplace_test = [](at::ScalarType type, int dims) {
+        for (int flip_dim = 0; flip_dim < dims; flip_dim++) {
+            for (int i = 0; i < 10; ++i) {
+                CATCH_CAPTURE(type, dims, flip_dim, i);
+
+                std::vector<int64_t> sizes(dims);
+                for (int64_t & size : sizes) {
+                    size = 1 + (rand() % 100);
+                }
+
+                auto input = at::rand(sizes, type);
+                const auto expected = input.flip(flip_dim);
+                CATCH_REQUIRE(expected.const_data_ptr() !=
+                              input.const_data_ptr());  // flip() should make a copy
+                dorado::utils::flip_inplace(input, flip_dim);
+
+                CATCH_REQUIRE(at::equal(expected, input));
+            }
+        }
+    };
+
+    for (at::ScalarType type : {at::kFloat, at::kHalf}) {
+        for (int dims : {2, 3}) {
+            flip_inplace_test(type, dims);
+        }
+    }
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+    {
+        const int64_t num_elems = GENERATE(10, 100, 500);
+        const auto flip_dim = GENERATE(0, 1, 2);
+        const std::array sizes{num_elems, num_elems, num_elems};
+        auto input = at::rand(sizes, at::kFloat);
+
+        CATCH_BENCHMARK(fmt::format("torch flip size={}, dim={}", num_elems, flip_dim)) {
+            input.flip(flip_dim);
+        };
+
+        CATCH_BENCHMARK(fmt::format("our flip size={}, dim={}", num_elems, flip_dim)) {
+            dorado::utils::flip_inplace(input, flip_dim);
+        };
+    }
+#endif  // DORADO_ENABLE_BENCHMARK_TESTS
+}
+
+}  // namespace

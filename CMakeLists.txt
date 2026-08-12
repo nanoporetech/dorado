@@ -105,8 +105,12 @@ endif()
 # For capturing test coverage.
 option(GENERATE_TEST_COVERAGE "Build with code coverage enabled" OFF)
 if (GENERATE_TEST_COVERAGE)
-    # Ignore negative values due to a bug in gcov https://gcc.gnu.org/bugzilla/show_bug.cgi?id=68080
-    set(GCOVR_ADDITIONAL_ARGS "--gcov-ignore-parse-errors=negative_hits.warn")
+    set(GCOVR_ADDITIONAL_ARGS
+        # Ignore negative and suspicious values due to bugs in gcov
+        # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=68080
+        "--gcov-ignore-parse-errors=negative_hits.warn"
+        "--gcov-ignore-parse-errors=suspicious_hits.warn"
+    )
     include(cmake/CodeCoverage.cmake)
     if (NOT DORADO_DISABLE_TESTS)
         setup_target_for_coverage_gcovr_xml_html(

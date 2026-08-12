@@ -92,7 +92,6 @@ add_executable(dorado_tests
     StringUtilsTest.cpp
     SummaryFileWriterTest.cpp
     synchronisation_test.cpp
-    TensorUtilsTest.cpp
     TimeUtilsTest.cpp
     TrimTest.cpp
     VCFWriterTest.cpp
