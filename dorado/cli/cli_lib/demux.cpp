@@ -197,17 +197,24 @@ int demuxer(int argc, char* argv[]) {
     }
     spdlog::info("num input files: {}", all_files.size());
 
-    threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
-    // The input thread is the total number of threads to use for dorado
-    // barcoding. Heuristically use 10% of threads for BAM generation and
-    // rest for barcoding. Empirically this shows good perf.
-    auto [demux_threads, demux_writer_threads] =
-            cli::worker_vs_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads, demux_writer_threads);
-
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
     auto barcoding_info = get_barcoding_info(parser);
+
+    threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
+    int demux_threads = 0, demux_writer_threads = 0;
+    if (barcoding_info) {
+        // Heuristically use 10% of threads for BAM generation and the rest for
+        // barcoding. Empirically this shows good performance.
+        std::tie(demux_threads, demux_writer_threads) =
+                cli::worker_vs_writer_thread_allocation(threads, 0.1f);
+        spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads,
+                      demux_writer_threads);
+    } else {
+        // With no classification work, all threads can go to the writer
+        demux_writer_threads = threads;
+        spdlog::debug("> writer threads {}", demux_writer_threads);
+    }
 
     // All progress reporting is in the post-processing part.
     ProgressTracker tracker(ProgressTracker::Mode::DEMUX, 0, 1.f);
@@ -258,7 +265,7 @@ int demuxer(int argc, char* argv[]) {
     }
 
     // Setup pools. These are referenced by the pipeline so must outlive it.
-    SimpleExecutor<BarcodeClassifierNode> demux_pool(demux_threads);
+    std::unique_ptr<SimpleExecutor<BarcodeClassifierNode>> demux_pool;
 
     auto client_info = std::make_shared<DefaultClientInfo>();
 
@@ -292,7 +299,8 @@ int demuxer(int argc, char* argv[]) {
             current_node =
                     pipeline_desc.add_node<TrimmerNode>({writer_node}, 1, kit_info.rna_barcodes);
         }
-        pipeline_desc.add_node<BarcodeClassifierNode>({current_node}, demux_pool.get());
+        demux_pool = std::make_unique<SimpleExecutor<BarcodeClassifierNode>>(demux_threads);
+        pipeline_desc.add_node<BarcodeClassifierNode>({current_node}, demux_pool->get());
     }
 
     // Create the Pipeline from our description.
