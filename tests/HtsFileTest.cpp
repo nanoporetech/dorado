@@ -180,6 +180,31 @@ CATCH_TEST_CASE("HtsFileTest: construct with zero threads for unsorted BAM does 
                                                           HtsFile::OutputMode::BAM, 0, false));
 }
 
+CATCH_TEST_CASE("HtsFileTest: multiple files can share a thread pool", TEST_GROUP) {
+    Tester tester;
+    tester.read_input_records();
+
+    auto thread_pool = std::make_shared<utils::HtsThreadPool>(NUM_THREADS);
+    const auto first_path = tester.output_test_dir.m_path / "first.bam";
+    const auto second_path = tester.output_test_dir.m_path / "second.bam";
+    HtsFile first(first_path.string(), HtsFile::OutputMode::BAM, NUM_THREADS, false, thread_pool);
+    HtsFile second(second_path.string(), HtsFile::OutputMode::BAM, NUM_THREADS, false, thread_pool);
+
+    first.set_header(tester.header_out.get());
+    second.set_header(tester.header_out.get());
+    for (const auto& record : tester.records) {
+        CATCH_REQUIRE(first.write(record.get()) >= 0);
+        CATCH_REQUIRE(second.write(record.get()) >= 0);
+    }
+
+    // Each HtsFile retains the pool for as long as its HTSlib handle may use it.
+    thread_pool.reset();
+    CATCH_REQUIRE_NOTHROW(first.finalise([](size_t) {}));
+    CATCH_REQUIRE_NOTHROW(second.finalise([](size_t) {}));
+    CATCH_CHECK(fs::file_size(first_path) > 0);
+    CATCH_CHECK(fs::file_size(second_path) > 0);
+}
+
 CATCH_TEST_CASE("FileMergeBatcher: Single batch", TEST_GROUP) {
     auto files = get_dummy_filenames(filepath("folder", "file_"), ".bam", 4, 0);
     utils::FileMergeBatcher batcher(files, filepath("folder", "merged.bam"), 4);
