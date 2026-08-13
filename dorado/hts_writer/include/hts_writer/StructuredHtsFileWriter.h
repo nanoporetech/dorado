@@ -21,6 +21,7 @@ public:
 private:
     const std::unique_ptr<IStructure> m_structure;
     const bool m_sort;
+    const std::shared_ptr<utils::HtsThreadPool> m_thread_pool;
     std::unordered_map<std::string, std::unique_ptr<utils::HtsFile>> m_hts_files;
 
     bool m_has_shutdown{false};

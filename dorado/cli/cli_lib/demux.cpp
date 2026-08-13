@@ -211,7 +211,8 @@ int demuxer(int argc, char* argv[]) {
         spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads,
                       demux_writer_threads);
     } else {
-        // With no classification work, all threads can go to the writer
+        // With no classification work, the shared HTS pool can use the full
+        // thread allocation without creating a pool per output file.
         demux_writer_threads = threads;
         spdlog::debug("> writer threads {}", demux_writer_threads);
     }
@@ -365,7 +366,8 @@ int demuxer(int argc, char* argv[]) {
 
     spdlog::info("> starting barcode demuxing");
     for (const auto& input : all_files) {
-        const std::size_t num_reader_threads = 1;
+        // multithread the reader's decompression if we're not doing classification
+        const std::size_t num_reader_threads = barcoding_info ? 1 : 2;
         HtsReader reader(input.string(), read_list, num_reader_threads);
         auto read_initialiser =
                 std::make_shared<ReadInitialiser>(reader.header(), alignment_counts, trim_flags);

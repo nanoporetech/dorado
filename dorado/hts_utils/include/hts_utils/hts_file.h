@@ -2,9 +2,12 @@
 
 #include "hts_types.h"
 
+#include <htslib/hts.h>
+
 #include <filesystem>
 #include <functional>
 #include <map>
+#include <memory>
 #include <string>
 
 namespace dorado {
@@ -12,6 +15,18 @@ namespace utils {
 
 using ProgressCallback = std::function<void(size_t percentage)>;
 using DescriptionCallback = std::function<void(const std::string&)>;
+
+class HtsThreadPool {
+public:
+    explicit HtsThreadPool(int threads);
+    ~HtsThreadPool();
+    HtsThreadPool(const HtsThreadPool&) = delete;
+    HtsThreadPool& operator=(const HtsThreadPool&) = delete;
+
+private:
+    friend class HtsFile;
+    htsThreadPool m_thread_pool{nullptr, 0};
+};
 
 class HtsFile {
 public:
@@ -24,7 +39,11 @@ public:
         FASTA,
     };
 
-    HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam);
+    HtsFile(std::string filename,
+            OutputMode mode,
+            int threads,
+            bool sort_bam,
+            std::shared_ptr<HtsThreadPool> thread_pool = nullptr);
     ~HtsFile();
     HtsFile(const HtsFile&) = delete;
     HtsFile& operator=(const HtsFile&) = delete;
@@ -44,6 +63,7 @@ public:
 
 private:
     const std::string m_filename;
+    const std::shared_ptr<HtsThreadPool> m_thread_pool;
     HtsFilePtr m_file;
     SamHdrPtr m_header;
     size_t m_num_records{0};
@@ -70,7 +90,7 @@ private:
     bool merge_temp_files(ProgressUpdater& update_progress,
                           const std::vector<std::string>& temp_files,
                           const std::string& merged_filename) const;
-    void initialise_threads();
+    void initialise_threads(htsFile* file) const;
 };
 
 class FileMergeBatcher {
