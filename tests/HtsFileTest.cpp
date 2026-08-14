@@ -187,8 +187,8 @@ CATCH_TEST_CASE("HtsFileTest: multiple files can share a thread pool", TEST_GROU
     auto thread_pool = std::make_shared<utils::HtsThreadPool>(NUM_THREADS);
     const auto first_path = tester.output_test_dir.m_path / "first.bam";
     const auto second_path = tester.output_test_dir.m_path / "second.bam";
-    HtsFile first(first_path.string(), HtsFile::OutputMode::BAM, NUM_THREADS, false, thread_pool);
-    HtsFile second(second_path.string(), HtsFile::OutputMode::BAM, NUM_THREADS, false, thread_pool);
+    HtsFile first(first_path.string(), HtsFile::OutputMode::BAM, thread_pool, false);
+    HtsFile second(second_path.string(), HtsFile::OutputMode::BAM, thread_pool, false);
 
     first.set_header(tester.header_out.get());
     second.set_header(tester.header_out.get());

@@ -41,9 +41,11 @@ public:
 
     HtsFile(std::string filename,
             OutputMode mode,
-            int threads,
-            bool sort_bam,
-            std::shared_ptr<HtsThreadPool> thread_pool = nullptr);
+            std::shared_ptr<HtsThreadPool> thread_pool,
+            bool sort_bam);
+
+    HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam);
+
     ~HtsFile();
     HtsFile(const HtsFile&) = delete;
     HtsFile& operator=(const HtsFile&) = delete;
@@ -67,7 +69,6 @@ private:
     HtsFilePtr m_file;
     SamHdrPtr m_header;
     size_t m_num_records{0};
-    const int m_threads{0};
     bool m_finalised{false};
     bool m_finalise_is_noop;
     bool m_sort_bam;

@@ -64,7 +64,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
     const std::string path = m_structure->get_path(item);
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
-        hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort, m_thread_pool);
+        hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_thread_pool, m_sort);
         set_hts_file_header(item, *hts_file);
     }
 

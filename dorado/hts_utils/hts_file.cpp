@@ -82,12 +82,10 @@ HtsThreadPool::~HtsThreadPool() {
 
 HtsFile::HtsFile(std::string filename,
                  OutputMode mode,
-                 int threads,
-                 bool sort_bam,
-                 std::shared_ptr<HtsThreadPool> thread_pool)
+                 std::shared_ptr<HtsThreadPool> thread_pool,
+                 bool sort_bam)
         : m_filename(std::move(filename)),
           m_thread_pool(std::move(thread_pool)),
-          m_threads(threads),
           m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
           m_mode(mode),
@@ -104,10 +102,16 @@ HtsFile::HtsFile(std::string filename,
         }
     }
 
-    if (m_threads > 0 && m_file != nullptr) {
+    if (m_file != nullptr) {
         initialise_threads(m_file.get());
     }
 }
+
+HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam)
+        : HtsFile(std::move(filename),
+                  mode,
+                  (threads > 0 ? std::make_shared<HtsThreadPool>(threads) : nullptr),
+                  sort_bam) {}
 
 void HtsFile::init_file() {
     switch (m_mode) {
@@ -164,10 +168,11 @@ std::string HtsFile::index_extension() const {
 }
 
 void HtsFile::initialise_threads(htsFile* file) const {
-    const int result = m_thread_pool != nullptr
-                               ? hts_set_thread_pool(file, &m_thread_pool->m_thread_pool)
-                               : hts_set_threads(file, m_threads);
-    if (result < 0) {
+    if (!m_thread_pool) {
+        return;
+    }
+
+    if (hts_set_thread_pool(file, &m_thread_pool->m_thread_pool) < 0) {
         throw std::runtime_error("Could not enable multi threading for file writing");
     }
 }
@@ -292,7 +297,8 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
             // say 50% complete until it finishes.
             constexpr size_t percent_start_indexing = 50;
             progress_callback(percent_start_indexing);
-            if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
+            int threads = (m_thread_pool ? hts_tpool_size(m_thread_pool->m_thread_pool.pool) : 0);
+            if (sam_index_build3(m_filename.c_str(), nullptr, 0, threads) < 0) {
                 spdlog::error("Failed to build index for file {}", m_filename);
             }
         }
