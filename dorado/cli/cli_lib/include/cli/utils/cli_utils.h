@@ -48,16 +48,16 @@ inline void parse(argparse::ArgumentParser& parser, int argc, const char* const 
     return parse(parser, {argv, argv + argc});
 }
 
-// Determine the thread allocation for writer and aligner threads
-// in dorado aligner.
+// Determine the thread allocation for writer and worker threads
+// in dorado aligner/demux.
 inline std::pair<int, int> worker_vs_writer_thread_allocation(int available_threads,
                                                               float writer_thread_fraction) {
     // clamping because we need at least 1 thread for alignment and for writing.
     int writer_threads =
             std::clamp(static_cast<int>(std::floor(writer_thread_fraction * available_threads)), 1,
                        available_threads - 1);
-    int aligner_threads = std::clamp(available_threads - writer_threads, 1, available_threads - 1);
-    return std::make_pair(aligner_threads, writer_threads);
+    int worker_threads = std::clamp(available_threads - writer_threads, 1, available_threads - 1);
+    return std::make_pair(worker_threads, writer_threads);
 }
 
 inline void add_aligner_pg_hdr(sam_hdr_t* hdr, int argc, char** argv) {

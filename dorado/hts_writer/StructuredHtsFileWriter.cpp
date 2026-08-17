@@ -20,7 +20,11 @@ namespace hts_writer {
 StructuredHtsFileWriter::StructuredHtsFileWriter(const HtsFileWriterConfig &cfg,
                                                  std::unique_ptr<IStructure> structure,
                                                  bool sort)
-        : HtsFileWriter(cfg), m_structure(std::move(structure)), m_sort(sort) {};
+        : HtsFileWriter(cfg),
+          m_structure(std::move(structure)),
+          m_sort(sort),
+          m_thread_pool(m_threads > 0 ? std::make_shared<utils::HtsThreadPool>(m_threads)
+                                      : nullptr) {};
 
 void StructuredHtsFileWriter::shutdown() {
     if (std::exchange(m_has_shutdown, true)) {
@@ -60,7 +64,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
     const std::string path = m_structure->get_path(item);
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
-        hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_threads, m_sort);
+        hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_thread_pool, m_sort);
         set_hts_file_header(item, *hts_file);
     }
 

@@ -3,9 +3,9 @@
 #include "hts_utils/bam_utils.h"
 #include "utils/PostCondition.h"
 
-#include <htslib/bgzf.h>
 #include <htslib/hts.h>
 #include <htslib/sam.h>
+#include <htslib/thread_pool.h>
 #include <spdlog/spdlog.h>
 
 #include <array>
@@ -64,9 +64,28 @@ struct HtsFile::ProgressUpdater {
     }
 };
 
-HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam)
+HtsThreadPool::HtsThreadPool(int threads) {
+    if (threads <= 0) {
+        throw std::invalid_argument("HTS thread pool size must be greater than zero");
+    }
+    m_thread_pool.pool = hts_tpool_init(threads);
+    if (m_thread_pool.pool == nullptr) {
+        throw std::runtime_error("Could not create HTS thread pool");
+    }
+}
+
+HtsThreadPool::~HtsThreadPool() {
+    if (m_thread_pool.pool != nullptr) {
+        hts_tpool_destroy(m_thread_pool.pool);
+    }
+}
+
+HtsFile::HtsFile(std::string filename,
+                 OutputMode mode,
+                 std::shared_ptr<HtsThreadPool> thread_pool,
+                 bool sort_bam)
         : m_filename(std::move(filename)),
-          m_threads(threads),
+          m_thread_pool(std::move(thread_pool)),
           m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
           m_mode(mode),
@@ -83,10 +102,16 @@ HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_b
         }
     }
 
-    if (m_threads > 0) {
-        initialise_threads();
+    if (m_file != nullptr) {
+        initialise_threads(m_file.get());
     }
 }
+
+HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam)
+        : HtsFile(std::move(filename),
+                  mode,
+                  (threads > 0 ? std::make_shared<HtsThreadPool>(threads) : nullptr),
+                  sort_bam) {}
 
 void HtsFile::init_file() {
     switch (m_mode) {
@@ -142,12 +167,12 @@ std::string HtsFile::index_extension() const {
     throw std::logic_error("Unknown htslib index extension for '" + to_string(m_mode) + "'.");
 }
 
-void HtsFile::initialise_threads() {
-    if (!m_finalise_is_noop) {
+void HtsFile::initialise_threads(htsFile* file) const {
+    if (!m_thread_pool) {
         return;
     }
 
-    if (hts_set_threads(m_file.get(), m_threads) < 0) {
+    if (hts_set_thread_pool(file, &m_thread_pool->m_thread_pool) < 0) {
         throw std::runtime_error("Could not enable multi threading for file writing");
     }
 }
@@ -192,9 +217,7 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + tempfilename);
     }
-    if (hts_set_threads(m_file.get(), m_threads) < 0) {
-        throw std::runtime_error("Could not enable multi threading for file writing");
-    }
+    initialise_threads(m_file.get());
     if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
         if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
             set_cram_opt(m_file, m_reference);
@@ -274,7 +297,8 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
             // say 50% complete until it finishes.
             constexpr size_t percent_start_indexing = 50;
             progress_callback(percent_start_indexing);
-            if (sam_index_build3(m_filename.c_str(), nullptr, 0, m_threads) < 0) {
+            int threads = (m_thread_pool ? hts_tpool_size(m_thread_pool->m_thread_pool.pool) : 0);
+            if (sam_index_build3(m_filename.c_str(), nullptr, 0, threads) < 0) {
                 spdlog::error("Failed to build index for file {}", m_filename);
             }
         }
@@ -398,8 +422,10 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     SamHdrPtr header{};
     for (size_t i = 0; i < num_temp_files; ++i) {
         in_files[i].reset(hts_open(temp_files[i].c_str(), "r"));
-        if (bgzf_mt(in_files[i]->fp.bgzf, m_threads, 128) < 0) {
-            spdlog::error("Could not enable multi threading for BAM reading.");
+        try {
+            initialise_threads(in_files[i].get());
+        } catch (const std::runtime_error&) {
+            spdlog::error("Could not enable multi threading for alignment reading.");
             return false;
         }
         SamHdrPtr current_header(sam_hdr_read(in_files[i].get()));
@@ -426,8 +452,10 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
 
     // Open the output file, and write the header.
     HtsFilePtr out_file(hts_open(merged_filename.c_str(), m_htslib_write_mode.c_str()));
-    if (bgzf_mt(out_file->fp.bgzf, m_threads, 128) < 0) {
-        spdlog::error("Could not enable multi threading for BAM generation.");
+    try {
+        initialise_threads(out_file.get());
+    } catch (const std::runtime_error&) {
+        spdlog::error("Could not enable multi threading for alignment generation.");
         return false;
     }
 
