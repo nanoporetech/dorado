@@ -267,7 +267,7 @@ class TestDorado(unittest.TestCase):
             test_files=test_files,
             result=None,
         )
-        checker = DataChecker(str(REFERENCE_FOLDER), str(OUTPUT_FOLDER))
+        checker = DataChecker(str(REFERENCE_FOLDER), str(OUTPUT_FOLDER), 0.0)
         results = checker.check_test_data(test_data, validation_settings)
         self.manager.add_test_files(test_files)
         errors = DataChecker.make_error_message(results)
