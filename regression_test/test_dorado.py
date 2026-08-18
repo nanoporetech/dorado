@@ -251,6 +251,7 @@ class TestDorado(unittest.TestCase):
         subfolder: str,
         expected_files: dict,
         validation_settings: dict | None,
+        tolerance: float = 0.0,
     ) -> str | None:
         """
         This functionality should be common to most, if not all, tests. It will gather the
@@ -267,7 +268,7 @@ class TestDorado(unittest.TestCase):
             test_files=test_files,
             result=None,
         )
-        checker = DataChecker(str(REFERENCE_FOLDER), str(OUTPUT_FOLDER), 0.0)
+        checker = DataChecker(str(REFERENCE_FOLDER), str(OUTPUT_FOLDER), tolerance)
         results = checker.check_test_data(test_data, validation_settings)
         self.manager.add_test_files(test_files)
         errors = DataChecker.make_error_message(results)
