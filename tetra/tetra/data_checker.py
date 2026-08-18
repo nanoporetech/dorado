@@ -15,14 +15,12 @@ except ImportError:
 
 
 class DataChecker(object):
-    def __init__(
-        self, ref_folder: str, output_folder: str, tolerance_factor: float = 1.0
-    ):
+    def __init__(self, ref_folder: str, output_folder: str, tolerance: float = 0.0):
         """
         The constructor will check for the existence of the output folder, and
         raise an exception if it is missing.
         """
-        self.tolerance_factor = tolerance_factor
+        self.tolerance = tolerance
         self.ref_path = pathlib.Path(ref_folder)
         self.output_path = pathlib.Path(output_folder)
         if not self.output_path.exists() or not self.output_path.is_dir():
@@ -81,7 +79,7 @@ class DataChecker(object):
             # If both the reference and output file exist, compare them.
             if test_file.exists_in_output and test_file.exists_in_ref:
                 errors = DataChecker.compare_files(
-                    ref_file_path, output_file_path, self.tolerance_factor
+                    ref_file_path, output_file_path, self.tolerance
                 )
                 if errors is None:
                     test_file.matches = True
@@ -107,7 +105,7 @@ class DataChecker(object):
     # Internal methods below. These are not meant to be called directly.
     @classmethod
     def compare_files(
-        cls, ref_file: pathlib.Path, output_file: pathlib.Path, tolerance_factor: float
+        cls, ref_file: pathlib.Path, output_file: pathlib.Path, tolerance: float
     ) -> str | None:
         regression_diffs = None
         extension = ref_file.suffix
@@ -117,9 +115,7 @@ class DataChecker(object):
             try:
                 actual_df = load_sorted_data_frame(output_file)
                 expected_df = load_sorted_data_frame(ref_file)
-                regression_diffs = check_pandas_equal(
-                    actual_df, expected_df, tolerance_factor
-                )
+                regression_diffs = check_pandas_equal(actual_df, expected_df, tolerance)
             except Exception:
                 return f"check_pandas_equal failed for {output_file}, {ref_file}"
             if regression_diffs == "":

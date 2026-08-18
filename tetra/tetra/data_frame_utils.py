@@ -5,7 +5,7 @@ from pandas.errors import EmptyDataError
 
 from tetra.error_display import pretty_print_diffs
 
-TOLERANCE = 0.0008  # 0.08%
+DEFAULT_TOLERANCE = 0.0008  # 0.08%
 
 
 def load_sorted_data_frame(path: pathlib.Path):
@@ -46,7 +46,7 @@ def merge_csv_files(
     merged_df.to_csv(output_file, sep=sep)
 
 
-def check_pandas_equal(actual, expected, tolerance_factor=1.0):
+def check_pandas_equal(actual, expected, tolerance=DEFAULT_TOLERANCE):
     # We do a pre-check for equality and pretty-print any diffs if required
     try:
         if expected.equals(actual):
@@ -54,7 +54,5 @@ def check_pandas_equal(actual, expected, tolerance_factor=1.0):
     except ValueError:
         # Different length series will be handled by pretty diff
         pass
-    pretty_diffs = pretty_print_diffs(
-        expected, actual, tolerance=(TOLERANCE * tolerance_factor)
-    )
+    pretty_diffs = pretty_print_diffs(expected, actual, tolerance)
     return pretty_diffs
