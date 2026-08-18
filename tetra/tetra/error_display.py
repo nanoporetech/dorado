@@ -2,7 +2,7 @@ import numpy
 import pandas
 
 
-def pretty_print_diffs(exp, act, tolerance=0):
+def pretty_print_diffs(exp, act, tolerance=0.0):
     # First we check which rows/columns fail to match
     pretty_diffs = []
     r_match, r_exp, r_act = row_match(exp, act)
@@ -51,7 +51,7 @@ def pretty_print_diffs(exp, act, tolerance=0):
                 ):
                     col_tolerance = (
                         col_tolerance * 12.5
-                    )  # equates to 1% with TOLERANCE at 0.08%
+                    )  # equates to 1% with tolerance at 0.08%
                 numeric_diff = abs(
                     numpy.mean(exp[col_name]) - numpy.mean(act[col_name])
                 ) / numpy.mean(exp[col_name])
