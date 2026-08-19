@@ -222,14 +222,17 @@ void VCFWriter::write_variant(const Variant& variant) {
     }
 
     // Look up the FILTER ID in the header
-    if (!std::empty(variant.filter) && (variant.filter != secondary::NO_VARIANT_FILTER)) {
+    if (variant.filters == Filters::Missing) {
+        bcf_update_filter(m_header.get(), record.get(), nullptr, 0);
+    }
+    for (const std::string_view filt : variant.filters.as_strings()) {
         // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): filter is NUL terminated.
-        int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, variant.filter.data());
+        int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, filt.data());
         if (filter_id < 0) {
-            throw std::runtime_error("VCF filter ID '" + std::string(variant.filter) +
+            throw std::runtime_error("VCF filter ID '" + std::string(filt.data(), std::size(filt)) +
                                      "' not found in header.");
         }
-        bcf_update_filter(m_header.get(), record.get(), &filter_id, 1);
+        bcf_add_filter(m_header.get(), record.get(), filter_id);
     }
 
     // Add INFO fields.
