@@ -49,8 +49,22 @@ elseif(APPLE)
 elseif(WIN32)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-win-x64.tar.gz")
     set(POD5_HASH "a9e4ca48daf5c6d9c5bbda56022a9b4a972286ce742c831e32533b2c9410213c")
+    if(POD5_STATIC)
+        add_library(pod5_format STATIC IMPORTED GLOBAL)
+        set_target_properties(pod5_format
+            PROPERTIES
+                IMPORTED_LOCATION ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
+        )
+    else()
+        add_library(pod5_format SHARED IMPORTED GLOBAL)
+        set_target_properties(pod5_format
+            PROPERTIES
+                IMPORTED_IMPLIB ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
+                IMPORTED_LOCATION ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/bin/pod5_format.dll
+        )
+    endif()
     set(POD5_LIBRARIES
-        ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/pod5_format.lib
+        pod5_format
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/arrow_static.lib
         ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/zstd_static.lib
         bcrypt.lib
