@@ -59,4 +59,4 @@ add_custom_command(
 
 add_custom_target(metal-lib DEPENDS default.metallib)
 
-install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib)
+install(FILES ${CMAKE_BINARY_DIR}/lib/default.metallib DESTINATION lib COMPONENT redist_libs)

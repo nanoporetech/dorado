@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.25)
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
+if (POLICY CMP0207)
+    # New in 4.3, keep old behaviour for now
+    set(CMAKE_POLICY_DEFAULT_CMP0207 OLD)
+endif()
 
 project(dorado LANGUAGES C CXX)
 if(APPLE)

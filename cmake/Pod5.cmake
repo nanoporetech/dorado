@@ -83,18 +83,3 @@ find_package(Threads REQUIRED)
 add_library(pod5_deps INTERFACE)
 target_link_libraries(pod5_deps INTERFACE Threads::Threads ${CMAKE_DL_LIBS})
 target_link_libraries(pod5_libs INTERFACE pod5_deps)
-
-# We need the libraries installed if they're not static.
-if (NOT POD5_STATIC)
-    if(WIN32)
-        install(
-            FILES ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/bin/pod5_format.dll
-            DESTINATION bin
-        )
-    else()
-        install(
-            FILES ${POD5_LIBRARIES}
-            DESTINATION lib
-        )
-    endif()
-endif()

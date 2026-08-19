@@ -24,8 +24,6 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
 elseif(WIN32)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dll")
     install(FILES ${TORCH_DLLS} DESTINATION bin COMPONENT redist_libs)
-    file(GLOB HTSLIB_DLLS "${HTSLIB_DIR}/*.dll")
-    install(FILES ${HTSLIB_DLLS} DESTINATION bin COMPONENT redist_libs)
 
 elseif(APPLE)
     file(GLOB TORCH_DLLS "${TORCH_LIB}/lib/*.dylib")
