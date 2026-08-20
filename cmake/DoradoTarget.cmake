@@ -134,4 +134,19 @@ function(dorado_add_test TARGET)
         # which we don't plan on supporting (256MB maxBufferLength, lack of compute memory barriers, etc...).
         #set_property(TEST ${TARGET} APPEND PROPERTY ENVIRONMENT_MODIFICATION "SIMCTL_CHILD_MTL_DEBUG_LAYER=set:1")
     endif()
+
+    install(
+        TARGETS ${TARGET}
+        DESTINATION tests
+        COMPONENT unit_tests
+        EXCLUDE_FROM_ALL
+    )
+
+    if(UNIX AND NOT APPLE)
+        # GNU ld preserves a trailing empty RPATH entry only when the RPATH
+        # begins with a non-empty entry.  Without this, CMake's install script
+        # can expect an RPATH that differs from the linked ELF RUNPATH.
+        set_property(TARGET ${TARGET} PROPERTY BUILD_RPATH "$ORIGIN")
+    endif()
+
 endfunction()
