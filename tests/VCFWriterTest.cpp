@@ -195,7 +195,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         }
     }
 
-    CATCH_SECTION("writes gVCF header metadata when requested") {
+    // clang-format off
+    CATCH_SECTION("writes gVCF header metadata when requested and tests that the writer sets the variant source FORMAT field to the missing value (\".\") when not provided") {
         {
             VCFWriter writer(data.vcf_path, data.filters, data.contigs, true);
             writer.write_variant(data.first_variant);
@@ -208,7 +209,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                     .filter = ".",
                     .info = {{"END", "11"}},
                     .qual = -1.0f,
-                    .format = {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}},
+                    .format = {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}},   // NOTE: Intentionally not specifying the variant source here, to test that the writer adds it automatically.
                     .rstart = 10,
                     .rend = 11,
             };
@@ -228,7 +229,33 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("chr1\t10\t.\tA\tC,<*>"));
         CATCH_CHECK_THAT(vcf_text,
                          Catch::Matchers::ContainsSubstring(
-                                 "chr1\t11\t.\tN\t<*>\t.\t.\tEND=11\tGT:GQ:LEN\t./.:.:1"));
+                                 "chr1\t11\t.\tN\t<*>\t.\t.\tEND=11\tGT:GQ:LEN:SRC\t./.:.:1:."));
+    }
+    // clang-format on
+
+    CATCH_SECTION(
+            "preserves an explicit variant source FORMAT field instead of defaulting to the "
+            "missing value") {
+        {
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+            Variant variant = data.first_variant;
+            variant.format = {
+                    {"GT", "0/1"},
+                    {"GQ", "45"},
+                    {FORMAT_TAG_VARIANT_SOURCE, VARIANT_SOURCE_INFERENCE}};  // Set to "I".
+            writer.write_variant(variant);
+        }
+
+        const std::string vcf_text = ReadFileIntoString(data.vcf_path);
+
+        // The SRC FORMAT field is declared in the header.
+        CATCH_CHECK_THAT(vcf_text,
+                         Catch::Matchers::ContainsSubstring(
+                                 "##FORMAT=<ID=SRC,Number=1,Type=String,Description=\"Source "
+                                 "of the variant\">"));
+        // The explicit source must be preserved and not overwritten with the missing-value default.
+        CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("\tGT:GQ:SRC\t0/1:45:I"));
+        CATCH_CHECK(vcf_text.find("0/1:45:.") == std::string::npos);
     }
 
     CATCH_SECTION("write_variant rejects filters missing from the header") {
@@ -239,6 +266,25 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
         CATCH_CHECK_THROWS_WITH(writer.write_variant(variant),
                                 Catch::Matchers::ContainsSubstring("not found in header"));
+    }
+
+    CATCH_SECTION("write_variant rejects unexpected INFO fields") {
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+        Variant variant = data.first_variant;
+        variant.info = {{"PIZZA", "1"}};
+
+        CATCH_CHECK_THROWS_WITH(writer.write_variant(variant),
+                                Catch::Matchers::ContainsSubstring("unexpected INFO field: PIZZA"));
+    }
+
+    CATCH_SECTION("write_variant rejects unexpected FORMAT fields") {
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+        Variant variant = data.first_variant;
+        variant.format = {{"GT", "0/1"}, {"PIZZA", "1"}};
+
+        CATCH_CHECK_THROWS_WITH(
+                writer.write_variant(variant),
+                Catch::Matchers::ContainsSubstring("unexpected FORMAT field: PIZZA"));
     }
 
     CATCH_SECTION("write_variant requires GT genotype information") {

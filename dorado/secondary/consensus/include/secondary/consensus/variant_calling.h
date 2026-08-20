@@ -43,6 +43,7 @@ std::string gq_from_qual(float qual);
  * \param end Reference end position.
  * \param rstart Span start in inference chunk coordinates.
  * \param rend Span end in inference chunk coordinates.
+ * \param variant_source Value for the SRC FORMAT tag (e.g. inference vs. plain reference block).
  */
 Variant make_gvcf_reference_record(int32_t seq_id,
                                    int64_t pos,
@@ -52,7 +53,8 @@ Variant make_gvcf_reference_record(int32_t seq_id,
                                    int32_t min_depth,
                                    int64_t end,
                                    int64_t rstart,
-                                   int64_t rend);
+                                   int64_t rend,
+                                   std::string_view variant_source);
 
 /**
  * \brief Post-process variants with empty alts.

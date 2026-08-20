@@ -17,6 +17,14 @@ constexpr std::string_view VARIANT_LOWQUAL_FILTER{"LowQual"};
 constexpr std::string_view VARIANT_ZYGOSITY_FILTER{"IncompatZyg"};
 constexpr std::string_view NO_VARIANT_FILTER{"."};
 
+// Plain `const char*` (not `string_view`) so these convert implicitly to `std::string`
+// map keys/values; `std::string`'s converting constructor from `string_view` is explicit.
+constexpr const char* FORMAT_TAG_VARIANT_SOURCE{"SRC"};
+constexpr const char* VARIANT_SOURCE_INFERENCE{"I"};
+constexpr const char* VARIANT_SOURCE_KADAYASHI{"K"};
+constexpr const char* VARIANT_SOURCE_REFERENCE{"R"};
+constexpr const char* VARIANT_SOURCE_UNKNOWN{"."};
+
 struct Variant {
     int32_t seq_id = -1;
     int64_t pos = -1;
