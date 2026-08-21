@@ -245,6 +245,7 @@ endif()
 
 if (NOT DORADO_DISABLE_TESTS)
     dorado_install_runtime_dependencies(dorado_unit_test_deps unit_tests)
+    dorado_install_unit_test_ctest_project()
     # CMake cannot reliably discover the Pod5 DLL transitively on Windows, so
     # explicitly add its imported runtime artifact to the unit-test payload.
     if (WIN32 AND TARGET pod5_format AND NOT POD5_STATIC)

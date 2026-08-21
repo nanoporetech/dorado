@@ -47,18 +47,8 @@
 .run_sanitizer_unit_tests:
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target dorado_unit_tests -j ${PARALLEL_JOBS}
   - cmake --install ${BUILD_DIR} --component unit_tests
-  - result=0
-  - for test in dist/bin/dorado_tests* dist/bin/test_*; do
-  - '[ -x "${test}" ] || continue'
-  - echo "+ ${test}"
-  - if "${test}"; then
-  - 'echo "PASSED: ${test}"'
-  - else
-  - 'echo "FAILED: ${test}"'
-  - result=1
-  - fi
-  - done
-  - exit ${result}
+  - cmake -S dist/tests -B unit_test_ctest
+  - ctest --test-dir unit_test_ctest --output-on-failure --verbose
 
 sanitize:linux:x86:noble:
   extends:

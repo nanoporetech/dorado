@@ -137,6 +137,7 @@ endfunction()
 function(dorado_add_test TARGET)
     # Keep an aggregate target for CI jobs which build only the unit tests.
     add_dependencies(dorado_unit_tests ${TARGET})
+    set_property(GLOBAL APPEND PROPERTY DORADO_UNIT_TEST_TARGETS ${TARGET})
 
     # Add the test.
     add_test(
@@ -185,4 +186,33 @@ function(dorado_add_test TARGET)
         set_property(TARGET ${TARGET} PROPERTY BUILD_RPATH "$ORIGIN")
     endif()
 
+endfunction()
+
+# Generate a standalone CTest project for the installed unit-test executables.
+# This avoids duplicating the test-target list in CI while retaining the test
+# working directory expected by the fixtures in the source checkout.
+function(dorado_install_unit_test_ctest_project)
+    get_property(unit_test_targets GLOBAL PROPERTY DORADO_UNIT_TEST_TARGETS)
+
+    set(unit_test_ctest_contents [=[
+cmake_minimum_required(VERSION 3.25)
+project(dorado_unit_tests NONE)
+enable_testing()
+]=])
+    foreach (target IN LISTS unit_test_targets)
+        string(APPEND unit_test_ctest_contents
+            "add_test(NAME ${target} COMMAND \"\${CMAKE_CURRENT_LIST_DIR}/../bin/$<TARGET_FILE_NAME:${target}>\")\n"
+            "set_tests_properties(${target} PROPERTIES WORKING_DIRECTORY \"\${CMAKE_CURRENT_LIST_DIR}/../..\")\n"
+        )
+    endforeach()
+
+    file(GENERATE
+        OUTPUT "${CMAKE_BINARY_DIR}/unit_test_ctest/CMakeLists.txt"
+        CONTENT "${unit_test_ctest_contents}"
+    )
+    install(
+        FILES "${CMAKE_BINARY_DIR}/unit_test_ctest/CMakeLists.txt"
+        DESTINATION tests
+        COMPONENT unit_tests
+    )
 endfunction()
