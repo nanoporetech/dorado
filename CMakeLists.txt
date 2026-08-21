@@ -95,6 +95,11 @@ include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
 include(cmake/DoradoCheckDeps.cmake)
 
+# Build all registered unit-test executables without also building the complete
+# application install target.  Individual tests add themselves as dependencies
+# in dorado_add_test().
+add_custom_target(dorado_unit_tests)
+
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
 if (ECM_ENABLE_SANITIZERS)

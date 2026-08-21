@@ -103,6 +103,9 @@ endfunction()
 
 # Wrapper for add_test(), plus some extra bits that we need.
 function(dorado_add_test TARGET)
+    # Keep an aggregate target for CI jobs which build only the unit tests.
+    add_dependencies(dorado_unit_tests ${TARGET})
+
     # Add the test.
     add_test(
         NAME ${TARGET}
