@@ -56,12 +56,18 @@ build_unit_tests:macos:arm:
   variables:
     GIT_SUBMODULE_STRATEGY: none
   script:
-    - |
-      result=0
-      for test in dist/tests/*; do
-        "${test}" || result=1
-      done
-      exit ${result}
+    - result=0
+    - for test in dist/bin/dorado_tests* dist/bin/test_*; do
+    - '[ -x "${test}" ] || continue'
+    - echo "+ ${test}"
+    - if "${test}"; then
+    - 'echo "PASSED: ${test}"'
+    - else
+    - 'echo "FAILED: ${test}"'
+    - result=1
+    - fi
+    - done
+    - exit ${result}
 
 test_unit_tests:windows:
   extends:
