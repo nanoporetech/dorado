@@ -110,7 +110,6 @@ test_unit_tests:linux:arm64:thor:
     - .linux_test_dependencies
     - .linux_thor_runner
     - .test_unit_tests
-    - .on_nightly_or_manual
   needs:
     - build_unit_tests:linux:arm64:cuda13
 
