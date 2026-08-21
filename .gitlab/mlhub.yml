@@ -20,7 +20,7 @@
         --csrf_token ${MLH_CRSF_TOKEN} \
         --session_id ${MLH_SESSION_ID}
   needs:
-  - job: build:linux:x86:noble
+  - job: build_archive:linux:x86:cuda12
     artifacts: false
   when: manual
 
