@@ -30,7 +30,6 @@ endif()
 
 set(CPACK_COMPONENTS_ALL 
         standalone_dorado
-        redist_libs
 )
 set(CPACK_ARCHIVE_COMPONENT_INSTALL ON)
 set(CPACK_COMPONENTS_GROUPING ALL_COMPONENTS_IN_ONE)

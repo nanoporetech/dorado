@@ -101,6 +101,38 @@ function(dorado_add_library)
     endforeach()
 endfunction()
 
+# Install runtime dependencies for an executable component.  Keep this in one
+# place so the standalone binary and unit tests use identical dependency
+# discovery and filtering rules.
+function(dorado_install_runtime_dependencies DEPENDENCY_SET COMPONENT)
+    install(
+        RUNTIME_DEPENDENCY_SET ${DEPENDENCY_SET}
+        # Despite what the docs would have you believe, regexes need to come
+        # before artefact-type keywords like RUNTIME or LIBRARY.
+        PRE_EXCLUDE_REGEXES
+            # api-* and ext-* are virtual Windows API-set aliases.
+            [[api-.*]]
+            [[ext-.*]]
+            # Ignore DLLs injected by Windows Defender and similar tools.
+            [[hvsifiletrust\.dll]]
+            [[pdmutilities\.dll]]
+            [[wpaxholder\.dll]]
+        POST_EXCLUDE_REGEXES
+            # Do not bundle system libraries.
+            [[.*(\\|/)system32(\\|/).*\.dll]]
+            [[^/(lib.*|usr)/.*]]
+        DIRECTORIES
+            "${TORCH_LIB}/lib"
+            "${HTSLIB_DIR}"
+        RUNTIME
+            DESTINATION bin
+            COMPONENT ${COMPONENT}
+        LIBRARY
+            DESTINATION lib
+            COMPONENT ${COMPONENT}
+    )
+endfunction()
+
 # Wrapper for add_test(), plus some extra bits that we need.
 function(dorado_add_test TARGET)
     # Keep an aggregate target for CI jobs which build only the unit tests.
@@ -140,6 +172,7 @@ function(dorado_add_test TARGET)
 
     install(
         TARGETS ${TARGET}
+        RUNTIME_DEPENDENCY_SET dorado_unit_test_deps
         DESTINATION tests
         COMPONENT unit_tests
         EXCLUDE_FROM_ALL
