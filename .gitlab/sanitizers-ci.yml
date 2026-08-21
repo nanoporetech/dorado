@@ -48,7 +48,7 @@
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target dorado_unit_tests -j ${PARALLEL_JOBS}
   - cmake --install ${BUILD_DIR} --component unit_tests
   - cmake -S dist/tests -B unit_test_ctest
-  - ctest --test-dir unit_test_ctest --output-on-failure --verbose
+  - ctest --test-dir unit_test_ctest -C Release --output-on-failure --verbose
 
 sanitize:linux:x86:noble:
   extends:

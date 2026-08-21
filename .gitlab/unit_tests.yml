@@ -57,7 +57,7 @@ build_unit_tests:macos:arm:
     GIT_SUBMODULE_STRATEGY: none
   script:
     - cmake -S dist/tests -B unit_test_ctest
-    - ctest --test-dir unit_test_ctest --output-on-failure --verbose
+    - ctest --test-dir unit_test_ctest -C Release --output-on-failure --verbose
 
 test_unit_tests:windows:
   extends:
