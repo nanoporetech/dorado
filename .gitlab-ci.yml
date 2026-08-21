@@ -309,8 +309,6 @@ pre-commit:
     - apt-get install -y build-essential
 
 .build_windows:
-  variables:
-    FF_USE_FASTZIP: false
   extends:
     - .windows_runner
   before_script:
