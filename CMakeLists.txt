@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.25)
 set(CMAKE_POLICY_DEFAULT_CMP0063 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0091 NEW)
+if (POLICY CMP0207)
+    # New in 4.3, keep old behaviour for now
+    set(CMAKE_POLICY_DEFAULT_CMP0207 OLD)
+endif()
 
 project(dorado LANGUAGES C CXX)
 if(APPLE)
@@ -89,7 +93,15 @@ include(cmake/UpdateSubmodules.cmake)
 include(cmake/DownloadAndExtract.cmake)
 include(cmake/SharedLibHelpers.cmake)
 include(cmake/DoradoTarget.cmake)
+
+# Both runnable components must carry their explicitly bundled runtime files.
+set(DORADO_RUNTIME_COMPONENTS standalone_dorado unit_tests)
 include(cmake/DoradoCheckDeps.cmake)
+
+# Build all registered unit-test executables without also building the complete
+# application install target.  Individual tests add themselves as dependencies
+# in dorado_add_test().
+add_custom_target(dorado_unit_tests)
 
 # Add sanitizer options to compilation flags
 include(cmake/ECMEnableSanitizers.cmake)
@@ -231,6 +243,24 @@ if (NOT DORADO_DISABLE_DORADO)
     add_subdirectory(dorado/cli)
 endif()
 
+if (NOT DORADO_DISABLE_TESTS)
+    dorado_install_runtime_dependencies(dorado_unit_test_deps unit_tests)
+    # CMake cannot reliably discover the Pod5 DLL transitively on Windows, so
+    # explicitly add its imported runtime artifact to the unit-test payload.
+    if (WIN32 AND TARGET pod5_format AND NOT POD5_STATIC)
+        install(
+            IMPORTED_RUNTIME_ARTIFACTS pod5_format
+            RUNTIME_DEPENDENCY_SET dorado_unit_test_deps
+            RUNTIME DESTINATION bin COMPONENT unit_tests
+        )
+    endif()
+    # The test aggregate bypasses the default ALL target, so explicitly build
+    # the Metal runtime payload it installs on macOS.
+    if (APPLE)
+        add_dependencies(dorado_unit_tests metal-lib)
+    endif()
+endif()
+
 # Stopgap target to keep things linking.
 # Eventually this will be removed and dependents should link only
 # to what they need.
@@ -301,8 +331,11 @@ if(CMAKE_COMPILER_IS_GNUCXX AND (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUA
         )
     endif ()
 
-    install(
-        FILES ${LIBSTDCPP_LOCATION} ${LIBSTDCPP_LINK_LOCATION}
-        DESTINATION lib
-    )
+    foreach(COMPONENT IN LISTS DORADO_RUNTIME_COMPONENTS)
+        install(
+            FILES ${LIBSTDCPP_LOCATION} ${LIBSTDCPP_LINK_LOCATION}
+            DESTINATION lib
+            COMPONENT ${COMPONENT}
+        )
+    endforeach()
 endif()

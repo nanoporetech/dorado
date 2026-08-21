@@ -25,4 +25,22 @@ target_link_libraries(dorado
     minimap2
 )
 
-install(TARGETS dorado RUNTIME)
+install(
+    TARGETS dorado
+    RUNTIME_DEPENDENCY_SET dorado_deps
+    RUNTIME
+        DESTINATION bin
+        COMPONENT standalone_dorado
+)
+
+dorado_install_runtime_dependencies(dorado_deps standalone_dorado)
+
+if(WIN32 AND TARGET pod5_format AND NOT POD5_STATIC)
+    install(
+        IMPORTED_RUNTIME_ARTIFACTS pod5_format
+        RUNTIME_DEPENDENCY_SET dorado_deps
+        RUNTIME
+            DESTINATION bin
+            COMPONENT standalone_dorado
+    )
+endif()
