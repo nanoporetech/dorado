@@ -173,7 +173,7 @@ function(dorado_add_test TARGET)
     install(
         TARGETS ${TARGET}
         RUNTIME_DEPENDENCY_SET dorado_unit_test_deps
-        DESTINATION tests
+        DESTINATION bin
         COMPONENT unit_tests
         EXCLUDE_FROM_ALL
     )
