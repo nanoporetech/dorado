@@ -124,7 +124,6 @@ int MergeHeaders::check_and_add_ref_data(sam_hdr_t* hdr) {
     KString tag_wrapper(1000000);
     auto tag_data = tag_wrapper.get();
     auto get_tag_string = [&](const char* tag, int index) -> std::string {
-        std::string tag_string;
         if (sam_hdr_find_tag_pos(hdr, "SQ", index, tag, &tag_data) == 0) {
             return std::string(ks_str(&tag_data));
         }

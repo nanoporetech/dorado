@@ -460,9 +460,6 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection without kit", TES
     auto primers = detector.get_primer_sequences("TEST_KIT2", dorado::demux::PrimerAux::DEFAULT);
     sort_queries(primers);
     // Make sure the adapters and primers have been properly loaded.
-    std::string expected_adapter_name = "adapter1";
-    std::string expected_adapter_front = "AGGGAACT";
-    std::string expected_adapter_rear = "AGTTCC";
     std::vector<std::string> expected_primer_names = {"primer1_FWD", "primer1_REV", "primer2_FWD",
                                                       "primer2_REV"};
     std::vector<std::string> expected_primers_front = {"TGCGAAT", "CAGAGGTC", "CTGACGT", "CAATGAA"};

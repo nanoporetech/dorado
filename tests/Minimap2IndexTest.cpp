@@ -31,7 +31,6 @@ protected:
 
 public:
     Minimap2IndexTestFixture() {
-        const std::string read_id{"aligner_node_test"};
         std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
         reference_file = ref.string();

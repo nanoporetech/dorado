@@ -46,8 +46,6 @@ std::unordered_map<std::string, int32_t> load_from_tsv(const std::filesystem::pa
 
 CATCH_TEST_CASE("Nonexistent input path, should throw", TEST_GROUP) {
     // Input data.
-    const std::filesystem::path test_data_dir =
-            get_data_dir("variant") / "test-01-kadayashi-parser";
     const std::filesystem::path in_bin_fn = "nonexistent.bin";
 
     // Results.

@@ -259,7 +259,6 @@ struct HtsFileDeleter {
 std::unordered_set<std::string> load_processed_reads(const std::filesystem::path& in_path) {
     std::unordered_set<std::string> ret;
     std::string line;
-    std::string token;
     std::ifstream ifs(in_path);
     while (std::getline(ifs, line)) {
         if (std::empty(line)) {
@@ -305,7 +304,6 @@ std::tuple<std::string, int64_t> find_furthest_skipped_read(
 
     std::ifstream ifs(in_reads_fai_fn);
     std::string line;
-    std::string token;
     while (std::getline(ifs, line)) {
         if (std::empty(line)) {
             throw std::runtime_error{"Empty lines found in the input index file: " +

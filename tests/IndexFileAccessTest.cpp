@@ -26,7 +26,6 @@ const std::string_view EXPECTED_2READ_REF_FILE_HEADER{
 
 const std::string& valid_reference_file() {
     static const std::string reference_file = []() {
-        const std::string read_id{"aligner_node_test"};
         std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
         return ref.string();
@@ -36,7 +35,6 @@ const std::string& valid_reference_file() {
 
 const std::string& valid_2read_reference_file() {
     static const std::string reference_file = []() {
-        const std::string read_id{"aligner_node_test"};
         std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "supplementary_aln_target.fa";
         return ref.string();
