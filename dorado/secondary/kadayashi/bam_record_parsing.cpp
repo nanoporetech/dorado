@@ -96,7 +96,7 @@ bool sancheck_MD_tag_exists_and_is_valid(const bam1_t *aln) {
     const char *md_s = bam_aux2Z(tmp);
     int i = 1;
     while (md_s[i]) {
-        const int md_type = md_op_table[(int)md_s[i]];
+        const int md_type = md_op_table[static_cast<uint8_t>(md_s[i])];
         if (md_type >= 4) {
             return false;
         }
@@ -210,7 +210,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     // (init)
     self_pos = self_start;
     ref_pos = ref_start;
-    prev_md_type = md_op_table[(int)md_s[0]];
+    prev_md_type = md_op_table[static_cast<uint8_t>(md_s[0])];
     if (prev_md_type == 2) {
         snp_base.push_back(filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, self_pos)], min_base_qv));
         const bool do_insert = check_blockedbloomfilter_to_decide_inserting(bf, ref_pos);
@@ -228,7 +228,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     // (collect operations)
     int i = 1;
     while (!failed && md_s[i]) {
-        md_type = md_op_table[(int)md_s[i]];
+        md_type = md_op_table[static_cast<uint8_t>(md_s[i])];
         if (md_type != prev_md_type) {
             if (prev_md_type == 0) {  // prev was match
                 int l{};

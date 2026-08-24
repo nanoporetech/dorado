@@ -272,10 +272,8 @@ void compare_feature_matrix_logical_data(const dorado::secondary::ReadAlignmentD
     for (int32_t pos = 0; pos < result.n_pos; ++pos) {
         for (int32_t lane = 0; lane < result.n_reads; ++lane) {
             for (int32_t feature = 0; feature < result.featlen; ++feature) {
-                const int32_t result_value =
-                        static_cast<int32_t>(get_feature_matrix_value(result, pos, lane, feature));
-                const int32_t expected_value = static_cast<int32_t>(
-                        get_feature_matrix_value(expected, pos, lane, feature));
+                const auto result_value = get_feature_matrix_value(result, pos, lane, feature);
+                const auto expected_value = get_feature_matrix_value(expected, pos, lane, feature);
                 if (result_value != expected_value) {
                     CATCH_CAPTURE(pos, lane, feature, result_value, expected_value);
                     CATCH_CHECK(result_value == expected_value);

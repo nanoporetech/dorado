@@ -163,7 +163,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
         read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
         for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
             // Initialize for what corresponds to 100% canonical base for each position.
-            const int base_id = utils::BaseInfo::BASE_IDS.at(
+            const auto base_id = utils::BaseInfo::BASE_IDS.at(
                     static_cast<std::uint8_t>(read->read_common.seq[i]));
             if (base_id < 0) {
                 throw std::runtime_error("Invalid character in sequence.");
@@ -321,7 +321,7 @@ void ModBaseCallerNode::simplex_mod_call(Message&& message) {
         read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
         for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
             // Initialize for what corresponds to 100% canonical base for each position.
-            const int base_id = utils::BaseInfo::BASE_IDS.at(
+            const auto base_id = utils::BaseInfo::BASE_IDS.at(
                     static_cast<std::uint8_t>(read->read_common.seq[i]));
             if (base_id < 0) {
                 throw std::runtime_error("Invalid character in sequence.");

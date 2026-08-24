@@ -62,7 +62,7 @@ namespace {
 
 bool check_ambig_in_string(const std::string_view &seq) {
     for (char c : seq) {
-        const unsigned char lookup = md_op_table[static_cast<int>(c)];
+        const unsigned char lookup = md_op_table[static_cast<uint8_t>(c)];
         if (lookup != 2) {
             return true;
         }

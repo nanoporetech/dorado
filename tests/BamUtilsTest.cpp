@@ -124,7 +124,7 @@ CATCH_TEST_CASE("BamUtilsTest: Test bam extraction helpers", TEST_GROUP) {
 
     CATCH_SECTION("Test mod base info extraction") {
         auto [modbase_str, modbase_probs] = utils::extract_modbase_info(record);
-        const std::vector<int8_t> expected_modbase_probs = {5, 1};
+        const std::vector<uint8_t> expected_modbase_probs = {5, 1};
         CATCH_CHECK(modbase_str == "C+h?,1;C+m?,1;");
         CATCH_CHECK(modbase_probs.size() == expected_modbase_probs.size());
         for (size_t i = 0; i < expected_modbase_probs.size(); i++) {

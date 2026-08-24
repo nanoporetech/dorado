@@ -156,7 +156,7 @@ inline static constexpr auto complement_table = [] {
 }();
 
 inline bool is_canonical_base(const char base) {
-    return (utils::BaseInfo::BASE_IDS_WITH_LOWER[static_cast<uint32_t>(base)] >= 0);
+    return (utils::BaseInfo::BASE_IDS_WITH_LOWER[static_cast<uint8_t>(base)] >= 0);
 }
 
 }  // namespace dorado::utils
