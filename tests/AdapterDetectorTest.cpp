@@ -565,6 +565,8 @@ CATCH_TEST_CASE(
         case 'T':
             read->read_common.base_mod_probs[i * mod_alphabet.size() + 4] = 255;
             break;
+        [[unlikely]] default:
+            break;
         }
     }
     auto flank_size = front_adapter.length() + front_primer.length() + umi_partial.length();
