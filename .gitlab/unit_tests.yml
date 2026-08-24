@@ -18,7 +18,7 @@
 
 build_unit_tests:linux:x86:noble:
   extends:
-    - .build_linux_x86_noble
+    - .build_settings_linux_x86_noble
     - .build_unit_tests
 
 build_unit_tests:linux:arm64:jammy:
@@ -43,12 +43,12 @@ build_unit_tests:linux:arm64:cuda13:
 
 build_unit_tests:windows:
   extends:
-    - .build_windows
+    - .build_settings_windows
     - .build_unit_tests
 
 build_unit_tests:macos:arm:
   extends:
-    - .build_macos_arm
+    - .build_settings_macos_arm
     - .build_unit_tests
 
 .test_unit_tests:

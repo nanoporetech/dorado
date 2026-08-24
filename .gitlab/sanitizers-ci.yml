@@ -52,12 +52,12 @@
 
 sanitize:linux:x86:noble:
   extends:
-    - .build_linux_x86_noble
+    - .build_settings_linux_x86_noble
     - .build_dorado
     - .sanitizer_common_linux
   before_script:
     # Run both base setups
-    - !reference [.build_linux_x86_noble, before_script]
+    - !reference [.build_settings_linux_x86_noble, before_script]
     - !reference [.sanitizer_common_linux, before_script]
     # We need to modify ASAN_OPTIONS for the following reasons:
     #   protect_shadow_gap - CUDA maps the same memory region as ASAN, so tell it to move the shadow
@@ -69,7 +69,7 @@ sanitize:linux:x86:noble:
 
 sanitize:macos:arm:
   extends:
-    - .build_macos_arm
+    - .build_settings_macos_arm
     - .build_dorado
     - .sanitizer_common
   script:

@@ -296,7 +296,7 @@ pre-commit:
 
 # Build stages
 
-.build_linux_x86_noble:
+.build_settings_linux_x86_noble:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
@@ -308,14 +308,14 @@ pre-commit:
     - !reference [.linux_build_dependencies, before_script]
     - apt-get install -y build-essential
 
-.build_windows:
+.build_settings_windows:
   extends:
     - .windows_runner
   before_script:
     - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
     - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G ${WIN_CMAKE_GENERATOR}"
 
-.build_macos_arm:
+.build_settings_macos_arm:
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
   extends:
@@ -327,7 +327,7 @@ build:linux:x86:noble_koi_from_source:
   variables:
     BUILD_OPTIONS: "-DKOI_DIR=koi -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
   extends:
-    - .build_linux_x86_noble
+    - .build_settings_linux_x86_noble
     - .build_dorado
     - .on_nightly_or_manual
   artifacts: null
@@ -336,7 +336,7 @@ build:linux:x86:noble:debug:
   variables:
     BUILD_TYPE: "Debug"
   extends:
-    - .build_linux_x86_noble
+    - .build_settings_linux_x86_noble
     - .build_dorado
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
@@ -346,7 +346,7 @@ build:linux:x86:noble:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
   extends:
-    - .build_linux_x86_noble
+    - .build_settings_linux_x86_noble
     - .build_dorado
     - .on_nightly_or_manual
   artifacts: null
@@ -445,7 +445,7 @@ build:windows:debug:
   variables:
     BUILD_TYPE: "Debug"
   extends:
-    - .build_windows
+    - .build_settings_windows
     - .build_dorado
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
@@ -453,22 +453,22 @@ build:windows:debug:
 
 build:windows_koi_from_source:
   extends:
-    - .build_windows
+    - .build_settings_windows
     - .build_dorado
     - .on_nightly_or_manual
   before_script:
-    - !reference [.build_windows, before_script]
+    - !reference [.build_settings_windows, before_script]
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -DKOI_DIR=koi -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -G ${WIN_CMAKE_GENERATOR}"
   artifacts: null
   timeout: 1h 30m
 
 build:windows:no_ccache:
   extends:
-    - .build_windows
+    - .build_settings_windows
     - .build_dorado
     - .on_nightly_or_manual
   before_script:
-    - !reference [.build_windows, before_script]
+    - !reference [.build_settings_windows, before_script]
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON -G \"Visual Studio 17 2022\""
   artifacts: null
 
@@ -476,7 +476,7 @@ build:macos:arm:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
   extends:
-    - .build_macos_arm
+    - .build_settings_macos_arm
     - .build_dorado
     - .on_nightly_or_manual
   artifacts: null
