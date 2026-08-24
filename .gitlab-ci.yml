@@ -2,6 +2,7 @@ include:
   - local: .gitlab/sanitizers-ci.yml
   - local: .gitlab/build-ont_core.yml
   - local: .gitlab/regression_tests.yml
+  - local: .gitlab/unit_tests.yml
   - local: .gitlab/mlhub.yml
   - local: .gitlab/pages.yml
 
@@ -73,7 +74,6 @@ variables:
   variables:
     EKS_ARCH: x86_64
     EKS_SIZE: 2xlarge
-    GIT_STRATEGY: clone   # temp hack due to https://gitlab.com/gitlab-org/gitlab-runner/-/work_items/38908 issues
 
 .linux_arm64_runner:
   extends:
@@ -155,10 +155,6 @@ variables:
   - eval cmake ${BUILD_OPTIONS} -S . -B ${BUILD_DIR} -D CMAKE_BUILD_TYPE=${BUILD_TYPE} -D DORADO_ENABLE_BENCHMARK_TESTS=ON -DDORADO_3RD_PARTY_DOWNLOAD=dorado-dependencies
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
-.run_dorado_cmake_ctest:
-  - echo Dorado test stage
-  - ctest -C ${BUILD_TYPE} --test-dir ${BUILD_DIR} --output-on-failure --verbose
-
 .create_venv:
   # Determine where we're getting python from.
   - if [[ -n ${ONT_PYTHON_URL} ]]; then
@@ -205,29 +201,17 @@ variables:
   - echo Dorado packaging stage
   - cpack --config ${BUILD_DIR}/CPackConfig.cmake
 
-.zip_test_files:
-  # Uploading these allows us to avoid checking out the repo in tests.
-  - echo Zipping test files
-  - |
-    zip -r  tests.archive tests/*.sh tests/*.py tests/data tests/cram ||
-    tar -cf tests.archive tests/*.sh tests/*.py tests/data tests/cram
-
-.unzip_test_files:
-  - echo Unzipping test files
-  - unzip tests.archive || tar -xf tests.archive
-
-.build_and_test_dorado:
+.build_dorado:
   stage: build
+  variables:
+    BUILD_TARGET: install
   script:
     - !reference [.create_venv]
     - !reference [.run_dorado_cmake_build]
-    - !reference [.run_dorado_cmake_ctest]
-    - !reference [.zip_test_files]
     - !reference [.run_tetra_tests]
   artifacts:
     paths:
       - dist
-      - tests.archive
     expire_in: 1 day
   cache:
     key: dorado-dependencies-$CI_JOB_NAME_SLUG
@@ -312,19 +296,7 @@ pre-commit:
 
 # Build stages
 
-build:linux:x86:noble_koi_from_source:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
-  variables:
-    BUILD_OPTIONS: "-DKOI_DIR=koi -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
-    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_313}
-  extends:
-    - .linux_build_dependencies
-    - .linux_runner
-    - .build_and_test_dorado
-    - .on_nightly_or_manual
-  artifacts: null
-
-build:linux:x86:noble:
+.build_settings_linux_x86_noble:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
   variables:
     BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
@@ -332,18 +304,51 @@ build:linux:x86:noble:
   extends:
     - .linux_build_dependencies
     - .linux_runner
-    - .build_and_test_dorado
   before_script:
     - !reference [.linux_build_dependencies, before_script]
     - apt-get install -y build-essential
+
+.build_settings_windows:
+  extends:
+    - .windows_runner
+  before_script:
+    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
+    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G ${WIN_CMAKE_GENERATOR}"
+
+.build_settings_macos_arm:
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+  extends:
+    - .macos_arm_runner
+
+# Full builds that test something specific
+
+build:linux:x86:noble_koi_from_source:
+  variables:
+    BUILD_OPTIONS: "-DKOI_DIR=koi -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -DONT_MM2_EXE=ON"
+  extends:
+    - .build_settings_linux_x86_noble
+    - .build_dorado
+    - .on_nightly_or_manual
+  artifacts: null
 
 build:linux:x86:noble:debug:
   variables:
     BUILD_TYPE: "Debug"
   extends:
-    - build:linux:x86:noble
+    - .build_settings_linux_x86_noble
+    - .build_dorado
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
+  artifacts: null
+
+build:linux:x86:noble:no_ccache:
+  variables:
+    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
+  extends:
+    - .build_settings_linux_x86_noble
+    - .build_dorado
+    - .on_nightly_or_manual
   artifacts: null
 
 build:linux:x86:coverage:
@@ -429,96 +434,54 @@ build:linux:x86:clang_tidy:
     # Build dorado.
     - !reference [.run_dorado_cmake_build]
     # Run the ordinary tests directly under valgrind.
-    # We don't use `ctest -VV -E smoke -T memcheck` since that requires additional setup.
+    # CMake's memcheck wrapper requires additional setup, so run the test directly.
     - ${valgrind} --error-exitcode=1 --track-origins=yes -- ./${BUILD_DIR}/tests/dorado_tests
   cache:
     key: dorado-dependencies-$CI_JOB_NAME_SLUG
     paths:
       - dorado-dependencies
 
-build:linux:arm64:jammy:
-  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON -DPOD5_STATIC=OFF"
-    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
-  extends:
-    - .linux_build_dependencies
-    - .linux_arm64_runner
-    - .build_and_test_dorado
-
-build:linux:arm64:cuda13:
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
-  extends:
-    - .linux_build_dependencies
-    - .linux_arm64_runner
-    - .build_and_test_dorado
-
-build:linux:x86:noble:no_ccache:
-  variables:
-    BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
-    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_313}
-  extends:
-    - build:linux:x86:noble
-    - .on_nightly_or_manual
-  artifacts: null
-
-build:windows:
-  variables:
-    # Disable fastzip on windows since it causes the slower runners to timeout
-    # when uploading artifacts.
-    FF_USE_FASTZIP: false
-  extends:
-    - .windows_runner
-    - .build_and_test_dorado
-  before_script:
-    - export CUDA_TOOLKIT=$(cygpath -u $(cygpath -d "${WIN_CUDA_TOOLKIT}"))
-    - export BUILD_OPTIONS="-A x64 -T cuda=${CUDA} -DCUDAToolkit_ROOT=${CUDA_TOOLKIT} -D WIN_THREADS=4 -G ${WIN_CMAKE_GENERATOR}"
-
 build:windows:debug:
   variables:
     BUILD_TYPE: "Debug"
   extends:
-    - build:windows
+    - .build_settings_windows
+    - .build_dorado
   rules:
     - if: $CI_MERGE_REQUEST_EVENT_TYPE == "merged_result"
   artifacts: null
 
 build:windows_koi_from_source:
   extends:
-    - build:windows
+    - .build_settings_windows
+    - .build_dorado
     - .on_nightly_or_manual
   before_script:
-    - !reference ["build:windows", before_script]
+    - !reference [.build_settings_windows, before_script]
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -DKOI_DIR=koi -DGITLAB_CI_TOKEN=${CI_JOB_TOKEN} -G ${WIN_CMAKE_GENERATOR}"
   artifacts: null
   timeout: 1h 30m
 
 build:windows:no_ccache:
   extends:
-    - build:windows
+    - .build_settings_windows
+    - .build_dorado
     - .on_nightly_or_manual
   before_script:
-    - !reference ["build:windows", before_script]
+    - !reference [.build_settings_windows, before_script]
     - export BUILD_OPTIONS="${BUILD_OPTIONS} -D DORADO_DISABLE_CCACHE=ON -G \"Visual Studio 17 2022\""
   artifacts: null
-
-build:macos:arm:
-  variables:
-    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
-  extends:
-    - .macos_arm_runner
-    - .build_and_test_dorado
 
 build:macos:arm:no_ccache:
   variables:
     BUILD_OPTIONS: "-D DORADO_DISABLE_CCACHE=ON"
   extends:
-    - build:macos:arm
+    - .build_settings_macos_arm
+    - .build_dorado
     - .on_nightly_or_manual
   artifacts: null
+
+# Archive builds: these are the deployable, testable artifacts
 
 .build_archive:linux:arm64:
   variables:
@@ -527,7 +490,6 @@ build:macos:arm:no_ccache:
     - .linux_build_dependencies
     - .linux_arm64_runner
     - .build_dorado_archive
-    - .on_nightly_or_manual
 
 build_archive:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
@@ -550,7 +512,6 @@ build_archive:linux:arm64:cuda13:
   extends:
     - .linux_runner
     - .build_dorado_archive
-    - .on_nightly_or_manual
 
 build_archive:linux:x86:cuda12:
   extends:
@@ -569,7 +530,6 @@ build_archive:linux:x86:cuda13:
   extends:
     - .windows_runner
     - .build_dorado_archive
-    - .on_nightly_or_manual
 
 build_archive:windows:cuda12:
   extends:
@@ -585,7 +545,6 @@ build_archive:macos:arm:
   extends:
     - .macos_arm_runner
     - .build_dorado_archive
-    - .on_nightly_or_manual
   script:
     - !reference [.build_dorado_archive, script]
     - !reference [.sign_dorado:macos, script]
@@ -595,11 +554,12 @@ build_archive:macos:arm:
 .test_dorado_common:
   stage: test
   variables:
-    GIT_STRATEGY: none
+    GIT_SUBMODULE_STRATEGY: none
     MODEL: dna_r10.4.1_e8.2_400bps_hac@v6.0.0
     BATCH: 384
     VALIDATE_FASTQ: 1
     VALIDATE_BAM: 1
+    DORADO_BIN: "./dorado-*/bin/dorado"
   script:
     - !reference [.create_venv]
     # Do everything inside a newly created folder, since some runners only run
@@ -607,21 +567,22 @@ build_archive:macos:arm:
     - rm -rf test_archive
     - mkdir test_archive
     - cd test_archive
-    - mv ../dist ../tests.archive .
-    - !reference [.unzip_test_files]
+    - mv ../archive .
+    - ln -s ../tests tests
+    - !reference [.extract_archive, script]
     # Manually sharding the tests based on how long they take (in an arm64 job).
     # Note that Windows can't run the cram tests (shard 1 and 2).
     - if [[ ${TEST_SHARD} -eq 0 ]] ; then
-    -   bash ./tests/test_simple_basecaller_execution.sh ./dist/bin/dorado ${MODEL} ${BATCH}  # 11m
-    -   bash ./tests/test_nested_output_structure.sh ./dist/bin/dorado ${MODEL} ${BATCH}      # <1m
-    -   bash ./tests/test_expected_logging.sh ./dist/bin/dorado ${MODEL} ${BATCH}             # <1m
-    -   bash ./tests/test_model_resolution.sh ./dist/bin/dorado                               # <1m
-    -   bash ./tests/test_dorado_correct.sh ./dist/bin/dorado                                 # <1m
+    -   bash ./tests/test_simple_basecaller_execution.sh ${DORADO_BIN} ${MODEL} ${BATCH}  # 11m
+    -   bash ./tests/test_nested_output_structure.sh ${DORADO_BIN} ${MODEL} ${BATCH}      # <1m
+    -   bash ./tests/test_expected_logging.sh ${DORADO_BIN} ${MODEL} ${BATCH}             # <1m
+    -   bash ./tests/test_model_resolution.sh ${DORADO_BIN}                               # <1m
+    -   bash ./tests/test_dorado_correct.sh ${DORADO_BIN}                                 # <1m
     - elif [[ ${TEST_SHARD} -eq 1 ]] ; then
-    -   bash ./tests/test_dorado_correct_cram.sh ./dist/bin/dorado                            # 10m
-    -   bash ./tests/test_dorado_variant.sh ./dist/bin/dorado                                 # 3m
+    -   bash ./tests/test_dorado_correct_cram.sh ${DORADO_BIN}                            # 10m
+    -   bash ./tests/test_dorado_variant.sh ${DORADO_BIN}                                 # 3m
     - elif [[ ${TEST_SHARD} -eq 2 ]] ; then
-    -   bash ./tests/test_dorado_polish.sh ./dist/bin/dorado                                  # 16m
+    -   bash ./tests/test_dorado_polish.sh ${DORADO_BIN}                                  # 16m
     - else
     -   echo "Invalid shard '${TEST_SHARD}'"
     -   exit 1
@@ -686,7 +647,7 @@ test:windows:
     - on-prem
     - gpu-5070ti  # Pin to a specific GPU to keep output consistent
   needs:
-    - build:windows
+    - build_archive:windows:cuda12
 
 test:linux:x86:noble:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
@@ -697,7 +658,7 @@ test:linux:x86:noble:
     - .linux_V100_runner
     - .test_dorado
   needs:
-    - build:linux:x86:noble
+    - build_archive:linux:x86:cuda12
 
 test:linux:arm64:jammy:
   image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
@@ -708,7 +669,7 @@ test:linux:arm64:jammy:
     - .linux_orin_cuda_12_runner
     - .test_dorado
   needs:
-    - build:linux:arm64:jammy
+    - build_archive:linux:arm64:jammy
 
 test:linux:arm64:thor:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
@@ -718,9 +679,8 @@ test:linux:arm64:thor:
     - .linux_test_dependencies
     - .linux_thor_runner
     - .test_dorado
-    - .on_nightly_or_manual
   needs:
-    - build:linux:arm64:cuda13
+    - build_archive:linux:arm64:cuda13
 
 test:linux:arm64:dgx_spark:
   image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
@@ -731,7 +691,7 @@ test:linux:arm64:dgx_spark:
     - .linux_dgx_spark_runner
     - .test_dorado
   needs:
-    - build:linux:arm64:cuda13
+    - build_archive:linux:arm64:cuda13
 
 test:macos:arm:
   tags:
@@ -743,7 +703,7 @@ test:macos:arm:
     - .macos_arm_runner
     - .test_dorado
   needs:
-    - build:macos:arm
+    - build_archive:macos:arm
 
 # Test that you can run dorado in clean environments
 .test_archive:linux:x86:
@@ -817,9 +777,10 @@ test:model_download:linux:x86:noble:
     - .on_nightly_or_manual
   stage: test
   needs:
-    - build:linux:x86:noble
+    - build_archive:linux:x86:cuda12
   script:
-    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data --batchsize 64
+    - !reference [.extract_archive, script]
+    - ./tests/test_model_download.py --exe ./dorado-*/bin/dorado --data ./tests/data --batchsize 64
 
 test:model_download:macos:arm:
   tags:
@@ -831,7 +792,8 @@ test:model_download:macos:arm:
     - .on_nightly_or_manual
   stage: test
   needs:
-    - build:macos:arm
+    - build_archive:macos:arm
   script:
-    - ./tests/test_model_download.py --exe ./dist/bin/dorado --data ./tests/data
+    - !reference [.extract_archive, script]
+    - ./tests/test_model_download.py --exe ./dorado-*/bin/dorado --data ./tests/data
   timeout: 3h

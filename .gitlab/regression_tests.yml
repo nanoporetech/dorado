@@ -51,8 +51,6 @@
     - nvidia-docker
     - on-prem
     - gpu-v100
-  variables:
-    GIT_STRATEGY: clone   # temp hack due to https://gitlab.com/gitlab-org/gitlab-runner/-/work_items/38908 issues
 
 .linux_regression_runner_a100:
   tags:

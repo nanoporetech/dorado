@@ -1,0 +1,126 @@
+.build_unit_tests:
+  stage: build
+  variables:
+    BUILD_TARGET: dorado_unit_tests
+  script:
+    - !reference [.create_venv]
+    - !reference [.run_dorado_cmake_build]
+    - cmake --install ${BUILD_DIR} --component unit_tests
+    - cmake --install ${BUILD_DIR} --component redist_libs
+  artifacts:
+    paths:
+      - dist
+    expire_in: 1 day
+  cache:
+    key: dorado-dependencies-$CI_JOB_NAME_SLUG
+    paths:
+      - dorado-dependencies
+
+build_unit_tests:linux:x86:noble:
+  extends:
+    - .build_settings_linux_x86_noble
+    - .build_unit_tests
+
+build_unit_tests:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON -DPOD5_STATIC=OFF"
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
+  extends:
+    - .linux_build_dependencies
+    - .linux_arm64_runner
+    - .build_unit_tests
+
+build_unit_tests:linux:arm64:cuda13:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
+  variables:
+    BUILD_OPTIONS: "-DONT_MM2_EXE=ON"
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
+  extends:
+    - .linux_build_dependencies
+    - .linux_arm64_runner
+    - .build_unit_tests
+
+build_unit_tests:windows:
+  extends:
+    - .build_settings_windows
+    - .build_unit_tests
+
+build_unit_tests:macos:arm:
+  extends:
+    - .build_settings_macos_arm
+    - .build_unit_tests
+
+.test_unit_tests:
+  stage: test
+  variables:
+    GIT_SUBMODULE_STRATEGY: none
+  script:
+    - cmake -S dist/tests -B unit_test_ctest
+    - ctest --test-dir unit_test_ctest -C Release --output-on-failure --verbose
+
+test_unit_tests:windows:
+  extends:
+    - .test_unit_tests
+  tags:
+    - windows
+    - cuda-${CUDA}
+    - on-prem
+    - gpu-5070ti
+  needs:
+    - build_unit_tests:windows
+
+test_unit_tests:linux:x86:noble:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
+  variables:
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_313}
+  extends:
+    - .linux_test_dependencies
+    - .linux_V100_runner
+    - .test_unit_tests
+  needs:
+    - build_unit_tests:linux:x86:noble
+
+test_unit_tests:linux:arm64:jammy:
+  image: ${DORADO_DOCKER_ROOT}/dorado-l4t-r36.4.0:1.0
+  variables:
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
+  extends:
+    - .linux_test_dependencies
+    - .linux_orin_cuda_12_runner
+    - .test_unit_tests
+  needs:
+    - build_unit_tests:linux:arm64:jammy
+
+test_unit_tests:linux:arm64:thor:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
+  variables:
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
+  extends:
+    - .linux_test_dependencies
+    - .linux_thor_runner
+    - .test_unit_tests
+  needs:
+    - build_unit_tests:linux:arm64:cuda13
+
+test_unit_tests:linux:arm64:dgx_spark:
+  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-arm64-cuda-13.0.0:1.0
+  variables:
+    ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_ARM64_313}
+  extends:
+    - .linux_test_dependencies
+    - .linux_dgx_spark_runner
+    - .test_unit_tests
+  needs:
+    - build_unit_tests:linux:arm64:cuda13
+
+test_unit_tests:macos:arm:
+  tags:
+    - osx_arm64
+    - on-prem
+    - osx-15.5
+  extends:
+    - .macos_arm_runner
+    - .test_unit_tests
+  needs:
+    - build_unit_tests:macos:arm
