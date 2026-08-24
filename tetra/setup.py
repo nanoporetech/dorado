@@ -8,7 +8,7 @@ install_requirements = [
     "certifi",
     "numpy",
     "pandas",
-    "pod5==0.3.44",
+    "pod5==0.3.47",
     "distro",
 ]
 
