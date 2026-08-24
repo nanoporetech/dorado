@@ -6,12 +6,9 @@
 #include "types.h"
 
 #include <cstdint>
-#include <filesystem>
-#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 struct faidx_t;

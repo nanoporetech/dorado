@@ -20,7 +20,6 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
-#include <unordered_map>
 #include <utility>
 
 static constexpr float EPS = 1e-9f;
@@ -68,7 +67,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     const int16_t kMinMedianForRNASignal = 700;
 
     int signal_len = static_cast<int>(read.read_common.get_raw_data_samples());
-    const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
+    const int16_t* signal = static_cast<const int16_t*>(read.read_common.raw_data.const_data_ptr());
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};

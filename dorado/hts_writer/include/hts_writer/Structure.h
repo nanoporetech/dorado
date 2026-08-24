@@ -4,7 +4,6 @@
 #include "hts_writer/HtsFileWriter.h"
 
 #include <filesystem>
-#include <memory>
 #include <unordered_map>
 
 namespace dorado::hts_writer {

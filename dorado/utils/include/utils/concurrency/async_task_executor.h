@@ -7,7 +7,6 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <type_traits>
 
 namespace dorado::utils::concurrency {
 
