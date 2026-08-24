@@ -50,8 +50,8 @@ private:
     std::shared_ptr<const alignment::Minimap2Index> get_index(const ClientInfo& client_info);
     std::shared_ptr<dorado::alignment::BedFile> get_bedfile(const ClientInfo& client_info,
                                                             const std::string& bedfile);
-    template <typename READ>
-    void align_read(READ&& read);
+    template <typename Read>
+    void align_read(Read&& read);
 
     void align_bam_message(BamMessage&& bam_message);
 

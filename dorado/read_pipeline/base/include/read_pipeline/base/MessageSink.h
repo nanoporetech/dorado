@@ -32,7 +32,7 @@ public:
     void push_message(Msg&& msg) {
         static_assert(!std::is_reference_v<Msg> && !std::is_const_v<Msg>,
                       "Pushed messages must be rvalues: the sink takes ownership");
-        push_message_internal(std::move(msg));
+        push_message_internal(std::forward<Msg>(msg));
     }
 
     // Waits until work is finished and shuts down worker threads.

@@ -41,7 +41,7 @@ ModuleHolder<AnyModule> populate_model(Model&& model,
     model->to(options.device_opt().value());
     model->eval();
 
-    auto module = AnyModule(std::move(model));
+    auto module = AnyModule(std::forward<Model>(model));
     auto holder = ModuleHolder<AnyModule>(std::move(module));
     return holder;
 }
