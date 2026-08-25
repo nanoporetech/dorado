@@ -35,8 +35,7 @@ std::string get_barcode_sequence(const std::string& barcode_name) {
 std::string get_tag(const std::string& tag,
                     const std::unordered_map<std::string, std::string>& tags) {
     const auto& it = tags.find(tag);
-    const std::string value = (it != std::end(tags)) ? it->second : "";
-    return value;
+    return (it != std::end(tags)) ? it->second : "";
 }
 
 std::vector<std::string> tokenize(const std::string& line, const char delimiter) {
