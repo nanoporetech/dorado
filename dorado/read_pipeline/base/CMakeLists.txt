@@ -27,7 +27,8 @@ dorado_add_library(
         stereo_features.cpp
         stereo_features.h
         stitch.cpp
-
+    SOURCES_TEST
+        ReadInitialiserTest.cpp
     DEPENDS_PUBLIC
         dorado_hts_utils
         dorado_models_lib

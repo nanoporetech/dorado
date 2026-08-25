@@ -137,6 +137,7 @@ void ReadInitialiser::undemux_read_group(HtsData& data) const {
     if (const auto al_tag = bam_aux_get(record, "al"); al_tag != nullptr) {
         alias = bam_aux2Z(al_tag);
         bam_aux_del(record, al_tag);
+        bam_aux_update_str(record, "BC", UNCLASSIFIED_STR.length() + 1, UNCLASSIFIED_STR.c_str());
     } else if (const auto bc_tag = bam_aux_get(record, "BC"); bc_tag != nullptr) {
         alias = bam_aux2Z(bc_tag);
         bam_aux_update_str(record, "BC", UNCLASSIFIED_STR.length() + 1, UNCLASSIFIED_STR.c_str());
