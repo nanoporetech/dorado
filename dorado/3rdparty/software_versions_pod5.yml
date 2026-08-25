@@ -40,7 +40,7 @@ xsimd:
         A unified means for using SIMD features for library authors.
     version: "13.0.0"
     url: https://github.com/xtensor-stack/xsimd
-    license: PATH_NOT_AVAILABLE
+    license: <pod5>/licenses/xsimd/licenses/LICENSE
     files:
         - PATH_NOT_AVAILABLE
 zstd:
