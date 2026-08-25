@@ -24,19 +24,19 @@ dorado::SamHdrPtr make_header() {
     return dorado::SamHdrPtr{sam_hdr_parse(header_text.size(), header_text.data())};
 }
 
-dorado::HtsData make_data(std::string_view qname = "read") {
+dorado::HtsData make_data(std::string_view qname) {
     dorado::BamPtr record{bam_init1()};
     bam_set1(record.get(), qname.size(), qname.data(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0, 1, "*",
              "*", 0);
     return dorado::HtsData{std::move(record)};
 }
 
-void set_string_tag(dorado::HtsData& data, const char tag[3], std::string_view value) {
+void set_string_tag(dorado::HtsData& data, const char (&tag)[3], std::string_view value) {
     CATCH_REQUIRE(bam_aux_update_str(data.bam_ptr.get(), tag, static_cast<int>(value.size() + 1),
                                      value.data()) == 0);
 }
 
-std::string get_string_tag(const dorado::HtsData& data, const char tag[3]) {
+std::string get_string_tag(const dorado::HtsData& data, const char (&tag)[3]) {
     const auto value = bam_aux_get(data.bam_ptr.get(), tag);
     CATCH_REQUIRE(value != nullptr);
     return bam_aux2Z(value);
@@ -54,7 +54,7 @@ CATCH_TEST_CASE(TEST_GROUP " updates read attributes from a parsed header", TEST
     requested_trim.set_adapter();
     ReadInitialiser initialiser(header.get(), alignment_counts, requested_trim);
 
-    auto data = make_data();
+    auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_barcode12");
     set_string_tag(data, "st", "2024-01-02T03:00:02Z");
     CATCH_REQUIRE(bam_aux_update_float(data.bam_ptr.get(), "qs", 9.5f) == 0);
@@ -86,7 +86,7 @@ CATCH_TEST_CASE(TEST_GROUP " updates record trim flags without a recognised read
     requested_trim.set_primer();
     ReadInitialiser initialiser(header.get(), {}, requested_trim);
 
-    auto data = make_data();
+    auto data = make_data("read");
     set_string_tag(data, "RG", "unknown-read-group");
     set_string_tag(data, "tm", "adapter");
 
@@ -101,7 +101,7 @@ CATCH_TEST_CASE(TEST_GROUP " updates barcoding fields from a parsed header", TES
     auto header = make_header();
     CATCH_REQUIRE(header != nullptr);
     ReadInitialiser initialiser(header.get(), {}, {});
-    auto data = make_data();
+    auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_barcode12");
 
     initialiser.update_barcoding_fields(data);
@@ -117,7 +117,7 @@ CATCH_TEST_CASE(TEST_GROUP " undemultiplexes read groups using barcode aliases",
     auto header = make_header();
     CATCH_REQUIRE(header != nullptr);
     ReadInitialiser initialiser(header.get(), {}, {});
-    auto data = make_data();
+    auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_sample-12");
     set_string_tag(data, "al", "sample-12");
     set_string_tag(data, "BC", "barcode12");
@@ -133,7 +133,7 @@ CATCH_TEST_CASE(TEST_GROUP " undemultiplexes read groups using barcode tags", TE
     auto header = make_header();
     CATCH_REQUIRE(header != nullptr);
     ReadInitialiser initialiser(header.get(), {}, {});
-    auto data = make_data();
+    auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_barcode12");
     set_string_tag(data, "BC", "barcode12");
 
