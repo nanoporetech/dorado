@@ -376,16 +376,12 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
             hap_result.draft_start = std::min(hap_result.draft_start, last_end);
             hap_result.draft_end = std::max(hap_result.draft_end, draft_len);
         }
-        if (!std::empty(part) && !std::empty(part.front().seq)) {
-            ret.emplace_back(std::move(part));
-        }
     }
-
-    spdlog::trace("[stitch_sequence] header = '{}', final.", header);
-
     if (!std::empty(part) && !std::empty(part.front().seq)) {
         ret.emplace_back(std::move(part));
     }
+
+    spdlog::trace("[stitch_sequence] header = '{}', final.", header);
 
     return ret;
 }
@@ -715,7 +711,9 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
     // Initialize a shared async queue with window IDs which threads can pop.
     utils::AsyncQueue<std::size_t> shared_window_queue(std::size(windows));
     for (std::size_t i = 0; i < std::size(windows); ++i) {
-        shared_window_queue.try_push(std::move(i));
+        // Avoid use-after-move warnings by making a (trivial) copy of i.
+        std::size_t ii = i;
+        shared_window_queue.try_push(std::move(ii));
     }
     shared_window_queue.terminate(utils::AsyncQueueTerminateFast::No);
 

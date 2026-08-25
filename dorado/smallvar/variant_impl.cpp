@@ -681,12 +681,12 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
 
                 // Odd samples will be processed alone.
                 if (std::ssize(sample.positions_major) != window_len) {
-                    InferenceData remainder_buffer;
-                    remainder_buffer.samples.emplace_back(std::move(sample));
                     spdlog::trace(
                             "[batch_producer] Pushing a remainder batch of data to infer_data "
                             "queue. Sample: [{}].",
                             secondary::sample_to_string(sample));
+                    InferenceData remainder_buffer;
+                    remainder_buffer.samples.emplace_back(std::move(sample));
                     output_queue.try_push(std::move(remainder_buffer));
                     continue;
                 }

@@ -465,7 +465,7 @@ ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
         : model_path(std::move(model_path_)),
           general(std::move(general_)),
           mods(std::move(mods_)),
-          context(general_.model_type == ModelType::CONV_LSTM_V2
+          context(general.model_type == ModelType::CONV_LSTM_V2
                           ? context_.normalised(general.stride)
                           : std::move(context_)),
           refine(std::move(refine_)) {

@@ -1774,18 +1774,15 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         if ((alt0 == ref) && (alt1 == ref)) {
             // we're in a completely broken state
             return {};
-        }
-        if (alt0 == ref) {
+        } else if (alt0 == ref) {
             alts = {std::move(alt1)};
             genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'1', '0'}
                                                              : std::pair<char, char>{'0', '1'};
-        }
-        if (alt1 == ref) {
+        } else if (alt1 == ref) {
             alts = {std::move(alt0)};
             genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'0', '1'}
                                                              : std::pair<char, char>{'1', '0'};
-        }
-        if (std::empty(alts)) {
+        } else {
             alts = {std::move(alt0), std::move(alt1)};
         }
     } else {
