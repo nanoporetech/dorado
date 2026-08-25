@@ -110,20 +110,20 @@ const std::unordered_map<PrimerCode, std::set<dorado::models::KitCode>> primer_k
 };
 
 struct CustomItem {
-    enum ItemType { UNKNOWN, ADAPTER, PRIMER };
-    enum ItemPos { FRONT, REAR };
+    enum class ItemType { UNKNOWN, ADAPTER, PRIMER };
+    enum class ItemPos { FRONT, REAR };
 
     std::string name;
     std::string front_sequence;
     std::string rear_sequence;
-    ItemType item_type{UNKNOWN};
+    ItemType item_type{ItemType::UNKNOWN};
 
     bool add_sequence(std::string nm, std::string sequence, ItemType ty, ItemPos pos) {
         if (!name.empty() && name != nm) {
             spdlog::error("Custom adapter/primer name mismatch error: {} and {}", name, nm);
             return false;
         }
-        if (item_type != ty && item_type != UNKNOWN) {
+        if (item_type != ty && item_type != ItemType::UNKNOWN) {
             spdlog::error("Custom adapter/primer type mismatch error. {} and {}", int(item_type),
                           int(ty));
             return false;
@@ -133,7 +133,7 @@ struct CustomItem {
             return false;
         }
         switch (pos) {
-        case FRONT:
+        case ItemPos::FRONT:
             if (!front_sequence.empty()) {
                 spdlog::error(
                         "Custom adapter/primer parsing error: Duplicate front sequence for {}", nm);
@@ -141,7 +141,7 @@ struct CustomItem {
             }
             front_sequence = std::move(sequence);
             break;
-        case REAR:
+        case ItemPos::REAR:
             if (!rear_sequence.empty()) {
                 spdlog::error("Custom adapter/primer parsing error: Duplicate rear sequence for {}",
                               nm);
@@ -175,15 +175,15 @@ std::set<std::string> parse_kit_names(const std::string& kit_string) {
 CustomItem::ItemType item_type(const std::unordered_map<std::string, std::string>& tags) {
     auto type_field = tags.find(ENTRY_TYPE_TAG);
     if (type_field == tags.end()) {
-        return CustomItem::UNKNOWN;
+        return CustomItem::ItemType::UNKNOWN;
     }
     if (type_field->second == "adapter") {
-        return CustomItem::ADAPTER;
+        return CustomItem::ItemType::ADAPTER;
     }
     if (type_field->second == "primer") {
-        return CustomItem::PRIMER;
+        return CustomItem::ItemType::PRIMER;
     }
-    return CustomItem::UNKNOWN;
+    return CustomItem::ItemType::UNKNOWN;
 }
 
 std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record_name) {
@@ -193,7 +193,7 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record
             return {};
         }
         auto name = record_name.substr(0, front_start);
-        return {std::move(name), CustomItem::FRONT};
+        return {std::move(name), CustomItem::ItemPos::FRONT};
     }
     auto rear_start = record_name.find("_rear");
     if (rear_start != std::string::npos) {
@@ -201,7 +201,7 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record
             return {};
         }
         auto name = record_name.substr(0, rear_start);
-        return {std::move(name), CustomItem::REAR};
+        return {std::move(name), CustomItem::ItemPos::REAR};
     }
     return {};
 }
@@ -248,7 +248,7 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
         auto ty = item_type(entry.tags);
         auto [name, pos] = split_name(entry.name);
         std::set<std::string> kits = kit_names(entry.tags);
-        if (ty == CustomItem::UNKNOWN) {
+        if (ty == CustomItem::ItemType::UNKNOWN) {
             spdlog::error("Invalid 'type' tag in custom adapter/primer file.");
             throw std::runtime_error("Error parsing custom adapter/primer file.");
         }
@@ -279,7 +279,7 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
         }
         Candidate candidate{entry.first, entry.second.front_sequence, entry.second.rear_sequence};
         for (const auto& kit : kits) {
-            if (entry.second.item_type == CustomItem::ADAPTER) {
+            if (entry.second.item_type == CustomItem::ItemType::ADAPTER) {
                 m_kit_adapter_lut[kit].push_back(candidate);
             } else {
                 m_kit_primer_lut[kit].push_back(candidate);
@@ -301,10 +301,10 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
     // with them will only be returned if the primer_aux value DEFAULT is passed here.
     const std::unordered_map<std::string, std::vector<Candidate>>* candidate_lut = nullptr;
     switch (ty) {
-    case ADAPTERS:
+    case CandidateType::ADAPTERS:
         candidate_lut = &m_kit_adapter_lut;
         break;
-    case PRIMERS:
+    case CandidateType::PRIMERS:
         candidate_lut = &m_kit_primer_lut;
         break;
     default:
@@ -326,7 +326,7 @@ std::vector<Candidate> AdapterPrimerManager::get_candidates(const std::string& k
     if (iter != candidate_lut->end()) {
         results.insert(results.end(), iter->second.begin(), iter->second.end());
     }
-    if (ty == ADAPTERS) {
+    if (ty == CandidateType::ADAPTERS) {
         return results;
     }
     std::vector<Candidate> filtered_results;

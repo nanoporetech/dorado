@@ -21,35 +21,35 @@ struct alignas(hardware_destructive_interference_size) WorkerPool::WorkerState {
     TaskPool* task_pool = nullptr;
 
     // All state changes are controlled by the pool, except for Pausing->Paused which is done by the worker.
-    enum State { Running, Pausing, Paused, Stopped };
-    std::atomic<State> state{Paused};
+    enum class State { Running, Pausing, Paused, Stopped };
+    std::atomic<State> state{State::Paused};
 };
 
 void WorkerPool::worker_thread(size_t worker_idx) {
     auto& worker_state = m_states[worker_idx];
 
     // Wait for us to become unpaused.
-    worker_state.state.wait(WorkerState::Paused, std::memory_order_acquire);
+    worker_state.state.wait(WorkerState::State::Paused, std::memory_order_acquire);
 
     while (true) {
         // Handle state change.
         const WorkerState::State state = worker_state.state.load(std::memory_order_relaxed);
-        if (state == WorkerState::Stopped) {
+        if (state == WorkerState::State::Stopped) {
             break;
-        } else if (state == WorkerState::Pausing) {
+        } else if (state == WorkerState::State::Pausing) {
             // Inform the pool that we're paused and then wait for it to be changed.
-            worker_state.state.exchange(WorkerState::Paused, std::memory_order_release);
+            worker_state.state.exchange(WorkerState::State::Paused, std::memory_order_release);
             worker_state.state.notify_one();
-            worker_state.state.wait(WorkerState::Paused, std::memory_order_acquire);
+            worker_state.state.wait(WorkerState::State::Paused, std::memory_order_acquire);
             continue;
         }
 
         // If we get here then we should be running.
-        assert(state == WorkerState::Running);
+        assert(state == WorkerState::State::Running);
 
         // If we don't have an active task pool then wait for one to be bound.
         if (worker_state.task_pool == nullptr) {
-            worker_state.state.wait(WorkerState::Running, std::memory_order_relaxed);
+            worker_state.state.wait(WorkerState::State::Running, std::memory_order_relaxed);
             continue;
         }
 
@@ -62,17 +62,17 @@ void WorkerPool::set_task_pool(TaskPool* pool) {
 
     // Tell the workers to pause.
     for (size_t idx = 0; idx < m_num_workers; idx++) {
-        m_states[idx].state.exchange(WorkerState::Pausing, std::memory_order_relaxed);
+        m_states[idx].state.exchange(WorkerState::State::Pausing, std::memory_order_relaxed);
         m_states[idx].state.notify_one();
     }
     // Wait for all of them to become paused.
     for (size_t idx = 0; idx < m_num_workers; idx++) {
-        m_states[idx].state.wait(WorkerState::Pausing, std::memory_order_acquire);
+        m_states[idx].state.wait(WorkerState::State::Pausing, std::memory_order_acquire);
     }
     // Assign the new task pool and start them off again.
     for (size_t idx = 0; idx < m_num_workers; idx++) {
         m_states[idx].task_pool = pool;
-        m_states[idx].state.exchange(WorkerState::Running, std::memory_order_release);
+        m_states[idx].state.exchange(WorkerState::State::Running, std::memory_order_release);
         m_states[idx].state.notify_one();
     }
 }
@@ -103,7 +103,7 @@ WorkerPool::~WorkerPool() {
 
     // Tell the workers to stop, then join them.
     for (size_t idx = 0; idx < m_num_workers; idx++) {
-        m_states[idx].state.exchange(WorkerState::Stopped);
+        m_states[idx].state.exchange(WorkerState::State::Stopped);
         m_states[idx].state.notify_one();
         m_states[idx].worker.join();
     }

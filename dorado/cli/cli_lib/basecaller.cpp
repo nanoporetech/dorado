@@ -944,7 +944,7 @@ void run(const BasecallerOptions& options,
                         ? num_reads
                         : std::min(num_reads, static_cast<size_t>(options.max_reads));
 
-    ProgressTracker tracker(ProgressTracker::SIMPLEX, num_reads);
+    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, num_reads);
 
     auto [num_devices, runners, modbase_runners] = create_runners(
             options, model_config, models.get_modbase_model_paths(), num_runners, modbase_params);

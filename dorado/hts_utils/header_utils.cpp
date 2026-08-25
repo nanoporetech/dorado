@@ -97,7 +97,7 @@ std::vector<utils::HeaderLineData> parse_header(
 
 void header_to_stream(std::ostream& os, const std::vector<utils::HeaderLineData>& header) {
     for (const auto& line : header) {
-        os << line.header_type;
+        os << fmt::underlying(line.header_type);
         for (const auto& [key, value] : line.tags) {
             os << '\t' << key << ":" << value;
         }

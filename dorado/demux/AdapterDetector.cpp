@@ -140,14 +140,14 @@ AdapterDetector::~AdapterDetector() = default;
 AdapterScoreResult AdapterDetector::find_adapters(const std::string& seq,
                                                   const std::string& kit_name) {
     const auto& adapter_sequences = get_adapter_sequences(kit_name);
-    return detect(seq, adapter_sequences, ADAPTER);
+    return detect(seq, adapter_sequences, QueryType::ADAPTER);
 }
 
 AdapterScoreResult AdapterDetector::find_primers(const std::string& seq,
                                                  const std::string& kit_name,
                                                  PrimerAux primer_aux) {
     const auto& primer_sequences = get_primer_sequences(kit_name, primer_aux);
-    return detect(seq, primer_sequences, PRIMER);
+    return detect(seq, primer_sequences, QueryType::PRIMER);
 }
 
 SingleEndResult AdapterDetector::find_umi_tag(const std::string& seq) {
@@ -205,7 +205,8 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
                                            const std::vector<Query>& queries,
                                            AdapterDetector::QueryType query_type) const {
     const std::string_view seq_view(seq);
-    const auto TRIM_LENGTH = (query_type == ADAPTER ? ADAPTER_TRIM_LENGTH : PRIMER_TRIM_LENGTH);
+    const auto TRIM_LENGTH =
+            (query_type == QueryType::ADAPTER ? ADAPTER_TRIM_LENGTH : PRIMER_TRIM_LENGTH);
     const std::string_view read_front = seq_view.substr(0, TRIM_LENGTH);
     int rear_start = std::max(0, int(seq.length()) - TRIM_LENGTH);
     const std::string_view read_rear = seq_view.substr(rear_start, TRIM_LENGTH);

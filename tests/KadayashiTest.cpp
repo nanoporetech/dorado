@@ -189,7 +189,7 @@ kadayashi::MedakaFeatureMatrixOptions make_medaka_feature_matrix_options(
             .tag_keep_missing = false,
             .readgroup = "",
             .disable_read_packing = disable_read_packing,
-            .hap_source = kadayashi::FORCE_UNPHASED,
+            .hap_source = kadayashi::haplotagsource::FORCE_UNPHASED,
             .max_reads = max_reads,
             .right_align_insertions = true,
             .min_snp_accuracy = min_snp_accuracy};
@@ -1340,7 +1340,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen normal case", TEST_GROUP) {
             .tag_keep_missing = false,
             .readgroup = "",
             .disable_read_packing = false,
-            .hap_source = kadayashi::USE_TAG_FROM_HASHTABLE,
+            .hap_source = kadayashi::haplotagsource::USE_TAG_FROM_HASHTABLE,
             .max_reads = 100,
             .right_align_insertions = true,
             .min_snp_accuracy = 0.0};
@@ -1439,7 +1439,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen matches calculate_read_alignment on real d
             .tag_keep_missing = TAG_KEEP_MISSING,
             .readgroup = read_group,
             .disable_read_packing = ROW_PER_READ,
-            .hap_source = kadayashi::USE_BAM_HAP_TAG,
+            .hap_source = kadayashi::haplotagsource::USE_BAM_HAP_TAG,
             .max_reads = MAX_READS,
             .right_align_insertions = RIGHT_ALIGN_INSERTIONS,
             .min_snp_accuracy = MIN_SNP_ACCURACY};
@@ -1550,7 +1550,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen no input", TEST_GROUP) {
             .tag_keep_missing = false,
             .readgroup = "",
             .disable_read_packing = false,
-            .hap_source = kadayashi::USE_TAG_FROM_HASHTABLE,
+            .hap_source = kadayashi::haplotagsource::USE_TAG_FROM_HASHTABLE,
             .max_reads = 100,
             .right_align_insertions = true,
             .min_snp_accuracy = 0.0};

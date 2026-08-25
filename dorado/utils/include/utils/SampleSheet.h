@@ -12,10 +12,6 @@ namespace dorado::utils {
 class SampleSheet {
 public:
     enum class Type { none, barcode };
-    enum IndexBits {
-        FLOW_CELL_ID = 0,
-        POSITION_ID,
-    };
 
     SampleSheet();
 
@@ -78,6 +74,8 @@ private:
     using Row = std::vector<std::string>;
     std::string m_filename;
     Type m_type{Type::none};
+    static constexpr std::size_t FLOW_CELL_ID = 0;
+    static constexpr std::size_t POSITION_ID = 1;
     std::bitset<2> m_index{};
     std::unordered_map<std::string, size_t> m_col_indices;
     std::vector<Row> m_rows;

@@ -832,7 +832,7 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
     }
 }
 
-enum var_classify_code {
+enum class var_classify_code {
     UNSET,
 
     // check het first
@@ -931,7 +931,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     var_classify_t ret;
     ret.is_accepted = FLAG_VARSTAT_REJECTED;
     ret.type = FLAG_VAR_NA;
-    ret.code = UNSET;
+    ret.code = var_classify_code::UNSET;
 
     constexpr int N_LONG_ALTS = 3;
     constexpr int MIN_SUF_COV_ALLELE = 3;
@@ -962,11 +962,11 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     // but 1 may be too low and allows confident false positives.
     constexpr int LOWCOV_THRESHOLD = 15;
     constexpr int LOWCOV_ALT_THRESHOLD = 3;
-    enum which_hap { HAP0, HAP1 };
+    enum class which_hap { HAP0, HAP1 };
     auto allele_dominates_haplotype = [&varcov](const vc_allele_t &allele, which_hap hap) {
         int a_cov_hap;
         int tot_cov_hap;
-        if (hap == HAP0) {
+        if (hap == which_hap::HAP0) {
             a_cov_hap = allele.cov.cov_hap0;
             tot_cov_hap = varcov.cov.cov_hap0;
         } else {
@@ -979,10 +979,10 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
         return regular_ok || lowcov_ok;
     };
     auto allele_is_cleanly_phased = [&allele_dominates_haplotype](vc_allele_t &a) {
-        const bool dominates_hap0 =
-                allele_dominates_haplotype(a, HAP0) && !allele_dominates_haplotype(a, HAP1);
-        const bool dominates_hap1 =
-                allele_dominates_haplotype(a, HAP1) && !allele_dominates_haplotype(a, HAP0);
+        const bool dominates_hap0 = allele_dominates_haplotype(a, which_hap::HAP0) &&
+                                    !allele_dominates_haplotype(a, which_hap::HAP1);
+        const bool dominates_hap1 = allele_dominates_haplotype(a, which_hap::HAP1) &&
+                                    !allele_dominates_haplotype(a, which_hap::HAP0);
         return dominates_hap0 || dominates_hap1;
     };
 
@@ -1029,18 +1029,18 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     if (ok) {
         if (!has_cov_diff && alt0_strand_ok && alt1_strand_ok) {
             ret.is_accepted = FLAG_VARSTAT_ACCEPTED;
-            ret.code = HET_FISHER_COV_STRAND;
+            ret.code = var_classify_code::HET_FISHER_COV_STRAND;
         } else {
             ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.code = HET_FISHER;
+            ret.code = var_classify_code::HET_FISHER;
         }
     } else {
         if (ok_weaker) {
             ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.code = HET_WEAKERFISHER;
+            ret.code = var_classify_code::HET_WEAKERFISHER;
         } else {
             ret.is_accepted = FLAG_VARSTAT_REJECTED;
-            ret.code = HET_NOTHING;
+            ret.code = var_classify_code::HET_NOTHING;
         }
     }
 
@@ -1053,7 +1053,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
         } else {
             ret.is_accepted = FLAG_VARSTAT_REJECTED;
             ret.type = FLAG_VAR_NA;
-            ret.code = REJECT_TOO_MANY_ALLELE;
+            ret.code = var_classify_code::REJECT_TOO_MANY_ALLELE;
         }
         has_decided = true;
     }
@@ -1063,7 +1063,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
         (var.alleles[1].allele[0] == SENTINEL_REF_ALLELE_INT)) {
         ret.is_accepted = FLAG_VARSTAT_REJECTED;
         ret.type = FLAG_VAR_NA;
-        ret.code = REJECT_REFREF;
+        ret.code = var_classify_code::REJECT_REFREF;
         has_decided = true;
     }
 
@@ -1075,10 +1075,10 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             ret.type = FLAG_VAR_HOM;
             if (alt0_strand_ok) {
                 ret.is_accepted = FLAG_VARSTAT_ACCEPTED;
-                ret.code = HOM_STRAND;
+                ret.code = var_classify_code::HOM_STRAND;
             } else {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
-                ret.code = HOM_NOTHING;
+                ret.code = var_classify_code::HOM_NOTHING;
             }
             has_decided = true;
         }
@@ -1089,7 +1089,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
                 static_cast<float>(allele.cov.cov_tot_all) >= 0.3f * varcov.cov.cov_tot_all) {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
                 ret.type = FLAG_VAR_NA;
-                ret.code = HOM_RESUCEFAIL;
+                ret.code = var_classify_code::HOM_RESUCEFAIL;
                 has_decided = true;
                 break;
             }
@@ -1099,7 +1099,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     if (!has_decided) {
         if (varcov.n_long_alts >= N_LONG_ALTS) {  // long alt
             ret.is_accepted = FLAG_VARSTAT_UNSURE;
-            ret.code = SUS_LONG_ALT;
+            ret.code = var_classify_code::SUS_LONG_ALT;
         } else if (var.alleles.size() > 4) {  // many alts; 4:ref/ref/alt/alt
             int n_allele_with_suf_cov = 0;
             for (const vc_allele_t &allele : var.alleles) {
@@ -1110,7 +1110,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             }
             if (n_allele_with_suf_cov >= 2) {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
-                ret.code = SUS_MULTI_ALLELE;
+                ret.code = var_classify_code::SUS_MULTI_ALLELE;
             }
         }
     }
@@ -1146,7 +1146,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
             is_at_repeat = is_adjacent_to_perfect_repeats(refseq, refseq_l, itvl_start, pos);
             if (is_at_repeat) {
                 ret.is_accepted = FLAG_VARSTAT_UNSURE;
-                ret.code = SUS_REPETITIVE;
+                ret.code = var_classify_code::SUS_REPETITIVE;
             }
         }
     }
@@ -1154,7 +1154,7 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
         (varcov.cov.cov_tot_all - varcov.cov.cov_tot_phased) >
                 (varcov.cov.cov_hap0 + varcov.cov.cov_hap1)) {
         ret.is_accepted = FLAG_VARSTAT_UNSURE;
-        ret.code = SUS_PHASE;
+        ret.code = var_classify_code::SUS_PHASE;
     }
 
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
@@ -1691,7 +1691,10 @@ variant_fullinfo_t derive_variant_fullinfo_from_varcall(const ta_t &var,
     return ret;
 }
 
-enum read_downsampling_rw { READ_DOWNSAMPLING_QUERY_ONLY, READ_DOWNSAMPLING_QUERY_AND_UPDATE };
+enum class read_downsampling_rw {
+    READ_DOWNSAMPLING_QUERY_ONLY,
+    READ_DOWNSAMPLING_QUERY_AND_UPDATE
+};
 bool read_downsampling_query_or_update_counter(read_downsampling_rw rw,
                                                uint32_t r_start_pos,
                                                uint32_t r_end_pos,
@@ -1720,7 +1723,7 @@ bool read_downsampling_query_or_update_counter(read_downsampling_rw rw,
     if (downsample_counter[iw_s] < downsample_readcap) {  // update the counter of downsampling
         read_may_be_accepted = true;
 
-        if (rw == READ_DOWNSAMPLING_QUERY_AND_UPDATE) {
+        if (rw == read_downsampling_rw::READ_DOWNSAMPLING_QUERY_AND_UPDATE) {
             const uint32_t effective_r_end = (r_end_pos > itvl_end ? itvl_end : r_end_pos) -
                                              (r_start_pos > itvl_start ? r_start_pos : itvl_start);
             const size_t n_counter = downsample_counter.size();
@@ -1951,8 +1954,9 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
 
         if (ENABLE_DOWNSAMPLE) {
             const bool read_may_be_accepted = read_downsampling_query_or_update_counter(
-                    READ_DOWNSAMPLING_QUERY_AND_UPDATE, r_start_pos, r_end_pos, span_start,
-                    span_end, downsample_counter, DOWNSAMPLE_WINDOW, DOWNSAMPLE_READCAP);
+                    read_downsampling_rw::READ_DOWNSAMPLING_QUERY_AND_UPDATE, r_start_pos,
+                    r_end_pos, span_start, span_end, downsample_counter, DOWNSAMPLE_WINDOW,
+                    DOWNSAMPLE_READCAP);
             if (!read_may_be_accepted) {
                 downsample_filtered++;
                 continue;  // go parse the next read
@@ -2905,8 +2909,9 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
         // based on other criteria.
         if (ENABLE_DOWNSAMPLE) {
             const bool read_may_be_accepted = read_downsampling_query_or_update_counter(
-                    READ_DOWNSAMPLING_QUERY_ONLY, r_start_pos, r_end_pos, gck.itvl_start,
-                    gck.itvl_end, downsample_counter, DOWNSAMPLE_WINDOW, DOWNSAMPLE_READCAP);
+                    read_downsampling_rw::READ_DOWNSAMPLING_QUERY_ONLY, r_start_pos, r_end_pos,
+                    gck.itvl_start, gck.itvl_end, downsample_counter, DOWNSAMPLE_WINDOW,
+                    DOWNSAMPLE_READCAP);
             if (!read_may_be_accepted) {
                 gck.n_downsample_filtered++;
                 continue;  // go parse the next read
@@ -2942,11 +2947,13 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
 
         // Read is accepted. Update the downsampling counter.
         read_downsampling_query_or_update_counter(
-                READ_DOWNSAMPLING_QUERY_AND_UPDATE, r_start_pos, r_end_pos, gck.itvl_start,
-                gck.itvl_end, downsample_counter, DOWNSAMPLE_WINDOW, DOWNSAMPLE_READCAP);
+                read_downsampling_rw::READ_DOWNSAMPLING_QUERY_AND_UPDATE, r_start_pos, r_end_pos,
+                gck.itvl_start, gck.itvl_end, downsample_counter, DOWNSAMPLE_WINDOW,
+                DOWNSAMPLE_READCAP);
 
         // save haptag from the alignment record if requested.
-        if (gck.options.include_haplotype_column && ((gck.options.hap_source == USE_BAM_HAP_TAG))) {
+        if (gck.options.include_haplotype_column &&
+            ((gck.options.hap_source == haplotagsource::USE_BAM_HAP_TAG))) {
             const uint8_t *const tag = bam_aux_get(aln.get(), "HP");
             if (tag) {
                 gck.qname2hp_bam[qn] = static_cast<int>(bam_aux2i(tag));
@@ -3206,22 +3213,25 @@ static void gen_medaka_feature_matrix_insert_to_matrix(
     const int8_t dtype = gck.all_dtype[i_read];
     uint8_t haptag = HAPTAG_UNPHASED;
     if (gck.options.include_haplotype_column) {
-        if (gck.options.hap_source == FORCE_UNPHASED) {
-            ;
-        } else if (gck.options.hap_source == USE_BAM_HAP_TAG) {
+        switch (gck.options.hap_source) {
+        case haplotagsource::FORCE_UNPHASED:
+            break;
+        case haplotagsource::USE_BAM_HAP_TAG: {
             const auto it = gck.readID2qn.find(i_read);
             assert(it != gck.readID2qn.cend());
             const auto it_hp = gck.qname2hp_bam.find(it->second);
             if (it_hp != gck.qname2hp_bam.cend()) {
                 haptag = static_cast<uint8_t>(it_hp->second);
             }
-        } else {  // USE_TAG_FROM_HASHTABLE
+        } break;
+        case haplotagsource::USE_TAG_FROM_HASHTABLE: {
             const auto it = gck.readID2qn.find(i_read);
             assert(it != gck.readID2qn.cend());
             const auto it_hp = qname2hp.find(it->second);
             if (it_hp != qname2hp.cend()) {
                 haptag = static_cast<uint8_t>(it_hp->second);
             }
+        } break;
         }
     }
 

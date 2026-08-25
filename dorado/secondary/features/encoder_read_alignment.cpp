@@ -375,11 +375,12 @@ secondary::Sample EncoderReadAlignment::encode_region(
                     .tag_keep_missing = m_tag_keep_missing,
                     .readgroup = m_read_group,
                     .disable_read_packing = m_row_per_read,
-                    .hap_source = m_hap_source == secondary::HaplotagSource::UNPHASED
-                                          ? kadayashi::FORCE_UNPHASED
-                                          : (m_hap_source == secondary::HaplotagSource::BAM_HAP_TAG
-                                                     ? kadayashi::USE_BAM_HAP_TAG
-                                                     : kadayashi::USE_TAG_FROM_HASHTABLE),
+                    .hap_source =
+                            m_hap_source == secondary::HaplotagSource::UNPHASED
+                                    ? kadayashi::haplotagsource::FORCE_UNPHASED
+                                    : (m_hap_source == secondary::HaplotagSource::BAM_HAP_TAG
+                                               ? kadayashi::haplotagsource::USE_BAM_HAP_TAG
+                                               : kadayashi::haplotagsource::USE_TAG_FROM_HASHTABLE),
                     .max_reads = m_max_reads,
                     .right_align_insertions = m_right_align_insertions,
                     .min_snp_accuracy = m_min_snp_accuracy,
