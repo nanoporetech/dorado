@@ -105,7 +105,7 @@ std::vector<std::string> construct_alleles_lookup(const std::string_view ref,
     }
     std::vector<std::string> alleles_lookup;
     alleles_lookup.reserve(std::size(unique_alts) + 1);
-    alleles_lookup.emplace_back(std::string(ref.data(), std::size(ref)));
+    alleles_lookup.emplace_back(std::string(ref));
     alleles_lookup.insert(std::end(alleles_lookup), std::cbegin(unique_alts),
                           std::cend(unique_alts));
     return alleles_lookup;
