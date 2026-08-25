@@ -32,7 +32,7 @@ void csv_write_entries(std::ostream &out,
 /// Read in the entries contained in a stream.
 /// @a Callback receives (gpu_name, model_name, entry) for all entries in the stream.
 template <typename Callback>
-inline void csv_read_lines(std::istream &in, Callback &&callback) {
+inline void csv_read_lines(std::istream &in, const Callback &callback) {
     std::string line;
     while (std::getline(in, line)) {
         if (auto parsed = detail::csv_try_parse_line(line); parsed.has_value()) {

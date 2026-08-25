@@ -47,7 +47,7 @@
 namespace dorado::utils {
 
 template <typename MetalObject>
-void name_mtl_object(MetalObject &&obj, const char *name) {
+void name_mtl_object(const MetalObject &obj, const char *name) {
     obj->setLabel(NS::String::string(name, NS::ASCIIStringEncoding));
 }
 

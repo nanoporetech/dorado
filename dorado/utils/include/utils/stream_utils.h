@@ -73,7 +73,7 @@ public:
     template <typename Func>
     static void invoke(Func &&func) {
         SuppressStderr suppression{};
-        func();
+        std::forward<Func>(func)();
     }
 };
 
@@ -93,7 +93,7 @@ public:
     template <typename Func>
     static void invoke(Func &&func) {
         SuppressStdout suppression{};
-        func();
+        std::forward<Func>(func)();
     }
 };
 

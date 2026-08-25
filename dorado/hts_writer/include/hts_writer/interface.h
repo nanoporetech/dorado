@@ -20,7 +20,7 @@ void dispatch_processable(const Processable& item, Visitor&& visitor) {
             [&](auto ref_wrapper) {
                 using T = std::decay_t<decltype(ref_wrapper.get())>;
                 T& data = ref_wrapper.get();
-                visitor(data);
+                std::forward<Visitor>(visitor)(data);
             },
             item);
 }

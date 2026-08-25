@@ -46,7 +46,7 @@ public:
 
     template <typename Func>
         requires(!is_function_ref_v<Func>)
-    FunctionRefBase(Func&& func) {
+    FunctionRefBase(const Func& func) {
         using F = std::remove_reference_t<Func>;
 
         m_functor = std::addressof(func);

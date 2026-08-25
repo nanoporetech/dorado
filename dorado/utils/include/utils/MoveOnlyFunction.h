@@ -60,7 +60,7 @@ public:
     template <typename Func>
         requires(std::is_invocable_r_v<R, Func, Args...> &&
                  std::is_convertible_v<Func, FunctionPtr>)
-    MoveOnlyFunctionBase(Func&& func) noexcept : MoveOnlyFunctionBase() {
+    MoveOnlyFunctionBase(Func func) noexcept : MoveOnlyFunctionBase() {
         FunctionPtr ptr = func;
         // Silence warning that |ptr| will always be non-NULL if |func| is the
         // address of a function.

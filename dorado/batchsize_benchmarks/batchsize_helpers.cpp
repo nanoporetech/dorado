@@ -16,6 +16,7 @@ namespace {
 // Fallback for platforms that don't support std::ranges::to() yet.
 #if !defined(_LIBCPP_VERSION)
 template <template <typename...> typename Container, std::ranges::range Range>
+// NOLINTNEXTLINE(cppcoreguidelines-missing-std-forward): ranges use rvalues.
 auto to(Range && range) {
     using T = std::ranges::range_value_t<Range>;
     return Container<T>{range.begin(), range.end()};
