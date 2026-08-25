@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <utility>
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access): union accesses here are safe.
+
 namespace dorado::utils {
 
 namespace detail {
@@ -208,3 +210,5 @@ public:
 };
 
 }  // namespace dorado::utils
+
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)
