@@ -14,6 +14,9 @@
 #include <Windows.h>
 #endif
 
+// Lots of singletons in the crash handling code, so ignore that warning for the whole file.
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables)
+
 namespace dorado::utils {
 
 namespace {
@@ -131,3 +134,5 @@ void install_uncaught_exception_handler() {
 }
 
 }  // namespace dorado::utils
+
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)

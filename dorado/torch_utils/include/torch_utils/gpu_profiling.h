@@ -18,7 +18,7 @@
 #include "metal_utils.h"
 
 namespace dorado::utils::detail {
-inline os_log_t s_scoped_os_log =
+inline const os_log_t s_scoped_os_log =
         os_log_create("scoped_profile", OS_LOG_CATEGORY_POINTS_OF_INTEREST);
 }  // namespace dorado::utils::detail
 

@@ -259,6 +259,7 @@ bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count
     return success;
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): intentional singleton.
 static NS::SharedPtr<MTL::Device> mtl_device;
 
 struct MTLAllocator : at::Allocator {
@@ -279,6 +280,7 @@ struct MTLAllocator : at::Allocator {
         default_copy_data(dest, src, count);
     }
 };
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): intentional singleton.
 static MTLAllocator mtl_allocator;
 
 NS::SharedPtr<MTL::Device> get_mtl_device() {
@@ -397,6 +399,7 @@ size_t get_apple_physical_memory_bytes() {
 }
 
 // MTLCaptureManager can only capture one thing at a time, so guard it with a global.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables)
 static std::atomic_bool s_capturing{false};
 
 ScopedMetalCapture::ScopedMetalCapture(MTL::Device *device,

@@ -1525,7 +1525,7 @@ const std::vector<ModelInfo> models = {
         },
 };
 
-std::vector<ModelInfo> deprecated = {
+const std::vector<ModelInfo> deprecated = {
         // Deprecated R9.4.1 modbase models - v3.{3,4}
         ModelInfo{
                 "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",

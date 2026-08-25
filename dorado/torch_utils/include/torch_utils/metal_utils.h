@@ -34,8 +34,9 @@
 //     }
 //   }
 // Not technically metal, but only usable with Instruments.
-#define CREATE_POINT_OF_INTEREST_ID(id)                                                        \
-    static os_log_t _s_##id##_os_log = os_log_create(#id, OS_LOG_CATEGORY_POINTS_OF_INTEREST); \
+#define CREATE_POINT_OF_INTEREST_ID(id)                             \
+    static const os_log_t _s_##id##_os_log =                        \
+            os_log_create(#id, OS_LOG_CATEGORY_POINTS_OF_INTEREST); \
     static_assert(true, "Force semicolon")
 #define POINT_OF_INTEREST_SCOPE(id, name, ...)                                           \
     os_signpost_id_t _poi_id_##name = os_signpost_id_generate(_s_##id##_os_log);         \

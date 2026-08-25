@@ -13,7 +13,7 @@
 
 namespace {
 using namespace dorado::utils;
-static std::unordered_map<std::string, HeaderLineType> header_type_lut{
+static const std::unordered_map<std::string, HeaderLineType> header_type_lut{
         {"HD", HeaderLineType::HD}, {"SQ", HeaderLineType::SQ}, {"RG", HeaderLineType::RG},
         {"PG", HeaderLineType::PG}, {"CO", HeaderLineType::CO},
 };

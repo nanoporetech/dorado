@@ -8,6 +8,7 @@
 namespace dorado::utils {
 
 namespace details {
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): intentional singleton.
 extern std::unordered_map<std::string, std::pair<double, bool>> g_dev_options;
 void extract_dev_options(const std::string& env_string);
 }  // namespace details

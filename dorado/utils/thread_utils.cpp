@@ -79,6 +79,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): intentional singleton.
 std::atomic<bool> s_spinners_enabled{false};
 
 }  // namespace
