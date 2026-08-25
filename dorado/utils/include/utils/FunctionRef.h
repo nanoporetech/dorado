@@ -12,6 +12,16 @@ namespace dorado::utils {
 namespace detail {
 
 template <bool IsConst, typename R, typename... Args>
+class FunctionRefBase;
+
+template <typename T>
+struct is_function_ref : std::false_type {};
+template <bool IsConst, typename R, typename... Args>
+struct is_function_ref<FunctionRefBase<IsConst, R, Args...>> : std::true_type {};
+template <typename T>
+inline constexpr bool is_function_ref_v = is_function_ref<T>::value;
+
+template <bool IsConst, typename R, typename... Args>
 class FunctionRefBase {
     using FunctionPtr = R (*)(Args...);
 
@@ -35,6 +45,7 @@ public:
     }
 
     template <typename Func>
+        requires(!is_function_ref_v<Func>)
     FunctionRefBase(Func&& func) {
         using F = std::remove_reference_t<Func>;
 
