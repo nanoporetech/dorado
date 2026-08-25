@@ -2,6 +2,7 @@
 
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
+#include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
@@ -102,6 +103,8 @@ void ReadInitialiser::update_barcoding_fields(HtsData& data) const {
         bool found = false;
         if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "SM", &ks) == 0) {
             barcoding_result->barcode_name = std::string(ks.s, ks.l);
+            barcoding_result->normalized_barcode_name =
+                    barcode_kits::normalize_barcode_name(barcoding_result->barcode_name);
             found = true;
         }
         if (sam_hdr_find_tag_id(m_header, "RG", "ID", rg_tag_value.c_str(), "al", &ks) == 0) {
@@ -134,6 +137,7 @@ void ReadInitialiser::undemux_read_group(HtsData& data) const {
     if (const auto al_tag = bam_aux_get(record, "al"); al_tag != nullptr) {
         alias = bam_aux2Z(al_tag);
         bam_aux_del(record, al_tag);
+        bam_aux_update_str(record, "BC", UNCLASSIFIED_STR.length() + 1, UNCLASSIFIED_STR.c_str());
     } else if (const auto bc_tag = bam_aux_get(record, "BC"); bc_tag != nullptr) {
         alias = bam_aux2Z(bc_tag);
         bam_aux_update_str(record, "BC", UNCLASSIFIED_STR.length() + 1, UNCLASSIFIED_STR.c_str());
