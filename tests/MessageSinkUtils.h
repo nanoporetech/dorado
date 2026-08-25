@@ -36,7 +36,7 @@ private:
 };
 
 template <class T>
-std::vector<T> ConvertMessages(std::vector<dorado::Message>&& messages) {
+std::vector<T> ConvertMessages(std::vector<dorado::Message> messages) {
     std::vector<T> converted_messages;
     converted_messages.reserve(messages.size());
     for (auto& message : messages) {

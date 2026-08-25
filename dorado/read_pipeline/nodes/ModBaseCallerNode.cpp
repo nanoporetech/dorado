@@ -153,7 +153,7 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets = mod_info.base_probs_offsets();
 }
 
-void ModBaseCallerNode::duplex_mod_call(Message&& message) {
+void ModBaseCallerNode::duplex_mod_call(Message message) {
     auto read = message.take<DuplexReadPtr>();
     stats::Timer timer;
 
@@ -311,7 +311,7 @@ void ModBaseCallerNode::duplex_mod_call(Message&& message) {
     }
 }
 
-void ModBaseCallerNode::simplex_mod_call(Message&& message) {
+void ModBaseCallerNode::simplex_mod_call(Message message) {
     auto read = message.take<SimplexReadPtr>();
     stats::Timer timer;
 

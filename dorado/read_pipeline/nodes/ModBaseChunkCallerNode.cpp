@@ -714,7 +714,7 @@ std::optional<ModBaseChunkCallerNode::EncodingData> ModBaseChunkCallerNode::popu
     return EncodingData{std::move(seq_to_sig_map), std::move(int_seq)};
 }
 
-void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
+void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
 
@@ -777,7 +777,7 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     }
 }
 
-void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
+void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
 

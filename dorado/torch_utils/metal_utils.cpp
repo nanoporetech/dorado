@@ -370,7 +370,7 @@ MTL::Buffer *mtl_for_tensor(const at::Tensor &x) {
 
 NS::SharedPtr<MTL::Buffer> extract_mtl_from_tensor(at::Tensor &&x) {
     auto bfr = NS::RetainPtr(mtl_for_tensor(x));
-    x.reset();
+    std::move(x).reset();
     return bfr;
 }
 

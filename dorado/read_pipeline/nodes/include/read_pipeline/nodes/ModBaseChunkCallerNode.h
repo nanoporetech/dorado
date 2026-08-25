@@ -86,8 +86,8 @@ private:
 
     void output_thread_fn();
 
-    void simplex_mod_call(Message&& message);
-    void duplex_mod_call(Message&& message);
+    void simplex_mod_call(Message message);
+    void duplex_mod_call(Message message);
 
     // Called by chunk_caller_thread_fn, calls the model and enqueues the results
     void call_batch(modbase::ModBaseRunner& runner, size_t model_id, ModBaseChunks& batched_chunks);

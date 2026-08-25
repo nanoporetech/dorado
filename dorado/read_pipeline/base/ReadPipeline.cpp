@@ -77,6 +77,7 @@ std::unique_ptr<Pipeline> Pipeline::create(
             new Pipeline(std::move(descriptor), source_to_sink_order, stats_reporters));
 }
 
+// NOLINTNEXTLINE(cppcoreguidelines-rvalue-reference-param-not-moved): we move parts of descriptor but not the object itself.
 Pipeline::Pipeline(PipelineDescriptor &&descriptor,
                    std::vector<NodeHandle> source_to_sink_order,
                    std::vector<dorado::stats::StatsReporter> *const stats_reporters)

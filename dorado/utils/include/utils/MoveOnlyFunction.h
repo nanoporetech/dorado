@@ -93,7 +93,7 @@ public:
 
         struct Callable : ICallable {
             F m_func;
-            explicit Callable(Func&& f) : m_func(std::forward<Func>(f)) {}
+            explicit Callable(Func&& f) : m_func(std::move(f)) {}
             R invoke(Args&&... args) override { return m_func(std::forward<Args>(args)...); }
         };
 
