@@ -57,10 +57,11 @@ T Message::take() {
 
 std::size_t Message::index() const { return m_message.index(); }
 
-#define MESSAGE_IMPL(T)                                              \
-    Message::Message(T &&message) : m_message(std::move(message)) {} \
-    template bool Message::holds<T>() const;                         \
-    template const T &Message::get<T>() const;                       \
+#define MESSAGE_IMPL(T)                                                                                               \
+    /* NOLINTNEXTLINE(bugprone-macro-parentheses): T isn't a value so wrapping it in parentheses is invalid syntax */ \
+    Message::Message(T &&message) : m_message(std::move(message)) {}                                                  \
+    template bool Message::holds<T>() const;                                                                          \
+    template const T &Message::get<T>() const;                                                                        \
     template T Message::take<T>();
 
 MESSAGE_IMPL(SimplexReadPtr)
