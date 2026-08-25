@@ -151,9 +151,8 @@ dorado::BamPtr make_synthetic_bam_record(const SyntheticBamRecord &record) {
     }
 
     if (!record.readgroup.empty()) {
-        bam_aux_append(
-                ret.get(), "RG", 'Z', record.readgroup.size() + 1,
-                reinterpret_cast<const uint8_t *>(const_cast<char *>(record.readgroup.c_str())));
+        bam_aux_append(ret.get(), "RG", 'Z', record.readgroup.size() + 1,
+                       reinterpret_cast<const uint8_t *>(record.readgroup.data()));
     }
 
     return ret;

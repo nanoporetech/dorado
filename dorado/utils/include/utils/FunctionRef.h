@@ -38,6 +38,7 @@ public:
         if (ptr) {
             m_functor = reinterpret_cast<void*>(ptr);
             m_invoke = [](const void* functor, Args&&... args) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): pointers to constant functions aren't allowed.
                 auto* f = reinterpret_cast<FunctionPtr>(const_cast<void*>(functor));
                 return (*f)(std::forward<Args>(args)...);
             };
@@ -51,6 +52,7 @@ public:
 
         m_functor = std::addressof(func);
         m_invoke = [](const void* functor, Args&&... args) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): we'll always use the non-const overload.
             auto* f = std::launder(reinterpret_cast<F*>(const_cast<void*>(functor)));
             return (*f)(std::forward<Args>(args)...);
         };

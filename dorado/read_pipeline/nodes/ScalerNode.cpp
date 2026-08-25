@@ -78,9 +78,11 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     const int signal_start = 1000;
     const int signal_end = 3 * signal_len / 4;
     for (int i = signal_start; i < signal_end; i += kStride) {
-        auto slice = at::from_blob(const_cast<int16_t*>(&signal[i]),
-                                   {static_cast<int>(std::min(kWindowSize, signal_len - i))},
-                                   at::TensorOptions().dtype(at::kShort));
+        auto slice =
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): from_blob() views non-const data but we clone() it.
+                at::from_blob(const_cast<int16_t*>(&signal[i]),
+                              {static_cast<int>(std::min(kWindowSize, signal_len - i))},
+                              at::TensorOptions().dtype(at::kShort));
         int16_t median = slice.median().item<int16_t>();
         medians[median_pos % medians.size()] = median;
         // Since the medians are stored in a circular buffer, we need

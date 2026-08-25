@@ -489,6 +489,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
 }
 
 ReadCommon &get_read_common_data(Message &message) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): original message is mutable.
     return const_cast<ReadCommon &>(get_read_common_data(const_cast<const Message &>(message)));
 }
 

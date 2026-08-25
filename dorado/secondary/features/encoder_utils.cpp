@@ -199,6 +199,7 @@ std::tuple<at::Tensor, std::vector<int64_t>, std::vector<int64_t>> filter_empty_
 
     // Convert positions_minor to a Tensor and move to the same device as the feature_tensor.
     const at::Tensor pos_minor_t =
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): from_blob() views non-const data but we clone() it.
             at::from_blob(const_cast<int64_t*>(positions_minor.data()),
                           {std::ssize(positions_minor)}, at::TensorOptions().dtype(at::kLong))
                     .clone()
