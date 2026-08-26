@@ -53,6 +53,14 @@ If libtorch is already downloaded on the host system and you do not wish the bui
 cmake -DDORADO_LIBTORCH_DIR=/usr/local/libtorch -S . -B cmake-build
 ```
 
+The same applies to pod5: if a pod5 library is already available on the host system, `DORADO_POD5_DIR` can be used to point the build process at it instead of downloading one. For example:
+
+```bash
+cmake -DDORADO_POD5_DIR=/usr/local/pod5 -S . -B cmake-build
+```
+
+The directory is expected to contain the `include` and `lib` (or `lib64`) folders of a pod5 install, as laid out in the [pod5 release archives](https://github.com/nanoporetech/pod5-file-format/releases).
+
 ### OSX dependencies
 
 On OSX, the following packages need to be available:
