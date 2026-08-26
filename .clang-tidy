@@ -34,6 +34,8 @@ performance-*,
 -cppcoreguidelines-use-default-member-init,
 -cppcoreguidelines-narrowing-conversions,
 -cppcoreguidelines-prefer-member-initializer,
+
+-bugprone-unchecked-optional-access,
 '
 # these are maybes:
 # bugprone-exception-escape - maybe with options
@@ -43,6 +45,8 @@ performance-*,
 # cppcoreguidelines-use-default-member-init - same as ^
 # cppcoreguidelines-narrowing-conversions - could complement the MSVC narrowing warnings
 # cppcoreguidelines-prefer-member-initializer - style choice (wants member list only)
+#
+# Have to disable bugprone-unchecked-optional-access since IgnoreValueCalls isn't working.
 
 WarningsAsErrors: '*'
 
