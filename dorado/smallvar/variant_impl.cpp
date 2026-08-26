@@ -75,8 +75,8 @@ std::vector<secondary::DeviceInfo> init_devices(const std::string& devices_str) 
         }
         for (const auto& val : parsed_devices) {
             torch::Device torch_device = torch::Device(val);
-            const double available_memory_GB =
-                    utils::available_memory(torch_device) / dorado::utils::BYTES_PER_GB;
+            const double available_memory_GB = utils::available_memory(torch_device) /
+                                               static_cast<double>(dorado::utils::BYTES_PER_GB);
             devices.emplace_back(secondary::DeviceInfo{.name = val,
                                                        .device = std::move(torch_device),
                                                        .available_memory_GB = available_memory_GB});
