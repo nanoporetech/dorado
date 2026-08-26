@@ -114,6 +114,30 @@ compensation". A `:cannot_represent` declaration sidesteps the automated check,
 so the rejection is a maintainer decision against the written rule rather than
 an audit failure, but the written rule is not ambiguous.
 
+### "But Homebrew is free, so it is not commercial"
+
+This is the obvious objection, and it misidentifies the party the restriction
+binds. DFSG §6 constrains what the *recipient* may do, not what the
+distributor charges:
+
+> **No Discrimination Against Fields of Endeavor.** The license must not
+> restrict anyone from making use of the program in a specific field of
+> endeavor. For example, it may not restrict the program from being used in a
+> business, or from being used for genetic research.
+
+Debian is itself a free, non-commercial project and still refuses
+non-commercial licences from `main` for exactly this reason. DFSG §1 goes
+further and requires that the licence permit *selling* the software as part of
+an aggregate distribution.
+
+There is also a concrete problem rather than a doctrinal one.
+`homebrew/core` builds bottles automatically and redistributes the compiled
+binaries from its own infrastructure (`https://ghcr.io/v2/homebrew/core`).
+Homebrew would therefore be shipping Dorado binaries to every user, including
+commercial ones, which a grant limited to "internal research ... not intended
+for or directed towards commercial advantages" does not cover. A commercial
+nanopore user running `brew install dorado` would be outside the licence.
+
 Notability is not a problem: at 865 stars / 128 forks, Dorado clears the
 [thresholds](https://docs.brew.sh/Package-Acceptance-Policy#notability) even
 for a self-submission.
