@@ -60,13 +60,19 @@ The build consumes prebuilt binaries with no source-build path in this repo:
 | Dependency | Origin |
 | --- | --- |
 | libtorch 2.9.0 (ONT-patched) | `cdn.oxfordnanoportal.com`, no published patch set |
-| pod5 0.3.39 | `nanoporetech/pod5-file-format` release tarballs |
+| pod5 0.3.39 | `nanoporetech/pod5-file-format` release tarballs (upstream source is MPL-2.0) |
 | metal-cpp | Apple developer download |
 | OpenSSL 3.5.5 | `cdn.oxfordnanoportal.com` prebuilt archives |
 | flash-attention (Linux/Windows) | `cdn.oxfordnanoportal.com` |
 
-The formula replaces OpenSSL with Homebrew's `openssl@3`. pod5 and metal-cpp
-remain binary-only with no source-build path here.
+The formula replaces OpenSSL with Homebrew's `openssl@3`. metal-cpp has no
+source distribution at all.
+
+pod5 is only binary-*here*: upstream,
+[`nanoporetech/pod5-file-format`](https://github.com/nanoporetech/pod5-file-format)
+is MPL-2.0 and buildable from source, so a core formula could plausibly depend
+on a `pod5` formula rather than the release tarball. Nobody has packaged one
+yet, but this is a gap rather than a hard blocker.
 
 libtorch is the least certain of the three. `homebrew/core` does carry
 `pytorch`, and `DORADO_LIBTORCH_DIR` accepts any libtorch tree, so a core
