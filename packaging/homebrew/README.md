@@ -90,6 +90,31 @@ the patched htslib build flags).
    libtorch, and get pod5 buildable from source.
 4. Un-vendor htslib/spdlog/zlib in favour of system packages.
 
-Until then, a third-party tap is the correct distribution channel, and the
-existing `dorado-<version>-osx-arm64.zip` release could alternatively be
-shipped as a Homebrew **cask**, which has no source or licence requirement.
+## Evidence that `:cannot_represent` is not accepted in core
+
+`brew audit` does not hard-fail on `license :cannot_represent` (it is in
+`SPDX::ALLOWED_LICENSE_SYMBOLS`), so the rejection is a policy one rather than
+an automated one. The empirical check is unambiguous: of the 8571 formulae in
+`homebrew/core`, **zero** declare `cannot_represent`. Homebrew's own
+incompatible-licence list also carries the `CC-BY-NC` prefix, annotated with
+Debian's ["no commercial use" DFSG FAQ entry](https://people.debian.org/~bap/dfsg-faq.html#no_commercial),
+which is the same defect as the ONT licence's "Research Purposes" grant.
+
+Notability is not a problem: at 865 stars / 128 forks, Dorado clears the
+[thresholds](https://docs.brew.sh/Package-Acceptance-Policy#notability) even
+for a self-submission. The licence is the only thing standing in the way.
+
+## About a cask
+
+Shipping the existing `dorado-<version>-osx-arm64.zip` release as a Homebrew
+**cask** is the closest thing to an official `brew install`, since casks have
+no source-build or licence requirement. It is plausible but not automatic:
+[Acceptable Casks](https://docs.brew.sh/Acceptable-Casks) says that
+"open-source command-line-only software normally belongs in `homebrew/core` as
+a formula built from source" and that "a rejection from `homebrew/core` does
+not by itself make the software eligible for `homebrew/cask`". The argument
+for a cask here is that Dorado is not DFSG-open-source and has no practical
+source-build path, which is exactly the gap casks exist to fill.
+
+Until one of those routes is taken, a third-party tap is the correct
+distribution channel.
