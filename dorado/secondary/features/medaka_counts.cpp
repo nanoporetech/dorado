@@ -15,9 +15,6 @@
 #include <stdexcept>
 #include <unordered_set>
 
-#define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
-#define bam1_seqi(s, i) (bam_seqi((s), (i)))
-
 namespace dorado::secondary {
 
 PileupData::PileupData(const int64_t n_cols_,
@@ -288,8 +285,7 @@ PileupData calculate_pileup(secondary::BamFile &bam_file,
             // loop over any query bases at or inserted after pos
             int32_t query_pos_offset = 0;
             for (int32_t minor = min_minor; minor <= max_minor; ++minor, ++query_pos_offset) {
-                int32_t base_j = bam1_seqi(bam1_seq(p->b), p->qpos + query_pos_offset);
-                //base = seq_nt16_str[base_j];
+                int32_t base_j = bam_seqi(bam_get_seq(p->b), p->qpos + query_pos_offset);
                 if bam_is_rev (p->b) {
                     base_j += 16;
                 }

@@ -67,7 +67,7 @@
 
 // HACK: DynamicProgress uses magic to move around in the terminal but assumes
 // cout. Rather than patching it to support using cerr just rename the symbol.
-#define cout cerr
+#define cout cerr  // NOLINT(cppcoreguidelines-macro-usage): see ^
 #include <indicators/dynamic_progress.hpp>
 #undef cout
 

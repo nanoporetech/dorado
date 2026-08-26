@@ -18,9 +18,13 @@
 #include <string>
 #include <vector>
 
-#define get_sample_sheets_data_dir() std::filesystem::path(get_data_dir("sample_sheets"))
-
 #define CUT_TAG "[sample_sheets]"
+
+namespace {
+
+auto get_sample_sheets_data_dir() { return std::filesystem::path(get_data_dir("sample_sheets")); }
+
+}  // namespace
 
 CATCH_TEST_CASE(CUT_TAG " load valid no-barcode sample sheet", CUT_TAG) {
     dorado::utils::SampleSheet sample_sheet;

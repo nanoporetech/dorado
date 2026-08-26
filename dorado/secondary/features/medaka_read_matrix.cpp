@@ -24,9 +24,6 @@
 #include <stdexcept>
 #include <unordered_map>
 
-#define bam1_seq(b) ((b)->data + (b)->core.n_cigar * 4 + (b)->core.l_qname)
-#define bam1_seqi(s, i) (bam_seqi((s), (i)))
-
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
@@ -573,7 +570,7 @@ ReadAlignmentData calculate_read_alignment(
                                                     ? minor
                                                     : (max_ins - max_minor + minor);
 
-                const int32_t base_j = bam1_seqi(read.seqi, p->qpos + query_pos_offset);
+                const int32_t base_j = bam_seqi(read.seqi, p->qpos + query_pos_offset);
                 const int8_t base_i = NUM_TO_COUNT_BASE_SYMM[base_j];
                 const size_t partial_index =
                         major_col +
