@@ -44,6 +44,20 @@ Or you can add the bin path to your `$PATH` environment variable, and run with t
 dorado basecaller hac pod5s/ > calls.bam
 ```
 
+### Homebrew (macOS, Apple Silicon)
+
+A Homebrew formula that builds Dorado from source is available in
+[packaging/homebrew](packaging/homebrew):
+
+```bash
+brew install autoconf automake cmake openssl@3
+brew install --build-from-source ./packaging/homebrew/dorado.rb
+```
+
+This requires a full Xcode install, because the Metal shaders are compiled with
+`xcrun metal`. Dorado cannot be published in `homebrew/core`; see
+[packaging/homebrew/README.md](packaging/homebrew/README.md) for the reasons.
+
 Please visit the [dorado documentation](https://software-docs.nanoporetech.com/dorado/latest/) for more information on getting started.
 
 See [DEV.md](DEV.md) for details about building Dorado for development.
