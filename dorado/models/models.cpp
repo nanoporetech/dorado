@@ -2066,7 +2066,8 @@ ModelInfo get_model_info(const std::string& model_name) {
 std::optional<ModelInfo> try_get_model_info(const std::string& model_name) {
     try {
         return get_model_info(model_name);
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::trace("Failed to get model info for {}: {}", model_name, e.what());
     }
     return std::nullopt;
 }

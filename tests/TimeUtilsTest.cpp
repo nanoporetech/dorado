@@ -80,6 +80,11 @@ CATCH_TEST_CASE(CUT_TAG ": std::string <-> time_t", CUT_TAG) {
     }
 }
 
+CATCH_TEST_CASE(CUT_TAG ": failed to parse") {
+    CATCH_CHECK(dorado::utils::get_unix_time_ms_from_string_timestamp("not a timestamp") ==
+                std::nullopt);
+}
+
 CATCH_TEST_CASE(CUT_TAG ": MinKnow datetime format from pod5 timestamp", CUT_TAG) {
     CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(0) == "19700101_0000");
     CATCH_CHECK(dorado::utils::get_minknow_timestamp_from_unix_time_ms(1110371400000) ==
