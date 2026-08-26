@@ -65,9 +65,16 @@ The build consumes prebuilt binaries with no source-build path in this repo:
 | OpenSSL 3.5.5 | `cdn.oxfordnanoportal.com` prebuilt archives |
 | flash-attention (Linux/Windows) | `cdn.oxfordnanoportal.com` |
 
-The formula replaces OpenSSL with Homebrew's `openssl@3`, but the ONT-patched
-libtorch cannot be swapped for an upstream build, and pod5 and metal-cpp remain
-binary-only.
+The formula replaces OpenSSL with Homebrew's `openssl@3`. pod5 and metal-cpp
+remain binary-only with no source-build path here.
+
+libtorch is the least certain of the three. `homebrew/core` does carry
+`pytorch`, and `DORADO_LIBTORCH_DIR` accepts any libtorch tree, so a core
+formula could in principle depend on a source-built libtorch. Whether Dorado
+actually needs the ONT patches (`TORCH_PATCH_SUFFIX` in `cmake/Torch.cmake`)
+or would link against a stock libtorch 2.9.0 has **not** been tested here, and
+the patch set is not published, so this is an open question rather than a
+demonstrated blocker.
 
 ### 4. Vendored dependencies
 
@@ -90,19 +97,30 @@ the patched htslib build flags).
    libtorch, and get pod5 buildable from source.
 4. Un-vendor htslib/spdlog/zlib in favour of system packages.
 
-## Evidence that `:cannot_represent` is not accepted in core
+## What actually blocks core, and what does not
 
-`brew audit` does not hard-fail on `license :cannot_represent` (it is in
-`SPDX::ALLOWED_LICENSE_SYMBOLS`), so the rejection is a policy one rather than
-an automated one. The empirical check is unambiguous: of the 8571 formulae in
-`homebrew/core`, **zero** declare `cannot_represent`. Homebrew's own
-incompatible-licence list also carries the `CC-BY-NC` prefix, annotated with
-Debian's ["no commercial use" DFSG FAQ entry](https://people.debian.org/~bap/dfsg-faq.html#no_commercial),
-which is the same defect as the ONT licence's "Research Purposes" grant.
+`brew audit` does not hard-fail on `license :cannot_represent`: it is in
+`SPDX::ALLOWED_LICENSE_SYMBOLS`, and 36 formulae in `homebrew/core` use it
+(`abnfgen`, `cspice`, `flite`, `ispell`, `nmap`, `ngspice`, `pymol`, `texlive`
+and others). Those are custom licences that SPDX cannot express but that are
+still free; being unrepresentable is not itself disqualifying.
+
+The disqualifier is the *content* of the licence, not its representability.
+Homebrew's `INCOMPATIBLE_LICENSE_PREFIXES` lists `CC-BY-NC`, annotated with
+Debian's ["no commercial use" DFSG FAQ entry](https://people.debian.org/~bap/dfsg-faq.html#no_commercial).
+The ONT licence has the same defect: §1.10 limits use to "internal research and
+not intended for or directed towards commercial advantages or monetary
+compensation". A `:cannot_represent` declaration sidesteps the automated check,
+so the rejection is a maintainer decision against the written rule rather than
+an audit failure, but the written rule is not ambiguous.
 
 Notability is not a problem: at 865 stars / 128 forks, Dorado clears the
 [thresholds](https://docs.brew.sh/Package-Acceptance-Policy#notability) even
-for a self-submission. The licence is the only thing standing in the way.
+for a self-submission.
+
+macOS-only is not a problem either: `homebrew/core` carries plenty of
+macOS-only formulae, so restricting the formula to Apple Silicon to avoid Koi
+would be acceptable on its own.
 
 ## About a cask
 
