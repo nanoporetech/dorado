@@ -45,8 +45,9 @@ const std::string& valid_2read_reference_file() {
 const dorado::alignment::Minimap2Options& invalid_options() {
     static const dorado::alignment::Minimap2Options result = []() {
         dorado::alignment::Minimap2Options options{dorado::alignment::create_dflt_options()};
-        options.mapping_options->get().bw_long = 1000;
-        options.mapping_options->get().bw = options.mapping_options->get().bw_long + 1;
+        options.mapping.mapping_options->get().bw_long = 1000;
+        options.mapping.mapping_options->get().bw =
+                options.mapping.mapping_options->get().bw_long + 1;
         return options;
     }();
     return result;
@@ -101,11 +102,11 @@ CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
 
     CATCH_GIVEN("load_index called with valid file and options") {
         auto original_options{create_dflt_options()};
-        original_options.mapping_options->get().best_n = 7;
+        original_options.mapping.mapping_options->get().best_n = 7;
 
         Minimap2Options compatible_options{create_dflt_options()};
-        auto compatible_best_n = original_options.mapping_options->get().best_n + 1;
-        compatible_options.mapping_options->get().best_n = compatible_best_n;
+        auto compatible_best_n = original_options.mapping.mapping_options->get().best_n + 1;
+        compatible_options.mapping.mapping_options->get().best_n = compatible_best_n;
 
         cut.load_index(valid_reference_file(), original_options, 1);
         CATCH_THEN("is_index_loaded returns true") {
@@ -119,7 +120,8 @@ CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
         }
         CATCH_AND_GIVEN("load_index called with same file and other valid indexing options") {
             Minimap2Options other_options{create_dflt_options()};
-            other_options.index_options->get().k = original_options.index_options->get().k + 1;
+            other_options.index.index_options->get().k =
+                    original_options.index.index_options->get().k + 1;
             cut.load_index(valid_reference_file(), other_options, 1);
             CATCH_THEN("is_index_loaded with other options returns true") {
                 CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
@@ -134,7 +136,7 @@ CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
                               default_options_index);
             }
             CATCH_AND_GIVEN("unload_index called with original options") {
-                cut.unload_index(valid_reference_file(), original_options);
+                cut.unload_index(valid_reference_file(), original_options.index);
                 CATCH_THEN("is_index_loaded with other options returns true") {
                     CATCH_REQUIRE(cut.is_index_loaded(valid_reference_file(), other_options));
                 }
@@ -173,7 +175,7 @@ CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
                 CATCH_CHECK(original_index);
 
                 CATCH_REQUIRE(original_index->mapping_options().best_n ==
-                              original_options.mapping_options->get().best_n);
+                              original_options.mapping.mapping_options->get().best_n);
             }
             CATCH_THEN(
                     "get_index with compatible options returns a Minimap2Index with the same "
@@ -186,7 +188,7 @@ CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
                 CATCH_REQUIRE(compatible_index->index() == original_index->index());
             }
             CATCH_AND_GIVEN("unload_index called with original options") {
-                cut.unload_index(valid_reference_file(), original_options);
+                cut.unload_index(valid_reference_file(), original_options.index);
                 CATCH_THEN("is_index_loaded with compatible options returns false") {
                     CATCH_REQUIRE_FALSE(
                             cut.is_index_loaded(valid_reference_file(), compatible_options));
@@ -217,7 +219,7 @@ CATCH_TEST_CASE(TEST_GROUP " get_index called with compatible index returns non-
     Minimap2Options original_options{create_dflt_options()};
     cut.load_index(valid_reference_file(), original_options, 1);
     Minimap2Options compatible_options{create_dflt_options()};
-    ++compatible_options.mapping_options->get().best_n;
+    ++compatible_options.mapping.mapping_options->get().best_n;
 
     CATCH_REQUIRE(cut.get_index(valid_reference_file(), compatible_options) != nullptr);
 }
@@ -230,7 +232,7 @@ CATCH_TEST_CASE(
     Minimap2Options original_options{create_dflt_options()};
     cut.load_index(valid_reference_file(), original_options, 1);
     Minimap2Options compatible_options{create_dflt_options()};
-    ++compatible_options.mapping_options->get().best_n;
+    ++compatible_options.mapping.mapping_options->get().best_n;
 
     auto index = cut.get_index(valid_reference_file(), compatible_options);
 

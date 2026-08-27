@@ -15,6 +15,7 @@ namespace dorado::utils {
 //
 
 template <class... Ts>
+// NOLINTNEXTLINE(misc-multiple-inheritance): we need multiple inheritance for this to work.
 struct overloaded : Ts... {
     using Ts::operator()...;
 };

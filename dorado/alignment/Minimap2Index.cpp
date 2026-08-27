@@ -60,7 +60,7 @@ const mm_idx_t* Minimap2Index::index(size_t n) const {
 std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initial_index(
         const std::string& index_file,
         int num_threads) {
-    m_index_reader = create_index_reader(index_file, m_options.index_options->get());
+    m_index_reader = create_index_reader(index_file, m_options.index.index_options->get());
     if (!m_index_reader.inner) {
         // Reason could be not having permissions to open the file
         return {nullptr, IndexLoadResult::file_open_error};
@@ -80,8 +80,8 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
         return {nullptr, IndexLoadResult::end_of_index};
     }
 
-    if (index->k != m_options.index_options->get().k ||
-        index->w != m_options.index_options->get().w) {
+    if (index->k != m_options.index.index_options->get().k ||
+        index->w != m_options.index.index_options->get().w) {
         spdlog::warn(
                 "Indexing parameters mismatch prebuilt index: using parameters kmer "
                 "size={} and window size={} from prebuilt index.",
@@ -123,7 +123,8 @@ IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
 }
 
 bool Minimap2Index::initialise(Minimap2Options options) {
-    if (mm_check_opt(&options.index_options->get(), &options.mapping_options->get()) < 0) {
+    if (mm_check_opt(&options.index.index_options->get(), &options.mapping.mapping_options->get()) <
+        0) {
         return false;
     }
 
@@ -134,7 +135,7 @@ bool Minimap2Index::initialise(Minimap2Options options) {
 IndexLoadResult Minimap2Index::load(const std::string& index_file,
                                     int num_threads,
                                     bool incremental_load) {
-    assert(m_options.index_options && m_options.mapping_options &&
+    assert(m_options.index.index_options && m_options.mapping.mapping_options &&
            "Loading an index requires options have been initialised.");
     assert(m_indexes.empty() && "Loading an index requires it is not already loaded.");
 
@@ -150,8 +151,8 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
         return result;
     }
 
-    if (!m_options.junc_bed.empty()) {
-        mm_idx_bed_read(index.get(), m_options.junc_bed.c_str(), 1);
+    if (!m_options.index.junc_bed.empty()) {
+        mm_idx_bed_read(index.get(), m_options.index.junc_bed.c_str(), 1);
     }
 
     set_index(std::move(index));
@@ -171,7 +172,7 @@ IndexLoadResult Minimap2Index::load(const std::string& index_file,
 
 std::shared_ptr<Minimap2Index> Minimap2Index::create_compatible_index(
         const Minimap2Options& options) const {
-    assert(static_cast<const Minimap2IndexOptions&>(m_options) == options &&
+    assert(m_options.index == options.index &&
            " create_compatible_index expects compatible indexing options");
     assert(!m_indexes.empty() && " create_compatible_index expects the index has been loaded.");
 
@@ -191,7 +192,7 @@ std::shared_ptr<Minimap2Index> Minimap2Index::create_compatible_index(
 void Minimap2Index::set_index(std::shared_ptr<const mm_idx_t> index) {
     m_indexes.clear();
     m_header_records_cache.clear();
-    mm_mapopt_update(&m_options.mapping_options->get(), index.get());
+    mm_mapopt_update(&m_options.mapping.mapping_options->get(), index.get());
     cache_header_records(*index);
     m_indexes.emplace_back(std::move(index));
 }
@@ -305,13 +306,15 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
 }
 
 const mm_idxopt_t& Minimap2Index::index_options() const {
-    assert(m_options.index_options && "Access to indexing options require they are initialised.");
-    return m_options.index_options->get();
+    assert(m_options.index.index_options &&
+           "Access to indexing options require they are initialised.");
+    return m_options.index.index_options->get();
 }
 
 const mm_mapopt_t& Minimap2Index::mapping_options() const {
-    assert(m_options.mapping_options && "Access to mapping options require they are initialised.");
-    return m_options.mapping_options->get();
+    assert(m_options.mapping.mapping_options &&
+           "Access to mapping options require they are initialised.");
+    return m_options.mapping.mapping_options->get();
 }
 
 const Minimap2Options& Minimap2Index::get_options() const { return m_options; }

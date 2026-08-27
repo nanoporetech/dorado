@@ -136,8 +136,8 @@ void add_arguments(argparse::ArgumentParser& parser) {
 }
 
 void apply_preset(Minimap2Options& options, const std::string& preset) {
-    if (preset.empty() || mm_set_opt(preset.c_str(), &options.index_options->get(),
-                                     &options.mapping_options->get()) == 0) {
+    if (preset.empty() || mm_set_opt(preset.c_str(), &options.index.index_options->get(),
+                                     &options.mapping.mapping_options->get()) == 0) {
         return;
     }
     throw std::runtime_error("Cannot set mm2 options with preset: " + preset);
@@ -210,16 +210,16 @@ void apply_mapping_options(const argparse::ArgumentParser& parser, mm_mapopt_t& 
 std::optional<Minimap2Options> process_arguments(const argparse::ArgumentParser& parser,
                                                  std::string& error_message) {
     Minimap2Options res;
-    mm_idxopt_set_defaults(res.index_options->get());
-    mm_mapopt_set_defaults(res.mapping_options->get());
+    mm_idxopt_set_defaults(res.index.index_options->get());
+    mm_mapopt_set_defaults(res.mapping.mapping_options->get());
 
     // apply preset before overwriting with other user supplied options.
     apply_preset(res, parser.get<std::string>("-x"));
 
-    apply_indexing_options(parser, res.index_options->get());
-    apply_mapping_options(parser, res.mapping_options->get());
+    apply_indexing_options(parser, res.index.index_options->get());
+    apply_mapping_options(parser, res.mapping.mapping_options->get());
 
-    auto rc = mm_check_opt(&res.index_options->get(), &res.mapping_options->get());
+    auto rc = mm_check_opt(&res.index.index_options->get(), &res.mapping.mapping_options->get());
     if (rc < 0) {
         error_message = "Invalid minimap2 options string. Error code: " + std::to_string(rc);
         return std::nullopt;
@@ -228,7 +228,7 @@ std::optional<Minimap2Options> process_arguments(const argparse::ArgumentParser&
     // Cache the --junc-bed arg with the index options for use when the index is loaded
     auto junc_bed = parser.present<std::string>("--junc-bed");
     if (junc_bed) {
-        res.junc_bed = std::move(*junc_bed);
+        res.index.junc_bed = std::move(*junc_bed);
     }
 
     if (parser.get<bool>("print-aln-seq")) {
@@ -301,7 +301,7 @@ void apply_cs_option(Minimap2Options& options, std::string_view cs_opt) {
     if (cs_opt.empty()) {
         return;
     }
-    auto& flag = options.mapping_options->get().flag;
+    auto& flag = options.mapping.mapping_options->get().flag;
 
     flag |= MM_F_OUT_CS | MM_F_CIGAR;
     if (cs_opt == "short") {
@@ -321,9 +321,9 @@ void apply_dual_option(Minimap2Options& options, std::string_view dual) {
     }
 
     if (dual == "yes") {
-        options.mapping_options->get().flag &= ~MM_F_NO_DUAL;
+        options.mapping.mapping_options->get().flag &= ~MM_F_NO_DUAL;
     } else if (dual == "no") {
-        options.mapping_options->get().flag |= MM_F_NO_DUAL;
+        options.mapping.mapping_options->get().flag |= MM_F_NO_DUAL;
     } else {
         spdlog::warn("Unrecognized options for --dual={}", dual);
     }

@@ -372,11 +372,11 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto query = aligner_test_dir / "basecall.sam";
 
     auto options = dorado::alignment::create_dflt_options();
-    options.index_options->get().k = 15;
-    options.index_options->get().w = 15;
+    options.index.index_options->get().k = 15;
+    options.index.index_options->get().w = 15;
     bool soft_clipping = GENERATE(true, false);
     if (soft_clipping) {
-        options.mapping_options->get().flag |= MM_F_SOFTCLIP;
+        options.mapping.mapping_options->get().flag |= MM_F_SOFTCLIP;
     }
 
     dorado::TestHtsReader reader(query.string());
