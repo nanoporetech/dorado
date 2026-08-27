@@ -898,6 +898,40 @@ CATCH_TEST_CASE("kadayashi_convert_fullinfo_var_to_dorado_style", TEST_GROUP) {
                             .rstart = 0,
                             .rend = 0},
             },
+            {
+                    // Regression test for two overlapping deletions of different lengths on the two
+                    // haplotypes (ATATCTTATCT->A and ATATCT->A). The shorter-reference allele must be
+                    // re-expressed against the longer reference by appending the reference suffix
+                    // beyond the shorter span, yielding ALT=ATATCT. Previously the append offset of 1
+                    // corrupted this into the full reference (REF=ATATCTTATCT ALT=A,ATATCTTATCT GT=1/2)
+                    // instead of the correct REF=ATATCTTATCT ALT=A,ATATCT GT=1/2.
+                    "multi allele with two different-length deletions normalizes to a common "
+                    "reference",
+                    kadayashi::variant_fullinfo_t{.is_valid = true,
+                                                  .is_confident = true,
+                                                  .is_multi_allele = true,
+                                                  .min_depth = 20,
+                                                  .median_depth = 20,
+                                                  .pos0 = 10378832,
+                                                  .ref_allele_seq0 = "ATATCTTATCT",
+                                                  .alt_allele_seq0 = "A",
+                                                  .is_phased0 = true,
+                                                  .genotype0 = {'1', '|', '2'},
+                                                  .ref_allele_seq1 = "ATATCT",
+                                                  .alt_allele_seq1 = "A"},
+                    false,
+                    dorado::secondary::Variant{
+                            .seq_id = -1,
+                            .pos = 10378832,
+                            .ref = "ATATCTTATCT",
+                            .alts = {"A", "ATATCT"},
+                            .filter = dorado::secondary::VARIANT_PASS_FILTER,
+                            .info = {},
+                            .qual = 60.0f,
+                            .format = {{"GT", "1/2"}, {"GQ", "60"}, {"DP", "20"}},
+                            .rstart = 0,
+                            .rend = 0},
+            },
     };
 
     for (const auto &test_case : test_cases) {
