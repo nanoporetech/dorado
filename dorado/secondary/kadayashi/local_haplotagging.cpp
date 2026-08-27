@@ -1768,7 +1768,24 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
                 alt0.append(ref.data() + 1, ref.size() - 1);
             }
         }
-        alts = {std::move(alt0), std::move(alt1)};
+        // check that we haven't just filled one alt with the ref, if so then clean up
+        if ((alt0 == ref) && (alt1 == ref)) {
+            // we're in a completely broken state
+            return {};
+        }
+        if (alt0 == ref) {
+            alts = {std::move(alt1)};
+            genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'1', '0'}
+                                                             : std::pair<char, char>{'0', '1'};
+        }
+        if (alt1 == ref) {
+            alts = {std::move(alt0)};
+            genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'0', '1'}
+                                                             : std::pair<char, char>{'1', '0'};
+        }
+        if (std::empty(alts)) {
+            alts = {std::move(alt0), std::move(alt1)};
+        }
     } else {
         genotype = {var.genotype0[0], var.genotype0[2]};
         alts = {var.alt_allele_seq0};
