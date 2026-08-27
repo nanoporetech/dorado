@@ -2679,7 +2679,10 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
         ret.variants.reserve(std::size(ck_and_vr.vr.variants));
         for (const variant_fullinfo_t &var : ck_and_vr.vr.variants) {  // return VCF-ready variants
             if (var.is_valid) {
-                ret.variants.emplace_back(convert_fullinfo_var_to_dorado_style(var, false));
+                dorado::secondary::Variant v = convert_fullinfo_var_to_dorado_style(var, false);
+                if (dorado::secondary::is_valid(v)) {
+                    ret.variants.emplace_back(std::move(v));
+                }
             }
         }
     }
