@@ -9,8 +9,6 @@
 
 #define TEST_GROUP "[modbase_config]"
 
-namespace fs = std::filesystem;
-
 using namespace dorado::config;
 
 namespace {

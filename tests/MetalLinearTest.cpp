@@ -13,8 +13,6 @@ using namespace dorado::utils;
 // For convenient Slice syntax.
 using namespace torch::indexing;
 
-namespace F = torch::nn::functional;
-
 #define TEST_GROUP "Metal: "
 
 float MeanAbsDiff(const at::Tensor &a, const at::Tensor &b) {

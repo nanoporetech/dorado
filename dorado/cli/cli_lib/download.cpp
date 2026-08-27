@@ -22,8 +22,6 @@
 #include <stdexcept>
 #include <vector>
 
-namespace fs = std::filesystem;
-
 namespace dorado {
 using namespace dorado::model_resolution;
 

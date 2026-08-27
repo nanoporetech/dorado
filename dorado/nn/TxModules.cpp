@@ -92,7 +92,6 @@ namespace {
 
 using namespace config;
 using namespace torch::nn;
-namespace Idx = torch::indexing;
 using Slice = torch::indexing::Slice;
 
 #if DORADO_CUDA_BUILD

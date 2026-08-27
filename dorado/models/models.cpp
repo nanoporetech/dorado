@@ -17,8 +17,6 @@
 #include <unordered_map>
 #include <vector>
 
-namespace fs = std::filesystem;
-
 namespace dorado::models {
 
 namespace {
