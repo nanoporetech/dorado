@@ -2,6 +2,8 @@
 
 #include "utils/container_utils.h"
 
+#include <spdlog/spdlog.h>
+
 #include <algorithm>
 #include <ostream>
 #include <string_view>
@@ -33,6 +35,12 @@ std::ostream& operator<<(std::ostream& os, const Variant& v) {
     return os;
 }
 
+std::string to_string(const Variant& v) {
+    std::ostringstream oss;
+    oss << v;
+    return oss.str();
+}
+
 bool operator==(const Variant& lhs, const Variant& rhs) {
     return std::tie(lhs.seq_id, lhs.pos, lhs.ref, lhs.alts, lhs.filter, lhs.info, lhs.qual,
                     lhs.format, lhs.rstart,
@@ -47,17 +55,21 @@ bool operator<(const Variant& lhs, const Variant& rhs) {
 
 bool is_valid(const Variant& var) {
     if (std::empty(var.ref)) {
+        spdlog::trace("Variant with empty ref is invalid: {}", to_string(var));
         return false;
     }
     if (std::empty(var.alts)) {
+        spdlog::trace("Variant with no alts is invalid: {}", to_string(var));
         return false;
     }
-    if (std::all_of(std::cbegin(var.alts), std::cend(var.alts),
+    if (std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                     [&var](const std::string_view val) { return val == var.ref; })) {
+        spdlog::trace("Variant with alt matching ref is invalid: {}", to_string(var));
         return false;
     }
     if (std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                     [](const std::string_view val) { return std::empty(val); })) {
+        spdlog::trace("Variant with empty alt string is invalid: {}", to_string(var));
         return false;
     }
     return true;

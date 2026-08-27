@@ -1762,13 +1762,32 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         if (var.ref_allele_seq0 != var.ref_allele_seq1) {
             if (var.ref_allele_seq0.size() > var.ref_allele_seq1.size()) {
                 ref = var.ref_allele_seq0;
-                alt1.append(ref.data() + 1, ref.size() - 1);
+                alt1.append(ref.data() + std::size(var.ref_allele_seq1),
+                            ref.size() - std::size(var.ref_allele_seq1));
             } else {
                 ref = var.ref_allele_seq1;
-                alt0.append(ref.data() + 1, ref.size() - 1);
+                alt0.append(ref.data() + std::size(var.ref_allele_seq0),
+                            ref.size() - std::size(var.ref_allele_seq0));
             }
         }
-        alts = {std::move(alt0), std::move(alt1)};
+        // check that we haven't just filled one alt with the ref, if so then clean up
+        if ((alt0 == ref) && (alt1 == ref)) {
+            // we're in a completely broken state
+            return {};
+        }
+        if (alt0 == ref) {
+            alts = {std::move(alt1)};
+            genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'1', '0'}
+                                                             : std::pair<char, char>{'0', '1'};
+        }
+        if (alt1 == ref) {
+            alts = {std::move(alt0)};
+            genotype = (var.genotype0[0] < var.genotype0[2]) ? std::pair<char, char>{'0', '1'}
+                                                             : std::pair<char, char>{'1', '0'};
+        }
+        if (std::empty(alts)) {
+            alts = {std::move(alt0), std::move(alt1)};
+        }
     } else {
         genotype = {var.genotype0[0], var.genotype0[2]};
         alts = {var.alt_allele_seq0};
@@ -2660,7 +2679,10 @@ varcall_result_t kadayashi_phase_and_varcall_wrapper(samFile *fp_bam,
         ret.variants.reserve(std::size(ck_and_vr.vr.variants));
         for (const variant_fullinfo_t &var : ck_and_vr.vr.variants) {  // return VCF-ready variants
             if (var.is_valid) {
-                ret.variants.emplace_back(convert_fullinfo_var_to_dorado_style(var, false));
+                dorado::secondary::Variant v = convert_fullinfo_var_to_dorado_style(var, false);
+                if (dorado::secondary::is_valid(v)) {
+                    ret.variants.emplace_back(std::move(v));
+                }
             }
         }
     }

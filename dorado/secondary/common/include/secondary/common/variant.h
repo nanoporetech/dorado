@@ -36,6 +36,8 @@ bool operator==(const Variant& lhs, const Variant& rhs);
 
 bool operator<(const Variant& lhs, const Variant& rhs);
 
+std::string to_string(const Variant& v);
+
 bool is_valid(const Variant& var);
 
 bool is_reference_record(const Variant& var);
