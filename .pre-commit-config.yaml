@@ -31,18 +31,18 @@ repos:
     hooks:
       - id: clang-format
         exclude: '^dorado/3rdparty/(?!kadayashi/)'
-  - repo: https://github.com/falkben/pre-commit-prepend-jira-issue
-    rev: 'v0.0.2'
-    hooks:
-      - id: prepend-jira-issue
-        name: prepend jira issue
-        stages: [prepare-commit-msg]
   - repo: local
     hooks:
+    -   id: prepend-jira-issue-local
+        name: prepend jira issue-local
+        entry: .gitlab/prepend_jira_issue.py
+        language: python
+        stages: [prepare-commit-msg]
+        always_run: true
     -   id: jira-ticket
         name: check for jira ticket
         language: pygrep
-        entry: '\A(?!\[?[A-Z]+-[0-9]+\]?)'
+        entry: '\A(?!\[[A-Z]+-[0-9]+\])'
         args: [--multiline]
         stages: [commit-msg]
     -   id: shell-tests-active
