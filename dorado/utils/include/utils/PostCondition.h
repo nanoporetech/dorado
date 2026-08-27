@@ -12,6 +12,12 @@ public:
     ~PostCondition() { m_func(); }
 
 private:
+    PostCondition(const PostCondition&) = delete;
+    PostCondition& operator=(const PostCondition&) = delete;
+    PostCondition(PostCondition&&) = delete;
+    PostCondition& operator=(PostCondition&&) = delete;
+
+private:
     Func m_func;
 };
 }  // namespace detail

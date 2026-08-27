@@ -10,6 +10,12 @@ class [[nodiscard]] ScopedTraceLog final {
 
     void write_log_message(const std::string &message_type, const std::string &message);
 
+private:
+    ScopedTraceLog(const ScopedTraceLog &) = delete;
+    ScopedTraceLog &operator=(const ScopedTraceLog &) = delete;
+    ScopedTraceLog(ScopedTraceLog &&) = delete;
+    ScopedTraceLog &operator=(ScopedTraceLog &&) = delete;
+
 public:
     ScopedTraceLog(std::string context);
     ~ScopedTraceLog();

@@ -13,11 +13,17 @@ public:
 
     ~PolishProgressTracker();
 
-    void set_description(const std::string& desc);
+    void set_description(const std::string &desc);
 
-    void update_progress_bar(const stats::NamedStats& stats);
+    void update_progress_bar(const stats::NamedStats &stats);
 
     void finalize();
+
+private:
+    PolishProgressTracker(const PolishProgressTracker &) = delete;
+    PolishProgressTracker &operator=(const PolishProgressTracker &) = delete;
+    PolishProgressTracker(PolishProgressTracker &&) = delete;
+    PolishProgressTracker &operator=(PolishProgressTracker &&) = delete;
 
 private:
     void internal_set_progress(double progress);

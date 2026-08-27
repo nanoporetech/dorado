@@ -14,10 +14,16 @@ public:
 
     std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
 
     DuplexReadPtr stereo_encode(ReadPair pair);
+
+private:
+    StereoDuplexEncoderNode(const StereoDuplexEncoderNode&) = delete;
+    StereoDuplexEncoderNode& operator=(const StereoDuplexEncoderNode&) = delete;
+    StereoDuplexEncoderNode(StereoDuplexEncoderNode&&) = delete;
+    StereoDuplexEncoderNode& operator=(StereoDuplexEncoderNode&&) = delete;
 
 private:
     void input_thread_fn();

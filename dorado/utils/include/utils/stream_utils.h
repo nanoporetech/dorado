@@ -68,6 +68,12 @@ inline void restore_stdout(int fd) {
 class [[nodiscard]] SuppressStderr final {
     const int m_fd;
 
+private:
+    SuppressStderr(const SuppressStderr &) = delete;
+    SuppressStderr &operator=(const SuppressStderr &) = delete;
+    SuppressStderr(SuppressStderr &&) = delete;
+    SuppressStderr &operator=(SuppressStderr &&) = delete;
+
 public:
     SuppressStderr() : m_fd(suppress_stderr()) {}
     ~SuppressStderr() { restore_stderr(m_fd); }
@@ -87,6 +93,12 @@ public:
 /// </summary>
 class [[nodiscard]] SuppressStdout final {
     const int m_fd;
+
+private:
+    SuppressStdout(const SuppressStdout &) = delete;
+    SuppressStdout &operator=(const SuppressStdout &) = delete;
+    SuppressStdout(SuppressStdout &&) = delete;
+    SuppressStdout &operator=(SuppressStdout &&) = delete;
 
 public:
     SuppressStdout() : m_fd(suppress_stdout()) {}

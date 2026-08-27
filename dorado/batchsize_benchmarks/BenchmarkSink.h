@@ -28,6 +28,12 @@ public:
     Clock::duration elapsed();
 
 private:
+    BenchmarkSink(const BenchmarkSink &) = delete;
+    BenchmarkSink &operator=(const BenchmarkSink &) = delete;
+    BenchmarkSink(BenchmarkSink &&) = delete;
+    BenchmarkSink &operator=(BenchmarkSink &&) = delete;
+
+private:
     void input_thread_fn();
 
 private:

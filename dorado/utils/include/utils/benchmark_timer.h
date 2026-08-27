@@ -17,6 +17,12 @@ public:
     void terminate();
 
 private:
+    BenchmarkTimer(const BenchmarkTimer&) = delete;
+    BenchmarkTimer& operator=(const BenchmarkTimer&) = delete;
+    BenchmarkTimer(BenchmarkTimer&&) = delete;
+    BenchmarkTimer& operator=(BenchmarkTimer&&) = delete;
+
+private:
     ShutdownCallback m_shutdown_callback;
     std::atomic<bool> m_should_terminate{false};
     std::thread m_benchmarking_thread;

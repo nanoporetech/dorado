@@ -61,6 +61,12 @@ public:
     bool enabled() const { return m_config.enabled; }
 
 protected:
+    PolyTailCalculator(const PolyTailCalculator&) = delete;
+    PolyTailCalculator& operator=(const PolyTailCalculator&) = delete;
+    PolyTailCalculator(PolyTailCalculator&&) = delete;
+    PolyTailCalculator& operator=(PolyTailCalculator&&) = delete;
+
+protected:
     // calculate the average number of samples per base
     virtual float average_samples_per_base(const std::vector<float>& sizes) const = 0;
 

@@ -21,6 +21,12 @@ public:
     }
 
 private:
+    MessageSinkToVector(const MessageSinkToVector&) = delete;
+    MessageSinkToVector& operator=(const MessageSinkToVector&) = delete;
+    MessageSinkToVector(MessageSinkToVector&&) = delete;
+    MessageSinkToVector& operator=(MessageSinkToVector&&) = delete;
+
+private:
     void terminate_impl(dorado::utils::AsyncQueueTerminateFast fast) {
         stop_input_processing(fast);
     }

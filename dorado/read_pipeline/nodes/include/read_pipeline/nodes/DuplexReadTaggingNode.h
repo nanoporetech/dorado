@@ -18,8 +18,14 @@ public:
     ~DuplexReadTaggingNode();
 
     std::string get_name() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
+
+private:
+    DuplexReadTaggingNode(const DuplexReadTaggingNode&) = delete;
+    DuplexReadTaggingNode& operator=(const DuplexReadTaggingNode&) = delete;
+    DuplexReadTaggingNode(DuplexReadTaggingNode&&) = delete;
+    DuplexReadTaggingNode& operator=(DuplexReadTaggingNode&&) = delete;
 
 private:
     void input_thread_fn();

@@ -45,6 +45,11 @@ public:
         ResourceLimiter& m_limiter;
         ResourceLimiter::WaiterState& m_waiter;
 
+        ScopedReservation(const ScopedReservation&) = delete;
+        ScopedReservation& operator=(const ScopedReservation&) = delete;
+        ScopedReservation(ScopedReservation&&) = delete;
+        ScopedReservation& operator=(ScopedReservation&&) = delete;
+
     public:
         explicit ScopedReservation(ResourceLimiter& limiter,
                                    ResourceLimiter::WaiterState& waiter,

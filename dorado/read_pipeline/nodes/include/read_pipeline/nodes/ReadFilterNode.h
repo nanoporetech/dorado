@@ -22,8 +22,14 @@ public:
 
     std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
+
+private:
+    ReadFilterNode(const ReadFilterNode&) = delete;
+    ReadFilterNode& operator=(const ReadFilterNode&) = delete;
+    ReadFilterNode(ReadFilterNode&&) = delete;
+    ReadFilterNode& operator=(ReadFilterNode&&) = delete;
 
 private:
     void input_thread_fn();

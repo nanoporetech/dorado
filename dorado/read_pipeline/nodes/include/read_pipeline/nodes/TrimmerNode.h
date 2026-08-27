@@ -18,6 +18,12 @@ public:
     void restart() override;
 
 private:
+    TrimmerNode(const TrimmerNode&) = delete;
+    TrimmerNode& operator=(const TrimmerNode&) = delete;
+    TrimmerNode(TrimmerNode&&) = delete;
+    TrimmerNode& operator=(TrimmerNode&&) = delete;
+
+private:
     std::atomic<int> m_num_records{0};
     const bool m_is_rna;
 

@@ -19,9 +19,6 @@ public:
     using Entries = std::vector<Entry>;
 
     BedFile() = default;
-    BedFile(BedFile&& other) = delete;
-    BedFile(const BedFile&) = delete;
-    BedFile& operator=(const BedFile&) = delete;
     ~BedFile() = default;
 
     bool load(const std::string& filename);
@@ -30,6 +27,12 @@ public:
     const Entries& entries(const std::string& genome) const;
 
     const std::string& filename() const;
+
+private:
+    BedFile(BedFile&& other) = delete;
+    BedFile& operator=(BedFile&&) = delete;
+    BedFile(const BedFile&) = delete;
+    BedFile& operator=(const BedFile&) = delete;
 
 private:
     std::map<std::string, Entries> m_genomes;

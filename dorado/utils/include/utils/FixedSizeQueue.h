@@ -30,6 +30,12 @@ class FixedSizeQueue {
         return capacity + 1;
     }
 
+private:
+    FixedSizeQueue(const FixedSizeQueue &) = delete;
+    FixedSizeQueue &operator=(const FixedSizeQueue &) = delete;
+    FixedSizeQueue(FixedSizeQueue &&) = delete;
+    FixedSizeQueue &operator=(FixedSizeQueue &&) = delete;
+
 public:
     explicit FixedSizeQueue(std::size_t capacity)
             : m_capacity(sanity_check_capacity(capacity)),

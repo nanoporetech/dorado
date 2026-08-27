@@ -33,6 +33,13 @@ public:
 
     virtual std::string get_name() const = 0;
     virtual stats::NamedStats sample_stats() const = 0;
+
+protected:
+    IWriter() = default;
+    IWriter(const IWriter&) = delete;
+    IWriter& operator=(const IWriter&) = delete;
+    IWriter(IWriter&&) = delete;
+    IWriter& operator=(IWriter&&) = delete;
 };
 
 class NullWriter : public IWriter {

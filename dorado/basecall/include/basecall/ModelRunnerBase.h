@@ -35,6 +35,13 @@ public:
     virtual void restart() = 0;
     virtual std::string get_name() const = 0;
     virtual stats::NamedStats sample_stats() const = 0;
+
+protected:
+    ModelRunnerBase() = default;
+    ModelRunnerBase(const ModelRunnerBase &) = delete;
+    ModelRunnerBase &operator=(const ModelRunnerBase &) = delete;
+    ModelRunnerBase(ModelRunnerBase &&) = delete;
+    ModelRunnerBase &operator=(ModelRunnerBase &&) = delete;
 };
 
 using RunnerPtr = std::unique_ptr<ModelRunnerBase>;

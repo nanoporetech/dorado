@@ -56,6 +56,12 @@ public:
     }
 
 private:
+    DataLoader(const DataLoader&) = delete;
+    DataLoader& operator=(const DataLoader&) = delete;
+    DataLoader(DataLoader&&) = delete;
+    DataLoader& operator=(DataLoader&&) = delete;
+
+private:
     static constexpr size_t POD5_READ_ID_SIZE = 16;
     using ReadID = std::array<uint8_t, POD5_READ_ID_SIZE>;
     using channel_to_read_id_t = std::map<int, std::vector<ReadID>>;

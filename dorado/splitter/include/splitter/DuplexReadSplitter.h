@@ -14,6 +14,12 @@ public:
     std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const override;
 
 private:
+    DuplexReadSplitter(const DuplexReadSplitter&) = delete;
+    DuplexReadSplitter& operator=(const DuplexReadSplitter&) = delete;
+    DuplexReadSplitter(DuplexReadSplitter&&) = delete;
+    DuplexReadSplitter& operator=(DuplexReadSplitter&&) = delete;
+
+private:
     struct ExtRead;
 
     ExtRead create_ext_read(SimplexReadPtr r) const;

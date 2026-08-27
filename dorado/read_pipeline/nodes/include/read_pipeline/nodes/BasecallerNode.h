@@ -39,6 +39,12 @@ public:
     void restart() override;
 
 private:
+    BasecallerNode(const BasecallerNode &) = delete;
+    BasecallerNode &operator=(const BasecallerNode &) = delete;
+    BasecallerNode(BasecallerNode &&) = delete;
+    BasecallerNode &operator=(BasecallerNode &&) = delete;
+
+private:
     void start_threads();
     void terminate_impl(utils::AsyncQueueTerminateFast fast);
     // Consume reads from input queue, chunks them up, and sticks them in the pending list.

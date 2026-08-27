@@ -35,6 +35,12 @@ public:
     void restart() override;
 
 private:
+    CorrectionInferenceNode(const CorrectionInferenceNode&) = delete;
+    CorrectionInferenceNode& operator=(const CorrectionInferenceNode&) = delete;
+    CorrectionInferenceNode(CorrectionInferenceNode&&) = delete;
+    CorrectionInferenceNode& operator=(CorrectionInferenceNode&&) = delete;
+
+private:
     const std::string m_fastq;
     const correction::ModelConfig m_model_config;
     void input_thread_fn();

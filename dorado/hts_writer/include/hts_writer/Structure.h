@@ -13,6 +13,13 @@ class IStructure {
 public:
     virtual ~IStructure() = default;
     virtual std::string get_path(const HtsData &item) = 0;
+
+protected:
+    IStructure() = default;
+    IStructure(const IStructure &) = delete;
+    IStructure &operator=(const IStructure &) = delete;
+    IStructure(IStructure &&) = delete;
+    IStructure &operator=(IStructure &&) = delete;
 };
 
 class SingleFileStructure : public IStructure {

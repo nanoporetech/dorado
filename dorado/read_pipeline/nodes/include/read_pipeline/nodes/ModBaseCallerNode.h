@@ -40,6 +40,12 @@ public:
     void duplex_mod_call(Message message);
 
 private:
+    ModBaseCallerNode(const ModBaseCallerNode&) = delete;
+    ModBaseCallerNode& operator=(const ModBaseCallerNode&) = delete;
+    ModBaseCallerNode(ModBaseCallerNode&&) = delete;
+    ModBaseCallerNode& operator=(ModBaseCallerNode&&) = delete;
+
+private:
     void start_threads();
     void terminate_impl(utils::AsyncQueueTerminateFast fast);
 

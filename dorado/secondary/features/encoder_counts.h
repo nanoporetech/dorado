@@ -55,6 +55,12 @@ public:
     static FeatureColumnMap produce_feature_column_map();
 
 private:
+    EncoderCounts(const EncoderCounts&) = delete;
+    EncoderCounts& operator=(const EncoderCounts&) = delete;
+    EncoderCounts(EncoderCounts&&) = delete;
+    EncoderCounts& operator=(EncoderCounts&&) = delete;
+
+private:
     secondary::BamFile m_bam_file;
     NormaliseType m_normalise_type{NormaliseType::TOTAL};
     std::vector<std::string> m_dtypes;

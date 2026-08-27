@@ -19,6 +19,12 @@ public:
     bool download(const models::ModelInfo& info);
 
 private:
+    Downloader(const Downloader&) = delete;
+    Downloader& operator=(const Downloader&) = delete;
+    Downloader(Downloader&&) = delete;
+    Downloader& operator=(Downloader&&) = delete;
+
+private:
 #if DORADO_MODELS_HAS_HTTPLIB
     std::unique_ptr<httplib::Client> m_client;
 #endif  // DORADO_MODELS_HAS_HTTPLIB

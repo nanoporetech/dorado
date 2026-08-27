@@ -28,6 +28,13 @@ public:
     virtual std::vector<DecodedChunk> beam_search_part_2(const DecodeData &data) const = 0;
     // Returns the torch::TensorOptions::dtype to use for input data to models that use this decoder
     virtual at::ScalarType dtype() const = 0;
+
+protected:
+    Decoder() = default;
+    Decoder(const Decoder &) = delete;
+    Decoder &operator=(const Decoder &) = delete;
+    Decoder(Decoder &&) = delete;
+    Decoder &operator=(Decoder &&) = delete;
 };
 
 std::unique_ptr<Decoder> create_decoder(c10::Device device,

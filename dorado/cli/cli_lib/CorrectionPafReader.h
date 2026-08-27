@@ -19,7 +19,13 @@ public:
     stats::NamedStats sample_stats() const override;
 
     // Main driver function.
-    void process(Pipeline& pipeline) override;
+    void process(Pipeline &pipeline) override;
+
+private:
+    CorrectionPafReader(const CorrectionPafReader &) = delete;
+    CorrectionPafReader &operator=(const CorrectionPafReader &) = delete;
+    CorrectionPafReader(CorrectionPafReader &&) = delete;
+    CorrectionPafReader &operator=(CorrectionPafReader &&) = delete;
 
 private:
     std::string m_paf_file;

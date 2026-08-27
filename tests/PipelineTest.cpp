@@ -105,6 +105,11 @@ CATCH_TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
         void restart() override {}
 
     private:
+        OrderTestNode(const OrderTestNode&) = delete;
+        OrderTestNode& operator=(const OrderTestNode&) = delete;
+        OrderTestNode(OrderTestNode&&) = delete;
+        OrderTestNode& operator=(OrderTestNode&&) = delete;
+
         std::vector<int>& m_destruction_order;
         int m_index;
     };

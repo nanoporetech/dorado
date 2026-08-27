@@ -11,8 +11,14 @@ public:
     ~NullNode();
 
     std::string get_name() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
+
+private:
+    NullNode(const NullNode&) = delete;
+    NullNode& operator=(const NullNode&) = delete;
+    NullNode(NullNode&&) = delete;
+    NullNode& operator=(NullNode&&) = delete;
 
 private:
     void input_thread_fn();

@@ -106,6 +106,8 @@ class ScopedAutoReleasePool {
 
     ScopedAutoReleasePool(const ScopedAutoReleasePool &) = delete;
     ScopedAutoReleasePool &operator=(const ScopedAutoReleasePool &) = delete;
+    ScopedAutoReleasePool(ScopedAutoReleasePool &&) = delete;
+    ScopedAutoReleasePool &operator=(ScopedAutoReleasePool &&) = delete;
 
 public:
     ScopedAutoReleasePool();
@@ -119,6 +121,8 @@ class ScopedMetalCapture {
 
     ScopedMetalCapture(const ScopedMetalCapture &) = delete;
     ScopedMetalCapture &operator=(const ScopedMetalCapture &) = delete;
+    ScopedMetalCapture(ScopedMetalCapture &&) = delete;
+    ScopedMetalCapture &operator=(ScopedMetalCapture &&) = delete;
 
 public:
     ScopedMetalCapture(MTL::Device *device, const std::optional<std::filesystem::path> &path);

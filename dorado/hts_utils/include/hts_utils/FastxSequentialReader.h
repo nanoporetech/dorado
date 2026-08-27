@@ -21,6 +21,12 @@ class FastxSequentialReader {
     struct Data;
     std::unique_ptr<Data> data_;
 
+private:
+    FastxSequentialReader(const FastxSequentialReader&) = delete;
+    FastxSequentialReader& operator=(const FastxSequentialReader&) = delete;
+    FastxSequentialReader(FastxSequentialReader&&) = delete;
+    FastxSequentialReader& operator=(FastxSequentialReader&&) = delete;
+
 public:
     FastxSequentialReader(const std::filesystem::path& fastx_path);
 

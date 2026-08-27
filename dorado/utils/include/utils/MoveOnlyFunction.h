@@ -32,6 +32,13 @@ template <typename R, typename... Args>
 struct ICallable {
     virtual ~ICallable() = default;
     virtual R invoke(Args&&...) = 0;
+
+protected:
+    ICallable() = default;
+    ICallable(const ICallable&) = delete;
+    ICallable& operator=(const ICallable&) = delete;
+    ICallable(ICallable&&) = delete;
+    ICallable& operator=(ICallable&&) = delete;
 };
 
 template <bool IsConst, typename R, typename... Args>

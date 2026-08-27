@@ -44,6 +44,12 @@ public:
 
     struct NNTask;
 
+private:
+    MetalCaller(const MetalCaller &) = delete;
+    MetalCaller &operator=(const MetalCaller &) = delete;
+    MetalCaller(MetalCaller &&) = delete;
+    MetalCaller &operator=(MetalCaller &&) = delete;
+
 protected:
     void start_threads();
     void metal_thread_fn();

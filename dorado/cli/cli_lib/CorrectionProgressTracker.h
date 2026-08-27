@@ -15,11 +15,17 @@ public:
     CorrectionProgressTracker();
     ~CorrectionProgressTracker();
 
-    void set_description(const std::string& desc);
+    void set_description(const std::string &desc);
 
     void summarize() const;
-    void update_progress_bar(const stats::NamedStats& stats,
-                             const stats::NamedStats& aligner_stats);
+    void update_progress_bar(const stats::NamedStats &stats,
+                             const stats::NamedStats &aligner_stats);
+
+private:
+    CorrectionProgressTracker(const CorrectionProgressTracker &) = delete;
+    CorrectionProgressTracker &operator=(const CorrectionProgressTracker &) = delete;
+    CorrectionProgressTracker(CorrectionProgressTracker &&) = delete;
+    CorrectionProgressTracker &operator=(CorrectionProgressTracker &&) = delete;
 
 private:
     void internal_set_progress(float progress);

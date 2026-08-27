@@ -250,6 +250,11 @@ static void init_load_balancers() {
                 m_thread.join();
             }
         }
+
+        ThreadRunner(const ThreadRunner&) = delete;
+        ThreadRunner& operator=(const ThreadRunner&) = delete;
+        ThreadRunner(ThreadRunner&&) = delete;
+        ThreadRunner& operator=(ThreadRunner&&) = delete;
     } thread_runner;
 #endif
 }

@@ -24,6 +24,12 @@ public:
     void restart() override;
 
 private:
+    AdapterDetectorNode(const AdapterDetectorNode&) = delete;
+    AdapterDetectorNode& operator=(const AdapterDetectorNode&) = delete;
+    AdapterDetectorNode(AdapterDetectorNode&&) = delete;
+    AdapterDetectorNode& operator=(AdapterDetectorNode&&) = delete;
+
+private:
     std::atomic<int> m_num_records{0};
     std::atomic<int> m_num_untrimmed_short_reads{0};
     demux::AdapterDetectorSelector m_detector_selector{};

@@ -24,8 +24,6 @@ public:
               const std::vector<std::pair<std::string, int64_t>>& contigs,
               bool include_gvcf_headers);
 
-    ~VCFWriter() = default;
-
     void write_variant(const Variant& variant);
 
 private:

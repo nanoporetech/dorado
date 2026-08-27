@@ -82,6 +82,12 @@ protected:
     void stop_input_processing(utils::AsyncQueueTerminateFast fast);
 
 private:
+    MessageSink(const MessageSink&) = delete;
+    MessageSink& operator=(const MessageSink&) = delete;
+    MessageSink(MessageSink&&) = delete;
+    MessageSink& operator=(MessageSink&&) = delete;
+
+private:
     // Queue of work items for this node.
     utils::AsyncQueue<Message> m_work_queue;
 

@@ -19,6 +19,12 @@ public:
     static int get_batch_size_granularity(const config::BasecallModelConfig &model_config);
 
 private:
+    MPSCaller(MPSCaller &&other) = delete;
+    MPSCaller &operator=(MPSCaller &&) = delete;
+    MPSCaller(const MPSCaller &) = delete;
+    MPSCaller &operator=(const MPSCaller &) = delete;
+
+private:
     bool run_scan_kernels(MTL::CommandBuffer *const cb, int try_count);
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;

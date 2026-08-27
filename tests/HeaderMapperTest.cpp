@@ -163,6 +163,12 @@ public:
     const std::vector<dorado::BamMessage> &messages() const { return m_messages; }
 
 private:
+    BamCollectorNode(const BamCollectorNode &) = delete;
+    BamCollectorNode &operator=(const BamCollectorNode &) = delete;
+    BamCollectorNode(BamCollectorNode &&) = delete;
+    BamCollectorNode &operator=(BamCollectorNode &&) = delete;
+
+private:
     void input_thread_fn() {
         dorado::Message message;
         while (get_input_message(message)) {

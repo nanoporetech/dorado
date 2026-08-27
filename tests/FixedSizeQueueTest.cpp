@@ -164,6 +164,7 @@ DEFINE_TEST("alignment check") {
     static constexpr std::size_t TestAlignment = 128;
 #endif
 
+    // NOLINTNEXTLINE(cppcoreguidelines-special-member-functions): we only check in the dtor since it's moved/copied around.
     struct TestType {
         alignas(TestAlignment) std::uint8_t i;
 

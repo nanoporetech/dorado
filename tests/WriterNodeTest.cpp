@@ -52,6 +52,12 @@ public:
     }
 
 private:
+    SubreadIdTaggerNode(const SubreadIdTaggerNode &) = delete;
+    SubreadIdTaggerNode &operator=(const SubreadIdTaggerNode &) = delete;
+    SubreadIdTaggerNode(SubreadIdTaggerNode &&) = delete;
+    SubreadIdTaggerNode &operator=(SubreadIdTaggerNode &&) = delete;
+
+private:
     void input_thread_fn() {
         Message message;
         std::unordered_map<std::string, size_t> read_id_counts;

@@ -19,11 +19,17 @@ public:
     ~ReadToBamTypeNode();
 
     std::string get_name() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
 
     // TODO: refactor duplex.cpp pipeline setup so that this isn't required.
     void set_modbase_threshold(float threshold);
+
+private:
+    ReadToBamTypeNode(const ReadToBamTypeNode&) = delete;
+    ReadToBamTypeNode& operator=(const ReadToBamTypeNode&) = delete;
+    ReadToBamTypeNode(ReadToBamTypeNode&&) = delete;
+    ReadToBamTypeNode& operator=(ReadToBamTypeNode&&) = delete;
 
 private:
     void input_thread_fn();

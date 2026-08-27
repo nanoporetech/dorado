@@ -25,6 +25,12 @@ public:
     void restart() override;
 
 private:
+    PolyACalculatorNode(const PolyACalculatorNode &) = delete;
+    PolyACalculatorNode &operator=(const PolyACalculatorNode &) = delete;
+    PolyACalculatorNode(PolyACalculatorNode &&) = delete;
+    PolyACalculatorNode &operator=(PolyACalculatorNode &&) = delete;
+
+private:
     void terminate_impl(utils::AsyncQueueTerminateFast fast);
     void input_thread_fn();
     void process_read(SimplexRead &read);

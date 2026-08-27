@@ -99,6 +99,11 @@ protected:
     };
     explicit ModelTorchBase(const MustConstructWithFactory &) {}
 
+    ModelTorchBase(const ModelTorchBase &) = delete;
+    ModelTorchBase &operator=(const ModelTorchBase &) = delete;
+    ModelTorchBase(ModelTorchBase &&) = delete;
+    ModelTorchBase &operator=(ModelTorchBase &&) = delete;
+
     bool m_normalise = true;
     bool m_half_precision = false;
     mutable std::mutex m_mutex_write;

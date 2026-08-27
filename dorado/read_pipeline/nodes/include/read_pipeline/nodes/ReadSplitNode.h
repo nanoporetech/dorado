@@ -21,8 +21,14 @@ public:
 
     std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
+
+private:
+    ReadSplitNode(const ReadSplitNode&) = delete;
+    ReadSplitNode& operator=(const ReadSplitNode&) = delete;
+    ReadSplitNode(ReadSplitNode&&) = delete;
+    ReadSplitNode& operator=(ReadSplitNode&&) = delete;
 
 private:
     void input_thread_fn();  // Worker thread performs splitting asynchronously.

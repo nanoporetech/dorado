@@ -44,6 +44,12 @@ public:
     void restart() override;
 
 private:
+    PairingNode(const PairingNode&) = delete;
+    PairingNode& operator=(const PairingNode&) = delete;
+    PairingNode(PairingNode&&) = delete;
+    PairingNode& operator=(PairingNode&&) = delete;
+
+private:
     void start_threads();
 
     /**
