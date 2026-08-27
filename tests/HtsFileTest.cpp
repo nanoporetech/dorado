@@ -524,8 +524,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_structure";
 
     auto [output_mode] = GENERATE(table<OutputMode>({
             {OutputMode::FASTQ},
@@ -565,8 +564,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_nested_structure";
 
     // subfolder here is NOT the file extension but the output folder name
     auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
@@ -635,8 +633,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_nested_structure";
 
     auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
@@ -717,8 +714,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_nested_structure";
 
     auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
