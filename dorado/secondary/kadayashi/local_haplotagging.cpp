@@ -1762,10 +1762,12 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         if (var.ref_allele_seq0 != var.ref_allele_seq1) {
             if (var.ref_allele_seq0.size() > var.ref_allele_seq1.size()) {
                 ref = var.ref_allele_seq0;
-                alt1.append(ref.data() + 1, ref.size() - 1);
+                alt1.append(ref.data() + std::size(var.ref_allele_seq1),
+                            ref.size() - std::size(var.ref_allele_seq1));
             } else {
                 ref = var.ref_allele_seq1;
-                alt0.append(ref.data() + 1, ref.size() - 1);
+                alt0.append(ref.data() + std::size(var.ref_allele_seq0),
+                            ref.size() - std::size(var.ref_allele_seq0));
             }
         }
         // check that we haven't just filled one alt with the ref, if so then clean up
