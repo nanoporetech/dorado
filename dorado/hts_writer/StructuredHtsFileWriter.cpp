@@ -5,6 +5,7 @@
 #include "hts_utils/hts_types.h"
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/Structure.h"
+#include "hts_writer_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -64,6 +65,7 @@ void StructuredHtsFileWriter::handle(const HtsData &item) {
     const std::string path = m_structure->get_path(item);
     auto &hts_file = m_hts_files[path];
     if (!hts_file) {
+        create_output_folder(path);
         hts_file = std::make_unique<utils::HtsFile>(path, m_mode, m_thread_pool, m_sort);
         set_hts_file_header(item, *hts_file);
     }
