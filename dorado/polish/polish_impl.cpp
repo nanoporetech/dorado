@@ -153,7 +153,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
 
             spdlog::debug("[create_resources] Using full precision.");
             spdlog::debug("[create_resources] Switching model to eval mode.");
-            spdlog::info("Loaded model to device {}: {}", 0, device_info.name);
+            spdlog::info("Loaded model to {}", device_info.name);
             return std::make_pair(std::move(ret), std::move(ret_streams));
         }
 
