@@ -4,6 +4,7 @@
 
 #include <htslib/hts.h>
 #include <htslib/vcf.h>
+#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
@@ -100,9 +101,6 @@ std::vector<int32_t> parse_vcf_int_list(const std::string_view value) {
     for (const auto token : tokens) {
         ret.push_back(parse_vcf_int(token));
     }
-    if (std::empty(ret)) {
-        throw std::runtime_error("FORMAT integer list is empty.");
-    }
     return ret;
 }
 
@@ -119,9 +117,6 @@ std::vector<float> parse_vcf_float_list(const std::string_view value) {
     ret.reserve(std::size(tokens));
     for (const auto token : tokens) {
         ret.push_back(parse_vcf_float(token));
-    }
-    if (std::empty(ret)) {
-        throw std::runtime_error("FORMAT float list is empty.");
     }
     return ret;
 }
@@ -331,7 +326,12 @@ void VCFWriter::write_variant(const Variant& variant) {
             }
 
             if (spec.type == FieldType::INT_LIST) {
-                auto parsed_values = parse_vcf_int_list(value);
+                std::vector<int32_t> parsed_values = parse_vcf_int_list(value);
+                if (std::empty(parsed_values)) {
+                    spdlog::debug("[write_variant] FORMAT {} list is empty for variant at {}:{}.",
+                                  spec.key, variant.seq_id, variant.pos);
+                    continue;
+                }
                 if (m_include_gvcf_headers && ((spec.number == "R") || (spec.number == "A"))) {
                     // Add extra missing entry corresponding to <*> allele
                     parsed_values.push_back(bcf_int32_missing);
@@ -349,7 +349,12 @@ void VCFWriter::write_variant(const Variant& variant) {
             }
 
             if (spec.type == FieldType::FLOAT_LIST) {
-                auto parsed_values = parse_vcf_float_list(value);
+                std::vector<float> parsed_values = parse_vcf_float_list(value);
+                if (std::empty(parsed_values)) {
+                    spdlog::debug("[write_variant] FORMAT {} list is empty for variant at {}:{}.",
+                                  spec.key, variant.seq_id, variant.pos);
+                    continue;
+                }
                 if (m_include_gvcf_headers && ((spec.number == "R") || (spec.number == "A"))) {
                     // Add extra missing entry corresponding to <*> allele
                     parsed_values.push_back(missing_bcf_float());
