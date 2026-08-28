@@ -124,6 +124,39 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
         std::vector<std::shared_ptr<secondary::ModelTorchBase>> ret;
         std::vector<c10::optional<c10::Stream>> ret_streams;
 
+        if (std::size(resources.devices) == 1 && resources.devices.front().device.is_cpu()) {
+            const auto& device_info = resources.devices.front();
+
+            auto create_model = [&] {
+                auto model = secondary::model_factory(model_config);
+                model->to_device(device_info.device);
+                model->set_eval();
+                return model;
+            };
+
+            spdlog::debug("[create_resources] About to load model to device {}: {}", 0,
+                          device_info.name);
+
+            std::size_t infer_threads = static_cast<std::size_t>(num_inference_threads);
+            std::vector<std::future<std::shared_ptr<secondary::ModelTorchBase>>> futures;
+            futures.reserve(infer_threads);
+            cxxpool::thread_pool pool{static_cast<std::size_t>(infer_threads)};
+            for (std::size_t i = 0; i < infer_threads; ++i) {
+                futures.emplace_back(pool.push(create_model));
+            }
+
+            for (auto&& future : futures) {
+                auto model = future.get();
+                ret.emplace_back(std::move(model));
+                ret_streams.emplace_back(c10::nullopt);
+            }
+
+            spdlog::debug("[create_resources] Using full precision.");
+            spdlog::debug("[create_resources] Switching model to eval mode.");
+            spdlog::info("Loaded model to {}", device_info.name);
+            return std::make_pair(std::move(ret), std::move(ret_streams));
+        }
+
         for (std::size_t device_id = 0; device_id < std::size(resources.devices); ++device_id) {
             const auto& device_info = resources.devices[device_id];
 
