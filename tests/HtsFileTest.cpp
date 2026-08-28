@@ -524,8 +524,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Structures and Strategies", TEST_GROUP) {
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_structure";
 
     auto [output_mode] = GENERATE(table<OutputMode>({
             {OutputMode::FASTQ},
@@ -565,8 +564,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_nested_structure";
 
     // subfolder here is NOT the file extension but the output folder name
     auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
@@ -620,8 +618,9 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures No Barcodes", TEST_GROUP) 
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs}));
     CATCH_CAPTURE(root, path, output_mode, attrs.experiment_id);
 
+    auto root_path = std::filesystem::weakly_canonical(root);
     // Check root is the parent of the output
-    CATCH_CHECK(path.string().substr(0, root.size()) == fs::path(root).string());
+    CATCH_CHECK(path.string().substr(0, root_path.string().size()) == root_path.string());
     // Check the folder structure
     CATCH_CHECK(fs::relative(path.parent_path(), root) == fs::path(expected_dir));
     // Check the filename
@@ -635,8 +634,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_nested_structure";
 
     auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
@@ -692,9 +690,10 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes", TEST_GROUP
     const auto path = fs::path(structure.get_path(HtsData{nullptr, attrs, barcode_score_result}));
 
     CATCH_SECTION(description) {
-        CATCH_CAPTURE(root, path, output_mode, barcode_name);
+        CATCH_CAPTURE(root, path, output_mode, attrs.experiment_id);
+        auto root_path = std::filesystem::weakly_canonical(root);
         // Check root is the parent of the output
-        CATCH_CHECK(path.string().substr(0, root.size()) == root);
+        CATCH_CHECK(path.string().substr(0, root_path.string().size()) == root_path.string());
         // Check the filename
         CATCH_CHECK(path.stem() == expected_fname);
         // Check the file type / extension
@@ -717,8 +716,7 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     using namespace hts_writer;
     namespace fs = std::filesystem;
 
-    const auto tmp_dir = make_temp_dir("test_writer_nested_structure");
-    const auto root = tmp_dir.m_path.string();
+    const std::string root = "test_writer_nested_structure";
 
     auto [output_mode, subfolder] = GENERATE(table<OutputMode, std::string>({
             {OutputMode::FASTQ, "fastq"},
@@ -776,9 +774,10 @@ CATCH_TEST_CASE(TEST_GROUP " Writer Nested Structures with Barcodes from file", 
     const auto path = fs::path(structure.get_path(HtsData{std::move(bam_record), attrs, nullptr}));
 
     CATCH_SECTION(description) {
-        CATCH_CAPTURE(root, path, output_mode, barcode_name, add_kit_name);
+        CATCH_CAPTURE(root, path, output_mode, attrs.experiment_id);
+        auto root_path = std::filesystem::weakly_canonical(root);
         // Check root is the parent of the output
-        CATCH_CHECK(path.string().substr(0, root.size()) == root);
+        CATCH_CHECK(path.string().substr(0, root_path.string().size()) == root_path.string());
         // Check the filename
         CATCH_CHECK(path.stem() == expected_fname);
         // Check the file type / extension

@@ -2,7 +2,6 @@
 
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
-#include "hts_writer_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
@@ -21,9 +20,7 @@ namespace hts_writer {
 namespace fs = std::filesystem;
 
 SingleFileStructure::SingleFileStructure(const std::string& output_dir, OutputMode mode)
-        : m_mode(mode), m_path((fs::path(output_dir) / get_filename())) {
-    create_output_folder(m_path);
-};
+        : m_mode(mode), m_path((fs::path(output_dir) / get_filename())) {};
 
 std::string SingleFileStructure::get_path([[maybe_unused]] const HtsData& hts_data) {
     return m_path.string();
@@ -46,7 +43,6 @@ std::string NestedFileStructure::get_path(const HtsData& hts_data) {
     const auto alias = format_alias(hts_data);
     const auto directory = format_directory(hts_data, alias);
     const auto path = directory / format_filename(hts_data, alias);
-    create_output_folder(path);
     return path.string();
 }
 
