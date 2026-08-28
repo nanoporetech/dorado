@@ -7,7 +7,7 @@ VCF output to stdout (variants only).
   > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/variants.vcf 2> out/stderr
   > echo "Exit code: $?"
-  > grep -v "#" ${expected} | awk -v OFS='\t' '{ $9 = $9 ":SRC"; $10 = $10 ":I"; print }' > out/expected.no_header.vcf
+  > grep -v "#" ${expected} > out/expected.no_header.vcf
   > grep -v "#" out/variants.vcf > out/result.no_header.vcf
   > diff out/expected.no_header.vcf out/result.no_header.vcf
   Exit code: 0
@@ -57,7 +57,7 @@ VCF output to a directory (variants only).
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/stderr
   > echo "Exit code: $?"
   > ls -1 out
-  > grep -v "#" ${expected} | awk -v OFS='\t' '{ $9 = $9 ":SRC"; $10 = $10 ":I"; print }' > out/expected.no_header.vcf
+  > grep -v "#" ${expected} > out/expected.no_header.vcf
   > grep -v "#" out/variants.vcf > out/result.no_header.vcf
   > diff out/expected.no_header.vcf out/result.no_header.vcf
   Exit code: 0
@@ -116,7 +116,7 @@ VCF output to stdout, lower-case reference.
   > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} > out/variants.vcf 2> out/stderr
   > echo "Exit code: $?"
-  > grep -v "#" ${expected} | awk -v OFS='\t' '{ $9 = $9 ":SRC"; $10 = $10 ":I"; print }' > out/expected.no_header.vcf
+  > grep -v "#" ${expected} > out/expected.no_header.vcf
   > grep -v "#" out/variants.vcf > out/result.no_header.vcf
   > diff out/expected.no_header.vcf out/result.no_header.vcf
   Exit code: 0

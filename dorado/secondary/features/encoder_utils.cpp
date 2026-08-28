@@ -288,4 +288,17 @@ at::Tensor draft_encoding_from_seq(const std::vector<int64_t>& positions_major,
     return draft_seq_tensor;
 }
 
+std::vector<int8_t> encode_sequence(const std::string_view draft_seq) {
+    std::vector<int8_t> encoded_sequence;
+    encoded_sequence.reserve(std::size(draft_seq));
+    for (const char c : draft_seq) {
+        int8_t base_encoding = NUM_TO_COUNT_BASE_SYMM[SEQ_NT16_TABLE[static_cast<uint8_t>(c)]];
+        if (base_encoding < 0) {
+            base_encoding = DEL_VAL;
+        }
+        encoded_sequence.emplace_back(base_encoding);
+    }
+    return encoded_sequence;
+}
+
 }  // namespace dorado::secondary

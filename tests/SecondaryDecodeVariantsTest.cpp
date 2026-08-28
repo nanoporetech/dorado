@@ -94,6 +94,243 @@ CATCH_TEST_CASE("variant_span_helpers", TEST_GROUP) {
     CATCH_CHECK(!variant_covers_position(len_record, 1, 23));
 }
 
+CATCH_TEST_CASE("extend_span", TEST_GROUP) {
+    const std::string draft = "ACGTACGT";
+
+    struct TestCase {
+        std::string test_name;
+        std::vector<int64_t> positions_major;
+        std::vector<int64_t> positions_minor;
+        std::string ref_seq_with_gaps;
+        std::vector<std::string> cons_seqs_with_gaps;
+        int64_t rstart;
+        int64_t rend;
+        std::vector<std::string> alleles;
+        bool prepended;
+        int64_t expected_rstart;
+        int64_t expected_rend;
+        std::vector<std::string> expected_alleles;
+    };
+
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+            TestCase{"basic case, no extension",
+                     // ACGTACGT
+                     // AGGTACGT
+                     // ATGTACGT
+                     //  ||
+                     {0, 1, 2, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 0, 0, 0, 0},
+                     "ACGTACGT",
+                     {"AGGTACGT", "ATGTACGT"},
+                     1,
+                     2,
+                     {"C", "G", "T"},
+                     false,
+                     1,
+                     2,
+                     {"C", "G", "T"}},
+            TestCase{"substitution, left flanking minors; extend to include minors but not major",
+                     // A**CGTACGT
+                     // A**GGTACGT
+                     // A**TGTACGT
+                     //  |  |
+                     {0, 0, 0, 1, 2, 3, 4, 5, 6, 7},
+                     {0, 1, 2, 0, 0, 0, 0, 0, 0, 0},
+                     "A**CGTACGT",
+                     {"A**GGTACGT", "A**TGTACGT"},
+                     3,
+                     4,
+                     {"C", "G", "T"},
+                     false,
+                     1,
+                     4,
+                     {"C", "G", "T"}},
+            TestCase{"substitution, right flanking minors; extend to include minors but not major",
+                     // AC**GTACGT
+                     // AG**GTACGT
+                     // AT**GTACGT
+                     //  |  |
+                     {0, 1, 1, 1, 2, 3, 4, 5, 6, 7},
+                     {0, 0, 1, 2, 0, 0, 0, 0, 0, 0},
+                     "AC**GTACGT",
+                     {"AG**GTACGT", "AT**GTACGT"},
+                     1,
+                     2,
+                     {"C", "G", "T"},
+                     false,
+                     1,
+                     4,
+                     {"C", "G", "T"}},
+            TestCase{"deletion; extend to include left and right majors",
+                     // ACGTACGT
+                     // ACG**CGT
+                     // ATG**CGT
+                     //   |   |
+                     {0, 1, 2, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 0, 0, 0, 0},
+                     "ACGTACGT",
+                     {"ACG**CGT", "ATG**CGT"},
+                     3,
+                     5,
+                     {"TA", "", ""},
+                     false,
+                     2,
+                     6,
+                     {"GTAC", "GC", "GC"}},
+            TestCase{"deletion with left minor; extend to include left and right majors",
+                     // ACG*TACGT
+                     // ACG**ACGT
+                     // ACG*TACGT
+                     //   |   |
+                     {0, 1, 2, 2, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 1, 0, 0, 0, 0, 0},
+                     "ACG*TACGT",
+                     {"ACG**ACGT", "ATG*TACGT"},
+                     3,
+                     5,
+                     {"T", "", "T"},
+                     false,
+                     2,
+                     6,
+                     {"GTA", "GA", "GTA"}},
+            TestCase{"deletion with right minor; extend to include left and right majors",
+                     // ACGT*ACGT
+                     // ACG**ACGT
+                     // ATG**ACGT
+                     //   |   |
+                     {0, 1, 2, 3, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 1, 0, 0, 0, 0},
+                     "ACGT*ACGT",
+                     {"ACG**ACGT", "ATG**ACGT"},
+                     3,
+                     4,
+                     {"T", "", ""},
+                     false,
+                     2,
+                     6,
+                     {"GTA", "GA", "GA"}},
+            TestCase{"insertion, left major will already have been prepended; extend to right "
+                     "major but not left",
+                     // ACGT*ACGT
+                     // ACGTTACGT
+                     // ATGTAACGT
+                     //    |  |
+                     {0, 1, 2, 3, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 1, 0, 0, 0, 0},
+                     "ACGT*ACGT",
+                     {"ACGTTACGT", "ATGTAACGT"},
+                     3,
+                     5,
+                     {"T", "TT", "TA"},
+                     true,
+                     3,
+                     6,
+                     {"TA", "TTA", "TAA"}},
+            TestCase{"insertion with right minors, left major will already have been prepended; "
+                     "extend to right major but not left",
+                     // ACGT***ACGT
+                     // ACGTT**ACGT
+                     // ACGTAA*ACGT
+                     //    |    |
+                     {0, 1, 2, 3, 3, 3, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0},
+                     "ACGT***ACGT",
+                     {"ACGTT**ACGT", "ATGTAA*ACGT"},
+                     3,
+                     6,
+                     {"T", "TT", "TAA"},
+                     true,
+                     3,
+                     8,
+                     {"TA", "TTA", "TAAA"}},
+            TestCase{"mixed indel ending on deletion, left major will already have been prepended; "
+                     "extend to right major but not left",
+                     // ACGT***ACGT
+                     // ACGT*CCC*GT
+                     // ATGT***CGGT
+                     //    |      |
+                     {0, 1, 2, 3, 3, 3, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0},
+                     "ACGT***ACGT",
+                     {"ACGT*CCC*GT", "ATGT***CGGT"},
+                     3,
+                     9,
+                     {"TAC", "TCCC", "TCG"},
+                     true,
+                     3,
+                     10,
+                     {"TACG", "TCCCG", "TCGG"}},
+            TestCase{"mixed indel ending on substitution, left major will already have been "
+                     "prepended; don't extend right or left",
+                     // ACGT***ACGT
+                     // ACGT*CCCGGT
+                     // ATGT***CGGT
+                     //    |     |
+                     {0, 1, 2, 3, 3, 3, 3, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 1, 2, 3, 0, 0, 0, 0},
+                     "ACGT***ACGT",
+                     {"ACGT*CCCGGT", "ATGT***CGGT"},
+                     3,
+                     9,
+                     {"TAC", "TCCCG", "TCG"},
+                     true,
+                     3,
+                     9,
+                     {"TAC", "TCCCG", "TCG"}},
+            TestCase{"mixed indel ending on substitution but with right minors, left major will "
+                     "already have been prepended; extend right through minors but not major",
+                     // ACGT***AC*GT
+                     // ACGT*CCCG*GT
+                     // ATGT***CG*GT
+                     //    |      |
+                     {0, 1, 2, 3, 3, 3, 3, 4, 5, 5, 6, 7},
+                     {0, 0, 0, 0, 1, 2, 3, 0, 0, 1, 0, 0},
+                     "ACGT***AC*GT",
+                     {"ACGT*CCCG*GT", "ATGT***CG*GT"},
+                     3,
+                     9,
+                     {"TAC", "TCCCG", "TCG"},
+                     true,
+                     3,
+                     10,
+                     {"TAC", "TCCCG", "TCG"}},
+            TestCase{"mixed indel starting with deletion; extend left but not right",
+                     // ACGTA***CGT
+                     // ACGT*CCCGGT
+                     // ATGT***CGGT
+                     //    |     |
+                     {0, 1, 2, 3, 4, 4, 4, 4, 5, 6, 7},
+                     {0, 0, 0, 0, 0, 1, 2, 3, 0, 0, 0},
+                     "ACGTA***CGT",
+                     {"ACGT*CCCGGT", "ATGT***CGGT"},
+                     4,
+                     9,
+                     {"AC", "CCCG", "CG"},
+                     false,
+                     3,
+                     9,
+                     {"TAC", "TCCCG", "TCG"}},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+
+    std::vector<secondary::ConsensusResult> consensus_results;
+    consensus_results.reserve(std::size(test_case.cons_seqs_with_gaps));
+    for (const auto& seq : test_case.cons_seqs_with_gaps) {
+        consensus_results.emplace_back(secondary::ConsensusResult{"", seq, ""});
+    }
+    int64_t rstart = test_case.rstart;
+    int64_t rend = test_case.rend;
+    std::vector<std::string> alleles = test_case.alleles;
+
+    secondary::extend_span(rstart, rend, alleles, test_case.prepended, draft,
+                           test_case.positions_major, test_case.positions_minor,
+                           test_case.ref_seq_with_gaps, consensus_results);
+    CATCH_CHECK(rstart == test_case.expected_rstart);
+    CATCH_CHECK(rend == test_case.expected_rend);
+    CATCH_CHECK(alleles == test_case.expected_alleles);
+}
+
 CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
     struct TestCase {
         std::string test_name;
@@ -819,6 +1056,187 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
                 test_case.merge_adjacent, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
 
         CATCH_CHECK(test_case.expected == result);
+    }
+}
+
+CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
+    const DecoderBase decoder(LabelSchemeType::HAPLOID);
+    const std::string symbols = decoder.get_label_scheme_symbols();
+
+    // Create a symbol lookup.
+    std::array<int32_t, 256> lookup{};
+    lookup.fill(static_cast<int32_t>(std::size(symbols)));
+    for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
+        lookup[static_cast<int32_t>(symbols[i])] = i;
+    }
+
+    auto make_sample = [&](at::Tensor basecalls, const std::string_view cons_seq) {
+        int64_t n_reads = 0;
+        if (basecalls.defined()) {
+            n_reads = basecalls.size(1);
+        }
+        const std::vector<std::string> read_ids = placeholder_read_ids(n_reads);
+        return VariantCallingSample{
+                0,
+                {0, 1, 2, 3},
+                {0, 0, 0, 0},
+                make_haploid_probs(symbols, cons_seq, 0.99f),
+                at::full({4}, n_reads, at::kInt),
+                read_ids,
+                read_ids,
+                std::move(basecalls),
+        };
+    };
+
+    const auto make_basecalls = [&lookup](const std::vector<std::string_view>& seqs) {
+        if (std::empty(seqs)) {
+            return at::empty({}, at::kChar);
+        }
+
+        at::Tensor basecalls = at::zeros({std::ssize(seqs.front()), std::ssize(seqs)}, at::kChar);
+        for (int64_t read_idx = 0; read_idx < std::ssize(seqs); ++read_idx) {
+            for (int64_t pos = 0; pos < std::ssize(seqs[read_idx]); ++pos) {
+                const char c = seqs[read_idx][pos];
+                const int8_t encoded = lookup[static_cast<int32_t>(c)];
+                basecalls.index_put_({pos, read_idx}, encoded);
+            }
+        }
+        return basecalls;
+    };
+
+    const auto decode = [&](const VariantCallingSample& sample, const std::string_view ref) {
+        return general_decode_variants(decoder, sample, ref, 10.0f, false, false, false, false,
+                                       false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+    };
+
+    CATCH_SECTION("counts matching ref and alt allele") {
+        const VariantCallingSample sample =
+                make_sample(make_basecalls({"ACTA", "ACTA", "ACTA", "ACAA", "ACAA"}), "ACTA");
+
+        const std::vector<Variant> result = decode(sample, "ACAA");
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(std::cbegin(result)->ref == "A");
+        CATCH_CHECK(std::cbegin(result)->alts == std::vector<std::string>{"T"});
+        const auto& format = std::cbegin(result)->format;
+        CATCH_REQUIRE_FALSE(std::empty(format));
+        const auto it_ad = format.find("AD");
+        CATCH_CHECK(it_ad != format.cend());
+        CATCH_CHECK(it_ad->second == "2,3");
+    }
+
+    CATCH_SECTION("partially spanning reads don't contribute") {
+        const VariantCallingSample sample =
+                make_sample(make_basecalls({"**GA", "AG**", "AGGA", "ACAA", "ACAA"}), "ACAA");
+
+        const std::vector<Variant> result = decode(sample, "AGGA");
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(std::cbegin(result)->ref == "GG");
+        CATCH_CHECK(std::cbegin(result)->alts == std::vector<std::string>{"CA"});
+        const auto& format = std::cbegin(result)->format;
+        CATCH_REQUIRE_FALSE(std::empty(format));
+        const auto it_ad = format.find("AD");
+        CATCH_CHECK(it_ad != std::cend(format));
+        CATCH_CHECK(it_ad->second == "1,2");
+    }
+
+    CATCH_SECTION("empty basecalls do not add AD") {
+        const std::vector<Variant> result = decode(make_sample({}, "ACTA"), "ACAA");
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        const auto& format = result.front().format;
+        CATCH_REQUIRE_FALSE(std::empty(format));
+        CATCH_CHECK(format.find("AD") == std::cend(format));
+    }
+
+    CATCH_SECTION("AD tag docs example 1") {
+        /**
+         * reference     ...A--C-GA...
+         * alt           ...A--T-GA...
+         * read 1        ...A--T-GA...
+         * read 2        ...AAAT-GA...
+         * read 3        ...A--TGGA...
+         */
+        const VariantCallingSample sample{
+                0,
+                {0, 0, 0, 1, 1, 2, 3},
+                {0, 1, 2, 0, 1, 0, 0},
+                make_haploid_probs(symbols, "A**T*GA", 0.99f),
+                at::full({7}, 3, at::kInt),
+                {"read_1", "read_2", "read_3"},
+                {"read_1", "read_2", "read_3"},
+                make_basecalls({"A--T-GA", "AAAT-GA", "A--TGGA"}),
+        };
+
+        const std::vector<Variant> result =
+                general_decode_variants(decoder, sample, "ACGA", 0.0f, false, false, true, true,
+                                        false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(std::cbegin(result)->ref == "C");
+        CATCH_CHECK(std::cbegin(result)->alts == std::vector<std::string>{"T"});
+        const auto& format = std::cbegin(result)->format;
+        CATCH_REQUIRE_FALSE(std::empty(format));
+        const auto it_ad = format.find("AD");
+        CATCH_CHECK(it_ad != std::cend(format));
+        CATCH_CHECK(it_ad->second == "0,1");
+    }
+
+    CATCH_SECTION("AD tag docs example 2") {
+        /**
+         * reference     ...AACCGA...
+         * alt           ...AA--GA...
+         * read 1        ...AA--GA...
+         * read 2        ...AA---A...
+         * read 3        ...A---GA...
+         */
+        const VariantCallingSample sample{0,
+                                          {0, 1, 2, 3, 4, 5},
+                                          {0, 0, 0, 0, 0, 0},
+                                          make_haploid_probs(symbols, "AA**GA", 0.99f),
+                                          at::full({6}, 3, at::kInt),
+                                          {"read_1", "read_2", "read_3"},
+                                          {"read_1", "read_2", "read_3"},
+                                          make_basecalls({"AA--GA", "AA---A", "A---GA"})};
+
+        const std::vector<Variant> result =
+                general_decode_variants(decoder, sample, "AACCGA", 0.0f, false, false, true, true,
+                                        false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(std::cbegin(result)->ref == "ACC");
+        CATCH_CHECK(std::cbegin(result)->alts == std::vector<std::string>{"A"});
+        const auto& format = std::cbegin(result)->format;
+        CATCH_REQUIRE_FALSE(std::empty(format));
+        const auto it_ad = format.find("AD");
+        CATCH_CHECK(it_ad != std::cend(format));
+        CATCH_CHECK(it_ad->second == "0,1");
+    }
+
+    CATCH_SECTION("counts matching ref and diploid alt alleles") {
+        const VariantCallingSample sample{
+                0,
+                {0, 1, 2, 3, 4, 5},
+                {0, 0, 0, 0, 0, 0},
+                make_polyploid_probs(symbols, {"AA**GA", "AAT*GA"}, {0.99f, 0.99f}),
+                at::full({6}, 5, at::kInt),
+                {"read_1", "read_2", "read_3", "read_4", "read_5"},
+                {"read_1", "read_2", "read_3", "read_4", "read_5"},
+                make_basecalls({"AA--GA", "AAT--A", "AA--GA", "AAT-GA", "AATG-A"})};
+
+        const std::vector<Variant> result =
+                general_decode_variants(decoder, sample, "AACCGA", 0.0f, false, false, true, true,
+                                        false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(std::cbegin(result)->ref == "ACC");
+        CATCH_CHECK(std::cbegin(result)->alts == std::vector<std::string>{"A", "AT"});
+        const auto& format = std::cbegin(result)->format;
+        CATCH_REQUIRE_FALSE(std::empty(format));
+        const auto it_ad = format.find("AD");
+        CATCH_CHECK(it_ad != std::cend(format));
+        CATCH_CHECK(it_ad->second == "0,2,2");
     }
 }
 

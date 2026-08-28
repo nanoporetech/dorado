@@ -5,6 +5,7 @@
 #include "secondary/common/interval.h"
 #include "secondary/common/region.h"
 #include "secondary/common/variant.h"
+#include "secondary/consensus/consensus_result.h"
 #include "secondary/features/decoder_base.h"
 #include "variant_calling_sample.h"
 
@@ -29,6 +30,32 @@ constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_
  * \param qual Float QUAL value.
  */
 std::string gq_from_qual(float qual);
+
+/**
+ * \brief Extend variant span in preparation for allele depth calculation.
+ *        Updates the rstart, rend and alleles in place.
+ *        Basic rules are:
+ *        - include all minor positions immediately flanking the span
+ *        - if the ends of a span are an indel, include the flanking major base
+ * \param rstart Span start coordinate in positions space.
+ * \param rend Span end coordinate in positions space (end-exclusive).
+ * \param alleles Gap-compressed sequences.
+ * \param prepended Whether a reference base has already been prepended; if true, no further changes will be made to rstart.
+ * \param draft Reference sequence for the full contig.
+ * \param positions_major Major reference coordinates.
+ * \param positions_minor Minor coordinates.
+ * \param ref_seq_with_gaps Gap-expanded reference sequence.
+ * \param cons_seqs_with_gaps Gap-expanded consensus sequence(s).
+ */
+void extend_span(int64_t& rstart,
+                 int64_t& rend,
+                 std::vector<std::string>& alleles,
+                 bool prepended,
+                 const std::string_view draft,
+                 const std::vector<int64_t>& positions_major,
+                 const std::vector<int64_t>& positions_minor,
+                 const std::string_view ref_seq_with_gaps,
+                 const std::vector<ConsensusResult>& cons_seqs_with_gaps);
 
 /**
  * \brief Construct a gVCF reference block.
