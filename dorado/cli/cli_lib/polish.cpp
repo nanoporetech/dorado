@@ -1202,6 +1202,9 @@ void run_polishing(const Options& opt,
 }  // namespace
 
 int polish(int argc, char* argv[]) {
+    utils::initialise_torch();
+    utils::make_torch_deterministic();
+
     try {
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
@@ -1267,9 +1270,6 @@ int polish(int argc, char* argv[]) {
         if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
             secondary::check_read_groups(bam_info, opt.read_group);
         }
-
-        // Set the number of threads so that libtorch doesn't cause a thread bomb.
-        utils::initialise_torch();
 
         // Resolve the model.
         secondary::ModelConfig model_config;
