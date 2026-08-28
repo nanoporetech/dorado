@@ -138,6 +138,42 @@ CATCH_TEST_CASE("merge_vc_samples", TEST_GROUP) {
             false,
         },
         TestCase{
+            "Do not merge adjacent major positions when the next sample starts at a minor position",
+            {
+                {
+                    5,
+                    {11936695},
+                    {14},
+                    at::tensor({0.0f}, at::kFloat),
+                    at::ones({1}, at::kInt),
+                },
+                {
+                    5,
+                    {11936696, 11936697},
+                    {62, 0},
+                    at::tensor({1.0f, 2.0f}, at::kFloat),
+                    at::full({2}, 2, at::kInt),
+                },
+            },
+            {
+                {
+                    5,
+                    {11936695},
+                    {14},
+                    at::tensor({0.0f}, at::kFloat),
+                    at::ones({1}, at::kInt),
+                },
+                {
+                    5,
+                    {11936696, 11936697},
+                    {62, 0},
+                    at::tensor({1.0f, 2.0f}, at::kFloat),
+                    at::full({2}, 2, at::kInt),
+                },
+            },
+            false,
+        },
+        TestCase{
             "Do not merge samples which have same major position but minor positions are not adjacent",
             {
                 {
