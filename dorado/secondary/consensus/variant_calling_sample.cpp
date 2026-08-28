@@ -251,9 +251,11 @@ std::vector<VariantCallingSample> merge_vc_samples(
             continue;
         }
 
-        // Merge if major coordinates are adjacent, or if major coordinates are equal but minor are adjacent.
+        // Merge if major coordinates are adjacent and the next sample starts at minor zero,
+        // or if major coordinates are equal but minor coordinates are adjacent.
         if ((curr.seq_id == last.seq_id) &&
-            ((curr.positions_major[0] == (last.positions_major.back() + 1)) ||
+            (((curr.positions_major[0] == (last.positions_major.back() + 1)) &&
+              (curr.positions_minor[0] == 0)) ||
              ((curr.positions_major[0] == last.positions_major.back()) &&
               (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
             merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
