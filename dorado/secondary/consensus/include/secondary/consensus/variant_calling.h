@@ -161,4 +161,14 @@ std::vector<Variant> general_decode_variants(
         bool merge_adjacent,
         std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins);
 
+/**
+ * \brief Get the set of genotype combinations for (ploidy, num_alleles) from lookup table
+ *        of pre-defined genotypes. Throws for invalid inputs.
+ * \param ploidy Number of haplotypes.
+ * \param num_alleles Number of alleles.
+ * \returns Pair containing: (number of genotype combinations, genotype combination strings).
+ */
+std::pair<int64_t, std::span<const std::string_view>> lookup_gts(int64_t ploidy,
+                                                                 int64_t num_alleles);
+
 }  // namespace dorado::secondary

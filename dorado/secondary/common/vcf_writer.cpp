@@ -1,6 +1,7 @@
 #include "secondary/common/vcf_writer.h"
 
 #include "dorado_version.h"
+#include "secondary/consensus/variant_calling.h"
 
 #include <htslib/hts.h>
 #include <htslib/vcf.h>

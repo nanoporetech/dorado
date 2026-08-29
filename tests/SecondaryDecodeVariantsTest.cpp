@@ -1304,4 +1304,44 @@ CATCH_TEST_CASE("compute VAF from AD", TEST_GROUP) {
     CATCH_CHECK(result == test_case.expected);
 }
 
+CATCH_TEST_CASE("lookup GT case lists", TEST_GROUP) {
+    struct TestCase {
+        std::string test_name;
+        int64_t ploidy;
+        int64_t num_alleles;
+        std::vector<std::string_view> expected_strings;
+        bool expect_throw = false;
+    };
+
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+            TestCase{"ploidy 1, num_alleles 1", 1, 1, {"0"}, false},
+            TestCase{"ploidy 1, num_alleles 2", 1, 2, {"0", "1"}, false},
+            TestCase{"ploidy 1, num_alleles 3", 1, 3, {"0", "1", "2"}, false},
+            TestCase{"ploidy 2, num_alleles 1", 2, 1, {"00"}, false},
+            TestCase{"ploidy 2, num_alleles 2", 2, 2, {"00", "01", "11"}, false},
+            TestCase{"ploidy 2, num_alleles 3", 2, 3, {"00", "01", "11", "02", "12", "22"}, false},
+            TestCase{"ploidy 2, num_alleles 4",
+                     2,
+                     4,
+                     {"00", "01", "11", "02", "12", "22", "03", "13", "23", "33"},
+                     false},
+            TestCase{"ploidy 0, invalid", 0, 1, {}, true},
+            TestCase{"ploidy out of range", 3, 1, {}, true},
+            TestCase{"ploidy 1, num_alleles out of range", 1, 4, {}, true},
+            TestCase{"ploidy 2, num_alleles out of range", 2, 5, {}, true},
+            TestCase{"num_alleles 0, invalid", 2, 0, {}, true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    if (test_case.expect_throw) {
+        CATCH_CHECK_THROWS(lookup_gts(test_case.ploidy, test_case.num_alleles));
+    } else {
+        const auto [num_elements, gt_list] = lookup_gts(test_case.ploidy, test_case.num_alleles);
+        CATCH_CHECK(num_elements == std::ssize(test_case.expected_strings));
+        CATCH_CHECK(num_elements == std::ssize(gt_list));
+        CATCH_CHECK(std::vector<std::string_view>(std::cbegin(gt_list), std::cend(gt_list)) ==
+                    test_case.expected_strings);
+    }
+}
+
 }  // namespace dorado::secondary::tests

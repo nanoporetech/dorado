@@ -1877,6 +1877,33 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         return std::string{genotype.first, delimiter, genotype.second};
     };
 
+    const auto get_placeholder_PL = [](const dorado::secondary::Variant &ret) {
+        const auto it = ret.format.find("GT");
+        if (it == std::cend(ret.format)) {
+            throw std::runtime_error{"Variant is missing genotype entry"};
+        }
+        std::string gt;
+        gt.reserve(std::size(it->second));
+        std::copy_if(std::cbegin(it->second), std::cend(it->second), std::back_inserter(gt),
+                     [](const char c) { return (c >= '0') && (c <= '9'); });
+        std::sort(std::begin(gt), std::end(gt));
+        const int32_t ploidy = std::ssize(gt);
+        const int64_t num_alleles = std::ssize(ret.alts) + 1;
+        const auto [num_elements, genotype_order] =
+                dorado::secondary::lookup_gts(ploidy, num_alleles);
+        if (num_elements == 0) {
+            return std::string{};
+        }
+        const auto it_go = std::find(std::cbegin(genotype_order), std::cend(genotype_order), gt);
+        if (it_go == std::cend(genotype_order)) {
+            throw std::runtime_error{"Genotype " + gt + " not found in genotype_order"};
+        }
+        std::vector<int32_t> pl_values(num_elements, dorado::secondary::VCF_MAX_PL_CAP);
+        const size_t idx = std::distance(std::cbegin(genotype_order), it_go);
+        pl_values[idx] = 0;
+        return dorado::utils::print_container_as_string(pl_values, ",", false);
+    };
+
     if (var.is_multi_allele) {
         std::string alt0 = var.alt_allele_seq0;
         std::string alt1 = var.alt_allele_seq1;
@@ -1964,6 +1991,13 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         ret.format["MIN_DP"] = std::to_string(var.min_depth);
     }
     dorado::secondary::add_VAF(ret);
+
+    if (var.is_confident) {
+        const std::string pl_str = get_placeholder_PL(ret);
+        if (!std::empty(pl_str)) {
+            ret.format["PL"] = pl_str;
+        }
+    }
 
     return ret;
 }

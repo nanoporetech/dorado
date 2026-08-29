@@ -628,23 +628,6 @@ const std::vector<std::vector<int64_t>> NUM_ELEMENTS = {
 // clang-format on
 
 /**
- * \brief Lookup genotypes list with bounds checking.
- */
-std::span<const std::string_view> lookup_gts(const int64_t ploidy, const int64_t num_alleles) {
-    if ((ploidy <= 0) || (ploidy > std::ssize(ALLELE_SETS))) {
-        throw std::runtime_error{"GL calculation for ploidy " + std::to_string(ploidy) +
-                                 " not implemented"};
-    }
-    const std::vector<std::string_view>& genotype_order = ALLELE_SETS[ploidy - 1];
-    if ((num_alleles <= 0) || (num_alleles > std::ssize(genotype_order))) {
-        throw std::runtime_error{"GL calculation for " + std::to_string(num_alleles) +
-                                 " alleles not implemented"};
-    }
-    int64_t num_elements = NUM_ELEMENTS[ploidy - 1][num_alleles - 1];
-    return {std::cbegin(genotype_order), static_cast<size_t>(num_elements)};
-}
-
-/**
  * \brief Calculate total log-probability for all possible permutations of a single genotype.
  */
 float compute_total_genotype_likelihood(const std::vector<float>& hap_allele_logprobs,
@@ -696,9 +679,7 @@ float compute_total_genotype_likelihood(const std::vector<float>& hap_allele_log
 std::vector<float> compute_GLs(const std::vector<float>& hap_allele_logprobs,
                                const int64_t num_haplotypes) {
     const int64_t num_alleles = std::ssize(hap_allele_logprobs) / num_haplotypes;
-    const std::span<const std::string_view> genotype_order =
-            lookup_gts(num_haplotypes, num_alleles);
-    const int64_t num_elements = std::ssize(genotype_order);
+    const auto [num_elements, genotype_order] = lookup_gts(num_haplotypes, num_alleles);
 
     std::vector<float> genotype_likelihoods(num_elements, NEGINF);
     for (int64_t gt = 0; gt < num_elements; ++gt) {
@@ -1213,6 +1194,28 @@ void add_depth(Variant& var, const at::Tensor& depth) {
 }
 
 }  // namespace
+
+/**
+ * \brief Lookup genotypes list with bounds checking.
+ */
+std::pair<int64_t, std::span<const std::string_view>> lookup_gts(const int64_t ploidy,
+                                                                 const int64_t num_alleles) {
+    if ((ploidy <= 0) || (ploidy > std::ssize(ALLELE_SETS))) {
+        throw std::runtime_error{"ALLELE_SETS not implemented for ploidy " +
+                                 std::to_string(ploidy)};
+    }
+    if ((ploidy > std::ssize(NUM_ELEMENTS)) || (num_alleles <= 0) ||
+        (num_alleles > std::ssize(NUM_ELEMENTS[ploidy - 1]))) {
+        throw std::runtime_error{"NUM_ELEMENTS not implemented for ploidy " +
+                                 std::to_string(ploidy) + " and " + std::to_string(num_alleles) +
+                                 " alleles"};
+    }
+    const int64_t num_elements = NUM_ELEMENTS[ploidy - 1][num_alleles - 1];
+    const std::vector<std::string_view>& genotype_order = ALLELE_SETS[ploidy - 1];
+    const std::span<const std::string_view> genotype_range{std::cbegin(genotype_order),
+                                                           static_cast<size_t>(num_elements)};
+    return std::make_pair(num_elements, genotype_range);
+}
 
 std::string gq_from_qual(const float qual) {
     if (qual < 0.0f) {
