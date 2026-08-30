@@ -38,6 +38,7 @@ constexpr std::array FORMAT_FIELD_SPECS{
         FieldSpec{"AD", FieldType::INT_LIST, "R", "Allele read depth"},
         FieldSpec{"VAF", FieldType::FLOAT_LIST, "A", "Variant allele fraction"},
         FieldSpec{"PL", FieldType::INT_LIST, "G", "Phred-scaled genotype likelihood"},
+        FieldSpec{"AQ", FieldType::INT_LIST, "R", "Phred-scaled allele quality score"},
 };
 
 constexpr std::array INFO_FIELD_SPECS{

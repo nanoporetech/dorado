@@ -708,6 +708,39 @@ std::string construct_PL_string(const std::vector<float>& genotype_logprobs) {
     return utils::print_container_as_string(pl_values, ",", false);
 }
 
+std::vector<float> calculate_AQs(const std::vector<float>& allele_logprobs,
+                                 const int64_t num_haplotypes) {
+    if (std::empty(allele_logprobs)) {
+        return {};
+    }
+    const int64_t num_alleles = std::ssize(allele_logprobs) / num_haplotypes;
+    std::vector<float> aq_values;
+    aq_values.reserve(num_alleles);
+    for (int32_t i = 0; i < num_alleles; ++i) {
+        const int32_t offset = i * num_haplotypes;
+        float logerr = 0.f;
+        // calculate the joint log-probability that "i is wrong" over all alleles
+        // clamp to avoid overflow for allele_logprobs very close to 0
+        for (int32_t j = 0; j < num_haplotypes; ++j) {
+            logerr += std::log(std::clamp(-std::expm1(allele_logprobs[offset + j]), EPS, 1.0f));
+        }
+        aq_values.emplace_back(phred_from_log(logerr, VCF_MAX_GQ_CAP));
+    }
+    return aq_values;
+};
+
+std::string construct_AQ_string(const std::vector<float>& aq_floats) {
+    if (std::empty(aq_floats)) {
+        return {};
+    }
+    std::vector<int32_t> aq_values;
+    aq_values.reserve(std::size(aq_floats));
+    for (const float aq : aq_floats) {
+        aq_values.emplace_back(static_cast<int32_t>(std::round(aq)));
+    }
+    return utils::print_container_as_string(aq_values, ",", false);
+};
+
 Variant construct_variant(const std::string_view draft,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
@@ -780,6 +813,8 @@ Variant construct_variant(const std::string_view draft,
     const std::vector<float> genotype_likelihoods =
             compute_GLs(hap_allele_likelihoods, num_haplotypes);
     const std::string pl_str = construct_PL_string(genotype_likelihoods);
+    const std::vector<float> aq_values = calculate_AQs(hap_allele_likelihoods, num_haplotypes);
+    const std::string aq_str = construct_AQ_string(aq_values);
 
     Variant var{
             .seq_id = seq_id,
@@ -844,6 +879,9 @@ Variant construct_variant(const std::string_view draft,
     var.format["GQ"] = gq_from_qual(var.qual);
     if (!std::empty(pl_str)) {
         var.format["PL"] = pl_str;
+    }
+    if (!std::empty(aq_str)) {
+        var.format["AQ"] = aq_str;
     }
 
     sanitize_empty_alts(var, num_haplotypes);
@@ -1350,6 +1388,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
         var.format.erase("AD");
         var.format.erase("VAF");
         var.format.erase("PL");
+        var.format.erase("AQ");
         var.filters = {Filters::NonVariant};
     }
 }

@@ -125,7 +125,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                                        {"MIN_DP", "25"},
                                        {"AD", "1,14,10"},
                                        {"VAF", "0.56,0.4"},
-                                       {"PL", "40,20,15,10,0,20"}},
+                                       {"PL", "40,20,15,10,0,20"},
+                                       {"AQ", "2,11,8"}},
                             .rstart = 0,
                             .rend = 0,
                     },
@@ -190,9 +191,10 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("chr1\t10\t."));
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("chr2\t42\t."));
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("LowQual;IncompatZyg"));
-            CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
-                                               "GT:GQ:MIN_DP:AD:VAF:PL:SRC\t1|"
-                                               "2:31:25:1,14,10:0.56,0.4:40,20,15,10,0,20:."));
+            CATCH_CHECK_THAT(vcf_text,
+                             Catch::Matchers::ContainsSubstring(
+                                     "GT:GQ:MIN_DP:AD:VAF:PL:AQ:SRC\t1|"
+                                     "2:31:25:1,14,10:0.56,0.4:40,20,15,10,0,20:2,11,8:."));
         }
 
         // Parse the VCF with Htslib to check that it is valid.
@@ -268,7 +270,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                                  "chr1\t11\t.\tN\t<*>\t.\t.\tEND=11\tGT:GQ:LEN:SRC\t./.:.:1:."));
         // Check that extra missing depth added for gVCF <*> record
         CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
-                                           "GT:GQ:MIN_DP:AD:VAF:PL:SRC\t1|2:31:25:1,14,10,.:0.56,0.4,.:40,20,15,10,0,20,.,.,.,.:."));
+                                           "GT:GQ:MIN_DP:AD:VAF:PL:AQ:SRC\t1|2:31:25:1,14,10,.:0.56,0.4,.:40,20,15,10,0,20,.,.,.,.:2,11,8,.:."));
     }
     // clang-format on
 
