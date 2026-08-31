@@ -1054,7 +1054,11 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 60.0f,
-                    .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
+                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                secondary::VARIANT_SOURCE_KADAYASHI},
+                               {"GT", "0/1"},
+                               {"GQ", "60"},
+                               {"DP", "20"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1066,7 +1070,11 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 60.0f,
-                    .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "20"}},
+                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                secondary::VARIANT_SOURCE_KADAYASHI},
+                               {"GT", "0/1"},
+                               {"GQ", "60"},
+                               {"DP", "20"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1078,7 +1086,11 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 60.0f,
-                    .format = {{"GT", "0/1"}, {"GQ", "60"}, {"DP", "15"}},
+                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                secondary::VARIANT_SOURCE_KADAYASHI},
+                               {"GT", "0/1"},
+                               {"GQ", "60"},
+                               {"DP", "15"}},
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1373,7 +1385,11 @@ CATCH_TEST_CASE(
                 .filter = secondary::VARIANT_PASS_FILTER,
                 .info = {},
                 .qual = 60.0f,
-                .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
+                .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
+                            secondary::VARIANT_SOURCE_KADAYASHI},
+                           {"GT", "1/1"},
+                           {"GQ", "60"},
+                           {"DP", "1"}},
                 .rstart = 0,
                 .rend = 0,
         };
@@ -1432,7 +1448,11 @@ CATCH_TEST_CASE(
                     .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 53.922f,
-                    .format = {{"GT", "1/1"}, {"GQ", "54"}, {"DP", "1"}},
+                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                secondary::VARIANT_SOURCE_INFERENCE},
+                               {"GT", "1/1"},
+                               {"GQ", "54"},
+                               {"DP", "1"}},
                     .rstart = 0,
                     .rend = 2,
             },
@@ -1498,7 +1518,9 @@ CATCH_TEST_CASE(
             .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
-            .format = {{"GT", "1/1"}, {"GQ", "60"}},
+            .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE, secondary::VARIANT_SOURCE_KADAYASHI},
+                       {"GT", "1/1"},
+                       {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1550,7 +1572,12 @@ CATCH_TEST_CASE(
                     .filter = secondary::VARIANT_PASS_FILTER,
                     .info = {},
                     .qual = 52.161f,
-                    .format = {{"GT", "1/1"}, {"GQ", "52"}, {"DP", "9"}, {"MIN_DP", "8"}},
+                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                secondary::VARIANT_SOURCE_INFERENCE},
+                               {"GT", "1/1"},
+                               {"GQ", "52"},
+                               {"DP", "9"},
+                               {"MIN_DP", "8"}},
                     .rstart = 0,
                     .rend = 3,
             },
@@ -1765,7 +1792,9 @@ CATCH_TEST_CASE(
             .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
-            .format = {{"GT", "1/1"}, {"GQ", "60"}},
+            .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE, secondary::VARIANT_SOURCE_KADAYASHI},
+                       {"GT", "1/1"},
+                       {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1777,7 +1806,9 @@ CATCH_TEST_CASE(
             .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
-            .format = {{"GT", "1"}, {"GQ", "60"}},
+            .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE, secondary::VARIANT_SOURCE_KADAYASHI},
+                       {"GT", "1"},
+                       {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -1869,7 +1900,9 @@ CATCH_TEST_CASE(
             .filter = secondary::VARIANT_PASS_FILTER,
             .info = {},
             .qual = 60.0f,
-            .format = {{"GT", "1/1"}, {"GQ", "60"}},
+            .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE, secondary::VARIANT_SOURCE_KADAYASHI},
+                       {"GT", "1/1"},
+                       {"GQ", "60"}},
             .rstart = 0,
             .rend = 0,
     };
@@ -2046,6 +2079,16 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     const auto temp_dir = make_temp_dir("variant_reduce_gvcf_no_samples");
     const auto reference_fasta = temp_dir.m_path / "reference.fa";
 
+    const std::pair<std::string, std::string> source_simple = {
+            secondary::FORMAT_TAG_VARIANT_SOURCE,
+            secondary::VARIANT_SOURCE_KADAYASHI,
+    };
+
+    const std::pair<std::string, std::string> source_ref = {
+            secondary::FORMAT_TAG_VARIANT_SOURCE,
+            secondary::VARIANT_SOURCE_REFERENCE,
+    };
+
     {
         std::ofstream ref_out(reference_fasta);
         ref_out << ">chr1\nACGTG\n";
@@ -2064,11 +2107,11 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
         data.selected_regions = {secondary::RegionInt{0, 0, 5}};
         data.variants_simple = {secondary::Variant{.seq_id = 0, .pos = 1, .ref = "C", .alts = {"A"},
                                                    .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 41.0f,
-                                                   .format = {{"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0,
+                                                   .format = {{source_simple}, {"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0,
                                                    .rend = 0},
                                 secondary::Variant{.seq_id = 0, .pos = 2, .ref = "G", .alts = {"T"},
                                                    .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 42.0f,
-                                                   .format = {{"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0,
+                                                   .format = {{source_simple}, {"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0,
                                                    .rend = 0}};
         data.read_endpoints = {
             {0, 1},
@@ -2115,15 +2158,15 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     CATCH_REQUIRE(chrom_reduce_data[0].variants_merged ==
                   std::vector{secondary::Variant{.seq_id = 0, .pos = 0, .ref = "A", .alts = {"<*>"}, .filter = secondary::NO_VARIANT_FILTER,
                                                  .info = {{"END", "1"}}, .qual = 60.0f,
-                                                 .format = {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, .rstart = 0,
+                                                 .format = {{source_ref}, {"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "4"}}, .rstart = 0,
                                                  .rend = 0},
                               secondary::Variant{.seq_id = 0, .pos = 1, .ref = "C", .alts = {"A"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 41.0f,
-                                                 .format = {{"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0, .rend = 0},
+                                                 .format = {{source_simple}, {"GT", "1/1"}, {"GQ", "41"}}, .rstart = 0, .rend = 0},
                               secondary::Variant{.seq_id = 0, .pos = 2, .ref = "G", .alts = {"T"}, .filter = secondary::VARIANT_PASS_FILTER, .info = {}, .qual = 42.0f,
-                                                 .format = {{"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0, .rend = 0},
+                                                 .format = {{source_simple}, {"GT", "1/1"}, {"GQ", "42"}}, .rstart = 0, .rend = 0},
                               secondary::Variant{.seq_id = 0, .pos = 3, .ref = "T", .alts = {"<*>"}, .filter = secondary::NO_VARIANT_FILTER,
                                                  .info = {{"END", "5"}}, .qual = 60.0f,
-                                                 .format = {{"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, .rstart = 0,
+                                                 .format = {{source_ref}, {"GT", "0/0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "3"}}, .rstart = 0,
                                                  .rend = 0}});
     CATCH_CHECK(stats.get_stats().at("processed") == 5.0);
     CATCH_CHECK(std::size(output_queue) == 1);

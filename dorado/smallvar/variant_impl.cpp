@@ -1638,7 +1638,8 @@ void add_gvcf_reference_records_for_unprocessed_regions(
             variants.emplace_back(secondary::make_gvcf_reference_record(
                     seq_id, block_start, draft[static_cast<std::size_t>(block_start)],
                     secondary::VCF_MAX_GQ_CAP, ploidy,
-                    (std::size(read_endpoints) > 0) ? min_depth : -1, pos, 0, 0));
+                    (std::size(read_endpoints) > 0) ? min_depth : -1, pos, 0, 0,
+                    secondary::VARIANT_SOURCE_REFERENCE));
         }
     }
 }

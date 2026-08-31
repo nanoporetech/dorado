@@ -89,6 +89,7 @@ add_executable(dorado_tests
     SequenceUtilsTest.cpp
     StereoDuplexTest.cpp
     StitchTest.cpp
+    StlUtilsTest.cpp
     StringUtilsTest.cpp
     SummaryFileWriterTest.cpp
     synchronisation_test.cpp

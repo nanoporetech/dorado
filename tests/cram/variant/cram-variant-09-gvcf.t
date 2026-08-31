@@ -9,7 +9,7 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep -E "^##INFO=<ID=END|^##ALT=<ID=\*|^##FORMAT=<ID=LEN" out/variants.vcf
+  > grep -E "^##INFO|^##ALT\*|^##FORMAT" out/variants.vcf
   > grep -v "^#" out/variants.vcf > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
   > awk 'NR == 1 { print $1, $2, $4, $5, $7, $8, $9, $10 }' out/gvcf.body.vcf
@@ -17,9 +17,14 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the reference block">
+  ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+  ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality score">
   ##FORMAT=<ID=LEN,Number=1,Type=Integer,Description="Length of <*> reference block">
+  ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
+  ##FORMAT=<ID=MIN_DP,Number=1,Type=Integer,Description="Minimum read depth">
+  ##FORMAT=<ID=SRC,Number=1,Type=String,Description="Source of the variant">
   1
-  chr20 1 T <*> . END=100 GT:GQ:LEN:MIN_DP 0/0:60:100:20
+  chr20 1 T <*> . END=100 GT:GQ:LEN:MIN_DP:SRC 0/0:60:100:20:R
 
 Candidate-filtered gVCF emits inferred variants and reference records for a targeted region.
 The `in.varcall.unsr.list` has the first candidate on position 1614. The variant calling is started at position 1000 to encompass non-inferred regions too.
@@ -62,14 +67,14 @@ chr20	1959	1
   chr20 1714 2001
   chr20 1860 2145
   20
-  chr20 1000 . G <*> . END=1345 GT:GQ:LEN:MIN_DP 0/0:60:346:20
-  chr20 1346 . G <*> . END=1471 GT:GQ:LEN:MIN_DP 0/0:60:126:20
-  chr20 1472 . T G,<*> PASS . GT:GQ:DP 0/1:42:20
-  chr20 1473 . C <*> . END=1555 GT:GQ:LEN:MIN_DP 0/0:60:83:20
-  chr20 1556 . C <*> . END=1557 GT:GQ:LEN:MIN_DP 0/0:50:2:20
-  chr20 1615 . C <*> . END=1615 GT:GQ:LEN:MIN_DP 0/0:54:1:20
-  chr20 1472 . T G,<*> PASS . GT:GQ:DP 0/1:42:20
-  chr20 1959 . T G,<*> PASS . GT:GQ:DP 0/1:44:19
+  chr20 1000 . G <*> . END=1345 GT:GQ:LEN:MIN_DP:SRC 0/0:60:346:20:R
+  chr20 1346 . G <*> . END=1471 GT:GQ:LEN:MIN_DP:SRC 0/0:60:126:20:I
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC 0/1:42:20:I
+  chr20 1473 . C <*> . END=1555 GT:GQ:LEN:MIN_DP:SRC 0/0:60:83:20:I
+  chr20 1556 . C <*> . END=1557 GT:GQ:LEN:MIN_DP:SRC 0/0:50:2:20:I
+  chr20 1615 . C <*> . END=1615 GT:GQ:LEN:MIN_DP:SRC 0/0:54:1:20:I
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC 0/1:42:20:I
+  chr20 1959 . T G,<*> PASS . GT:GQ:DP:SRC 0/1:44:19:I
 
 Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   $ rm -rf out; mkdir -p out
@@ -89,7 +94,7 @@ Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   1
-  chr20 1 T <*> . END=10000 GT:GQ:LEN:MIN_DP 0/0:60:10000:15
+  chr20 1 T <*> . END=10000 GT:GQ:LEN:MIN_DP:SRC 0/0:60:10000:15:R
 
 Candidate-filtered gVCF handles a region with an omitted end.
 In this region, all reads are dropped by kadayashi, so depth information is empty.
@@ -110,4 +115,4 @@ In this region, all reads are dropped by kadayashi, so depth information is empt
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
   1
-  chr20 9991 A <*> . END=10000 GT:GQ:LEN:MIN_DP 0/0:60:10:.
+  chr20 9991 A <*> . END=10000 GT:GQ:LEN:MIN_DP:SRC 0/0:60:10:.:R

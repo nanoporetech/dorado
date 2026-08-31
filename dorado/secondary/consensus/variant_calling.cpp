@@ -6,6 +6,7 @@
 #include "utils/container_utils.h"
 #include "utils/rle.h"
 #include "utils/sequence_utils.h"
+#include "utils/stl_utils.h"
 #include "utils/string_utils.h"
 
 #include <ATen/ATen.h>
@@ -309,6 +310,7 @@ Variant construct_variant(const std::string_view draft,
                           const bool is_var,
                           const bool ambig_ref,
                           const bool normalize,
+                          const std::string& variant_source,
                           const at::Tensor& probs_3D,
                           const std::unordered_set<char>& symbol_set,
                           const std::array<int32_t, 256>& symbol_lookup) {
@@ -364,7 +366,7 @@ Variant construct_variant(const std::string_view draft,
             .filter = VARIANT_PASS_FILTER,
             .info = {},
             .qual = 0.0f,
-            .format = {{"GT", gt}},
+            .format = {{"GT", gt}, {FORMAT_TAG_VARIANT_SOURCE, variant_source}},
             .rstart = rstart,
             .rend = rend,
     };
@@ -460,10 +462,13 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             std::cerr << "[merge_sorted_variants] Constructing new_var.\n";
 #endif
 
+            const std::string variant_source = utils::get_value_or_default(
+                    variants[prev_i].format, FORMAT_TAG_VARIANT_SOURCE, VARIANT_SOURCE_UNKNOWN);
+
             Variant new_var = construct_variant(
                     draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                     variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
-                    probs_3D, symbol_set, symbol_lookup);
+                    variant_source, probs_3D, symbol_set, symbol_lookup);
 
 #ifdef DEBUG_NORMALIZE_VARIANT
             std::cerr << "[merge_sorted_variants] new_var = " << new_var << '\n';
@@ -484,10 +489,13 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
 #endif
     {  // Remaining.
         if (furthest_rend != variants[prev_i].rend) {
+            const std::string variant_source = utils::get_value_or_default(
+                    variants[prev_i].format, FORMAT_TAG_VARIANT_SOURCE, VARIANT_SOURCE_UNKNOWN);
+
             Variant new_var = construct_variant(
                     draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                     variants[prev_i].seq_id, variants[prev_i].rstart, furthest_rend, true,
-                    ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
+                    ambig_ref, normalize, variant_source, probs_3D, symbol_set, symbol_lookup);
 
             if (is_valid(new_var)) {
                 filtered.emplace_back(std::move(new_var));
@@ -755,7 +763,8 @@ Variant make_gvcf_reference_record(const int32_t seq_id,
                                    const int32_t min_depth,
                                    const int64_t end,
                                    const int64_t rstart,
-                                   const int64_t rend) {
+                                   const int64_t rend,
+                                   const std::string_view variant_source) {
     const bool is_callable = utils::is_canonical_base(ref_base);
     const float qual_ = is_callable ? qual : -1.0f;
 
@@ -770,7 +779,9 @@ Variant make_gvcf_reference_record(const int32_t seq_id,
             .filter = NO_VARIANT_FILTER,
             .info = {},
             .qual = qual_,
-            .format = {{"GT", gt_str}, {"GQ", gq_str}},
+            .format = {{"GT", gt_str},
+                       {"GQ", gq_str},
+                       {FORMAT_TAG_VARIANT_SOURCE, std::string(variant_source)}},
             .rstart = rstart,
             .rend = rend,
     };
@@ -1236,7 +1247,8 @@ std::vector<Variant> general_decode_variants(
 
         Variant var = construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
                                         cons_seqs_with_gaps, seq_id, rstart, rend, is_var,
-                                        ambig_ref, normalize, probs_3D, symbol_set, symbol_lookup);
+                                        ambig_ref, normalize, VARIANT_SOURCE_INFERENCE, probs_3D,
+                                        symbol_set, symbol_lookup);
 
 #ifdef DEBUG_VARIANT_REGIONS
         {
@@ -1370,7 +1382,8 @@ std::vector<Variant> general_decode_variants(
 
             Variant var = make_gvcf_reference_record(
                     seq_id, block_start_pos, draft[block_start_pos], min_gq, num_haplotypes,
-                    /*min_depth*/ -1, block_end_pos, block_start_idx, block_end_idx);
+                    /*min_depth*/ -1, block_end_pos, block_start_idx, block_end_idx,
+                    VARIANT_SOURCE_INFERENCE);
             variants.emplace_back(std::move(var));
         }
     }

@@ -11,6 +11,7 @@
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 #include "utils/memory_utils.h"
+#include "utils/stl_utils.h"
 #include "utils/string_utils.h"
 #include "utils/timer_high_res.h"
 
@@ -1711,6 +1712,11 @@ std::vector<secondary::Variant> call_variants(
                     std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                             decoder, vc_sample, draft, pass_min_qual, ambig_ref, gvcf, true, true,
                             true, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+
+                    for (auto& v : variants) {
+                        v.format.try_emplace(secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                             secondary::VARIANT_SOURCE_INFERENCE);
+                    }
 
                     ps.add("processed", static_cast<double>(vc_sample.end() - vc_sample.start()));
 

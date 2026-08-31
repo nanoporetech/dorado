@@ -17,7 +17,7 @@ namespace dorado::secondary {
 
 namespace {
 
-enum class FieldType { GENOTYPE, INT_SCALAR, INT_LIST };
+enum class FieldType { GENOTYPE, INT_SCALAR, INT_LIST, STRING };
 
 struct FieldSpec {
     std::string_view key;
@@ -32,15 +32,16 @@ constexpr std::array FORMAT_FIELD_SPECS{
         FieldSpec{"LEN", FieldType::INT_SCALAR, "1", "Length of <*> reference block"},
         FieldSpec{"DP", FieldType::INT_SCALAR, "1", "Read depth"},
         FieldSpec{"MIN_DP", FieldType::INT_SCALAR, "1", "Minimum read depth"},
+        FieldSpec{"SRC", FieldType::STRING, "1", "Source of the variant"},
         // FieldSpec{"AD", FieldType::INT_LIST, "R", "Allele read depth"},
 };
 
 constexpr std::array INFO_FIELD_SPECS{
-        FieldSpec{"END", FieldType::INT_LIST, "1", "End position of the reference block"},
+        FieldSpec{"END", FieldType::INT_SCALAR, "1", "End position of the reference block"},
 };
 
 std::string_view format_field_type(const FieldType& type) {
-    return (type == FieldType::GENOTYPE) ? "String" : "Integer";
+    return ((type == FieldType::GENOTYPE) || (type == FieldType::STRING)) ? "String" : "Integer";
 }
 
 void ensure_buffer_initialized(kstring_t& buffer) {
@@ -223,12 +224,36 @@ void VCFWriter::write_variant(const Variant& variant) {
     }
 
     // Add INFO fields.
-    for (const auto& [key, value] : variant.info) {
-        if (key == "END") {
-            const int32_t end = std::stoi(value);
-            bcf_update_info_int32(m_header.get(), record.get(), key.c_str(), &end, 1);
-        } else {
-            bcf_update_info_string(m_header.get(), record.get(), key.c_str(), value.c_str());
+    {
+        for (const FieldSpec& spec : INFO_FIELD_SPECS) {
+            const auto it = variant.info.find(std::string(spec.key));
+            if (it == variant.info.cend()) {
+                continue;
+            }
+            const std::string& key = it->first;
+            const std::string& value = it->second;
+
+            if (spec.type == FieldType::INT_SCALAR) {
+                const int32_t end = std::stoi(value);
+                bcf_update_info_int32(m_header.get(), record.get(), key.c_str(), &end, 1);
+                continue;
+            }
+
+            if (spec.type == FieldType::STRING) {
+                bcf_update_info_string(m_header.get(), record.get(), key.c_str(), value.c_str());
+                continue;
+            }
+
+            throw std::runtime_error("Unhandled info field " + std::string(spec.key) +
+                                     " with Type " + std::string(format_field_type(spec.type)));
+        }
+        // Sanity check that the Variant object has no unexpected INFO fields.
+        for (const auto& [key, value] : variant.info) {
+            if (std::find_if(std::cbegin(INFO_FIELD_SPECS), std::cend(INFO_FIELD_SPECS),
+                             [&key](const FieldSpec& spec) { return spec.key == key; }) ==
+                std::cend(INFO_FIELD_SPECS)) {
+                throw std::runtime_error("Variant object has unexpected INFO field: " + key);
+            }
         }
     }
 
@@ -270,6 +295,12 @@ void VCFWriter::write_variant(const Variant& variant) {
                 continue;
             }
 
+            if (spec.type == FieldType::STRING) {
+                const char* data = value.c_str();
+                bcf_update_format_string(m_header.get(), record.get(), spec.key.data(), &data, 1);
+                continue;
+            }
+
             throw std::runtime_error("Unhandled genotype field " + std::string(spec.key) +
                                      " with Type " + std::string(format_field_type(spec.type)));
         }
@@ -280,6 +311,21 @@ void VCFWriter::write_variant(const Variant& variant) {
         }
         bcf_update_genotypes(m_header.get(), record.get(), std::data(genotype_values),
                              std::size(genotype_values));
+
+        // The variant is missing the SRC FORMAT field; emit the missing value (".").
+        if (variant.format.count(FORMAT_TAG_VARIANT_SOURCE) == 0) {
+            bcf_update_format_string(m_header.get(), record.get(), FORMAT_TAG_VARIANT_SOURCE,
+                                     const_cast<const char**>(&VARIANT_SOURCE_UNKNOWN), 1);
+        }
+
+        // Sanity check that the Variant object has no unexpected FORMAT fields.
+        for (const auto& [key, value] : variant.format) {
+            if (std::find_if(std::cbegin(FORMAT_FIELD_SPECS), std::cend(FORMAT_FIELD_SPECS),
+                             [&key](const FieldSpec& spec) { return spec.key == key; }) ==
+                std::cend(FORMAT_FIELD_SPECS)) {
+                throw std::runtime_error("Variant object has unexpected FORMAT field: " + key);
+            }
+        }
     }
 
     // Write the record.
