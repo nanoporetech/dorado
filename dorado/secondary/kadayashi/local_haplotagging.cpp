@@ -2061,7 +2061,7 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
             .info = {},
             .qual = qual,
             .format = {{"GT", make_gt_string(var.is_phased0)},
-                       {"GQ", dorado::secondary::gq_from_qual(qual)},
+                       {"GQ", dorado::secondary::q_string_from_float(qual)},
                        {"DP", std::to_string(var.median_depth)},
                        {dorado::secondary::FORMAT_TAG_VARIANT_SOURCE,
                         dorado::secondary::VARIANT_SOURCE_KADAYASHI},

@@ -491,32 +491,6 @@ float compute_quality_from_probs(
 }
 
 /**
- * \brief Utility function to compute a quality score for the assertion that the haplotypes in a region are the consensus sequences.
- *        This is the phred-scaled log-likelihood over the predictions that any predicted allele is wrong.
- * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
- *                  Dimensions: [seq_len x num_haplotypes x num_classes].
- * \param ref_seq_with_gaps Input sequence, used to access class probabilities.
- * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
- * \param rstart Region start (start of the subsequence in seq). Zero-based.
- * \param rend Region end (end of the subsequence in seq). Non-inclusive.
- * \returns Phred-scaled quality for the predicted haplotype sequences.
- */
-float compute_consensus_quality(
-        const at::Tensor& probs_3D,  // Probabilities for a single sample (not batch).
-        const std::vector<ConsensusResult>& cons_seqs_with_gaps,
-        const std::array<int32_t, 256>& symbol_lookup,
-        const int64_t rstart,
-        const int64_t rend) {
-    std::vector<std::string_view> seqs;
-    seqs.reserve(std::size(cons_seqs_with_gaps));
-    for (const auto& val : cons_seqs_with_gaps) {
-        seqs.emplace_back(val.seq);
-    }
-
-    return compute_quality_from_probs(probs_3D, seqs, symbol_lookup, rstart, rend);
-}
-
-/**
  * \brief Utility function to compute a quality score for the assertion that all haplotypes in a region are the reference sequence.
  *        This is the phred-scaled log-likelihood over the predictions that any allele is not reference.
  * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
@@ -741,6 +715,67 @@ std::string construct_AQ_string(const std::vector<float>& aq_floats) {
     return utils::print_container_as_string(aq_values, ",", false);
 };
 
+/**
+ * \brief QUAL is calculated from the likelihood that genotype is reference
+ */
+float get_qual(const std::vector<float>& genotype_logprobs, bool is_reference) {
+    if (std::empty(genotype_logprobs)) {
+        return 0.0f;
+    }
+    float err = 0.0f;
+    if (is_reference) {
+        err = -std::expm1(genotype_logprobs[0]);
+    } else {
+        err = std::exp(genotype_logprobs[0]);
+    }
+    return round_float(phred(err, VCF_MAX_GQ_CAP), 3);
+}
+
+/**
+ * \brief GQ is calculated as the likelihood that the predicted genotype is wrong
+ */
+std::string construct_GQ_string(const std::vector<float>& genotype_logprobs,
+                                const std::string_view gt,
+                                const int64_t num_alleles) {
+    if (std::empty(genotype_logprobs) || std::empty(gt)) {
+        return {};
+    }
+    const auto [all_idx, phased] = split_GT_string(gt);
+    std::vector<int32_t> alleles;
+    alleles.reserve(std::size(all_idx));
+    for (const std::string_view allele : all_idx) {
+        if (allele == ".") {
+            alleles.emplace_back(-1);
+        } else {
+            alleles.emplace_back(dorado::utils::from_chars<int32_t>(allele).value());
+        }
+    }
+    std::sort(std::begin(alleles), std::end(alleles));
+
+    const int32_t num_haplotypes = std::ssize(alleles);
+    const auto [num_elements, genotype_order] =
+            dorado::secondary::lookup_gts(num_haplotypes, num_alleles);
+    if ((num_elements == 0) || (num_elements > std::ssize(genotype_logprobs))) {
+        return std::string{};
+    }
+    const auto it_go = std::find(std::cbegin(genotype_order), std::cend(genotype_order), alleles);
+    if (it_go == std::cend(genotype_order)) {
+        throw std::runtime_error{"Genotype " +
+                                 utils::print_container_as_string(alleles, ",", true) +
+                                 " not found in genotype_order"};
+    }
+    const int64_t idx = std::distance(std::cbegin(genotype_order), it_go);
+    // calculate log-probs excluding idx, then normalize including the predicted genotype
+    float logerr = NEGINF;
+    for (int64_t i = 0; i < num_elements; ++i) {
+        if (i != idx) {
+            logerr = logaddexp(logerr, genotype_logprobs[i]);
+        }
+    }
+    logerr -= logaddexp(logerr, genotype_logprobs[idx]);
+    return q_string_from_float(phred_from_log(logerr, VCF_MAX_GQ_CAP));
+}
+
 Variant construct_variant(const std::string_view draft,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
@@ -815,6 +850,8 @@ Variant construct_variant(const std::string_view draft,
     const std::string pl_str = construct_PL_string(genotype_likelihoods);
     const std::vector<float> aq_values = calculate_AQs(hap_allele_likelihoods, num_haplotypes);
     const std::string aq_str = construct_AQ_string(aq_values);
+    const std::string gq_str =
+            construct_GQ_string(genotype_likelihoods, gt, std::ssize(alleles_lookup));
 
     Variant var{
             .seq_id = seq_id,
@@ -823,7 +860,7 @@ Variant construct_variant(const std::string_view draft,
             .alts = alts_out,
             .filters = {Filters::Pass},
             .info = {},
-            .qual = 0.0f,
+            .qual = get_qual(genotype_likelihoods, false),
             .format = {{"GT", gt}, {FORMAT_TAG_VARIANT_SOURCE, variant_source}},
             .rstart = rstart,
             .rend = rend,
@@ -873,10 +910,9 @@ Variant construct_variant(const std::string_view draft,
 #endif
     }
 
-    var.qual = round_float(compute_consensus_quality(probs_3D, cons_seqs_with_gaps, symbol_lookup,
-                                                     var.rstart, var.rend),
-                           3);
-    var.format["GQ"] = gq_from_qual(var.qual);
+    if (!std::empty(gq_str)) {
+        var.format["GQ"] = gq_str;
+    }
     if (!std::empty(pl_str)) {
         var.format["PL"] = pl_str;
     }
@@ -1254,7 +1290,7 @@ std::pair<int64_t, std::span<const std::vector<int32_t>>> lookup_gts(const int64
     return std::make_pair(num_elements, genotype_range);
 }
 
-std::string gq_from_qual(const float qual) {
+std::string q_string_from_float(const float qual) {
     if (qual < 0.0f) {
         return ".";
     }
@@ -1346,7 +1382,7 @@ Variant make_gvcf_reference_record(const int32_t seq_id,
     const float qual_ = is_callable ? qual : -1.0f;
 
     const std::string gt_str = make_reference_gt(ploidy, is_callable ? '0' : '.');
-    const std::string gq_str = gq_from_qual(qual_);
+    const std::string gq_str = q_string_from_float(qual_);
     const std::string depth_str = (min_depth >= 0) ? std::to_string(min_depth) : ".";
     Variant ref_var{
             .seq_id = seq_id,
