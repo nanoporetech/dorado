@@ -852,6 +852,7 @@ void validate_bam_model(const secondary::BamInfo& bam_info,
 }
 
 void run_polishing(const Options& opt,
+                   const std::string_view command_line,
                    const secondary::ModelConfig& model_config,
                    const secondary::BamInfo& bam_info,
                    polisher::PolisherResources& resources,
@@ -931,8 +932,9 @@ void run_polishing(const Options& opt,
                 {secondary::NO_VARIANT_FILTER, "Non-variant position"},
         };
 
-        vcf_writer = std::make_unique<secondary::VCFWriter>(
-                out_vcf_fn, filters, draft_lens, opt.vc_type == VariantCallingEnum::GVCF);
+        vcf_writer = std::make_unique<secondary::VCFWriter>(out_vcf_fn, filters, draft_lens,
+                                                            opt.vc_type == VariantCallingEnum::GVCF,
+                                                            command_line);
     }
 
     // Prepare regions for processing.
@@ -1206,6 +1208,9 @@ int polish(int argc, char* argv[]) {
     utils::make_torch_deterministic();
 
     try {
+        const std::vector<std::string_view> arguments(argv, argv + argc);
+        const std::string command_line = utils::join(arguments, " ");
+
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
         int verbosity = 0;
@@ -1309,7 +1314,7 @@ int polish(int argc, char* argv[]) {
         auto stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
 
-        run_polishing(opt, model_config, bam_info, resources, tracker, stats);
+        run_polishing(opt, command_line, model_config, bam_info, resources, tracker, stats);
 
         tracker.finalize();
         stats_sampler->terminate();

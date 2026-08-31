@@ -1211,11 +1211,11 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
 
     // Run worker_variant_writer.
     {
-        secondary::VCFWriter merged_writer(merged_vcf, filters, contigs, false);
-        std::optional<secondary::VCFWriter> simple_writer{std::in_place, simple_vcf, filters,
-                                                          contigs, false};
-        std::optional<secondary::VCFWriter> inference_writer{std::in_place, inference_vcf, filters,
-                                                             contigs, false};
+        secondary::VCFWriter merged_writer(merged_vcf, filters, contigs, false, std::string_view{});
+        std::optional<secondary::VCFWriter> simple_writer{
+                std::in_place, simple_vcf, filters, contigs, false, std::string_view{}};
+        std::optional<secondary::VCFWriter> inference_writer{
+                std::in_place, inference_vcf, filters, contigs, false, std::string_view{}};
         std::ofstream ofs_regions(processed_regions_bed);
 
         worker_variant_writer(input_queue, chrom_reduce_data, worker_terminate, ret_status,

@@ -118,7 +118,8 @@ std::string format_header_line(const FieldSpec& spec, const std::string_view met
 VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
                      const std::vector<std::pair<std::string_view, std::string>>& filters,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
-                     const bool include_gvcf_headers)
+                     const bool include_gvcf_headers,
+                     const std::string_view command_line)
         : m_vcf_fp{hts_open(in_fn.string().c_str(), "w"), HtsFileDestructor()},
           m_header{bcf_hdr_init("w"), BcfHdrDestructor()},
           m_include_gvcf_headers{include_gvcf_headers} {
@@ -142,15 +143,23 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
         bcf_hdr_append(m_header.get(), filter_entry.c_str());
     }
 
-    // Add contig information
+    // Add target sequence information.
     for (const auto& [name, length] : contigs) {
         const std::string contig_entry =
                 "##contig=<ID=" + name + ",length=" + std::to_string(length) + ">";
         bcf_hdr_append(m_header.get(), contig_entry.c_str());
     }
 
-    // Add mandatory INFO and FORMAT fields
+    // Add the Dorado version.
     bcf_hdr_append(m_header.get(), ("##dorado_version=" + std::string(DORADO_VERSION)).c_str());
+
+    // Add the command line to the header if provided.
+    if (!std::empty(command_line)) {
+        const std::string line = "##cmdline=" + std::string(command_line);
+        bcf_hdr_append(m_header.get(), line.c_str());
+    }
+
+    // Add INFO and FORMAT fields.
     for (const auto& spec : INFO_FIELD_SPECS) {
         if (!include_gvcf_headers && (spec.key == "END")) {
             continue;
