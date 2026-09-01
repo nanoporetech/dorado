@@ -574,8 +574,8 @@ std::vector<float> compute_allele_logprobs_array(const at::Tensor& probs_3D,
         const int64_t seq_len = std::ssize(allele);
         // Test whether there is only one unique decode path through the scores.
         // This will be the case when either all positions are gaps or there are no gaps.
-        // If so, compute the log-probability using direct evaluation given the
-        // class indices.
+        // If so, for speed we compute the log-probability using direct evaluation given
+        // the class indices.
         // When there is a mixture of gaps and bases in the allele, there will be more
         // than one valid decode path. In this case, compute the log-probability using
         // dynamic programming as the sum over all valid paths.
