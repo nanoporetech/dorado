@@ -100,8 +100,8 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
     // modstr = A+a?,1,0;C+m.,0;
     // probs = [10, 20, 30]
     // Trim interval = {1, 6}
-    int start = trim_interval.first;
-    int end = trim_interval.second;
+    const int start = trim_interval.first;
+    const int end = trim_interval.second;
 
     // Get cardinal base counts till trim start and end positions.
     std::unordered_map<char, int> bases_skipped_at_start;
@@ -117,7 +117,7 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
     // bases_skipped_at_start = {A:1, T:0, C:0, G:0}
     // bases_skipped_at_end = {A:2, T:1, C:1, G:2}
 
-    std::stringstream trimmed_modbase_str;
+    std::ostringstream trimmed_modbase_str;
     std::vector<uint8_t> trimmed_modbase_probs;
     if (!modbase_str.empty()) {
         // First extract all the sub strings in the mod string
@@ -133,8 +133,6 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
         // Iterate over each substring, and fetch the count values per cardinal base.
         int prob_pos = 0;  // Track the probability values to keep from the original vector.
         for (auto mod : mods) {
-            std::string_view prefix;
-            std::stringstream counts;
             int cardinal_bases_seen = 0;
             bool in_counts = false;
             bool found_start = false;
@@ -148,7 +146,8 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
                 // start after the first comma is seen.
                 if (!in_counts) {
                     in_counts = true;
-                    prefix = mod.substr(0, comma_pos);  // prefixes will be A+a? and C+m.
+                    auto prefix = mod.substr(0, comma_pos);  // prefixes will be A+a? and C+m.
+                    trimmed_modbase_str << prefix;
                     char cardinal_base = prefix[0];
                     cardinal_count_at_start = bases_skipped_at_start[cardinal_base];
                     cardinal_count_at_end = bases_skipped_at_end[cardinal_base];
@@ -161,10 +160,11 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
                         if (!found_start) {
                             // Once we skip the number or cardinal bases till the trim start position,
                             // the skip count for the next methylated base needs to be adjusted.
-                            counts << "," << (cardinal_bases_seen - cardinal_count_at_start);
+                            trimmed_modbase_str << ","
+                                                << (cardinal_bases_seen - cardinal_count_at_start);
                             found_start = true;
                         } else {
-                            counts << "," << num_skips;
+                            trimmed_modbase_str << "," << num_skips;
                         }
                         if (!modbase_probs.empty()) {
                             trimmed_modbase_probs.push_back(modbase_probs[prob_pos]);
@@ -175,10 +175,10 @@ std::tuple<std::string, std::vector<uint8_t>> trim_modbase_info(
                 }
                 mod.remove_prefix(std::min(comma_pos + 1, mod.length()));  // No comma at the end.
             }
-            trimmed_modbase_str << std::string(prefix) << counts.str() << ";";
+            trimmed_modbase_str << ";";
         }
     }
-    return {trimmed_modbase_str.str(), trimmed_modbase_probs};
+    return {std::move(trimmed_modbase_str).str(), std::move(trimmed_modbase_probs)};
 }
 
 }  // namespace dorado::utils

@@ -432,12 +432,12 @@ std::pair<at::Tensor, at::Tensor> ModelSlotAttentionConsensus::forward_impl(
 
     at::Tensor empty_position_mask = in_x.select(-1, m_column_base).eq(0).flatten(0, 1);
 
-    at::Tensor attn;
-    std::tie(x, attn) =
+    auto [out, attn] =
             m_slot_attention->forward(std::move(x), std::move(empty_position_mask), m_num_slots);
 
-    x = x.view({b, p, m_num_slots, -1});
+    x = out.view({b, p, m_num_slots, -1});
     attn = attn.view({b, p, m_num_slots, d});
+    out.reset();
 
     if (m_add_lstm) {
         const at::Tensor lstm_input = x.flatten(-2);

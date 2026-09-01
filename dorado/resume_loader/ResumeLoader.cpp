@@ -44,30 +44,23 @@ void ResumeLoader::copy_completed_reads() {
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     // Iterate over all reads and write to sink.
-    try {
-        while (reader.read()) {
-            std::string read_id;
-            // If a split read is found, use the parent read id to
-            // resume basecalling since that's the read id found in
-            // the raw dataset.
-            auto pid_tag = bam_aux_get(reader.record.get(), "pi");
-            if (pid_tag) {
-                read_id = std::string(bam_aux2Z(pid_tag));
-            } else {
-                read_id = bam_get_qname(reader.record);
-            }
-            m_processed_read_ids.insert(read_id);
-            auto hts_data =
-                    std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(reader.record.get()))});
-            m_sink.push_message(BamMessage{std::move(hts_data), client_info});
-            if (is_safe_to_log && m_processed_read_ids.size() % 100 == 0) {
-                bar.tick();
-            }
+    while (reader.read()) {
+        std::string read_id;
+        // If a split read is found, use the parent read id to
+        // resume basecalling since that's the read id found in
+        // the raw dataset.
+        auto pid_tag = bam_aux_get(reader.record.get(), "pi");
+        if (pid_tag) {
+            read_id = std::string(bam_aux2Z(pid_tag));
+        } else {
+            read_id = bam_get_qname(reader.record);
         }
-    } catch (std::exception&) {
-        // Exception implies the reader could not read
-        // the last record. We take this to be the end of
-        // properly formatted records.
+        m_processed_read_ids.insert(read_id);
+        auto hts_data = std::make_unique<HtsData>(HtsData{BamPtr(bam_dup1(reader.record.get()))});
+        m_sink.push_message(BamMessage{std::move(hts_data), client_info});
+        if (is_safe_to_log && m_processed_read_ids.size() % 100 == 0) {
+            bar.tick();
+        }
     }
     std::cerr << "\r";
     spdlog::info("> {} original read ids found in resume file.", m_processed_read_ids.size());

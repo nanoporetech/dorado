@@ -69,7 +69,7 @@ std::string get_string_timestamp_from_unix_time_sZ(int64_t s) {
 
 // Expects the time to be encoded like "2017-09-12T09:50:12.456+00:00" or "2017-09-12T09:50:12Z".
 // Time stamp can be specified up to microseconds
-int64_t get_unix_time_ms_from_string_timestamp(const std::string& time_stamp) {
+std::optional<int64_t> get_unix_time_ms_from_string_timestamp(const std::string& time_stamp) {
     std::istringstream ss(time_stamp);
     date::sys_time<std::chrono::microseconds> time_us;
     ss >> date::parse("%FT%T%Ez", time_us);
@@ -78,6 +78,9 @@ int64_t get_unix_time_ms_from_string_timestamp(const std::string& time_stamp) {
         ss.clear();
         ss.str(time_stamp);
         ss >> date::parse("%FT%TZ", time_us);
+        if (ss.fail()) {
+            return std::nullopt;
+        }
     }
 
     auto epoch = time_us.time_since_epoch();

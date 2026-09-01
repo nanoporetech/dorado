@@ -170,9 +170,9 @@ void AlignerNode::align_read_common(ReadCommon& read_common, mm_tbuf_t* tbuf) {
     }
 }
 
-template <typename READ>
-void AlignerNode::align_read(READ&& read) {
-    m_task_executor.send([this, read_ = std::move(read)]() mutable {
+template <typename Read>
+void AlignerNode::align_read(Read&& read) {
+    m_task_executor.send([this, read_ = std::forward<Read>(read)]() mutable {
         thread_local MmTbufPtr tbuf{mm_tbuf_init()};
         align_read_common(read_->read_common, tbuf.get());
         send_message_to_sink(std::move(read_));

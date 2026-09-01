@@ -5,9 +5,7 @@
 
 #include <cstdint>
 #include <filesystem>
-#include <memory>
 #include <string>
-#include <tuple>
 #include <vector>
 
 namespace dorado::secondary {
@@ -23,8 +21,6 @@ public:
               const std::vector<std::pair<std::string_view, std::string>>& filters,
               const std::vector<std::pair<std::string, int64_t>>& contigs,
               bool include_gvcf_headers);
-
-    ~VCFWriter() = default;
 
     void write_variant(const Variant& variant);
 

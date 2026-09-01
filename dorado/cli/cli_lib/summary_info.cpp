@@ -69,8 +69,8 @@ std::tuple<hts_writer::SummaryFileWriter::FieldFlags, AlignmentCounts> make_summ
                 flags |= SummaryFileWriter::POLYA_FIELDS;
             }
 
-            SamHdrSharedPtr shared_hdr(sam_hdr_dup(reader.header()));
-            auto hdr = const_cast<sam_hdr_t*>(shared_hdr.get());
+            SamHdrPtr shared_hdr(sam_hdr_dup(reader.header()));
+            auto hdr = shared_hdr.get();
             int num_rg_lines = sam_hdr_count_lines(hdr, "RG");
             KString tag_wrapper(100000);
             auto& tag_value = tag_wrapper.get();

@@ -4,7 +4,6 @@
 #include "hts_writer/HtsFileWriter.h"
 
 #include <filesystem>
-#include <memory>
 #include <unordered_map>
 
 namespace dorado::hts_writer {
@@ -13,6 +12,13 @@ class IStructure {
 public:
     virtual ~IStructure() = default;
     virtual std::string get_path(const HtsData &item) = 0;
+
+protected:
+    IStructure() = default;
+    IStructure(const IStructure &) = delete;
+    IStructure &operator=(const IStructure &) = delete;
+    IStructure(IStructure &&) = delete;
+    IStructure &operator=(IStructure &&) = delete;
 };
 
 class SingleFileStructure : public IStructure {

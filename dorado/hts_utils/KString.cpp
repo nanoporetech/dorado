@@ -14,7 +14,7 @@ KString::KString(size_t n) : m_data(std::make_unique<kstring_t>()) {
 }
 
 KString::KString(kstring_t&& data) noexcept : m_data(std::make_unique<kstring_t>()) {
-    *m_data = data;
+    *m_data = std::move(data);
     data = {0, 0, nullptr};
 }
 

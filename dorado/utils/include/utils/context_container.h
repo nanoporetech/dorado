@@ -14,6 +14,13 @@ class ContextBase {
 public:
     virtual ~ContextBase() = default;
     virtual bool is_const() const = 0;
+
+protected:
+    ContextBase() = default;
+    ContextBase(const ContextBase&) = delete;
+    ContextBase& operator=(const ContextBase&) = delete;
+    ContextBase(ContextBase&&) = delete;
+    ContextBase& operator=(ContextBase&&) = delete;
 };
 
 template <typename T>

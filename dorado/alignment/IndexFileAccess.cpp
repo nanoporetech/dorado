@@ -20,11 +20,11 @@ const Minimap2Index* IndexFileAccess::get_compatible_index(
 std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index_impl(
         const std::string& index_file,
         const Minimap2Options& options) const {
-    auto compatible_indices = m_index_lut.find({index_file, options});
+    auto compatible_indices = m_index_lut.find({index_file, options.index});
     if (compatible_indices == m_index_lut.end()) {
         return nullptr;
     }
-    auto exact_index = compatible_indices->second.find(options);
+    auto exact_index = compatible_indices->second.find(options.mapping);
     return exact_index == compatible_indices->second.end() ? nullptr : exact_index->second;
 }
 
@@ -39,11 +39,11 @@ std::shared_ptr<Minimap2Index> IndexFileAccess::get_exact_index(
 
 bool IndexFileAccess::is_index_loaded_impl(const std::string& index_file,
                                            const Minimap2Options& options) const {
-    const auto compatible_indices = m_index_lut.find({index_file, options});
+    const auto compatible_indices = m_index_lut.find({index_file, options.index});
     if (compatible_indices == m_index_lut.end()) {
         return false;
     }
-    return compatible_indices->second.count(options) > 0;
+    return compatible_indices->second.count(options.mapping) > 0;
 }
 
 std::shared_ptr<Minimap2Index> IndexFileAccess::get_or_load_compatible_index(
@@ -53,7 +53,7 @@ std::shared_ptr<Minimap2Index> IndexFileAccess::get_or_load_compatible_index(
     if (index) {
         return index;
     }
-    auto compatible_index = get_compatible_index(index_file, options);
+    auto compatible_index = get_compatible_index(index_file, options.index);
     if (!compatible_index) {
         return nullptr;
     }
@@ -62,7 +62,7 @@ std::shared_ptr<Minimap2Index> IndexFileAccess::get_or_load_compatible_index(
     if (!new_index) {
         return nullptr;
     }
-    m_index_lut[{index_file, options}][options] = new_index;
+    m_index_lut[{index_file, options.index}][options.mapping] = new_index;
     return new_index;
 }
 
@@ -91,7 +91,7 @@ IndexLoadResult IndexFileAccess::load_index(const std::string& index_file,
     }
 
     std::lock_guard<std::mutex> lock(m_mutex);
-    m_index_lut[{index_file, options}][options] = std::move(new_index);
+    m_index_lut[{index_file, options.index}][options.mapping] = std::move(new_index);
     return IndexLoadResult::success;
 }
 

@@ -60,6 +60,12 @@ protected:
         cut = std::make_unique<MultiQueueThreadPool>(thread_pool_size, "test_executor");
     }
 
+private:
+    NoQueueThreadPoolTestFixture(const NoQueueThreadPoolTestFixture&) = delete;
+    NoQueueThreadPoolTestFixture& operator=(const NoQueueThreadPoolTestFixture&) = delete;
+    NoQueueThreadPoolTestFixture(NoQueueThreadPoolTestFixture&&) = delete;
+    NoQueueThreadPoolTestFixture& operator=(NoQueueThreadPoolTestFixture&&) = delete;
+
 public:
     NoQueueThreadPoolTestFixture() {
         task_release_flags.reserve(MAX_TASKS);

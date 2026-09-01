@@ -34,8 +34,9 @@
 //     }
 //   }
 // Not technically metal, but only usable with Instruments.
-#define CREATE_POINT_OF_INTEREST_ID(id)                                                        \
-    static os_log_t _s_##id##_os_log = os_log_create(#id, OS_LOG_CATEGORY_POINTS_OF_INTEREST); \
+#define CREATE_POINT_OF_INTEREST_ID(id)                             \
+    static const os_log_t _s_##id##_os_log =                        \
+            os_log_create(#id, OS_LOG_CATEGORY_POINTS_OF_INTEREST); \
     static_assert(true, "Force semicolon")
 #define POINT_OF_INTEREST_SCOPE(id, name, ...)                                           \
     os_signpost_id_t _poi_id_##name = os_signpost_id_generate(_s_##id##_os_log);         \
@@ -47,7 +48,7 @@
 namespace dorado::utils {
 
 template <typename MetalObject>
-void name_mtl_object(MetalObject &&obj, const char *name) {
+void name_mtl_object(const MetalObject &obj, const char *name) {
     obj->setLabel(NS::String::string(name, NS::ASCIIStringEncoding));
 }
 
@@ -105,6 +106,8 @@ class ScopedAutoReleasePool {
 
     ScopedAutoReleasePool(const ScopedAutoReleasePool &) = delete;
     ScopedAutoReleasePool &operator=(const ScopedAutoReleasePool &) = delete;
+    ScopedAutoReleasePool(ScopedAutoReleasePool &&) = delete;
+    ScopedAutoReleasePool &operator=(ScopedAutoReleasePool &&) = delete;
 
 public:
     ScopedAutoReleasePool();
@@ -118,6 +121,8 @@ class ScopedMetalCapture {
 
     ScopedMetalCapture(const ScopedMetalCapture &) = delete;
     ScopedMetalCapture &operator=(const ScopedMetalCapture &) = delete;
+    ScopedMetalCapture(ScopedMetalCapture &&) = delete;
+    ScopedMetalCapture &operator=(ScopedMetalCapture &&) = delete;
 
 public:
     ScopedMetalCapture(MTL::Device *device, const std::optional<std::filesystem::path> &path);

@@ -43,7 +43,13 @@ public:
                                           const std::string& seq);
 
 private:
-    enum QueryType { ADAPTER, PRIMER };
+    AdapterDetector(const AdapterDetector&) = delete;
+    AdapterDetector& operator=(const AdapterDetector&) = delete;
+    AdapterDetector(AdapterDetector&&) = delete;
+    AdapterDetector& operator=(AdapterDetector&&) = delete;
+
+private:
+    enum class QueryType { ADAPTER, PRIMER };
 
     std::mutex m_mutex;
     std::unique_ptr<dorado::adapter_primer_kits::AdapterPrimerManager> m_sequence_manager;

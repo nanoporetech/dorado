@@ -79,6 +79,7 @@ public:
     }
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): intentional singleton.
 std::atomic<bool> s_spinners_enabled{false};
 
 }  // namespace
@@ -249,6 +250,11 @@ static void init_load_balancers() {
                 m_thread.join();
             }
         }
+
+        ThreadRunner(const ThreadRunner&) = delete;
+        ThreadRunner& operator=(const ThreadRunner&) = delete;
+        ThreadRunner(ThreadRunner&&) = delete;
+        ThreadRunner& operator=(ThreadRunner&&) = delete;
     } thread_runner;
 #endif
 }

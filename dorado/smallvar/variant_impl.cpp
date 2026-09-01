@@ -75,8 +75,8 @@ std::vector<secondary::DeviceInfo> init_devices(const std::string& devices_str) 
         }
         for (const auto& val : parsed_devices) {
             torch::Device torch_device = torch::Device(val);
-            const double available_memory_GB =
-                    utils::available_memory(torch_device) / dorado::utils::BYTES_PER_GB;
+            const double available_memory_GB = utils::available_memory(torch_device) /
+                                               static_cast<double>(dorado::utils::BYTES_PER_GB);
             devices.emplace_back(secondary::DeviceInfo{.name = val,
                                                        .device = std::move(torch_device),
                                                        .available_memory_GB = available_memory_GB});
@@ -681,12 +681,12 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
 
                 // Odd samples will be processed alone.
                 if (std::ssize(sample.positions_major) != window_len) {
-                    InferenceData remainder_buffer;
-                    remainder_buffer.samples.emplace_back(std::move(sample));
                     spdlog::trace(
                             "[batch_producer] Pushing a remainder batch of data to infer_data "
                             "queue. Sample: [{}].",
                             secondary::sample_to_string(sample));
+                    InferenceData remainder_buffer;
+                    remainder_buffer.samples.emplace_back(std::move(sample));
                     output_queue.try_push(std::move(remainder_buffer));
                     continue;
                 }

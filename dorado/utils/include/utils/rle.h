@@ -9,7 +9,7 @@ namespace dorado {
 
 template <typename T, typename Compare>
 std::vector<std::tuple<int64_t, int64_t, T>> run_length_encode(const std::vector<T> &data,
-                                                               Compare &&comp) {
+                                                               const Compare &comp) {
     std::vector<std::tuple<int64_t, int64_t, T>> result;
 
     if (std::empty(data)) {

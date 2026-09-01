@@ -36,7 +36,7 @@ public:
      *  sequences, and whether any of the sequences are listed as being compatible with all kits.
      */
     std::vector<Candidate> get_adapters(const std::string& kit_name) const {
-        return get_candidates(kit_name, demux::PrimerAux::DEFAULT, ADAPTERS);
+        return get_candidates(kit_name, demux::PrimerAux::DEFAULT, CandidateType::ADAPTERS);
     }
 
     /** Get the primer to search for corresponding to the specified kit.
@@ -52,11 +52,11 @@ public:
      */
     std::vector<Candidate> get_primers(const std::string& kit_name,
                                        demux::PrimerAux primer_aux) const {
-        return get_candidates(kit_name, primer_aux, PRIMERS);
+        return get_candidates(kit_name, primer_aux, CandidateType::PRIMERS);
     }
 
 private:
-    enum CandidateType { ADAPTERS, PRIMERS };
+    enum class CandidateType { ADAPTERS, PRIMERS };
     std::unordered_map<std::string, std::vector<Candidate>> m_kit_adapter_lut;
     std::unordered_map<std::string, std::vector<Candidate>> m_kit_primer_lut;
 

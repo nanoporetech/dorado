@@ -24,7 +24,7 @@ namespace {
 const size_t MAX_USER_FIELD_LENGTH = 40;
 
 // clang-format off
-std::vector<std::string> allowed_column_names{
+const std::string_view allowed_column_names[] {
     // Standard
     "protocol_run_id",
     "flow_cell_id",
@@ -285,8 +285,8 @@ void SampleSheet::validate_headers(const std::vector<std::string>& col_names,
 
     // Each header must be in the allowed list
     for (auto& col_name : col_names) {
-        if (std::find(allowed_column_names.begin(), allowed_column_names.end(), col_name) ==
-            allowed_column_names.end()) {
+        if (std::find(std::begin(allowed_column_names), std::end(allowed_column_names), col_name) ==
+            std::end(allowed_column_names)) {
             throw std::runtime_error(std::string("Sample sheet ")
                                              .append(filename)
                                              .append(" contains invalid column ")

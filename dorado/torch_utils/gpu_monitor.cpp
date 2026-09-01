@@ -225,6 +225,8 @@ class NvmlApi final {
 
     NvmlApi(const NvmlApi &) = delete;
     NvmlApi &operator=(const NvmlApi &) = delete;
+    NvmlApi(NvmlApi &&) = delete;
+    NvmlApi &operator=(NvmlApi &&) = delete;
 
     // This slight design flaw is in place of having NvmlApi as a singleton.
     // Instead it is held as a member variable of the DeviceInfoCache singleton.

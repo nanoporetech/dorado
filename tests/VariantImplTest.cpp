@@ -286,7 +286,7 @@ at::Tensor make_haploid_probs(const std::string_view symbols,
     std::array<int32_t, 256> lookup{};
     lookup.fill(static_cast<int32_t>(std::size(symbols)));
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
-        lookup[static_cast<int32_t>(symbols[i])] = i;
+        lookup[static_cast<uint8_t>(symbols[i])] = i;
     }
 
     const float fp_prob = (1.0f - tp_prob) / static_cast<float>(std::ssize(symbols) - 1);
@@ -295,7 +295,7 @@ at::Tensor make_haploid_probs(const std::string_view symbols,
                                 at::TensorOptions().dtype(at::kFloat).device(at::kCPU));
 
     for (int64_t row = 0; row < std::ssize(seq); ++row) {
-        const int64_t col = lookup[static_cast<int32_t>(seq[row])];
+        const int64_t col = lookup[static_cast<uint8_t>(seq[row])];
         probs.index_put_({row, col}, tp_prob);
     }
 
@@ -388,8 +388,8 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         // Input samples are a combination of 2 full-length samples, and one short sample (middle one).
         InferenceData input_batch;
         input_batch.samples = {sample_a, odd_sample, sample_b};
-        CATCH_REQUIRE(input_queue.try_push(std::move(input_batch)) ==
-                      utils::AsyncQueueStatus::Success);
+        const auto push_result = input_queue.try_push(std::move(input_batch));
+        CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
         input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
         // Workflow control variables.
@@ -431,8 +431,8 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
 
         InferenceData input_batch;
         input_batch.samples = {sample_a, zero_depth_sample, sample_b};
-        CATCH_REQUIRE(input_queue.try_push(std::move(input_batch)) ==
-                      utils::AsyncQueueStatus::Success);
+        const auto push_result = input_queue.try_push(std::move(input_batch));
+        CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
         input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
         std::atomic<bool> worker_terminate{false};
@@ -477,7 +477,8 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
 
         InferenceData batch;
         batch.samples = {sample_a, sample_b};
-        CATCH_REQUIRE(batch_queue.try_push(std::move(batch)) == utils::AsyncQueueStatus::Success);
+        const auto push_result = batch_queue.try_push(std::move(batch));
+        CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
         batch_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
         std::atomic<bool> worker_terminate{false};
@@ -525,8 +526,8 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         DecodeData decode_data;
         decode_data.samples = {sample_a, sample_b};
         decode_data.logits = batched_logits;
-        CATCH_REQUIRE(input_queue.try_push(std::move(decode_data)) ==
-                      utils::AsyncQueueStatus::Success);
+        const auto push_result = input_queue.try_push(std::move(decode_data));
+        CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
         input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
         std::atomic<bool> worker_terminate{false};
@@ -1307,7 +1308,8 @@ CATCH_TEST_CASE(
 
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
     utils::AsyncQueue<int64_t> output_queue{2};
-    CATCH_REQUIRE(input_queue.try_push(std::move(vc_sample)) == utils::AsyncQueueStatus::Success);
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
     input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     std::atomic<bool> worker_terminate{false};
@@ -1422,7 +1424,8 @@ CATCH_TEST_CASE(
 
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
     utils::AsyncQueue<int64_t> output_queue{2};
-    CATCH_REQUIRE(input_queue.try_push(std::move(vc_sample)) == utils::AsyncQueueStatus::Success);
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
     input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     std::atomic<bool> worker_terminate{false};
@@ -1546,7 +1549,8 @@ CATCH_TEST_CASE(
 
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
     utils::AsyncQueue<int64_t> output_queue{2};
-    CATCH_REQUIRE(input_queue.try_push(std::move(vc_sample)) == utils::AsyncQueueStatus::Success);
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
     input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     std::atomic<bool> worker_terminate{false};
@@ -1651,7 +1655,8 @@ CATCH_TEST_CASE(
 
     // Populate the input queue.
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
-    CATCH_REQUIRE(input_queue.try_push(std::move(vc_sample)) == utils::AsyncQueueStatus::Success);
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
     input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     // Create the output queue.
@@ -1837,7 +1842,8 @@ CATCH_TEST_CASE(
 
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
     utils::AsyncQueue<int64_t> output_queue{2};
-    CATCH_REQUIRE(input_queue.try_push(std::move(vc_sample)) == utils::AsyncQueueStatus::Success);
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
     input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     std::atomic<bool> worker_terminate{false};
@@ -1929,7 +1935,8 @@ CATCH_TEST_CASE(
 
     utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
     utils::AsyncQueue<int64_t> output_queue{2};
-    CATCH_REQUIRE(input_queue.try_push(std::move(vc_sample)) == utils::AsyncQueueStatus::Success);
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
     input_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
     std::atomic<bool> worker_terminate{false};

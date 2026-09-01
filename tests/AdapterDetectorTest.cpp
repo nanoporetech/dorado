@@ -397,25 +397,26 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection with kit", TEST_G
     const auto& adapters = detector.get_adapter_sequences("TEST_KIT1");
     auto primers = detector.get_primer_sequences("TEST_KIT2", dorado::demux::PrimerAux::DEFAULT);
     sort_queries(primers);
-    // Make sure the adapters and primers have been properly loaded.
-    std::string expected_adapter_name = "adapter1";
-    std::string expected_adapter_front = "AGGGAACT";
-    std::string expected_adapter_rear = "AGTTCC";
-    std::vector<std::string> expected_primer_names = {"primer1_FWD", "primer1_REV"};
-    std::vector<std::string> expected_primer_fronts = {"TGCGAAT", "CAGAGGTC"};
-    std::vector<std::string> expected_primer_rears = {"GACCTCTG", "ATTCGCA"};
-    CATCH_REQUIRE(adapters.size() == 1);
-    CATCH_CHECK(adapters[0].name == expected_adapter_name);
-    CATCH_CHECK(adapters[0].front_sequence == expected_adapter_front);
-    CATCH_CHECK(adapters[0].rear_sequence == expected_adapter_rear);
 
-    CATCH_REQUIRE(primers.size() == 2);
-    CATCH_CHECK(primers[0].name == expected_primer_names[0]);
-    CATCH_CHECK(primers[0].front_sequence == expected_primer_fronts[0]);
-    CATCH_CHECK(primers[0].rear_sequence == expected_primer_rears[0]);
-    CATCH_CHECK(primers[1].name == expected_primer_names[1]);
-    CATCH_CHECK(primers[1].front_sequence == expected_primer_fronts[1]);
-    CATCH_CHECK(primers[1].rear_sequence == expected_primer_rears[1]);
+    // Make sure the adapters and primers have been properly loaded.
+    {
+        std::string expected_adapter_name = "adapter1";
+        std::string expected_adapter_front = "AGGGAACT";
+        std::string expected_adapter_rear = "AGTTCC";
+        std::vector<std::string> expected_primer_names = {"primer1_FWD", "primer1_REV"};
+        std::vector<std::string> expected_primer_fronts = {"TGCGAAT", "CAGAGGTC"};
+        std::vector<std::string> expected_primer_rears = {"GACCTCTG", "ATTCGCA"};
+        CATCH_REQUIRE(adapters.size() == 1);
+        CATCH_CHECK(adapters[0].name == expected_adapter_name);
+        CATCH_CHECK(adapters[0].front_sequence == expected_adapter_front);
+        CATCH_CHECK(adapters[0].rear_sequence == expected_adapter_rear);
+        CATCH_REQUIRE(primers.size() == 2);
+        for (size_t i = 0; i < primers.size(); ++i) {
+            CATCH_CHECK(primers[i].name == expected_primer_names[i]);
+            CATCH_CHECK(primers[i].front_sequence == expected_primer_fronts[i]);
+            CATCH_CHECK(primers[i].rear_sequence == expected_primer_rears[i]);
+        }
+    }
 
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
     TestHtsReader reader(test_file.string());
@@ -459,21 +460,30 @@ CATCH_TEST_CASE("AdapterDetector: test custom primer detection without kit", TES
     const auto& adapters = detector.get_adapter_sequences("TEST_KIT1");
     auto primers = detector.get_primer_sequences("TEST_KIT2", dorado::demux::PrimerAux::DEFAULT);
     sort_queries(primers);
+
     // Make sure the adapters and primers have been properly loaded.
-    std::string expected_adapter_name = "adapter1";
-    std::string expected_adapter_front = "AGGGAACT";
-    std::string expected_adapter_rear = "AGTTCC";
-    std::vector<std::string> expected_primer_names = {"primer1_FWD", "primer1_REV", "primer2_FWD",
-                                                      "primer2_REV"};
-    std::vector<std::string> expected_primers_front = {"TGCGAAT", "CAGAGGTC", "CTGACGT", "CAATGAA"};
-    std::vector<std::string> expected_primers_rear = {"GACCTCTG", "ATTCGCA", "TTCATTG", "ACGTCAG"};
-    CATCH_CHECK(adapters.size() == 1);
-    CATCH_CHECK(primers.size() == 4);
-    for (size_t i = 0; i < primers.size(); ++i) {
-        CATCH_CHECK(primers[i].name == expected_primer_names[i]);
-        CATCH_CHECK(primers[i].front_sequence == expected_primers_front[i]);
-        CATCH_CHECK(primers[i].rear_sequence == expected_primers_rear[i]);
+    {
+        std::string expected_adapter_name = "adapter1";
+        std::string expected_adapter_front = "AGGGAACT";
+        std::string expected_adapter_rear = "AGTTCC";
+        std::vector<std::string> expected_primer_names = {"primer1_FWD", "primer1_REV",
+                                                          "primer2_FWD", "primer2_REV"};
+        std::vector<std::string> expected_primers_front = {"TGCGAAT", "CAGAGGTC", "CTGACGT",
+                                                           "CAATGAA"};
+        std::vector<std::string> expected_primers_rear = {"GACCTCTG", "ATTCGCA", "TTCATTG",
+                                                          "ACGTCAG"};
+        CATCH_REQUIRE(adapters.size() == 1);
+        CATCH_CHECK(adapters[0].name == expected_adapter_name);
+        CATCH_CHECK(adapters[0].front_sequence == expected_adapter_front);
+        CATCH_CHECK(adapters[0].rear_sequence == expected_adapter_rear);
+        CATCH_REQUIRE(primers.size() == 4);
+        for (size_t i = 0; i < primers.size(); ++i) {
+            CATCH_CHECK(primers[i].name == expected_primer_names[i]);
+            CATCH_CHECK(primers[i].front_sequence == expected_primers_front[i]);
+            CATCH_CHECK(primers[i].rear_sequence == expected_primers_rear[i]);
+        }
     }
+
     auto test_file = data_dir / "SQK-RBK114-96_BC01.fastq";
     TestHtsReader reader(test_file.string());
     reader.read();
@@ -568,6 +578,9 @@ CATCH_TEST_CASE(
         case 'T':
             read->read_common.base_mod_probs[i * mod_alphabet.size() + 4] = 255;
             break;
+        default:
+            CATCH_FAIL(fmt::format("Unexpected character in sequence: {} @ {}",
+                                   read->read_common.seq[i], i));
         }
     }
     auto flank_size = front_adapter.length() + front_primer.length() + umi_partial.length();

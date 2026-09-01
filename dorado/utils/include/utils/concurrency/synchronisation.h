@@ -34,8 +34,6 @@ public:
      */
     Latch(std::size_t count) : m_count(count), m_mutex(), m_condition() {}
 
-    ~Latch() {}
-
     bool is_zeroed() const {
         std::lock_guard lock(m_mutex);
         return m_count == 0;

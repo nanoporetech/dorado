@@ -2,7 +2,8 @@
 
 namespace dorado::basecall {
 
-ChunkBenchmarks::ChunkBenchmarks() {}
+ChunkBenchmarks::ChunkBenchmarks() = default;
+ChunkBenchmarks::~ChunkBenchmarks() = default;
 
 std::optional<const ChunkBenchmarks::ChunkTimings> ChunkBenchmarks::get_chunk_timings_internal(
         const GPUName& gpu_name,

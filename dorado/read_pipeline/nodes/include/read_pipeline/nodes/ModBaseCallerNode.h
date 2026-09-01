@@ -36,8 +36,14 @@ public:
     void terminate(const TerminateOptions&) override;
     void restart() override;
 
-    void simplex_mod_call(Message&& message);
-    void duplex_mod_call(Message&& message);
+    void simplex_mod_call(Message message);
+    void duplex_mod_call(Message message);
+
+private:
+    ModBaseCallerNode(const ModBaseCallerNode&) = delete;
+    ModBaseCallerNode& operator=(const ModBaseCallerNode&) = delete;
+    ModBaseCallerNode(ModBaseCallerNode&&) = delete;
+    ModBaseCallerNode& operator=(ModBaseCallerNode&&) = delete;
 
 private:
     void start_threads();

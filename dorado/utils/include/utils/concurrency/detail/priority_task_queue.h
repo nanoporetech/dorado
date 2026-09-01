@@ -51,10 +51,14 @@ public:
 
         TaskQueue(const TaskQueue&) = delete;
         TaskQueue& operator=(const TaskQueue&) = delete;
+        TaskQueue(TaskQueue&&) = delete;
+        TaskQueue& operator=(TaskQueue&&) = delete;
 
     public:
         TaskPriority priority() const { return m_priority; }
         void push(TaskType&& task);
+
+        ~TaskQueue();
     };
 
 private:

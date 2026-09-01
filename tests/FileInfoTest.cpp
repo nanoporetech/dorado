@@ -14,7 +14,7 @@
 namespace dorado::file_info::test {
 
 namespace {
-const auto& dir_entries = utils::fetch_directory_entries;
+constexpr auto dir_entries = utils::fetch_directory_entries;
 }
 
 CATCH_TEST_CASE(TEST_GROUP "Test calculating number of reads from fast5 throws", TEST_GROUP) {

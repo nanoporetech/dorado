@@ -6,12 +6,9 @@
 #include "types.h"
 
 #include <cstdint>
-#include <filesystem>
-#include <memory>
 #include <string>
 #include <string_view>
 #include <unordered_map>
-#include <unordered_set>
 #include <vector>
 
 struct faidx_t;
@@ -341,7 +338,7 @@ typedef dorado::secondary::ReadAlignmentData MedakaFeatureMatrix;
       lane2 115525533444300
  */
 
-enum haplotagsource { FORCE_UNPHASED, USE_BAM_HAP_TAG, USE_TAG_FROM_HASHTABLE };
+enum class haplotagsource { FORCE_UNPHASED, USE_BAM_HAP_TAG, USE_TAG_FROM_HASHTABLE };
 
 struct MedakaFeatureMatrixOptions {
     bool include_dwells;

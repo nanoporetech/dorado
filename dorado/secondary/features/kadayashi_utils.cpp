@@ -18,7 +18,7 @@ void read_checked(std::ifstream& ifs,
                   T* buffer,
                   const size_t num_elements,
                   const std::string_view context) {
-    const int64_t num_bytes = static_cast<int64_t>(sizeof(T) * num_elements);
+    const int64_t num_bytes = static_cast<int64_t>(sizeof(T)) * num_elements;
     ifs.read(reinterpret_cast<char*>(buffer), num_bytes);
     if (ifs.gcount() != num_bytes) {
         const std::string context_suffix =

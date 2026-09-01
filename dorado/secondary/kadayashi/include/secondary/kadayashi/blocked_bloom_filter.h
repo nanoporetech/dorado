@@ -17,6 +17,12 @@ public:
     bool query(uint32_t val);
 
 private:
+    BlockedBloomFilter(const BlockedBloomFilter &) = delete;
+    BlockedBloomFilter &operator=(const BlockedBloomFilter &) = delete;
+    BlockedBloomFilter(BlockedBloomFilter &&) = delete;
+    BlockedBloomFilter &operator=(BlockedBloomFilter &&) = delete;
+
+private:
     bool m_is_enabled;
     const int m_n_hashes;
     const int m_n_blocks_bits;

@@ -10,7 +10,7 @@ std::vector<uint8_t> seq2nt4seq(const std::string_view &seq) {
     h.reserve(seq.size());
     for (size_t i = 0; i < seq.size(); i++) {
         h.emplace_back(
-                static_cast<uint8_t>(kadayashi::kdy_seq_nt4_table[static_cast<int>(seq[i])]));
+                static_cast<uint8_t>(kadayashi::kdy_seq_nt4_table[static_cast<uint8_t>(seq[i])]));
     }
     return h;
 }

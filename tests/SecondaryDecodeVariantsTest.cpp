@@ -29,7 +29,7 @@ at::Tensor make_haploid_probs(const std::string_view symbols,
     std::array<int32_t, 256> lookup{};
     lookup.fill(static_cast<int32_t>(std::size(symbols)));
     for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
-        lookup[static_cast<int32_t>(symbols[i])] = i;
+        lookup[static_cast<uint8_t>(symbols[i])] = i;
     }
 
     const float fp_prob = (1.0 - tp_prob) / (std::ssize(symbols) - 1);
@@ -38,7 +38,7 @@ at::Tensor make_haploid_probs(const std::string_view symbols,
                                 at::TensorOptions().dtype(at::kFloat).device(at::kCPU));
 
     for (int64_t row = 0; row < std::ssize(seq); ++row) {
-        const int64_t col = lookup[static_cast<int32_t>(seq[row])];
+        const int64_t col = lookup[static_cast<uint8_t>(seq[row])];
         probs.index_put_({row, col}, tp_prob);
     }
 

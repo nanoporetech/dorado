@@ -167,6 +167,7 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     // Check input/output reads are matching.
     std::string orig_read = dorado::utils::extract_sequence(in_rec);
     std::string aligned_read = dorado::utils::extract_sequence(rec);
+    CATCH_CHECK(orig_read == aligned_read);
 
     // Check quals are matching.
     std::vector<uint8_t> orig_qual = dorado::utils::extract_quality(in_rec);
@@ -201,6 +202,7 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     // Check input/output reads are matching.
     std::string orig_read = dorado::utils::extract_sequence(in_rec);
     std::string aligned_read = dorado::utils::extract_sequence(rec);
+    CATCH_CHECK(orig_read == aligned_read);
 
     // Check quals are matching.
     std::vector<uint8_t> orig_qual = dorado::utils::extract_quality(in_rec);
@@ -370,11 +372,11 @@ CATCH_TEST_CASE_METHOD(AlignerNodeTestFixture,
     auto query = aligner_test_dir / "basecall.sam";
 
     auto options = dorado::alignment::create_dflt_options();
-    options.index_options->get().k = 15;
-    options.index_options->get().w = 15;
+    options.index.index_options->get().k = 15;
+    options.index.index_options->get().w = 15;
     bool soft_clipping = GENERATE(true, false);
     if (soft_clipping) {
-        options.mapping_options->get().flag |= MM_F_SOFTCLIP;
+        options.mapping.mapping_options->get().flag |= MM_F_SOFTCLIP;
     }
 
     dorado::TestHtsReader reader(query.string());
@@ -517,8 +519,6 @@ CATCH_SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TE
                             align_info, align_info, READ_ID, sequence);
 
                     CATCH_THEN("Output sam line has read_id as QNAME") {
-                        const std::string expected{READ_ID +
-                                                   dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
                         CATCH_REQUIRE(
                                 simplex_read->read_common.alignment_results[0].sam_string.substr(
                                         0, READ_ID.size()) == READ_ID);
@@ -536,8 +536,6 @@ CATCH_SCENARIO_METHOD(AlignerNodeTestFixture, "AlignerNode push SimplexRead", TE
                             align_info, align_info, READ_ID, sequence);
 
                     CATCH_THEN("Output sam line has read_id as QNAME") {
-                        const std::string expected{READ_ID +
-                                                   dorado::alignment::UNMAPPED_SAM_LINE_STRIPPED};
                         CATCH_REQUIRE(
                                 duplex_read->read_common.alignment_results[0].sam_string.substr(
                                         0, READ_ID.size()) == READ_ID);

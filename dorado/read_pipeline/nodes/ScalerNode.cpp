@@ -20,7 +20,6 @@
 #include <cmath>
 #include <cstdint>
 #include <iterator>
-#include <unordered_map>
 #include <utility>
 
 static constexpr float EPS = 1e-9f;
@@ -68,7 +67,7 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     const int16_t kMinMedianForRNASignal = 700;
 
     int signal_len = static_cast<int>(read.read_common.get_raw_data_samples());
-    const int16_t* signal = static_cast<int16_t*>(read.read_common.raw_data.data_ptr());
+    const int16_t* signal = static_cast<const int16_t*>(read.read_common.raw_data.const_data_ptr());
 
     // Check the median value change over 5 windows.
     std::array<int16_t, 5> medians = {0, 0, 0, 0, 0};
@@ -78,9 +77,11 @@ int determine_rna_adapter_pos(const dorado::SimplexRead& read) {
     const int signal_start = 1000;
     const int signal_end = 3 * signal_len / 4;
     for (int i = signal_start; i < signal_end; i += kStride) {
-        auto slice = at::from_blob(const_cast<int16_t*>(&signal[i]),
-                                   {static_cast<int>(std::min(kWindowSize, signal_len - i))},
-                                   at::TensorOptions().dtype(at::kShort));
+        auto slice =
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): from_blob() views non-const data but we clone() it.
+                at::from_blob(const_cast<int16_t*>(&signal[i]),
+                              {static_cast<int>(std::min(kWindowSize, signal_len - i))},
+                              at::TensorOptions().dtype(at::kShort));
         int16_t median = slice.median().item<int16_t>();
         medians[median_pos % medians.size()] = median;
         // Since the medians are stored in a circular buffer, we need

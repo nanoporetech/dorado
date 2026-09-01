@@ -56,10 +56,20 @@ public:
 
         ThreadPoolQueue(const ThreadPoolQueue&) = delete;
         ThreadPoolQueue& operator=(const ThreadPoolQueue&) = delete;
+        ThreadPoolQueue(ThreadPoolQueue&&) = delete;
+        ThreadPoolQueue& operator=(ThreadPoolQueue&&) = delete;
 
     public:
         void push(TaskType task);
+
+        ~ThreadPoolQueue() = default;
     };
+
+private:
+    MultiQueueThreadPool(const MultiQueueThreadPool&) = delete;
+    MultiQueueThreadPool& operator=(const MultiQueueThreadPool&) = delete;
+    MultiQueueThreadPool(MultiQueueThreadPool&&) = delete;
+    MultiQueueThreadPool& operator=(MultiQueueThreadPool&&) = delete;
 
 private:
     void send(TaskType&& task, detail::PriorityTaskQueue::TaskQueue& task_queue);

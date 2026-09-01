@@ -31,6 +31,12 @@ public:
     void restart() override;
 
 private:
+    BarcodeClassifierNode(const BarcodeClassifierNode&) = delete;
+    BarcodeClassifierNode& operator=(const BarcodeClassifierNode&) = delete;
+    BarcodeClassifierNode(BarcodeClassifierNode&&) = delete;
+    BarcodeClassifierNode& operator=(BarcodeClassifierNode&&) = delete;
+
+private:
     utils::concurrency::AsyncExecutor m_task_executor;
 
     std::atomic<int> m_num_records{0};

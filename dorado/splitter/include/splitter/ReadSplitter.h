@@ -98,10 +98,16 @@ struct DuplexSplitSettings {
 
 class ReadSplitter {
 public:
-    ReadSplitter() = default;
     virtual ~ReadSplitter() = default;
 
     virtual std::vector<SimplexReadPtr> split(SimplexReadPtr init_read) const = 0;
+
+protected:
+    ReadSplitter() = default;
+    ReadSplitter(const ReadSplitter&) = delete;
+    ReadSplitter& operator=(const ReadSplitter&) = delete;
+    ReadSplitter(ReadSplitter&&) = delete;
+    ReadSplitter& operator=(ReadSplitter&&) = delete;
 };
 
 }  // namespace splitter

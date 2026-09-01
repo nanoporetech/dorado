@@ -27,6 +27,12 @@ public:
     static utils::HtsFile::OutputMode get_output_mode(const std::string& mode);
 
 private:
+    HtsWriterNode(const HtsWriterNode&) = delete;
+    HtsWriterNode& operator=(const HtsWriterNode&) = delete;
+    HtsWriterNode(HtsWriterNode&&) = delete;
+    HtsWriterNode& operator=(HtsWriterNode&&) = delete;
+
+private:
     size_t m_total{0};
     size_t m_primary{0};
     size_t m_unmapped{0};

@@ -151,9 +151,8 @@ dorado::BamPtr make_synthetic_bam_record(const SyntheticBamRecord &record) {
     }
 
     if (!record.readgroup.empty()) {
-        bam_aux_append(
-                ret.get(), "RG", 'Z', record.readgroup.size() + 1,
-                reinterpret_cast<const uint8_t *>(const_cast<char *>(record.readgroup.c_str())));
+        bam_aux_append(ret.get(), "RG", 'Z', record.readgroup.size() + 1,
+                       reinterpret_cast<const uint8_t *>(record.readgroup.data()));
     }
 
     return ret;
@@ -189,7 +188,7 @@ kadayashi::MedakaFeatureMatrixOptions make_medaka_feature_matrix_options(
             .tag_keep_missing = false,
             .readgroup = "",
             .disable_read_packing = disable_read_packing,
-            .hap_source = kadayashi::FORCE_UNPHASED,
+            .hap_source = kadayashi::haplotagsource::FORCE_UNPHASED,
             .max_reads = max_reads,
             .right_align_insertions = true,
             .min_snp_accuracy = min_snp_accuracy};
@@ -272,10 +271,8 @@ void compare_feature_matrix_logical_data(const dorado::secondary::ReadAlignmentD
     for (int32_t pos = 0; pos < result.n_pos; ++pos) {
         for (int32_t lane = 0; lane < result.n_reads; ++lane) {
             for (int32_t feature = 0; feature < result.featlen; ++feature) {
-                const int32_t result_value =
-                        static_cast<int32_t>(get_feature_matrix_value(result, pos, lane, feature));
-                const int32_t expected_value = static_cast<int32_t>(
-                        get_feature_matrix_value(expected, pos, lane, feature));
+                const auto result_value = get_feature_matrix_value(result, pos, lane, feature);
+                const auto expected_value = get_feature_matrix_value(expected, pos, lane, feature);
                 if (result_value != expected_value) {
                     CATCH_CAPTURE(pos, lane, feature, result_value, expected_value);
                     CATCH_CHECK(result_value == expected_value);
@@ -1342,7 +1339,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen normal case", TEST_GROUP) {
             .tag_keep_missing = false,
             .readgroup = "",
             .disable_read_packing = false,
-            .hap_source = kadayashi::USE_TAG_FROM_HASHTABLE,
+            .hap_source = kadayashi::haplotagsource::USE_TAG_FROM_HASHTABLE,
             .max_reads = 100,
             .right_align_insertions = true,
             .min_snp_accuracy = 0.0};
@@ -1441,7 +1438,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen matches calculate_read_alignment on real d
             .tag_keep_missing = TAG_KEEP_MISSING,
             .readgroup = read_group,
             .disable_read_packing = ROW_PER_READ,
-            .hap_source = kadayashi::USE_BAM_HAP_TAG,
+            .hap_source = kadayashi::haplotagsource::USE_BAM_HAP_TAG,
             .max_reads = MAX_READS,
             .right_align_insertions = RIGHT_ALIGN_INSERTIONS,
             .min_snp_accuracy = MIN_SNP_ACCURACY};
@@ -1552,7 +1549,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen no input", TEST_GROUP) {
             .tag_keep_missing = false,
             .readgroup = "",
             .disable_read_packing = false,
-            .hap_source = kadayashi::USE_TAG_FROM_HASHTABLE,
+            .hap_source = kadayashi::haplotagsource::USE_TAG_FROM_HASHTABLE,
             .max_reads = 100,
             .right_align_insertions = true,
             .min_snp_accuracy = 0.0};

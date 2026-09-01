@@ -7,9 +7,7 @@
 
 #include <atomic>
 #include <filesystem>
-#include <memory>
 #include <mutex>
-#include <queue>
 #include <string>
 #include <thread>
 #include <unordered_set>
@@ -33,6 +31,12 @@ public:
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions&) override;
     void restart() override;
+
+private:
+    CorrectionInferenceNode(const CorrectionInferenceNode&) = delete;
+    CorrectionInferenceNode& operator=(const CorrectionInferenceNode&) = delete;
+    CorrectionInferenceNode(CorrectionInferenceNode&&) = delete;
+    CorrectionInferenceNode& operator=(CorrectionInferenceNode&&) = delete;
 
 private:
     const std::string m_fastq;

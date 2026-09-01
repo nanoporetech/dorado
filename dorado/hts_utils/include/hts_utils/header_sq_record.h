@@ -32,6 +32,12 @@ public:
     static std::string fast_sequence_transform(std::string_view sequence);
 
 private:
+    MD5Generator(const MD5Generator&) = delete;
+    MD5Generator& operator=(const MD5Generator&) = delete;
+    MD5Generator(MD5Generator&&) = delete;
+    MD5Generator& operator=(MD5Generator&&) = delete;
+
+private:
     hts_md5_context* m_ctx;
 };
 

@@ -20,6 +20,12 @@ public:
     void restart() override;
 
 private:
+    ReadForwarderNode(const ReadForwarderNode &) = delete;
+    ReadForwarderNode &operator=(const ReadForwarderNode &) = delete;
+    ReadForwarderNode(ReadForwarderNode &&) = delete;
+    ReadForwarderNode &operator=(ReadForwarderNode &&) = delete;
+
+private:
     void input_thread_fn();
 
     std::function<void(Message &&)> m_message_callback;

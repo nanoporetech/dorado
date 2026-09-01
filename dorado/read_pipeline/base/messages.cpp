@@ -57,10 +57,11 @@ T Message::take() {
 
 std::size_t Message::index() const { return m_message.index(); }
 
-#define MESSAGE_IMPL(T)                                              \
-    Message::Message(T &&message) : m_message(std::move(message)) {} \
-    template bool Message::holds<T>() const;                         \
-    template const T &Message::get<T>() const;                       \
+#define MESSAGE_IMPL(T)                                                                                               \
+    /* NOLINTNEXTLINE(bugprone-macro-parentheses): T isn't a value so wrapping it in parentheses is invalid syntax */ \
+    Message::Message(T &&message) : m_message(std::move(message)) {}                                                  \
+    template bool Message::holds<T>() const;                                                                          \
+    template const T &Message::get<T>() const;                                                                        \
     template T Message::take<T>();
 
 MESSAGE_IMPL(SimplexReadPtr)
@@ -172,14 +173,14 @@ void ReadCommon::generate_read_tags(bam1_t *aln, bool emit_moves, bool is_duplex
     }
 
     if (emit_moves) {
-        std::vector<uint8_t> m(moves.size() + 1, 0);
-        m[0] = uint8_t(attributes.model_stride);
+        std::vector<uint8_t> mv(moves.size() + 1, 0);
+        mv[0] = uint8_t(attributes.model_stride);
 
         for (size_t idx = 0; idx < moves.size(); idx++) {
-            m[idx + 1] = static_cast<uint8_t>(moves[idx]);
+            mv[idx + 1] = static_cast<uint8_t>(moves[idx]);
         }
 
-        bam_aux_update_array(aln, "mv", 'c', int(m.size()), (uint8_t *)m.data());
+        bam_aux_update_array(aln, "mv", 'c', int(mv.size()), mv.data());
     }
 
     if (rna_poly_tail_length != ReadCommon::POLY_TAIL_NOT_ENABLED) {
@@ -488,6 +489,7 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
 }
 
 ReadCommon &get_read_common_data(Message &message) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): original message is mutable.
     return const_cast<ReadCommon &>(get_read_common_data(const_cast<const Message &>(message)));
 }
 

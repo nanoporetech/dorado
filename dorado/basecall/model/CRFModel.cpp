@@ -20,7 +20,6 @@
 #include <torch/nn.h>
 
 using namespace torch::nn;
-namespace F = torch::nn::functional;
 using Slice = torch::indexing::Slice;
 
 namespace dorado::basecall::model {

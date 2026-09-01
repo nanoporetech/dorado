@@ -31,7 +31,6 @@ protected:
 
 public:
     Minimap2IndexTestFixture() {
-        const std::string read_id{"aligner_node_test"};
         std::filesystem::path aligner_test_dir{get_aligner_data_dir()};
         auto ref = aligner_test_dir / "target.fq";
         reference_file = ref.string();
@@ -63,27 +62,27 @@ CATCH_TEST_CASE(TEST_GROUP " initialise() with specified option sets indexing op
     Minimap2Index cut{};
 
     auto options{create_dflt_options()};
-    options.index_options->get().k = 11;
-    options.index_options->get().w = 12;
-    options.index_options->get().batch_size = 123456789;
+    options.index.index_options->get().k = 11;
+    options.index.index_options->get().w = 12;
+    options.index.index_options->get().batch_size = 123456789;
 
     cut.initialise(options);
 
-    CATCH_CHECK(cut.index_options().k == options.index_options->get().k);
-    CATCH_CHECK(cut.index_options().w == options.index_options->get().w);
-    CATCH_CHECK(cut.index_options().batch_size == options.index_options->get().batch_size);
+    CATCH_CHECK(cut.index_options().k == options.index.index_options->get().k);
+    CATCH_CHECK(cut.index_options().w == options.index.index_options->get().w);
+    CATCH_CHECK(cut.index_options().batch_size == options.index.index_options->get().batch_size);
 }
 
 CATCH_TEST_CASE(TEST_GROUP " initialise() with default options sets mapping options", TEST_GROUP) {
     Minimap2Index cut{};
     auto options{create_dflt_options()};
-    options.mapping_options->get().bw = 300;
-    options.mapping_options->get().bw_long = 12000;
+    options.mapping.mapping_options->get().bw = 300;
+    options.mapping.mapping_options->get().bw_long = 12000;
 
     cut.initialise(options);
 
-    CATCH_CHECK(cut.mapping_options().bw == options.mapping_options->get().bw);
-    CATCH_CHECK(cut.mapping_options().bw_long == options.mapping_options->get().bw_long);
+    CATCH_CHECK(cut.mapping_options().bw == options.mapping.mapping_options->get().bw);
+    CATCH_CHECK(cut.mapping_options().bw_long == options.mapping.mapping_options->get().bw_long);
 }
 
 CATCH_TEST_CASE_METHOD(Minimap2IndexTestFixture,
@@ -120,7 +119,7 @@ CATCH_TEST_CASE_METHOD(Minimap2IndexTestFixture,
                        TEST_GROUP) {
     cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{create_dflt_options()};
-    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
+    compatible_options.mapping.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     CATCH_REQUIRE(cut.create_compatible_index(compatible_options) != nullptr);
 }
@@ -133,7 +132,7 @@ CATCH_TEST_CASE_METHOD(
         TEST_GROUP) {
     cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{create_dflt_options()};
-    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
+    compatible_options.mapping.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 
@@ -148,7 +147,7 @@ CATCH_TEST_CASE_METHOD(
         TEST_GROUP) {
     cut.load(reference_file, 1, false);
     Minimap2Options compatible_options{create_dflt_options()};
-    compatible_options.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
+    compatible_options.mapping.mapping_options->get().best_n = cut.mapping_options().best_n + 1;
 
     auto compatible_index = cut.create_compatible_index(compatible_options);
 

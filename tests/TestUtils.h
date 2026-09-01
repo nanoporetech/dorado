@@ -15,17 +15,12 @@ std::string ReadFileIntoString(const std::filesystem::path& path);
 // Reads into a vector<uint8_t>.
 std::vector<uint8_t> ReadFileIntoVector(const std::filesystem::path& path);
 
-#define get_fast5_data_dir() get_data_dir("fast5")
-
-#define get_pod5_data_dir() get_data_dir("pod5")
-
-#define get_single_pod5_file_path() (get_data_dir("pod5") / "single_na24385.pod5")
-
-#define get_nested_pod5_data_dir() get_data_dir("nested_pod5_folder")
-
-#define get_stereo_data_dir() get_data_dir("stereo")
-
-#define get_aligner_data_dir() get_data_dir("aligner_test")
+inline auto get_fast5_data_dir() { return get_data_dir("fast5"); }
+inline auto get_pod5_data_dir() { return get_data_dir("pod5"); }
+inline auto get_single_pod5_file_path() { return (get_data_dir("pod5") / "single_na24385.pod5"); }
+inline auto get_nested_pod5_data_dir() { return get_data_dir("nested_pod5_folder"); }
+inline auto get_stereo_data_dir() { return get_data_dir("stereo"); }
+inline auto get_aligner_data_dir() { return get_data_dir("aligner_test"); }
 
 // Wrapper around a temporary directory since one doesn't exist in the standard
 struct TempDir {

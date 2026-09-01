@@ -387,16 +387,18 @@ build:linux:x86:coverage:
 
 build:linux:x86:clang_tidy:
   stage: build
-  image: ${DORADO_DOCKER_ROOT}/dorado-24.04-cuda-${CUDA}.0:1.1
+  # We need a 26.04 docker image for a recent version of clang-tidy.
+  image: ${DORADO_DOCKER_ROOT}/dorado-26.04-cuda-13.3.0:1.0
   variables:
     ONT_PYTHON_URL: ${ONT_PYTHON_URL_PREFIX}/${ONT_PYTHON_FILENAME_LINUX_X86_313}
   extends:
     - .linux_build_dependencies
     - .linux_runner
   script:
+    - !reference [.create_venv]
+    - !reference [.set_parallel_jobs]
     - apt update
     - apt install -y automake clang clang-tidy
-    - !reference [.set_parallel_jobs]
     - ./.gitlab/run_clang_tidy.sh -j ${PARALLEL_JOBS} -c dorado-dependencies -t dorado
   artifacts: null
   cache:

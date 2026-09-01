@@ -77,6 +77,13 @@ public:
             std::vector<secondary::Sample> samples) const = 0;
 
     virtual FeatureColumnMap get_feature_column_map() const = 0;
+
+protected:
+    EncoderBase() = default;
+    EncoderBase(const EncoderBase&) = delete;
+    EncoderBase& operator=(const EncoderBase&) = delete;
+    EncoderBase(EncoderBase&&) = delete;
+    EncoderBase& operator=(EncoderBase&&) = delete;
 };
 
 inline std::string feature_column_to_string(const FeatureColumns feature) {

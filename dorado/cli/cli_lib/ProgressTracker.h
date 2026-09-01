@@ -15,19 +15,19 @@ namespace dorado {
 // overall performance.
 class ProgressTracker {
 public:
-    enum Mode : uint8_t { SIMPLEX, DUPLEX, DEMUX, TRIM, ALIGN };
+    enum class Mode : uint8_t { SIMPLEX, DUPLEX, DEMUX, TRIM, ALIGN };
 
     ProgressTracker(Mode mode, int total_reads);
     ProgressTracker(Mode mode, int total_reads, float post_processing_percentage);
     ~ProgressTracker();
 
-    void set_description(const std::string& desc);
+    void set_description(const std::string &desc);
     void set_total_reads(int num_reads) { m_num_reads_expected = num_reads; }
     void set_post_processing_percentage(float pct) { m_post_processing_percentage = pct; }
 
     void mark_as_completed();
     void summarize() const;
-    void update_progress_bar(const stats::NamedStats& stats);
+    void update_progress_bar(const stats::NamedStats &stats);
     void update_post_processing_progress(float progress);
 
     void reset_initialization_time();
@@ -37,6 +37,12 @@ public:
     // so it may interleave.
     // Note, summarize will not be disabled as it uses spdlog to report.
     void disable_progress_reporting();
+
+private:
+    ProgressTracker(const ProgressTracker &) = delete;
+    ProgressTracker &operator=(const ProgressTracker &) = delete;
+    ProgressTracker(ProgressTracker &&) = delete;
+    ProgressTracker &operator=(ProgressTracker &&) = delete;
 
 private:
     void internal_set_progress(float progress, bool post_processing);

@@ -456,10 +456,9 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
 
     std::array<uint32_t, 4> bests = {0};
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        const std::string a0 = nt4seq2seq(ck.varcalls[i_self].alleles[0]);
-        const std::string a1 = nt4seq2seq(ck.varcalls[i_self].alleles[1]);
         LOG_TRACE("[kdys::{}] i_self={} (pos={} a1={} a2={}):", __func__, i_self,
-                  ck.varcalls[i_self].pos, a0, a1);
+                  ck.varcalls[i_self].pos, nt4seq2seq(ck.varcalls[i_self].alleles[0]),
+                  nt4seq2seq(ck.varcalls[i_self].alleles[1]));
     }
 
     // check whether we have a coverage dropout

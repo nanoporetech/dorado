@@ -7,7 +7,6 @@
 #include <memory>
 #include <mutex>
 #include <thread>
-#include <type_traits>
 
 namespace dorado::utils::concurrency {
 
@@ -35,6 +34,11 @@ class AsyncTaskExecutor {
     void decrement_tasks_in_flight();
     void increment_tasks_in_flight();
     void create_flushing_counter();
+
+    AsyncTaskExecutor(const AsyncTaskExecutor&) = delete;
+    AsyncTaskExecutor& operator=(const AsyncTaskExecutor&) = delete;
+    AsyncTaskExecutor(AsyncTaskExecutor&&) = delete;
+    AsyncTaskExecutor& operator=(AsyncTaskExecutor&&) = delete;
 
 public:
     AsyncTaskExecutor(MultiQueueThreadPool& thread_pool,

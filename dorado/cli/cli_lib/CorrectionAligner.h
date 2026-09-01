@@ -1,6 +1,5 @@
 #pragma once
 
-#include "CorrectionAligner.h"
 #include "utils/stats.h"
 
 namespace dorado {

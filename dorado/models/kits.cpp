@@ -384,7 +384,7 @@ const std::unordered_map<Chemistry, ChemistryKits> kit_map = {
 };
 
 // Crate a map of flowcell and sequencing kit pairs to categorical chemistry
-static ChemistryMap chemistry_map = [] {
+static const ChemistryMap chemistry_map = [] {
     ChemistryMap map;
     for (const auto& [chemistry, kit_collection] : kit_map) {
         for (const auto& kset : kit_collection.kit_sets) {

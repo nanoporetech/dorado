@@ -13,7 +13,7 @@
 
 namespace {
 using namespace dorado::utils;
-static std::unordered_map<std::string, HeaderLineType> header_type_lut{
+static const std::unordered_map<std::string, HeaderLineType> header_type_lut{
         {"HD", HeaderLineType::HD}, {"SQ", HeaderLineType::SQ}, {"RG", HeaderLineType::RG},
         {"PG", HeaderLineType::PG}, {"CO", HeaderLineType::CO},
 };
@@ -97,7 +97,7 @@ std::vector<utils::HeaderLineData> parse_header(
 
 void header_to_stream(std::ostream& os, const std::vector<utils::HeaderLineData>& header) {
     for (const auto& line : header) {
-        os << line.header_type;
+        os << fmt::underlying(line.header_type);
         for (const auto& [key, value] : line.tags) {
             os << '\t' << key << ":" << value;
         }

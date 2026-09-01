@@ -40,16 +40,16 @@ done
 
 script_dir="$(cd -- "$(dirname -- "$0")" >/dev/null 2>&1 && pwd -P)"
 if [[ $type == "dorado" ]] ; then
-    # Assuming the current script is in .gitlab/
+  # Assuming the current script is in .gitlab/
   source_dir=$(dirname $script_dir)
-  source_filter='^(?!.*\/dorado\/3rdparty\/).*$'
+  exclude_3rdparty="dorado\/3rdparty"
   if [[ -n $preset ]] ; then
     echo "Presets are not currently supported in dorado. This parameter will be ignored."
   fi
 elif [[ $type == "ont_core_cpp" ]] ; then
-    # Assuming the current script is in dorado/.gitlab/
+  # Assuming the current script is in dorado/.gitlab/
   source_dir=$(dirname $(dirname $script_dir))
-  source_filter='^(?!.*\/(dorado\/dorado\/3rdparty|third_party)\/).*$'
+  exclude_3rdparty="(dorado\/dorado\/3rdparty|third_party)"
   if [[ -z $preset ]] ; then
     echo "A preset is required for ont_core_cpp. Please provide a supported preset value -p".
     exit 1
@@ -57,6 +57,11 @@ elif [[ $type == "ont_core_cpp" ]] ; then
 else
   echo "Invalid type argument: -t $type. Expects 'ont_core_cpp' or 'dorado'"
   exit 1
+fi
+if [[ -n ${cache_dir} ]] ; then
+  source_filter="^(?!.*\/(${exclude_3rdparty}|${cache_dir})\/).*$"
+else
+  source_filter="^(?!.*\/(${exclude_3rdparty})\/).*$"
 fi
 
 # Check that we can actually find clang-tidy.
@@ -92,7 +97,7 @@ else
     --build ${build_dir} \
     --target guppy_ipc_schema \
     -j ${num_jobs}
-  
+
   find ${source_dir}/dorado/dorado/3rdparty/* -name .clang-tidy -delete
   find ${source_dir}/third_party/* -name .clang-tidy -delete
 fi

@@ -15,6 +15,13 @@ public:
 
     virtual ContextContainer& contexts() = 0;
     virtual const ContextContainer& contexts() const = 0;
+
+protected:
+    ClientInfo() = default;
+    ClientInfo(const ClientInfo&) = delete;
+    ClientInfo& operator=(const ClientInfo&) = delete;
+    ClientInfo(ClientInfo&&) = delete;
+    ClientInfo& operator=(ClientInfo&&) = delete;
 };
 
 }  // namespace dorado

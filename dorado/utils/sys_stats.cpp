@@ -18,6 +18,7 @@ ReportedStats sys_stats_report() {
     const int ret = getrusage(RUSAGE_SELF, &usage);
     if (ret == 0) {
         named_stats["maxrss_mb"] =
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access): ru_maxrss is part of a union.
                 static_cast<double>(usage.ru_maxrss) / 1024.0;  // We are given this in KB.
     }
 #elif __APPLE__

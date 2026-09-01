@@ -55,7 +55,6 @@
 #endif
 
 using OutputMode = dorado::utils::HtsFile::OutputMode;
-namespace fs = std::filesystem;
 
 namespace dorado {
 

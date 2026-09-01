@@ -11,7 +11,6 @@
 #include <array>
 #include <bitset>
 #include <cstring>
-#include <iostream>
 #include <limits>
 #include <numeric>
 
@@ -90,7 +89,7 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
     }
 
     for (size_t i = 0; i < seqLen; ++i) {
-        sequence[i] = alphabet[int(sequence[i])];
+        sequence[i] = alphabet[static_cast<uint8_t>(sequence[i])];
         baseProbs[i] = 1.0f - (baseProbs[i] / totalProbs[i]);
         baseProbs[i] = -10.0f * std::log10(baseProbs[i]);
         float qscore = baseProbs[i] * scale + shift;

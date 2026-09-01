@@ -1,18 +1,65 @@
-# Disable all default warnings, then enable only the ones we want to check for.
+# Disable all default warnings, then enable all of the groups we want, then disable specific cases.
+# bugprone-unchecked-optional-access should be enabled, but IgnoreValueCalls isn't working.
 Checks: '-*,
 fuchsia-default-arguments-declarations,
+bugprone-*,
+cppcoreguidelines-*,
 performance-*,
+misc-*,
+-bugprone-branch-clone,
+-bugprone-command-processor,
+-bugprone-easily-swappable-parameters,
+-bugprone-exception-escape,
+-bugprone-implicit-widening-of-multiplication-result,
+-bugprone-narrowing-conversions,
+-bugprone-random-generator-seed,
+-bugprone-throwing-static-initialization,
+-bugprone-unchecked-optional-access,
+-cppcoreguidelines-avoid-c-arrays,
+-cppcoreguidelines-avoid-const-or-ref-data-members,
+-cppcoreguidelines-avoid-do-while,
+-cppcoreguidelines-avoid-magic-numbers,
+-cppcoreguidelines-explicit-virtual-functions,
+-cppcoreguidelines-init-variables,
+-cppcoreguidelines-macro-to-enum,
+-cppcoreguidelines-narrowing-conversions,
+-cppcoreguidelines-non-private-member-variables-in-classes,
+-cppcoreguidelines-owning-memory,
+-cppcoreguidelines-prefer-member-initializer,
+-cppcoreguidelines-pro-bounds-array-to-pointer-decay,
+-cppcoreguidelines-pro-bounds-avoid-unchecked-container-access,
+-cppcoreguidelines-pro-bounds-constant-array-index,
+-cppcoreguidelines-pro-bounds-pointer-arithmetic,
+-cppcoreguidelines-pro-type-cstyle-cast,
+-cppcoreguidelines-pro-type-member-init,
+-cppcoreguidelines-pro-type-reinterpret-cast,
+-cppcoreguidelines-pro-type-vararg,
+-cppcoreguidelines-use-default-member-init,
+-misc-const-correctness,
+-misc-include-cleaner,
+-misc-no-recursion,
+-misc-non-private-member-variables-in-classes,
+-misc-predictable-rand,
+-misc-use-anonymous-namespace,
+-misc-use-internal-linkage,
+-modernize-avoid-c-arrays,
 -performance-enum-size,
 '
+
 WarningsAsErrors: '*'
 
-# clang-tidy's regex doesn't support negative lookahead, so we have to list all the places to
-# check rather than "not 3rdparty" -_-
-HeaderFilterRegex: 'dorado/(aligner|alignment|api|basecall|batchsize_benchmarks|cli|compat|config|correct|data_loader|demux|devtools|file_info|hts_utils|hts_writer|modbase|model_downloader|model_resolver|models|nn|polish|poly_tail|read_pipeline|resume_loader|secondary|splitter|torch_utils|utils)'
-# When llvm-19 becomes available we might be able to switch to the following, though in testing
-# it seems like this skips some of our headers.
-# ExcludeHeaderFilterRegex: '3rdparty'
+ExcludeHeaderFilterRegex: '3rdparty'
 
 CheckOptions:
   - key:    performance-move-const-arg.CheckTriviallyCopyableMove
     value:  0
+  - key:    cppcoreguidelines-no-malloc.Deallocations
+    value:  "" # ignore calls to free() since our dependencies return malloc'd pointers
+  - key:    cppcoreguidelines-avoid-do-while.IgnoreMacros
+    value:  true # ignore do-while in macros, ie in catch2
+  - key:    cppcoreguidelines-macro-usage.CheckCapsOnly
+    value:  true # ignore CAPS_ONLY macros (value is inverted for some reason)
+  - key:    bugprone-unchecked-optional-access.IgnoreValueCalls
+    value:  true # optional.value() throws so it's safe to use
+  - key:    modernize-use-override.IgnoreDestructors
+    value:  true # not the existing style

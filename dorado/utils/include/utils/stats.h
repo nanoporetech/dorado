@@ -49,6 +49,12 @@ public:
     void dump_stats(std::ostream& out_stream, std::optional<std::regex> name_filter) const;
 
 private:
+    StatsSampler(const StatsSampler&) = delete;
+    StatsSampler& operator=(const StatsSampler&) = delete;
+    StatsSampler(StatsSampler&&) = delete;
+    StatsSampler& operator=(StatsSampler&&) = delete;
+
+private:
     std::vector<StatsReporter> m_stats_reporters;  // Entities we monitor
     std::vector<StatsCallable> m_stats_callables;
     size_t m_max_records = static_cast<size_t>(0);

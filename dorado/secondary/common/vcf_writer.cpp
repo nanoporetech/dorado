@@ -214,10 +214,10 @@ void VCFWriter::write_variant(const Variant& variant) {
 
     // Look up the FILTER ID in the header
     if (!std::empty(variant.filter) && (variant.filter != secondary::NO_VARIANT_FILTER)) {
+        // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): filter is NUL terminated.
         int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, variant.filter.data());
         if (filter_id < 0) {
-            throw std::runtime_error("VCF filter ID '" +
-                                     std::string(variant.filter.data(), std::size(variant.filter)) +
+            throw std::runtime_error("VCF filter ID '" + std::string(variant.filter) +
                                      "' not found in header.");
         }
         bcf_update_filter(m_header.get(), record.get(), &filter_id, 1);
@@ -297,6 +297,7 @@ void VCFWriter::write_variant(const Variant& variant) {
 
             if (spec.type == FieldType::STRING) {
                 const char* data = value.c_str();
+                // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): key is NUL terminated.
                 bcf_update_format_string(m_header.get(), record.get(), spec.key.data(), &data, 1);
                 continue;
             }

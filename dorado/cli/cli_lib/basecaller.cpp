@@ -67,7 +67,7 @@
 
 // HACK: DynamicProgress uses magic to move around in the terminal but assumes
 // cout. Rather than patching it to support using cerr just rename the symbol.
-#define cout cerr
+#define cout cerr  // NOLINT(cppcoreguidelines-macro-usage): see ^
 #include <indicators/dynamic_progress.hpp>
 #undef cout
 
@@ -944,7 +944,7 @@ void run(const BasecallerOptions& options,
                         ? num_reads
                         : std::min(num_reads, static_cast<size_t>(options.max_reads));
 
-    ProgressTracker tracker(ProgressTracker::SIMPLEX, num_reads);
+    ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, num_reads);
 
     auto [num_devices, runners, modbase_runners] = create_runners(
             options, model_config, models.get_modbase_model_paths(), num_runners, modbase_params);

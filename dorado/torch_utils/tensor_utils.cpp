@@ -25,6 +25,7 @@ namespace {
 IFUNC_DEFINE_DEFAULT(void, convert_f32_to_f16_impl)(c10::Half* const dest,
                                                     const float* const src,
                                                     std::size_t count) {
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): from_blob() views non-const data but to() doesn't mutate it.
     auto src_tensor_f32 = at::from_blob(const_cast<float*>(src), {static_cast<int64_t>(count)});
     auto src_tensor_f16 = src_tensor_f32.to(at::ScalarType::Half);
     std::memcpy(dest, src_tensor_f16.data_ptr(), count * sizeof(c10::Half));
@@ -59,9 +60,9 @@ void convert_f32_to_f16_impl
     auto* dest_ptr = dest;
     for (size_t chunk_i = 0; chunk_i < count / kUnroll; ++chunk_i) {
         for (size_t unroll_i = 0; unroll_i < kUnrollFactor; ++unroll_i) {
-            const simd::FloatRegister elems_f32 = simd_load_f32(src_ptr);
-            const simd::HalfRegister elems_f16 = simd_convert_f32_f16(elems_f32);
-            simd_store_f16(dest_ptr, elems_f16);
+            const simd::FloatRegister elems_f32 = SIMD_LOAD_F32(src_ptr);
+            const simd::HalfRegister elems_f16 = SIMD_CONVERT_F32_F16(elems_f32);
+            SIMD_STORE_F16(dest_ptr, elems_f16);
             src_ptr += simd::kFloatsPerRegister;
             dest_ptr += simd::kFloatsPerRegister;
         }
@@ -71,9 +72,9 @@ void convert_f32_to_f16_impl
     // TODO -- probably nicer to use masked loads/stores.
     const size_t remaining_count = count % kUnroll;
     for (size_t i = 0; i < remaining_count; ++i) {
-        const simd::FloatRegister elem_f32 = simd_load1_f32(src_ptr);
-        const simd::HalfRegister elem_f16 = simd_convert_f32_f16(elem_f32);
-        simd_store1_f16(dest_ptr, elem_f16);
+        const simd::FloatRegister elem_f32 = SIMD_LOAD1_F32(src_ptr);
+        const simd::HalfRegister elem_f16 = SIMD_CONVERT_F32_F16(elem_f32);
+        SIMD_STORE1_F16(dest_ptr, elem_f16);
         ++src_ptr;
         ++dest_ptr;
     }
@@ -112,16 +113,16 @@ void shift_scale_tensor_i16_to_f16_inplace_impl
     const std::size_t size = tensor.numel();
 
     // Process in blocks.
-    const simd::FloatRegister shift_f32 = simd_load1_f32(&shift);
-    const simd::FloatRegister scale_f32 = simd_load1_f32(&scale);
+    const simd::FloatRegister shift_f32 = SIMD_LOAD1_F32(&shift);
+    const simd::FloatRegister scale_f32 = SIMD_LOAD1_F32(&scale);
     for (std::size_t block = 0; block < size / elems_per_block; block++) {
         for (std::size_t unroll_i = 0; unroll_i < kUnrollFactor; unroll_i++) {
-            const simd::Int16Register data_i16 = simd_load_i16(data);
-            const simd::FloatRegister data_f32 = simd_convert_i16_f32(data_i16);
+            const simd::Int16Register data_i16 = SIMD_LOAD_I16(data);
+            const simd::FloatRegister data_f32 = SIMD_CONVERT_I16_F32(data_i16);
             const simd::FloatRegister scaled_f32 =
-                    simd_div_f32(simd_sub_f32(data_f32, shift_f32), scale_f32);
-            const simd::HalfRegister scaled_f16 = simd_convert_f32_f16(scaled_f32);
-            simd_store_f16(data, scaled_f16);
+                    SIMD_DIV_F32(SIMD_SUB_F32(data_f32, shift_f32), scale_f32);
+            const simd::HalfRegister scaled_f16 = SIMD_CONVERT_F32_F16(scaled_f32);
+            SIMD_STORE_F16(data, scaled_f16);
             data += simd::kFloatsPerRegister;
         }
     }
@@ -460,7 +461,6 @@ ScaledTensor quantize_tensor(const at::Tensor& t, int dim) {
 }
 
 std::string print_size(const at::Tensor& t, const std::string& name) {
-    std::string size;
     std::stringstream ss;
     ss << name << " tensor size: [";
     for (int i = 0; i < t.dim(); i++) {

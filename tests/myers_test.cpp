@@ -6,7 +6,6 @@
 #define CUT_TAG "[myers]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 
-using dorado::splitter::EdistResult;
 using dorado::splitter::myers_align;
 
 DEFINE_TEST("Basic alignment, single hit") {

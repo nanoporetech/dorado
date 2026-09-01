@@ -19,8 +19,6 @@
 namespace dorado {
 namespace hts_writer {
 
-namespace fs = std::filesystem;
-
 HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
                                            bool emit_sam,
                                            bool emit_cram,

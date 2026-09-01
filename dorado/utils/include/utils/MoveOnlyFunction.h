@@ -7,6 +7,8 @@
 #include <type_traits>
 #include <utility>
 
+// NOLINTBEGIN(cppcoreguidelines-pro-type-union-access): union accesses here are safe.
+
 namespace dorado::utils {
 
 namespace detail {
@@ -30,6 +32,13 @@ template <typename R, typename... Args>
 struct ICallable {
     virtual ~ICallable() = default;
     virtual R invoke(Args&&...) = 0;
+
+protected:
+    ICallable() = default;
+    ICallable(const ICallable&) = delete;
+    ICallable& operator=(const ICallable&) = delete;
+    ICallable(ICallable&&) = delete;
+    ICallable& operator=(ICallable&&) = delete;
 };
 
 template <bool IsConst, typename R, typename... Args>
@@ -60,7 +69,7 @@ public:
     template <typename Func>
         requires(std::is_invocable_r_v<R, Func, Args...> &&
                  std::is_convertible_v<Func, FunctionPtr>)
-    MoveOnlyFunctionBase(Func&& func) noexcept : MoveOnlyFunctionBase() {
+    MoveOnlyFunctionBase(Func func) noexcept : MoveOnlyFunctionBase() {
         FunctionPtr ptr = func;
         // Silence warning that |ptr| will always be non-NULL if |func| is the
         // address of a function.
@@ -93,7 +102,7 @@ public:
 
         struct Callable : ICallable {
             F m_func;
-            explicit Callable(Func&& f) : m_func(std::forward<Func>(f)) {}
+            explicit Callable(Func&& f) : m_func(std::move(f)) {}
             R invoke(Args&&... args) override { return m_func(std::forward<Args>(args)...); }
         };
 
@@ -208,3 +217,5 @@ public:
 };
 
 }  // namespace dorado::utils
+
+// NOLINTEND(cppcoreguidelines-pro-type-union-access)

@@ -20,8 +20,12 @@ class HtsThreadPool {
 public:
     explicit HtsThreadPool(int threads);
     ~HtsThreadPool();
+
+private:
     HtsThreadPool(const HtsThreadPool&) = delete;
     HtsThreadPool& operator=(const HtsThreadPool&) = delete;
+    HtsThreadPool(HtsThreadPool&&) = delete;
+    HtsThreadPool& operator=(HtsThreadPool&&) = delete;
 
 private:
     friend class HtsFile;
@@ -47,8 +51,6 @@ public:
     HtsFile(std::string filename, OutputMode mode, int threads, bool sort_bam);
 
     ~HtsFile();
-    HtsFile(const HtsFile&) = delete;
-    HtsFile& operator=(const HtsFile&) = delete;
 
     void set_buffer_size(size_t buff_size);
     void set_cram_reference(const std::string& reference);
@@ -62,6 +64,12 @@ public:
     OutputMode get_output_mode() const { return m_mode; }
     std::string htslib_write_mode() const;
     std::string index_extension() const;
+
+private:
+    HtsFile(const HtsFile&) = delete;
+    HtsFile& operator=(const HtsFile&) = delete;
+    HtsFile(HtsFile&&) = delete;
+    HtsFile& operator=(HtsFile&&) = delete;
 
 private:
     const std::string m_filename;

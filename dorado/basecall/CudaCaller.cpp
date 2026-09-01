@@ -682,7 +682,6 @@ void CudaCaller::cuda_thread_fn() {
             "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
     const std::string input_q_cv_scope_str =
             "input_queue_cv_device_" + std::to_string(m_options.device().index());
-    const std::string gpu_lock_scope_str = "gpu_lock_" + std::to_string(m_options.device().index());
 
     c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     auto &task_queue = get_task_queue();

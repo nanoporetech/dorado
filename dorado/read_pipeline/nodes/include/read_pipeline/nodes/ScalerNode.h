@@ -20,6 +20,12 @@ public:
     void restart() override;
 
 private:
+    ScalerNode(const ScalerNode&) = delete;
+    ScalerNode& operator=(const ScalerNode&) = delete;
+    ScalerNode(ScalerNode&&) = delete;
+    ScalerNode& operator=(ScalerNode&&) = delete;
+
+private:
     void input_thread_fn();
 
     const config::SignalNormalisationParams m_scaling_params;

@@ -83,6 +83,12 @@ public:
     size_t num_models() const { return m_model_data.size(); }
 
 private:
+    ModBaseCaller(const ModBaseCaller&) = delete;
+    ModBaseCaller& operator=(const ModBaseCaller&) = delete;
+    ModBaseCaller(ModBaseCaller&&) = delete;
+    ModBaseCaller& operator=(ModBaseCaller&&) = delete;
+
+private:
     void start_threads();
     void modbase_task_thread_fn(size_t model_id);
 

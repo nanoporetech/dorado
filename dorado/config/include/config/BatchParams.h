@@ -20,10 +20,6 @@ public:
         FORCE = 3,
     };
 
-    BatchParams() {}
-    BatchParams(const std::filesystem::path& path) { update(path); };
-    ~BatchParams() {}
-
     // Number of signal samples in a chunk
     int chunk_size() const { return m_chunk_size.val; }
     // Number of signal samples overlapping consecutive chunks

@@ -226,6 +226,7 @@ const KitInfo kit_rlb = {
 };
 
 // Final map to go from kit name to actual barcode arrangement information.
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): custom barcodes are appended to this.
 std::unordered_map<std::string, KitInfo> kit_info_map = {
         // SQK-16S024 && SQK-16S114-24
         {"SQK-16S024", kit_16S},
@@ -657,6 +658,7 @@ std::unordered_map<std::string, KitInfo> kit_info_map = {
          }},
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): custom barcodes are appended to this.
 std::unordered_map<std::string, std::string> barcodes = {
         // BC** barcodes.
         {"BC01", "AAGAAAGTTGTCGGTGTCTTTGTG"},
@@ -1741,8 +1743,10 @@ std::unordered_map<std::string, std::string> barcodes = {
         {"16X_H02R_16", "CACAGCAAGA"},
 };
 
+// NOLINTBEGIN(cppcoreguidelines-avoid-non-const-global-variables): custom barcode tracking.
 std::unordered_set<std::string> custom_kit_names;
 std::unordered_set<std::string> custom_barcode_names;
+// NOLINTEND(cppcoreguidelines-avoid-non-const-global-variables)
 
 }  // namespace
 

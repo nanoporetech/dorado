@@ -75,6 +75,12 @@ public:
                                                        const bool include_dtypes);
 
 private:
+    EncoderReadAlignment(const EncoderReadAlignment&) = delete;
+    EncoderReadAlignment& operator=(const EncoderReadAlignment&) = delete;
+    EncoderReadAlignment(EncoderReadAlignment&&) = delete;
+    EncoderReadAlignment& operator=(EncoderReadAlignment&&) = delete;
+
+private:
     hts_io::FastxRandomReader m_fastx_reader;
     secondary::BamFile m_bam_file;
     std::vector<std::string> m_dtypes;

@@ -62,6 +62,12 @@ public:
     }
 
 private:
+    HtsReader(const HtsReader&) = delete;
+    HtsReader& operator=(const HtsReader&) = delete;
+    HtsReader(HtsReader&&) = delete;
+    HtsReader& operator=(HtsReader&&) = delete;
+
+private:
     const std::string m_filename;
     const std::string m_current_filename;
     HtsFilePtr m_file;

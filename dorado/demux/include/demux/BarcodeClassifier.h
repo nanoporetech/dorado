@@ -25,6 +25,12 @@ public:
                                const BarcodeFilterSet& allowed_barcodes) const;
 
 private:
+    BarcodeClassifier(const BarcodeClassifier&) = delete;
+    BarcodeClassifier& operator=(const BarcodeClassifier&) = delete;
+    BarcodeClassifier(BarcodeClassifier&&) = delete;
+    BarcodeClassifier& operator=(BarcodeClassifier&&) = delete;
+
+private:
     const KitInfoProvider m_kit_info_provider;
     const barcode_kits::BarcodeKitScoringParams m_scoring_params;
     const std::vector<BarcodeCandidateKit> m_barcode_candidates;

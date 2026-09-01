@@ -20,8 +20,14 @@ public:
     ~SubreadTaggerNode();
 
     std::string get_name() const override;
-    void terminate(const TerminateOptions &) override;
+    void terminate(const TerminateOptions&) override;
     void restart() override;
+
+private:
+    SubreadTaggerNode(const SubreadTaggerNode&) = delete;
+    SubreadTaggerNode& operator=(const SubreadTaggerNode&) = delete;
+    SubreadTaggerNode(SubreadTaggerNode&&) = delete;
+    SubreadTaggerNode& operator=(SubreadTaggerNode&&) = delete;
 
 protected:
     // Ensure this node processes reads from disconnected clients, otherwise we may not properly

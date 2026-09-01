@@ -20,6 +20,12 @@ public:
     static int get_batch_size_granularity();
 
 private:
+    MetalLSTMCaller(MetalLSTMCaller &&other) = delete;
+    MetalLSTMCaller &operator=(MetalLSTMCaller &&) = delete;
+    MetalLSTMCaller(const MetalLSTMCaller &) = delete;
+    MetalLSTMCaller &operator=(const MetalLSTMCaller &) = delete;
+
+private:
     void set_chunk_batch_size(const config::BasecallModelConfig &model_config,
                               const std::vector<at::Tensor> &state_dict,
                               int chunk_size,

@@ -55,7 +55,7 @@ void check_record(const bcf_hdr_t* header,
 
     if (!std::empty(expected.filter)) {
         // Not a const ref because bcf_has_filter takes a non-const char pointer.
-        std::string filter_name(expected.filter.data(), std::size(expected.filter));
+        std::string filter_name(expected.filter);
         CATCH_CHECK(bcf_has_filter(header, record, filter_name.data()) == 1);
     }
 

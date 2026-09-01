@@ -9,7 +9,7 @@ struct sam_hdr_t;
 namespace dorado {
 namespace utils {
 
-enum HeaderLineType {
+enum class HeaderLineType {
     CO,       // One-line text comment
     HD,       // File-level metadata. Optional.
     PG,       // Program

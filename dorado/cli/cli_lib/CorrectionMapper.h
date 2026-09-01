@@ -24,7 +24,7 @@ class Pipeline;
 
 class CorrectionMapper : public CorrectionAligner {
 public:
-    CorrectionMapper(const std::string& index_file,
+    CorrectionMapper(const std::string &index_file,
                      int32_t threads,
                      uint64_t index_size,
                      std::string furthest_skip_header,
@@ -40,12 +40,18 @@ public:
     stats::NamedStats sample_stats() const override;
 
     // Main driver function.
-    void process(Pipeline& pipeline) override;
+    void process(Pipeline &pipeline) override;
 
     bool load_next_index_block();
 
     int get_current_index_block_id() const;
     int get_index_seqs() const;
+
+private:
+    CorrectionMapper(const CorrectionMapper &) = delete;
+    CorrectionMapper &operator=(const CorrectionMapper &) = delete;
+    CorrectionMapper(CorrectionMapper &&) = delete;
+    CorrectionMapper &operator=(CorrectionMapper &&) = delete;
 
 private:
     std::string m_index_file;
@@ -56,12 +62,12 @@ private:
 
     void input_thread_fn();
     void load_read_fn();
-    void send_data_fn(Pipeline& pipeline);
+    void send_data_fn(Pipeline &pipeline);
 
-    void extract_alignments(const mm_reg1_t* reg,
+    void extract_alignments(const mm_reg1_t *reg,
                             int hits,
-                            const std::string& qread,
-                            const std::string& qname);
+                            const std::string &qread,
+                            const std::string &qname);
 
     // Queue for reads being aligned.
     utils::AsyncQueue<BamPtr> m_reads_queue;

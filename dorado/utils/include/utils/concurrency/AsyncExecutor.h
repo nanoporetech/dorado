@@ -24,6 +24,7 @@ public:
             throw std::logic_error("Invalid queue index for pool");
         }
     }
+    ~AsyncExecutor() = default;
 
     explicit AsyncExecutor() noexcept = default;
     AsyncExecutor(AsyncExecutor&& o) noexcept : AsyncExecutor() {

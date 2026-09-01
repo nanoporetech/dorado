@@ -19,7 +19,7 @@ public:
     static auto with_lock(Functor &&func) {
         std::lock_guard guard(s_cache.m_mutex);
         CacheProxy proxy(s_cache);
-        return func(proxy);
+        return std::forward<Functor>(func)(proxy);
     }
 
     class CacheProxy final {

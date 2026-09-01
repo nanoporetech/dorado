@@ -31,6 +31,12 @@ public:
     stats::NamedStats sample_stats() const final;
 
 private:
+    ModelRunner(const ModelRunner &) = delete;
+    ModelRunner &operator=(const ModelRunner &) = delete;
+    ModelRunner(ModelRunner &&) = delete;
+    ModelRunner &operator=(ModelRunner &&) = delete;
+
+private:
     const config::BasecallModelConfig m_config;
     std::unique_ptr<decode::Decoder> m_decoder;
     at::TensorOptions m_options;

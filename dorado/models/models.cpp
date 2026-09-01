@@ -17,8 +17,6 @@
 #include <unordered_map>
 #include <vector>
 
-namespace fs = std::filesystem;
-
 namespace dorado::models {
 
 namespace {
@@ -1525,7 +1523,7 @@ const std::vector<ModelInfo> models = {
         },
 };
 
-std::vector<ModelInfo> deprecated = {
+const std::vector<ModelInfo> deprecated = {
         // Deprecated R9.4.1 modbase models - v3.{3,4}
         ModelInfo{
                 "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
@@ -2066,7 +2064,8 @@ ModelInfo get_model_info(const std::string& model_name) {
 std::optional<ModelInfo> try_get_model_info(const std::string& model_name) {
     try {
         return get_model_info(model_name);
-    } catch (const std::exception&) {
+    } catch (const std::exception& e) {
+        spdlog::trace("Failed to get model info for {}: {}", model_name, e.what());
     }
     return std::nullopt;
 }

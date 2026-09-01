@@ -302,11 +302,11 @@ CorrectionMapper::CorrectionMapper(const std::string& index_file,
           m_skip_set{std::move(skip_set)},
           m_run_block_id{run_block_id} {
     auto options = alignment::create_preset_options("ava-ont");
-    auto& index_options = options.index_options->get();
+    auto& index_options = options.index.index_options->get();
     index_options.k = static_cast<int16_t>(kmer_size);
     index_options.w = static_cast<int16_t>(window_size);
     index_options.batch_size = index_size;
-    auto& mapping_options = options.mapping_options->get();
+    auto& mapping_options = options.mapping.mapping_options->get();
     mapping_options.bw = 150;
     mapping_options.bw_long = 2000;
     mapping_options.min_chain_score = min_chain_score;

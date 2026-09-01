@@ -79,8 +79,7 @@ bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r
 }
 
 bool operator==(const Minimap2Options& l, const Minimap2Options& r) {
-    return static_cast<const Minimap2IndexOptions&>(l) == r &&
-           static_cast<const Minimap2MappingOptions&>(l) == r;
+    return l.index == r.index && l.mapping == r.mapping;
 }
 
 bool operator!=(const Minimap2Options& l, const Minimap2Options& r) { return !(l == r); }

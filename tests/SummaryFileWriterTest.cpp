@@ -49,9 +49,9 @@ CATCH_TEST_CASE(TEST_GROUP " rows have correct number of entries", TEST_GROUP) {
     BamPtr bam_record(bam_init1());
     std::string_view record_name = "test_record"sv;
     std::string_view seq = "ACGT"sv;
-    std::string_view qual = "0000"sv;
+    const char qual[] = "0000";
     bam_set1(bam_record.get(), record_name.size(), record_name.data(), 4, -1, -1, 0, 0, nullptr, -1,
-             -1, 0, seq.size(), seq.data(), qual.data(), 0);
+             -1, 0, seq.size(), seq.data(), qual, 0);
 
     HtsData hts_data{
             std::move(bam_record),

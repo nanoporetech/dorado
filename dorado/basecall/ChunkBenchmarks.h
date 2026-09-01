@@ -33,6 +33,9 @@ private:
     ChunkBenchmarks();
     ChunkBenchmarks(const ChunkBenchmarks&) = delete;
     ChunkBenchmarks& operator=(const ChunkBenchmarks&) = delete;
+    ChunkBenchmarks(ChunkBenchmarks&&) = delete;
+    ChunkBenchmarks& operator=(ChunkBenchmarks&&) = delete;
+    ~ChunkBenchmarks();
 
     // Must be called with m_chunk_benchmarks_mutex already locked.
     std::optional<const ChunkTimings> get_chunk_timings_internal(const GPUName& gpu_name,

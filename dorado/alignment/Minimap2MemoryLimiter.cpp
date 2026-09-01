@@ -19,6 +19,7 @@ struct Limiters {
     utils::ResourceLimiter small_queue;
 };
 
+// NOLINTNEXTLINE(cppcoreguidelines-avoid-non-const-global-variables): intentional singleton.
 std::unique_ptr<Limiters> s_limiters;
 
 }  // namespace

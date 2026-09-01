@@ -257,7 +257,6 @@ CATCH_TEST_CASE(TEST_GROUP ": Methylation tag generation", TEST_GROUP) {
     read_common.base_mod_probs = modbase_probs;
     read_common.is_duplex = false;
 
-    std::string methylation_tag;
     CATCH_SECTION("Methylation threshold is correctly applied") {
         read_common.mod_base_info =
                 std::make_shared<dorado::ModBaseInfo>(modbase_alphabet, modbase_long_names, "");

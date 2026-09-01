@@ -297,6 +297,9 @@ CATCH_TEST_CASE(
         case 'T':
             read->read_common.base_mod_probs[i * mod_alphabet.size() + 4] = 255;
             break;
+        default:
+            CATCH_FAIL(fmt::format("Unexpected character in sequence: {} @ {}",
+                                   read->read_common.seq[i], i));
         }
     }
     read->read_common.base_mod_probs[front_flank.length() * mod_alphabet.size()] = 20;  // A
@@ -428,7 +431,9 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     reader.read();
     BamPtr read2(bam_dup1(reader.record.get()));
     std::string id_in2 = bam_get_qname(read2.get());
+    CATCH_CHECK(id_in1 != id_in2);
     auto orig_seq2 = dorado::utils::extract_sequence(read2.get());
+    CATCH_CHECK(orig_seq1 != orig_seq2);
     auto hts_data2 = std::make_unique<HtsData>(HtsData{std::move(read2)});
     pipeline->push_message(dorado::BamMessage{std::move(hts_data2), client_info});
 
@@ -443,7 +448,6 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
 
     // Reads may not come back in the same order.
     std::string id_out1 = bam_get_qname(read1.get());
-    std::string id_out2 = bam_get_qname(read2.get());
     if (id_out1 != id_in1) {
         read1.swap(read2);
     }

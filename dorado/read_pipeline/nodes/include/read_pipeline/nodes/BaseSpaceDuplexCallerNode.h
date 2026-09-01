@@ -22,6 +22,12 @@ public:
     void restart() override;
 
 private:
+    BaseSpaceDuplexCallerNode(const BaseSpaceDuplexCallerNode&) = delete;
+    BaseSpaceDuplexCallerNode& operator=(const BaseSpaceDuplexCallerNode&) = delete;
+    BaseSpaceDuplexCallerNode(BaseSpaceDuplexCallerNode&&) = delete;
+    BaseSpaceDuplexCallerNode& operator=(BaseSpaceDuplexCallerNode&&) = delete;
+
+private:
     void start_threads();
     void terminate_impl(utils::AsyncQueueTerminateFast fast);
     void worker_thread();

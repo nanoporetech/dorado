@@ -67,6 +67,12 @@ public:
             const std::vector<std::pair<uint64_t, uint64_t>>& merged_chunks);
 
 private:
+    ModBaseChunkCallerNode(const ModBaseChunkCallerNode&) = delete;
+    ModBaseChunkCallerNode& operator=(const ModBaseChunkCallerNode&) = delete;
+    ModBaseChunkCallerNode(ModBaseChunkCallerNode&&) = delete;
+    ModBaseChunkCallerNode& operator=(ModBaseChunkCallerNode&&) = delete;
+
+private:
     using ModBaseChunks = std::vector<std::unique_ptr<ModBaseChunkCallerNode::ModBaseChunk>>;
     using PerBaseSizeTVec = std::array<std::vector<size_t>, 4>;
 
@@ -86,8 +92,8 @@ private:
 
     void output_thread_fn();
 
-    void simplex_mod_call(Message&& message);
-    void duplex_mod_call(Message&& message);
+    void simplex_mod_call(Message message);
+    void duplex_mod_call(Message message);
 
     // Called by chunk_caller_thread_fn, calls the model and enqueues the results
     void call_batch(modbase::ModBaseRunner& runner, size_t model_id, ModBaseChunks& batched_chunks);

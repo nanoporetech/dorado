@@ -20,6 +20,12 @@ public:
     void finalize();
 
 private:
+    VariantProgressTracker(const VariantProgressTracker&) = delete;
+    VariantProgressTracker& operator=(const VariantProgressTracker&) = delete;
+    VariantProgressTracker(VariantProgressTracker&&) = delete;
+    VariantProgressTracker& operator=(VariantProgressTracker&&) = delete;
+
+private:
     void internal_set_progress(double progress);
 
     SimpleProgressBar m_progress_bar;

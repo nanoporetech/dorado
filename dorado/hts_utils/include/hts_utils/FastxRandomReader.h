@@ -26,7 +26,6 @@ private:
 public:
     FastxRandomReader(const std::filesystem::path& fastx_path);
     FastxRandomReader(const std::filesystem::path& fastx_path, bool force_upper);
-    ~FastxRandomReader() = default;
 
     std::string fetch_seq(const std::string& read_id) const;
     std::vector<uint8_t> fetch_qual(const std::string& read_id) const;

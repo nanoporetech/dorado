@@ -28,8 +28,7 @@ void SamHdrDestructor::operator()(sam_hdr_t* bam) { sam_hdr_destroy(bam); }
 namespace {
 
 std::shared_ptr<const sam_hdr_t> make_sam_hdr(sam_hdr_t* hdr) {
-    return std::shared_ptr<const sam_hdr_t>(
-            hdr, [](const sam_hdr_t* h) { sam_hdr_destroy(const_cast<sam_hdr_t*>(h)); });
+    return std::shared_ptr<sam_hdr_t>(hdr, [](sam_hdr_t* h) { sam_hdr_destroy(h); });
 }
 
 }  // namespace

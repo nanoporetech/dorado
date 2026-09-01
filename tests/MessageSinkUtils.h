@@ -21,6 +21,12 @@ public:
     }
 
 private:
+    MessageSinkToVector(const MessageSinkToVector&) = delete;
+    MessageSinkToVector& operator=(const MessageSinkToVector&) = delete;
+    MessageSinkToVector(MessageSinkToVector&&) = delete;
+    MessageSinkToVector& operator=(MessageSinkToVector&&) = delete;
+
+private:
     void terminate_impl(dorado::utils::AsyncQueueTerminateFast fast) {
         stop_input_processing(fast);
     }
@@ -36,7 +42,7 @@ private:
 };
 
 template <class T>
-std::vector<T> ConvertMessages(std::vector<dorado::Message>&& messages) {
+std::vector<T> ConvertMessages(std::vector<dorado::Message> messages) {
     std::vector<T> converted_messages;
     converted_messages.reserve(messages.size());
     for (auto& message : messages) {

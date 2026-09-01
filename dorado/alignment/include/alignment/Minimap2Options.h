@@ -37,7 +37,10 @@ bool operator>=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r
 bool operator==(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
 bool operator!=(const Minimap2MappingOptions& l, const Minimap2MappingOptions& r);
 
-struct Minimap2Options : public Minimap2IndexOptions, public Minimap2MappingOptions {
+struct Minimap2Options {
+    Minimap2IndexOptions index;
+    Minimap2MappingOptions mapping;
+
     static std::optional<Minimap2Options> parse(const std::string& option_string,
                                                 std::string& error_message);
 };

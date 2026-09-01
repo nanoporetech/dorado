@@ -35,8 +35,7 @@ std::string get_barcode_sequence(const std::string& barcode_name) {
 std::string get_tag(const std::string& tag,
                     const std::unordered_map<std::string, std::string>& tags) {
     const auto& it = tags.find(tag);
-    const std::string value = (it != std::end(tags)) ? it->second : "";
-    return value;
+    return (it != std::end(tags)) ? it->second : "";
 }
 
 std::vector<std::string> tokenize(const std::string& line, const char delimiter) {
@@ -58,8 +57,8 @@ int64_t parse_DT_tag(const std::unordered_map<std::string, std::string>& tags) {
     if (dt.empty()) {
         return 0;
     }
-    const int64_t datetime_ms = utils::get_unix_time_ms_from_string_timestamp(dt);
-    return datetime_ms;
+    const auto datetime_ms = utils::get_unix_time_ms_from_string_timestamp(dt);
+    return datetime_ms.value_or(0);
 }
 
 std::string_view parse_DS_tag_key(const std::vector<std::string>& tokens, const std::string& key) {
@@ -150,8 +149,11 @@ void HeaderMapper::process(const std::unordered_map<std::string, ReadGroup>& rea
         }
 
         if (!read_group.exp_start_time.empty()) {
-            attrs.protocol_start_time_ms =
+            const auto protocol_start_time_ms =
                     utils::get_unix_time_ms_from_string_timestamp(read_group.exp_start_time);
+            if (protocol_start_time_ms) {
+                attrs.protocol_start_time_ms = protocol_start_time_ms.value();
+            }
         }
 
         auto& merged_header_ptr = merged_headers[attrs];
@@ -249,8 +251,11 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
         }
 
         if (!rg_data.data.exp_start_time.empty()) {
-            attrs.protocol_start_time_ms =
+            const auto protocol_start_time_ms =
                     utils::get_unix_time_ms_from_string_timestamp(rg_data.data.exp_start_time);
+            if (protocol_start_time_ms) {
+                attrs.protocol_start_time_ms = protocol_start_time_ms.value();
+            }
         }
 
         auto& merged_header_ptr = merged_headers[attrs];

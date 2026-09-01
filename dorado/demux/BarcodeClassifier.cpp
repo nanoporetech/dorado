@@ -131,6 +131,7 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view stra
     int bc_loc = extract_mask_location(result, strand);
     utils::trace_log("{} dist {} position {} bc_loc {} score {}", debug_prefix, result.editDistance,
                      result.startLocations[0], bc_loc, score);
+    // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
     utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
     return {result, score, bc_loc};
 }
@@ -150,6 +151,7 @@ std::tuple<EdlibAlignResult, float, int, int> extract_flank_fit_dual(
     auto [bc_loc, bc_loc_inner] = extract_dual_mask_location(result, strand);
     utils::trace_log("{} dist {} position {} bc_loc {} bc_loc_inner {} score {}", debug_prefix,
                      result.editDistance, result.startLocations[0], bc_loc, bc_loc_inner, score);
+    // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
     utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
     return {result, score, bc_loc, bc_loc_inner};
 }
@@ -163,8 +165,10 @@ int extract_barcode_penalty(std::string_view barcode,
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto penalty = result.editDistance;
-    utils::trace_log("{} {}\n{}", debug_prefix, penalty,
-                     utils::alignment_to_str(barcode.data(), read.data(), result));
+    utils::trace_log(
+            "{} {}\n{}", debug_prefix, penalty,
+            // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
+            utils::alignment_to_str(barcode.data(), read.data(), result));
     edlibFreeAlignResult(result);
     return penalty;
 }

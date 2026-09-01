@@ -91,6 +91,12 @@ public:
                      uint8_t threshold) const;
 
 private:
+    ModBaseContext(const ModBaseContext&) = delete;
+    ModBaseContext& operator=(const ModBaseContext&) = delete;
+    ModBaseContext(ModBaseContext&&) = delete;
+    ModBaseContext& operator=(ModBaseContext&&) = delete;
+
+private:
     std::array<std::string, 4> m_motifs;
     std::array<size_t, 4> m_offsets = {0, 0, 0, 0};
     std::array<std::unique_ptr<MotifMatcher>, 4> m_motif_matchers;

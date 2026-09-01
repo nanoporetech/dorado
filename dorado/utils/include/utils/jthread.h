@@ -9,6 +9,9 @@ namespace dorado::utils {
  * \brief Polyfill until std::jthread becomes available.
  */
 class jthread : private std::thread {
+    jthread(const jthread &) = delete;
+    jthread &operator=(const jthread &) = delete;
+
 public:
     using std::thread::join;
     using std::thread::thread;

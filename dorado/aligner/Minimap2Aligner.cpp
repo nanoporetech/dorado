@@ -51,7 +51,7 @@ void add_sa_tag(bam1_t* record,
         clip5 = r->rev ? l_seq - r->qe : r->qs;
         clip3 = r->rev ? r->qs : l_seq - r->qe;
 
-        ss << std::string(idx->seq[r->rid].name) << ",";
+        ss << idx->seq[r->rid].name << ",";
         ss << r->rs + 1 << ",";
         ss << "+-"[r->rev] << ",";
         if (clip5) {
@@ -147,7 +147,7 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
         throw std::logic_error(
                 "Minimap2Aligner::get_mapping() called on fully-loaded split index.");
     }
-    std::string_view qname(bam_get_qname(irecord));
+    const char* const qname = bam_get_qname(irecord);
 
     // get the sequence to map from the record
     std::string seq = utils::extract_sequence(irecord);
@@ -157,7 +157,7 @@ std::tuple<mm_reg1_t*, int> Minimap2Aligner::get_mapping(bam1_t* irecord, mm_tbu
     auto mm_index = m_minimap_index->index();
     const auto& mm_map_opts = m_minimap_index->mapping_options();
     mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
-                            &mm_map_opts, qname.data());
+                            &mm_map_opts, qname);
     return {reg, hits};
 }
 
@@ -264,7 +264,8 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
     std::vector<BamPtr> results;
 
     // get query name.
-    std::string_view qname(bam_get_qname(irecord));
+    const char* const qname = bam_get_qname(irecord);
+    const size_t qname_len = strlen(qname);
 
     std::string seq;
     std::string seq_rev;
@@ -298,7 +299,7 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
     auto mm_index = m_minimap_index->index(idx_no);
     const auto& mm_map_opts = m_minimap_index->mapping_options();
     mm_reg1_t* reg = mm_map(mm_index, static_cast<int>(seq.length()), seq.c_str(), &hits, buf,
-                            &mm_map_opts, qname.data());
+                            &mm_map_opts, qname);
 
     // just return the input record
     if (hits == 0) {
@@ -405,9 +406,10 @@ std::vector<BamPtr> Minimap2Aligner::align_impl(bam1_t* irecord, mm_tbuf_t* buf,
         bam1_t* record = bam_init1();
 
         // Set properties of the BAM record.
-        bam_set1(record, qname.size(), qname.data(), flag, tid, pos, mapq, n_cigar,
+        bam_set1(record, qname_len, qname, flag, tid, pos, mapq, n_cigar,
                  cigar.empty() ? nullptr : cigar.data(), irecord->core.mtid, irecord->core.mpos,
-                 irecord->core.isize, l_seq, seq_tmp, (char*)qual_tmp, bam_get_l_aux(irecord));
+                 irecord->core.isize, l_seq, seq_tmp, reinterpret_cast<char*>(qual_tmp),
+                 bam_get_l_aux(irecord));
 
         // Copy over tags from input alignment.
         memcpy(bam_get_aux(record), bam_get_aux(irecord), bam_get_l_aux(irecord));
@@ -612,8 +614,7 @@ void Minimap2Aligner::add_tags(bam1_t* record,
 
     // de / dv
     if (aln->p) {
-        float div;
-        div = static_cast<float>(1.0 - mm_event_identity(aln));
+        float div = static_cast<float>(1.0 - mm_event_identity(aln));
         bam_aux_append(record, "de", 'f', sizeof(div), (uint8_t*)&div);
     } else if (aln->div >= 0.0f && aln->div <= 1.0f) {
         bam_aux_append(record, "dv", 'f', sizeof(aln->div), (uint8_t*)&aln->div);

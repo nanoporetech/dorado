@@ -318,7 +318,7 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
     for (size_t i = 0; i < read.seq.size(); ++i) {
         // Initialize for what corresponds to 100% canonical base for each position.
         // This is like one-hot encoding the canonical bases
-        const int base_id = utils::BaseInfo::BASE_IDS.at(static_cast<std::uint8_t>(read.seq[i]));
+        const auto base_id = utils::BaseInfo::BASE_IDS.at(static_cast<std::uint8_t>(read.seq[i]));
         if (base_id < 0) {
             spdlog::error("Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
                           read.seq[i], read.read_id);
@@ -714,7 +714,7 @@ std::optional<ModBaseChunkCallerNode::EncodingData> ModBaseChunkCallerNode::popu
     return EncodingData{std::move(seq_to_sig_map), std::move(int_seq)};
 }
 
-void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
+void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
 
@@ -777,7 +777,7 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message&& message) {
     }
 }
 
-void ModBaseChunkCallerNode::duplex_mod_call(Message&& message) {
+void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
 

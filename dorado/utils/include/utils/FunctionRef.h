@@ -12,6 +12,16 @@ namespace dorado::utils {
 namespace detail {
 
 template <bool IsConst, typename R, typename... Args>
+class FunctionRefBase;
+
+template <typename T>
+struct is_function_ref : std::false_type {};
+template <bool IsConst, typename R, typename... Args>
+struct is_function_ref<FunctionRefBase<IsConst, R, Args...>> : std::true_type {};
+template <typename T>
+inline constexpr bool is_function_ref_v = is_function_ref<T>::value;
+
+template <bool IsConst, typename R, typename... Args>
 class FunctionRefBase {
     using FunctionPtr = R (*)(Args...);
 
@@ -28,6 +38,7 @@ public:
         if (ptr) {
             m_functor = reinterpret_cast<void*>(ptr);
             m_invoke = [](const void* functor, Args&&... args) {
+                // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): pointers to constant functions aren't allowed.
                 auto* f = reinterpret_cast<FunctionPtr>(const_cast<void*>(functor));
                 return (*f)(std::forward<Args>(args)...);
             };
@@ -35,11 +46,13 @@ public:
     }
 
     template <typename Func>
-    FunctionRefBase(Func&& func) {
+        requires(!is_function_ref_v<Func>)
+    FunctionRefBase(const Func& func) {
         using F = std::remove_reference_t<Func>;
 
         m_functor = std::addressof(func);
         m_invoke = [](const void* functor, Args&&... args) {
+            // NOLINTNEXTLINE(cppcoreguidelines-pro-type-const-cast): we'll always use the non-const overload.
             auto* f = std::launder(reinterpret_cast<F*>(const_cast<void*>(functor)));
             return (*f)(std::forward<Args>(args)...);
         };

@@ -20,7 +20,7 @@ void dispatch_processable(const Processable& item, Visitor&& visitor) {
             [&](auto ref_wrapper) {
                 using T = std::decay_t<decltype(ref_wrapper.get())>;
                 T& data = ref_wrapper.get();
-                visitor(data);
+                std::forward<Visitor>(visitor)(data);
             },
             item);
 }
@@ -33,6 +33,13 @@ public:
 
     virtual std::string get_name() const = 0;
     virtual stats::NamedStats sample_stats() const = 0;
+
+protected:
+    IWriter() = default;
+    IWriter(const IWriter&) = delete;
+    IWriter& operator=(const IWriter&) = delete;
+    IWriter(IWriter&&) = delete;
+    IWriter& operator=(IWriter&&) = delete;
 };
 
 class NullWriter : public IWriter {

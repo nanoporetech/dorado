@@ -36,6 +36,8 @@ class CUDATimer {
 
     CUDATimer(const CUDATimer &) = delete;
     CUDATimer &operator=(const CUDATimer &) = delete;
+    CUDATimer(CUDATimer &&) = delete;
+    CUDATimer &operator=(CUDATimer &&) = delete;
 
 public:
     /**

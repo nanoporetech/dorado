@@ -68,6 +68,12 @@ private:
     bool is_disabled() const;
     void join_report_thread();
 
+private:
+    ReadOutputProgressStats(const ReadOutputProgressStats &) = delete;
+    ReadOutputProgressStats &operator=(const ReadOutputProgressStats &) = delete;
+    ReadOutputProgressStats(ReadOutputProgressStats &&) = delete;
+    ReadOutputProgressStats &operator=(ReadOutputProgressStats &&) = delete;
+
 public:
     ReadOutputProgressStats(std::chrono::seconds interval_duration,
                             std::size_t num_input_files,
@@ -77,13 +83,13 @@ public:
 
     void start();
 
-    void update_stats(const stats::NamedStats& stats);
+    void update_stats(const stats::NamedStats &stats);
 
     // Called to indicate the current stats collection has completed.
     // There may be new stats but their counters will be reset to zero.
     // E.g. happens in `dorado aligner` when reading from multiple input files
     // a new pipeline and HtsWriterNode is created for each input file
-    void notify_stats_collector_completed(const stats::NamedStats& stats);
+    void notify_stats_collector_completed(const stats::NamedStats &stats);
 
     // Useful for collector_per_input_file mode (aligner), so that further
     // report outputs will be based on read stats instead of post processing

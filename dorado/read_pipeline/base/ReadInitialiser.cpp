@@ -70,25 +70,25 @@ void ReadInitialiser::update_read_attributes(HtsData& data) const {
 
         // position_id is not currently stored in the output files
         // assign_not_empty(data.read_attrs.position_id, read_group.position_id);
-        data.read_attrs.protocol_start_time_ms =
+        const auto protocol_start_time_ms =
                 utils::get_unix_time_ms_from_string_timestamp(read_group.exp_start_time);
+        data.read_attrs.protocol_start_time_ms = protocol_start_time_ms.value();
 
         if (const auto qs_tag = bam_aux_get(data.bam_ptr.get(), "qs"); qs_tag != nullptr) {
             const float qscore = static_cast<float>(bam_aux2f(qs_tag));
             data.read_attrs.is_status_pass = qscore >= m_minimum_qscore;
         }
 
-        try {
-            if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
-                const std::string read_start_time_str = bam_aux2Z(st_tag);
-                const auto acq_start_time =
-                        utils::get_unix_time_ms_from_string_timestamp(read_group.acq_start_time);
-                const auto read_start_time =
-                        utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
-                data.read_attrs.start_time_ms = read_start_time - acq_start_time;
+        if (const auto st_tag = bam_aux_get(data.bam_ptr.get(), "st"); st_tag != nullptr) {
+            const std::string read_start_time_str = bam_aux2Z(st_tag);
+            const auto acq_start_time =
+                    utils::get_unix_time_ms_from_string_timestamp(read_group.acq_start_time);
+            const auto read_start_time =
+                    utils::get_unix_time_ms_from_string_timestamp(read_start_time_str);
+            if (acq_start_time && read_start_time) {
+                // can't parse something, ignore start_time and continue
+                data.read_attrs.start_time_ms = read_start_time.value() - acq_start_time.value();
             }
-        } catch (...) {
-            // can't parse something, ignore start_time and continue
         }
     }
 }
