@@ -1,12 +1,9 @@
 #pragma once
 
-#include "secondary/kadayashi/hts_types.h"
-
 #include <array>
 #include <cassert>
 #include <cstdint>
 #include <limits>
-#include <memory>
 #include <string>
 #include <unordered_map>
 #include <vector>

@@ -1,5 +1,6 @@
 #include "bam_tagging.h"
 
+#include "hts_utils/hts_types.h"
 #include "kadayashi_utils.h"
 #include "pipeline.h"
 #include "secondary/common/bam_file.h"
@@ -12,7 +13,6 @@
 
 #include <cassert>
 #include <cstdlib>
-#include <sstream>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)
@@ -47,7 +47,7 @@ int write_haptagged_bam_given_hashtable_and_itvl(
         return 1;
     }
 
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         const char *refname = hf.hdr()->target_name[aln->core.tid];
         const int start_pos = static_cast<int>(aln->core.pos);
@@ -121,7 +121,7 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
         return 1;
     }
 
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         const std::string qn = bam_get_qname(aln.get());
 
@@ -201,7 +201,7 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
             query_interavls[chrom].push_back({0, hf.hdr()->target_len[i_ref]});
         }
 
-        BamPtr aln(bam_init1());
+        dorado::BamPtr aln(bam_init1());
         for (const std::pair<uint32_t, uint32_t> &query_itvl : query_interavls[chrom]) {
             std::string query_itvl_s = chrom;
             query_itvl_s.append(":");

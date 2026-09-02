@@ -14,6 +14,7 @@
 
 struct faidx_t;
 struct bam1_t;
+typedef struct htsFile samFile;
 
 namespace kadayashi {
 

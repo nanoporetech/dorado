@@ -2,8 +2,8 @@
 
 #include "../string_utils.h"
 #include "../variant_graph.h"
-#include "bam_tagging.h"
 #include "hts_utils/FastxRandomReader.h"
+#include "hts_utils/hts_types.h"
 #include "kadayashi_utils.h"
 #include "resources.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
@@ -329,7 +329,7 @@ void local_haptagging_write_tsv2(std::ofstream &fp,
     // The haptags are supplied from qname2hp;
     // haptags in the bam file has no effect.
     str2int_t ht;
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         const char *qn = bam_get_qname(aln);
         auto it = qname2hp.find(qn);
@@ -861,7 +861,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
     // ^stores haptag of ref allele; hap0, hap1, unphased, allele not matched
 
     HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), refname));
-    BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
+    dorado::BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
 
     // index known locations
     std::unordered_map<uint32_t, int> pos2idx;  // position-on-ref to index-in-linear-buffer
@@ -1867,7 +1867,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     int haptag;
     int n_lines = 0;
     int n_lines_seen = 0;
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         char *refname = hf.hdr()->target_name[aln->core.tid];
         int start_pos = aln->core.pos;
@@ -2294,7 +2294,7 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
 
     dorado::secondary::BamFile hf{fn_bam, n_threads};
     HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), interval_string.c_str()));
-    BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
+    dorado::BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
 
     uint32_t ref_start = 0;
     uint32_t ref_end = 0;

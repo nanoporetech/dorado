@@ -1,11 +1,11 @@
 #include "secondary/kadayashi/local_haplotagging.h"
 
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/blocked_bloom_filter.h"
 #include "secondary/kadayashi/faidx_utils.h"
-#include "secondary/kadayashi/hts_types.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
 #include "variant_graph.h"
@@ -473,7 +473,7 @@ interval_t expand_query_interval(dorado::secondary::BamFileView &hf,
     const std::string itvl_left =
             create_region_string(refname, itvl_start, itvl_start + 1);  // +1 to get 1 base
 
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
     HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str()));
 
     uint32_t offset_left = OFFSET_DEFAULT;
@@ -1860,7 +1860,7 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
 
     const std::string itvl = create_region_string(refname, ck.abs_start, ck.abs_end);
     HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
 
     if (!pp.disable_region_expansion) {
         interval_t new_itvl = expand_query_interval(hf, refname, ck.abs_start, ck.abs_end);
@@ -2716,7 +2716,7 @@ struct medaka_feature_matrix_lane_tracker_compare_t {
 };
 
 static medaka_feature_matrix_features_t gen_medaka_feature_matrix_parse_features_aln_record(
-        BamPtr &aln) {
+        dorado::BamPtr &aln) {
     return medaka_feature_matrix_features_t{
             .qn = bam_get_qname(aln.get()), .flag = aln.get()->core.flag, .mapq = aln->core.qual};
 }
@@ -2837,7 +2837,7 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
     // input files
     const std::string itvl = create_region_string(gck.refname, gck.itvl_start, gck.itvl_end);
     HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
-    BamPtr aln(bam_init1());
+    dorado::BamPtr aln(bam_init1());
 
     // helpers for read downsampling (adapted from pileup_ht)
     constexpr bool ENABLE_DOWNSAMPLE = true;
