@@ -1,16 +1,14 @@
-option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" OFF)
+option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" ON)
 
 set(PUBLIC_BASE ${CMAKE_CURRENT_SOURCE_DIR}/include/secondary/kadayashi)
 target_sources(dorado_secondary
     PUBLIC
         ${PUBLIC_BASE}/local_haplotagging.h
         ${PUBLIC_BASE}/faidx_utils.h
-        ${PUBLIC_BASE}/hts_types.h
         ${PUBLIC_BASE}/types.h
         ${PUBLIC_BASE}/blocked_bloom_filter.h
     PRIVATE
         local_haplotagging.cpp
-        hts_types.cpp
         blocked_bloom_filter.cpp
         faidx_utils.cpp
         sequence_utility.cpp

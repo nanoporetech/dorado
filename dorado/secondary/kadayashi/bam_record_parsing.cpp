@@ -159,9 +159,8 @@ bool parse_variants_for_one_read(const bam1_t *aln,
         op = bam_cigar_op(cigar[i]);
         op_l = bam_cigar_oplen(cigar[i]);
         if (op_l == 0) {
-            throw std::runtime_error{"[kdys::" + std::string(__func__) +
-                                     "] cigar oplen cannot be 0, qn is " +
-                                     std::string(bam_get_qname(aln))};
+            throw std::runtime_error{std::string("[kdys::") + __func__ +
+                                     "] cigar oplen cannot be 0, qn is " + bam_get_qname(aln)};
         }
         if (op == BAM_CREF_SKIP) {
             ref_pos += op_l;

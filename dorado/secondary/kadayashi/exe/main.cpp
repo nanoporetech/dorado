@@ -12,10 +12,11 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
-#include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <string_view>
+
+namespace {
 
 void print_end_summary(int argc, char *argv[], double timestamp) {
     spdlog::info("\n[M::{}] ELAPSED: {:.1f}s , PeakRSS: {:.1f} GiB", __func__,
@@ -98,7 +99,9 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
         // get the refseq names from the bam
         std::vector<std::string> ref_names;
         dorado::secondary::BamFile tmp_hf{fn_bam, 1};
-        for (int i = 0; i < tmp_hf.hdr()->n_targets; i++) {
+        const int n_targets = tmp_hf.hdr()->n_targets;
+        ref_names.reserve(n_targets);
+        for (int i = 0; i < n_targets; i++) {
             ref_names.push_back(tmp_hf.hdr()->target_name[i]);
         }
 
@@ -144,9 +147,9 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                         : kadayashi::gen_medaka_feature_matrix(
                                                   hf_view, chrom, ref_start, ref_end, qname2hp,
                                                   mfm_options);
-                        spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(), __func__,
-                                      (int)ref_start, (int)ref_end,
-                                      mfm.matrix.size() > 0 ? (int)mfm.matrix[0] : -1);
+                        spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(),
+                                      "main_featmatgen", ref_start, ref_end,
+                                      mfm.matrix.size() > 0 ? mfm.matrix[0] : -1);
                     }
                 }
             };
@@ -166,6 +169,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
 
     return 0;
 }
+
+}  // namespace
 
 int main(int argc, char *argv[]) {
     int ret = 0;
@@ -196,8 +201,8 @@ int main(int argc, char *argv[]) {
         if (clio.write_dbg_bam) {
             std::string fn_out_bam = fn_out_binary + ".bam";
             const int writebam_err = kadayashi::write_haptagged_bam_given_bin_and_itvl(
-                    clio.fn_bam, fn_out_binary, clio.one_region_str, fn_out_bam, clio.n_threads,
-                    BAM_THREAD_MULT);
+                    clio.fn_bam, fn_out_binary, clio.one_region_str.c_str(), fn_out_bam,
+                    clio.n_threads, BAM_THREAD_MULT);
             if (writebam_err) {
                 spdlog::error("[kdys::{}] failed to write debug haptagged bam, check code!",
                               __func__);
@@ -217,8 +222,8 @@ int main(int argc, char *argv[]) {
         // given bam, bin and an interval, output bam with modified haplotag. Debug util.
         cliopt_t &clio = clio_pack.clio_phase;
         ret = kadayashi::write_haptagged_bam_given_bin_and_itvl(
-                clio.fn_bam, clio.fn_bin, clio.one_region_str, clio.output_name, clio.n_threads,
-                BAM_THREAD_MULT);
+                clio.fn_bam, clio.fn_bin, clio.one_region_str.c_str(), clio.output_name,
+                clio.n_threads, BAM_THREAD_MULT);
     } else if (subcommand == "phaseglobal") {
         cliopt_phaseglobal_t &clio = clio_pack.clio_phaseglobal;
 
@@ -273,7 +278,7 @@ int main(int argc, char *argv[]) {
                 .tag_keep_missing = false,
                 .readgroup = clio.readgroup,
                 .disable_read_packing = clio.disable_read_packing,
-                .hap_source = kadayashi::FORCE_UNPHASED,
+                .hap_source = kadayashi::haplotagsource::FORCE_UNPHASED,
                 .max_reads = clio.max_lanes,
                 .right_align_insertions = clio.right_align_insertions,
                 .min_snp_accuracy = clio.min_snp_accuracy};

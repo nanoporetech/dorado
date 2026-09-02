@@ -1,11 +1,11 @@
 #include "secondary/kadayashi/local_haplotagging.h"
 
 #include "hts_utils/bam_utils.h"
+#include "hts_utils/hts_types.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/blocked_bloom_filter.h"
 #include "secondary/kadayashi/faidx_utils.h"
-#include "secondary/kadayashi/hts_types.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
 #include "variant_graph.h"
@@ -473,9 +473,8 @@ interval_t expand_query_interval(dorado::secondary::BamFileView &hf,
     const std::string itvl_left =
             create_region_string(refname, itvl_start, itvl_start + 1);  // +1 to get 1 base
 
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str()), HtsItrDestructor());
+    dorado::BamPtr aln(bam_init1());
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str()));
 
     uint32_t offset_left = OFFSET_DEFAULT;
     int offset_right = 0;
@@ -491,7 +490,7 @@ interval_t expand_query_interval(dorado::secondary::BamFileView &hf,
     //right
     const std::string itvl_right =
             create_region_string(refname, itvl_end, itvl_end + 1);  // +1 to get 1 base
-    bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str()), HtsItrDestructor());
+    bamitr = dorado::secondary::HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str()));
     while (sam_itr_next(hf.fp, bamitr.get(), aln.get()) >= 0) {
         const uint32_t end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
         if (end_pos < OFFSET_DEFAULT + itvl_end) {
@@ -1304,11 +1303,11 @@ std::pair<std::string, std::string> ta_t_reconstruct_haplotypes_for_del_absorbti
                     insert_one_var_to_hap_recon(hap1, var, 1);
                 } else {
                     throw std::runtime_error{
-                            "[kdys::" + std::string(__func__) +
-                            "] unexpected genotype(multi-allelic): " +
-                            std::string(var.genotype.data()) + " , query range was " + ck.refname +
-                            ":" + std::to_string(range_start) + "-" + std::to_string(range_end) +
-                            " , var.pos was " + std::to_string(var.pos)};
+                            std::string("[kdys::") + __func__ +
+                            "] unexpected genotype(multi-allelic): " + var.genotype.data() +
+                            " , query range was " + ck.refname + ":" + std::to_string(range_start) +
+                            "-" + std::to_string(range_end) + " , var.pos was " +
+                            std::to_string(var.pos)};
                 }
             } else {
                 if (var.genotype[0] == '1') {
@@ -1321,11 +1320,11 @@ std::pair<std::string, std::string> ta_t_reconstruct_haplotypes_for_del_absorbti
                             hap1, var, var.alleles[0][0] == SENTINEL_REF_ALLELE_INT ? 1 : 0);
                 } else {
                     throw std::runtime_error{
-                            "[kdys::" + std::string(__func__) +
-                            "] unexpected genotype(single-allelic): " +
-                            std::string(var.genotype.data()) + " , query range was " + ck.refname +
-                            ":" + std::to_string(range_start) + "-" + std::to_string(range_end) +
-                            " , var.pos was " + std::to_string(var.pos)};
+                            std::string("[kdys::") + __func__ +
+                            "] unexpected genotype(single-allelic): " + var.genotype.data() +
+                            " , query range was " + ck.refname + ":" + std::to_string(range_start) +
+                            "-" + std::to_string(range_end) + " , var.pos was " +
+                            std::to_string(var.pos)};
                 }
             }
         }  // insert var seq into haplotype seq for one var
@@ -1860,8 +1859,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
     uint32_t span_end = ck.abs_end;
 
     const std::string itvl = create_region_string(refname, ck.abs_start, ck.abs_end);
-    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()), HtsItrDestructor());
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
+    dorado::BamPtr aln(bam_init1());
 
     if (!pp.disable_region_expansion) {
         interval_t new_itvl = expand_query_interval(hf, refname, ck.abs_start, ck.abs_end);
@@ -1869,7 +1868,7 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         span_end = new_itvl.end;
         const std::string itvl2 = create_region_string(refname, span_start, span_end);
 
-        bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()), HtsItrDestructor());
+        bamitr = dorado::secondary::HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()));
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
             LOG_DEBUG("[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__, itvl2,
                       pp.disable_region_expansion);
@@ -2717,7 +2716,7 @@ struct medaka_feature_matrix_lane_tracker_compare_t {
 };
 
 static medaka_feature_matrix_features_t gen_medaka_feature_matrix_parse_features_aln_record(
-        BamPtr &aln) {
+        dorado::BamPtr &aln) {
     return medaka_feature_matrix_features_t{
             .qn = bam_get_qname(aln.get()), .flag = aln.get()->core.flag, .mapq = aln->core.qual};
 }
@@ -2740,7 +2739,7 @@ static inline bool sort_qa_t_ins_last(const qa_t &a, const qa_t &b) {
 
 static size_t get_qa_t_allele_len(const qa_t &var) {
     if (var.allele.size() < 2) {
-        throw std::runtime_error{"[kdys::" + std::string(__func__) + "] invalid allele size"};
+        throw std::runtime_error{std::string("[kdys::") + __func__ + "] invalid allele size"};
     }
     return var.allele.size() - 1;
 }
@@ -2791,9 +2790,9 @@ static double get_snp_accuracy_dorado_style(const read_t &read, const char *qn) 
     }
     const int span = static_cast<int>(read.end_pos - read.start_pos);
     if (span <= n_del) {
-        throw std::runtime_error{"[kdys::" + std::string(__func__) +
-                                 "] read has abnormal deletion length? qn " + std::string(qn) +
-                                 "aln start " + std::to_string(read.start_pos) + " end " +
+        throw std::runtime_error{std::string("[kdys::") + __func__ +
+                                 "] read has abnormal deletion length? qn " + qn + "aln start " +
+                                 std::to_string(read.start_pos) + " end " +
                                  std::to_string(read.end_pos) + " del " + std::to_string(n_del)};
     }
     const int tot = span - n_del + n_ins;
@@ -2837,8 +2836,8 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
 
     // input files
     const std::string itvl = create_region_string(gck.refname, gck.itvl_start, gck.itvl_end);
-    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()), HtsItrDestructor());
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
+    dorado::BamPtr aln(bam_init1());
 
     // helpers for read downsampling (adapted from pileup_ht)
     constexpr bool ENABLE_DOWNSAMPLE = true;
@@ -3044,9 +3043,9 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
                     r.vars.clear();
                 } else {
                     if (first_viable_i < 0 || last_viable_i < 0) {
-                        throw std::runtime_error{"[kdys::" + std::string(__func__) +
+                        throw std::runtime_error{std::string("[kdys::") + __func__ +
                                                  "] removing oob variants from read failed: qn " +
-                                                 std::string(qn) + "interval " + itvl};
+                                                 qn + "interval " + itvl};
                     } else {
                         const uint32_t right = r.vars.size() - last_viable_i + 1;
                         if (first_viable_i > 0) {
@@ -3848,8 +3847,8 @@ static void print_medaka_feature_matrix1(std::ostream &out, const MedakaFeatureM
     }
 }
 
-void print_medaka_feature_matrix(const std::string &fn_out, const MedakaFeatureMatrix &mfm) {
-    std::ofstream fp(fn_out);
+void print_medaka_feature_matrix(const std::filesystem::path &out, const MedakaFeatureMatrix &mfm) {
+    std::ofstream fp(out);
     print_medaka_feature_matrix1(fp, mfm);
 }
 

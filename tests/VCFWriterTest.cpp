@@ -172,7 +172,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
         // Parse the VCF with Htslib to check that it is valid.
         {
-            HtsFilePtr vcf_file{hts_open(data.vcf_path.string().c_str(), "r"), HtsFileDestructor()};
+            HtsFilePtr vcf_file{hts_open(data.vcf_path.string().c_str(), "r")};
             CATCH_REQUIRE(vcf_file);
 
             BcfHdrPtr header{bcf_hdr_read(vcf_file.get()), BcfHdrDestructor{}};

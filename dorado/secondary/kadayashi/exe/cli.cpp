@@ -106,7 +106,7 @@ void parse_cli_phase_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pack)
     p.add_argument("--slice-in-bed")
             .flag()
             .help("Do sliding windows in bed-specified intervals.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info("[kdys::{}] will use window & stride in bed regions.", func);
             });
     p.add_argument("--region")
@@ -119,7 +119,7 @@ void parse_cli_phase_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pack)
     p.add_argument("--strict-intervals")
             .flag()
             .help("If set, do not allow attempts to expand the requested interval(s).")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info("[kdys::{}] region expansion disabled.", func);
             });
     p.add_argument("-i").help("Specify an interval string.");
@@ -443,13 +443,13 @@ void parse_cli_varcall_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pac
             .flag()
             .help("Set to disable region expansion i.e. phase using only the variants "
                   "within each chunk.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info("[kdys::{}] will not expand intervals during phasing.", func);
             });
     p.add_argument("--ambig-ref")
             .flag()
             .help("Set to allow the output vcf to contain")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info(
                         "[kdys::{}] vcf output will include entries where reference allele "
                         "contains ambiguous bases",
@@ -523,19 +523,19 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
     p.add_argument("--exclude-dwells")
             .flag()
             .help("Omit dwells from the matrix.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info("[kdys::{}] feature matrix will not include dwells", func);
             });
     p.add_argument("--exclude-haplotag")
             .flag()
             .help("Omit haplotags from the matrix.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info("[kdys::{}] feature matrix will not include haplotags", func);
             });
     p.add_argument("--exclude-snp-qv")
             .flag()
             .help("Omit SNP QVs from the matrix.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info("[kdys::{}] feature matrix will not include SNP QVs", func);
             });
     p.add_argument("--min-mapq")
@@ -547,7 +547,7 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
     p.add_argument("--disable-read-packing")
             .flag()
             .help("Let each read reside on its own lane.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info(
                         "[kdys::{}] feature matrix will not pack reads. Read will appear on its "
                         "own lane.",
@@ -560,7 +560,7 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
     p.add_argument("--left-align-insertions")
             .flag()
             .help("Left align insertions (default is right-align).")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info(
                         "[kdys::{}] feature matrix will left-align insertions. Default is "
                         "right-aligned.",
@@ -569,7 +569,7 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
     p.add_argument("--use-medaka")
             .flag()
             .help("Use medaka's feature generator instead.")
-            .action([func = __func__](const std::string &_) {
+            .action([func = __func__](const std::string &) {
                 spdlog::info(
                         "[kdys::{}] feature matrix generation will use the medaka implementation.",
                         func);

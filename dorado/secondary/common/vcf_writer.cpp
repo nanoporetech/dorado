@@ -120,8 +120,8 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
                      const bool include_gvcf_headers,
                      const std::string_view command_line)
-        : m_vcf_fp{hts_open(in_fn.string().c_str(), "w"), HtsFileDestructor()},
-          m_header{bcf_hdr_init("w"), BcfHdrDestructor()},
+        : m_vcf_fp{hts_open(in_fn.string().c_str(), "w")},
+          m_header{bcf_hdr_init("w")},
           m_include_gvcf_headers{include_gvcf_headers} {
     if (!m_vcf_fp) {
         throw std::runtime_error("Failed to open VCF file: " + in_fn.string());

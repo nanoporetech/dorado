@@ -173,7 +173,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
                  std::make_pair<std::string, std::string>(generate_random_sequence_string(10000),
                                                           "read5"),
          }) {
-        BamPtr rec = BamPtr(bam_init1());
+        BamPtr rec(bam_init1());
         bam_set1(rec.get(), read_id.length(), read_id.c_str(), 4, -1, -1, 0, 0, nullptr, -1, -1, 0,
                  seq.length(), seq.c_str(), nullptr, 0);
         writer.write(rec.get());

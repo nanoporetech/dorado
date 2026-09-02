@@ -98,7 +98,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
             // Found the ref.
             if (ref_name == chrom) {
                 if (DEBUG_PRINT) {
-                    spdlog::debug("[dbg::{}] found ref {}\n", std::string(__func__), ref_name);
+                    spdlog::debug("[dbg::{}] found ref {}\n", __func__, ref_name);
                 }
                 ref_i = static_cast<int32_t>(i);
             }
@@ -144,7 +144,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
 
         if ((chrom_end_uint > start) && (chrom_start_uint < end)) {
             if (DEBUG_PRINT) {
-                spdlog::debug("[dbg::{}] checking {}-{}\n", std::string(__func__), start, end);
+                spdlog::debug("[dbg::{}] checking {}-{}\n", __func__, start, end);
             }
             const uint64_t l = std::min(static_cast<uint64_t>(end), chrom_end_uint) -
                                std::max(static_cast<uint64_t>(start), chrom_start_uint);
@@ -152,7 +152,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
                 if (DEBUG_PRINT) {
                     spdlog::debug(
                             "[dbg::{}] update best hit to: {}-{} with {} reads (l: {} => {})\n",
-                            std::string(__func__), start, end, n_reads, best_ovlp_len, l);
+                            __func__, start, end, n_reads, best_ovlp_len, l);
                 }
                 best_ovlp_len = l;
                 best_ovlp_chunk_start = pos_chunk_start;
@@ -161,8 +161,8 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
                 best_ovlp_end = end;
             } else {
                 if (DEBUG_PRINT) {
-                    spdlog::debug("[dbg::{}] hit (worse): {}-{} with {} reads\n",
-                                  std::string(__func__), start, end, n_reads);
+                    spdlog::debug("[dbg::{}] hit (worse): {}-{} with {} reads\n", __func__, start,
+                                  end, n_reads);
                 }
             }
         } else if (start > chrom_end_uint) {
@@ -183,8 +183,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     seek_checked(ifs, best_ovlp_chunk_start, std::ios::beg, "best_ovlp_chunk_start");
 
     if (DEBUG_PRINT) {
-        spdlog::debug("[M::{}] use interval {}-{}\n", std::string(__func__), best_ovlp_start,
-                      best_ovlp_end);
+        spdlog::debug("[dbg::{}] use interval {}-{}\n", __func__, best_ovlp_start, best_ovlp_end);
     }
 
     // Read the chunk.
@@ -208,7 +207,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
         found = true;
 
         if (DEBUG_PRINT) {
-            spdlog::debug("[dbg::{}] insert qn '{}' tag '{}'\n", std::string(__func__), qn, haptag);
+            spdlog::debug("[dbg::{}] insert qn '{}' tag '{}'\n", __func__, qn, haptag);
         }
     }
 

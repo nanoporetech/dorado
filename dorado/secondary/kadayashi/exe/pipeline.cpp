@@ -2,8 +2,8 @@
 
 #include "../string_utils.h"
 #include "../variant_graph.h"
-#include "bam_tagging.h"
 #include "hts_utils/FastxRandomReader.h"
+#include "hts_utils/hts_types.h"
 #include "kadayashi_utils.h"
 #include "resources.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
@@ -50,9 +50,9 @@ struct u32p_t {
     uint32_t s, e;
 };
 
-enum input_file_format { IS_VCF, IS_BED };
+enum class input_file_format { IS_VCF, IS_BED };
 
-enum region_string_format { IS_WHOLE_CHROM, IS_REGULAR_SANE, IS_MALFORMAT };
+enum class region_string_format { IS_WHOLE_CHROM, IS_REGULAR_SANE, IS_MALFORMAT };
 
 region_string_format region_string_is_sane(std::string_view s, const int s_l) {
     int cnt[2] = {0, 0};  // : and -
@@ -64,12 +64,12 @@ region_string_format region_string_is_sane(std::string_view s, const int s_l) {
         }
     }
     if (cnt[0] == 0 && cnt[1] == 0) {
-        return IS_WHOLE_CHROM;
+        return region_string_format::IS_WHOLE_CHROM;
     }
     if (cnt[0] > 1 || cnt[1] > 1) {
-        return IS_MALFORMAT;
+        return region_string_format::IS_MALFORMAT;
     }
-    return IS_REGULAR_SANE;
+    return region_string_format::IS_REGULAR_SANE;
 }
 
 bool parse_region_integer(std::string_view s,
@@ -221,7 +221,7 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
                                                           std::string_view chrom,
                                                           const uint32_t ref_start,
                                                           const uint32_t ref_end,
-                                                          const enum input_file_format fn_format) {
+                                                          const input_file_format fn_format) {
     std::vector<u32p_t> ret;
     std::vector<uint64_t> sorter;
 
@@ -233,16 +233,16 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
 
     std::string line;
     while (std::getline(fp, line)) {
-        if (fn_format == IS_BED) {
+        if (fn_format == input_file_format::IS_BED) {
             insert_bed_line(line, chrom, ret);
             if (!ret.empty()) {
                 sorter.push_back(((uint64_t)ret.back().s) << 32 | ret.back().e);
             }
-        } else if (fn_format == IS_VCF) {
+        } else if (fn_format == input_file_format::IS_VCF) {
             insert_variant_positions_from_a_vcf_line(line, chrom, ref_start, ref_end, ret);
         }
     }
-    if (fn_format == IS_BED) {  // make sure intervals loaded from bed is sorted
+    if (fn_format == input_file_format::IS_BED) {  // make sure intervals loaded from bed is sorted
         std::sort(sorter.begin(), sorter.end());
         for (size_t i = 0; i < sorter.size(); i++) {
             ret[i].s = sorter[i] >> 32;
@@ -250,7 +250,7 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
         }
     }
 
-    if (fn_format == IS_VCF) {
+    if (fn_format == input_file_format::IS_VCF) {
         spdlog::info("[kdys::{}] loaded {} variant positions from vcf", __func__,
                      static_cast<int>(ret.size()));
     }
@@ -269,6 +269,10 @@ void local_haptagging_write_tsv(std::ofstream &fp,
                                 const std::vector<uint8_t> &haptags,
                                 const std::vector<u32p_t> &votes,
                                 const std::vector<uint32_t> &informative_site_positions) {
+    if (!success) {
+        spdlog::warn("[kdys::{}] interval failed: {}:{}-{}", __func__, refname, ref_start, ref_end);
+        return;
+    }
     int n = 0;
     for (int i = 0; i < n_reads; i++) {
         if (qnames[i].empty()) {
@@ -276,8 +280,8 @@ void local_haptagging_write_tsv(std::ofstream &fp,
         }
         n++;
     }
-    fp << fmt::format("C\tck.{:d}\t{:s}\t{:d}\t{:d}\t{:s}\t{:d}\n", chunkID, refname.data(),
-                      ref_start, ref_end,
+    fp << fmt::format("C\tck.{:d}\t{:s}\t{:d}\t{:d}\t{:s}\t{:d}\n", chunkID, refname, ref_start,
+                      ref_end,
                       "phased",  // unused; we now re-init as soon as phasing breaks
                       1 + n);  // +1 because it's number of lines in tsv block, not number of reads
 
@@ -306,7 +310,6 @@ void local_haptagging_write_tsv2(std::ofstream &fp,
                                  const uint32_t ref_end,    // 0-index, exclusive
                                  const str2int_t &qname2hp  // 0-index
 ) {
-    // clang-format off
     // Note: This is for usage in varcall routine. When preparing output,
     //        unlike the earliest local haptag routines, we have a approximated
     //        global phasing and its phasing breakpoints, but have not kept
@@ -319,17 +322,15 @@ void local_haptagging_write_tsv2(std::ofstream &fp,
     //        and set the following to unuseful placeholder values:
     //              - informative site positions
     //              - phasing votes of each read
-    // clang-format on
     const std::string itvl = kadayashi::create_region_string(refname, ref_start, ref_end);
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()), HtsItrDestructor());
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()));
 
     // Here we go through the bam file just to make sure
     // only relevant reads will be written to the output.
     // The haptags are supplied from qname2hp;
     // haptags in the bam file has no effect.
     str2int_t ht;
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    dorado::BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         const char *qn = bam_get_qname(aln);
         auto it = qname2hp.find(qn);
@@ -851,7 +852,7 @@ chunk_t kadayashi_global_phasing_simple1(dorado::secondary::BamFileView &hf_view
 }
 
 void haptag_variants_2ad(dorado::secondary::BamFile &hf,
-                         std::string_view refname,
+                         const char *refname,
                          const variants_t &vars,  // known variants of the current chromosome
                          const str2int_t &qname2hp,
                          var2hap_t &var2hap) {
@@ -860,9 +861,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
     std::vector<std::array<int, 4>> counter(vars.size(), {0, 0, 0, 0});
     // ^stores haptag of ref allele; hap0, hap1, unphased, allele not matched
 
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), refname.data()), HtsItrDestructor());
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());  // use local buffer instead of hf->aln
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), refname));
+    dorado::BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
 
     // index known locations
     std::unordered_map<uint32_t, int> pos2idx;  // position-on-ref to index-in-linear-buffer
@@ -1011,11 +1011,13 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                     __func__, (int)pos, counter[i][0], counter[i][1], counter[i][2], counter[i][3]);
         }
 
-        // clang-format off
-        if ((counter[i][0]>=3 && counter[i][1]>=3)  // ambiguous
-            || (counter[i][0] < 3 && counter[i][1] < 3)  // both low coverage
-            || (counter[i][3] >= std::max(counter[i][0], counter[i][1]))  // too many unmatched alt allele
-        ) {
+        const bool ambiguous =  // ambiguous
+                counter[i][0] >= 3 && counter[i][1] >= 3;
+        const bool low_coverage =  // both low coverage
+                counter[i][0] < 3 && counter[i][1] < 3;
+        const bool too_many_unmatched =  // too many unmatched alt allele
+                counter[i][3] >= std::max(counter[i][0], counter[i][1]);
+        if (ambiguous || low_coverage || too_many_unmatched) {
             hp = HAPTAG_UNPHASED;
         } else if (counter[i][0] > counter[i][1]) {
             hp = 0;
@@ -1023,7 +1025,6 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
             hp = 1;
         }
         var2hap[pos] = hp;
-        // clang-format on
     }
 }
 
@@ -1350,7 +1351,7 @@ std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1
             }
         }
 
-        haptag_variants_2ad(hf, chrom, vars, tmp_qname2hp, varhaps[chrom]);
+        haptag_variants_2ad(hf, chrom.c_str(), vars, tmp_qname2hp, varhaps[chrom]);
 
         int counter[3] = {0, 0, 0};
         for (auto &[pos, hp] : varhaps[chrom]) {
@@ -1387,10 +1388,10 @@ query_regions_t region_strings_to_ht(const std::vector<std::string> &query_regio
             return ret0;
         }
         const region_string_format stat = region_string_is_sane(s, s.size());
-        if (stat == IS_WHOLE_CHROM) {
+        if (stat == region_string_format::IS_WHOLE_CHROM) {
             ret0[s].push_back(
                     {.chrom = s.c_str(), .start = 0, .end = 0});  // sentinel for whole chrom
-        } else if (stat == IS_REGULAR_SANE) {
+        } else if (stat == region_string_format::IS_REGULAR_SANE) {
             region_string_t region = parse_region_string2(s);
             if (!region.is_parse_success) {
                 spdlog::error("[kdys::{}] failed to parse the query reigon string: {}", __func__,
@@ -1454,13 +1455,13 @@ struct varcall_chunk_phasing_t {
     str2int_t first_names;
 };
 
-enum get_phased_read_qname2hp_which_t { FRONT, BACK };
+enum class get_phased_read_qname2hp_which { FRONT, BACK };
 
 str2int_t get_phased_read_qnames2hp(
         const chunk_t &ck,
         const std::unordered_map<uint32_t, uint8_t> &phasing_breakpoints,
         const size_t max_n,
-        const get_phased_read_qname2hp_which_t which_end) {
+        const get_phased_read_qname2hp_which which_end) {
     str2int_t ht;
     const size_t n_reads = ck.reads.size();
     if (!ck.reads.empty()) {
@@ -1476,13 +1477,13 @@ str2int_t get_phased_read_qnames2hp(
         }
 
         const int min_i = (int)(max_n > n_reads ? 0 : n_reads - max_n);
-        if (which_end == FRONT) {
+        if (which_end == get_phased_read_qname2hp_which::FRONT) {
             for (size_t i = 0; i < std::min<size_t>(max_n, ck.reads.size()); i++) {
                 if (ck.reads[i].start_pos < first_breakpoint_pos) {
                     ht[ck.qnames[i]] = ck.reads[i].hp;
                 }
             }
-        } else if (which_end == BACK) {
+        } else if (which_end == get_phased_read_qname2hp_which::BACK) {
             for (int64_t i = std::ssize(ck.reads) - 1; i >= min_i; i--) {
                 if (ck.reads[i].start_pos > last_breakpoint_pos) {
                     ht[ck.qnames[i]] = ck.reads[i].hp;
@@ -1496,8 +1497,6 @@ str2int_t get_phased_read_qnames2hp(
 }
 
 std::string make_vcf_line_given_variant_fullinfo_t(std::string_view ref_name,
-                                                   const uint32_t ref_start,
-                                                   const uint32_t ref_end,
                                                    const std::vector<uint32_t> &breakpoints_arr,
                                                    const variant_fullinfo_t &var,
                                                    uint32_t &phaseblockID_fallback) {
@@ -1683,9 +1682,11 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
     // (normalized between chunks and save the results)
     for (int i = 1; i < n_jobs; i++) {
         const auto ht_ref_back = get_phased_read_qnames2hp(
-                ck_and_vrs[i - 1].ck, ck_and_vrs[i - 1].vr.phasing_breakpoints, N_REF_READS, BACK);
-        const auto ht_self_front = get_phased_read_qnames2hp(
-                ck_and_vrs[i].ck, ck_and_vrs[i].vr.phasing_breakpoints, N_REF_READS, FRONT);
+                ck_and_vrs[i - 1].ck, ck_and_vrs[i - 1].vr.phasing_breakpoints, N_REF_READS,
+                get_phased_read_qname2hp_which::BACK);
+        const auto ht_self_front =
+                get_phased_read_qnames2hp(ck_and_vrs[i].ck, ck_and_vrs[i].vr.phasing_breakpoints,
+                                          N_REF_READS, get_phased_read_qname2hp_which::FRONT);
 
         int cis = 0;
         int trans = 0;
@@ -1805,8 +1806,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
 
     dorado::secondary::BamFile hf{fn_bam, n_bam_threads};
     spdlog::info("[kdys::{}] itvl: {}", __func__, itvl);
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.data()), HtsItrDestructor());
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()));
 
     // read read tags
     std::unordered_map<std::string, int> qname2hp;
@@ -1868,7 +1868,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     int haptag;
     int n_lines = 0;
     int n_lines_seen = 0;
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    dorado::BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         char *refname = hf.hdr()->target_name[aln->core.tid];
         int start_pos = aln->core.pos;
@@ -1960,7 +1960,8 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                 .n_bam_threads = n_bam_threads};
 
         if (!dbg_region_str.empty()) {
-            if (region_string_is_sane(dbg_region_str, dbg_region_str.size()) == IS_MALFORMAT) {
+            if (region_string_is_sane(dbg_region_str, dbg_region_str.size()) ==
+                region_string_format::IS_MALFORMAT) {
                 spdlog::error("[kdys::{}] --region was malformatted: {}", __func__, dbg_region_str);
                 exit(1);
             }
@@ -1991,8 +1992,8 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                              (int)region.start, (int)region.end);
             }
         } else if (!fn_bed.native().empty()) {
-            const std::vector<u32p_t> loaded_ranges =
-                    load_intervals_vars_from_file_one_ref(fn_bed, refname, 0, 0, IS_BED);
+            const std::vector<u32p_t> loaded_ranges = load_intervals_vars_from_file_one_ref(
+                    fn_bed, refname, 0, 0, input_file_format::IS_BED);
             if (slice_in_bed) {
                 for (const u32p_t &range : loaded_ranges) {
                     const uint32_t start = range.s;
@@ -2192,7 +2193,6 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
         std::vector<bed_intereval_t> unsure_intervals;
         uint32_t phaseblockID_fallback = 0;
         for (uint32_t i = 0; i < query_intervals.size(); i++) {
-            const auto &itvl = query_intervals[i];
             for (const auto &fullvar : varcall_results[i].vr.variants) {
                 if (!fullvar.is_valid) {
                     continue;
@@ -2200,8 +2200,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
 
                 // vcf
                 const std::string vcf_line = make_vcf_line_given_variant_fullinfo_t(
-                        chrom, itvl.first, itvl.second, breakpoints_arr, fullvar,
-                        phaseblockID_fallback);
+                        chrom, breakpoints_arr, fullvar, phaseblockID_fallback);
                 fp_out_vcf << fmt::format("{:s}", vcf_line);
 
                 // unsure list
@@ -2273,7 +2272,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
 // for local realn testing with spoa
 std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
                                             const std::filesystem::path &fn_bam,
-                                            const std::string_view interval_string,
+                                            const std::string &interval_string,
                                             const int n_threads,
                                             const std::filesystem::path &fn_out_fa) {
     // The first seq in return is the region's reference sequence,
@@ -2287,7 +2286,7 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
     }
 
     dorado::hts_io::FastxRandomReader fp_fai{fn_ref};
-    const std::string refseq_s = fp_fai.fetch_seq(interval_string.data());
+    const std::string refseq_s = fp_fai.fetch_seq(interval_string.c_str());
 
     ret.push_back(refseq_s);
     if (fp_out_fa) {
@@ -2295,9 +2294,9 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
     }
 
     dorado::secondary::BamFile hf{fn_bam, n_threads};
-    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), interval_string.data()),
-                                 HtsItrDestructor());
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());  // use local buffer instead of hf->aln
+    dorado::secondary::HtsItrPtr bamitr(
+            sam_itr_querys(hf.idx(), hf.hdr(), interval_string.c_str()));
+    dorado::BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
 
     uint32_t ref_start = 0;
     uint32_t ref_end = 0;

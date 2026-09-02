@@ -1,6 +1,6 @@
 #pragma once
 
-#include "secondary/kadayashi/hts_types.h"
+struct faidx_t;
 
 #include <cstdint>
 #include <string>
