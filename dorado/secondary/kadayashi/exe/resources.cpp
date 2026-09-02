@@ -10,8 +10,6 @@
 
 namespace kadayashi {
 
-bool KDY_VERBOSE = false;
-
 double get_timestamp() {
     return static_cast<double>(std::chrono::duration_cast<std::chrono::milliseconds>(
                                        std::chrono::system_clock::now().time_since_epoch())
@@ -23,7 +21,8 @@ double get_timestamp() {
 double get_peakrss() {
     struct rusage s;
     getrusage(RUSAGE_SELF, &s);
-    return (double)s.ru_maxrss / 1048576.0;  // GB
+    // NOLINTNEXTLINE(cppcoreguidelines-pro-type-union-access): ru_maxrss is part of a union.
+    return s.ru_maxrss / 1048576.0;  // GB
 }
 #else
 double get_peakrss() { return 0.0; }
