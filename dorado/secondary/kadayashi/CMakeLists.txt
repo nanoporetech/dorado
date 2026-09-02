@@ -1,4 +1,4 @@
-option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" OFF)
+option(BUILD_KADAYASHI_EXE "Build the kadayashi executable" ON)
 
 set(PUBLIC_BASE ${CMAKE_CURRENT_SOURCE_DIR}/include/secondary/kadayashi)
 target_sources(dorado_secondary

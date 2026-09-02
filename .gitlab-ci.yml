@@ -159,7 +159,6 @@ variables:
       -D CMAKE_BUILD_TYPE=${BUILD_TYPE}
       -D DORADO_ENABLE_BENCHMARK_TESTS=ON
       -D DORADO_3RD_PARTY_DOWNLOAD=dorado-dependencies
-      -D BUILD_KADAYASHI_EXE=ON
   - cmake --build ${BUILD_DIR} --config ${BUILD_TYPE} --target ${BUILD_TARGET} -j ${PARALLEL_JOBS}
 
 .create_venv:
