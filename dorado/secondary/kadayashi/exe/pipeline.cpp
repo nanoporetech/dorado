@@ -270,6 +270,7 @@ void local_haptagging_write_tsv(std::ofstream &fp,
                                 const std::vector<u32p_t> &votes,
                                 const std::vector<uint32_t> &informative_site_positions) {
     if (!success) {
+        spdlog::warn("[kdys::{}] interval failed: {}:{}-{}", __func__, refname, ref_start, ref_end);
         return;
     }
     int n = 0;
