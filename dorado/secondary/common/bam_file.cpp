@@ -8,11 +8,12 @@
 
 #include <stdexcept>
 
+namespace dorado::secondary {
+
 void HtsIdxDestructor::operator()(hts_idx_t* bam) { hts_idx_destroy(bam); }
 
 void HtsItrDestructor::operator()(hts_itr_t* itr) const noexcept { hts_itr_destroy(itr); }
 
-namespace dorado::secondary {
 BamIterator::BamIterator(hts_itr_t* itr, htsFile* fp) : m_itr(itr), m_fp(fp) {}
 
 BamPtr BamIterator::get_next() {

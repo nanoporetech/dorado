@@ -33,7 +33,7 @@ int write_haptagged_bam_given_hashtable_and_itvl(
     int ret = 0;
 
     dorado::secondary::BamFile hf{fn_bam, n_threads / 2};
-    HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl));
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl));
 
     BGZF *fp_out = bgzf_open(fn_out.string().c_str(), "w");
     if (!fp_out) {
@@ -100,7 +100,7 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
     }
 
     dorado::secondary::BamFile hf{fn_bam, n_bam_threads};
-    HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl));
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl));
 
     const std::unordered_map<std::string, int> qname2hp =
             query_bin_file_get_qname2hp(fn_bin, region.chrom, region.start, region.end);
@@ -210,7 +210,8 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
             query_itvl_s.append(std::to_string(query_itvl.second));
             LOG_TRACE("[kdys::{}] writing bam: {}\n", __func__, query_itvl_s);
 
-            HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), query_itvl_s.c_str()));
+            dorado::secondary::HtsItrPtr bamitr(
+                    sam_itr_querys(hf.idx(), hf.hdr(), query_itvl_s.c_str()));
             int haptag;
             while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
                 char *refname = hf.hdr()->target_name[aln->core.tid];

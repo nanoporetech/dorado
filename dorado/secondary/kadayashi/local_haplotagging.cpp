@@ -474,7 +474,7 @@ interval_t expand_query_interval(dorado::secondary::BamFileView &hf,
             create_region_string(refname, itvl_start, itvl_start + 1);  // +1 to get 1 base
 
     dorado::BamPtr aln(bam_init1());
-    HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str()));
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl_left.c_str()));
 
     uint32_t offset_left = OFFSET_DEFAULT;
     int offset_right = 0;
@@ -490,7 +490,7 @@ interval_t expand_query_interval(dorado::secondary::BamFileView &hf,
     //right
     const std::string itvl_right =
             create_region_string(refname, itvl_end, itvl_end + 1);  // +1 to get 1 base
-    bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str()));
+    bamitr = dorado::secondary::HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl_right.c_str()));
     while (sam_itr_next(hf.fp, bamitr.get(), aln.get()) >= 0) {
         const uint32_t end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
         if (end_pos < OFFSET_DEFAULT + itvl_end) {
@@ -1859,7 +1859,7 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
     uint32_t span_end = ck.abs_end;
 
     const std::string itvl = create_region_string(refname, ck.abs_start, ck.abs_end);
-    HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
     dorado::BamPtr aln(bam_init1());
 
     if (!pp.disable_region_expansion) {
@@ -1868,7 +1868,7 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         span_end = new_itvl.end;
         const std::string itvl2 = create_region_string(refname, span_start, span_end);
 
-        bamitr = HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()));
+        bamitr = dorado::secondary::HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()));
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
             LOG_DEBUG("[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__, itvl2,
                       pp.disable_region_expansion);
@@ -2836,7 +2836,7 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
 
     // input files
     const std::string itvl = create_region_string(gck.refname, gck.itvl_start, gck.itvl_end);
-    HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
+    dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx, hf.hdr, itvl.c_str()));
     dorado::BamPtr aln(bam_init1());
 
     // helpers for read downsampling (adapted from pileup_ht)

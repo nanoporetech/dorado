@@ -5,13 +5,14 @@
 
 #include <filesystem>
 #include <string>
-#include <vector>
 
 struct htsFile;
 struct hts_idx_t;
 struct sam_hdr_t;
 struct bam1_t;
 struct hts_itr_t;
+
+namespace dorado::secondary {
 
 struct HtsIdxDestructor {
     void operator()(hts_idx_t*);
@@ -22,8 +23,6 @@ struct HtsItrDestructor {
     void operator()(hts_itr_t* itr) const noexcept;
 };
 using HtsItrPtr = std::unique_ptr<hts_itr_t, HtsItrDestructor>;
-
-namespace dorado::secondary {
 
 struct BamFileView {
     htsFile* fp = nullptr;
