@@ -1400,6 +1400,162 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
     CATCH_CHECK(std::filesystem::file_size(processed_regions_bed) > 0);
 }
 
+CATCH_TEST_CASE("worker_variant_writer orders chromosome completion notifications", TEST_GROUP) {
+    const secondary::Filters::FilterType filters{};
+
+    const auto make_chrom_reduce_data = [](const auto& contigs) {
+        std::vector<ChromosomeReduceData> chrom_reduce_data(std::size(contigs));
+        for (int32_t seq_id = 0; seq_id < std::ssize(chrom_reduce_data); ++seq_id) {
+            auto& reduce_data = chrom_reduce_data[seq_id];
+            reduce_data.seq_id = seq_id;
+            reduce_data.seq_name = contigs[seq_id].first;
+            reduce_data.seq_len = contigs[seq_id].second;
+            reduce_data.variants_merged = {secondary::Variant{
+                    .seq_id = seq_id,
+                    .pos = 10,
+                    .ref = "A",
+                    .alts = {"T"},
+                    .filters = {secondary::Filters::Pass},
+                    .info = {},
+                    .qual = 60.0f,
+                    .format = {{"GT", "1/1"}, {"GQ", "60"}, {"DP", "1"}},
+                    .rstart = 0,
+                    .rend = 0,
+            }};
+        }
+        return chrom_reduce_data;
+    };
+    const auto run_writer = [&](const std::filesystem::path& output_vcf,
+                                const std::vector<std::pair<std::string, int64_t>>& contigs,
+                                std::vector<ChromosomeReduceData>& chrom_reduce_data,
+                                const std::vector<int64_t>& sequence_ids,
+                                const bool continue_on_exception) {
+        utils::AsyncQueue<int64_t> input_queue{std::size(sequence_ids) + 1};
+        for (int64_t seq_id : sequence_ids) {
+            const auto push_status = input_queue.try_push(std::move(seq_id));
+            CATCH_REQUIRE(push_status == utils::AsyncQueueStatus::Success);
+        }
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+
+        std::atomic<bool> worker_terminate{false};
+        secondary::WorkerReturnStatus ret_status;
+        {
+            secondary::VCFWriter writer(output_vcf, filters, contigs, false,
+                                        secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
+            std::ofstream ofs_regions;
+            std::optional<secondary::VCFWriter> simple_writer;
+            std::optional<secondary::VCFWriter> inference_writer;
+            worker_variant_writer(input_queue, chrom_reduce_data, worker_terminate, ret_status,
+                                  writer, ofs_regions, simple_writer, inference_writer,
+                                  continue_on_exception);
+        }
+        return std::pair{ret_status, worker_terminate.load()};
+    };
+    const auto read_output_contigs = [](const std::filesystem::path& output_vcf) {
+        std::vector<std::string> output_contigs;
+        std::ifstream input_vcf(output_vcf);
+        std::string line;
+        while (std::getline(input_vcf, line)) {
+            if (std::empty(line) || (line.front() == '#')) {
+                continue;
+            }
+            output_contigs.emplace_back(line.substr(0, line.find('\t')));
+        }
+        return output_contigs;
+    };
+
+    const std::vector<std::pair<std::string, int64_t>> contigs{
+            {"chr1", 100},
+            {"chr2", 100},
+            {"chr3", 100},
+    };
+    const auto temp_dir = make_temp_dir("variant_writer_reference_order");
+    const auto output_vcf = temp_dir.m_path / "output.vcf";
+
+    CATCH_SECTION("Out-of-order chromosomes are written in reference order") {
+        auto chrom_reduce_data = make_chrom_reduce_data(contigs);
+        const auto [ret_status, worker_terminated] =
+                run_writer(output_vcf, contigs, chrom_reduce_data, {2, 0, 1}, false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(!worker_terminated);
+        CATCH_CHECK(read_output_contigs(output_vcf) ==
+                    std::vector<std::string>{"chr1", "chr2", "chr3"});
+        for (const auto& reduce_data : chrom_reduce_data) {
+            CATCH_CHECK(reduce_data.variants_merged.capacity() == 0);
+        }
+    }
+
+    CATCH_SECTION("Queue termination skips chromosomes that never arrive") {
+        auto chrom_reduce_data = make_chrom_reduce_data(contigs);
+        const auto [ret_status, worker_terminated] =
+                run_writer(output_vcf, contigs, chrom_reduce_data, {2, 1}, false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(!worker_terminated);
+        CATCH_CHECK(read_output_contigs(output_vcf) == std::vector<std::string>{"chr2", "chr3"});
+    }
+
+    CATCH_SECTION("Empty input terminates without writing records") {
+        const std::vector<std::pair<std::string, int64_t>> empty_contigs;
+        std::vector<ChromosomeReduceData> chrom_reduce_data;
+        const auto [ret_status, worker_terminated] =
+                run_writer(output_vcf, empty_contigs, chrom_reduce_data, {}, false);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(!worker_terminated);
+        CATCH_CHECK(read_output_contigs(output_vcf).empty());
+    }
+
+    CATCH_SECTION("Consecutive duplicate chromosome notifications fail") {
+        auto chrom_reduce_data = make_chrom_reduce_data(contigs);
+        const auto [ret_status, worker_terminated] =
+                run_writer(output_vcf, contigs, chrom_reduce_data, {0, 0, 1, 2}, false);
+
+        CATCH_REQUIRE(ret_status.exception_thrown);
+        CATCH_REQUIRE(worker_terminated);
+        CATCH_CHECK(ret_status.message.find("duplicate chromosome seq_id") != std::string::npos);
+    }
+
+    CATCH_SECTION("An out-of-order duplicate chromosome notification fails") {
+        auto chrom_reduce_data = make_chrom_reduce_data(contigs);
+        const auto [ret_status, worker_terminated] =
+                run_writer(output_vcf, contigs, chrom_reduce_data, {0, 1, 0, 2}, false);
+
+        CATCH_REQUIRE(ret_status.exception_thrown);
+        CATCH_REQUIRE(worker_terminated);
+        CATCH_CHECK(ret_status.message.find("duplicate chromosome seq_id") != std::string::npos);
+    }
+
+    CATCH_SECTION("Continue-on-error skips invalid notifications without skipping chromosomes") {
+        auto chrom_reduce_data = make_chrom_reduce_data(contigs);
+        const auto [ret_status, worker_terminated] =
+                run_writer(output_vcf, contigs, chrom_reduce_data, {-1, 3, 2, 2, 0, 0, 1}, true);
+
+        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE(!worker_terminated);
+        CATCH_CHECK(read_output_contigs(output_vcf) ==
+                    std::vector<std::string>{"chr1", "chr2", "chr3"});
+    }
+
+    CATCH_SECTION("Write failures respect continue-on-error") {
+        for (const bool continue_on_exception : {false, true}) {
+            auto chrom_reduce_data = make_chrom_reduce_data(contigs);
+            // Removing the required GT field makes VCFWriter::write_variant throw for chr2.
+            chrom_reduce_data[1].variants_merged.front().format.clear();
+            const auto [ret_status, worker_terminated] = run_writer(
+                    output_vcf, contigs, chrom_reduce_data, {2, 0, 1}, continue_on_exception);
+
+            CATCH_REQUIRE(ret_status.exception_thrown == !continue_on_exception);
+            CATCH_REQUIRE(worker_terminated == !continue_on_exception);
+            const std::vector<std::string> expected_contigs =
+                    continue_on_exception ? std::vector<std::string>{"chr1", "chr3"}
+                                          : std::vector<std::string>{"chr1"};
+            CATCH_CHECK(read_output_contigs(output_vcf) == expected_contigs);
+        }
+    }
+}
+
 CATCH_TEST_CASE(
         "worker_variant_calling_reduce keeps simple variants when flank trimming collapses a "
         "window",

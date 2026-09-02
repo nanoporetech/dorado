@@ -2024,27 +2024,56 @@ void worker_variant_writer(
         utils::ScopedProfileRange spr2("variant_writer-worker", 3);
         at::InferenceMode infer_guard;
 
+        // Reduction can finish out of order. Track completed chromosomes by reference-header ID
+        // and write each contiguous ready prefix as soon as it becomes available.
+        std::vector<uint8_t> chromosome_complete(std::size(chrom_reduce_data), false);
+        int64_t next_seq_id = 0;
+        bool input_terminated = false;
+
         while (!worker_terminate) {
             utils::ScopedProfileRange spr3("variant_writer-worker-while", 4);
 
-            int64_t item{0};
-            const auto pop_status = input_queue.try_pop(item);
-
-            if (pop_status == utils::AsyncQueueStatus::Terminate) {
-                break;
-            }
-
             try {
-                const int32_t seq_id = item;
-
-                // Sanity check.
-                if (seq_id >= std::ssize(chrom_reduce_data)) {
-                    throw std::runtime_error{
-                            "Chromosome seq_id is larger than the expected number of "
-                            "input sequences when attempting to write the results. seq_id = " +
-                            std::to_string(seq_id) + ", chrom_reduce_data.size = " +
-                            std::to_string(std::size(chrom_reduce_data))};
+                if (input_terminated && (next_seq_id >= std::ssize(chromosome_complete))) {
+                    break;
                 }
+
+                if ((next_seq_id >= std::ssize(chromosome_complete)) ||
+                    !chromosome_complete[next_seq_id]) {
+                    if (input_terminated) {
+                        ++next_seq_id;
+                        continue;
+                    }
+
+                    int64_t item{0};
+                    const auto pop_status = input_queue.try_pop(item);
+
+                    if (pop_status == utils::AsyncQueueStatus::Terminate) {
+                        input_terminated = true;
+                        continue;
+                    }
+
+                    // Sanity check.
+                    if ((item < 0) || (item >= std::ssize(chrom_reduce_data))) {
+                        throw std::runtime_error{
+                                "Chromosome seq_id is outside the expected range when attempting "
+                                "to write the results. seq_id = " +
+                                std::to_string(item) + ", chrom_reduce_data.size = " +
+                                std::to_string(std::size(chrom_reduce_data))};
+                    }
+                    if (chromosome_complete[item]) {
+                        throw std::runtime_error{
+                                "Received duplicate chromosome seq_id when attempting to write "
+                                "the results. seq_id = " +
+                                std::to_string(item)};
+                    }
+                    chromosome_complete[item] = true;
+                    continue;
+                }
+
+                const int64_t seq_id = next_seq_id;
+                // Advance before writing so continue-on-error skips a failed chromosome.
+                ++next_seq_id;
 
                 // Non-const so we can free the results for this chromosome.
                 auto& results = chrom_reduce_data[seq_id];
