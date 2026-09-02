@@ -16,7 +16,7 @@ namespace dorado::secondary {
 BamIterator::BamIterator(hts_itr_t* itr, htsFile* fp) : m_itr(itr), m_fp(fp) {}
 
 BamPtr BamIterator::get_next() {
-    BamPtr rec(bam_init1(), BamDestructor());
+    BamPtr rec(bam_init1());
 
     if (!rec) {
         throw std::runtime_error{"Failed to initialize BAM record"};
@@ -29,24 +29,24 @@ BamPtr BamIterator::get_next() {
     }
 
     // Iteration finished.
-    return BamPtr(nullptr, BamDestructor());
+    return nullptr;
 }
 
 BamFile::BamFile(const std::filesystem::path& in_fn, int n_threads)
         : m_fp{nullptr}, m_idx{nullptr}, m_hdr{nullptr}, m_n_threads{1} {
-    m_fp = HtsFilePtr{hts_open(in_fn.string().c_str(), "rb"), HtsFileDestructor()};
+    m_fp = HtsFilePtr{hts_open(in_fn.string().c_str(), "rb")};
     if (!m_fp) {
         throw std::runtime_error{"Could not open BAM file: '" + in_fn.string() + "'!"};
     }
 
-    m_idx = HtsIdxPtr{sam_index_load(m_fp.get(), in_fn.string().c_str()), HtsIdxDestructor()};
+    m_idx = HtsIdxPtr{sam_index_load(m_fp.get(), in_fn.string().c_str())};
     if (!m_idx) {
         throw std::runtime_error{
                 "Could not open index for BAM file, or the BAM file itself was malformatted: '" +
                 in_fn.string() + "'!"};
     }
 
-    m_hdr = SamHdrPtr{sam_hdr_read(m_fp.get()), SamHdrDestructor()};
+    m_hdr = SamHdrPtr{sam_hdr_read(m_fp.get())};
     if (!m_hdr) {
         throw std::runtime_error{"Could not load header from BAM file: '" + in_fn.string() + "'!"};
     }
@@ -58,18 +58,18 @@ BamFile::BamFile(const std::filesystem::path& in_fn, int n_threads)
 }
 
 BamPtr BamFile::get_next() {
-    BamPtr record(bam_init1(), BamDestructor());
+    BamPtr record(bam_init1());
 
     if (record == nullptr) {
         throw std::runtime_error{"Failed to initialize BAM record"};
-        return BamPtr(nullptr, BamDestructor());
+        return nullptr;
     }
 
     if (sam_read1(m_fp.get(), m_hdr.get(), record.get()) >= 0) {
         return record;
     }
 
-    return BamPtr(nullptr, BamDestructor());
+    return nullptr;
 }
 
 BamFileView BamFile::get_view() {

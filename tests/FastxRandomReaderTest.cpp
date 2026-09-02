@@ -15,7 +15,7 @@ using namespace dorado;
 BamPtr generate_bam_entry(const std::string& read_id,
                           const std::string& seq,
                           const std::vector<uint8_t>& qscore) {
-    BamPtr rec = BamPtr(bam_init1());
+    BamPtr rec(bam_init1());
 
     const char* quals =
             std::empty(qscore) ? nullptr : reinterpret_cast<const char*>(std::data(qscore));

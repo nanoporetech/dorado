@@ -322,15 +322,14 @@ void local_haptagging_write_tsv2(std::ofstream &fp,
     //              - informative site positions
     //              - phasing votes of each read
     const std::string itvl = kadayashi::create_region_string(refname, ref_start, ref_end);
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()), HtsItrDestructor());
+    HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()));
 
     // Here we go through the bam file just to make sure
     // only relevant reads will be written to the output.
     // The haptags are supplied from qname2hp;
     // haptags in the bam file has no effect.
     str2int_t ht;
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         const char *qn = bam_get_qname(aln);
         auto it = qname2hp.find(qn);
@@ -861,8 +860,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
     std::vector<std::array<int, 4>> counter(vars.size(), {0, 0, 0, 0});
     // ^stores haptag of ref allele; hap0, hap1, unphased, allele not matched
 
-    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), refname), HtsItrDestructor());
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());  // use local buffer instead of hf->aln
+    HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), refname));
+    BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
 
     // index known locations
     std::unordered_map<uint32_t, int> pos2idx;  // position-on-ref to index-in-linear-buffer
@@ -1806,8 +1805,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
 
     dorado::secondary::BamFile hf{fn_bam, n_bam_threads};
     spdlog::info("[kdys::{}] itvl: {}", __func__, itvl);
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()), HtsItrDestructor());
+    HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()));
 
     // read read tags
     std::unordered_map<std::string, int> qname2hp;
@@ -1869,7 +1867,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     int haptag;
     int n_lines = 0;
     int n_lines_seen = 0;
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());
+    BamPtr aln(bam_init1());
     while (sam_itr_next(hf.fp(), bamitr.get(), aln.get()) >= 0) {
         char *refname = hf.hdr()->target_name[aln->core.tid];
         int start_pos = aln->core.pos;
@@ -2295,9 +2293,8 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
     }
 
     dorado::secondary::BamFile hf{fn_bam, n_threads};
-    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), interval_string.c_str()),
-                                 HtsItrDestructor());
-    BamPtr aln = BamPtr(bam_init1(), BamDestructor());  // use local buffer instead of hf->aln
+    HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), interval_string.c_str()));
+    BamPtr aln(bam_init1());  // use local buffer instead of hf->aln
 
     uint32_t ref_start = 0;
     uint32_t ref_end = 0;
