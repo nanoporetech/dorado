@@ -21,7 +21,7 @@ struct FilterSpec {
 
 // "PASS" is a reserved filter string in the VCF specification, it should not be changed.
 // Other filter strings are locally defined in the VCF header so can be changed if needed.
-static inline constexpr std::array KNOWN_FILTERS{
+inline constexpr std::array KNOWN_FILTERS{
         FilterSpec{"PASS", "All filters passed"},
         FilterSpec{"LowQual", "Variant quality is below threshold"},
         FilterSpec{"IncompatZyg", "Predicted zygosity incompatible with ploidy"},
