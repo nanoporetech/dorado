@@ -309,7 +309,6 @@ void local_haptagging_write_tsv2(std::ofstream &fp,
                                  const uint32_t ref_end,    // 0-index, exclusive
                                  const str2int_t &qname2hp  // 0-index
 ) {
-    // clang-format off
     // Note: This is for usage in varcall routine. When preparing output,
     //        unlike the earliest local haptag routines, we have a approximated
     //        global phasing and its phasing breakpoints, but have not kept
@@ -322,7 +321,6 @@ void local_haptagging_write_tsv2(std::ofstream &fp,
     //        and set the following to unuseful placeholder values:
     //              - informative site positions
     //              - phasing votes of each read
-    // clang-format on
     const std::string itvl = kadayashi::create_region_string(refname, ref_start, ref_end);
     HtsItrPtr bamitr =
             HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()), HtsItrDestructor());
@@ -1013,11 +1011,13 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                     __func__, (int)pos, counter[i][0], counter[i][1], counter[i][2], counter[i][3]);
         }
 
-        // clang-format off
-        if ((counter[i][0]>=3 && counter[i][1]>=3)  // ambiguous
-            || (counter[i][0] < 3 && counter[i][1] < 3)  // both low coverage
-            || (counter[i][3] >= std::max(counter[i][0], counter[i][1]))  // too many unmatched alt allele
-        ) {
+        const bool ambiguous =  // ambiguous
+                counter[i][0] >= 3 && counter[i][1] >= 3;
+        const bool low_coverage =  // both low coverage
+                counter[i][0] >= 3 && counter[i][1] >= 3;
+        const bool too_many_unmatched =  // too many unmatched alt allele
+                counter[i][3] >= std::max(counter[i][0], counter[i][1]);
+        if (ambiguous || low_coverage || too_many_unmatched) {
             hp = HAPTAG_UNPHASED;
         } else if (counter[i][0] > counter[i][1]) {
             hp = 0;
@@ -1025,7 +1025,6 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
             hp = 1;
         }
         var2hap[pos] = hp;
-        // clang-format on
     }
 }
 
