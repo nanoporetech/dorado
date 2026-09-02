@@ -145,7 +145,7 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
 
     // index output file
     bgzf_close(fp_out);
-    const std::string fn_bai_out = std::string(fn_out) + ".bai";
+    const std::string fn_bai_out = fn_out.string() + ".bai";
     stat = sam_index_build3(fn_out.string().c_str(), fn_bai_out.c_str(), 0, n_threads);
     if (stat != 0) {
         spdlog::error("[kdys::{}] failed to index output (stat={})\n", __func__, stat);

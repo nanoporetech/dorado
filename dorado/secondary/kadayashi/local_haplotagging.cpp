@@ -3848,8 +3848,8 @@ static void print_medaka_feature_matrix1(std::ostream &out, const MedakaFeatureM
     }
 }
 
-void print_medaka_feature_matrix(const std::string &fn_out, const MedakaFeatureMatrix &mfm) {
-    std::ofstream fp(fn_out);
+void print_medaka_feature_matrix(const std::filesystem::path &out, const MedakaFeatureMatrix &mfm) {
+    std::ofstream fp(out);
     print_medaka_feature_matrix1(fp, mfm);
 }
 

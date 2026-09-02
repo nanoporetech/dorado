@@ -6,6 +6,7 @@
 #include "types.h"
 
 #include <cstdint>
+#include <filesystem>
 #include <string>
 #include <string_view>
 #include <unordered_map>
@@ -417,7 +418,7 @@ MedakaFeatureMatrix gen_medaka_feature_matrix_wrapper(
         const std::unordered_map<std::string, int32_t> &qname2hp,
         const MedakaFeatureMatrixOptions &options);
 
-void print_medaka_feature_matrix(const std::string &fn_out, const MedakaFeatureMatrix &mfm);
+void print_medaka_feature_matrix(const std::filesystem::path &out, const MedakaFeatureMatrix &mfm);
 std::string print_medaka_feature_matrix(const MedakaFeatureMatrix &mfm);
 
 }  // namespace kadayashi
