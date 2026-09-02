@@ -273,7 +273,7 @@ int main(int argc, char *argv[]) {
                 .tag_keep_missing = false,
                 .readgroup = clio.readgroup,
                 .disable_read_packing = clio.disable_read_packing,
-                .hap_source = kadayashi::FORCE_UNPHASED,
+                .hap_source = kadayashi::haplotagsource::FORCE_UNPHASED,
                 .max_reads = clio.max_lanes,
                 .right_align_insertions = clio.right_align_insertions,
                 .min_snp_accuracy = clio.min_snp_accuracy};
