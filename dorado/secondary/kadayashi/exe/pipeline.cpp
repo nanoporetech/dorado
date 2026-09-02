@@ -269,6 +269,9 @@ void local_haptagging_write_tsv(std::ofstream &fp,
                                 const std::vector<uint8_t> &haptags,
                                 const std::vector<u32p_t> &votes,
                                 const std::vector<uint32_t> &informative_site_positions) {
+    if (!success) {
+        return;
+    }
     int n = 0;
     for (int i = 0; i < n_reads; i++) {
         if (qnames[i].empty()) {
@@ -1495,8 +1498,6 @@ str2int_t get_phased_read_qnames2hp(
 }
 
 std::string make_vcf_line_given_variant_fullinfo_t(std::string_view ref_name,
-                                                   const uint32_t ref_start,
-                                                   const uint32_t ref_end,
                                                    const std::vector<uint32_t> &breakpoints_arr,
                                                    const variant_fullinfo_t &var,
                                                    uint32_t &phaseblockID_fallback) {
@@ -2191,7 +2192,6 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
         std::vector<bed_intereval_t> unsure_intervals;
         uint32_t phaseblockID_fallback = 0;
         for (uint32_t i = 0; i < query_intervals.size(); i++) {
-            const auto &itvl = query_intervals[i];
             for (const auto &fullvar : varcall_results[i].vr.variants) {
                 if (!fullvar.is_valid) {
                     continue;
@@ -2199,8 +2199,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
 
                 // vcf
                 const std::string vcf_line = make_vcf_line_given_variant_fullinfo_t(
-                        chrom, itvl.first, itvl.second, breakpoints_arr, fullvar,
-                        phaseblockID_fallback);
+                        chrom, breakpoints_arr, fullvar, phaseblockID_fallback);
                 fp_out_vcf << fmt::format("{:s}", vcf_line);
 
                 // unsure list
