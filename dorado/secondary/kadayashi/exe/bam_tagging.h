@@ -4,7 +4,6 @@
 
 #include <filesystem>
 #include <string>
-#include <string_view>
 #include <unordered_map>
 #include <vector>
 
@@ -12,14 +11,14 @@ namespace kadayashi {
 
 int write_haptagged_bam_given_hashtable_and_itvl(
         const std::filesystem::path &fn_bam,
-        const std::string_view itvl,
+        const char *itvl,
         const std::filesystem::path &fn_out,
         const std::unordered_map<std::string, int> &qname2hp,
         const int n_threads);
 
 int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
                                            const std::filesystem::path &fn_bin,
-                                           const std::string_view itvl,
+                                           const char *itvl,
                                            const std::filesystem::path &fn_out,
                                            const int n_threads,
                                            const int n_bam_threads);

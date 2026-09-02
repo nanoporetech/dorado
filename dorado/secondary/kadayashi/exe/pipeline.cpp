@@ -276,8 +276,8 @@ void local_haptagging_write_tsv(std::ofstream &fp,
         }
         n++;
     }
-    fp << fmt::format("C\tck.{:d}\t{:s}\t{:d}\t{:d}\t{:s}\t{:d}\n", chunkID, refname.data(),
-                      ref_start, ref_end,
+    fp << fmt::format("C\tck.{:d}\t{:s}\t{:d}\t{:d}\t{:s}\t{:d}\n", chunkID, refname, ref_start,
+                      ref_end,
                       "phased",  // unused; we now re-init as soon as phasing breaks
                       1 + n);  // +1 because it's number of lines in tsv block, not number of reads
 
@@ -851,7 +851,7 @@ chunk_t kadayashi_global_phasing_simple1(dorado::secondary::BamFileView &hf_view
 }
 
 void haptag_variants_2ad(dorado::secondary::BamFile &hf,
-                         std::string_view refname,
+                         const char *refname,
                          const variants_t &vars,  // known variants of the current chromosome
                          const str2int_t &qname2hp,
                          var2hap_t &var2hap) {
@@ -860,8 +860,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
     std::vector<std::array<int, 4>> counter(vars.size(), {0, 0, 0, 0});
     // ^stores haptag of ref allele; hap0, hap1, unphased, allele not matched
 
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), refname.data()), HtsItrDestructor());
+    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), refname), HtsItrDestructor());
     BamPtr aln = BamPtr(bam_init1(), BamDestructor());  // use local buffer instead of hf->aln
 
     // index known locations
@@ -1350,7 +1349,7 @@ std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1
             }
         }
 
-        haptag_variants_2ad(hf, chrom, vars, tmp_qname2hp, varhaps[chrom]);
+        haptag_variants_2ad(hf, chrom.c_str(), vars, tmp_qname2hp, varhaps[chrom]);
 
         int counter[3] = {0, 0, 0};
         for (auto &[pos, hp] : varhaps[chrom]) {
@@ -1806,7 +1805,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     dorado::secondary::BamFile hf{fn_bam, n_bam_threads};
     spdlog::info("[kdys::{}] itvl: {}", __func__, itvl);
     HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.data()), HtsItrDestructor());
+            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()), HtsItrDestructor());
 
     // read read tags
     std::unordered_map<std::string, int> qname2hp;
@@ -2273,7 +2272,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
 // for local realn testing with spoa
 std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
                                             const std::filesystem::path &fn_bam,
-                                            const std::string_view interval_string,
+                                            const std::string &interval_string,
                                             const int n_threads,
                                             const std::filesystem::path &fn_out_fa) {
     // The first seq in return is the region's reference sequence,
@@ -2287,7 +2286,7 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
     }
 
     dorado::hts_io::FastxRandomReader fp_fai{fn_ref};
-    const std::string refseq_s = fp_fai.fetch_seq(interval_string.data());
+    const std::string refseq_s = fp_fai.fetch_seq(interval_string.c_str());
 
     ret.push_back(refseq_s);
     if (fp_out_fa) {
@@ -2295,7 +2294,7 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
     }
 
     dorado::secondary::BamFile hf{fn_bam, n_threads};
-    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), interval_string.data()),
+    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), interval_string.c_str()),
                                  HtsItrDestructor());
     BamPtr aln = BamPtr(bam_init1(), BamDestructor());  // use local buffer instead of hf->aln
 

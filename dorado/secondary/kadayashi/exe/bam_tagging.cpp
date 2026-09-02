@@ -24,17 +24,16 @@ namespace kadayashi {
 
 int write_haptagged_bam_given_hashtable_and_itvl(
         const std::filesystem::path &fn_bam,
-        const std::string_view itvl,
+        const char *itvl,
         const std::filesystem::path &fn_out,
         const std::unordered_map<std::string, int> &qname2hp,
         const int n_threads) {
     assert(!fn_bam.native().empty());
-    assert(!itvl.empty());
+    assert(itvl != nullptr);
     int ret = 0;
 
     dorado::secondary::BamFile hf{fn_bam, n_threads / 2};
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.data()), HtsItrDestructor());
+    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl), HtsItrDestructor());
 
     BGZF *fp_out = bgzf_open(fn_out.string().c_str(), "w");
     if (!fp_out) {
@@ -80,13 +79,13 @@ int write_haptagged_bam_given_hashtable_and_itvl(
 
 int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
                                            const std::filesystem::path &fn_bin,
-                                           const std::string_view itvl,
+                                           const char *itvl,
                                            const std::filesystem::path &fn_out,
                                            const int n_threads,
                                            const int n_bam_threads) {
     assert(!fn_bam.native().empty());
     assert(!fn_bin.native().empty());
-    assert(!itvl.empty());
+    assert(itvl != nullptr);
     int ret = 0;
 
     const region_string_t region = parse_region_string2(itvl);
@@ -101,8 +100,7 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
     }
 
     dorado::secondary::BamFile hf{fn_bam, n_bam_threads};
-    HtsItrPtr bamitr =
-            HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.data()), HtsItrDestructor());
+    HtsItrPtr bamitr = HtsItrPtr(sam_itr_querys(hf.idx(), hf.hdr(), itvl), HtsItrDestructor());
 
     const std::unordered_map<std::string, int> qname2hp =
             query_bin_file_get_qname2hp(fn_bin, region.chrom, region.start, region.end);

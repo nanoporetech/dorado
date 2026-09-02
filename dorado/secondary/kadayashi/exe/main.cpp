@@ -201,8 +201,8 @@ int main(int argc, char *argv[]) {
         if (clio.write_dbg_bam) {
             std::string fn_out_bam = fn_out_binary + ".bam";
             const int writebam_err = kadayashi::write_haptagged_bam_given_bin_and_itvl(
-                    clio.fn_bam, fn_out_binary, clio.one_region_str, fn_out_bam, clio.n_threads,
-                    BAM_THREAD_MULT);
+                    clio.fn_bam, fn_out_binary, clio.one_region_str.c_str(), fn_out_bam,
+                    clio.n_threads, BAM_THREAD_MULT);
             if (writebam_err) {
                 spdlog::error("[kdys::{}] failed to write debug haptagged bam, check code!",
                               __func__);
@@ -222,8 +222,8 @@ int main(int argc, char *argv[]) {
         // given bam, bin and an interval, output bam with modified haplotag. Debug util.
         cliopt_t &clio = clio_pack.clio_phase;
         ret = kadayashi::write_haptagged_bam_given_bin_and_itvl(
-                clio.fn_bam, clio.fn_bin, clio.one_region_str, clio.output_name, clio.n_threads,
-                BAM_THREAD_MULT);
+                clio.fn_bam, clio.fn_bin, clio.one_region_str.c_str(), clio.output_name,
+                clio.n_threads, BAM_THREAD_MULT);
     } else if (subcommand == "phaseglobal") {
         cliopt_phaseglobal_t &clio = clio_pack.clio_phaseglobal;
 

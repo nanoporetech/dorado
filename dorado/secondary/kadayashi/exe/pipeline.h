@@ -74,7 +74,7 @@ intervals_t region_strings_to_intervals(dorado::secondary::BamFile &hf,
 
 std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
                                             const std::filesystem::path &fn_bam,
-                                            const std::string_view interval_string,
+                                            const std::string &interval_string,
                                             const int n_threads,
                                             const std::filesystem::path &fn_out_fa);
 
