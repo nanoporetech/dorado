@@ -1137,7 +1137,7 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
     const auto processed_regions_bed = temp_dir.m_path / "processed_regions.bed";
 
     // VCF filters.
-    const std::vector<std::pair<std::string_view, std::string>> filters{};
+    const secondary::Filters::FilterType filters{};
 
     // Input reference sequences.
     const std::vector<std::pair<std::string, int64_t>> contigs = {

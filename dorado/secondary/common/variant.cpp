@@ -11,6 +11,14 @@
 
 namespace dorado::secondary {
 
+std::string FilterSpec::header_string() const {
+    return std::string("##FILTER=<ID=")
+            .append(id)
+            .append(",Description=\"")
+            .append(description)
+            .append("\">");
+}
+
 Filters::Filters(const FilterType filter) : m_filter(filter) {}
 
 void Filters::update(const Filter filter) {
@@ -32,17 +40,10 @@ void Filters::update(const Filter filter) {
 
 std::vector<std::string_view> Filters::as_strings() const {
     std::vector<std::string_view> filters;
-    if (m_filter & Filter::Pass) {
-        filters.push_back(VARIANT_PASS_FILTER);
-    }
-    if (m_filter & Filter::LowQual) {
-        filters.push_back(VARIANT_LOWQUAL_FILTER);
-    }
-    if (m_filter & Filter::IncompatZyg) {
-        filters.push_back(VARIANT_ZYGOSITY_FILTER);
-    }
-    if (m_filter & Filter::NonVariant) {
-        filters.push_back(NO_VARIANT_FILTER);
+    for (size_t n = 0; n < std::size(KNOWN_FILTERS); ++n) {
+        if (m_filter & (1 << n)) {
+            filters.push_back(KNOWN_FILTERS[n].id);
+        }
     }
     return filters;
 }

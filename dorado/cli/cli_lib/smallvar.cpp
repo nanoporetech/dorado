@@ -1152,13 +1152,9 @@ void run_variant_calling(const Options& opt,
 
     // Initialize the header of the output VCF file.
     // These are the only available FILTER options.
-    const std::vector<std::pair<std::string_view, std::string>> vcf_filters{
-            // PASS is added automatically by bcf_hdr
-            // {secondary::VARIANT_PASS_FILTER, "All filters passed"},
-            {secondary::VARIANT_LOWQUAL_FILTER, "Variant quality is below threshold"},
-            {secondary::VARIANT_ZYGOSITY_FILTER, "Predicted zygosity incompatible with ploidy"},
-            {secondary::NO_VARIANT_FILTER, "Non-variant position"},
-    };
+    const secondary::Filters::FilterType vcf_filters =
+            secondary::Filters::Pass | secondary::Filters::LowQual |
+            secondary::Filters::IncompatZyg | secondary::Filters::NonVariant;
 
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer = std::make_unique<secondary::VCFWriter>(

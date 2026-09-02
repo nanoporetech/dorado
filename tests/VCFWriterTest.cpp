@@ -55,7 +55,7 @@ void check_record(const bcf_hdr_t* header,
 
     for (std::string_view filt : expected.filters.as_strings()) {
         // Not a const ref because bcf_has_filter takes a non-const char pointer.
-        std::string filter_name(filt.data(), std::size(filt));
+        std::string filter_name(filt);
         CATCH_CHECK(bcf_has_filter(header, record, filter_name.data()) == 1);
     }
 
@@ -81,7 +81,7 @@ void check_record(const bcf_hdr_t* header,
 CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", TEST_GROUP) {
     struct WriterTestData {
         std::filesystem::path vcf_path;
-        std::vector<std::pair<std::string_view, std::string>> filters;
+        Filters::FilterType filters;
         std::vector<std::pair<std::string, int64_t>> contigs;
         Variant first_variant;
         Variant second_variant;
@@ -92,12 +92,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
     const WriterTestData data{
             .vcf_path = temp_dir.m_path / "variants.vcf",
-            .filters =
-                    {
-                            {VARIANT_LOWQUAL_FILTER, "Low quality"},
-                            {VARIANT_ZYGOSITY_FILTER, "Zygosity filtered"},
-                            {NO_VARIANT_FILTER, "Non-variant filter"},
-                    },
+            .filters = Filters::Pass | Filters::LowQual | Filters::IncompatZyg,
             .contigs =
                     {
                             {"chr1", 100},
@@ -166,13 +161,12 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                              Catch::Matchers::ContainsSubstring("##contig=<ID=chr1,length=100>"));
             CATCH_CHECK_THAT(vcf_text,
                              Catch::Matchers::ContainsSubstring("##contig=<ID=chr2,length=250>"));
-            CATCH_CHECK_THAT(vcf_text,
-                             Catch::Matchers::ContainsSubstring(
-                                     "##FILTER=<ID=LowQual,Description=\"Low quality\">"));
-            CATCH_CHECK_THAT(
-                    vcf_text,
-                    Catch::Matchers::ContainsSubstring(
-                            "##FILTER=<ID=IncompatZyg,Description=\"Zygosity filtered\">"));
+            CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
+                                               "##FILTER=<ID=LowQual,Description=\"Variant quality "
+                                               "is below threshold\">"));
+            CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
+                                               "##FILTER=<ID=IncompatZyg,Description=\"Predicted "
+                                               "zygosity incompatible with ploidy\">"));
             CATCH_CHECK_THAT(vcf_text,
                              Catch::Matchers::ContainsSubstring(
                                      "##FILTER=<ID=PASS,Description=\"All filters passed\">"));
@@ -239,7 +233,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                     .pos = 10,
                     .ref = "N",
                     .alts = {"<*>"},
-                    .filters = {Filters::NonVariant},
+                    .filters = {Filters::Missing},
                     .info = {{"END", "11"}},
                     .qual = -1.0f,
                     .format = {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}},   // NOTE: Intentionally not specifying the variant source here, to test that the writer adds it automatically.
@@ -292,10 +286,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects filters missing from the header") {
-        const std::vector<std::pair<std::string_view, std::string>> filters{
-                {VARIANT_LOWQUAL_FILTER, "Low quality"}};
-
-        VCFWriter writer(data.vcf_path, filters, data.contigs, false, std::string_view{});
+        VCFWriter writer(data.vcf_path, Filters::LowQual, data.contigs, false, std::string_view{});
 
         CATCH_CHECK_THROWS_WITH(writer.write_variant(data.third_variant),
                                 Catch::Matchers::ContainsSubstring("not found in header"));
