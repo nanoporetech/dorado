@@ -50,9 +50,9 @@ struct u32p_t {
     uint32_t s, e;
 };
 
-enum input_file_format { IS_VCF, IS_BED };
+enum class input_file_format { IS_VCF, IS_BED };
 
-enum region_string_format { IS_WHOLE_CHROM, IS_REGULAR_SANE, IS_MALFORMAT };
+enum class region_string_format { IS_WHOLE_CHROM, IS_REGULAR_SANE, IS_MALFORMAT };
 
 region_string_format region_string_is_sane(std::string_view s, const int s_l) {
     int cnt[2] = {0, 0};  // : and -
@@ -64,12 +64,12 @@ region_string_format region_string_is_sane(std::string_view s, const int s_l) {
         }
     }
     if (cnt[0] == 0 && cnt[1] == 0) {
-        return IS_WHOLE_CHROM;
+        return region_string_format::IS_WHOLE_CHROM;
     }
     if (cnt[0] > 1 || cnt[1] > 1) {
-        return IS_MALFORMAT;
+        return region_string_format::IS_MALFORMAT;
     }
-    return IS_REGULAR_SANE;
+    return region_string_format::IS_REGULAR_SANE;
 }
 
 bool parse_region_integer(std::string_view s,
@@ -221,7 +221,7 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
                                                           std::string_view chrom,
                                                           const uint32_t ref_start,
                                                           const uint32_t ref_end,
-                                                          const enum input_file_format fn_format) {
+                                                          const input_file_format fn_format) {
     std::vector<u32p_t> ret;
     std::vector<uint64_t> sorter;
 
@@ -233,16 +233,16 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
 
     std::string line;
     while (std::getline(fp, line)) {
-        if (fn_format == IS_BED) {
+        if (fn_format == input_file_format::IS_BED) {
             insert_bed_line(line, chrom, ret);
             if (!ret.empty()) {
                 sorter.push_back(((uint64_t)ret.back().s) << 32 | ret.back().e);
             }
-        } else if (fn_format == IS_VCF) {
+        } else if (fn_format == input_file_format::IS_VCF) {
             insert_variant_positions_from_a_vcf_line(line, chrom, ref_start, ref_end, ret);
         }
     }
-    if (fn_format == IS_BED) {  // make sure intervals loaded from bed is sorted
+    if (fn_format == input_file_format::IS_BED) {  // make sure intervals loaded from bed is sorted
         std::sort(sorter.begin(), sorter.end());
         for (size_t i = 0; i < sorter.size(); i++) {
             ret[i].s = sorter[i] >> 32;
@@ -250,7 +250,7 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
         }
     }
 
-    if (fn_format == IS_VCF) {
+    if (fn_format == input_file_format::IS_VCF) {
         spdlog::info("[kdys::{}] loaded {} variant positions from vcf", __func__,
                      static_cast<int>(ret.size()));
     }
@@ -1389,10 +1389,10 @@ query_regions_t region_strings_to_ht(const std::vector<std::string> &query_regio
             return ret0;
         }
         const region_string_format stat = region_string_is_sane(s, s.size());
-        if (stat == IS_WHOLE_CHROM) {
+        if (stat == region_string_format::IS_WHOLE_CHROM) {
             ret0[s].push_back(
                     {.chrom = s.c_str(), .start = 0, .end = 0});  // sentinel for whole chrom
-        } else if (stat == IS_REGULAR_SANE) {
+        } else if (stat == region_string_format::IS_REGULAR_SANE) {
             region_string_t region = parse_region_string2(s);
             if (!region.is_parse_success) {
                 spdlog::error("[kdys::{}] failed to parse the query reigon string: {}", __func__,
@@ -1456,13 +1456,13 @@ struct varcall_chunk_phasing_t {
     str2int_t first_names;
 };
 
-enum get_phased_read_qname2hp_which_t { FRONT, BACK };
+enum class get_phased_read_qname2hp_which { FRONT, BACK };
 
 str2int_t get_phased_read_qnames2hp(
         const chunk_t &ck,
         const std::unordered_map<uint32_t, uint8_t> &phasing_breakpoints,
         const size_t max_n,
-        const get_phased_read_qname2hp_which_t which_end) {
+        const get_phased_read_qname2hp_which which_end) {
     str2int_t ht;
     const size_t n_reads = ck.reads.size();
     if (!ck.reads.empty()) {
@@ -1478,13 +1478,13 @@ str2int_t get_phased_read_qnames2hp(
         }
 
         const int min_i = (int)(max_n > n_reads ? 0 : n_reads - max_n);
-        if (which_end == FRONT) {
+        if (which_end == get_phased_read_qname2hp_which::FRONT) {
             for (size_t i = 0; i < std::min<size_t>(max_n, ck.reads.size()); i++) {
                 if (ck.reads[i].start_pos < first_breakpoint_pos) {
                     ht[ck.qnames[i]] = ck.reads[i].hp;
                 }
             }
-        } else if (which_end == BACK) {
+        } else if (which_end == get_phased_read_qname2hp_which::BACK) {
             for (int64_t i = std::ssize(ck.reads) - 1; i >= min_i; i--) {
                 if (ck.reads[i].start_pos > last_breakpoint_pos) {
                     ht[ck.qnames[i]] = ck.reads[i].hp;
@@ -1683,9 +1683,11 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
     // (normalized between chunks and save the results)
     for (int i = 1; i < n_jobs; i++) {
         const auto ht_ref_back = get_phased_read_qnames2hp(
-                ck_and_vrs[i - 1].ck, ck_and_vrs[i - 1].vr.phasing_breakpoints, N_REF_READS, BACK);
-        const auto ht_self_front = get_phased_read_qnames2hp(
-                ck_and_vrs[i].ck, ck_and_vrs[i].vr.phasing_breakpoints, N_REF_READS, FRONT);
+                ck_and_vrs[i - 1].ck, ck_and_vrs[i - 1].vr.phasing_breakpoints, N_REF_READS,
+                get_phased_read_qname2hp_which::BACK);
+        const auto ht_self_front =
+                get_phased_read_qnames2hp(ck_and_vrs[i].ck, ck_and_vrs[i].vr.phasing_breakpoints,
+                                          N_REF_READS, get_phased_read_qname2hp_which::FRONT);
 
         int cis = 0;
         int trans = 0;
@@ -1960,7 +1962,8 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                 .n_bam_threads = n_bam_threads};
 
         if (!dbg_region_str.empty()) {
-            if (region_string_is_sane(dbg_region_str, dbg_region_str.size()) == IS_MALFORMAT) {
+            if (region_string_is_sane(dbg_region_str, dbg_region_str.size()) ==
+                region_string_format::IS_MALFORMAT) {
                 spdlog::error("[kdys::{}] --region was malformatted: {}", __func__, dbg_region_str);
                 exit(1);
             }
@@ -1991,8 +1994,8 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
                              (int)region.start, (int)region.end);
             }
         } else if (!fn_bed.native().empty()) {
-            const std::vector<u32p_t> loaded_ranges =
-                    load_intervals_vars_from_file_one_ref(fn_bed, refname, 0, 0, IS_BED);
+            const std::vector<u32p_t> loaded_ranges = load_intervals_vars_from_file_one_ref(
+                    fn_bed, refname, 0, 0, input_file_format::IS_BED);
             if (slice_in_bed) {
                 for (const u32p_t &range : loaded_ranges) {
                     const uint32_t start = range.s;
