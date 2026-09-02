@@ -1304,11 +1304,11 @@ std::pair<std::string, std::string> ta_t_reconstruct_haplotypes_for_del_absorbti
                     insert_one_var_to_hap_recon(hap1, var, 1);
                 } else {
                     throw std::runtime_error{
-                            "[kdys::" + std::string(__func__) +
-                            "] unexpected genotype(multi-allelic): " +
-                            std::string(var.genotype.data()) + " , query range was " + ck.refname +
-                            ":" + std::to_string(range_start) + "-" + std::to_string(range_end) +
-                            " , var.pos was " + std::to_string(var.pos)};
+                            std::string("[kdys::") + __func__ +
+                            "] unexpected genotype(multi-allelic): " + var.genotype.data() +
+                            " , query range was " + ck.refname + ":" + std::to_string(range_start) +
+                            "-" + std::to_string(range_end) + " , var.pos was " +
+                            std::to_string(var.pos)};
                 }
             } else {
                 if (var.genotype[0] == '1') {
@@ -1321,11 +1321,11 @@ std::pair<std::string, std::string> ta_t_reconstruct_haplotypes_for_del_absorbti
                             hap1, var, var.alleles[0][0] == SENTINEL_REF_ALLELE_INT ? 1 : 0);
                 } else {
                     throw std::runtime_error{
-                            "[kdys::" + std::string(__func__) +
-                            "] unexpected genotype(single-allelic): " +
-                            std::string(var.genotype.data()) + " , query range was " + ck.refname +
-                            ":" + std::to_string(range_start) + "-" + std::to_string(range_end) +
-                            " , var.pos was " + std::to_string(var.pos)};
+                            std::string("[kdys::") + __func__ +
+                            "] unexpected genotype(single-allelic): " + var.genotype.data() +
+                            " , query range was " + ck.refname + ":" + std::to_string(range_start) +
+                            "-" + std::to_string(range_end) + " , var.pos was " +
+                            std::to_string(var.pos)};
                 }
             }
         }  // insert var seq into haplotype seq for one var
@@ -2740,7 +2740,7 @@ static inline bool sort_qa_t_ins_last(const qa_t &a, const qa_t &b) {
 
 static size_t get_qa_t_allele_len(const qa_t &var) {
     if (var.allele.size() < 2) {
-        throw std::runtime_error{"[kdys::" + std::string(__func__) + "] invalid allele size"};
+        throw std::runtime_error{std::string("[kdys::") + __func__ + "] invalid allele size"};
     }
     return var.allele.size() - 1;
 }
@@ -2791,9 +2791,9 @@ static double get_snp_accuracy_dorado_style(const read_t &read, const char *qn) 
     }
     const int span = static_cast<int>(read.end_pos - read.start_pos);
     if (span <= n_del) {
-        throw std::runtime_error{"[kdys::" + std::string(__func__) +
-                                 "] read has abnormal deletion length? qn " + std::string(qn) +
-                                 "aln start " + std::to_string(read.start_pos) + " end " +
+        throw std::runtime_error{std::string("[kdys::") + __func__ +
+                                 "] read has abnormal deletion length? qn " + qn + "aln start " +
+                                 std::to_string(read.start_pos) + " end " +
                                  std::to_string(read.end_pos) + " del " + std::to_string(n_del)};
     }
     const int tot = span - n_del + n_ins;
@@ -3044,9 +3044,9 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
                     r.vars.clear();
                 } else {
                     if (first_viable_i < 0 || last_viable_i < 0) {
-                        throw std::runtime_error{"[kdys::" + std::string(__func__) +
+                        throw std::runtime_error{std::string("[kdys::") + __func__ +
                                                  "] removing oob variants from read failed: qn " +
-                                                 std::string(qn) + "interval " + itvl};
+                                                 qn + "interval " + itvl};
                     } else {
                         const uint32_t right = r.vars.size() - last_viable_i + 1;
                         if (first_viable_i > 0) {

@@ -148,8 +148,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                                   hf_view, chrom, ref_start, ref_end, qname2hp,
                                                   mfm_options);
                         spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(),
-                                      "main_featmatgen", (int)ref_start, (int)ref_end,
-                                      mfm.matrix.size() > 0 ? (int)mfm.matrix[0] : -1);
+                                      "main_featmatgen", ref_start, ref_end,
+                                      mfm.matrix.size() > 0 ? mfm.matrix[0] : -1);
                     }
                 }
             };
