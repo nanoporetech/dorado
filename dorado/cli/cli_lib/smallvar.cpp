@@ -992,6 +992,7 @@ void init_progress_tracker(secondary::Stats& stats,
 }
 
 void run_variant_calling(const Options& opt,
+                         const std::string_view command_line,
                          const secondary::BamInfo& bam_info,
                          const secondary::ModelConfig& model_config,
                          smallvar::VariantResources& resources,
@@ -1164,7 +1165,8 @@ void run_variant_calling(const Options& opt,
 
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer = std::make_unique<secondary::VCFWriter>(
-            out_vcf_fn, vcf_filters, draft_lens, opt.out_format == VariantCallingFormatEnum::GVCF);
+            out_vcf_fn, vcf_filters, draft_lens, opt.out_format == VariantCallingFormatEnum::GVCF,
+            command_line);
 
     // Optionally write Kadayashi variants.
     std::optional<secondary::VCFWriter> vcf_writer_kadayashi;
@@ -1172,12 +1174,14 @@ void run_variant_calling(const Options& opt,
     if (candidate_filtering && opt.dump_variants) {
         const std::string out_vcf_kadayashi_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf").string();
-        vcf_writer_kadayashi.emplace(out_vcf_kadayashi_fn, vcf_filters, draft_lens, false);
+        vcf_writer_kadayashi.emplace(out_vcf_kadayashi_fn, vcf_filters, draft_lens, false,
+                                     command_line);
 
         const std::string out_vcf_inference_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf").string();
         vcf_writer_inference.emplace(out_vcf_inference_fn, vcf_filters, draft_lens,
-                                     opt.out_format == VariantCallingFormatEnum::GVCF);
+                                     opt.out_format == VariantCallingFormatEnum::GVCF,
+                                     command_line);
     }
 
     // Compute the minimum usable memory across all devices and use that as the batch size.
@@ -1378,6 +1382,9 @@ void run_variant_calling(const Options& opt,
 
 int small_variant_caller(int argc, char* argv[]) {
     try {
+        const std::vector<std::string_view> arguments(argv, argv + argc);
+        const std::string command_line = utils::join(arguments, " ");
+
         // Initialize CLI options. The parse_args below requires a non-const reference.
         // Verbosity is passed into a callback, so we need it here.
         int verbosity = 0;
@@ -1491,7 +1498,7 @@ int small_variant_caller(int argc, char* argv[]) {
             spdlog::info("Using half precision!");
         }
 
-        run_variant_calling(opt, bam_info, model_config, resources, stats);
+        run_variant_calling(opt, command_line, bam_info, model_config, resources, stats);
 
         tracker.finalize();
         stats_sampler->terminate();

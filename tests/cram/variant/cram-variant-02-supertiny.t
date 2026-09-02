@@ -9,6 +9,9 @@ Run a supertiny test case.
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ### Check the command line in the header
+  > expected_cmdline="##cmdline=smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --ignore-read-groups"
+  > grep -Fxq "${expected_cmdline}" out/out.vcf || exit 1
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
   > cat out/out.vcf | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf

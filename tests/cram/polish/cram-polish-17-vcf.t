@@ -76,6 +76,10 @@ IMPORTANT: not comparing exact reference block boundaries because they depend on
   > ${DORADO_BIN} polish --gvcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out 2> out/stderr
   > echo "Exit code: $?"
   > ls -1 out
+  > ### Check the command line in the header
+  > expected_cmdline="##cmdline=polish --gvcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out"
+  > grep -Fxq "${expected_cmdline}" out/variants.vcf || exit 1
+  > ### Check other lines.
   > grep -E "^##INFO=<ID=END|^##ALT=<ID=\*|^##FORMAT=<ID=LEN" out/variants.vcf
   > grep -v "#" ${expected} | awk 'BEGIN { FS=OFS="\t" } $5 != "." && $5 !~ /(^|,)<\*>($|,)/ { $5 = $5 ",<*>" } { print }' | cut -f 1-5,7-8 > out/expected.variants.no_qual.vcf
   > grep -v "#" out/variants.vcf | awk '$5 != "." && $5 != "<*>"' | cut -f 1-5,7-8 > out/result.variants.no_qual.vcf

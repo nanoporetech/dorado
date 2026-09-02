@@ -131,7 +131,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     CATCH_SECTION("round-trips header metadata and records through htslib") {
         // Write data to a file.
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+            const std::string command_line = "dorado smallvar reads.bam reference.fa --device cpu";
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, command_line);
             writer.write_variant(data.first_variant);
             writer.write_variant(data.second_variant);
         }
@@ -153,6 +154,10 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             CATCH_CHECK_THAT(vcf_text,
                              Catch::Matchers::ContainsSubstring(
                                      "##FILTER=<ID=PASS,Description=\"All filters passed\">"));
+            CATCH_CHECK_THAT(
+                    vcf_text,
+                    Catch::Matchers::ContainsSubstring(
+                            "##cmdline=dorado smallvar reads.bam reference.fa --device cpu"));
             CATCH_CHECK_THAT(
                     vcf_text,
                     Catch::Matchers::ContainsSubstring(
@@ -198,7 +203,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     // clang-format off
     CATCH_SECTION("writes gVCF header metadata when requested and tests that the writer sets the variant source FORMAT field to the missing value (\".\") when not provided") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, true);
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, true, std::string_view{});
             writer.write_variant(data.first_variant);
 
             Variant no_call_variant{
@@ -237,7 +242,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             "preserves an explicit variant source FORMAT field instead of defaulting to the "
             "missing value") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
             Variant variant = data.first_variant;
             variant.format = {
                     {"GT", "0/1"},
@@ -262,14 +267,14 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         Variant variant = data.first_variant;
         variant.filter = "UnknownFilter";
 
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
 
         CATCH_CHECK_THROWS_WITH(writer.write_variant(variant),
                                 Catch::Matchers::ContainsSubstring("not found in header"));
     }
 
     CATCH_SECTION("write_variant rejects unexpected INFO fields") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
         Variant variant = data.first_variant;
         variant.info = {{"PIZZA", "1"}};
 
@@ -278,7 +283,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects unexpected FORMAT fields") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
         Variant variant = data.first_variant;
         variant.format = {{"GT", "0/1"}, {"PIZZA", "1"}};
 
@@ -288,7 +293,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant requires GT genotype information") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false);
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
         Variant variant = data.first_variant;
         variant.format = {{"GQ", "45"}};
 
