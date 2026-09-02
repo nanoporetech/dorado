@@ -12,10 +12,11 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
-#include <cstdio>
 #include <cstdlib>
 #include <string>
 #include <string_view>
+
+namespace {
 
 void print_end_summary(int argc, char *argv[], double timestamp) {
     spdlog::info("\n[M::{}] ELAPSED: {:.1f}s , PeakRSS: {:.1f} GiB", __func__,
@@ -98,7 +99,9 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
         // get the refseq names from the bam
         std::vector<std::string> ref_names;
         dorado::secondary::BamFile tmp_hf{fn_bam, 1};
-        for (int i = 0; i < tmp_hf.hdr()->n_targets; i++) {
+        const int n_targets = tmp_hf.hdr()->n_targets;
+        ref_names.reserve(n_targets);
+        for (int i = 0; i < n_targets; i++) {
             ref_names.push_back(tmp_hf.hdr()->target_name[i]);
         }
 
@@ -144,8 +147,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                         : kadayashi::gen_medaka_feature_matrix(
                                                   hf_view, chrom, ref_start, ref_end, qname2hp,
                                                   mfm_options);
-                        spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(), __func__,
-                                      (int)ref_start, (int)ref_end,
+                        spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(),
+                                      "main_featmatgen", (int)ref_start, (int)ref_end,
                                       mfm.matrix.size() > 0 ? (int)mfm.matrix[0] : -1);
                     }
                 }
@@ -166,6 +169,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
 
     return 0;
 }
+
+}  // namespace
 
 int main(int argc, char *argv[]) {
     int ret = 0;
