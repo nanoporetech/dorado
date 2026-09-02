@@ -1013,7 +1013,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
         const bool ambiguous =  // ambiguous
                 counter[i][0] >= 3 && counter[i][1] >= 3;
         const bool low_coverage =  // both low coverage
-                counter[i][0] >= 3 && counter[i][1] >= 3;
+                counter[i][0] < 3 && counter[i][1] < 3;
         const bool too_many_unmatched =  // too many unmatched alt allele
                 counter[i][3] >= std::max(counter[i][0], counter[i][1]);
         if (ambiguous || low_coverage || too_many_unmatched) {
