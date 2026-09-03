@@ -6,11 +6,6 @@
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
 #include "torch_utils/auto_detect_device.h"
-
-#if DORADO_CUDA_BUILD
-#include "torch_utils/cuda_utils.h"
-#endif
-
 #include "utils/dev_utils.h"
 #include "utils/fs_utils.h"
 
@@ -30,6 +25,10 @@
 #include <string_view>
 #include <utility>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include "torch_utils/cuda_utils.h"
+#endif
 
 namespace dorado {
 

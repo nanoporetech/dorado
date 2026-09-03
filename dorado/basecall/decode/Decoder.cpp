@@ -1,14 +1,11 @@
 #include "Decoder.h"
 
+#include "CPUDecoder.h"
 #include "config/BasecallModelConfig.h"
 
 #if DORADO_CUDA_BUILD
 #include "CUDADecoder.h"
 #endif
-
-#include "CPUDecoder.h"
-
-#include <c10/core/Device.h>
 
 namespace dorado::basecall::decode {
 

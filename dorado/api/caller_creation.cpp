@@ -1,13 +1,13 @@
 #include "api/caller_creation.h"
 
+#include "modbase/ModBaseCaller.h"
+
 #if DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
 #include "config/BatchParams.h"
 #elif DORADO_METAL_BUILD
 #include "basecall/MetalCaller.h"
 #endif
-
-#include "modbase/ModBaseCaller.h"
 
 namespace dorado::api {
 

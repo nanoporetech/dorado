@@ -36,9 +36,6 @@
 #include <random>
 #include <string_view>
 
-#ifndef _WIN32
-#endif
-
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 #endif

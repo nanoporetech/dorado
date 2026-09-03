@@ -4,9 +4,7 @@
 #include "modbase/MotifMatcher.h"
 #include "torch_utils/module_utils.h"
 #include "utils/stats.h"
-#if DORADO_CUDA_BUILD
-#include <c10/cuda/CUDAStream.h>
-#endif
+
 #include <torch/nn.h>
 
 #include <atomic>
@@ -18,6 +16,10 @@
 #include <string>
 #include <thread>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include <c10/cuda/CUDAStream.h>
+#endif
 
 namespace dorado::modbase {
 

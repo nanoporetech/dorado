@@ -32,10 +32,6 @@
 
 #endif  // HAS_NVML
 
-#include <cassert>
-#include <cstdlib>
-#include <string_view>
-
 namespace dorado::utils::gpu_monitor {
 
 namespace {
