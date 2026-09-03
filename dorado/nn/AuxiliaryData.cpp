@@ -5,6 +5,11 @@
 #include <stdexcept>
 
 #if DORADO_CUDA_BUILD
+#include "utils/math_utils.h"
+
+#include <ATen/ops/empty.h>
+#include <ATen/ops/from_blob.h>
+#include <ATen/ops/zeros.h>
 #include <c10/cuda/CUDAStream.h>
 
 extern "C" {

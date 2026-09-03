@@ -3,6 +3,10 @@
 #include <string>
 
 #if DORADO_CUDA_BUILD
+#include "torch_utils/gpu_profiling.h"
+#include "torch_utils/tensor_utils.h"
+#include "utils/dev_utils.h"
+
 extern "C" {
 #include "koi.h"
 }

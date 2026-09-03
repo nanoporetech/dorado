@@ -7,18 +7,29 @@
 #endif
 
 #if HAS_NVML
+
 #include "utils/scoped_trace_log.h"
 #include "utils/string_utils.h"
 
 #include <nvml.h>
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <numeric>
+#include <set>
+
 #if defined(_WIN32)
 #include <Windows.h>
 #else  // _WIN32
 #include <dlfcn.h>
+
+#include <fstream>
 #endif  // _WIN32
+
 #if DORADO_ORIN
 #include <torch/torch.h>
 #endif  // DORADO_ORIN
+
 #endif  // HAS_NVML
 
 #include <cassert>

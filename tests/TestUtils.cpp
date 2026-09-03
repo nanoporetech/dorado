@@ -7,8 +7,8 @@
 #include <fstream>
 #include <iostream>
 
-#ifndef _WIN32
-#include <unistd.h>
+#ifdef __APPLE__
+#include <unistd.h>  // mkdtemp() lives in <stdlib.h> on non-macOS
 #endif
 
 namespace dorado::tests {

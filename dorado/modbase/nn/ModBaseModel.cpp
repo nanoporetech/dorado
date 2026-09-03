@@ -12,7 +12,9 @@
 #include <optional>
 
 #if DORADO_CUDA_BUILD
+#include "nn/ConvStack.h"
 #include "nn/KoiUtils.h"
+#include "nn/LSTMStack.h"
 
 #include <c10/cuda/CUDAGuard.h>
 #endif

@@ -3,17 +3,17 @@
 #if defined(WIN32)
 #include <windows.h>
 #elif defined(__linux__)
+#include <spdlog/spdlog.h>
 #include <sys/sysinfo.h>
+
+#include <fstream>
+#include <string>
 #elif defined(__APPLE__)
-#include <mach/host_info.h>
-#include <mach/mach_host.h>
-#include <mach/mach_init.h>
-#include <mach/message.h>
-#include <mach/vm_statistics.h>
+#include <mach/mach.h>
 #include <sys/sysctl.h>
-#endif
 
 #include <array>
+#endif
 
 namespace dorado::utils {
 

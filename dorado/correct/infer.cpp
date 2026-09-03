@@ -11,6 +11,7 @@
 #endif
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
+#include "utils/string_utils.h"
 #endif
 
 namespace keys {
