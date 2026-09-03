@@ -1,7 +1,5 @@
 #include "utils/alignment_utils.h"
 
-#include <minimap.h>
-
 namespace dorado::utils {
 
 std::string alignment_to_str(const char* query,

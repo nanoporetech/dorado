@@ -5,7 +5,6 @@
 #elif __APPLE__
 #include <mach/mach_init.h>
 #include <mach/task.h>
-#include <sys/sysctl.h>
 #endif
 
 namespace dorado {

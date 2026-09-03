@@ -2,19 +2,13 @@
 
 #include "TestUtils.h"
 #include "alignment/minimap2_args.h"
-#include "alignment/minimap2_wrappers.h"
 #include "hts_utils/hts_file.h"
 #include "read_pipeline/nodes/HtsWriterNode.h"
 
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
-#include <locale>
-#include <numeric>
 #include <ranges>
 
 #define TEST_GROUP "[alignment::Minimap2Index]"

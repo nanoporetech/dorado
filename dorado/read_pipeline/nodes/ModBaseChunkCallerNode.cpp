@@ -13,13 +13,9 @@
 #include "utils/types.h"
 
 #include <ATen/TensorIndexing.h>
-#include <ATen/TensorOperators.h>
 #include <ATen/core/TensorBody.h>
-#include <c10/core/ScalarType.h>
-#include <c10/core/TensorOptions.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>
-#include <torch/version.h>
 
 #include <algorithm>
 #include <atomic>

@@ -1,9 +1,5 @@
 #include "nn/LSTMStack.h"
 
-#include "torch_utils/gpu_profiling.h"
-#include "torch_utils/tensor_utils.h"
-
-#include <stdexcept>
 #include <string>
 
 #if DORADO_CUDA_BUILD
@@ -11,8 +7,6 @@ extern "C" {
 #include "koi.h"
 }
 #endif
-
-#include <torch/nn.h>
 
 namespace dorado::nn {
 

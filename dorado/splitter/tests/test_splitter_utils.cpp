@@ -3,11 +3,8 @@
 #include "utils/types.h"
 
 #include <ATen/ops/from_blob.h>
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
-#include <spdlog/spdlog.h>
 
 #include <limits>
 #include <numeric>

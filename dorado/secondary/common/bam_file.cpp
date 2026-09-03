@@ -4,7 +4,6 @@
 
 #include <htslib/hts.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <stdexcept>
 

@@ -2,9 +2,6 @@
 
 #include "secondary/features/medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/container_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <cstddef>
 #include <span>

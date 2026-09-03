@@ -1,9 +1,7 @@
 #include "alignment/Minimap2Index.h"
 
-#include "alignment/minimap2_wrappers.h"
 #include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/header_sq_record.h"
-#include "hts_utils/hts_types.h"
 #include "hts_utils/sequence_file_format.h"
 
 #include <spdlog/spdlog.h>

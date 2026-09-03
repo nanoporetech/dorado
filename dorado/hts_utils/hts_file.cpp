@@ -11,7 +11,6 @@
 #include <array>
 #include <cassert>
 #include <filesystem>
-#include <map>
 #include <stdexcept>
 
 namespace {

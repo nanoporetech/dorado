@@ -4,7 +4,6 @@
 #include "utils/container_utils.h"
 
 #include <spdlog/spdlog.h>
-#include <torch/csrc/autograd/InferenceMode.h>
 #include <torch/serialize.h>
 
 #include <fstream>

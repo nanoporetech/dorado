@@ -15,15 +15,12 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/fs_utils.h"
 #include "utils/log_utils.h"
-#include "utils/parameters.h"
 #include "utils/string_utils.h"
 
-#include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cctype>
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -38,7 +35,6 @@
 using namespace std::chrono_literals;
 
 #ifndef _WIN32
-#include <unistd.h>
 #endif
 
 namespace dorado {

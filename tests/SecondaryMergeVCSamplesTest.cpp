@@ -1,12 +1,7 @@
-#include "secondary/common/variant.h"
-#include "secondary/consensus/variant_calling.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <spdlog/spdlog.h>
 
-#include <cstdint>
-#include <numeric>
 #include <string>
 #include <vector>
 

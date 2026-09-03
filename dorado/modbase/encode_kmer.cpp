@@ -3,14 +3,11 @@
 #include "utils/sequence_utils.h"
 #include "utils/simd.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <cassert>
 #include <cstddef>
 #include <cstdint>
 #include <cstring>
-#include <iterator>
 #include <vector>
 
 namespace {

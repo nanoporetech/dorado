@@ -1,7 +1,5 @@
 #include "polish_progress_tracker.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 
 namespace dorado::polisher {

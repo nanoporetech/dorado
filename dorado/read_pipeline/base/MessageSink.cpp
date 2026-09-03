@@ -1,6 +1,5 @@
 #include "read_pipeline/base/MessageSink.h"
 
-#include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages/ReadCommon.h"
 #include "utils/thread_utils.h"
 

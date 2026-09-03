@@ -1,13 +1,7 @@
 #include "nn/AuxiliaryData.h"
 
 #include "nn/KoiThreads.h"
-#include "utils/math_utils.h"
 
-#include <ATen/ops/empty.h>
-#include <ATen/ops/from_blob.h>
-#include <ATen/ops/zeros.h>
-
-#include <numeric>
 #include <stdexcept>
 
 #if DORADO_CUDA_BUILD

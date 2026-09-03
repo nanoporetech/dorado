@@ -1,8 +1,5 @@
 #include "utils/sys_utils.h"
 
-#include <fstream>
-#include <string>
-
 namespace dorado::utils {
 
 bool running_in_docker() {

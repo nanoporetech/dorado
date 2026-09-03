@@ -1,19 +1,14 @@
 #include "utils/memory_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #if defined(WIN32)
 #include <windows.h>
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
 #elif defined(__APPLE__)
-#include <mach/mach.h>
 #include <sys/sysctl.h>
 #endif
 
 #include <array>
-#include <fstream>
-#include <sstream>
 
 namespace dorado::utils {
 

@@ -14,12 +14,9 @@
 #include <htslib/bgzf.h>
 #include <htslib/faidx.h>
 #include <htslib/hts.h>
-#include <htslib/khash.h>
-#include <htslib/khash_str2int.h>
 #include <htslib/sam.h>
 #include <spdlog/fmt/bundled/format.h>
 #include <spdlog/spdlog.h>
-#include <zlib.h>
 
 #include <algorithm>
 #include <array>

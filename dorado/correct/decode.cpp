@@ -3,8 +3,6 @@
 #include "correct/conversions.h"
 #include "correct/types.h"
 
-#include <spdlog/spdlog.h>
-
 #include <array>
 
 #ifdef NDEBUG

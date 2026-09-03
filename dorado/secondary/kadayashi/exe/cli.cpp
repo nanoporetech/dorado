@@ -5,10 +5,7 @@
 #include <argparse/argparse.hpp>
 #include <spdlog/fmt/bundled/format.h>
 #include <spdlog/spdlog.h>
-#include <sys/stat.h>
-#include <sys/types.h>
 
-#include <cstdio>
 #include <cstdlib>
 #include <exception>
 #include <sstream>

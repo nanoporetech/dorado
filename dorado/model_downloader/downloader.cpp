@@ -14,7 +14,6 @@
 #ifndef _WIN32
 // Required for MSG_NOSIGNAL and SO_NOSIGPIPE
 #include <sys/socket.h>
-#include <sys/types.h>
 #endif
 
 #ifdef MSG_NOSIGNAL

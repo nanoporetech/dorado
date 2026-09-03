@@ -1,8 +1,5 @@
 #include "utils/basecaller_utils.h"
 
-#include <fstream>
-#include <optional>
-
 namespace dorado::utils {
 std::optional<std::unordered_set<std::string>> load_read_list(const std::string& read_list) {
     std::unordered_set<std::string> read_ids;

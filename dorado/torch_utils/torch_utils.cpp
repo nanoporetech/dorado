@@ -1,10 +1,6 @@
 #include "torch_utils/torch_utils.h"
 
-#include "compat/compat_utils.h"
-
 #include <c10/util/Backtrace.h>
-#include <torch/torch.h>
-#include <torch/version.h>
 
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAAllocatorConfig.h>

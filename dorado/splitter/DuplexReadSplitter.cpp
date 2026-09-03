@@ -10,7 +10,6 @@
 
 #include <ATen/TensorIndexing.h>
 #include <edlib.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>

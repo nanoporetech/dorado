@@ -7,7 +7,6 @@
 #include "utils/sequence_utils.h"
 
 #include <edlib.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>

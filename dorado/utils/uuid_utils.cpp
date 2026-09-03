@@ -5,7 +5,6 @@
 #include <algorithm>
 #include <array>
 #include <iomanip>
-#include <sstream>
 
 namespace dorado::utils {
 

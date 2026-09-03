@@ -1,7 +1,6 @@
 #include "utils/concurrency/TaskPool.h"
 
 #include <cassert>
-#include <chrono>
 #include <thread>
 
 namespace dorado::utils::concurrency {

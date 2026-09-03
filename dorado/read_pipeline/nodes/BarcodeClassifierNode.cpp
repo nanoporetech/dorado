@@ -1,19 +1,16 @@
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 
-#include "demux/BarcodeClassifier.h"
 #include "demux/Trimmer.h"
 #include "demux/barcoding_info.h"
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
-#include "utils/barcode_kits.h"
 #include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <string>

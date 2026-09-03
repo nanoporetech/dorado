@@ -2,7 +2,6 @@
 
 #include "hts_utils/FastxRandomReader.h"
 #include "secondary/architectures/model_factory.h"
-#include "secondary/common/batching.h"
 #include "secondary/common/region.h"
 #include "secondary/consensus/sample_collate_utils.h"
 #include "secondary/consensus/variant_calling.h"
@@ -12,18 +11,14 @@
 #include "utils/container_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/sequence_utils.h"
-#include "utils/string_utils.h"
 #include "utils/timer_high_res.h"
 
-#include <ATen/ATen.h>
 #include <cxxpool.h>
-#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
 #include <cassert>
-#include <cmath>
 #include <fstream>
 #include <memory>
 #include <span>

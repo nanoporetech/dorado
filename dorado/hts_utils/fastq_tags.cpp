@@ -1,8 +1,5 @@
 #include "hts_utils/fastq_tags.h"
 
-#include "hts_utils/hts_types.h"
-#include "utils/string_utils.h"
-
 #if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
@@ -11,9 +8,6 @@
 #if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #pragma GCC diagnostic pop
 #endif
-#include <string>
-#include <unordered_set>
-#include <vector>
 
 namespace dorado::utils {
 

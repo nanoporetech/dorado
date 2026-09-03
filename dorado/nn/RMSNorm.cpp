@@ -1,8 +1,5 @@
 #include "nn/RMSNorm.h"
 
-#include <c10/core/TensorOptions.h>
-#include <spdlog/spdlog.h>
-
 namespace dorado::nn {
 
 RMSNormImpl::RMSNormImpl(int hidden_size_) : hidden_size(hidden_size_) {

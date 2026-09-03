@@ -1,7 +1,5 @@
 #include "torch_utils/gpu_monitor.h"
 
-#include "utils/sys_utils.h"
-
 #if defined(_WIN32) || defined(__linux__)
 #define HAS_NVML 1
 #else
@@ -23,22 +21,9 @@
 #endif  // DORADO_ORIN
 #endif  // HAS_NVML
 
-#include <spdlog/spdlog.h>
-
-#include <algorithm>
 #include <cassert>
-#include <chrono>
 #include <cstdlib>
-#include <fstream>
-#include <memory>
-#include <mutex>
-#include <numeric>
-#include <regex>
-#include <set>
-#include <sstream>
 #include <string_view>
-#include <unordered_map>
-#include <utility>
 
 namespace dorado::utils::gpu_monitor {
 

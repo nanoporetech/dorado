@@ -4,10 +4,8 @@
 #include "torch_utils/tensor_utils.h"
 
 #include <ATen/core/TensorBody.h>
-#include <ATen/ops/cumsum.h>
 #include <ATen/ops/zeros.h>
 #include <c10/core/ScalarType.h>
-#include <spdlog/spdlog.h>
 #include <torch/types.h>
 
 #include <cmath>

@@ -2,9 +2,6 @@
 
 #include "utils/thread_utils.h"
 
-#include <ostream>
-#include <set>
-
 namespace dorado::stats {
 
 struct StatsSampler::StatsRecord {

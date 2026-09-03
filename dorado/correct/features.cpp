@@ -7,10 +7,8 @@
 #include "utils/cigar.h"
 #include "utils/sequence_utils.h"
 
-#include <ATen/Tensor.h>
 #include <ATen/ops/empty.h>
 #include <ATen/ops/from_blob.h>
-#include <spdlog/spdlog.h>
 
 #include <cstdint>
 #include <stdexcept>

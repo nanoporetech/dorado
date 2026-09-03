@@ -6,7 +6,6 @@
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <sstream>

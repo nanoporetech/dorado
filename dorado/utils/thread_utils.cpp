@@ -5,14 +5,10 @@
 #include <algorithm>
 #include <array>
 #include <atomic>
-#include <chrono>
 #include <cstdlib>
 #include <cstring>
-#include <fstream>
 #include <optional>
-#include <sstream>
 #include <string>
-#include <thread>
 
 #ifdef _WIN32
 #include <Windows.h>

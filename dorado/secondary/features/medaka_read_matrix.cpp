@@ -3,23 +3,15 @@
 #include "hts_utils/bam_utils.h"
 #include "medaka_bamiter.h"
 #include "secondary/common/bam_file.h"
-#include "secondary/features/kadayashi_utils.h"
-#include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 
-#include <htslib/faidx.h>
-#include <htslib/khash.h>
-#include <htslib/khash_str2int.h>
-#include <htslib/kstring.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cassert>
 #include <cerrno>
 #include <cmath>
 #include <cstddef>
-#include <iostream>
 #include <limits>
 #include <stdexcept>
 #include <unordered_map>

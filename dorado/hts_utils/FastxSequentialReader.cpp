@@ -1,11 +1,8 @@
 #include "hts_utils/FastxSequentialReader.h"
 
-#include <htslib/faidx.h>
-#include <spdlog/spdlog.h>
 #include <zlib.h>
 
 #include <stdexcept>
-#include <vector>
 
 #ifdef _MSC_VER
 #pragma warning(push)

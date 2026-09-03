@@ -1,12 +1,8 @@
 #include "hts_utils/header_utils.h"
 
-#include "utils/string_utils.h"
-
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
-#include <ostream>
-#include <sstream>
 #include <string_view>
 #include <unordered_map>
 #include <vector>

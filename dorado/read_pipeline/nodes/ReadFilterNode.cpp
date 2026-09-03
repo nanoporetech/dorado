@@ -2,8 +2,6 @@
 
 #include "read_pipeline/base/messages/ReadCommon.h"
 
-#include <spdlog/spdlog.h>
-
 namespace dorado {
 
 void ReadFilterNode::input_thread_fn() {

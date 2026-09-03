@@ -1,7 +1,6 @@
 #include "hts_utils/FastxRandomReader.h"
 
 #include "hts_utils/sequence_file_format.h"
-#include "utils/string_utils.h"
 
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>

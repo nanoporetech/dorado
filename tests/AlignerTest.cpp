@@ -3,7 +3,6 @@
 #include "aligner/Minimap2Aligner.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
-#include "alignment/minimap2_wrappers.h"
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/header_sq_record.h"
@@ -18,7 +17,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <catch2/matchers/catch_matchers_all.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>

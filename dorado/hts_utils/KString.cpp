@@ -1,9 +1,5 @@
 #include "hts_utils/KString.h"
 
-#include <htslib/sam.h>
-
-#include <memory>
-
 namespace dorado {
 
 KString::KString() : m_data(std::make_unique<kstring_t>()) { *m_data = {0, 0, nullptr}; }

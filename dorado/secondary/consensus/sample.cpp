@@ -3,7 +3,6 @@
 #include "secondary/common/interval.h"
 #include "torch_utils/tensor_utils.h"
 
-#include <ATen/ATen.h>
 #include <ATen/TensorIndexing.h>
 #include <spdlog/spdlog.h>
 

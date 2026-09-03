@@ -3,9 +3,7 @@
 #include "utils/locale_utils.h"
 
 #include <catch2/catch_session.hpp>
-#include <catch2/catch_test_macros.hpp>
 #include <nvtx3/nvtx3.hpp>
-#include <torch/utils.h>
 
 int main(int argc, char* argv[]) {
     // global setup...

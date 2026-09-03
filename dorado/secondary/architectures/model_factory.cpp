@@ -12,8 +12,6 @@
 #include "utils/container_utils.h"
 
 #include <spdlog/spdlog.h>
-#include <torch/autograd.h>
-#include <torch/csrc/jit/serialization/pickle.h>
 
 #include <filesystem>
 #include <unordered_map>

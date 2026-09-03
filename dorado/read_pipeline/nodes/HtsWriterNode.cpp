@@ -2,10 +2,7 @@
 
 #include "utils/time_utils.h"
 
-#include <htslib/bgzf.h>
-#include <htslib/kroundup.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <stdexcept>

@@ -3,7 +3,6 @@
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
-#include "nn/KoiUtils.h"
 
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
@@ -13,10 +12,8 @@
 #include "torch_utils/cuda_utils.h"
 #endif
 
-#include <cxxpool.h>
 #include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <thread>
 
 namespace dorado::api {

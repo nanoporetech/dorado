@@ -28,7 +28,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/internal/catch_run_context.hpp>
-#include <torch/cuda.h>
 
 #include <algorithm>
 #include <filesystem>
@@ -38,7 +37,6 @@
 #include <string_view>
 
 #ifndef _WIN32
-#include <unistd.h>
 #endif
 
 #if DORADO_CUDA_BUILD

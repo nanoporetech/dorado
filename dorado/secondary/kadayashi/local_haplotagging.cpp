@@ -10,7 +10,6 @@
 #include "string_utils.h"
 #include "variant_graph.h"
 
-#include <htslib/bgzf.h>
 #include <htslib/faidx.h>
 #include <htslib/hts.h>
 #include <htslib/kfunc.h>

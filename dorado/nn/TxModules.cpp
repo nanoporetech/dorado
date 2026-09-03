@@ -9,14 +9,7 @@
 #include <ATen/TensorIndexing.h>
 #include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/core/ScalarType.h>
-#include <c10/core/TensorOptions.h>
 #include <spdlog/spdlog.h>
-#include <torch/nn.h>
-#include <torch/nn/functional/padding.h>
-#include <torch/nn/options/padding.h>
-#include <torch/serialize.h>
-#include <torch/types.h>
-#include <torch/version.h>
 
 #include <cmath>
 

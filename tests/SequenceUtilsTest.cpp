@@ -1,16 +1,13 @@
 #include "utils/sequence_utils.h"
 
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/internal/catch_run_context.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <cstdlib>
-#include <numeric>
 #include <optional>
 #include <random>
 

@@ -1,7 +1,6 @@
 #include "nn/ConvStack.h"
 
 #include "config/common.h"
-#include "nn/KoiUtils.h"
 #include "torch_utils/gpu_profiling.h"
 
 #if DORADO_CUDA_BUILD
@@ -9,8 +8,6 @@ extern "C" {
 #include "koi.h"
 }
 #endif
-
-#include <torch/nn.h>
 
 namespace dorado::nn {
 

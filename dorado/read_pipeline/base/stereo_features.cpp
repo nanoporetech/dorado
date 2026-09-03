@@ -3,7 +3,6 @@
 #include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <ATen/TensorOperators.h>
 
 #include <algorithm>
 #include <array>

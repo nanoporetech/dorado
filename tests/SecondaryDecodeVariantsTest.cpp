@@ -2,9 +2,7 @@
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/consensus/variant_calling_sample.h"
 #include "secondary/features/decoder_base.h"
-#include "torch_utils/tensor_utils.h"
 
-#include <ATen/ATen.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 

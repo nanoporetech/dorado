@@ -2,9 +2,6 @@
 
 #include "utils/concurrency/TaskPool.h"
 #include "utils/hardware_interference_size.h"
-#include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <stdexcept>

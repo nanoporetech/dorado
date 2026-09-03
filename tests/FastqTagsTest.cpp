@@ -1,4 +1,3 @@
-#include "TestUtils.h"
 #include "hts_utils/fastq_tags.h"
 
 #include <catch2/catch_test_macros.hpp>

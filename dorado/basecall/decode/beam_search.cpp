@@ -5,7 +5,6 @@
 #include <c10/core/ScalarType.h>
 #include <c10/util/Half.h>
 #include <math.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>

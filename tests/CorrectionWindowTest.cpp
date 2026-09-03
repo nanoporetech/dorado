@@ -7,7 +7,6 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <cstdint>
-#include <iostream>
 #include <string>
 #include <utility>
 #include <vector>

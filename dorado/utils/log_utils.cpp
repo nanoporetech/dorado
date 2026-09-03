@@ -7,11 +7,7 @@
 
 #ifndef _WIN32
 #include <fcntl.h>
-#include <unistd.h>
 #endif
-
-#include <array>
-#include <string>
 
 namespace dorado::utils {
 

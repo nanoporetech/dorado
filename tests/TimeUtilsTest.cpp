@@ -5,7 +5,6 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <chrono>
-#include <limits>
 
 using std::make_tuple;
 using namespace std::chrono;

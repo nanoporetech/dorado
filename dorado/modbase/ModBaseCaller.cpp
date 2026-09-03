@@ -8,9 +8,7 @@
 #include "utils/thread_utils.h"
 
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 
-#include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <stdexcept>

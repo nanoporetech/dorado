@@ -1,12 +1,8 @@
 #include "hts_utils/MergeHeaders.h"
 
-#include "TestUtils.h"
-
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>
 #include <htslib/sam.h>
-
-#include <stdexcept>
 
 #define TEST_GROUP "[merge_headers]"
 

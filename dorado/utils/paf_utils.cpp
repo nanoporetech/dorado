@@ -1,13 +1,6 @@
 #include "utils/paf_utils.h"
 
-#include "utils/alignment_utils.h"
 #include "utils/overlap.h"
-
-#include <spdlog/spdlog.h>
-
-#include <iostream>
-#include <ostream>
-#include <sstream>
 
 namespace dorado::utils {
 

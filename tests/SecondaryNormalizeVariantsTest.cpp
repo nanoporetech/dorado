@@ -6,7 +6,6 @@
 #include <spdlog/spdlog.h>
 
 #include <cstdint>
-#include <numeric>
 #include <string>
 #include <vector>
 
