@@ -62,3 +62,5 @@ CheckOptions:
     value:  true # optional.value() throws so it's safe to use
   - key:    modernize-use-override.IgnoreDestructors
     value:  true # not the existing style
+  - key:    misc-include-cleaner.MissingIncludes
+    value:  false # too noisy
