@@ -2,6 +2,12 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [1.3.4] (3 September 2026)
+
+This release of Dorado adds a bug fix backport to the 1.3.x release.
+
+* 640f8afee8819a108e5147e5a6a7aa5c562ee84f - Fix `cannot write chunk end` crash when running HAC models.
+
 # [2.1.2] (26 August 2026)
 
 This version of Dorado includes bug fixes following the Dorado 2.1.1 release.
