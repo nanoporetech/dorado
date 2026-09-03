@@ -17,6 +17,7 @@
 #include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/window_utils.h"
+#include "secondary/features/feature_columns.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"

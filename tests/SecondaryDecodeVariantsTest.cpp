@@ -1066,8 +1066,8 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
     // Create a symbol lookup.
     std::array<int32_t, 256> lookup{};
     lookup.fill(static_cast<int32_t>(std::size(symbols)));
-    for (int32_t i = 0; i < static_cast<int32_t>(std::size(symbols)); ++i) {
-        lookup[static_cast<int32_t>(symbols[i])] = i;
+    for (int32_t i = 0; i < static_cast<int32_t>(std::ssize(symbols)); ++i) {
+        lookup[static_cast<uint8_t>(symbols[i])] = i;
     }
 
     auto make_sample = [&](at::Tensor basecalls, const std::string_view cons_seq) {
@@ -1097,7 +1097,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
         for (int64_t read_idx = 0; read_idx < std::ssize(seqs); ++read_idx) {
             for (int64_t pos = 0; pos < std::ssize(seqs[read_idx]); ++pos) {
                 const char c = seqs[read_idx][pos];
-                const int8_t encoded = lookup[static_cast<int32_t>(c)];
+                const int8_t encoded = lookup[static_cast<uint8_t>(c)];
                 basecalls.index_put_({pos, read_idx}, encoded);
             }
         }

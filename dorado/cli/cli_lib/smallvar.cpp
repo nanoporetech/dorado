@@ -13,6 +13,7 @@
 #include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/window_utils.h"
+#include "secondary/features/feature_columns.h"
 #include "secondary/features/haplotag_source.h"
 #include "secondary/features/variant_candidate_source.h"
 #include "smallvar_progress_tracker.h"

@@ -17,6 +17,7 @@
 #include "secondary/consensus/variant_calling_sample.h"
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
+#include "secondary/features/feature_columns.h"
 #include "secondary/features/kadayashi_options.h"
 #include "secondary/features/variant_candidate_source.h"
 #include "secondary/kadayashi/local_haplotagging.h"

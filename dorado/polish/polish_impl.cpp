@@ -1466,12 +1466,6 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                         continue;
                     }
 
-                    const int64_t base_column =
-                            (std::size(feature_column_map) > 0)
-                                    ? secondary::get_feature_column_or_throw(
-                                              feature_column_map, secondary::FeatureColumns::BASE)
-                                    : -1;
-
                     // Create the variant calling data. Clone the tensor to convert the view to actual data.
                     for (std::size_t i = 0; i < std::size(item.samples); ++i) {
                         thread_vc_data.emplace_back(secondary::VariantCallingSample{
@@ -1482,15 +1476,9 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 .depth = item.samples[i].depth.clone(),
                                 .read_ids_left = std::move(item.samples[i].read_ids_left),
                                 .read_ids_right = std::move(item.samples[i].read_ids_right),
-                                .basecalls =
-                                        ((!item.samples[i].features.defined()) ||
-                                         (item.samples[i].features.dim() != 3) ||
-                                         (base_column < 0) ||
-                                         (base_column >= item.samples[i].features.size(-1)))
-                                                ? at::Tensor{}
-                                                : item.samples[i]
-                                                          .features.select(/*dim=*/-1, base_column)
-                                                          .contiguous()});
+                                .basecalls = item.samples[i].select_feature_channel(
+                                        secondary::FeatureColumns::BASE, feature_column_map),
+                        });
                     }
                 }
 

@@ -55,6 +55,20 @@ int64_t Sample::find_max_depth(const int64_t start_idx, const int64_t end_idx) c
     return ret;
 }
 
+at::Tensor Sample::select_feature_channel(const FeatureColumns& feature_column,
+                                          const FeatureColumnMap& feature_column_map) const {
+    if ((!features.defined()) || (features.dim() != 3) || std::empty(feature_column_map)) {
+        return {};
+    }
+    const int64_t base_column =
+            secondary::get_feature_column_or_throw(feature_column_map, feature_column);
+    if ((base_column < 0) || (base_column >= features.size(-1))) {
+        return {};
+    }
+    // contiguous called so that direct linear access works without striding
+    return features.select(/*dim=*/-1, base_column).contiguous();
+}
+
 // Helper function to generate placeholder read IDs for read level models.
 std::vector<std::string> placeholder_read_ids(const int64_t n) {
     std::vector<std::string> placeholder_ids(n);

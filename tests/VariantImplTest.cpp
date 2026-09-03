@@ -2,6 +2,7 @@
 #include "hts_utils/fai_utils.h"
 #include "secondary/architectures/model_torch_base.h"
 #include "secondary/features/decoder_base.h"
+#include "secondary/features/feature_columns.h"
 #include "variant/variant_impl.h"
 
 #include <catch2/catch_test_macros.hpp>

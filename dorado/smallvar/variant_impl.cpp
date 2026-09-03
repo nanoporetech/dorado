@@ -7,6 +7,7 @@
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/features/encoder_base.h"
 #include "secondary/features/encoder_utils.h"
+#include "secondary/features/feature_columns.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
@@ -1150,12 +1151,6 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                             ", split_logits.size = " + std::to_string(std::size(split_logits)));
                 }
 
-                const int64_t base_column =
-                        (std::size(feature_column_map) > 0)
-                                ? secondary::get_feature_column_or_throw(
-                                          feature_column_map, secondary::FeatureColumns::BASE)
-                                : -1;
-
                 // Create the variant calling data.
                 spdlog::trace("[separate_decode_data {}] About to push {} items to vc_data_queue.",
                               tid, std::ssize(item.samples));
@@ -1168,16 +1163,9 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                             .depth = std::move(item.samples[i].depth),
                             .read_ids_left = std::move(item.samples[i].read_ids_left),
                             .read_ids_right = std::move(item.samples[i].read_ids_right),
-                            // if we've somehow got here with counts features, don't store basecalls
-                            .basecalls =
-                                    ((!item.samples[i].features.defined()) ||
-                                     (item.samples[i].features.dim() != 3) || (base_column < 0) ||
-                                     (base_column >= item.samples[i].features.size(-1)))
-                                            ? at::Tensor{}
-                                            : item.samples[i]
-                                                      .features.select(/*dim=*/-1, base_column)
-                                                      .contiguous(),
-                                                    });
+                            .basecalls = item.samples[i].select_feature_channel(
+                                    secondary::FeatureColumns::BASE, feature_column_map),
+                    });
                 }
                 spdlog::trace("[separate_decode_data {}] Pushed {} items to vc_data_queue.", tid,
                               std::ssize(item.samples));

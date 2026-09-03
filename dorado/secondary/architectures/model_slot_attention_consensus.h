@@ -3,6 +3,7 @@
 #include "model_latent_space_lstm.h"
 #include "secondary/architectures/model_torch_base.h"
 #include "secondary/features/encoder_base.h"
+#include "secondary/features/feature_columns.h"
 
 #include <ATen/ATen.h>
 #include <torch/nn/modules/embedding.h>
