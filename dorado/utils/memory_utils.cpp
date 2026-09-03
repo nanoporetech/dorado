@@ -5,6 +5,11 @@
 #elif defined(__linux__)
 #include <sys/sysinfo.h>
 #elif defined(__APPLE__)
+#include <mach/host_info.h>
+#include <mach/mach_host.h>
+#include <mach/mach_init.h>
+#include <mach/message.h>
+#include <mach/vm_statistics.h>
 #include <sys/sysctl.h>
 #endif
 

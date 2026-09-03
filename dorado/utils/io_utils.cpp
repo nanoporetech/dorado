@@ -1,5 +1,7 @@
 #include "utils/io_utils.h"
 
+#include <fstream>
+#include <iostream>
 #include <stdexcept>
 
 namespace dorado::utils {

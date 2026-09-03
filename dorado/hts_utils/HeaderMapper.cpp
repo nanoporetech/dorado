@@ -7,6 +7,8 @@
 #include "hts_utils/header_utils.h"
 #include "hts_utils/hts_types.h"
 #include "utils/SampleSheet.h"
+#include "utils/barcode_kits.h"
+#include "utils/time_utils.h"
 
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>

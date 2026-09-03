@@ -1,6 +1,7 @@
 #include "hts_utils/bam_utils.h"
 
 #include "hts_utils/KString.h"
+#include "utils/sequence_utils.h"
 
 #include <htslib/sam.h>
 
@@ -10,6 +11,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
+#include <set>
+#include <sstream>
 #include <string_view>
 
 #ifdef _WIN32

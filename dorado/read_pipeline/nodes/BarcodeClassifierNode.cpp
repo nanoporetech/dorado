@@ -1,5 +1,6 @@
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 
+#include "demux/BarcodeClassifier.h"  // required for BarcodeClassifier
 #include "demux/Trimmer.h"
 #include "demux/barcoding_info.h"
 #include "hts_utils/bam_utils.h"

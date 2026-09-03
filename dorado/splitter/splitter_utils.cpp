@@ -3,6 +3,7 @@
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "read_pipeline/base/read_utils.h"
 #include "utils/time_utils.h"
+#include "utils/types.h"  // required for ModBaseInfo
 
 #include <ATen/TensorIndexing.h>
 

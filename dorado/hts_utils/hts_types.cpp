@@ -4,6 +4,7 @@
 #include <htslib/vcf.h>
 
 #include <memory>
+#include <sstream>
 
 namespace dorado {
 

@@ -1,5 +1,7 @@
 #include "hts_utils/header_utils.h"
 
+#include "utils/string_utils.h"
+
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 

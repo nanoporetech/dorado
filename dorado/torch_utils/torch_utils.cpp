@@ -1,5 +1,7 @@
 #include "torch_utils/torch_utils.h"
 
+#include <ATen/Context.h>
+#include <ATen/Parallel.h>
 #include <c10/util/Backtrace.h>
 
 #if DORADO_CUDA_BUILD
@@ -13,20 +15,20 @@ void initialise_torch() {
     // operations are small and the threads don't appear to be pooled and so torch continuously spawns and destroys
     // them, significantly hurting performance. Limiting this to the minimum number of threads (1) reduces runtime
     // on one of our 44 core CI machine from ~4mins to ~20sec.
-    torch::set_num_threads(1);
+    at::set_num_threads(1);
 
     // We don't want empty tensors to be initialised with data since we always overwrite them.
-    torch::globalContext().setDeterministicFillUninitializedMemory(false);
+    at::globalContext().setDeterministicFillUninitializedMemory(false);
 }
 
 void make_torch_deterministic() {
 #if DORADO_CUDA_BUILD
     setenv("CUBLAS_WORKSPACE_CONFIG", ":4096:8", true);
-    torch::globalContext().setDeterministicCuDNN(true);
-    torch::globalContext().setBenchmarkCuDNN(false);
+    at::globalContext().setDeterministicCuDNN(true);
+    at::globalContext().setBenchmarkCuDNN(false);
 #endif
 
-    torch::globalContext().setDeterministicAlgorithms(true, false);
+    at::globalContext().setDeterministicAlgorithms(true, false);
 }
 
 void set_torch_allocator_max_split_size() {

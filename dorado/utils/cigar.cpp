@@ -1,5 +1,8 @@
 #include "utils/cigar.h"
 
+#include <ostream>
+#include <sstream>
+
 namespace dorado {
 
 std::ostream& operator<<(std::ostream& os, const CigarOp& a) {

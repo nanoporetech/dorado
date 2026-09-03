@@ -7,6 +7,7 @@
 #include <atomic>
 #include <cstdlib>
 #include <cstring>
+#include <fstream>
 #include <optional>
 #include <string>
 

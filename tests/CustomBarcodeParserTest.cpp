@@ -3,7 +3,9 @@
 #include "demux/parse_custom_sequences.h"
 #include "utils/barcode_kits.h"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 namespace fs = std::filesystem;
 

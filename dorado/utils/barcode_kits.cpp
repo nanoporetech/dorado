@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <numeric>
+#include <set>
 #include <stdexcept>
 
 namespace dorado::barcode_kits {

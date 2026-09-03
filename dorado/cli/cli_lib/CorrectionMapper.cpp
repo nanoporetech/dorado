@@ -5,6 +5,7 @@
 #include "alignment/Minimap2IndexSupportTypes.h"
 #include "alignment/Minimap2Options.h"
 #include "alignment/minimap2_args.h"
+#include "alignment/minimap2_wrappers.h"  // required for Minimap2IdxOptHolder
 #include "hts_utils/bam_utils.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"

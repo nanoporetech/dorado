@@ -428,7 +428,7 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                 }
                 const at::Tensor pos_slice = sample.features.index({pos});
                 const at::Tensor bases = pos_slice.index({at::indexing::Slice(), 0});
-                const at::Tensor mask = (bases == DEL_VAL);
+                const at::Tensor mask = bases.eq(DEL_VAL);
                 const int64_t count = mask.sum().item<int64_t>();
                 if (count >= min_count) {
                     return true;
@@ -445,7 +445,7 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                 }
                 const at::Tensor pos_slice = sample.features.index({pos});
                 const at::Tensor bases = pos_slice.index({at::indexing::Slice(), 0});
-                const at::Tensor mask = (bases == DEL_VAL);
+                const at::Tensor mask = bases.eq(DEL_VAL);
                 const int64_t count = mask.sum().item<int64_t>();
                 if (count >= min_count) {
                     return true;

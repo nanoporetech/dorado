@@ -1,8 +1,11 @@
 #include "utils/SampleSheet.h"
 
 #include "utils/PostCondition.h"
+#include "utils/string_utils.h"
 
 #include <algorithm>
+#include <fstream>
+#include <istream>
 #include <iterator>
 #include <set>
 

@@ -21,6 +21,8 @@
 #include <ATen/ops/zeros.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/matchers/catch_matchers_vector.hpp>
 #include <htslib/sam.h>
 
 #include <cstdint>
@@ -51,8 +53,6 @@ std::shared_ptr<const demux::BarcodingInfo> create_barcoding_info(
 }  // namespace
 
 CATCH_TEST_CASE("BarcodeClassifier: check instantiation for all kits", TEST_GROUP) {
-    using Catch::Matchers::Contains;
-
     auto barcoding_kits = barcode_kits::barcode_kits_list_str();
 
     std::string s;

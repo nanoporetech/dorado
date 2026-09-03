@@ -1,5 +1,7 @@
 #include "hts_utils/fastq_tags.h"
 
+#include <unordered_set>
+
 #if defined(__GNUC__) && !defined(__clang__) && !defined(__INTEL_COMPILER)
 #pragma GCC diagnostic push
 #pragma GCC diagnostic ignored "-Wmaybe-uninitialized"

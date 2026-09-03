@@ -2,6 +2,9 @@
 
 #include "utils/overlap.h"
 
+#include <cassert>
+#include <sstream>
+
 namespace dorado::utils {
 
 PafEntry parse_paf(std::istringstream& ss) {

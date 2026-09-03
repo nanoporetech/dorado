@@ -1,5 +1,7 @@
 #include "torch_utils/trim.h"
 
+#include <spdlog/fmt/bundled/format.h>
+
 #include <algorithm>
 #include <sstream>
 

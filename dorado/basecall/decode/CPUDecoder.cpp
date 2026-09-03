@@ -7,6 +7,7 @@
 #include <ATen/TensorOperators.h>
 #include <math.h>
 
+#include <thread>
 #include <vector>
 
 namespace {

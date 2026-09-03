@@ -1,5 +1,6 @@
 #include "alignment/minimap2_args.h"
 
+#include "alignment/minimap2_wrappers.h"  // required for Minimap2IdxOptHolder
 #include "utils/arg_parse_ext.h"
 #include "utils/string_utils.h"
 

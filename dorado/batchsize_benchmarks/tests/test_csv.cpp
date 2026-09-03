@@ -1,6 +1,7 @@
 #include "SpeedEntry.h"
 #include "csv_helpers.h"
 #include "entries_equal.h"
+#include "spdlog/fmt/bundled/format.h"
 
 #include <catch2/catch_test_macros.hpp>
 

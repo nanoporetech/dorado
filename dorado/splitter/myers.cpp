@@ -2,6 +2,8 @@
 
 #include "utils/PostCondition.h"
 
+#include <edlib.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cstdint>

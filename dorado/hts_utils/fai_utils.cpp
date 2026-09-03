@@ -3,6 +3,7 @@
 #include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
+#include <fstream>
 #include <string>
 
 namespace dorado::utils {
