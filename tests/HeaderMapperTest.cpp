@@ -12,6 +12,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <htslib/sam.h>
 
+#include <array>
 #include <filesystem>
 #include <set>
 #include <unordered_map>

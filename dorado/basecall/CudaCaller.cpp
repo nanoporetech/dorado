@@ -7,7 +7,7 @@
 #include "utils/math_utils.h"
 #include "utils/thread_utils.h"
 
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <nvtx3/nvtx3.hpp>
 #include <spdlog/spdlog.h>

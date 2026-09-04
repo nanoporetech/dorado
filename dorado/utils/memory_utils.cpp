@@ -7,6 +7,7 @@
 #include <sys/sysinfo.h>
 
 #include <fstream>
+#include <sstream>
 #include <string>
 #elif defined(__APPLE__)
 #include <mach/mach.h>

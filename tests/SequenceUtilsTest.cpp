@@ -14,6 +14,8 @@
 #if DORADO_ENABLE_BENCHMARK_TESTS
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <spdlog/fmt/bundled/format.h>
+
+#include <numeric>
 #endif
 
 #define TEST_GROUP "[seq_utils]"
