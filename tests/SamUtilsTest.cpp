@@ -214,9 +214,9 @@ CATCH_TEST_CASE(CUT_TAG " test result sorting", CUT_TAG) {
         const auto flags_str = std::to_string(flags);
         std::string section = "read_";
         section += flags_str;
-        section += "\t";
+        section += '\t';
         section += flags_str;
-        section += "\n";
+        section += '\n';
         alignment_sections.emplace_back(std::move(section));
     }
 

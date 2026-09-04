@@ -353,7 +353,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
                     }
                 }
             }
-            modbase_string += ";";
+            modbase_string += ';';
         }
     }
 
@@ -390,7 +390,7 @@ void ReadCommon::generate_modbase_tags(bam1_t *aln, std::optional<uint8_t> thres
                         }
                     }
                 }
-                modbase_string += ";";
+                modbase_string += ';';
             }
         }
     }

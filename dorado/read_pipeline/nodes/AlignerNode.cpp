@@ -57,7 +57,7 @@ void update_bed_results(dorado::ReadCommon& read_common, const dorado::alignment
                 // A hit
                 align_result.bed_hits++;
                 if (!align_result.bed_lines.empty()) {
-                    align_result.bed_lines += "\n";
+                    align_result.bed_lines += '\n';
                 }
                 align_result.bed_lines += entry.bed_line;
             }

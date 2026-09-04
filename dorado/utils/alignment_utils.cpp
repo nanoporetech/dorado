@@ -13,7 +13,7 @@ std::string alignment_to_str(const char* query,
     int qpos = 0;
     for (int i = 0; i < result.alignmentLength; i++) {
         if (result.alignment[i] == EDLIB_EDOP_DELETE) {
-            ss += "-";
+            ss += '-';
         } else {
             ss += query[qpos];
             qpos++;
@@ -24,13 +24,13 @@ std::string alignment_to_str(const char* query,
 
     for (int i = 0; i < result.alignmentLength; i++) {
         if (result.alignment[i] == EDLIB_EDOP_MATCH) {
-            ss += "|";
+            ss += '|';
         } else if (result.alignment[i] == EDLIB_EDOP_INSERT) {
-            ss += " ";
+            ss += ' ';
         } else if (result.alignment[i] == EDLIB_EDOP_DELETE) {
-            ss += " ";
+            ss += ' ';
         } else if (result.alignment[i] == EDLIB_EDOP_MISMATCH) {
-            ss += "*";
+            ss += '*';
         }
     }
 
@@ -39,7 +39,7 @@ std::string alignment_to_str(const char* query,
     int tpos = result.startLocations[0];
     for (int i = 0; i < result.alignmentLength; i++) {
         if (result.alignment[i] == EDLIB_EDOP_INSERT) {
-            ss += "-";
+            ss += '-';
         } else {
             ss += target[tpos];
             tpos++;

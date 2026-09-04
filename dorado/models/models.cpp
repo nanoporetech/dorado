@@ -2090,7 +2090,7 @@ std::string extract_model_names_from_paths(const std::vector<std::filesystem::pa
     std::string model_names;
     for (const auto& model_path : model_paths) {
         if (!model_names.empty()) {
-            model_names += ",";
+            model_names += ',';
         }
         model_names += models::extract_model_name_from_path(model_path);
     }

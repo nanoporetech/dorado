@@ -1204,7 +1204,7 @@ void vcfio_alter_phasings(
                             if (hp != HAPTAG_UNPHASED || phaseblockID >= 0) {
                                 // new genotype
                                 if (col_sample_new.size() != 0) {
-                                    col_sample_new += ":";
+                                    col_sample_new += ':';
                                 }
                                 if (hp == 0) {
                                     if (col_sample[0] == col_sample[2]) {
@@ -1228,15 +1228,15 @@ void vcfio_alter_phasings(
                                     }
                                 } else {
                                     col_sample_new += col_sample[0];
-                                    col_sample_new += "/";
+                                    col_sample_new += '/';
                                     col_sample_new += col_sample[2];
                                 }
                             } else {
                                 if (col_sample_new.size() != 0) {
-                                    col_sample_new += ":";
+                                    col_sample_new += ':';
                                 }
                                 col_sample_new += std::string(1, col_sample[0]);
-                                col_sample_new += "/";
+                                col_sample_new += '/';
                                 col_sample_new += std::string(1, col_sample[2]);
                             }
                         } else {  // no change to the GT field
@@ -1244,16 +1244,16 @@ void vcfio_alter_phasings(
                         }
                     } else if (j == i_PS) {
                         if (col_sample_new.size() != 0) {
-                            col_sample_new += ":";
+                            col_sample_new += ':';
                         }
                         if (hp == HAPTAG_UNPHASED) {
-                            col_sample_new += ".";
+                            col_sample_new += '.';
                         } else {
                             col_sample_new += std::to_string(phaseblockID);
                         }
                     } else {
                         if (col_sample_new.size() != 0) {
-                            col_sample_new += ":";
+                            col_sample_new += ':';
                         }
                         col_sample_new += col_sample;
                     }
@@ -1262,10 +1262,10 @@ void vcfio_alter_phasings(
                 if (i_PS < 0) {  // input doesn't have phaseblockID field in col 8, so
                     // col 8 and 9 will have it appened as the last entry in their values
                     if (col_sample_new.size() != 0) {
-                        col_sample_new += ":";
+                        col_sample_new += ':';
                     }
                     if (hp == HAPTAG_UNPHASED) {
-                        col_sample_new += ".";
+                        col_sample_new += '.';
                     } else {
                         col_sample_new += std::to_string(phaseblockID);
                     }
@@ -1565,24 +1565,24 @@ std::string make_vcf_line_given_variant_fullinfo_t(std::string_view ref_name,
     }
 
     // sample
-    oline0_s += "\t";
+    oline0_s += '\t';
     oline0_s.append(genotype0, 3);
-    oline0_s += ":";
+    oline0_s += ':';
     if (var.is_multi_allele) {  // the second allele on different line
-        oline1_s += "\t";
+        oline1_s += '\t';
         oline1_s.append(genotype1, 3);
-        oline1_s += ":";
+        oline1_s += ':';
     }
 
     if (!var.is_confident || !var.is_phased0 || phaseblockID < 0) {
-        oline0_s += ".";
-        oline1_s += ".";
+        oline0_s += '.';
+        oline1_s += '.';
     } else {
         oline0_s += std::to_string(phaseblockID);
         oline1_s += std::to_string(phaseblockID);
     }
-    oline0_s += "\n";
-    oline1_s += "\n";
+    oline0_s += '\n';
+    oline1_s += '\n';
 
     std::string ret;
     if (var.is_multi_allele) {
