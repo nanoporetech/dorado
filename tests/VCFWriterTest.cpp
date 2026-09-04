@@ -44,7 +44,7 @@ void check_record(const bcf_hdr_t* header,
     CATCH_REQUIRE(bcf_unpack(record, BCF_UN_ALL) == 0);
 
     CATCH_CHECK(record->rid == expected.seq_id);
-    CATCH_CHECK(std::string(bcf_hdr_id2name(header, record->rid)) == expected_contig);
+    CATCH_CHECK(bcf_hdr_id2name(header, record->rid) == expected_contig);
     CATCH_CHECK(record->pos == expected.pos);
     CATCH_REQUIRE(record->n_allele == (1 + std::size(expected.alts)));
     CATCH_CHECK(std::string(record->d.allele[0]) == expected.ref);

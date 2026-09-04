@@ -60,7 +60,7 @@ struct BasecallerNode::BasecallingRead {
 };
 
 struct BasecallerNode::BatchedChunks {
-    BatchedChunks(int id) : worker_id(id) { reset(); }
+    explicit BatchedChunks(int id) : worker_id(id) { reset(); }
 
     std::vector<std::unique_ptr<BasecallingChunk>> chunks;
     std::size_t chunks_size;

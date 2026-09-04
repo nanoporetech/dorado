@@ -17,7 +17,7 @@ class BarcodeClassifier {
     struct BarcodeCandidateKit;
 
 public:
-    BarcodeClassifier(const std::string& kit_name);
+    explicit BarcodeClassifier(const std::string& kit_name);
     ~BarcodeClassifier();
 
     BarcodeScoreResult barcode(const std::string& seq,

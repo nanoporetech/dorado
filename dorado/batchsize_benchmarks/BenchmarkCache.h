@@ -24,7 +24,7 @@ public:
 
     class CacheProxy final {
     public:
-        CacheProxy(BenchmarkCache &cache) : m_cache(cache) {}
+        explicit CacheProxy(BenchmarkCache &cache) : m_cache(cache) {}
 
         // Add new timings to the cache.
         // This will replace existing ones with the same gpu+model.

@@ -27,7 +27,7 @@ struct TempDir {
 private:
     // Force devs to use the function instead of creating their own TempDirs
     friend TempDir make_temp_dir(const std::string& prefix);
-    TempDir(std::filesystem::path path) : m_path(std::move(path)) {}
+    explicit TempDir(std::filesystem::path path) : m_path(std::move(path)) {}
 
 public:
     ~TempDir();

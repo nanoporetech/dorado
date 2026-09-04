@@ -6,7 +6,7 @@
 namespace dorado::nn {
 
 struct RMSNormImpl : torch::nn::Module {
-    RMSNormImpl(int hidden_size_);
+    explicit RMSNormImpl(int hidden_size_);
     at::Tensor forward(at::Tensor x);
 
     at::Tensor weight;

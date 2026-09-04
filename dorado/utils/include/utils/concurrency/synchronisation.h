@@ -32,7 +32,7 @@ public:
      *
      * @param count the initial value of the internal counter
      */
-    Latch(std::size_t count) : m_count(count), m_mutex(), m_condition() {}
+    explicit Latch(std::size_t count) : m_count(count), m_mutex(), m_condition() {}
 
     bool is_zeroed() const {
         std::lock_guard lock(m_mutex);

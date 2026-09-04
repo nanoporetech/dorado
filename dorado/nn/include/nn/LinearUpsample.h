@@ -10,7 +10,7 @@ namespace dorado::nn {
 
 struct LinearUpsampleImpl : torch::nn::Module {
     LinearUpsampleImpl(const int size, const int scale_factor);
-    LinearUpsampleImpl(const config::LinearUpsampleParams &params);
+    explicit LinearUpsampleImpl(const config::LinearUpsampleParams &params);
 
     at::Tensor forward(const at::Tensor &x);
 

@@ -201,7 +201,8 @@ CATCH_TEST_CASE("TerminateRestart", TEST_GROUP) {
 CATCH_TEST_CASE("TerminateFast", TEST_GROUP) {
     class TerminateTestNode : public MessageSink {
     public:
-        TerminateTestNode(std::optional<dorado::utils::AsyncQueueTerminateFast>& was_fast_terminate)
+        explicit TerminateTestNode(
+                std::optional<dorado::utils::AsyncQueueTerminateFast>& was_fast_terminate)
                 : MessageSink(1, 0), m_was_fast_terminate(was_fast_terminate) {}
 
         std::string get_name() const override { return "TerminateTestNode"; }

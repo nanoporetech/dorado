@@ -238,7 +238,7 @@ std::string to_string(const SampleType& sample_type);
 
 class ConditionInfo {
 public:
-    ConditionInfo(const ChemistryKey& key)
+    explicit ConditionInfo(const ChemistryKey& key)
             : m_flowcell(std::get<0>(key)),
               m_kit(std::get<1>(key)),
               m_kit_info(get_kit_info()),

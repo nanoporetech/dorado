@@ -12,7 +12,7 @@ namespace dorado::modbase {
 
 class MotifMatcher {
 public:
-    MotifMatcher(const config::ModBaseModelConfig& model_config);
+    explicit MotifMatcher(const config::ModBaseModelConfig& model_config);
     MotifMatcher(const std::string& motif, size_t offset);
 
     std::vector<size_t> get_motif_hits(std::string_view seq) const;

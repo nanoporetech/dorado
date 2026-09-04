@@ -43,7 +43,7 @@ std::string expand_motif_regex(const std::string& motif) {
     for (auto base : motif) {
         motif_regex += IUPAC_CODES.at(base);
     }
-    motif_regex += ")";
+    motif_regex += ')';
     return motif_regex;
 }
 

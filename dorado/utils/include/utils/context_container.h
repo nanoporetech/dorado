@@ -28,7 +28,7 @@ class ContextHolder final : public ContextBase {
     std::shared_ptr<T> m_context;
 
 public:
-    ContextHolder(std::shared_ptr<T> context) : m_context(std::move(context)) {}
+    explicit ContextHolder(std::shared_ptr<T> context) : m_context(std::move(context)) {}
 
     std::shared_ptr<T> get_ptr() { return m_context; }
 

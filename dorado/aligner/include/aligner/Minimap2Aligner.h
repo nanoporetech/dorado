@@ -19,7 +19,7 @@ extern const std::string UNMAPPED_SAM_LINE_STRIPPED;
 class Minimap2Aligner {
 public:
     /// Construct with a single index.
-    Minimap2Aligner(std::shared_ptr<const Minimap2Index> minimap_index)
+    explicit Minimap2Aligner(std::shared_ptr<const Minimap2Index> minimap_index)
             : m_minimap_index(std::move(minimap_index)) {}
 
     /// Align to the full reference (and merge results if index is split).

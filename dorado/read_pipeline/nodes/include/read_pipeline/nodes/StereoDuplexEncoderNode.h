@@ -9,7 +9,7 @@ namespace dorado {
 
 class StereoDuplexEncoderNode : public MessageSink {
 public:
-    StereoDuplexEncoderNode(int input_signal_stride);
+    explicit StereoDuplexEncoderNode(int input_signal_stride);
     ~StereoDuplexEncoderNode();
 
     std::string get_name() const override;

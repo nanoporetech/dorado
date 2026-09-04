@@ -129,7 +129,8 @@ class TestHtsReader : public HtsReader {
     static constexpr std::size_t NUM_THREADS = 2;
 
 public:
-    TestHtsReader(const std::string& filename) : HtsReader(filename, std::nullopt, NUM_THREADS) {}
+    explicit TestHtsReader(const std::string& filename)
+            : HtsReader(filename, std::nullopt, NUM_THREADS) {}
 };
 
 /**

@@ -851,7 +851,7 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
         return ret;
     }
 
-    const bool is_homozygous = it_gt->second.find("0") == std::string::npos;
+    const bool is_homozygous = it_gt->second.find('0') == std::string::npos;
     if (is_homozygous || !require_hom) {
         it_gt->second = "1";
     } else {

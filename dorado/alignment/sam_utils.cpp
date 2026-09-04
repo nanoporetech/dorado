@@ -36,7 +36,7 @@ class SamLineStream {
     }
 
 public:
-    SamLineStream(std::string_view line) : m_stream(line) {}
+    explicit SamLineStream(std::string_view line) : m_stream(line) {}
 
     template <typename T>
     SamLineStream& operator>>(T& val) {
@@ -51,7 +51,7 @@ public:
         return *this;
     }
 
-    [[nodiscard]] operator bool() const { return m_stream; }
+    [[nodiscard]] explicit operator bool() const { return static_cast<bool>(m_stream); }
 };
 
 std::pair<char, int> next_op(std::string_view& seq) {

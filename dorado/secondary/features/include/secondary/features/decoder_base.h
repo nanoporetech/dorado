@@ -17,7 +17,7 @@ enum class LabelSchemeType {
 
 class DecoderBase {
 public:
-    DecoderBase(const LabelSchemeType label_scheme_type);
+    explicit DecoderBase(const LabelSchemeType label_scheme_type);
 
     /**
      * \brief Given an input batch tensor of probabilities this function decodes the bases and qualities

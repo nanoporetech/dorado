@@ -17,7 +17,7 @@ namespace dorado::basecall {
 
 class ModelRunner final : public ModelRunnerBase {
 public:
-    ModelRunner(const config::BasecallModelConfig &model_config);
+    explicit ModelRunner(const config::BasecallModelConfig &model_config);
     ~ModelRunner();
 
     void accept_chunk(int chunk_idx, const at::Tensor &chunk) final;

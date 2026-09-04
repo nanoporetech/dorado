@@ -13,7 +13,7 @@ namespace dorado::model_downloader {
 
 class Downloader {
 public:
-    Downloader(std::filesystem::path directory);
+    explicit Downloader(std::filesystem::path directory);
     ~Downloader();
 
     bool download(const models::ModelInfo& info);

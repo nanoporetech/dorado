@@ -28,7 +28,7 @@ private:
     FastxSequentialReader& operator=(FastxSequentialReader&&) = delete;
 
 public:
-    FastxSequentialReader(const std::filesystem::path& fastx_path);
+    explicit FastxSequentialReader(const std::filesystem::path& fastx_path);
 
     ~FastxSequentialReader();
 

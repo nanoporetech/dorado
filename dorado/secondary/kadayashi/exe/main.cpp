@@ -27,7 +27,7 @@ void print_end_summary(int argc, char *argv[], double timestamp) {
     cmd += "] CMD: ";
     for (int i = 0; i < argc; i++) {
         cmd += argv[i];
-        cmd += " ";
+        cmd += ' ';
     }
     spdlog::info(cmd);
 }

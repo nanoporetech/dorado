@@ -15,7 +15,7 @@ class IWriter;
 
 class WriterNode : public MessageSink {
 public:
-    WriterNode(std::vector<std::unique_ptr<hts_writer::IWriter>> writers);
+    explicit WriterNode(std::vector<std::unique_ptr<hts_writer::IWriter>> writers);
     ~WriterNode();
     std::string get_name() const override;
     stats::NamedStats sample_stats() const override;
