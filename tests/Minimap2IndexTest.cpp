@@ -2,7 +2,7 @@
 
 #include "TestUtils.h"
 #include "alignment/minimap2_args.h"
-#include "alignment/minimap2_wrappers.h"  // required for Minimap2MapOptHolder
+#include "alignment/minimap2_wrappers.h"  // IWYU pragma: keep for Minimap2MapOptHolder
 #include "hts_utils/hts_file.h"
 #include "read_pipeline/nodes/HtsWriterNode.h"
 

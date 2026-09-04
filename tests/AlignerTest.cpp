@@ -3,7 +3,7 @@
 #include "aligner/Minimap2Aligner.h"
 #include "alignment/alignment_info.h"
 #include "alignment/minimap2_args.h"
-#include "alignment/minimap2_wrappers.h"  // required for Minimap2IdxOptHolder
+#include "alignment/minimap2_wrappers.h"  // IWYU pragma: keep for Minimap2IdxOptHolder
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/header_sq_record.h"

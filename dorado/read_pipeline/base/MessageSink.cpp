@@ -1,6 +1,6 @@
 #include "read_pipeline/base/MessageSink.h"
 
-#include "read_pipeline/base/ClientInfo.h"  // required for ClientInfo
+#include "read_pipeline/base/ClientInfo.h"  // IWYU pragma: keep for ClientInfo
 #include "read_pipeline/base/messages/ReadCommon.h"
 #include "utils/thread_utils.h"
 
