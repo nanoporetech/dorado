@@ -12,6 +12,12 @@
 #include <filesystem>
 #include <ranges>
 
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <spdlog/fmt/bundled/format.h>
+#endif
+
 #define TEST_GROUP "[alignment::Minimap2Index]"
 
 using namespace dorado::utils;

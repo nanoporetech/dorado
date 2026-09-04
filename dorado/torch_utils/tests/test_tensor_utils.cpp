@@ -6,6 +6,12 @@
 #include <cstdlib>
 #include <random>
 
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <spdlog/fmt/bundled/format.h>
+#endif
+
 #define CUT_TAG "[TensorUtils]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 

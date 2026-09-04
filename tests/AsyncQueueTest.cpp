@@ -10,6 +10,12 @@
 #include <numeric>
 #include <thread>
 
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include <spdlog/spdlog.h>
+
+#include <latch>
+#endif
+
 using dorado::utils::AsyncQueue;
 using dorado::utils::AsyncQueueStatus;
 using dorado::utils::AsyncQueueNonBlockingMode::FullLock;
