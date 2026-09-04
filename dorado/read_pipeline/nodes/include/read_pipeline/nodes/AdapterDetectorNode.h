@@ -15,7 +15,7 @@ struct AdapterInfo;
 
 class AdapterDetectorNode : public MessageSink {
 public:
-    AdapterDetectorNode(int threads);
+    explicit AdapterDetectorNode(int threads);
     ~AdapterDetectorNode() override;
 
     std::string get_name() const override;

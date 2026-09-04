@@ -17,7 +17,7 @@ public:
      *  @param strip_alignment If set, no SQ lines will be included in the
      *         merged header, and no checks will be made for SQ conflicts. 
      */
-    MergeHeaders(bool strip_alignment);
+    explicit MergeHeaders(bool strip_alignment);
 
     /** Add a header.
      *  @param hdr The header to add.

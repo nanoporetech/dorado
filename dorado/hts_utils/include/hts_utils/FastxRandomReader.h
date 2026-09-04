@@ -24,7 +24,7 @@ private:
     bool m_force_upper{false};
 
 public:
-    FastxRandomReader(const std::filesystem::path& fastx_path);
+    explicit FastxRandomReader(const std::filesystem::path& fastx_path);
     FastxRandomReader(const std::filesystem::path& fastx_path, bool force_upper);
 
     std::string fetch_seq(const std::string& read_id) const;

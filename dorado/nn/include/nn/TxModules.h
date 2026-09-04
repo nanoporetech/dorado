@@ -132,7 +132,7 @@ struct TxEncoderStackImpl : torch::nn::Module {
 TORCH_MODULE(TxEncoderStack);
 
 struct LinearScaledCRFImpl : torch::nn::Module {
-    LinearScaledCRFImpl(const config::CRFEncoderParams &params);
+    explicit LinearScaledCRFImpl(const config::CRFEncoderParams &params);
 
     at::Tensor forward(const at::Tensor &x);
 

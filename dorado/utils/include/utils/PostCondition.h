@@ -8,7 +8,7 @@ namespace detail {
 template <typename Func>
 class PostCondition {
 public:
-    PostCondition(Func&& func) : m_func(std::move(func)) {}
+    explicit PostCondition(Func&& func) : m_func(std::move(func)) {}
     ~PostCondition() { m_func(); }
 
 private:

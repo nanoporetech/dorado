@@ -88,7 +88,7 @@ struct ModsConvImpl : Module {
         activation = config::Activation::SWISH;
     }
 
-    ModsConvImpl(const config::ConvParams& params)
+    explicit ModsConvImpl(const config::ConvParams& params)
             : name("conv_act_" + std::to_string(params.size)) {
         conv = register_module("conv",
                                Conv1d(Conv1dOptions(params.insize, params.size, params.winlen)
@@ -207,7 +207,7 @@ const std::vector<std::string> ModBaseConvModelImpl::weight_tensors{
 };
 
 struct ModBaseConvLSTMModelImpl : Module {
-    ModBaseConvLSTMModelImpl(const config::ModBaseModelConfig& config)
+    explicit ModBaseConvLSTMModelImpl(const config::ModBaseModelConfig& config)
             : m_config(config),
               //int size, int kmer_len, int num_out, bool is_conv_lstm_v2, int stride
               m_is_conv_lstm_v2(config.is_chunked_input_model()) {
@@ -314,7 +314,8 @@ struct ModBaseConvLSTMModelImpl : Module {
 };
 
 struct ModBaseConvLSTMV3ModelImpl : Module {
-    ModBaseConvLSTMV3ModelImpl(const config::ModBaseModelConfig& config) : m_config(config) {
+    explicit ModBaseConvLSTMV3ModelImpl(const config::ModBaseModelConfig& config)
+            : m_config(config) {
         const auto& sig_cvs = m_config.general.modules->signal_convs;
         const auto& seq_cvs = m_config.general.modules->sequence_convs;
         const auto& merge_cv = m_config.general.modules->merge_conv;

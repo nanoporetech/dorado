@@ -21,7 +21,8 @@ using DecodedData = std::tuple<std::string, std::string, std::vector<uint8_t>>;
 
 class MetalCaller {
 protected:
-    MetalCaller(const config::BasecallModelConfig &model_config) : m_config(model_config) {}
+    explicit MetalCaller(const config::BasecallModelConfig &model_config)
+            : m_config(model_config) {}
 
 public:
     static std::shared_ptr<MetalCaller> create(const config::BasecallModelConfig &model_config,

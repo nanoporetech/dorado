@@ -9,7 +9,7 @@ namespace dorado::basecall {
 
 class MPSCaller final : public MetalCaller {
 public:
-    MPSCaller(const config::BasecallModelConfig &model_config);
+    explicit MPSCaller(const config::BasecallModelConfig &model_config);
     ~MPSCaller();
 
     at::Tensor create_input_tensor() const override;

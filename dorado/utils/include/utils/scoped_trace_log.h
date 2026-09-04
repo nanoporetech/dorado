@@ -17,7 +17,7 @@ private:
     ScopedTraceLog &operator=(ScopedTraceLog &&) = delete;
 
 public:
-    ScopedTraceLog(std::string context);
+    explicit ScopedTraceLog(std::string context);
     ~ScopedTraceLog();
 
     // Writes a message in the context of the scoped log

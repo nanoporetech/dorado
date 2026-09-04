@@ -68,7 +68,7 @@ struct RefinementParams {
     const size_t center_idx;      ///< The position in the kmer at which to check the levels
 
     RefinementParams() : do_rough_rescale(false), center_idx(0) {}
-    RefinementParams(int center_idx_);
+    explicit RefinementParams(int center_idx_);
 };
 
 struct ModificationParams {

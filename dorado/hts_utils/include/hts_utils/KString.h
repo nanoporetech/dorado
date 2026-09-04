@@ -26,7 +26,7 @@ public:
          *  into your C++ code using htslib macros. So make sure you pre-allocate
          *  with enough memory to insure that no resizing will be needed.
          */
-    KString(size_t n);
+    explicit KString(size_t n);
 
     /** This object owns the storage in the internal kstring_t object.
          *  To avoid reference counting, we don't allow this object to be copied.
@@ -37,7 +37,7 @@ public:
          *  Note that it is an error to create more than one KString object
          *  that owns the same kstring_t data.
          */
-    KString(kstring_t &&data) noexcept;
+    explicit KString(kstring_t &&data) noexcept;
 
     /// Move Constructor
     KString(KString &&other) noexcept;

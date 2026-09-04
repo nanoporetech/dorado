@@ -22,7 +22,7 @@ public:
      *  Adapter and primer sequences will be selected according to the specifications of that
      *  file.
      */
-    AdapterPrimerManager(const std::string& custom_file);
+    explicit AdapterPrimerManager(const std::string& custom_file);
 
     /** Get the adapter to search for corresponding to the specified kit.
      *  This will return any adapters that should be searched for, corresponding to the specified

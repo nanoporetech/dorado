@@ -12,7 +12,7 @@ namespace dorado::model_resolution {
 
 class Models {
 public:
-    Models(ModelSources sources);
+    explicit Models(ModelSources sources);
 
     ~Models() { cleanup_temporary_models(); };
 
@@ -51,7 +51,7 @@ protected:
 
 class DuplexModels final : public Models {
 public:
-    DuplexModels(const ModelSources& sources);
+    explicit DuplexModels(const ModelSources& sources);
 
     std::string get_stereo_model_name() const;
     std::filesystem::path get_stereo_model_path() const;

@@ -76,7 +76,7 @@ protected:
     static std::string parse_variant_version(const std::string& version);
 
     // ModelComplex constructor for PATH style;
-    ModelComplex(const std::string& path);
+    explicit ModelComplex(const std::string& path);
 };
 
 // The ModelComplexSearch takes the sequencing chemistry, and the user's ModelComplex input which

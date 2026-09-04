@@ -53,7 +53,7 @@ DEFINE_TEST("AsyncTaskExecutor::send() with non-copyable task invokes the task")
 
     Flag invoked{};
     struct Signaller {
-        Signaller(Flag& flag) : m_flag(flag) {}
+        explicit Signaller(Flag& flag) : m_flag(flag) {}
         void signal() { m_flag.signal(); }
 
         Flag& m_flag;

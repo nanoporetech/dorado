@@ -11,7 +11,7 @@ namespace dorado::demux {
 
 class KitInfoProvider {
 public:
-    KitInfoProvider(const std::string& kit_name);
+    explicit KitInfoProvider(const std::string& kit_name);
 
     const barcode_kits::KitInfo& get_kit_info(const std::string& kit_name) const;
     const std::string& get_barcode_sequence(const std::string& barcode_name) const;

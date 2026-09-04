@@ -21,7 +21,7 @@ public:
     static inline constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};
     static inline constexpr char QUEUE_THREAD_NAME[] = "barcoding";
 
-    BarcodeClassifierNode(utils::concurrency::AsyncExecutor&& task_executor);
+    explicit BarcodeClassifierNode(utils::concurrency::AsyncExecutor&& task_executor);
 
     ~BarcodeClassifierNode();
 

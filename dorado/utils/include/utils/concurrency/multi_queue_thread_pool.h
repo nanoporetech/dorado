@@ -36,7 +36,7 @@ using TaskType = detail::TaskType;
 // tasks are being processed.
 class MultiQueueThreadPool {
 public:
-    MultiQueueThreadPool(std::size_t num_threads);
+    explicit MultiQueueThreadPool(std::size_t num_threads);
     MultiQueueThreadPool(std::size_t num_threads, std::string name);
     ~MultiQueueThreadPool();
 
