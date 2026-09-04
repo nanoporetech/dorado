@@ -13,6 +13,8 @@
 #include <vector>
 
 #ifndef NDEBUG
+#include "utils/dev_utils.h"
+
 #include <spdlog/spdlog.h>
 #endif
 

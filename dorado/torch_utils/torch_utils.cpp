@@ -8,6 +8,10 @@
 #include <c10/cuda/CUDAAllocatorConfig.h>
 #endif  // DORADO_CUDA_BUILD
 
+#ifdef _WIN32
+#include "compat/compat_utils.h"
+#endif
+
 namespace dorado::utils {
 
 void initialise_torch() {

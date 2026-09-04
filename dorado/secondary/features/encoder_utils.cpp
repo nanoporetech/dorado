@@ -11,6 +11,9 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
+#include "utils/container_utils.h"
+
+#include <spdlog/spdlog.h>
 #define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
 #endif
 

@@ -1641,7 +1641,8 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
                 break;
             }
 
-            LOG_TRACE("[kdys::{}] worker got jobID starting from {}", __func__, (int)jobID_start);
+            LOG_TRACE("[kdys::{}] worker got jobID starting from {}",
+                      "kadayashi_phase_and_varcall_multiregionthreaded", (int)jobID_start);
 
             const int jobID_end = std::min<int>(jobID_start + JOB_CHUNK_SIZE, n_jobs);
             for (int jobID = jobID_start; jobID < jobID_end; jobID++) {
@@ -2235,7 +2236,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
                                         chunk_start, chunk_end, varcall_results[i].qname2hp_local);
             local_haptagging_write_tsv2(fp_out_kdystsv_apprxglobal, hf, (int)binchunkID, chrom,
                                         chunk_start, chunk_end, varcall_results[i].vr.qname2hp);
-            assert(binchunkID < INTMAX_MAX - 1);
+            assert(binchunkID < INT_MAX - 1);
             binchunkID++;
 
             // collect global phasing (for them to be returned)
