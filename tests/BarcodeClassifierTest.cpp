@@ -324,7 +324,7 @@ CATCH_TEST_CASE(
     constexpr size_t num_expected_messages = 3;
     CATCH_CHECK(messages.size() == num_expected_messages);
 
-    const std::string expected_bc = "SQK-RPB004_barcode01";
+    const std::string expected_bc = "barcode01";
     std::vector<uint8_t> expected_move_vals;
     for (size_t i = 0; i < nonbc_seq.length(); i++) {
         expected_move_vals.push_back(1);
@@ -457,7 +457,7 @@ CATCH_TEST_CASE("BarcodeClassifierNode: test for proper trimming and alignment d
     auto seq2 = dorado::utils::extract_sequence(read2.get());
     CATCH_CHECK(seq2 ==
                 seq1);  // Sequence 2 is just sequence 1 plus the barcode, which should be trimmed.
-    CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(read2.get(), "BC")), Equals("SQK-16S024_barcode01"));
+    CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(read2.get(), "BC")), Equals("barcode01"));
 
     // Check to make sure alignment data has been stripped from both reads.
     CATCH_CHECK(read1->core.tid == -1);

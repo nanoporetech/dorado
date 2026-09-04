@@ -5,6 +5,7 @@
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "utils/context_container.h"
+#include "utils/types.h"
 
 #include <spdlog/spdlog.h>
 
@@ -39,7 +40,11 @@ void PolyACalculatorNode::process_read(SimplexRead &read) {
         return;
     }
 
-    auto calculator = selector->get_calculator(read.read_common.barcode);
+    auto calculator = selector->get_calculator(
+            read.read_common.barcoding_result
+                    ? read.read_common.barcoding_result->barcode_kit + "_" +
+                              read.read_common.barcoding_result->normalized_barcode_name
+                    : UNCLASSIFIED);
     if (!calculator || !calculator->enabled()) {
         // Barcode overrides have been specified and this read is either unclassified
         // or estimation for this barcode has been explicitly disabled

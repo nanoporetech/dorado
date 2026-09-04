@@ -220,6 +220,7 @@ std::string SampleSheet::get_value_from_column(const std::string& column_name,
     }
 
     std::string_view barcode_only(barcode);
+    // This implies underscores aren't allowed in barcode names, but the twist barcodes do use them, so it seems unsafe.
     if (auto pos = barcode_only.find('_'); pos != std::string::npos) {
         // trim off the kit name
         barcode_only = barcode_only.substr(pos + 1);
