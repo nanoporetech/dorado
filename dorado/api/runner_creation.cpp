@@ -4,17 +4,20 @@
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
 
+#include <spdlog/spdlog.h>
+
+#include <thread>
+
 #if DORADO_METAL_BUILD
 #include "basecall/MetalModelRunner.h"
 #elif DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
 #include "basecall/CudaModelRunner.h"
+#include "nn/KoiUtils.h"
 #include "torch_utils/cuda_utils.h"
+
+#include <cxxpool.h>
 #endif
-
-#include <spdlog/spdlog.h>
-
-#include <thread>
 
 namespace dorado::api {
 

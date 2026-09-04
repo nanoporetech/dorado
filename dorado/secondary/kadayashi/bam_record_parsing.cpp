@@ -8,6 +8,7 @@
 #include <cassert>
 #include <charconv>
 #include <cstdio>
+#include <stdexcept>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)
