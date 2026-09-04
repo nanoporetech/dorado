@@ -12,7 +12,6 @@
 #include <spdlog/spdlog.h>
 
 #include <cassert>
-#include <cstdlib>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)

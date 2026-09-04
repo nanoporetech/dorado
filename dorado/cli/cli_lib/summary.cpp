@@ -15,7 +15,6 @@
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
-#include <cctype>
 #include <filesystem>
 #include <string>
 

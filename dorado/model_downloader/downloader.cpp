@@ -12,8 +12,7 @@
 
 #if DORADO_MODELS_HAS_HTTPLIB
 #ifndef _WIN32
-// Required for MSG_NOSIGNAL and SO_NOSIGPIPE
-#include <sys/socket.h>
+#include <sys/socket.h>  // IWYU pragma: keep for MSG_NOSIGNAL and SO_NOSIGPIPE
 #endif
 
 #ifdef MSG_NOSIGNAL

@@ -6,7 +6,6 @@
 #include <spdlog/fmt/bundled/format.h>
 #include <spdlog/spdlog.h>
 
-#include <cstdlib>
 #include <exception>
 #include <sstream>
 #include <stdexcept>

@@ -2,13 +2,11 @@
 
 #include "torch_utils/gpu_monitor.h"
 #include "utils/PostCondition.h"
-#include "utils/math_utils.h"
 
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/CUDAContextLight.h>
 #include <ATen/ops/matmul.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <cublas_v2.h>
-#include <cuda_runtime.h>
 #include <cuda_runtime_api.h>
 #include <spdlog/spdlog.h>
 #include <torch/cuda.h>

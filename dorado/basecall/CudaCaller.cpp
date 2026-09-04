@@ -5,8 +5,6 @@
 #include "decode/Decoder.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/math_utils.h"
-#include "utils/memory_utils.h"
-#include "utils/sys_utils.h"
 #include "utils/thread_utils.h"
 
 #include <ATen/cuda/CUDAContext.h>
@@ -17,15 +15,12 @@
 
 #include <algorithm>
 #include <cassert>
-#include <chrono>
 #include <condition_variable>
 #include <limits>
 #include <map>
 #include <mutex>
 #include <queue>
 #include <set>
-
-using namespace std::chrono_literals;
 
 namespace dorado::basecall {
 

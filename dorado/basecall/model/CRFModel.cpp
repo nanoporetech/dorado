@@ -12,7 +12,6 @@
 #if DORADO_CUDA_BUILD
 #include "nn/KoiUtils.h"
 
-#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
 #endif
 

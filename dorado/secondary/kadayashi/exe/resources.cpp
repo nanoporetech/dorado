@@ -1,12 +1,11 @@
+
 #include "resources.h"
+
+#include <chrono>
 
 #if defined(__linux__) || defined(__unix__) || defined(__APPLE__) || defined(_POSIX_VERSION)
 #include <sys/resource.h>
 #endif
-
-#include <chrono>
-#include <cstddef>
-#include <cstdlib>
 
 namespace kadayashi {
 

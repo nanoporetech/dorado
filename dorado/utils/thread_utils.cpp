@@ -17,7 +17,6 @@
 #include <pthread.h>
 #elif defined(__linux__)
 #include <pthread.h>
-#include <sched.h>
 #endif
 
 namespace dorado::utils {

@@ -1,7 +1,5 @@
 #include "flash_attention3_backend.h"
 
-#include <c10/util/Exception.h>
-
 #include <optional>
 
 #if DORADO_HAS_FLASHATTENTION3

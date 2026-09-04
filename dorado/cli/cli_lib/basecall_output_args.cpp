@@ -5,7 +5,6 @@
 #include <argparse/argparse.hpp>
 #include <spdlog/spdlog.h>
 
-#include <ctime>
 #include <optional>
 
 namespace dorado::cli {

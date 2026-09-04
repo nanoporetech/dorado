@@ -20,7 +20,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cctype>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
@@ -33,9 +32,6 @@
 #include <unordered_set>
 #include <vector>
 using namespace std::chrono_literals;
-
-#ifndef _WIN32
-#endif
 
 namespace dorado {
 

@@ -5,7 +5,7 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#ifndef _WIN32
+#ifdef __APPLE__
 #include <fcntl.h>
 #endif
 

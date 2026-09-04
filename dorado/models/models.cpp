@@ -6,7 +6,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cstddef>
 #include <exception>
 #include <filesystem>
 #include <iterator>
