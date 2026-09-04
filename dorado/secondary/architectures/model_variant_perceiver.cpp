@@ -522,7 +522,7 @@ at::Tensor MultiHeadCrossAttentionImpl::attn_fn(
             auto opts = at::TensorOptions().dtype(attn_out.dtype()).device(attn_out.device());
             at::Tensor unmasked_attn_out = at::zeros({N_Q * T, m_nhead * m_head_dim}, opts);
             unmasked_attn_out.masked_scatter_((*q_pos_mask).flatten(0, 1).unsqueeze(-1), attn_out);
-            attn_out = unmasked_attn_out;
+            attn_out = std::move(unmasked_attn_out);
         }
         attn_out = attn_out.view({N_Q, T, -1}).contiguous();
     } else {

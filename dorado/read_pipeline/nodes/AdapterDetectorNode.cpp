@@ -130,7 +130,7 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
             ++m_num_untrimmed_short_reads;
             return;
         }
-        bam_message.data->adapter_trim_interval = trim_interval;
+        bam_message.data->adapter_trim_interval = std::move(trim_interval);
     }
 }
 
@@ -184,7 +184,7 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
             ++m_num_untrimmed_short_reads;
             return;
         }
-        read.read_common.adapter_trim_interval = trim_interval;
+        read.read_common.adapter_trim_interval = std::move(trim_interval);
     }
 }
 
