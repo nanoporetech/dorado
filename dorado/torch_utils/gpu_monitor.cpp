@@ -2,6 +2,10 @@
 
 #include "utils/sys_utils.h"
 
+// Suppress deprecated NVIDIA NVML API warnings (CUDA 13+)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wdeprecated-declarations"
+
 #if defined(_WIN32) || defined(__linux__)
 #define HAS_NVML 1
 #else
@@ -18,9 +22,9 @@
 #else  // _WIN32
 #include <dlfcn.h>
 #endif  // _WIN32
-#if DORADO_ORIN
+#if DORADO_CUDA_BUILD
 #include <torch/torch.h>
-#endif  // DORADO_ORIN
+#endif  // DORADO_CUDA_BUILD
 #endif  // HAS_NVML
 
 #include <spdlog/spdlog.h>
@@ -453,19 +457,18 @@ class DeviceInfoCache final {
         }
     }
 
-    void map_visible_devices(unsigned int device_count) {
+    void map_visible_devices(unsigned int max_device_count) {
         // NVML doesn't respect CUDA_VISIBLE_DEVICES envvar, so check this separately
         const char *cuda_visible_devices_env = std::getenv("CUDA_VISIBLE_DEVICES");
         if (cuda_visible_devices_env != nullptr) {
             spdlog::debug("Found CUDA_VISIBLE_DEVICES={}", cuda_visible_devices_env);
             std::set<int> used_ids;
             auto device_ids = utils::split(cuda_visible_devices_env, ',');
-            if (device_ids.size() > device_count) {
-                spdlog::error(
-                        "CUDA_VISIBLE_DEVICES={} specifies more device ids than the number of GPUs "
-                        "present",
-                        cuda_visible_devices_env);
-                throw std::runtime_error("Invalid device ids");
+            if (device_ids.size() > max_device_count) {
+                spdlog::warn(
+                        "CUDA_VISIBLE_DEVICES={} specifies {} device ids, but only {} CUDA "
+                        "devices are visible. Some devices may be ignored.",
+                        cuda_visible_devices_env, device_ids.size(), max_device_count);
             }
 
             if (!device_ids.empty() && (utils::starts_with(device_ids.front(), "GPU-") ||
@@ -500,7 +503,7 @@ class DeviceInfoCache final {
                     for (const auto &id : device_ids) {
                         last_device_id = id;
                         int index = std::stoi(id);
-                        if (index < 0 || index >= static_cast<int>(device_count)) {
+                        if (index < 0 || index >= static_cast<int>(max_device_count)) {
                             spdlog::warn(
                                     "Invalid index '{}' for GPU device - skipping further device "
                                     "enumeration",
@@ -526,38 +529,45 @@ class DeviceInfoCache final {
                 m_visible_device_indices.clear();
             }
         } else {
-            m_visible_device_indices.resize(device_count);
+            m_visible_device_indices.resize(max_device_count);
             std::iota(std::begin(m_visible_device_indices), std::end(m_visible_device_indices), 0);
         }
     }
 
     void set_device_count() {
-        unsigned int device_count = 0;
+        unsigned int nvml_device_count = 0;
         if (m_nvml.is_loaded()) {
-            auto result = m_nvml.DeviceGetCount(&device_count);
+            auto result = m_nvml.DeviceGetCount(&nvml_device_count);
             if (result != NVML_SUCCESS) {
-                device_count = 0;
+                nvml_device_count = 0;
                 spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
             }
         }
-#if DORADO_ORIN
-        if (device_count == 0) {
-            // Orin may not have NVML, in which case ask torch how many devices it thinks there are.
-            device_count = torch::cuda::device_count();
-            spdlog::info("Setting device count to {} as reported from torch", device_count);
+
+        // CUDA runtime can expose more visible devices than NVML parent device count in MIG layouts.
+        unsigned int cuda_device_count = 0;
+    #if DORADO_CUDA_BUILD
+        cuda_device_count = static_cast<unsigned int>(torch::cuda::device_count());
+    #endif
+        const auto max_visible_device_count = std::max(nvml_device_count, cuda_device_count);
+        if (cuda_device_count > nvml_device_count) {
+            spdlog::info(
+                    "CUDA reports more visible devices ({}) than NVML parent devices ({}); "
+                    "using CUDA-visible count for device indexing.",
+                    cuda_device_count, nvml_device_count);
         }
-#endif
-        map_visible_devices(device_count);
+
+        map_visible_devices(max_visible_device_count);
         unsigned int cuda_visible_devices_count =
                 static_cast<unsigned int>(m_visible_device_indices.size());
 
-        if (cuda_visible_devices_count > device_count) {
+        if (cuda_visible_devices_count > max_visible_device_count) {
             spdlog::warn(
-                    "CUDA_VISIBLE_DEVICES contains more device ids ({}) than devices found by NVML "
+                    "CUDA_VISIBLE_DEVICES contains more device ids ({}) than CUDA-visible devices "
                     "({}).",
-                    cuda_visible_devices_count, device_count);
+                    cuda_visible_devices_count, max_visible_device_count);
         }
-        m_device_count = std::min(cuda_visible_devices_count, device_count);
+        m_device_count = std::min(cuda_visible_devices_count, max_visible_device_count);
     }
 
     std::optional<DeviceStatusInfo> create_new_device_entry(unsigned int device_index,
@@ -758,3 +768,5 @@ bool is_accessible_device([[maybe_unused]] unsigned int device_index) {
 }  // namespace detail
 
 }  // namespace dorado::utils::gpu_monitor
+
+#pragma GCC diagnostic pop
