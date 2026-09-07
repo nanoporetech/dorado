@@ -42,7 +42,7 @@ void PolyACalculatorNode::process_read(SimplexRead &read) {
 
     auto calculator = selector->get_calculator(
             read.read_common.barcoding_result
-                    ? read.read_common.barcoding_result->barcode_kit + "_" +
+                    ? read.read_common.barcoding_result->kit + "_" +
                               read.read_common.barcoding_result->normalized_barcode_name
                     : UNCLASSIFIED);
     if (!calculator || !calculator->enabled()) {
