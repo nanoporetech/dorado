@@ -1,6 +1,6 @@
 #include "nn/KoiUtils.h"
 
-#include <ATen/cuda/CUDAContext.h>
+#include <ATen/cuda/CUDAContextLight.h>
 
 namespace {
 

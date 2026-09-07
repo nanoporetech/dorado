@@ -1,7 +1,6 @@
 #include "torch_utils/duplex_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <ATen/TensorOperators.h>
 
 #include <fstream>
 #include <vector>

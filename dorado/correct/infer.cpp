@@ -2,9 +2,7 @@
 
 #include "correct/types.h"
 #include "utils/memory_utils.h"
-#include "utils/string_utils.h"
 
-#include <c10/core/Device.h>
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 
@@ -13,6 +11,7 @@
 #endif
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
+#include "utils/string_utils.h"
 #endif
 
 namespace keys {

@@ -1,13 +1,12 @@
 #include "SpeedEntry.h"
 #include "csv_helpers.h"
 #include "entries_equal.h"
+#include "spdlog/fmt/bundled/format.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <spdlog/spdlog.h>
 
 #include <sstream>
 #include <unordered_map>
-#include <utility>
 
 #define CUT_TAG "[batchsize_benchmarks]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)

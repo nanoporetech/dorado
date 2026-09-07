@@ -1,6 +1,5 @@
 #include "correct/windows.h"
 
-#include "correct/conversions.h"
 #include "correct/features.h"
 #include "correct/types.h"
 #include "read_pipeline/base/messages/CorrectionAlignments.h"
@@ -9,7 +8,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <functional>
 #include <sstream>
 #include <stdexcept>
 #include <utility>

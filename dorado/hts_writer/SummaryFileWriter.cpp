@@ -2,7 +2,6 @@
 
 #include "hts_utils/bam_utils.h"
 #include "hts_writer_utils.h"
-#include "utils/barcode_kits.h"
 #include "utils/string_utils.h"
 
 #include <htslib/sam.h>

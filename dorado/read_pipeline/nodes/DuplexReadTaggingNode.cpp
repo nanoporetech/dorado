@@ -2,8 +2,6 @@
 
 #include "read_pipeline/base/messages/SimplexRead.h"
 
-#include <spdlog/spdlog.h>
-
 namespace dorado {
 
 void DuplexReadTaggingNode::input_thread_fn() {

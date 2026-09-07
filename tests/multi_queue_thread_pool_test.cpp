@@ -5,8 +5,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-#include <utility>
-
 #define CUT_TAG "[dorado::utils::concurrency::MultiQueueThreadPool]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
 #define DEFINE_TEST_FIXTURE_METHOD(name) \

@@ -3,7 +3,6 @@
 #include "basecall/MetalCaller.h"
 
 #include <ATen/TensorIndexing.h>
-#include <spdlog/spdlog.h>
 
 namespace dorado::basecall {
 

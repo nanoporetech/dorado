@@ -10,7 +10,6 @@
 
 #include <ATen/TensorIndexing.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 using Slice = at::indexing::Slice;
 

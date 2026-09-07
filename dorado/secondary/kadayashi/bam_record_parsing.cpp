@@ -3,13 +3,12 @@
 #include "secondary/kadayashi/sequence_utility.h"
 
 #include <htslib/sam.h>
-#include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
 #include <charconv>
 #include <cstdio>
+#include <stdexcept>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)

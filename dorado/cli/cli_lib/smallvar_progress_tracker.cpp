@@ -2,8 +2,6 @@
 
 #include "utils/tty_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 
 namespace dorado::smallvar {

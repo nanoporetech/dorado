@@ -3,7 +3,6 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
-#include <cctype>
 #include <ranges>
 
 using namespace std::chrono_literals;

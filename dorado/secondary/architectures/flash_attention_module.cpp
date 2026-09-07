@@ -6,16 +6,19 @@
 
 #include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/util/Exception.h>
-#if DORADO_CUDA_BUILD
-#include <ATen/cuda/CUDAContextLight.h>
-#endif
 #include <spdlog/spdlog.h>
+#include <torch/headeronly/core/ScalarType.h>
 
 #include <algorithm>
 #include <cstdint>
 #include <mutex>
+#include <optional>
 #include <stdexcept>
 #include <vector>
+
+#if DORADO_CUDA_BUILD
+#include <ATen/cuda/CUDAContextLight.h>
+#endif
 
 namespace dorado::secondary {
 

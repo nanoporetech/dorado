@@ -6,8 +6,8 @@
 #include <ATen/TensorIndexing.h>
 #include <ATen/TensorOperators.h>
 #include <math.h>
-#include <spdlog/spdlog.h>
 
+#include <thread>
 #include <vector>
 
 namespace {

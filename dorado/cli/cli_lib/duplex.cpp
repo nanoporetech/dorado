@@ -34,10 +34,8 @@
 #include "utils/sys_stats.h"
 #include "utils/types.h"
 
-#include <cxxpool.h>
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
-#include <torch/utils.h>
 
 #include <cstdlib>
 #include <exception>

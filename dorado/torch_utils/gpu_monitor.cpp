@@ -1,7 +1,5 @@
 #include "torch_utils/gpu_monitor.h"
 
-#include "utils/sys_utils.h"
-
 #if defined(_WIN32) || defined(__linux__)
 #define HAS_NVML 1
 #else
@@ -9,36 +7,30 @@
 #endif
 
 #if HAS_NVML
+
 #include "utils/scoped_trace_log.h"
 #include "utils/string_utils.h"
 
 #include <nvml.h>
+#include <spdlog/spdlog.h>
+
+#include <chrono>
+#include <numeric>
+#include <set>
+
 #if defined(_WIN32)
 #include <Windows.h>
 #else  // _WIN32
 #include <dlfcn.h>
+
+#include <fstream>
 #endif  // _WIN32
+
 #if DORADO_ORIN
 #include <torch/torch.h>
 #endif  // DORADO_ORIN
+
 #endif  // HAS_NVML
-
-#include <spdlog/spdlog.h>
-
-#include <algorithm>
-#include <cassert>
-#include <chrono>
-#include <cstdlib>
-#include <fstream>
-#include <memory>
-#include <mutex>
-#include <numeric>
-#include <regex>
-#include <set>
-#include <sstream>
-#include <string_view>
-#include <unordered_map>
-#include <utility>
 
 namespace dorado::utils::gpu_monitor {
 

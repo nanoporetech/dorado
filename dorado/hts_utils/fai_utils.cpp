@@ -4,8 +4,6 @@
 #include <spdlog/spdlog.h>
 
 #include <fstream>
-#include <sstream>
-#include <stdexcept>
 #include <string>
 
 namespace dorado::utils {

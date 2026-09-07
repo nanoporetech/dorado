@@ -2,11 +2,10 @@
 
 #include "utils/PostCondition.h"
 #include "utils/string_utils.h"
-#include "utils/types.h"
 
 #include <algorithm>
 #include <fstream>
-#include <iostream>
+#include <istream>
 #include <iterator>
 #include <set>
 

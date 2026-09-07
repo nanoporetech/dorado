@@ -6,7 +6,6 @@
 #include "utils/string_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <stdexcept>

@@ -1,9 +1,6 @@
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 
 #include "read_pipeline/base/messages/SimplexRead.h"
-#include "utils/barcode_kits.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 

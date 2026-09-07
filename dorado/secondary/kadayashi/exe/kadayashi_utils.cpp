@@ -1,7 +1,5 @@
 #include "kadayashi_utils.h"
 
-#include "secondary/kadayashi/types.h"
-
 #include <spdlog/spdlog.h>
 
 #include <cassert>

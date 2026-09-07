@@ -1,17 +1,17 @@
 #include "nn/FLSTMStack.h"
 
-#include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 
-#include <stdexcept>
-#include <tuple>
-
 #if DORADO_CUDA_BUILD
+#include "torch_utils/gpu_profiling.h"
+
+#include <c10/cuda/CUDAStream.h>
 
 extern "C" {
 #include "koi.h"
 }
-
+#else
+#include <tuple>
 #endif
 
 namespace dorado::nn {

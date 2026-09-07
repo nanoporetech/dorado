@@ -1,9 +1,6 @@
 #include "hts_utils/header_sq_record.h"
 
-#include "utils/sequence_utils.h"
-
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cstdint>

@@ -12,10 +12,8 @@
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
 
-#include <ATen/Tensor.h>
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
-#include <minimap.h>
 #include <spdlog/spdlog.h>
 
 #include <cassert>

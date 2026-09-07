@@ -1,11 +1,10 @@
 #include "MessageSinkUtils.h"
 #include "TestUtils.h"
 #include "read_pipeline/base/HtsReader.h"
-#include "read_pipeline/base/messages/SimplexRead.h"
+#include "read_pipeline/base/messages/SimplexRead.h"  // IWYU pragma: keep for read_bam() return value
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <htslib/sam.h>
 
 #include <filesystem>
 #include <unordered_set>

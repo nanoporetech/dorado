@@ -1,13 +1,13 @@
 #include "splitter/myers.h"
 
 #include "utils/PostCondition.h"
-#include "utils/alignment_utils.h"
+
+#include <edlib.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cstdint>
 #include <iomanip>
-#include <optional>
 #include <ostream>
 
 namespace dorado::splitter {

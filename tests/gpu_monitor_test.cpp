@@ -1,11 +1,10 @@
 #include "torch_utils/gpu_monitor.h"
 
+#include <ATen/Context.h>
 #include <catch2/catch_test_macros.hpp>
-#include <torch/torch.h>
 
 #include <algorithm>
 #include <cctype>
-#include <sstream>
 
 #define CUT_TAG "[dorado::utils::gpu_monitor]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
@@ -34,9 +33,9 @@ public:
 
 namespace dorado::utils::gpu_monitor::test {
 
-DEFINE_TEST("get_nvidia_driver_version has value if torch::hasCUDA") {
+DEFINE_TEST("get_nvidia_driver_version has value if at::hasCUDA") {
     auto driver_version = get_nvidia_driver_version();
-    if (torch::hasCUDA()) {
+    if (at::hasCUDA()) {
         CATCH_REQUIRE(driver_version.has_value());
     }
 }
@@ -347,7 +346,7 @@ DEFINE_TEST_FIXTURE_METHOD(
 
 #if !defined(__APPLE__)
 DEFINE_TEST("get_device_count returns a non zero value if torch getNumGPUs is non-zero") {
-    if (!torch::getNumGPUs()) {
+    if (!at::getNumGPUs()) {
         return;
     }
     CATCH_CHECK(get_device_count() > 0);

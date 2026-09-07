@@ -2,7 +2,6 @@
 
 #include "demux/parse_custom_sequences.h"
 
-#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 

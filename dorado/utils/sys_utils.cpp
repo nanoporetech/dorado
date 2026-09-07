@@ -1,7 +1,9 @@
 #include "utils/sys_utils.h"
 
+#if defined(__linux__)
 #include <fstream>
 #include <string>
+#endif
 
 namespace dorado::utils {
 

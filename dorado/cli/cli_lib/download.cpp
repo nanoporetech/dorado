@@ -1,5 +1,4 @@
 #include "cli/cli.h"
-#include "cli/utils/cli_utils.h"
 #include "data_loader/DataLoader.h"
 #include "dorado_version.h"
 #include "model_downloader/model_downloader.h"

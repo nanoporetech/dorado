@@ -2,9 +2,7 @@
 
 #include "hts_utils/KString.h"
 #include "utils/sequence_utils.h"
-#include "utils/string_utils.h"
 
-#include <edlib.h>
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -13,11 +11,8 @@
 #include <cctype>
 #include <cmath>
 #include <cstdint>
-#include <iostream>
-#include <map>
 #include <set>
 #include <sstream>
-#include <string>
 #include <string_view>
 
 #ifdef _WIN32

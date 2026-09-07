@@ -20,7 +20,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <chrono>
 #include <memory>
 #include <optional>
 #include <string>
@@ -29,7 +28,6 @@
 using namespace std::chrono_literals;
 
 #ifndef _WIN32
-#include <unistd.h>
 #endif
 
 namespace dorado {

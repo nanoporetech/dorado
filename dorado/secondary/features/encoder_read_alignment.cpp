@@ -6,9 +6,7 @@
 #include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/container_utils.h"
 
-#include <htslib/hts.h>
 #include <spdlog/spdlog.h>
 
 #include <cassert>

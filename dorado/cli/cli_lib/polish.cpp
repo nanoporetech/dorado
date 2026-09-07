@@ -16,32 +16,24 @@
 #include "secondary/common/stats.h"
 #include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
-#include "secondary/consensus/variant_calling.h"
 #include "secondary/consensus/window_utils.h"
-#include "torch_utils/auto_detect_device.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"
 #include "utils/arg_parse_ext.h"
-#include "utils/fs_utils.h"
 #include "utils/io_utils.h"
 #include "utils/jthread.h"
-#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
 
-#include <ATen/Parallel.h>
-#include <htslib/faidx.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
-#include <cctype>
 #include <chrono>
 #include <cstddef>
 #include <cstdint>
 #include <filesystem>
-#include <fstream>
 #include <memory>
 #include <numeric>
 #include <optional>
@@ -52,7 +44,6 @@
 #include <vector>
 
 #ifndef _WIN32
-#include <unistd.h>
 #endif
 
 // #define DEBUG_POLISH_DUMP_SEQ_PIECES

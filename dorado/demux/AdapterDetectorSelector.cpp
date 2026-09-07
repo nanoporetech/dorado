@@ -3,8 +3,6 @@
 #include "demux/AdapterDetector.h"
 #include "demux/adapter_info.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cassert>
 
 namespace dorado::demux {

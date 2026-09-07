@@ -1,15 +1,11 @@
 #include "flash_attention3_backend.h"
 
-#include <c10/util/Exception.h>
-#include <spdlog/spdlog.h>
-
-#include <mutex>
 #include <optional>
-#include <tuple>
 
 #if DORADO_HAS_FLASHATTENTION3
 #include <ATen/cuda/CUDAContextLight.h>
 #include <flash_api.h>
+#include <spdlog/spdlog.h>
 #endif
 
 namespace dorado::secondary {

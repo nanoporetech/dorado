@@ -1,11 +1,9 @@
 #include "medaka_bamiter.h"
 
 #include "hts_utils/bam_utils.h"
-#include "utils/cigar.h"
 
 #include <htslib/sam.h>
 
-#include <algorithm>
 #include <cerrno>
 #include <cstring>
 

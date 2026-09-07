@@ -3,8 +3,6 @@
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_file.h"
 #include "hts_utils/hts_types.h"
-#include "spdlog/fmt/bundled/format.h"
-#include "utils/barcode_kits.h"
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>

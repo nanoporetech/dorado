@@ -36,7 +36,6 @@ misc-*,
 -cppcoreguidelines-pro-type-vararg,
 -cppcoreguidelines-use-default-member-init,
 -misc-const-correctness,
--misc-include-cleaner,
 -misc-no-recursion,
 -misc-non-private-member-variables-in-classes,
 -misc-predictable-rand,
@@ -63,3 +62,5 @@ CheckOptions:
     value:  true # optional.value() throws so it's safe to use
   - key:    modernize-use-override.IgnoreDestructors
     value:  true # not the existing style
+  - key:    misc-include-cleaner.MissingIncludes
+    value:  false # too noisy

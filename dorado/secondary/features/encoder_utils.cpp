@@ -2,9 +2,6 @@
 
 #include "secondary/features/medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/container_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <cstddef>
 #include <span>
@@ -14,6 +11,10 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
+#include "utils/container_utils.h"
+
+#include <spdlog/spdlog.h>
+
 #define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
 #endif
 

@@ -4,7 +4,6 @@
 
 #include <functional>
 #include <memory>
-#include <type_traits>
 #include <utility>
 
 #define CUT_TAG "[FunctionRef]"

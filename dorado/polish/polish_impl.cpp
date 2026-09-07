@@ -11,19 +11,14 @@
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 #include "utils/memory_utils.h"
-#include "utils/stl_utils.h"
-#include "utils/string_utils.h"
 #include "utils/timer_high_res.h"
 
-#include <ATen/ATen.h>
 #include <cxxpool.h>
-#include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
 #include <cassert>
-#include <fstream>
 #include <memory>
 #include <span>
 #include <stdexcept>
@@ -31,7 +26,6 @@
 #if DORADO_CUDA_BUILD
 #include "torch_utils/cuda_utils.h"
 
-#include <c10/cuda/CUDACachingAllocator.h>
 #include <c10/cuda/CUDAGuard.h>
 #endif
 

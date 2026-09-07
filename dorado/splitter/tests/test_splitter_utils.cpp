@@ -3,16 +3,19 @@
 #include "utils/types.h"
 
 #include <ATen/ops/from_blob.h>
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
-#include <catch2/generators/catch_generators.hpp>
-#include <spdlog/spdlog.h>
 
 #include <limits>
 #include <numeric>
 #include <random>
 #include <set>
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <spdlog/fmt/bundled/format.h>
+#endif
 
 #define CUT_TAG "[splitter_utils]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)

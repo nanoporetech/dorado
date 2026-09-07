@@ -5,7 +5,6 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
-#include <ostream>
 #include <sstream>
 #include <string_view>
 #include <unordered_map>

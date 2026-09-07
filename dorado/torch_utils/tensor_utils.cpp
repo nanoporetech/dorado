@@ -1,6 +1,5 @@
 #include "torch_utils/tensor_utils.h"
 
-#include "utils/dev_utils.h"
 #include "utils/simd.h"
 
 #include <torch/serialize.h>
@@ -14,6 +13,8 @@
 #include <vector>
 
 #ifndef NDEBUG
+#include "utils/dev_utils.h"
+
 #include <spdlog/spdlog.h>
 #endif
 

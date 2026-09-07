@@ -6,7 +6,6 @@
 #include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <spdlog/spdlog.h>
 
 #include <cstdint>
 

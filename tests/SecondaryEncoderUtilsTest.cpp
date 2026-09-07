@@ -1,9 +1,8 @@
 #include "secondary/features/encoder_utils.h"
 
-#include <ATen/ATen.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <torch/torch.h>
+#include <torch/types.h>
 
 #include <cstdint>
 #include <string>

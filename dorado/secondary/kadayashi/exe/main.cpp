@@ -12,7 +12,6 @@
 #include <htslib/sam.h>
 #include <spdlog/spdlog.h>
 
-#include <cstdlib>
 #include <string>
 #include <string_view>
 

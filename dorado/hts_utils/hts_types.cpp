@@ -2,7 +2,6 @@
 
 #include <htslib/sam.h>
 #include <htslib/vcf.h>
-#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <sstream>

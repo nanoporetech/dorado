@@ -3,8 +3,6 @@
 #include "demux/BarcodeClassifier.h"
 #include "demux/barcoding_info.h"
 
-#include <spdlog/spdlog.h>
-
 #include <cassert>
 
 namespace dorado::demux {

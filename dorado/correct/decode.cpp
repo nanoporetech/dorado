@@ -3,13 +3,12 @@
 #include "correct/conversions.h"
 #include "correct/types.h"
 
-#include <spdlog/spdlog.h>
-
 #include <array>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
+#include <spdlog/spdlog.h>
 #define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
 #endif
 

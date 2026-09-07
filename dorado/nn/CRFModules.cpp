@@ -1,10 +1,11 @@
 #include "nn/CRFModules.h"
 
-#include "nn/KoiUtils.h"
 #include "torch_utils/gpu_profiling.h"
-#include "torch_utils/tensor_utils.h"
 
 #if DORADO_CUDA_BUILD
+#include "nn/KoiUtils.h"
+#include "torch_utils/tensor_utils.h"
+
 extern "C" {
 #include "koi.h"
 }

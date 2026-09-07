@@ -5,7 +5,6 @@
 #include <cassert>
 #include <cstdio>
 #include <fstream>
-#include <memory>
 #include <stdexcept>
 #include <string_view>
 

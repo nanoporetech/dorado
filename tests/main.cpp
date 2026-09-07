@@ -2,10 +2,9 @@
 #include "torch_utils/torch_utils.h"
 #include "utils/locale_utils.h"
 
+#include <c10/core/InferenceMode.h>
 #include <catch2/catch_session.hpp>
-#include <catch2/catch_test_macros.hpp>
 #include <nvtx3/nvtx3.hpp>
-#include <torch/utils.h>
 
 int main(int argc, char* argv[]) {
     // global setup...
@@ -25,7 +24,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Only inference during tests or benchmarks.
-    at::InferenceMode inference_mode_guard;
+    c10::InferenceMode inference_mode_guard;
 
     int result = Catch::Session().run(argc, argv);
 

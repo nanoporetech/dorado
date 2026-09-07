@@ -12,6 +12,8 @@
 #define NOMINMAX
 #define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
+#else
+#include <sys/signal.h>
 #endif
 
 // Lots of singletons in the crash handling code, so ignore that warning for the whole file.

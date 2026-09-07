@@ -3,17 +3,21 @@
 #include "utils/concurrency/synchronisation.h"
 #include "utils/jthread.h"
 
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <spdlog/spdlog.h>
 
-#include <algorithm>
 #include <atomic>
-#include <barrier>
 #include <chrono>
-#include <random>
 #include <thread>
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <catch2/generators/catch_generators.hpp>
+#include <spdlog/fmt/bundled/format.h>
+
+#include <barrier>
+#include <random>
+#endif
 
 #define CUT_TAG "[dorado::utils::ResourceLimiter]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)

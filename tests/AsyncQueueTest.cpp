@@ -2,16 +2,19 @@
 
 #include "utils/jthread.h"
 
-#include <catch2/benchmark/catch_benchmark.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <chrono>
-#include <latch>
 #include <numeric>
 #include <thread>
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include <spdlog/spdlog.h>
+
+#include <latch>
+#endif
 
 using dorado::utils::AsyncQueue;
 using dorado::utils::AsyncQueueStatus;

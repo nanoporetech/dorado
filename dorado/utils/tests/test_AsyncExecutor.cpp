@@ -1,19 +1,27 @@
 #include "utils/concurrency/AsyncExecutor.h"
 #include "utils/concurrency/TaskPool.h"
 #include "utils/concurrency/WorkerPool.h"
-#include "utils/jthread.h"
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <spdlog/spdlog.h>
 
 #include <atomic>
 #include <chrono>
+#include <cmath>
 #include <latch>
 #include <optional>
-#include <random>
 #include <thread>
+
+#if DORADO_ENABLE_BENCHMARK_TESTS
+#include "utils/jthread.h"
+
+#include <catch2/benchmark/catch_benchmark.hpp>
+#include <spdlog/fmt/bundled/format.h>
+#include <spdlog/spdlog.h>
+
+#include <random>
+#endif
 
 #define CUT_TAG "[AsyncExecutor]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
@@ -320,11 +328,12 @@ enum class ProducerMode {
 };
 
 template <typename Executor>
-static void producer_thread(std::atomic_bool &finished,
-                            ProducerMode mode,
-                            Executor &&executor,
-                            std::size_t seed,
-                            std::atomic_size_t &counter) {
+static void producer_thread(
+        std::atomic_bool &finished,
+        ProducerMode mode,
+        Executor &&executor,  // NOLINT(cppcoreguidelines-missing-std-forward): universal reference
+        std::size_t seed,
+        std::atomic_size_t &counter) {
     // Randomly pick how long each task takes.
     std::minstd_rand rng(static_cast<std::minstd_rand::result_type>(seed));
     std::uniform_int_distribution<> time_dist(1, 100);

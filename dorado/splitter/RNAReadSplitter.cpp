@@ -5,10 +5,7 @@
 #include "utils/log_utils.h"
 #include "utils/uuid_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #include <chrono>
-#include <cmath>
 #include <sstream>
 #include <string>
 

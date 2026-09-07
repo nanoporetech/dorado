@@ -4,7 +4,7 @@
 #include "utils/hardware_interference_size.h"
 #include "utils/thread_utils.h"
 
-#include <spdlog/spdlog.h>
+#include <spdlog/fmt/bundled/format.h>  // IWYU pragma: keep for fmt::format()
 
 #include <cassert>
 #include <stdexcept>

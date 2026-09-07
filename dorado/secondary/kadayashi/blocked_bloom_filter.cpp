@@ -2,9 +2,7 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cstdio>
 #include <cstring>
-#include <memory>
 
 namespace kadayashi {
 

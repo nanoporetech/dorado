@@ -3,7 +3,6 @@
 #include "config/BasecallModelConfig.h"
 #include "nn/FLSTMStack.h"
 #include "nn/FactorisedLinearLayer.h"
-#include "nn/KoiUtils.h"
 #include "nn/LSTMStack.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
@@ -11,13 +10,10 @@
 #include <optional>
 
 #if DORADO_CUDA_BUILD
+#include "nn/KoiUtils.h"
 
-#include <ATen/cuda/CUDAContext.h>
 #include <c10/cuda/CUDAGuard.h>
-
 #endif
-
-#include <torch/nn.h>
 
 using namespace torch::nn;
 using Slice = torch::indexing::Slice;

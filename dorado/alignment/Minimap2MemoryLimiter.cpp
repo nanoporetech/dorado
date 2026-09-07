@@ -3,7 +3,7 @@
 #include "utils/ResourceLimiter.h"
 
 #include <minimap.h>
-#include <spdlog/spdlog.h>
+#include <spdlog/fmt/bundled/format.h>
 
 #include <memory>
 

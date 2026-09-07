@@ -1,8 +1,6 @@
 
 #include "secondary/consensus/sample_collate_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #include <stdexcept>
 
 namespace dorado::secondary {

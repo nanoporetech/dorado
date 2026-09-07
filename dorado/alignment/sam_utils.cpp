@@ -5,8 +5,6 @@
 #include "utils/sequence_utils.h"
 #include "utils/string_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #include <algorithm>
 #include <map>
 #include <tuple>

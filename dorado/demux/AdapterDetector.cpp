@@ -7,8 +7,6 @@
 #include "utils/types.h"
 
 #include <edlib.h>
-#include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <string>

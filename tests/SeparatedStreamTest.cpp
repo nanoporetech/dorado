@@ -1,8 +1,8 @@
 #include "utils/SeparatedStream.h"
 
-#include "catch2/catch_message.hpp"
 #include "utils/string_utils.h"
 
+#include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 

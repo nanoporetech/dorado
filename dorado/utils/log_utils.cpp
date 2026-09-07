@@ -5,13 +5,9 @@
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
-#ifndef _WIN32
+#ifdef __APPLE__
 #include <fcntl.h>
-#include <unistd.h>
 #endif
-
-#include <array>
-#include <string>
 
 namespace dorado::utils {
 

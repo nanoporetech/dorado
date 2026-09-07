@@ -8,7 +8,6 @@
 #include "../model_slot_attention_consensus.h"
 #include "../model_variant_perceiver.h"
 
-#include <cstdint>
 #include <memory>
 
 namespace dorado::secondary::tests {

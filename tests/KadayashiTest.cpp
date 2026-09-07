@@ -11,9 +11,6 @@
 #include "utils/cigar.h"
 
 #include <catch2/catch_test_macros.hpp>
-#include <htslib/faidx.h>
-#include <htslib/khash.h>
-#include <htslib/khash_str2int.h>
 #include <htslib/sam.h>
 #include <stdint.h>
 
@@ -21,7 +18,6 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <iostream>
 #include <optional>
 #include <span>
 #include <string>

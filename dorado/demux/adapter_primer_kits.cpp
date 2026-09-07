@@ -6,7 +6,6 @@
 
 #include <spdlog/spdlog.h>
 
-#include <cctype>
 #include <set>
 #include <sstream>
 

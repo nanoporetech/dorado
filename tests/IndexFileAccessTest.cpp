@@ -1,8 +1,8 @@
 #include "alignment/IndexFileAccess.h"
 
 #include "TestUtils.h"
-#include "alignment/Minimap2Index.h"
-#include "alignment/minimap2_wrappers.h"
+#include "alignment/Minimap2Index.h"      // IWYU pragma: keep for Minimap2Index
+#include "alignment/minimap2_wrappers.h"  // IWYU pragma: keep for Minimap2MapOptHolder
 #include "utils/stream_utils.h"
 
 #include <catch2/catch_test_macros.hpp>

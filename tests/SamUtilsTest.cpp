@@ -1,9 +1,10 @@
 #include "alignment/sam_utils.h"
-#include "catch2/matchers/catch_matchers.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
-#include <catch2/matchers/catch_matchers_all.hpp>
+#include <catch2/matchers/catch_matchers.hpp>
+#include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <algorithm>
 #include <numeric>
