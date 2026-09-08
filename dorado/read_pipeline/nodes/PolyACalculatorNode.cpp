@@ -39,12 +39,9 @@ void PolyACalculatorNode::process_read(SimplexRead &read) {
         num_not_called++;
         return;
     }
-
+    auto &bc_res = read.read_common.barcoding_result;
     auto calculator = selector->get_calculator(
-            read.read_common.barcoding_result
-                    ? read.read_common.barcoding_result->kit + "_" +
-                              read.read_common.barcoding_result->normalized_barcode_name
-                    : UNCLASSIFIED);
+            bc_res ? bc_res->kit + "_" + bc_res->normalized_barcode_name : UNCLASSIFIED);
     if (!calculator || !calculator->enabled()) {
         // Barcode overrides have been specified and this read is either unclassified
         // or estimation for this barcode has been explicitly disabled

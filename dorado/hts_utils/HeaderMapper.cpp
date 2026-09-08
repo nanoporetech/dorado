@@ -438,7 +438,6 @@ void HeaderMapper::add_barcodes() {
                 for (const auto& inner_barcode_name : kit_info.barcodes_inner1) {
                     const auto normalized_inner_barcode_name =
                             barcode_kits::normalize_barcode_name(inner_barcode_name);
-                    // Note that we don't include the barcode kit again in the standard barcode name for dual.
                     add_bc_header(barcode_name, inner_barcode_name,
                                   std::string(normalized_barcode_name)
                                           .append("_")
