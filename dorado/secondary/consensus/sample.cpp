@@ -258,11 +258,13 @@ std::vector<Sample> split_samples_around_positions(
     std::vector<secondary::Sample> all_results;
     all_results.reserve(std::size(samples));
 
+    // Retained chunks own cloned tensors, so release each source after it has been processed.
     for (auto& sample : samples) {
         const auto it_seq_id = candidate_trees.find(sample.seq_id);
 
         // No candidate positions for this sequence.
         if (it_seq_id == std::cend(candidate_trees)) {
+            sample = {};
             continue;
         }
         const auto& tree = it_seq_id->second;
@@ -367,6 +369,7 @@ std::vector<Sample> split_samples_around_positions(
 
         all_results.insert(std::end(all_results), std::make_move_iterator(std::begin(results)),
                            std::make_move_iterator(std::end(results)));
+        sample = {};
     }
 
     return all_results;
@@ -480,6 +483,7 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
     std::vector<secondary::Sample> results;
     results.reserve(std::size(samples));
 
+    // Retained chunks own cloned tensors, so release each source after it has been processed.
     for (auto& sample : samples) {
         const int64_t sample_len = static_cast<int64_t>(std::size(sample.positions_major));
 
@@ -488,6 +492,7 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         if (it_seq_id == std::cend(candidate_trees)) {
             spdlog::debug("Cannot find seq_id = {} in candidate_trees! Sample: {}", sample.seq_id,
                           secondary::sample_to_string(sample));
+            sample = {};
             continue;
         }
         const auto& tree = it_seq_id->second;
@@ -495,6 +500,8 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         if (sample_len <= chunk_len) {
             if (has_candidates(tree, sample, 0, sample_len)) {
                 results.emplace_back(std::move(sample));
+            } else {
+                sample = {};
             }
             continue;
         }
@@ -573,6 +580,7 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                 results.emplace_back(slice_sample(sample, start, end, true));
             }
         }
+        sample = {};
     }
 
     return results;

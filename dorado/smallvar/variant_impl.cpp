@@ -331,9 +331,15 @@ BamWindowResult process_single_bam_window(
     const std::vector<secondary::Interval64> intervals =
             secondary::find_sample_intervals(sample, true, min_depth);
 
-    // Non-const because it will be moved below.
-    std::vector<secondary::Sample> local_samples =
-            secondary::split_sample_on_intervals(sample, intervals);
+    std::vector<secondary::Sample> local_samples;
+    // Avoid cloning all tensors when filtering keeps the complete encoded sample.
+    if ((std::size(intervals) == 1) && (intervals.front().start == 0) &&
+        (intervals.front().end == std::ssize(sample.positions_major))) {
+        local_samples.emplace_back(std::move(sample));
+    } else {
+        local_samples = secondary::split_sample_on_intervals(sample, intervals);
+        sample = {};
+    }
 
     constexpr int64_t MIN_SAMPLE_POSITIONS_FOR_VARIANT_INFERENCE = 5;
     std::erase_if(local_samples, [](const secondary::Sample& local_sample) {
@@ -458,7 +464,7 @@ void worker_sample_producer(
 
             bool reduce_data_updated = false;
             try {
-                const BamWindowResult bam_window_result = process_single_bam_window(
+                BamWindowResult bam_window_result = process_single_bam_window(
                         bam_window, *resources.encoders[tid], draft_lens, draft_seqs,
                         candidate_source, candidate_trees_from_file, ploidy, pass_min_qual,
                         window_len, window_overlap, variant_flanking_bases, tiled_regions,
@@ -524,9 +530,8 @@ void worker_sample_producer(
                     if (!sample_has_inference_features(sample)) {
                         continue;
                     }
-                    InferenceData item{
-                            .samples = {sample},
-                    };
+                    InferenceData item;
+                    item.samples.emplace_back(std::move(sample));
                     output_queue.try_push(std::move(item));
                 }
             } catch (const std::exception& e) {
@@ -810,7 +815,7 @@ void worker_infer_samples_in_parallel(
     }
 
     auto batch_infer = [&encoders, &draft_lens](secondary::ModelTorchBase& model,
-                                                const InferenceData& batch, const int32_t tid) {
+                                                InferenceData& batch, const int32_t tid) {
         utils::ScopedProfileRange spr2("infer_samples_in_parallel-batch_infer", 3);
         timer::TimerHighRes timer_total;
 
@@ -864,6 +869,13 @@ void worker_infer_samples_in_parallel(
                                                 .view({std::ssize(batch.samples), -1})};
             }
             spdlog::trace("Post-batching, batch has refs: {}", batched_data.refseqs ? true : false);
+
+            // Decoding only needs positions and depth. Release the source tensors once their
+            // collated representations own the inference input data.
+            for (auto& sample : batch.samples) {
+                sample.features = at::Tensor{};
+                sample.draft_seq.reset();
+            }
 
             time_collate = timer_collate.GetElapsedMilliseconds();
         }
@@ -1125,7 +1137,7 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                 }
 
                 // Split data for each input sample in the batch.
-                const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
+                std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
 
                 // Sanity check that the number of inferred samples matches the expected input.
                 if (std::size(item.samples) != std::size(split_logits)) {
@@ -1143,8 +1155,8 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                 for (int64_t i = 0; i < std::ssize(item.samples); ++i) {
                     out_queue.try_push(secondary::VariantCallingSample{
                             item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                            std::move(item.samples[i].positions_minor), split_logits[i],
-                            item.samples[i].depth});
+                            std::move(item.samples[i].positions_minor), std::move(split_logits[i]),
+                            std::move(item.samples[i].depth)});
                 }
                 spdlog::trace("[separate_decode_data {}] Pushed {} items to vc_data_queue.", tid,
                               std::ssize(item.samples));
