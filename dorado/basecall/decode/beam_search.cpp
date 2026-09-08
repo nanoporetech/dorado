@@ -91,8 +91,12 @@ std::tuple<std::string, std::string> generate_sequence(const std::vector<uint8_t
 
     for (size_t i = 0; i < seqLen; ++i) {
         sequence[i] = alphabet[int(sequence[i])];
-        baseProbs[i] = 1.0f - (baseProbs[i] / totalProbs[i]);
-        baseProbs[i] = -10.0f * std::log10(baseProbs[i]);
+        if (totalProbs[i] > 0.0f) {
+            baseProbs[i] = 1.0f - (baseProbs[i] / totalProbs[i]);
+            baseProbs[i] = -10.0f * std::log10(std::max(baseProbs[i], std::numeric_limits<float>::min()));
+        } else {
+            baseProbs[i] = 0.0f;
+        }
         float qscore = baseProbs[i] * scale + shift;
         qscore = std::clamp(qscore, 1.0f, 50.0f);
         qstring[i] = static_cast<char>(33.5f + qscore);
