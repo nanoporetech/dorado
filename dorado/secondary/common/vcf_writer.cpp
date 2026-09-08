@@ -116,7 +116,7 @@ std::string format_header_line(const FieldSpec& spec, const std::string_view met
 }  // namespace
 
 VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
-                     const Filters::FilterType& filters,
+                     const Filters::FilterType filters,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
                      const bool include_gvcf_headers,
                      const std::string_view command_line)

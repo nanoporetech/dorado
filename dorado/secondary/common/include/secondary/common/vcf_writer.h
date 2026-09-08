@@ -19,7 +19,7 @@ public:
      * \param command_line The command line to add to the VCF header. An empty value is omitted.
      */
     VCFWriter(const std::filesystem::path& filename,
-              const Filters::FilterType& filters,
+              const Filters::FilterType filters,
               const std::vector<std::pair<std::string, int64_t>>& contigs,
               bool include_gvcf_headers,
               std::string_view command_line);
