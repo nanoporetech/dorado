@@ -78,7 +78,12 @@ struct Options {
     std::vector<secondary::Region> hemizygous_regions;
     bool full_precision = false;
     bool load_scripted_model = false;
-    int32_t queue_size = 1000;
+    std::optional<int32_t> bam_region_queue_size;
+    std::optional<int32_t> sample_queue_size;
+    std::optional<int32_t> batch_queue_size;
+    std::optional<int32_t> decode_queue_size;
+    std::optional<int32_t> vc_data_queue_size;
+    std::optional<int32_t> vc_writer_queue_size;
     std::optional<int32_t> min_mapq;
     std::string read_group;
     bool ignore_read_groups = false;
@@ -114,6 +119,42 @@ struct Options {
     bool dump_variants = false;
     bool legacy_feature_gen = false;
 };
+
+struct QueueSizes {
+    size_t bam_region{};
+    size_t sample{};
+    size_t batch{};
+    size_t decode{};
+    size_t vc_data{};
+    size_t vc_writer{};
+};
+
+QueueSizes resolve_queue_sizes(const Options& opt, const size_t num_inference_workers) {
+    constexpr size_t QUEUED_ITEMS_PER_WORKER = 2;
+    constexpr size_t BATCHES_PER_INFERENCE_WORKER = 5;
+    constexpr size_t DECODE_BATCHES_PER_WORKER = 2;
+    constexpr size_t WRITER_QUEUE_SIZE = 2;
+
+    const size_t num_feature_workers = static_cast<size_t>(opt.threads);
+    const size_t num_reduce_workers = static_cast<size_t>(opt.threads);
+
+    const auto resolve = [](const std::optional<int32_t>& stage_size, const size_t default_size) {
+        return stage_size ? static_cast<size_t>(*stage_size) : default_size;
+    };
+
+    return {
+            .bam_region = resolve(opt.bam_region_queue_size,
+                                  QUEUED_ITEMS_PER_WORKER * num_feature_workers),
+            .sample = resolve(opt.sample_queue_size, QUEUED_ITEMS_PER_WORKER * num_feature_workers),
+            .batch = resolve(opt.batch_queue_size,
+                             BATCHES_PER_INFERENCE_WORKER * num_inference_workers),
+            .decode = resolve(opt.decode_queue_size,
+                              DECODE_BATCHES_PER_WORKER * num_inference_workers),
+            .vc_data =
+                    resolve(opt.vc_data_queue_size, QUEUED_ITEMS_PER_WORKER * num_reduce_workers),
+            .vc_writer = resolve(opt.vc_writer_queue_size, WRITER_QUEUE_SIZE),
+    };
+}
 
 bool parse_bool_arg(const std::string& raw_value) {
     std::string value = raw_value;
@@ -262,10 +303,29 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .hidden()
                 .help("Always use full precision for inference.")
                 .flag();
-        parser.add_argument("--queue-size")
+        parser.add_argument("--bam-region-queue-size")
                 .hidden()
-                .help("Queue size for processing.")
-                .default_value(1000)
+                .help("Override the BAM-region queue size.")
+                .scan<'i', int>();
+        parser.add_argument("--sample-queue-size")
+                .hidden()
+                .help("Override the encoded-sample queue size.")
+                .scan<'i', int>();
+        parser.add_argument("--batch-queue-size")
+                .hidden()
+                .help("Override the inference-batch queue size.")
+                .scan<'i', int>();
+        parser.add_argument("--decode-queue-size")
+                .hidden()
+                .help("Override the inference-output queue size.")
+                .scan<'i', int>();
+        parser.add_argument("--vc-data-queue-size")
+                .hidden()
+                .help("Override the variant-calling sample queue size.")
+                .scan<'i', int>();
+        parser.add_argument("--vc-writer-queue-size")
+                .hidden()
+                .help("Override the variant-writer notification queue size.")
                 .scan<'i', int>();
         parser.add_argument("--scripted")
                 .hidden()
@@ -451,7 +511,12 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.variant_flanking_bases = parser.present<int32_t>("variant-flanking-bases");
     opt.full_precision = parser.get<bool>("full-precision");
     opt.load_scripted_model = parser.get<bool>("scripted");
-    opt.queue_size = parser.get<int>("queue-size");
+    opt.bam_region_queue_size = parser.present<int32_t>("bam-region-queue-size");
+    opt.sample_queue_size = parser.present<int32_t>("sample-queue-size");
+    opt.batch_queue_size = parser.present<int32_t>("batch-queue-size");
+    opt.decode_queue_size = parser.present<int32_t>("decode-queue-size");
+    opt.vc_data_queue_size = parser.present<int32_t>("vc-data-queue-size");
+    opt.vc_writer_queue_size = parser.present<int32_t>("vc-writer-queue-size");
     opt.any_bam = parser.get<bool>("any-bam");
     opt.continue_on_error = parser.get<bool>("continue-on-error");
     opt.read_group = (parser.is_used("--RG")) ? parser.get<std::string>("RG") : "";
@@ -530,10 +595,19 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
 
-    if (opt.queue_size <= 0) {
-        spdlog::error("Queue size needs to be > 0, given: {}.", opt.queue_size);
-        std::exit(EXIT_FAILURE);
-    }
+    const auto validate_queue_size = [](const std::string_view option_name,
+                                        const std::optional<int32_t>& queue_size) {
+        if (queue_size && (*queue_size <= 0)) {
+            spdlog::error("{} needs to be > 0, given: {}.", option_name, *queue_size);
+            std::exit(EXIT_FAILURE);
+        }
+    };
+    validate_queue_size("--bam-region-queue-size", opt.bam_region_queue_size);
+    validate_queue_size("--sample-queue-size", opt.sample_queue_size);
+    validate_queue_size("--batch-queue-size", opt.batch_queue_size);
+    validate_queue_size("--decode-queue-size", opt.decode_queue_size);
+    validate_queue_size("--vc-data-queue-size", opt.vc_data_queue_size);
+    validate_queue_size("--vc-writer-queue-size", opt.vc_writer_queue_size);
 
     if ((std::size(opt.tag_name) == 1) || (std::size(opt.tag_name) > 2)) {
         spdlog::error(
@@ -1221,12 +1295,19 @@ void run_variant_calling(const Options& opt,
         }
     }
 
-    utils::AsyncQueue<secondary::Window> bam_region_queue(opt.queue_size);
-    utils::AsyncQueue<smallvar::InferenceData> sample_queue(opt.queue_size);
-    utils::AsyncQueue<smallvar::InferenceData> batch_queue(opt.queue_size);
-    utils::AsyncQueue<smallvar::DecodeData> decode_queue(opt.queue_size);
-    utils::AsyncQueue<secondary::VariantCallingSample> vc_data_queue(opt.queue_size);
-    utils::AsyncQueue<int64_t> vc_writer_queue(opt.queue_size);
+    const QueueSizes queue_sizes = resolve_queue_sizes(opt, std::size(resources.models));
+    spdlog::debug(
+            "Queue sizes: bam_region = {}, sample = {}, batch = {}, decode = {}, vc_data = {}, "
+            "vc_writer = {}",
+            queue_sizes.bam_region, queue_sizes.sample, queue_sizes.batch, queue_sizes.decode,
+            queue_sizes.vc_data, queue_sizes.vc_writer);
+
+    utils::AsyncQueue<secondary::Window> bam_region_queue(queue_sizes.bam_region);
+    utils::AsyncQueue<smallvar::InferenceData> sample_queue(queue_sizes.sample);
+    utils::AsyncQueue<smallvar::InferenceData> batch_queue(queue_sizes.batch);
+    utils::AsyncQueue<smallvar::DecodeData> decode_queue(queue_sizes.decode);
+    utils::AsyncQueue<secondary::VariantCallingSample> vc_data_queue(queue_sizes.vc_data);
+    utils::AsyncQueue<int64_t> vc_writer_queue(queue_sizes.vc_writer);
 
     // Initialize data needed to reduce the processing (decode/merge/trim results).
     std::vector<smallvar::ChromosomeReduceData> chrom_reduce_data(std::size(input_regions));
