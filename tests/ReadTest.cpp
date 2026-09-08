@@ -119,14 +119,14 @@ CATCH_TEST_CASE(TEST_GROUP ": Test tag generation", TEST_GROUP) {
     }
 
     CATCH_SECTION("Barcode") {
-        auto old_barcode = std::exchange(read_common.barcode, "kit_barcode02");
+        auto old_barcode = std::exchange(read_common.barcode, "barcode02");
 
         auto alignments = read_common.extract_sam_lines(false, std::nullopt, false);
         CATCH_REQUIRE(alignments.size() == 1);
         auto* aln = alignments[0].get();
 
-        CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model_kit_barcode02"));
-        CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "BC")), Equals("kit_barcode02"));
+        CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "RG")), Equals("xyz_test_model_barcode02"));
+        CATCH_CHECK_THAT(bam_aux2Z(bam_aux_get(aln, "BC")), Equals("barcode02"));
 
         read_common.barcode = old_barcode;
     }

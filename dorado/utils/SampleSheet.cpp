@@ -218,15 +218,9 @@ std::string SampleSheet::get_value_from_column(const std::string& column_name,
         return "";
     }
 
-    std::string_view barcode_only(barcode);
-    if (auto pos = barcode_only.find('_'); pos != std::string::npos) {
-        // trim off the kit name
-        barcode_only = barcode_only.substr(pos + 1);
-    }
-
     for (const auto& row : m_rows) {
         if (match_index(row, flow_cell_id, position_id, experiment_id) &&
-            get(row, "barcode") == barcode_only) {
+            get(row, "barcode") == barcode) {
             return get(row, column_name);
         }
     }

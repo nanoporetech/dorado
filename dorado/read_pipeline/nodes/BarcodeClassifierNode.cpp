@@ -23,7 +23,7 @@ const std::string UNCLASSIFIED_BARCODE = "unclassified";
 std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     std::string bc;
     if (bc_res.barcode_name != UNCLASSIFIED_BARCODE) {
-        bc = bc_res.kit + "_" + bc_res.normalized_barcode_name;
+        bc = bc_res.normalized_barcode_name;
     } else {
         bc = UNCLASSIFIED_BARCODE;
     }
