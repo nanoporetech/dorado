@@ -53,9 +53,9 @@ void check_record(const bcf_hdr_t* header,
     }
     CATCH_CHECK(record->qual == Catch::Approx(expected.qual));
 
-    if (!std::empty(expected.filter)) {
+    for (std::string_view filt : expected.filters.as_strings()) {
         // Not a const ref because bcf_has_filter takes a non-const char pointer.
-        std::string filter_name(expected.filter);
+        std::string filter_name(filt);
         CATCH_CHECK(bcf_has_filter(header, record, filter_name.data()) == 1);
     }
 
@@ -81,20 +81,18 @@ void check_record(const bcf_hdr_t* header,
 CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", TEST_GROUP) {
     struct WriterTestData {
         std::filesystem::path vcf_path;
-        std::vector<std::pair<std::string_view, std::string>> filters;
+        Filters::FilterType filters;
         std::vector<std::pair<std::string, int64_t>> contigs;
         Variant first_variant;
         Variant second_variant;
+        Variant third_variant;
     };
 
     const TempDir temp_dir = make_temp_dir("vcf_writer");
 
     const WriterTestData data{
             .vcf_path = temp_dir.m_path / "variants.vcf",
-            .filters =
-                    {
-                            {VARIANT_LOWQUAL_FILTER, "Low quality"},
-                    },
+            .filters = Filters::Pass | Filters::LowQual | Filters::IncompatZyg,
             .contigs =
                     {
                             {"chr1", 100},
@@ -106,7 +104,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .pos = 9,
                             .ref = "A",
                             .alts = {"C"},
-                            .filter = VARIANT_PASS_FILTER,
+                            .filters = {Filters::Pass},
                             .info = {},
                             .qual = 60.0f,
                             .format = {{"GT", "0/1"}, {"GQ", "45"}},
@@ -119,10 +117,24 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .pos = 41,
                             .ref = "T",
                             .alts = {"C", "G"},
-                            .filter = VARIANT_LOWQUAL_FILTER,
+                            .filters = {Filters::LowQual},
                             .info = {},
                             .qual = 17.5f,
                             .format = {{"GT", "1/2"}, {"GQ", "31"}, {"MIN_DP", "25"}},
+                            .rstart = 0,
+                            .rend = 0,
+                    },
+            // check correct handling of multiple variant filters
+            .third_variant =
+                    {
+                            .seq_id = 1,
+                            .pos = 51,
+                            .ref = "T",
+                            .alts = {"C"},
+                            .filters = {Filters::LowQual | Filters::IncompatZyg},
+                            .info = {},
+                            .qual = 17.5f,
+                            .format = {{"GT", "1"}, {"GQ", "31"}, {"MIN_DP", "25"}},
                             .rstart = 0,
                             .rend = 0,
                     },
@@ -135,6 +147,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, command_line);
             writer.write_variant(data.first_variant);
             writer.write_variant(data.second_variant);
+            writer.write_variant(data.third_variant);
         }
 
         // Check that the VCF text file contains the important lines.
@@ -148,9 +161,12 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                              Catch::Matchers::ContainsSubstring("##contig=<ID=chr1,length=100>"));
             CATCH_CHECK_THAT(vcf_text,
                              Catch::Matchers::ContainsSubstring("##contig=<ID=chr2,length=250>"));
-            CATCH_CHECK_THAT(vcf_text,
-                             Catch::Matchers::ContainsSubstring(
-                                     "##FILTER=<ID=LowQual,Description=\"Low quality\">"));
+            CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
+                                               "##FILTER=<ID=LowQual,Description=\"Variant quality "
+                                               "is below threshold\">"));
+            CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
+                                               "##FILTER=<ID=IncompatZyg,Description=\"Predicted "
+                                               "zygosity incompatible with ploidy\">"));
             CATCH_CHECK_THAT(vcf_text,
                              Catch::Matchers::ContainsSubstring(
                                      "##FILTER=<ID=PASS,Description=\"All filters passed\">"));
@@ -168,6 +184,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("chr1\t10\t."));
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("chr2\t42\t."));
+            CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring("LowQual;IncompatZyg"));
         }
 
         // Parse the VCF with Htslib to check that it is valid.
@@ -185,9 +202,11 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
             BcfRecordPtr first_record{bcf_init(), BcfRecordDestructor{}};
             BcfRecordPtr second_record{bcf_init(), BcfRecordDestructor{}};
+            BcfRecordPtr third_record{bcf_init(), BcfRecordDestructor{}};
 
             CATCH_REQUIRE(first_record);
             CATCH_REQUIRE(second_record);
+            CATCH_REQUIRE(third_record);
 
             CATCH_REQUIRE(bcf_read(vcf_file.get(), header.get(), first_record.get()) == 0);
             check_record(header.get(), first_record.get(), data.first_variant, "chr1", {0, 1}, 45);
@@ -196,7 +215,10 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             check_record(header.get(), second_record.get(), data.second_variant, "chr2", {1, 2},
                          31);
 
-            CATCH_CHECK(bcf_read(vcf_file.get(), header.get(), second_record.get()) < 0);
+            CATCH_REQUIRE(bcf_read(vcf_file.get(), header.get(), third_record.get()) == 0);
+            check_record(header.get(), third_record.get(), data.third_variant, "chr2", {1}, 31);
+
+            CATCH_CHECK(bcf_read(vcf_file.get(), header.get(), third_record.get()) < 0);
         }
     }
 
@@ -211,7 +233,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                     .pos = 10,
                     .ref = "N",
                     .alts = {"<*>"},
-                    .filter = ".",
+                    .filters = {Filters::Missing},
                     .info = {{"END", "11"}},
                     .qual = -1.0f,
                     .format = {{"GT", "./."}, {"GQ", "."}, {"LEN", "1"}},   // NOTE: Intentionally not specifying the variant source here, to test that the writer adds it automatically.
@@ -264,12 +286,9 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects filters missing from the header") {
-        Variant variant = data.first_variant;
-        variant.filter = "UnknownFilter";
+        VCFWriter writer(data.vcf_path, Filters::LowQual, data.contigs, false, std::string_view{});
 
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
-
-        CATCH_CHECK_THROWS_WITH(writer.write_variant(variant),
+        CATCH_CHECK_THROWS_WITH(writer.write_variant(data.third_variant),
                                 Catch::Matchers::ContainsSubstring("not found in header"));
     }
 

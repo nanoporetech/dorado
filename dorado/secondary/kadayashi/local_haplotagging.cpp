@@ -1803,8 +1803,8 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
             .pos = var.pos0,
             .ref = std::string(ref),
             .alts = alts,
-            .filter = var.is_confident ? dorado::secondary::VARIANT_PASS_FILTER
-                                       : dorado::secondary::VARIANT_LOWQUAL_FILTER,
+            .filters = {var.is_confident ? dorado::secondary::Filters::Pass
+                                         : dorado::secondary::Filters::LowQual},
             .info = {},
             .qual = qual,
             .format = {{"GT", make_gt_string(var.is_phased0)},

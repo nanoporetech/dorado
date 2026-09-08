@@ -14,12 +14,12 @@ class VCFWriter {
 public:
     /**
      * \brief Opens a VCF file for writing.
-     * \param filters A vector of all possible filters which can appear in this VCF. Required, or Htslib will fail to produce a record. Pair is: <filter_name, description>. The description is a free-text description of the filter.
+     * \param filters A bitset representation of the allowed filters, which will be read from KNOWN_FILTERS.
      * \param contigs A vector of header/length pairs for every contig which may appear in this VCF.
      * \param command_line The command line to add to the VCF header. An empty value is omitted.
      */
     VCFWriter(const std::filesystem::path& filename,
-              const std::vector<std::pair<std::string_view, std::string>>& filters,
+              const Filters::FilterType filters,
               const std::vector<std::pair<std::string, int64_t>>& contigs,
               bool include_gvcf_headers,
               std::string_view command_line);

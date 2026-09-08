@@ -116,7 +116,7 @@ std::string format_header_line(const FieldSpec& spec, const std::string_view met
 }  // namespace
 
 VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
-                     const std::vector<std::pair<std::string_view, std::string>>& filters,
+                     const Filters::FilterType filters,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
                      const bool include_gvcf_headers,
                      const std::string_view command_line)
@@ -134,13 +134,16 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
     bcf_hdr_set_version(m_header.get(), "VCFv4.2");
 
     // Add FILTER entries.
-    for (const auto& [id, description] : filters) {
-        const auto filter_entry = std::string("##FILTER=<ID=")
-                                          .append(id)
-                                          .append(",Description=\"")
-                                          .append(description)
-                                          .append("\">");
-        bcf_hdr_append(m_header.get(), filter_entry.c_str());
+    for (size_t n = 0; n < std::size(KNOWN_FILTERS); ++n) {
+        Filters::FilterType filtbit = 1 << n;
+        if (filtbit & Filters::Pass) {
+            // PASS is added automatically by htslib
+            continue;
+        }
+        if (filtbit & filters) {
+            const auto filter_entry = KNOWN_FILTERS[n].header_string();
+            bcf_hdr_append(m_header.get(), filter_entry.c_str());
+        }
     }
 
     // Add target sequence information.
@@ -222,14 +225,17 @@ void VCFWriter::write_variant(const Variant& variant) {
     }
 
     // Look up the FILTER ID in the header
-    if (!std::empty(variant.filter) && (variant.filter != secondary::NO_VARIANT_FILTER)) {
+    if (variant.filters == Filters::Missing) {
+        bcf_update_filter(m_header.get(), record.get(), nullptr, 0);
+    }
+    for (const std::string_view filt : variant.filters.as_strings()) {
         // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): filter is NUL terminated.
-        int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, variant.filter.data());
+        int32_t filter_id = bcf_hdr_id2int(m_header.get(), BCF_DT_ID, filt.data());
         if (filter_id < 0) {
-            throw std::runtime_error("VCF filter ID '" + std::string(variant.filter) +
+            throw std::runtime_error("VCF filter ID '" + std::string(filt) +
                                      "' not found in header.");
         }
-        bcf_update_filter(m_header.get(), record.get(), &filter_id, 1);
+        bcf_add_filter(m_header.get(), record.get(), filter_id);
     }
 
     // Add INFO fields.

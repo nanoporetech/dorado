@@ -916,12 +916,9 @@ void run_polishing(const Options& opt,
 
     if (opt.run_variant_calling) {
         // These are the only available FILTER options.
-        const std::vector<std::pair<std::string_view, std::string>> filters{
-                // PASS is added automatically by bcf_hdr
-                // {secondary::VARIANT_PASS_FILTER, "All filters passed"},
-                {secondary::VARIANT_LOWQUAL_FILTER, "Variant quality is below threshold"},
-                {secondary::NO_VARIANT_FILTER, "Non-variant position"},
-        };
+        const secondary::Filters::FilterType filters = secondary::Filters::Pass |
+                                                       secondary::Filters::LowQual |
+                                                       secondary::Filters::NonVariant;
 
         vcf_writer = std::make_unique<secondary::VCFWriter>(out_vcf_fn, filters, draft_lens,
                                                             opt.vc_type == VariantCallingEnum::GVCF,

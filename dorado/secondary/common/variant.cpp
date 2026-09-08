@@ -11,6 +11,47 @@
 
 namespace dorado::secondary {
 
+std::string FilterSpec::header_string() const {
+    return std::string("##FILTER=<ID=")
+            .append(id)
+            .append(",Description=\"")
+            .append(description)
+            .append("\">");
+}
+
+Filters::Filters(const FilterType filter) : m_filter(filter) {}
+
+void Filters::update(const Filter filter) {
+    // filter is PASS or NonVariant, set and return
+    if (filter & (Filter::Pass | Filter::NonVariant)) {
+        m_filter = filter;
+        return;
+    }
+    // if filter is empty, ignore
+    if (filter == Filter::Missing) {
+        return;
+    }
+    // If m_filter is currently PASS or NonVariant, clear; then append
+    if (m_filter & (Filter::Pass | Filter::NonVariant)) {
+        m_filter = Filter::Missing;
+    }
+    m_filter = m_filter | filter;
+}
+
+std::vector<std::string_view> Filters::as_strings() const {
+    std::vector<std::string_view> filters;
+    for (size_t n = 0; n < std::size(KNOWN_FILTERS); ++n) {
+        if (m_filter & (1 << n)) {
+            filters.push_back(KNOWN_FILTERS[n].id);
+        }
+    }
+    return filters;
+}
+
+bool Filters::operator&(const Filter& filter) const { return m_filter & filter; }
+
+bool Filters::operator|(const Filter& filter) const { return m_filter | filter; }
+
 std::ostream& operator<<(std::ostream& os, const Variant& v) {
     const auto print_map = [&os](const std::string_view name, const auto& paired_data) {
         os << name << ':';
@@ -26,7 +67,9 @@ std::ostream& operator<<(std::ostream& os, const Variant& v) {
 
     os << v.seq_id << '\t' << v.pos << '\t' << v.ref << "\t{";
     utils::print_container(os, v.alts, ",", true);
-    os << "}\t" << v.filter << '\t' << v.qual << '\t' << v.rstart << '\t' << v.rend;
+    os << "}\t";
+    utils::print_container(os, v.filters.as_strings(), ",", false);
+    os << '\t' << v.qual << '\t' << v.rstart << '\t' << v.rend;
     os << '\t';
     print_map("gt", v.format);
     os << '\t';
@@ -42,9 +85,9 @@ std::string to_string(const Variant& v) {
 }
 
 bool operator==(const Variant& lhs, const Variant& rhs) {
-    return std::tie(lhs.seq_id, lhs.pos, lhs.ref, lhs.alts, lhs.filter, lhs.info, lhs.qual,
+    return std::tie(lhs.seq_id, lhs.pos, lhs.ref, lhs.alts, lhs.filters, lhs.info, lhs.qual,
                     lhs.format, lhs.rstart,
-                    lhs.rend) == std::tie(rhs.seq_id, rhs.pos, rhs.ref, rhs.alts, rhs.filter,
+                    lhs.rend) == std::tie(rhs.seq_id, rhs.pos, rhs.ref, rhs.alts, rhs.filters,
                                           rhs.info, rhs.qual, rhs.format, rhs.rstart, rhs.rend);
 }
 
@@ -76,7 +119,7 @@ bool is_valid(const Variant& var) {
 }
 
 bool is_reference_record(const Variant& var) {
-    return (var.filter == NO_VARIANT_FILTER) || std::empty(var.alts) ||
+    return (var.filters & Filters::NonVariant) || std::empty(var.alts) ||
            ((std::size(var.alts) == 1) &&
             ((var.alts.front() == ".") || (var.alts.front() == "<*>")));
 }

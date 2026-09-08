@@ -1,21 +1,56 @@
 #pragma once
 
+#include <array>
 #include <cstdint>
 #include <iosfwd>
 #include <span>
 #include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <vector>
 
 namespace dorado::secondary {
 
+struct FilterSpec {
+    std::string_view id;
+    std::string_view description;
+
+    std::string header_string() const;
+};
+
 // "PASS" is a reserved filter string in the VCF specification, it should not be changed.
 // Other filter strings are locally defined in the VCF header so can be changed if needed.
-constexpr std::string_view VARIANT_PASS_FILTER{"PASS"};
-constexpr std::string_view VARIANT_LOWQUAL_FILTER{"LowQual"};
-constexpr std::string_view VARIANT_ZYGOSITY_FILTER{"IncompatZyg"};
-constexpr std::string_view NO_VARIANT_FILTER{"."};
+inline constexpr std::array KNOWN_FILTERS{
+        FilterSpec{"PASS", "All filters passed"},
+        FilterSpec{"LowQual", "Variant quality is below threshold"},
+        FilterSpec{"IncompatZyg", "Predicted zygosity incompatible with ploidy"},
+        FilterSpec{".", "Non-variant position"},
+};
+
+class Filters {
+public:
+    using FilterType = uint8_t;
+    enum Filter : FilterType {
+        Missing = 0,
+        Pass = 1 << 0,
+        LowQual = 1 << 1,
+        IncompatZyg = 1 << 2,
+        NonVariant = 1 << 3,
+    };
+
+    Filters() = default;
+    Filters(FilterType filter);
+    void update(const Filter filter);
+    std::vector<std::string_view> as_strings() const;
+
+    bool operator==(const Filters&) const = default;
+    bool operator&(const Filter& filter) const;
+    bool operator|(const Filter& filter) const;
+
+private:
+    FilterType m_filter = Filter::Missing;
+};
 
 // Plain `const char*` (not `string_view`) so these convert implicitly to `std::string`
 // map keys/values; `std::string`'s converting constructor from `string_view` is explicit.
@@ -30,7 +65,7 @@ struct Variant {
     int64_t pos = -1;
     std::string ref;
     std::vector<std::string> alts;
-    std::string_view filter;
+    Filters filters;
     std::unordered_map<std::string, std::string> info;
     float qual = 0.0f;
     std::unordered_map<std::string, std::string> format;
