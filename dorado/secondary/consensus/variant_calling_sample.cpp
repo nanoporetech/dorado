@@ -210,8 +210,7 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
     return slice_vc_sample(vc_sample, start_idx, end_idx);
 }
 
-std::vector<VariantCallingSample> merge_vc_samples(
-        const std::vector<VariantCallingSample>& vc_samples) {
+std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples) {
     const auto merge_adjacent_samples_in_place = [](VariantCallingSample& lh,
                                                     const VariantCallingSample& rh) {
         const size_t width = std::size(lh.positions_major);
@@ -232,22 +231,27 @@ std::vector<VariantCallingSample> merge_vc_samples(
     if (std::empty(vc_samples)) {
         return {};
     }
-
-    std::vector<VariantCallingSample> ret{vc_samples.front()};
+    if (std::size(vc_samples) == 1) {
+        vc_samples.front().validate();
+        return vc_samples;
+    }
 
     // Validate sample for sanity. This can throw.
     vc_samples[0].validate();
+    std::vector<VariantCallingSample> ret;
+    ret.reserve(std::size(vc_samples));
+    ret.emplace_back(std::move(vc_samples.front()));
 
     for (std::size_t i = 1; i < std::size(vc_samples); ++i) {
         const VariantCallingSample& last = ret.back();
-        const VariantCallingSample& curr = vc_samples[i];
+        VariantCallingSample& curr = vc_samples[i];
 
         // Validate sample for sanity. This can throw.
         curr.validate();
 
         // Should not happen, but sanity check.
         if (std::empty(last.positions_major) || std::empty(curr.positions_major)) {
-            ret.emplace_back(vc_samples[i]);
+            ret.emplace_back(std::move(curr));
             continue;
         }
 
@@ -259,8 +263,9 @@ std::vector<VariantCallingSample> merge_vc_samples(
              ((curr.positions_major[0] == last.positions_major.back()) &&
               (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
             merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
+            curr = {};
         } else {
-            ret.emplace_back(vc_samples[i]);
+            ret.emplace_back(std::move(curr));
         }
     }
 
@@ -274,7 +279,7 @@ std::vector<VariantCallingSample> merge_vc_samples(
  *          previous sample's right portion). The right part is then added to a cleared queue.
  *          The goal of this function is to prevent calling variants on sample boundaries.
  */
-std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
+std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples,
                                                const std::string& draft,
                                                const DecoderBase& decoder) {
     std::vector<VariantCallingSample> ret;
@@ -282,7 +287,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
     std::vector<VariantCallingSample> queue;
 
     for (std::size_t i = 0; i < std::size(vc_samples); ++i) {
-        const VariantCallingSample& vc_sample = vc_samples[i];
+        VariantCallingSample& vc_sample = vc_samples[i];
 
         vc_sample.validate();
 
@@ -324,7 +329,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
 
         // All positions differ. Merge the entire sample with the next one.
         if (last_non_var_start <= 0) {
-            queue.emplace_back(vc_sample);
+            queue.emplace_back(std::move(vc_sample));
             continue;
         }
 
@@ -332,6 +337,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
         VariantCallingSample left_slice = slice_vc_sample(vc_sample, 0, last_non_var_start);
         VariantCallingSample right_slice =
                 slice_vc_sample(vc_sample, last_non_var_start, num_positions);
+        vc_sample = {};
 
         // Enqueue the queue if possible.
         if (last_non_var_start > 0) {
@@ -340,8 +346,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
 
         // Merge and insert.
         if (!std::empty(queue)) {
-            auto new_samples = merge_vc_samples(queue);
-            queue.clear();
+            auto new_samples = merge_vc_samples(std::move(queue));
 
             ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
                        std::make_move_iterator(std::end(new_samples)));
@@ -353,8 +358,7 @@ std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingS
 
     // Merge and insert.
     if (!std::empty(queue)) {
-        auto new_samples = merge_vc_samples(queue);
-        queue.clear();
+        auto new_samples = merge_vc_samples(std::move(queue));
 
         ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
                    std::make_move_iterator(std::end(new_samples)));
@@ -411,15 +415,12 @@ std::vector<VariantCallingSample> trim_vc_samples(
             continue;
         }
 
-        // Add a new trimmed sample.
-        trimmed_samples.emplace_back(
-                VariantCallingSample{s.seq_id,
-                                     std::vector<int64_t>(std::begin(s.positions_major) + t.start,
-                                                          std::begin(s.positions_major) + t.end),
-                                     std::vector<int64_t>(std::begin(s.positions_minor) + t.start,
-                                                          std::begin(s.positions_minor) + t.end),
-                                     s.logits.index({at::indexing::Slice(t.start, t.end)}).clone(),
-                                     s.depth.index({at::indexing::Slice(t.start, t.end)}).clone()});
+        // Avoid cloning tensor storage when trimming keeps the complete sample.
+        if ((t.start == 0) && (t.end == std::ssize(s.positions_major))) {
+            trimmed_samples.emplace_back(s);
+        } else {
+            trimmed_samples.emplace_back(slice_vc_sample(s, t.start, t.end));
+        }
     }
 
     return trimmed_samples;

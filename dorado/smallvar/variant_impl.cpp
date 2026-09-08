@@ -1353,7 +1353,7 @@ std::vector<secondary::IntervalInt64> construct_trimmed_merge_regions(
 }
 
 std::vector<secondary::VariantCallingSample> trim_samples_to_merge_regions(
-        const std::vector<secondary::VariantCallingSample>& vc_samples,
+        std::vector<secondary::VariantCallingSample> vc_samples,
         const std::vector<secondary::IntervalInt64>& merge_regions) {
     if (std::empty(vc_samples) || std::empty(merge_regions)) {
         return {};
@@ -1365,8 +1365,9 @@ std::vector<secondary::VariantCallingSample> trim_samples_to_merge_regions(
 
     std::vector<secondary::VariantCallingSample> ret;
 
-    for (const auto& sample : vc_samples) {
+    for (auto& sample : vc_samples) {
         if (sample.start() >= sample.end()) {
+            sample = {};
             continue;
         }
 
@@ -1376,6 +1377,7 @@ std::vector<secondary::VariantCallingSample> trim_samples_to_merge_regions(
 
         // This sample is not in any merge region, skip it.
         if (std::empty(hits)) {
+            sample = {};
             continue;
         }
 
@@ -1392,11 +1394,17 @@ std::vector<secondary::VariantCallingSample> trim_samples_to_merge_regions(
         const int64_t decode_end = std::min(min_it_end->stop + 1, sample.end());
 
         if (decode_start >= decode_end) {
+            sample = {};
             continue;
         }
 
         // Clip.
-        ret.emplace_back(slice_vc_sample_in_ref_coords(sample, decode_start, decode_end));
+        if ((decode_start == sample.start()) && (decode_end == sample.end())) {
+            ret.emplace_back(std::move(sample));
+        } else {
+            ret.emplace_back(slice_vc_sample_in_ref_coords(sample, decode_start, decode_end));
+            sample = {};
+        }
     }
 
     return ret;
@@ -1404,7 +1412,7 @@ std::vector<secondary::VariantCallingSample> trim_samples_to_merge_regions(
 
 std::pair<std::vector<secondary::Variant>, std::vector<secondary::IntervalInt64>>
 call_variants_single_chrom(const std::string& draft,
-                           const std::vector<secondary::VariantCallingSample>& vc_input_data,
+                           std::vector<secondary::VariantCallingSample> vc_input_data,
                            const secondary::DecoderBase& decoder,
                            const std::vector<secondary::Variant>& simple_variants,
                            const int32_t flank_trim,
@@ -1437,9 +1445,10 @@ call_variants_single_chrom(const std::string& draft,
         return {};
     }
 
+    [[maybe_unused]] const int32_t seq_id = vc_input_data[ordered_ids.front()].seq_id;
+
     // Debug print.
     if constexpr (DEBUG_VC_SAMPLES == true) {
-        const int32_t seq_id = vc_input_data.front().seq_id;
         spdlog::trace("[call_variants_single_chrom seq_id = {}] vc_input_data: size = {}", seq_id,
                       std::size(vc_input_data));
         for (int64_t i = 0; i < std::ssize(vc_input_data); ++i) {
@@ -1449,11 +1458,11 @@ call_variants_single_chrom(const std::string& draft,
     }
 
     // Trim the overlapping portions between samples.
-    const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, ordered_ids);
+    auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, ordered_ids);
+    std::vector<secondary::VariantCallingSample>{}.swap(vc_input_data);
 
     // Debug print.
     if constexpr (DEBUG_VC_SAMPLES == true) {
-        const int32_t seq_id = vc_input_data.front().seq_id;
         spdlog::trace("[call_variants_single_chrom seq_id = {}] trimmed_vc_samples: size = {}",
                       seq_id, std::size(trimmed_vc_samples));
         for (int64_t i = 0; i < std::ssize(trimmed_vc_samples); ++i) {
@@ -1462,16 +1471,15 @@ call_variants_single_chrom(const std::string& draft,
         }
     }
 
-    const std::vector<secondary::IntervalInt64> merge_regions =
+    std::vector<secondary::IntervalInt64> merge_regions =
             construct_trimmed_merge_regions(trimmed_vc_samples, simple_variants, flank_trim);
 
     // Trim overlaps with simple variants.
-    const auto callable_vc_samples =
-            trim_samples_to_merge_regions(trimmed_vc_samples, merge_regions);
+    auto callable_vc_samples =
+            trim_samples_to_merge_regions(std::move(trimmed_vc_samples), merge_regions);
 
     // Debug print.
     if constexpr (DEBUG_VC_SAMPLES == true) {
-        const int32_t seq_id = vc_input_data.front().seq_id;
         spdlog::trace("[call_variants_single_chrom seq_id = {}] callable_vc_samples: size = {}",
                       seq_id, std::size(callable_vc_samples));
         for (int64_t i = 0; i < std::ssize(callable_vc_samples); ++i) {
@@ -1481,7 +1489,7 @@ call_variants_single_chrom(const std::string& draft,
     }
 
     // Break and merge samples on non-variant positions.
-    const auto joined_samples = join_samples(callable_vc_samples, draft, decoder);
+    const auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
     std::vector<secondary::Variant> results;
 
     for (const auto& vc_sample : joined_samples) {
@@ -1496,7 +1504,7 @@ call_variants_single_chrom(const std::string& draft,
     // Sort the variants.
     std::stable_sort(std::begin(results), std::end(results));
 
-    return {results, merge_regions};
+    return {std::move(results), std::move(merge_regions)};
 }
 
 std::vector<secondary::Interval64> merge_intervals(
@@ -1769,8 +1777,8 @@ void worker_variant_calling_reduce(
                     reduce_data.num_samples);
         }
 
-        const std::vector<secondary::VariantCallingSample>& vc_decode_data =
-                chrom_vc_samples[seq_id];
+        std::vector<secondary::VariantCallingSample> vc_decode_data =
+                std::move(chrom_vc_samples[seq_id]);
 
         const std::string& seq_name = draft_lens[seq_id].first;
         std::optional<std::string> draft;
@@ -1780,6 +1788,7 @@ void worker_variant_calling_reduce(
 
         std::vector<secondary::Variant> variants;
         std::vector<secondary::IntervalInt64> merge_regions;
+        reduce_data.processed_regions = make_processed_regions(vc_decode_data, false);
         if (!std::empty(vc_decode_data)) {
             const bool merge_with_simple =
                     (variant_candidate_source == secondary::VariantCandidateSource::COMPUTE);
@@ -1787,7 +1796,7 @@ void worker_variant_calling_reduce(
             const auto& simple_variants =
                     merge_with_simple ? reduce_data.variants_simple : empty_simple_variants;
             std::tie(variants, merge_regions) = call_variants_single_chrom(
-                    *draft, vc_decode_data, decoder, simple_variants,
+                    *draft, std::move(vc_decode_data), decoder, simple_variants,
                     merge_with_simple ? flank_trim : 0, pass_min_qual, ambig_ref, gvcf);
         }
 
@@ -1796,8 +1805,6 @@ void worker_variant_calling_reduce(
                 "for sequence: {}, variants: {}, "
                 "reduce_data.ready = {}, reduce_data.num_samples = {}",
                 tid, seq_name, std::size(variants), reduce_data.ready, reduce_data.num_samples);
-
-        reduce_data.processed_regions = make_processed_regions(vc_decode_data, false);
 
         // Store inference variants.
         reduce_data.variants_inference = std::move(variants);
@@ -1829,8 +1836,6 @@ void worker_variant_calling_reduce(
             }
         }
 
-        // Release the data after processing.
-        chrom_vc_samples[seq_id].clear();
         chrom_reduced[seq_id] = true;
 
         // Trigger writing.
