@@ -1,5 +1,7 @@
 #include "ModBaseScaler.h"
 
+#include "config/ModBaseModelConfig.h"
+#include "torch_utils/tensor_utils.h"
 #include "utils/math_utils.h"
 
 #include <ATen/TensorOperators.h>
@@ -11,10 +13,30 @@
 
 namespace dorado::modbase {
 
-ModBaseScaler::ModBaseScaler(const std::vector<float>& kmer_levels,
-                             size_t kmer_len,
-                             size_t centre_index)
-        : m_kmer_levels(kmer_levels), m_kmer_len(kmer_len), m_centre_index(centre_index) {
+namespace {
+std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config) {
+    std::vector<float> levels;
+    if (!config.refine.do_rough_rescale) {
+        return levels;
+    }
+
+    std::vector<at::Tensor> tensors =
+            utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"});
+    if (tensors.empty()) {
+        throw std::runtime_error("Failed to load modbase refinement tensors.");
+    }
+    auto& t = tensors.front();
+    t.contiguous();
+    levels.reserve(t.numel());
+    std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
+    return levels;
+}
+}  // namespace
+
+ModBaseScaler::ModBaseScaler(const config::ModBaseModelConfig& config)
+        : m_kmer_levels(load_kmer_refinement_levels(config)),
+          m_kmer_len(config.general.kmer_len),
+          m_centre_index(config.refine.center_idx) {
     // ensure that the levels were the length we expected
     if (m_kmer_levels.size() != static_cast<size_t>(1ull << (2 * m_kmer_len))) {
         throw std::runtime_error(

@@ -647,22 +647,4 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
     }
 }
 
-std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config) {
-    std::vector<float> levels;
-    if (!config.refine.do_rough_rescale) {
-        return levels;
-    }
-
-    std::vector<at::Tensor> tensors =
-            utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"});
-    if (tensors.empty()) {
-        throw std::runtime_error("Failed to load modbase refinement tensors.");
-    }
-    auto& t = tensors.front();
-    t.contiguous();
-    levels.reserve(t.numel());
-    std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
-    return levels;
-}
-
 }  // namespace dorado::modbase

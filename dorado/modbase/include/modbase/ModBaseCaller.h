@@ -41,7 +41,6 @@ public:
         int64_t get_seq_len() const;
 
         const config::ModBaseModelConfig params;
-        const std::vector<float> kmer_refinement_levels;
         std::unique_ptr<ModBaseScaler> scaler;
 
     private:

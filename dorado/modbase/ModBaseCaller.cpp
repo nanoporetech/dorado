@@ -42,13 +42,11 @@ ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config
                                         const at::TensorOptions& opts,
                                         const int batch_size_)
         : params(config),
-          kmer_refinement_levels(load_kmer_refinement_levels(config)),
           module_holder(load_modbase_model(params, opts, batch_size_)),
           matcher(params),
           batch_size(batch_size_) {
     if (params.refine.do_rough_rescale) {
-        scaler = std::make_unique<ModBaseScaler>(kmer_refinement_levels, params.general.kmer_len,
-                                                 params.refine.center_idx);
+        scaler = std::make_unique<ModBaseScaler>(params);
     }
 
 #if DORADO_CUDA_BUILD

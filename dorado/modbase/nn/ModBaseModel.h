@@ -15,6 +15,4 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
         const at::TensorOptions& options,
         const int batchsize);
 
-std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config);
-
 }  // namespace dorado::modbase
