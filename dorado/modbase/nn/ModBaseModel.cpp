@@ -68,6 +68,18 @@ std::vector<std::string> load_modbase_conv_lstm_weights(bool has_upsample) {
     return tensors;
 }
 
+std::tuple<int64_t, int64_t> v3_chunked_sequence_input_TC(
+        const dorado::config::ConvLSTMV3ModelConfig& config) {
+    const auto& params = config.general;
+    return {params.chunk_size / (params.stride / params.sequence_stride),
+            config.context.kmer_len * 4};
+}
+
+std::tuple<int64_t, int64_t> v3_chunked_signal_input_TC(
+        const dorado::config::ConvLSTMV3ModelConfig& config) {
+    return {config.general.chunk_size, 1};
+}
+
 }  // namespace
 
 namespace dorado::modbase {
@@ -466,14 +478,14 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             // Reserve and allocate working memory for the sequence convs
-            auto [T, C] = m_config.chunked_sequence_input_TC();
+            auto [T, C] = v3_chunked_sequence_input_TC(m_config);
             wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
             seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
         }
         {
             // Reserve and allocate working memory for everything else
             const auto& params = m_config.general;
-            auto [T, C] = m_config.chunked_signal_input_TC();
+            auto [T, C] = v3_chunked_signal_input_TC(m_config);
             wm.next_TC(T, C, nn::TensorLayout::NTC);
             sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
@@ -503,7 +515,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
 
         {
             utils::ScopedProfileRange spr2("seq_copy", 2);
-            const auto [Tin_seq, Cin_seq] = m_config.chunked_sequence_input_TC();
+            const auto [Tin_seq, Cin_seq] = v3_chunked_sequence_input_TC(m_config);
             if (!wm_seq.backing_tensor.defined()) {
                 wm_seq.allocate_backing_tensor(seqs_NTC.device());
             }
@@ -512,7 +524,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             utils::ScopedProfileRange spr2("sig_copy", 2);
-            const auto [Tin_sig, Cin_sig] = m_config.chunked_signal_input_TC();
+            const auto [Tin_sig, Cin_sig] = v3_chunked_signal_input_TC(m_config);
             if (!wm.backing_tensor.defined()) {
                 wm.allocate_backing_tensor(sigs_N1T.device());
             }

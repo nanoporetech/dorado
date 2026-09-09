@@ -521,31 +521,6 @@ ModBaseModelConfigData::ModBaseModelConfigData(std::filesystem::path model_path_
     }
 }
 
-ChunkedModelConfigData::ChunkedModelConfigData(std::filesystem::path model_path_,
-                                               ModificationParams mods_,
-                                               ContextParams context_,
-                                               RefinementParams refine_,
-                                               int kmer_len_)
-        : ModBaseModelConfigData(std::move(model_path_),
-                                 std::move(mods_),
-                                 std::move(context_),
-                                 std::move(refine_),
-                                 kmer_len_) {}
-
-std::tuple<int64_t, int64_t> ChunkedModelConfigData::chunked_sequence_input_TC() const {
-    const auto& params = chunked_params();
-    return {params.chunk_size / sequence_stride_ratio(), context.kmer_len * 4};
-}
-
-std::tuple<int64_t, int64_t> ChunkedModelConfigData::chunked_signal_input_TC() const {
-    return {chunked_params().chunk_size, 1};
-}
-
-std::tuple<int64_t, int64_t> ChunkedModelConfigData::chunked_output_TC() const {
-    const auto& params = chunked_params();
-    return {params.chunk_size / params.stride, params.num_out};
-}
-
 ConvOnlyModelConfig::ConvOnlyModelConfig(std::filesystem::path model_path_,
                                          CommonModelParams general_,
                                          ModificationParams mods_,
@@ -575,7 +550,7 @@ ConvLSTMV2ModelConfig::ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
                                              ModificationParams mods_,
                                              ContextParams context_,
                                              RefinementParams refine_)
-        : ChunkedModelConfigData(std::move(model_path_),
+        : ModBaseModelConfigData(std::move(model_path_),
                                  std::move(mods_),
                                  context_.normalised(general_.stride),
                                  std::move(refine_),
@@ -591,7 +566,7 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
                                              ModificationParams mods_,
                                              ContextParams context_,
                                              RefinementParams refine_)
-        : ChunkedModelConfigData(std::move(model_path_),
+        : ModBaseModelConfigData(std::move(model_path_),
                                  std::move(mods_),
                                  std::move(context_),
                                  std::move(refine_),
@@ -624,10 +599,19 @@ bool is_chunked_input_model(const ModBaseModelConfig& config) {
 }
 
 const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
-    if (const auto* v2 = std::get_if<ConvLSTMV2ModelConfig>(&config)) {
-        return v2->general;
-    }
-    return std::get<ConvLSTMV3ModelConfig>(config).general;
+    return std::visit(
+            utils::overloaded{
+                    [](const ConvLSTMV2ModelConfig& model) -> const ChunkedModelParams& {
+                        return model.general;
+                    },
+                    [](const ConvLSTMV3ModelConfig& model) -> const ChunkedModelParams& {
+                        return model.general;
+                    },
+                    [](const auto&) -> const ChunkedModelParams& {
+                        throw std::runtime_error("Modbase model does not accept chunked input");
+                    },
+            },
+            config);
 }
 
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
@@ -642,6 +626,36 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
                     },
             },
             config);
+}
+
+std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {
+    return std::visit(
+            utils::overloaded{
+                    [](const ConvLSTMV2ModelConfig& model) {
+                        return std::tuple{model.general.chunk_size,
+                                          int64_t(model.context.kmer_len * 4)};
+                    },
+                    [](const ConvLSTMV3ModelConfig& model) {
+                        return std::tuple{
+                                model.general.chunk_size /
+                                        (model.general.stride / model.general.sequence_stride),
+                                int64_t(model.context.kmer_len * 4)};
+                    },
+                    [](const auto&) -> std::tuple<int64_t, int64_t> {
+                        throw std::runtime_error("Modbase model does not accept chunked input");
+                    },
+            },
+            config);
+}
+
+std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config) {
+    const auto& params = get_chunked_model_params(config);
+    return {params.chunk_size, 1};
+}
+
+std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config) {
+    const auto& params = get_chunked_model_params(config);
+    return {params.chunk_size / params.stride, params.num_out};
 }
 
 const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config) {

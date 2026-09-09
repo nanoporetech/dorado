@@ -212,9 +212,9 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
 
     CATCH_SECTION("chunked tensor dimensions") {
         if (const auto* v2 = std::get_if<ConvLSTMV2ModelConfig>(&model)) {
-            const auto [seq_t, seq_c] = v2->chunked_sequence_input_TC();
-            const auto [sig_t, sig_c] = v2->chunked_signal_input_TC();
-            const auto [out_t, out_c] = v2->chunked_output_TC();
+            const auto [seq_t, seq_c] = get_chunked_sequence_input_TC(model);
+            const auto [sig_t, sig_c] = get_chunked_signal_input_TC(model);
+            const auto [out_t, out_c] = get_chunked_output_TC(model);
             CATCH_CHECK(seq_t == v2->general.chunk_size);
             CATCH_CHECK(seq_c == v2->context.kmer_len * 4);
             CATCH_CHECK(sig_t == v2->general.chunk_size);

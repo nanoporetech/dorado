@@ -128,26 +128,6 @@ struct ModBaseModelConfigData {
                            int kmer_len_);
 };
 
-struct ChunkedModelConfigData : ModBaseModelConfigData {
-    // Sequence input tensor dimensions for chunked models
-    std::tuple<int64_t, int64_t> chunked_sequence_input_TC() const;
-    // Signal input tensor dimensions for chunked models
-    std::tuple<int64_t, int64_t> chunked_signal_input_TC() const;
-    // Output tensor dimensions for chunked models
-    std::tuple<int64_t, int64_t> chunked_output_TC() const;
-
-    virtual ~ChunkedModelConfigData() = default;
-
-protected:
-    ChunkedModelConfigData(std::filesystem::path model_path_,
-                           ModificationParams mods_,
-                           ContextParams context_,
-                           RefinementParams refine_,
-                           int kmer_len_);
-    virtual const ChunkedModelParams& chunked_params() const = 0;
-    virtual int sequence_stride_ratio() const = 0;
-};
-
 struct ConvOnlyModelConfig : ModBaseModelConfigData {
     CommonModelParams general;
     ConvOnlyModelConfig(std::filesystem::path model_path_,
@@ -166,30 +146,22 @@ struct ConvLSTMModelConfig : ModBaseModelConfigData {
                         RefinementParams refine_);
 };
 
-struct ConvLSTMV2ModelConfig : ChunkedModelConfigData {
+struct ConvLSTMV2ModelConfig : ModBaseModelConfigData {
     ChunkedModelParams general;
     ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
                           ChunkedModelParams general_,
                           ModificationParams mods_,
                           ContextParams context_,
                           RefinementParams refine_);
-
-private:
-    const ChunkedModelParams& chunked_params() const override { return general; }
-    int sequence_stride_ratio() const override { return 1; }
 };
 
-struct ConvLSTMV3ModelConfig : ChunkedModelConfigData {
+struct ConvLSTMV3ModelConfig : ModBaseModelConfigData {
     ConvLSTMV3ModelParams general;
     ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
                           ConvLSTMV3ModelParams general_,
                           ModificationParams mods_,
                           ContextParams context_,
                           RefinementParams refine_);
-
-private:
-    const ChunkedModelParams& chunked_params() const override { return general; }
-    int sequence_stride_ratio() const override { return general.stride / general.sequence_stride; }
 };
 
 const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config);
@@ -198,6 +170,9 @@ bool is_chunked_input_model(const ModBaseModelConfig& config);
 
 const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
+std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config);
+std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config);
+std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config);
 const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
