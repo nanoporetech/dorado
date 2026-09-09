@@ -55,8 +55,7 @@ ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config
         stream = c10::cuda::getStreamFromPool(false, opts.device().index());
 
         const int channels =
-                utils::BaseInfo::NUM_BASES *
-                std::visit([](const auto& model) { return model.general.kmer_len; }, params);
+                utils::BaseInfo::NUM_BASES * config::get_model_config_data(params).context.kmer_len;
 
         // Warmup
         c10::cuda::CUDAStreamGuard guard(*stream);

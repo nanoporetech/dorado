@@ -242,8 +242,9 @@ ConvOnlyModelConfig parse_conv_v1(const std::filesystem::path& model_path,
     auto mods = parse_modification_params(config_toml);
     auto context = parse_context_params(config_toml);
     auto refine = parse_refinement_params(config_toml);
-    return ConvOnlyModelConfig{model_path, std::move(common), std::move(mods), std::move(context),
-                               std::move(refine)};
+    return ConvOnlyModelConfig{
+            model_path, std::move(common), std::move(mods), std::move(context), std::move(refine),
+    };
 }
 
 ConvLSTMModelConfig parse_lstm_v1(const std::filesystem::path& model_path,
@@ -252,8 +253,9 @@ ConvLSTMModelConfig parse_lstm_v1(const std::filesystem::path& model_path,
     auto mods = parse_modification_params(config_toml);
     auto context = parse_context_params(config_toml);
     auto refine = parse_refinement_params(config_toml);
-    return ConvLSTMModelConfig{model_path, std::move(common), std::move(mods), std::move(context),
-                               std::move(refine)};
+    return ConvLSTMModelConfig{
+            model_path, std::move(common), std::move(mods), std::move(context), std::move(refine),
+    };
 }
 
 ConvLSTMV2ModelConfig parse_lstm_v2(const std::filesystem::path& model_path,
@@ -266,8 +268,10 @@ ConvLSTMV2ModelConfig parse_lstm_v2(const std::filesystem::path& model_path,
     const auto chunk_size = normalise_to_stride(raw_chunk_size, common.stride);
     spdlog::trace("Normalised modbase chunk size for stride: {} - {} -> {}", common.stride,
                   raw_chunk_size, chunk_size);
-    return ConvLSTMV2ModelConfig{model_path, ChunkedModelParams{std::move(common), chunk_size},
-                                 std::move(mods), std::move(context), std::move(refine)};
+    return ConvLSTMV2ModelConfig{
+            model_path,      std::move(common),  ChunkedModelParams{chunk_size},
+            std::move(mods), std::move(context), std::move(refine),
+    };
 }
 
 ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
@@ -283,10 +287,18 @@ ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
     auto context = parse_context_params(config_toml);
     auto refine = parse_refinement_params(config_toml);
     const auto chunk_size = parse_chunk_size(config_toml, context);
-    return ConvLSTMV3ModelConfig{model_path,
-                                 ConvLSTMV3ModelParams{std::move(common), chunk_size,
-                                                       sequence_stride, std::move(modules)},
-                                 std::move(mods), std::move(context), std::move(refine)};
+    return ConvLSTMV3ModelConfig{
+            model_path,
+            ConvLSTMV3ModelParams{
+                    std::move(common),
+                    ChunkedModelParams{chunk_size},
+                    sequence_stride,
+                    std::move(modules),
+            },
+            std::move(mods),
+            std::move(context),
+            std::move(refine),
+    };
 }
 
 ModBaseModelConfig parse_model_config(const std::filesystem::path& model_path,
@@ -384,38 +396,38 @@ CommonModelParams::CommonModelParams(int size_, int kmer_len_, int num_out_, int
     }
 }
 
-ChunkedModelParams::ChunkedModelParams(CommonModelParams common_, int64_t chunk_size_)
-        : CommonModelParams(std::move(common_)), chunk_size(chunk_size_) {
+ChunkedModelParams::ChunkedModelParams(int64_t chunk_size_) : chunk_size(chunk_size_) {
     if (chunk_size < 1) {
         throw std::runtime_error(ERR_STR + "chunked model params: 'negative or zero chunk size'.");
     }
 }
 
 ConvLSTMV3ModelParams::ConvLSTMV3ModelParams(CommonModelParams common_,
-                                             int64_t chunk_size_,
+                                             ChunkedModelParams chunked_,
                                              int sequence_stride_,
                                              ModulesParams modules_)
-        : ChunkedModelParams(std::move(common_), chunk_size_),
+        : common(std::move(common_)),
+          chunked(std::move(chunked_)),
           modules(std::move(modules_)),
           sequence_stride(sequence_stride_) {
     if (sequence_stride < 1) {
         throw std::runtime_error(ERR_STR + "v3 model params: 'negative or zero sequence stride'.");
     }
-    if (stride % sequence_stride != 0) {
+    if (common.stride % sequence_stride != 0) {
         throw std::runtime_error(
                 "Modbase model config signal stride must be evenly divisible by sequence stride");
     }
-    if ((size != modules.lstms.front().size) ||
+    if ((common.size != modules.lstms.front().size) ||
         (modules.lstms.front().size != modules.lstms.back().size)) {
         throw std::runtime_error("Modbase model config lstm size mismatch");
     }
-    if (stride != stride_product(modules.signal_convs)) {
+    if (common.stride != stride_product(modules.signal_convs)) {
         throw std::runtime_error("Modbase model config signal convolution stride mismatch");
     }
     if (sequence_stride != stride_product(modules.sequence_convs)) {
         throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
     }
-    if (num_out != modules.linear.out_size) {
+    if (common.num_out != modules.linear.out_size) {
         throw std::runtime_error("Modbase model config linear and num_out mismatch");
     }
 }
@@ -526,11 +538,11 @@ ConvOnlyModelConfig::ConvOnlyModelConfig(std::filesystem::path model_path_,
                                          ModificationParams mods_,
                                          ContextParams context_,
                                          RefinementParams refine_)
-        : ModBaseModelConfigData(std::move(model_path_),
-                                 std::move(mods_),
-                                 std::move(context_),
-                                 std::move(refine_),
-                                 general_.kmer_len),
+        : data(std::move(model_path_),
+               std::move(mods_),
+               std::move(context_),
+               std::move(refine_),
+               general_.kmer_len),
           general(std::move(general_)) {}
 
 ConvLSTMModelConfig::ConvLSTMModelConfig(std::filesystem::path model_path_,
@@ -538,25 +550,27 @@ ConvLSTMModelConfig::ConvLSTMModelConfig(std::filesystem::path model_path_,
                                          ModificationParams mods_,
                                          ContextParams context_,
                                          RefinementParams refine_)
-        : ModBaseModelConfigData(std::move(model_path_),
-                                 std::move(mods_),
-                                 std::move(context_),
-                                 std::move(refine_),
-                                 general_.kmer_len),
+        : data(std::move(model_path_),
+               std::move(mods_),
+               std::move(context_),
+               std::move(refine_),
+               general_.kmer_len),
           general(std::move(general_)) {}
 
 ConvLSTMV2ModelConfig::ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
-                                             ChunkedModelParams general_,
+                                             CommonModelParams general_,
+                                             ChunkedModelParams chunked_,
                                              ModificationParams mods_,
                                              ContextParams context_,
                                              RefinementParams refine_)
-        : ModBaseModelConfigData(std::move(model_path_),
-                                 std::move(mods_),
-                                 context_.normalised(general_.stride),
-                                 std::move(refine_),
-                                 general_.kmer_len),
-          general(std::move(general_)) {
-    if (general.chunk_size < context.samples) {
+        : data(std::move(model_path_),
+               std::move(mods_),
+               context_.normalised(general_.stride),
+               std::move(refine_),
+               general_.kmer_len),
+          general(std::move(general_)),
+          chunked(std::move(chunked_)) {
+    if (chunked.chunk_size < data.context.samples) {
         throw std::runtime_error(ERR_STR + "context params: 'chunk size < context size'.");
     }
 }
@@ -566,11 +580,11 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
                                              ModificationParams mods_,
                                              ContextParams context_,
                                              RefinementParams refine_)
-        : ModBaseModelConfigData(std::move(model_path_),
-                                 std::move(mods_),
-                                 std::move(context_),
-                                 std::move(refine_),
-                                 general_.kmer_len),
+        : data(std::move(model_path_),
+               std::move(mods_),
+               std::move(context_),
+               std::move(refine_),
+               general_.common.kmer_len),
           general(std::move(general_)) {}
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
@@ -579,7 +593,25 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
 }
 
 const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config) {
-    return std::visit([](const auto& model) -> const ModBaseModelConfigData& { return model; },
+    return std::visit([](const auto& model) -> const ModBaseModelConfigData& { return model.data; },
+                      config);
+}
+
+const CommonModelParams& get_common_model_params(const ModBaseModelConfig& config) {
+    return std::visit(utils::overloaded{
+                              [](const ConvOnlyModelConfig& model) -> const CommonModelParams& {
+                                  return model.general;
+                              },
+                              [](const ConvLSTMModelConfig& model) -> const CommonModelParams& {
+                                  return model.general;
+                              },
+                              [](const ConvLSTMV2ModelConfig& model) -> const CommonModelParams& {
+                                  return model.general;
+                              },
+                              [](const ConvLSTMV3ModelConfig& model) -> const CommonModelParams& {
+                                  return model.general.common;
+                              },
+                      },
                       config);
 }
 
@@ -602,10 +634,10 @@ const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& con
     return std::visit(
             utils::overloaded{
                     [](const ConvLSTMV2ModelConfig& model) -> const ChunkedModelParams& {
-                        return model.general;
+                        return model.chunked;
                     },
                     [](const ConvLSTMV3ModelConfig& model) -> const ChunkedModelParams& {
-                        return model.general;
+                        return model.general.chunked;
                     },
                     [](const auto&) -> const ChunkedModelParams& {
                         throw std::runtime_error("Modbase model does not accept chunked input");
@@ -619,7 +651,7 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
             utils::overloaded{
                     [](const ConvLSTMV2ModelConfig&) -> int { return 1; },
                     [](const ConvLSTMV3ModelConfig& model) -> int {
-                        return model.general.stride / model.general.sequence_stride;
+                        return model.general.common.stride / model.general.sequence_stride;
                     },
                     [](const auto&) -> int {
                         throw std::runtime_error("Modbase model does not accept chunked input");
@@ -630,20 +662,20 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
 
 std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ConvLSTMV3ModelConfig& config) {
     const auto& params = config.general;
-    return {params.chunk_size / (params.stride / params.sequence_stride),
-            config.context.kmer_len * 4};
+    return {params.chunked.chunk_size / (params.common.stride / params.sequence_stride),
+            config.data.context.kmer_len * 4};
 }
 
 std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ConvLSTMV3ModelConfig& config) {
-    return {config.general.chunk_size, 1};
+    return {config.general.chunked.chunk_size, 1};
 }
 
 std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
                     [](const ConvLSTMV2ModelConfig& model) {
-                        return std::tuple{model.general.chunk_size,
-                                          int64_t(model.context.kmer_len * 4)};
+                        return std::tuple{model.chunked.chunk_size,
+                                          int64_t(model.data.context.kmer_len * 4)};
                     },
                     [](const ConvLSTMV3ModelConfig& model) {
                         return get_chunked_sequence_input_TC(model);
@@ -659,7 +691,7 @@ std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfi
     return std::visit(
             utils::overloaded{
                     [](const ConvLSTMV2ModelConfig& model) {
-                        return std::tuple{model.general.chunk_size, int64_t(1)};
+                        return std::tuple{model.chunked.chunk_size, int64_t(1)};
                     },
                     [](const ConvLSTMV3ModelConfig& model) {
                         return get_chunked_signal_input_TC(model);
@@ -673,15 +705,16 @@ std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfi
 
 std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config) {
     const auto& params = get_chunked_model_params(config);
-    return {params.chunk_size / params.stride, params.num_out};
+    const auto& common = get_common_model_params(config);
+    return {params.chunk_size / common.stride, common.num_out};
 }
 
 const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config) {
     assert(!is_chunked_input_model(config));
     if (const auto* conv_only = std::get_if<ConvOnlyModelConfig>(&config)) {
-        return *conv_only;
+        return conv_only->data;
     }
-    return std::get<ConvLSTMModelConfig>(config);
+    return std::get<ConvLSTMModelConfig>(config).data;
 }
 
 ModBaseInfo get_modbase_info(

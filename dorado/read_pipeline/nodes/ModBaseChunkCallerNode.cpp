@@ -79,6 +79,7 @@ std::vector<modbase::RunnerPtr> validate_runners(std::vector<modbase::RunnerPtr>
         }
 
         const auto& context = data.context;
+        const auto& common = config::get_common_model_params(model_config);
         const auto& chunked = config::get_chunked_model_params(model_config);
         if (chunked.chunk_size < context.samples_before + context.samples_after) {
             spdlog::error("{} chunk_size:{} is less than samples_before:{} + samples_after:{}.",
@@ -92,7 +93,7 @@ std::vector<modbase::RunnerPtr> validate_runners(std::vector<modbase::RunnerPtr>
             throw std::runtime_error(name + "model strides are not compatible.");
         }
 
-        const int modbase_stride = chunked.stride;
+        const int modbase_stride = common.stride;
         if (canonical_stride % modbase_stride != 0) {
             spdlog::error("{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
                           name, canonical_stride, modbase_stride);
@@ -1119,11 +1120,11 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         // Extract useful modbase model parameters
         const auto& model_config = runner.model_params(chunk->model_id);
         const auto& cfg = config::get_model_config_data(model_config);
+        const auto& common = config::get_common_model_params(model_config);
+        const auto& chunked = config::get_chunked_model_params(model_config);
         const char modbase_model_base = cfg.mods.base;
-        const int64_t modbase_stride =
-                dorado::config::get_chunked_model_params(model_config).stride;
-        const int64_t chunk_size =
-                dorado::config::get_chunked_model_params(model_config).chunk_size;
+        const int64_t modbase_stride = common.stride;
+        const int64_t chunk_size = chunked.chunk_size;
         const int64_t context_samples_before = cfg.context.samples_before;
         const int64_t context_samples_after = cfg.context.samples_after;
 

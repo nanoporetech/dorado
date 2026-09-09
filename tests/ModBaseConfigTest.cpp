@@ -34,8 +34,9 @@ General get_general(const ModBaseModelConfig& config) {
                     return {ModelType::CONV_LSTM_V2, model.general.size, model.general.kmer_len,
                             model.general.num_out, std::nullopt};
                 } else {
-                    return {ModelType::CONV_LSTM_V3, model.general.size, model.general.kmer_len,
-                            model.general.num_out, model.general.modules};
+                    return {ModelType::CONV_LSTM_V3, model.general.common.size,
+                            model.general.common.kmer_len, model.general.common.num_out,
+                            model.general.modules};
                 }
             },
             config);
@@ -215,11 +216,11 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
             const auto [seq_t, seq_c] = get_chunked_sequence_input_TC(model);
             const auto [sig_t, sig_c] = get_chunked_signal_input_TC(model);
             const auto [out_t, out_c] = get_chunked_output_TC(model);
-            CATCH_CHECK(seq_t == v2->general.chunk_size);
-            CATCH_CHECK(seq_c == v2->context.kmer_len * 4);
-            CATCH_CHECK(sig_t == v2->general.chunk_size);
+            CATCH_CHECK(seq_t == v2->chunked.chunk_size);
+            CATCH_CHECK(seq_c == v2->data.context.kmer_len * 4);
+            CATCH_CHECK(sig_t == v2->chunked.chunk_size);
             CATCH_CHECK(sig_c == 1);
-            CATCH_CHECK(out_t == v2->general.chunk_size / v2->general.stride);
+            CATCH_CHECK(out_t == v2->chunked.chunk_size / v2->general.stride);
             CATCH_CHECK(out_c == v2->general.num_out);
         }
     }

@@ -628,28 +628,32 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
             utils::overloaded{
                     [&](const config::ConvOnlyModelConfig& model_config) {
                         auto model = model::ModBaseConvModel(model_config);
-                        return populate_model(std::move(model), model_config.model_path, options);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
                     },
                     [&](const config::ConvLSTMModelConfig& model_config) {
                         auto model = model::ModBaseConvLSTMModel(model_config);
-                        return populate_model(std::move(model), model_config.model_path, options);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
                     },
                     [&](const config::ConvLSTMV2ModelConfig& model_config) {
                         auto model = model::ModBaseConvLSTMModel(model_config);
-                        return populate_model(std::move(model), model_config.model_path, options);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
                     },
                     [&](const config::ConvLSTMV3ModelConfig& model_config) {
 #if DORADO_CUDA_BUILD
                         static bool use_torch = utils::get_dev_opt("modbase_torch", false);
                         if (options.device().is_cuda() && !use_torch) {
                             auto model = model::ModBaseConvLSTMV3CUDAModel(model_config, batchsize);
-                            return populate_model(std::move(model), model_config.model_path,
+                            return populate_model(std::move(model), model_config.data.model_path,
                                                   options);
                         }
 #endif
                         spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
                         auto model = model::ModBaseConvLSTMV3Model(model_config);
-                        return populate_model(std::move(model), model_config.model_path, options);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
                     },
             },
             config);

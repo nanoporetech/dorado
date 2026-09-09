@@ -50,16 +50,18 @@ struct CommonModelParams {
     CommonModelParams(int size_, int kmer_len_, int num_out_, int stride_);
 };
 
-struct ChunkedModelParams : CommonModelParams {
+struct ChunkedModelParams {
     const int64_t chunk_size;
-    ChunkedModelParams(CommonModelParams common_, int64_t chunk_size_);
+    explicit ChunkedModelParams(int64_t chunk_size_);
 };
 
-struct ConvLSTMV3ModelParams : ChunkedModelParams {
+struct ConvLSTMV3ModelParams {
+    const CommonModelParams common;
+    const ChunkedModelParams chunked;
     const ModulesParams modules;
     const int sequence_stride;
     ConvLSTMV3ModelParams(CommonModelParams common_,
-                          int64_t chunk_size_,
+                          ChunkedModelParams chunked_,
                           int sequence_stride_,
                           ModulesParams modules_);
 };
@@ -128,7 +130,8 @@ struct ModBaseModelConfigData {
                            int kmer_len_);
 };
 
-struct ConvOnlyModelConfig : ModBaseModelConfigData {
+struct ConvOnlyModelConfig {
+    ModBaseModelConfigData data;
     CommonModelParams general;
     ConvOnlyModelConfig(std::filesystem::path model_path_,
                         CommonModelParams general_,
@@ -137,7 +140,8 @@ struct ConvOnlyModelConfig : ModBaseModelConfigData {
                         RefinementParams refine_);
 };
 
-struct ConvLSTMModelConfig : ModBaseModelConfigData {
+struct ConvLSTMModelConfig {
+    ModBaseModelConfigData data;
     CommonModelParams general;
     ConvLSTMModelConfig(std::filesystem::path model_path_,
                         CommonModelParams general_,
@@ -146,16 +150,20 @@ struct ConvLSTMModelConfig : ModBaseModelConfigData {
                         RefinementParams refine_);
 };
 
-struct ConvLSTMV2ModelConfig : ModBaseModelConfigData {
-    ChunkedModelParams general;
+struct ConvLSTMV2ModelConfig {
+    ModBaseModelConfigData data;
+    CommonModelParams general;
+    ChunkedModelParams chunked;
     ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
-                          ChunkedModelParams general_,
+                          CommonModelParams general_,
+                          ChunkedModelParams chunked_,
                           ModificationParams mods_,
                           ContextParams context_,
                           RefinementParams refine_);
 };
 
-struct ConvLSTMV3ModelConfig : ModBaseModelConfigData {
+struct ConvLSTMV3ModelConfig {
+    ModBaseModelConfigData data;
     ConvLSTMV3ModelParams general;
     ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
                           ConvLSTMV3ModelParams general_,
@@ -165,6 +173,7 @@ struct ConvLSTMV3ModelConfig : ModBaseModelConfigData {
 };
 
 const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config);
+const CommonModelParams& get_common_model_params(const ModBaseModelConfig& config);
 ModelType get_model_type(const ModBaseModelConfig& config);
 bool is_chunked_input_model(const ModBaseModelConfig& config);
 
