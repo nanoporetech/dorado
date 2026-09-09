@@ -16,12 +16,13 @@ namespace dorado::modbase {
 namespace {
 std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config) {
     std::vector<float> levels;
-    if (!config.refine.do_rough_rescale) {
+    const auto& data = config::get_model_config_data(config);
+    if (!data.refine.do_rough_rescale) {
         return levels;
     }
 
     std::vector<at::Tensor> tensors =
-            utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"});
+            utils::load_tensors(data.model_path, {"refine_kmer_levels.tensor"});
     if (tensors.empty()) {
         throw std::runtime_error("Failed to load modbase refinement tensors.");
     }
@@ -35,8 +36,8 @@ std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig&
 
 ModBaseScaler::ModBaseScaler(const config::ModBaseModelConfig& config)
         : m_kmer_levels(load_kmer_refinement_levels(config)),
-          m_kmer_len(config.general.kmer_len),
-          m_centre_index(config.refine.center_idx) {
+          m_kmer_len(std::visit([](const auto& model) { return model.general.kmer_len; }, config)),
+          m_centre_index(config::get_model_config_data(config).refine.center_idx) {
     // ensure that the levels were the length we expected
     if (m_kmer_levels.size() != static_cast<size_t>(1ull << (2 * m_kmer_len))) {
         throw std::runtime_error(

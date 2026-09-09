@@ -45,59 +45,25 @@ int get_int_in_range(const toml::value& p,
     }
     return val;
 }
-}  // namespace
 
+}  // namespace
 namespace dorado::config {
 
-std::string to_string(const ModelType& model_type) {
-    switch (model_type) {
-    case ModelType::CONV_LSTM_V1:
-        return std::string("conv_lstm");
-    case ModelType::CONV_LSTM_V2:
-        return std::string("conv_lstm_v2");
-    case ModelType::CONV_LSTM_V3:
-        return std::string("conv_lstm_v3");
-    case ModelType::CONV_V1:
-        return std::string("conv_v1");
-    case ModelType::UNKNOWN:
-        return std::string("UNKNOWN");
-    }
-    throw std::runtime_error("Invalid modbase model type");
-};
-
-ModelType model_type_from_string(const std::string& model_type) {
-    if (model_type == "conv_lstm") {
-        return ModelType::CONV_LSTM_V1;
-    }
-    if (model_type == "conv_lstm_v2") {
-        return ModelType::CONV_LSTM_V2;
-    }
-    if (model_type == "conv_lstm_v3") {
-        return ModelType::CONV_LSTM_V3;
-    }
-    if (model_type == "conv_only" || model_type == "conv_v1") {
-        return ModelType::CONV_V1;
-    }
-    return ModelType::UNKNOWN;
-}
-
-ModelType get_modbase_model_type(const std::filesystem::path& path) {
-    try {
-        const auto config_toml = toml::parse(path / "config.toml");
-        if (!config_toml.contains("general")) {
-            return ModelType::UNKNOWN;
-        }
-        return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
-    } catch (std::exception&) {
-        return ModelType::UNKNOWN;
-    }
-}
-
-bool is_modbase_model(const std::filesystem::path& path) {
-    return get_modbase_model_type(path) != ModelType::UNKNOWN;
-}
-
 namespace {
+// Normalise `v` by `stride` strictly increasing the value if needed.
+int64_t normalise_to_stride(const int64_t v, const int64_t stride) {
+    const int64_t remainder = v % stride;
+    if (remainder == 0) {
+        return v;
+    }
+    return v + stride - remainder;
+}
+
+int stride_product(const std::vector<ConvParams>& cs) {
+    return std::accumulate(cs.cbegin(), cs.cend(), 1,
+                           [](const int s, const auto& c) { return s * c.stride; });
+}
+
 LinearParams parse_linear(const toml::value& segment) {
     LinearParams p;
     p.in_size = toml::find<int>(segment, "in_features");
@@ -180,11 +146,214 @@ ModulesParams parse_modules_params(const toml::value& config) {
     return m;
 }
 
-int stride_product(const std::vector<ConvParams>& cs) {
-    return std::accumulate(cs.cbegin(), cs.cend(), 1,
-                           [](const int s, const auto& c) { return s * c.stride; });
+ModificationParams parse_modification_params(const toml::value& config_toml) {
+    const auto& params = toml::find(config_toml, keys::MODBASES);
+
+    std::vector<std::string> codes;
+    const auto& mod_bases = toml::find(params, keys::MOD_BASES);
+    if (mod_bases.is_string()) {
+        // style: mod_bases = "hm" - does not accept chebi codes
+        auto mod_base_string = mod_bases.as_string();
+        for (const auto& mod_base : mod_base_string) {
+            codes.push_back(std::string(1, mod_base));
+        }
+    } else {
+        // style: mod_bases = [ "h", "m",]
+        auto mod_base_array = mod_bases.as_array();
+        for (const auto& mod_base : mod_base_array) {
+            assert(mod_base.is_string());
+            codes.push_back(mod_base.as_string());
+        }
+    }
+
+    std::vector<std::string> long_names;
+    long_names.reserve(codes.size());
+    for (size_t i = 0; i < codes.size(); ++i) {
+        long_names.push_back(
+                toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
+    }
+
+    const auto motif = toml::find<std::string>(params, "motif");
+    const auto motif_offset = static_cast<size_t>(
+            get_int_in_range(params, "motif_offset", 0, int(motif.size()), REQUIRED));
+
+    return ModificationParams{std::move(codes), std::move(long_names), motif, motif_offset};
+}
+
+ContextParams parse_context_params(const toml::value& config_toml) {
+    const auto& params = toml::find(config_toml, keys::MODBASES);
+
+    const int context_before = get_int_in_range(params, "chunk_context_0", 0, 4096, REQUIRED);
+    const int context_after = get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED);
+
+    const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
+    const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
+
+    const bool reverse = toml::find_or<bool>(params, "reverse_signal", false);
+    const bool base_start_justify = toml::find_or<bool>(params, "base_start_justify", false);
+
+    return ContextParams(context_before, context_after, bases_before, bases_after, reverse,
+                         base_start_justify);
+}
+
+int64_t parse_chunk_size(const toml::value& config_toml, const ContextParams& context) {
+    const auto& params = toml::find(config_toml, keys::MODBASES);
+    constexpr int MAX_CHUNK_SIZE = 102400;
+    const auto chunk_size = utils::get_dev_opt(
+            "modbase_chunksize", get_int_in_range(params, "chunk_size", context.samples,
+                                                  MAX_CHUNK_SIZE, context.samples));
+    if (chunk_size < context.samples) {
+        throw std::runtime_error(ERR_STR + "context params: 'chunk size < context size'.");
+    }
+    return chunk_size;
+}
+
+RefinementParams parse_refinement_params(const toml::value& config_toml) {
+    if (!config_toml.contains("refinement")) {
+        return RefinementParams{};
+    }
+
+    const auto segment = toml::find(config_toml, "refinement");
+
+    bool do_rough_rescale = toml::find<int>(segment, "refine_do_rough_rescale") == 1;
+    if (!do_rough_rescale) {
+        return RefinementParams{};
+    }
+
+    const int center_index = get_int_in_range(segment, "refine_kmer_center_idx", 0, 19, REQUIRED);
+    return RefinementParams(center_index);
+}
+
+CommonModelParams parse_common_model_params(const toml::value& config_toml) {
+    const auto params = toml::find(config_toml, "model_params");
+    constexpr int max_size = 4096, max_kmer = 19, max_features = 10, max_stride = 6;
+    const auto size = get_int_in_range(params, "size", 1, max_size, REQUIRED);
+    const auto kmer_len = get_int_in_range(params, "kmer_len", 1, max_kmer, REQUIRED);
+    const auto num_out = get_int_in_range(params, "num_out", 1, max_features, REQUIRED);
+    const auto stride = get_int_in_range(params, "stride", 1, max_stride, 3);
+    return CommonModelParams{size, kmer_len, num_out, stride};
+}
+
+ConvOnlyModelConfig parse_conv_v1(const std::filesystem::path& model_path,
+                                  const toml::value& config_toml) {
+    auto common = parse_common_model_params(config_toml);
+    auto mods = parse_modification_params(config_toml);
+    auto context = parse_context_params(config_toml);
+    auto refine = parse_refinement_params(config_toml);
+    return ConvOnlyModelConfig{model_path, std::move(common), std::move(mods), std::move(context),
+                               std::move(refine)};
+}
+
+ConvLSTMModelConfig parse_lstm_v1(const std::filesystem::path& model_path,
+                                  const toml::value& config_toml) {
+    auto common = parse_common_model_params(config_toml);
+    auto mods = parse_modification_params(config_toml);
+    auto context = parse_context_params(config_toml);
+    auto refine = parse_refinement_params(config_toml);
+    return ConvLSTMModelConfig{model_path, std::move(common), std::move(mods), std::move(context),
+                               std::move(refine)};
+}
+
+ConvLSTMV2ModelConfig parse_lstm_v2(const std::filesystem::path& model_path,
+                                    const toml::value& config_toml) {
+    auto common = parse_common_model_params(config_toml);
+    auto mods = parse_modification_params(config_toml);
+    auto context = parse_context_params(config_toml);
+    auto refine = parse_refinement_params(config_toml);
+    const auto raw_chunk_size = parse_chunk_size(config_toml, context);
+    const auto chunk_size = normalise_to_stride(raw_chunk_size, common.stride);
+    spdlog::trace("Normalised modbase chunk size for stride: {} - {} -> {}", common.stride,
+                  raw_chunk_size, chunk_size);
+    return ConvLSTMV2ModelConfig{model_path, ChunkedModelParams{std::move(common), chunk_size},
+                                 std::move(mods), std::move(context), std::move(refine)};
+}
+
+ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
+                                    const toml::value& config_toml) {
+    auto common = parse_common_model_params(config_toml);
+    const auto params = toml::find(config_toml, "model_params");
+    constexpr int max_stride = 6;
+    const auto sequence_stride =
+            get_int_in_range(params, "sequence_stride", 1, max_stride, common.stride);
+    auto modules = parse_modules_params(config_toml);
+
+    auto mods = parse_modification_params(config_toml);
+    auto context = parse_context_params(config_toml);
+    auto refine = parse_refinement_params(config_toml);
+    const auto chunk_size = parse_chunk_size(config_toml, context);
+    return ConvLSTMV3ModelConfig{model_path,
+                                 ConvLSTMV3ModelParams{std::move(common), chunk_size,
+                                                       sequence_stride, std::move(modules)},
+                                 std::move(mods), std::move(context), std::move(refine)};
+}
+
+ModBaseModelConfig parse_model_config(const std::filesystem::path& model_path,
+                                      const toml::value& config_toml) {
+    const ModelType type =
+            model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+    switch (type) {
+    case ModelType::CONV_V1:
+        return parse_conv_v1(model_path, config_toml);
+    case ModelType::CONV_LSTM_V1:
+        return parse_lstm_v1(model_path, config_toml);
+    case ModelType::CONV_LSTM_V2:
+        return parse_lstm_v2(model_path, config_toml);
+    case ModelType::CONV_LSTM_V3:
+        return parse_lstm_v3(model_path, config_toml);
+    case ModelType::UNKNOWN:
+        throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
+    }
+    throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
 }
 }  // namespace
+
+std::string to_string(const ModelType& model_type) {
+    switch (model_type) {
+    case ModelType::CONV_LSTM_V1:
+        return std::string("conv_lstm");
+    case ModelType::CONV_LSTM_V2:
+        return std::string("conv_lstm_v2");
+    case ModelType::CONV_LSTM_V3:
+        return std::string("conv_lstm_v3");
+    case ModelType::CONV_V1:
+        return std::string("conv_v1");
+    case ModelType::UNKNOWN:
+        return std::string("UNKNOWN");
+    }
+    throw std::runtime_error("Invalid modbase model type");
+};
+
+ModelType model_type_from_string(const std::string& model_type) {
+    if (model_type == "conv_lstm") {
+        return ModelType::CONV_LSTM_V1;
+    }
+    if (model_type == "conv_lstm_v2") {
+        return ModelType::CONV_LSTM_V2;
+    }
+    if (model_type == "conv_lstm_v3") {
+        return ModelType::CONV_LSTM_V3;
+    }
+    if (model_type == "conv_only" || model_type == "conv_v1") {
+        return ModelType::CONV_V1;
+    }
+    return ModelType::UNKNOWN;
+}
+
+ModelType get_modbase_model_type(const std::filesystem::path& path) {
+    try {
+        const auto config_toml = toml::parse(path / "config.toml");
+        if (!config_toml.contains("general")) {
+            return ModelType::UNKNOWN;
+        }
+        return model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
+    } catch (std::exception&) {
+        return ModelType::UNKNOWN;
+    }
+}
+
+bool is_modbase_model(const std::filesystem::path& path) {
+    return get_modbase_model_type(path) != ModelType::UNKNOWN;
+}
 
 int ModulesParams::sequence_stride() const { return stride_product(sequence_convs); };
 int ModulesParams::signal_stride() const { return stride_product(signal_convs); };
@@ -203,76 +372,51 @@ int ModulesParams::stride_ratio() const {
     return sig / seq;
 };
 
-ModelGeneralParams::ModelGeneralParams(ModelType model_type_,
-                                       int size_,
-                                       int kmer_len_,
-                                       int num_out_,
-                                       int stride_,
-                                       int sequence_stride_,
-                                       std::optional<ModulesParams> modules_)
-        : model_type(model_type_),
-          size(size_),
-          kmer_len(kmer_len_),
-          num_out(num_out_),
-          stride(stride_),
-          sequence_stride(sequence_stride_),
-          modules(std::move(modules_)) {
-    if (model_type == ModelType::UNKNOWN) {
-        throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
-    }
+CommonModelParams::CommonModelParams(int size_, int kmer_len_, int num_out_, int stride_)
+        : size(size_), kmer_len(kmer_len_), num_out(num_out_), stride(stride_) {
     if (size < 1 || kmer_len < 1 || num_out < 1 || stride < 1) {
         throw std::runtime_error(ERR_STR + "general params: 'negative or zero value'.");
     }
     if (kmer_len % 2 != 1) {
         throw std::runtime_error(ERR_STR + "general params: 'kmer_length is not odd'.");
     }
+}
 
-    if (modules.has_value()) {
-        if ((size != modules->lstms.front().size) ||
-            (modules->lstms.front().size != modules->lstms.back().size)) {
-            throw std::runtime_error("Modbase model config lstm size mismatch");
-        }
-        if (stride != stride_product(modules->signal_convs)) {
-            throw std::runtime_error("Modbase model config signal convolution stride mismatch");
-        }
-        if (sequence_stride != stride_product(modules->sequence_convs)) {
-            throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
-        }
-        if (num_out != modules->linear.out_size) {
-            throw std::runtime_error("Modbase model config linear and num_out mismatch");
-        }
+ChunkedModelParams::ChunkedModelParams(CommonModelParams common_, int64_t chunk_size_)
+        : CommonModelParams(std::move(common_)), chunk_size(chunk_size_) {
+    if (chunk_size < 1) {
+        throw std::runtime_error(ERR_STR + "chunked model params: 'negative or zero chunk size'.");
     }
 }
 
-namespace {
-
-ModelGeneralParams parse_general_params(const toml::value& config_toml) {
-    ModelType model_type =
-            model_type_from_string(toml::find<std::string>(config_toml, "general", "model"));
-
-    std::optional<ModulesParams> modules =
-            model_type == ModelType::CONV_LSTM_V3 ? std::optional(parse_modules_params(config_toml))
-                                                  : std::nullopt;
-    const auto segment = toml::find(config_toml, "model_params");
-
-    constexpr int MAX_SIZE = 4096;
-    constexpr int MAX_KMER = 19;
-    constexpr int MAX_FEATURES = 10;
-    constexpr int MAX_STRIDE = 6;
-
-    const auto size = get_int_in_range(segment, "size", 1, MAX_SIZE, REQUIRED);
-    const auto kmer_len = get_int_in_range(segment, "kmer_len", 1, MAX_KMER, REQUIRED);
-    const auto num_out = get_int_in_range(segment, "num_out", 1, MAX_FEATURES, REQUIRED);
-    const auto stride = get_int_in_range(segment, "stride", 1, MAX_STRIDE, 3);
-    const auto sequence_stride =
-            get_int_in_range(segment, "sequence_stride", 1, MAX_STRIDE, stride);
-
-    ModelGeneralParams params{model_type,      size,   kmer_len, num_out, stride,
-                              sequence_stride, modules};
-    return params;
+ConvLSTMV3ModelParams::ConvLSTMV3ModelParams(CommonModelParams common_,
+                                             int64_t chunk_size_,
+                                             int sequence_stride_,
+                                             ModulesParams modules_)
+        : ChunkedModelParams(std::move(common_), chunk_size_),
+          modules(std::move(modules_)),
+          sequence_stride(sequence_stride_) {
+    if (sequence_stride < 1) {
+        throw std::runtime_error(ERR_STR + "v3 model params: 'negative or zero sequence stride'.");
+    }
+    if (stride % sequence_stride != 0) {
+        throw std::runtime_error(
+                "Modbase model config signal stride must be evenly divisible by sequence stride");
+    }
+    if ((size != modules.lstms.front().size) ||
+        (modules.lstms.front().size != modules.lstms.back().size)) {
+        throw std::runtime_error("Modbase model config lstm size mismatch");
+    }
+    if (stride != stride_product(modules.signal_convs)) {
+        throw std::runtime_error("Modbase model config signal convolution stride mismatch");
+    }
+    if (sequence_stride != stride_product(modules.sequence_convs)) {
+        throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
+    }
+    if (num_out != modules.linear.out_size) {
+        throw std::runtime_error("Modbase model config linear and num_out mismatch");
+    }
 }
-
-}  // namespace
 
 ModificationParams::ModificationParams(std::vector<std::string> codes_,
                                        std::vector<std::string> long_names_,
@@ -318,47 +462,8 @@ char ModificationParams::get_canonical_base_name(const std::string& motif, size_
     return motif_base[0];
 }
 
-namespace {
-
-ModificationParams parse_modification_params(const toml::value& config_toml) {
-    const auto& params = toml::find(config_toml, keys::MODBASES);
-
-    std::vector<std::string> codes;
-    const auto& mod_bases = toml::find(params, keys::MOD_BASES);
-    if (mod_bases.is_string()) {
-        // style: mod_bases = "hm" - does not accept chebi codes
-        auto mod_base_string = mod_bases.as_string();
-        for (const auto& mod_base : mod_base_string) {
-            codes.push_back(std::string(1, mod_base));
-        }
-    } else {
-        // style: mod_bases = [ "h", "m",]
-        auto mod_base_array = mod_bases.as_array();
-        for (const auto& mod_base : mod_base_array) {
-            assert(mod_base.is_string());
-            codes.push_back(mod_base.as_string());
-        }
-    }
-
-    std::vector<std::string> long_names;
-    long_names.reserve(codes.size());
-    for (size_t i = 0; i < codes.size(); ++i) {
-        long_names.push_back(
-                toml::find<std::string>(params, "mod_long_names_" + std::to_string(i)));
-    }
-
-    const auto motif = toml::find<std::string>(params, "motif");
-    const auto motif_offset = static_cast<size_t>(
-            get_int_in_range(params, "motif_offset", 0, int(motif.size()), REQUIRED));
-
-    return ModificationParams{std::move(codes), std::move(long_names), motif, motif_offset};
-}
-
-}  // namespace
-
 ContextParams::ContextParams(int64_t samples_before_,
                              int64_t samples_after_,
-                             int64_t chunk_size_,
                              int bases_before_,
                              int bases_after_,
                              bool reverse_,
@@ -366,7 +471,6 @@ ContextParams::ContextParams(int64_t samples_before_,
         : samples_before(samples_before_),
           samples_after(samples_after_),
           samples(samples_before + samples_after),
-          chunk_size(chunk_size_),
           bases_before(bases_before_),
           bases_after(bases_after_),
           kmer_len(bases_before_ + bases_after_ + 1),
@@ -375,59 +479,19 @@ ContextParams::ContextParams(int64_t samples_before_,
     if (samples_before < 0 || samples_after < 0) {
         throw std::runtime_error(ERR_STR + "context params: 'negative context samples'.");
     }
-    if (chunk_size < samples) {
-        throw std::runtime_error(ERR_STR + "context params: 'chunk size < context size'.");
-    }
     if (bases_before < 1 || bases_after < 1) {
         throw std::runtime_error(ERR_STR + "context params: 'negative or zero context bases'.");
     }
 }
 
-// Normalise `v` by `stride` strictly increasing the if needed.
-int64_t ContextParams::normalise(const int64_t v, const int64_t stride) {
-    const int64_t remainder = v % stride;
-    if (remainder == 0) {
-        return v;
-    }
-    return v + stride - remainder;
-}
-
-namespace {
-
-ContextParams parse_context_params(const toml::value& config_toml) {
-    const auto& params = toml::find(config_toml, keys::MODBASES);
-
-    const int context_before = get_int_in_range(params, "chunk_context_0", 0, 4096, REQUIRED);
-    const int context_after = get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED);
-
-    constexpr int MAX_CHUNK_SIZE = 102400;
-    const int min_chunk_size = context_before + context_after;
-    const int chunk_size = utils::get_dev_opt(
-            "modbase_chunksize",
-            get_int_in_range(params, "chunk_size", min_chunk_size, MAX_CHUNK_SIZE, min_chunk_size));
-
-    const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
-    const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
-
-    const bool reverse = toml::find_or<bool>(params, "reverse_signal", false);
-    const bool base_start_justify = toml::find_or<bool>(params, "base_start_justify", false);
-
-    return ContextParams(context_before, context_after, chunk_size, bases_before, bases_after,
-                         reverse, base_start_justify);
-}
-
-}  // namespace
-
 ContextParams ContextParams::normalised(const int stride) const {
-    const int64_t sb = normalise(samples_before, stride);
-    const int64_t sa = normalise(samples_after, stride);
-    const int64_t cs = normalise(chunk_size, stride);
-
+    const int64_t sb = normalise_to_stride(samples_before, stride);
+    const int64_t sa = normalise_to_stride(samples_after, stride);
     spdlog::trace(
             "Normalised modbase context for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
-            "[samples_before, samples_after, chunk_size]",
-            stride, samples_before, samples_after, chunk_size, sb, sa, cs);
-    return ContextParams(sb, sa, cs, bases_before, bases_after, reverse, base_start_justify);
+            "[samples_before, samples_after, samples]",
+            stride, samples_before, samples_after, samples, sb, sa, sb + sa);
+    return ContextParams(sb, sa, bases_before, bases_after, reverse, base_start_justify);
 }
 
 RefinementParams::RefinementParams(int center_idx_)
@@ -437,72 +501,169 @@ RefinementParams::RefinementParams(int center_idx_)
     }
 }
 
-namespace {
-
-RefinementParams parse_refinement_params(const toml::value& config_toml) {
-    if (!config_toml.contains("refinement")) {
-        return RefinementParams{};
-    }
-
-    const auto segment = toml::find(config_toml, "refinement");
-
-    bool do_rough_rescale = toml::find<int>(segment, "refine_do_rough_rescale") == 1;
-    if (!do_rough_rescale) {
-        return RefinementParams{};
-    }
-
-    const int center_index = get_int_in_range(segment, "refine_kmer_center_idx", 0, 19, REQUIRED);
-    return RefinementParams(center_index);
-}
-
-}  // namespace
-
-ModBaseModelConfig::ModBaseModelConfig(std::filesystem::path model_path_,
-                                       ModelGeneralParams general_,
-                                       ModificationParams mods_,
-                                       ContextParams context_,
-                                       RefinementParams refine_)
+ModBaseModelConfigData::ModBaseModelConfigData(std::filesystem::path model_path_,
+                                               ModificationParams mods_,
+                                               ContextParams context_,
+                                               RefinementParams refine_,
+                                               int kmer_len_)
         : model_path(std::move(model_path_)),
-          general(std::move(general_)),
           mods(std::move(mods_)),
-          context(general.model_type == ModelType::CONV_LSTM_V2
-                          ? context_.normalised(general.stride)
-                          : std::move(context_)),
+          context(std::move(context_)),
           refine(std::move(refine_)) {
     // Kmer length is duplicated in modbase model configs - check they match
-    if (general.kmer_len != context.kmer_len) {
-        auto kl_a = std::to_string(general.kmer_len);
+    if (kmer_len_ != context.kmer_len) {
+        auto kl_a = std::to_string(kmer_len_);
         auto kl_b = std::to_string(context.kmer_len);
         throw std::runtime_error(ERR_STR + "config: 'inconsistent kmer_len: " + kl_a +
                                  " != " + kl_b + "'.");
     }
 }
 
-std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_sequence_input_TC() const {
-    assert(is_chunked_input_model());
-    const int64_t T = context.chunk_size / general.stride_ratio();
-    const int64_t C = context.kmer_len * 4;
-    return {T, C};
-};
+ChunkedModelConfigData::ChunkedModelConfigData(std::filesystem::path model_path_,
+                                               ModificationParams mods_,
+                                               ContextParams context_,
+                                               RefinementParams refine_,
+                                               int kmer_len_)
+        : ModBaseModelConfigData(std::move(model_path_),
+                                 std::move(mods_),
+                                 std::move(context_),
+                                 std::move(refine_),
+                                 kmer_len_) {}
 
-std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_signal_input_TC() const {
-    assert(is_chunked_input_model());
-    return {context.chunk_size, 1};
-};
+std::tuple<int64_t, int64_t> ChunkedModelConfigData::chunked_sequence_input_TC() const {
+    const auto& params = chunked_params();
+    return {params.chunk_size / sequence_stride_ratio(), context.kmer_len * 4};
+}
 
-std::tuple<int64_t, int64_t> ModBaseModelConfig::chunked_output_TC() const {
-    assert(is_chunked_input_model());
-    const int64_t T = context.chunk_size / general.stride;
-    const int64_t C = general.num_out;
-    return {T, C};
-};
+std::tuple<int64_t, int64_t> ChunkedModelConfigData::chunked_signal_input_TC() const {
+    return {chunked_params().chunk_size, 1};
+}
+
+std::tuple<int64_t, int64_t> ChunkedModelConfigData::chunked_output_TC() const {
+    const auto& params = chunked_params();
+    return {params.chunk_size / params.stride, params.num_out};
+}
+
+ConvOnlyModelConfig::ConvOnlyModelConfig(std::filesystem::path model_path_,
+                                         CommonModelParams general_,
+                                         ModificationParams mods_,
+                                         ContextParams context_,
+                                         RefinementParams refine_)
+        : ModBaseModelConfigData(std::move(model_path_),
+                                 std::move(mods_),
+                                 std::move(context_),
+                                 std::move(refine_),
+                                 general_.kmer_len),
+          general(std::move(general_)) {}
+
+ConvLSTMModelConfig::ConvLSTMModelConfig(std::filesystem::path model_path_,
+                                         CommonModelParams general_,
+                                         ModificationParams mods_,
+                                         ContextParams context_,
+                                         RefinementParams refine_)
+        : ModBaseModelConfigData(std::move(model_path_),
+                                 std::move(mods_),
+                                 std::move(context_),
+                                 std::move(refine_),
+                                 general_.kmer_len),
+          general(std::move(general_)) {}
+
+ConvLSTMV2ModelConfig::ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
+                                             ChunkedModelParams general_,
+                                             ModificationParams mods_,
+                                             ContextParams context_,
+                                             RefinementParams refine_)
+        : ChunkedModelConfigData(std::move(model_path_),
+                                 std::move(mods_),
+                                 context_.normalised(general_.stride),
+                                 std::move(refine_),
+                                 general_.kmer_len),
+          general(std::move(general_)) {
+    if (general.chunk_size < context.samples) {
+        throw std::runtime_error(ERR_STR + "context params: 'chunk size < context size'.");
+    }
+}
+
+ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
+                                             ConvLSTMV3ModelParams general_,
+                                             ModificationParams mods_,
+                                             ContextParams context_,
+                                             RefinementParams refine_)
+        : ChunkedModelConfigData(std::move(model_path_),
+                                 std::move(mods_),
+                                 std::move(context_),
+                                 std::move(refine_),
+                                 general_.kmer_len),
+          general(std::move(general_)) {}
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     const auto config_toml = toml::parse(model_path / "config.toml");
+    return parse_model_config(model_path, config_toml);
+}
 
-    return ModBaseModelConfig{
-            model_path, parse_general_params(config_toml), parse_modification_params(config_toml),
-            parse_context_params(config_toml), parse_refinement_params(config_toml)};
+const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config) {
+    return std::visit([](const auto& model) -> const ModBaseModelConfigData& { return model; },
+                      config);
+}
+
+ModelType get_model_type(const ModBaseModelConfig& config) {
+    return std::visit(
+            [](const auto& model) {
+                using T = std::decay_t<decltype(model)>;
+                if constexpr (std::is_same_v<T, ConvOnlyModelConfig>) {
+                    return ModelType::CONV_V1;
+                } else if constexpr (std::is_same_v<T, ConvLSTMModelConfig>) {
+                    return ModelType::CONV_LSTM_V1;
+                } else if constexpr (std::is_same_v<T, ConvLSTMV2ModelConfig>) {
+                    return ModelType::CONV_LSTM_V2;
+                } else {
+                    return ModelType::CONV_LSTM_V3;
+                }
+            },
+            config);
+}
+
+bool is_chunked_input_model(const ModBaseModelConfig& config) {
+    return std::holds_alternative<ConvLSTMV2ModelConfig>(config) ||
+           std::holds_alternative<ConvLSTMV3ModelConfig>(config);
+}
+
+const ConvLSTMV2ModelConfig& get_conv_lstm_v2_model_config(const ModBaseModelConfig& config) {
+    return std::get<ConvLSTMV2ModelConfig>(config);
+}
+
+const ConvLSTMV3ModelConfig& get_conv_lstm_v3_model_config(const ModBaseModelConfig& config) {
+    return std::get<ConvLSTMV3ModelConfig>(config);
+}
+
+const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
+    if (const auto* v2 = std::get_if<ConvLSTMV2ModelConfig>(&config)) {
+        return v2->general;
+    }
+    return std::get<ConvLSTMV3ModelConfig>(config).general;
+}
+
+int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
+    return std::visit(
+            [](const auto& model) -> int {
+                using T = std::decay_t<decltype(model)>;
+                if constexpr (std::is_same_v<T, ConvLSTMV2ModelConfig>) {
+                    return 1;
+                } else if constexpr (std::is_same_v<T, ConvLSTMV3ModelConfig>) {
+                    return model.general.stride / model.general.sequence_stride;
+                } else {
+                    throw std::runtime_error("Modbase model does not accept chunked input");
+                }
+            },
+            config);
+}
+
+const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config) {
+    assert(!is_chunked_input_model(config));
+    if (const auto* conv_only = std::get_if<ConvOnlyModelConfig>(&config)) {
+        return *conv_only;
+    }
+    return std::get<ConvLSTMModelConfig>(config);
 }
 
 ModBaseInfo get_modbase_info(
@@ -522,7 +683,7 @@ ModBaseInfo get_modbase_info(
     }
 
     for (const auto& params_ref : base_mod_params) {
-        const auto& params = params_ref.get().mods;
+        const auto& params = get_model_config_data(params_ref.get()).mods;
         auto base = params.motif[params.motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in modbase model metadata.");
@@ -559,12 +720,12 @@ void check_modbase_multi_model_compatibility(
     std::string err_msg = "";
     for (size_t i = 0; i < modbase_models.size(); i++) {
         const auto ref_model = load_modbase_model_config(modbase_models[i]);
-        const auto& ref_params = ref_model.mods;
+        const auto& ref_params = get_model_config_data(ref_model).mods;
         const auto& ref_motif = ref_params.motif[ref_params.motif_offset];
 
         for (size_t j = i + 1; j < modbase_models.size(); j++) {
             const auto query_model = load_modbase_model_config(modbase_models[j]);
-            const auto& query_params = query_model.mods;
+            const auto& query_params = get_model_config_data(query_model).mods;
             const auto& query_motif = query_params.motif[query_params.motif_offset];
 
             if (ref_motif == query_motif) {

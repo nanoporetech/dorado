@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "config/ModBaseModelConfigFwd.h"
 #include "utils/types.h"
 
 #include <cstddef>
@@ -41,26 +42,26 @@ struct ModulesParams {
     int signal_stride() const;
 };
 
-struct ModelGeneralParams {
-    const ModelType model_type;
+struct CommonModelParams {
     const int size;
     const int kmer_len;
     const int num_out;
     const int stride;
+    CommonModelParams(int size_, int kmer_len_, int num_out_, int stride_);
+};
+
+struct ChunkedModelParams : CommonModelParams {
+    const int64_t chunk_size;
+    ChunkedModelParams(CommonModelParams common_, int64_t chunk_size_);
+};
+
+struct ConvLSTMV3ModelParams : ChunkedModelParams {
+    const ModulesParams modules;
+    ConvLSTMV3ModelParams(CommonModelParams common_,
+                          int64_t chunk_size_,
+                          int sequence_stride_,
+                          ModulesParams modules_);
     const int sequence_stride;
-
-    // For conv_lstm_v3 models only
-    const std::optional<ModulesParams> modules;
-
-    ModelGeneralParams(ModelType model_type_,
-                       int size_,
-                       int kmer_len_,
-                       int num_out_,
-                       int stride_,
-                       int sequence_stride_,
-                       std::optional<ModulesParams> modules_);
-
-    int stride_ratio() const { return modules.has_value() ? modules->stride_ratio() : 1; }
 };
 
 struct RefinementParams {
@@ -95,7 +96,6 @@ struct ContextParams {
     const int64_t samples_before;  ///< Number of context signal samples before a context hit.
     const int64_t samples_after;   ///< Number of context signal samples after a context hit.
     const int64_t samples;         ///< The total context samples (before + after)
-    const int64_t chunk_size;      ///< The total samples in a chunk
 
     const int bases_before;  ///< Number of bases before the primary base of a kmer.
     const int bases_after;   ///< Number of bases after the primary base of a kmer.
@@ -106,44 +106,100 @@ struct ContextParams {
 
     ContextParams(int64_t samples_before_,
                   int64_t samples_after_,
-                  int64_t chunk_size_,
                   int bases_before_,
                   int bases_after_,
                   bool reverse_,
                   bool base_start_justify_);
 
-    // Normalise `v` by `stride` strictly increasing the if needed.
-    static int64_t normalise(const int64_t v, const int64_t stride);
     // Return the context params but normalised by a stride
     ContextParams normalised(const int stride) const;
 };
 
-struct ModBaseModelConfig {
+struct ModBaseModelConfigData {
     std::filesystem::path model_path;  ///< Path to modbase model
-    ModelGeneralParams general;        ///< General model params for legacy model architectures
     ModificationParams mods;           ///< Params for the modifications being detected
     ContextParams context;             ///< Params for the context over which mods are inferred
     RefinementParams refine;           ///< Params for kmer refinement
 
-    // Returns true if this modbase model processes chunks instead of context hits
-    bool is_chunked_input_model() const {
-        return (general.model_type == ModelType::CONV_LSTM_V2) ||
-               (general.model_type == ModelType::CONV_LSTM_V3);
-    };
+    ModBaseModelConfigData(std::filesystem::path model_path_,
+                           ModificationParams mods_,
+                           ContextParams context_,
+                           RefinementParams refine_,
+                           int kmer_len_);
+};
 
-    ModBaseModelConfig(std::filesystem::path model_path_,
-                       ModelGeneralParams general_,
-                       ModificationParams mods_,
-                       ContextParams context_,
-                       RefinementParams refine_);
-
+struct ChunkedModelConfigData : ModBaseModelConfigData {
     // Sequence input tensor dimensions for chunked models
     std::tuple<int64_t, int64_t> chunked_sequence_input_TC() const;
     // Signal input tensor dimensions for chunked models
     std::tuple<int64_t, int64_t> chunked_signal_input_TC() const;
     // Output tensor dimensions for chunked models
     std::tuple<int64_t, int64_t> chunked_output_TC() const;
+
+protected:
+    ChunkedModelConfigData(std::filesystem::path model_path_,
+                           ModificationParams mods_,
+                           ContextParams context_,
+                           RefinementParams refine_,
+                           int kmer_len_);
+    virtual const ChunkedModelParams& chunked_params() const = 0;
+    virtual int sequence_stride_ratio() const = 0;
 };
+
+struct ConvOnlyModelConfig : ModBaseModelConfigData {
+    CommonModelParams general;
+    ConvOnlyModelConfig(std::filesystem::path model_path_,
+                        CommonModelParams general_,
+                        ModificationParams mods_,
+                        ContextParams context_,
+                        RefinementParams refine_);
+};
+
+struct ConvLSTMModelConfig : ModBaseModelConfigData {
+    CommonModelParams general;
+    ConvLSTMModelConfig(std::filesystem::path model_path_,
+                        CommonModelParams general_,
+                        ModificationParams mods_,
+                        ContextParams context_,
+                        RefinementParams refine_);
+};
+
+struct ConvLSTMV2ModelConfig : ChunkedModelConfigData {
+    ChunkedModelParams general;
+    ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
+                          ChunkedModelParams general_,
+                          ModificationParams mods_,
+                          ContextParams context_,
+                          RefinementParams refine_);
+
+private:
+    const ChunkedModelParams& chunked_params() const override { return general; }
+    int sequence_stride_ratio() const override { return 1; }
+};
+
+struct ConvLSTMV3ModelConfig : ChunkedModelConfigData {
+    ConvLSTMV3ModelParams general;
+    ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
+                          ConvLSTMV3ModelParams general_,
+                          ModificationParams mods_,
+                          ContextParams context_,
+                          RefinementParams refine_);
+
+private:
+    const ChunkedModelParams& chunked_params() const override { return general; }
+    int sequence_stride_ratio() const override { return general.stride / general.sequence_stride; }
+};
+
+const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config);
+ModelType get_model_type(const ModBaseModelConfig& config);
+bool is_chunked_input_model(const ModBaseModelConfig& config);
+
+// These helpers enforce the same runtime routes as the modbase caller nodes.
+const ConvLSTMV2ModelConfig& get_conv_lstm_v2_model_config(const ModBaseModelConfig& config);
+const ConvLSTMV3ModelConfig& get_conv_lstm_v3_model_config(const ModBaseModelConfig& config);
+const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
+int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
+const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 

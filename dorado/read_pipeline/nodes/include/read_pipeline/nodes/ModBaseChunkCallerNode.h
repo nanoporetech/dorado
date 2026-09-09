@@ -134,8 +134,6 @@ private:
     // Used to minimise the CPU work to encode CG contexts
     const bool m_minimal_encode;
 
-    void validate_runners() const;
-
     void initialise_base_mod_probs(ReadCommon& read) const;
 
     std::optional<EncodingData> populate_modbase_data(ModBaseData& modbase_data,

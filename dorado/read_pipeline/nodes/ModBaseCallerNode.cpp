@@ -139,7 +139,7 @@ void ModBaseCallerNode::init_modbase_info() {
     auto& runner = m_runners[0];
     modbase::ModBaseContext context_handler;
     for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
-        const auto& params = runner->model_params(caller_id).mods;
+        const auto& params = config::get_model_config_data(runner->model_params(caller_id)).mods;
         if (!params.motif.empty()) {
             context_handler.set_context(params.motif, size_t(params.motif_offset));
         }
@@ -228,7 +228,8 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
             for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
                 nvtx3::scoped_range range{"generate_chunks"};
                 auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-                auto& params = runner->model_params(caller_id);
+                const auto& params =
+                        config::get_context_model_config(runner->model_params(caller_id));
                 auto signal = simplex_signal.slice(0, moves_offset * m_block_stride,
                                                    moves_offset * m_block_stride + signal_len);
 
@@ -351,7 +352,7 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
                                     read->read_common.seq.size() + 1);
 
         auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-        auto& params = runner->model_params(caller_id);
+        const auto& params = config::get_context_model_config(runner->model_params(caller_id));
         auto signal = read->read_common.raw_data;
         if (params.context.reverse) {
             signal = at::flip(signal, 0);

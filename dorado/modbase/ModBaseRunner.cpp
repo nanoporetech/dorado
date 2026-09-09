@@ -119,14 +119,16 @@ void ModBaseRunner::restart() { m_caller->restart(); }
 
 bool ModBaseRunner::is_chunked_model_type() const {
     // Assert all models are either chunked or context-centered.
-    const bool is_chunked_model = model_params(0).is_chunked_input_model();
+    const bool is_chunked_model = config::is_chunked_input_model(model_params(0));
     for (size_t i = 1; i < num_models(); i++) {
-        if (is_chunked_model != model_params(i).is_chunked_input_model()) {
-            const auto base_0 = std::string(1, model_params(0).mods.base);
-            const auto base_i = std::string(1, model_params(i).mods.base);
+        if (is_chunked_model != config::is_chunked_input_model(model_params(i))) {
+            const auto base_0 =
+                    std::string(1, config::get_model_config_data(model_params(0)).mods.base);
+            const auto base_i =
+                    std::string(1, config::get_model_config_data(model_params(i)).mods.base);
 
-            const auto type_0 = to_string(model_params(0).general.model_type);
-            const auto type_i = to_string(model_params(i).general.model_type);
+            const auto type_0 = to_string(config::get_model_type(model_params(0)));
+            const auto type_i = to_string(config::get_model_type(model_params(i)));
 
             spdlog::error("Modbase models have different types {}:{} {}:{}.", base_0, type_0,
                           base_i, type_i);

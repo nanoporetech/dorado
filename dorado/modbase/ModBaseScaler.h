@@ -1,15 +1,13 @@
 #pragma once
 
+#include "config/ModBaseModelConfigFwd.h"
+
 #include <ATen/core/TensorBody.h>
 
 #include <cstdint>
 #include <string>
 #include <utility>
 #include <vector>
-
-namespace dorado::config {
-struct ModBaseModelConfig;
-}
 
 namespace dorado::modbase {
 
