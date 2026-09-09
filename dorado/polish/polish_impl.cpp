@@ -1695,10 +1695,11 @@ std::vector<secondary::Variant> call_variants(
                 const std::string draft = draft_readers[tid]->fetch_seq(header);
 
                 // Trim the overlapping portions between samples.
-                const auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
+                auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, group);
 
                 // Break and merge samples on non-variant positions.
-                const auto joined_samples = join_samples(trimmed_vc_samples, draft, decoder);
+                const auto joined_samples =
+                        join_samples(std::move(trimmed_vc_samples), draft, decoder);
 
                 for (const auto& vc_sample : joined_samples) {
                     std::vector<secondary::Variant> variants = secondary::general_decode_variants(

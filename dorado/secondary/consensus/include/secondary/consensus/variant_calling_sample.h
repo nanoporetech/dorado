@@ -64,13 +64,14 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
 /**
  * \brief Given a vector of variant calling samples, it returns a new vector of VariantCallingSample objects
  *          where neighboring input samples are merged if hteir positions are adjacent and on the same sequence.
- * \param vc_samples Input variant calling samples. Should be sorted by the start position (positions_major[0]).
+ * \param vc_samples Input variant calling samples. Should be sorted by the start position
+ *                   (positions_major[0]). The samples are consumed while constructing the result.
  * \return A new vector of VariantCallingSample where any adjacent samples from the input are merged into a single sample.
  */
-std::vector<VariantCallingSample> merge_vc_samples(
-        const std::vector<VariantCallingSample>& vc_samples);
+std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples);
 
-std::vector<VariantCallingSample> join_samples(const std::vector<VariantCallingSample>& vc_samples,
+// Consumes vc_samples so intermediate tensor storage can be released as samples are joined.
+std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples,
                                                const std::string& draft,
                                                const DecoderBase& decoder);
 

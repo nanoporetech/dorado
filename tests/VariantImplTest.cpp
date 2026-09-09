@@ -501,6 +501,8 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         CATCH_REQUIRE(std::size(decoded_batch.samples) == 2);
         CATCH_CHECK(decoded_batch.samples[0].positions_major == sample_a.positions_major);
         CATCH_CHECK(decoded_batch.samples[1].positions_major == sample_b.positions_major);
+        CATCH_CHECK(!decoded_batch.samples[0].features.defined());
+        CATCH_CHECK(!decoded_batch.samples[1].features.defined());
 
         const at::Tensor expected_logits =
                 at::stack(std::vector<at::Tensor>{sample_a.features, sample_b.features}) +

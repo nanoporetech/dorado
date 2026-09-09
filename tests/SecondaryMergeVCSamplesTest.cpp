@@ -263,4 +263,20 @@ CATCH_TEST_CASE("variant_calling_sample_less prefers longer sample for identical
     CATCH_CHECK_FALSE(variant_calling_sample_less(shorter, longer));
 }
 
+CATCH_TEST_CASE("trim_vc_samples reuses tensors for an unchanged sample", TEST_GROUP) {
+    const VariantCallingSample sample{
+            0,
+            {0, 1, 2, 3},
+            {0, 0, 0, 0},
+            at::arange(8, at::kFloat).reshape({4, 2}),
+            at::tensor({1, 2, 3, 4}, at::kInt),
+    };
+
+    const std::vector<VariantCallingSample> result = trim_vc_samples({sample}, {0});
+
+    CATCH_REQUIRE(result.size() == 1);
+    CATCH_CHECK(result.front().logits.data_ptr() == sample.logits.data_ptr());
+    CATCH_CHECK(result.front().depth.data_ptr() == sample.depth.data_ptr());
+}
+
 }  // namespace dorado::secondary::consensus::tests
