@@ -200,8 +200,9 @@ int64_t parse_chunk_size(const toml::value& config_toml, const ContextParams& co
     const auto& params = toml::find(config_toml, keys::MODBASES);
     constexpr int MAX_CHUNK_SIZE = 102400;
     const auto chunk_size = utils::get_dev_opt(
-            "modbase_chunksize", get_int_in_range(params, "chunk_size", context.samples,
-                                                  MAX_CHUNK_SIZE, context.samples));
+            "modbase_chunksize",
+            get_int_in_range(params, "chunk_size", static_cast<int>(context.samples),
+                             MAX_CHUNK_SIZE, static_cast<int>(context.samples)));
     if (chunk_size < context.samples) {
         throw std::runtime_error(ERR_STR + "context params: 'chunk size < context size'.");
     }
