@@ -26,10 +26,9 @@ std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig&
     if (tensors.empty()) {
         throw std::runtime_error("Failed to load modbase refinement tensors.");
     }
-    auto& t = tensors.front();
-    t.contiguous();
-    levels.reserve(t.numel());
-    std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
+    auto t = tensors.front().expect_contiguous();
+    levels.resize(t->numel());
+    std::copy_n(t->data_ptr<float>(), t->numel(), std::begin(levels));
     return levels;
 }
 }  // namespace
