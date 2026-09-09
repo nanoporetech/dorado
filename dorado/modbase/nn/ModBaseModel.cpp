@@ -11,7 +11,6 @@
 #include <spdlog/spdlog.h>
 
 #include <optional>
-#include <type_traits>
 
 #if DORADO_CUDA_BUILD
 #include "nn/ConvStack.h"
