@@ -623,14 +623,6 @@ bool is_chunked_input_model(const ModBaseModelConfig& config) {
            std::holds_alternative<ConvLSTMV3ModelConfig>(config);
 }
 
-const ConvLSTMV2ModelConfig& get_conv_lstm_v2_model_config(const ModBaseModelConfig& config) {
-    return std::get<ConvLSTMV2ModelConfig>(config);
-}
-
-const ConvLSTMV3ModelConfig& get_conv_lstm_v3_model_config(const ModBaseModelConfig& config) {
-    return std::get<ConvLSTMV3ModelConfig>(config);
-}
-
 const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
     if (const auto* v2 = std::get_if<ConvLSTMV2ModelConfig>(&config)) {
         return v2->general;

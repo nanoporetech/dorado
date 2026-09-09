@@ -196,9 +196,6 @@ const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& co
 ModelType get_model_type(const ModBaseModelConfig& config);
 bool is_chunked_input_model(const ModBaseModelConfig& config);
 
-// These helpers enforce the same runtime routes as the modbase caller nodes.
-const ConvLSTMV2ModelConfig& get_conv_lstm_v2_model_config(const ModBaseModelConfig& config);
-const ConvLSTMV3ModelConfig& get_conv_lstm_v3_model_config(const ModBaseModelConfig& config);
 const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
 const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
