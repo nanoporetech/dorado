@@ -74,6 +74,7 @@ class TestDorado(unittest.TestCase):
             data: str
             model: str
             emit_cram: bool = False
+            barcode_kit: str | None = None
 
         runs = [
             Run("Kit14_fast", "SQK-LSK114", "fast"),
@@ -84,6 +85,12 @@ class TestDorado(unittest.TestCase):
             Run("Kit14_RNA_hac", "SQK-RNA004", "hac"),
             Run("Kit14_RNA_sup", "SQK-RNA004", "sup"),
             Run("Kit14_RNA_hac_cram", "SQK-RNA004", "hac", emit_cram=True),
+            Run(
+                "Kit14_RNA_hac_DRB004",
+                "SQK-DRB004-24",
+                "hac",
+                barcode_kit="SQK-DRB004-24",
+            ),
         ]
 
         test_name = "basecalling"
@@ -108,6 +115,7 @@ class TestDorado(unittest.TestCase):
                         emit_fastq=False,
                         emit_summary=True,
                         emit_cram=run.emit_cram,
+                        barcode_kit=run.barcode_kit,
                     )
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
@@ -282,6 +290,7 @@ class TestDorado(unittest.TestCase):
         emit_fastq: bool,
         emit_cram: bool,
         emit_summary: bool,
+        barcode_kit: str | None = None,
         recursive: bool = False,
     ) -> list:
         device = "metal" if PLATFORM == "osx_arm" else "cuda:0"
@@ -313,6 +322,13 @@ class TestDorado(unittest.TestCase):
             args.append("--emit-cram")
         if recursive:
             args.append("--recursive")
+        if barcode_kit is not None:
+            args.extend(
+                [
+                    "--kit-name",
+                    str(barcode_kit),
+                ]
+            )
         return args
 
 
