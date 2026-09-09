@@ -136,6 +136,8 @@ struct ChunkedModelConfigData : ModBaseModelConfigData {
     // Output tensor dimensions for chunked models
     std::tuple<int64_t, int64_t> chunked_output_TC() const;
 
+    virtual ~ChunkedModelConfigData() = default;
+
 protected:
     ChunkedModelConfigData(std::filesystem::path model_path_,
                            ModificationParams mods_,
