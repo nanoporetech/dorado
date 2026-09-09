@@ -57,11 +57,11 @@ struct ChunkedModelParams : CommonModelParams {
 
 struct ConvLSTMV3ModelParams : ChunkedModelParams {
     const ModulesParams modules;
+    const int sequence_stride;
     ConvLSTMV3ModelParams(CommonModelParams common_,
                           int64_t chunk_size_,
                           int sequence_stride_,
                           ModulesParams modules_);
-    const int sequence_stride;
 };
 
 struct RefinementParams {
