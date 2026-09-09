@@ -3,6 +3,7 @@
 #include "config/common.h"
 #include "hts_utils/bam_utils.h"
 #include "utils/dev_utils.h"
+#include "utils/overloaded.h"
 #include "utils/sequence_utils.h"
 
 #include <spdlog/spdlog.h>
@@ -608,20 +609,13 @@ const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& co
 }
 
 ModelType get_model_type(const ModBaseModelConfig& config) {
-    return std::visit(
-            [](const auto& model) {
-                using T = std::decay_t<decltype(model)>;
-                if constexpr (std::is_same_v<T, ConvOnlyModelConfig>) {
-                    return ModelType::CONV_V1;
-                } else if constexpr (std::is_same_v<T, ConvLSTMModelConfig>) {
-                    return ModelType::CONV_LSTM_V1;
-                } else if constexpr (std::is_same_v<T, ConvLSTMV2ModelConfig>) {
-                    return ModelType::CONV_LSTM_V2;
-                } else {
-                    return ModelType::CONV_LSTM_V3;
-                }
-            },
-            config);
+    return std::visit(utils::overloaded{
+                              [](const ConvOnlyModelConfig&) { return ModelType::CONV_V1; },
+                              [](const ConvLSTMModelConfig&) { return ModelType::CONV_LSTM_V1; },
+                              [](const ConvLSTMV2ModelConfig&) { return ModelType::CONV_LSTM_V2; },
+                              [](const ConvLSTMV3ModelConfig&) { return ModelType::CONV_LSTM_V3; },
+                      },
+                      config);
 }
 
 bool is_chunked_input_model(const ModBaseModelConfig& config) {
@@ -646,15 +640,14 @@ const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& con
 
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
     return std::visit(
-            [](const auto& model) -> int {
-                using T = std::decay_t<decltype(model)>;
-                if constexpr (std::is_same_v<T, ConvLSTMV2ModelConfig>) {
-                    return 1;
-                } else if constexpr (std::is_same_v<T, ConvLSTMV3ModelConfig>) {
-                    return model.general.stride / model.general.sequence_stride;
-                } else {
-                    throw std::runtime_error("Modbase model does not accept chunked input");
-                }
+            utils::overloaded{
+                    [](const ConvLSTMV2ModelConfig&) -> int { return 1; },
+                    [](const ConvLSTMV3ModelConfig& model) -> int {
+                        return model.general.stride / model.general.sequence_stride;
+                    },
+                    [](const auto&) -> int {
+                        throw std::runtime_error("Modbase model does not accept chunked input");
+                    },
             },
             config);
 }

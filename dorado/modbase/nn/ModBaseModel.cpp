@@ -5,6 +5,7 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/overloaded.h"
 
 #include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
@@ -625,27 +626,32 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
     c10::cuda::OptionalCUDAGuard device_guard(device);
 #endif
     return std::visit(
-            [&](const auto& model_config) -> torch::nn::ModuleHolder<torch::nn::AnyModule> {
-                using ModelConfig = std::decay_t<decltype(model_config)>;
-                if constexpr (std::is_same_v<ModelConfig, config::ConvOnlyModelConfig>) {
-                    auto model = model::ModBaseConvModel(model_config);
-                    return populate_model(std::move(model), model_config.model_path, options);
-                } else if constexpr (std::is_same_v<ModelConfig, config::ConvLSTMModelConfig> ||
-                                     std::is_same_v<ModelConfig, config::ConvLSTMV2ModelConfig>) {
-                    auto model = model::ModBaseConvLSTMModel(model_config);
-                    return populate_model(std::move(model), model_config.model_path, options);
-                } else {
-#if DORADO_CUDA_BUILD
-                    static bool use_torch = utils::get_dev_opt("modbase_torch", false);
-                    if (options.device().is_cuda() && !use_torch) {
-                        auto model = model::ModBaseConvLSTMV3CUDAModel(model_config, batchsize);
+            utils::overloaded{
+                    [&](const config::ConvOnlyModelConfig& model_config) {
+                        auto model = model::ModBaseConvModel(model_config);
                         return populate_model(std::move(model), model_config.model_path, options);
-                    }
+                    },
+                    [&](const config::ConvLSTMModelConfig& model_config) {
+                        auto model = model::ModBaseConvLSTMModel(model_config);
+                        return populate_model(std::move(model), model_config.model_path, options);
+                    },
+                    [&](const config::ConvLSTMV2ModelConfig& model_config) {
+                        auto model = model::ModBaseConvLSTMModel(model_config);
+                        return populate_model(std::move(model), model_config.model_path, options);
+                    },
+                    [&](const config::ConvLSTMV3ModelConfig& model_config) {
+#if DORADO_CUDA_BUILD
+                        static bool use_torch = utils::get_dev_opt("modbase_torch", false);
+                        if (options.device().is_cuda() && !use_torch) {
+                            auto model = model::ModBaseConvLSTMV3CUDAModel(model_config, batchsize);
+                            return populate_model(std::move(model), model_config.model_path,
+                                                  options);
+                        }
 #endif
-                    spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
-                    auto model = model::ModBaseConvLSTMV3Model(model_config);
-                    return populate_model(std::move(model), model_config.model_path, options);
-                }
+                        spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
+                        auto model = model::ModBaseConvLSTMV3Model(model_config);
+                        return populate_model(std::move(model), model_config.model_path, options);
+                    },
             },
             config);
 }
