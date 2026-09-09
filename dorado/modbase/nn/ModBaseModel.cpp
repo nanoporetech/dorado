@@ -318,12 +318,12 @@ struct ModBaseConvLSTMModelImpl : Module {
 struct ModBaseConvLSTMV3ModelImpl : Module {
     explicit ModBaseConvLSTMV3ModelImpl(const config::ConvLSTMV3ModelConfig& config)
             : m_config(config) {
-        const auto& sig_cvs = m_config.general.modules.signal_convs;
-        const auto& seq_cvs = m_config.general.modules.sequence_convs;
-        const auto& merge_cv = m_config.general.modules.merge_conv;
-        const auto& lstms = m_config.general.modules.lstms;
-        const auto& ll = m_config.general.modules.linear;
-        const auto& lu = m_config.general.modules.upsample;
+        const auto& sig_cvs = m_config.modules.signal_convs;
+        const auto& seq_cvs = m_config.modules.sequence_convs;
+        const auto& merge_cv = m_config.modules.merge_conv;
+        const auto& lstms = m_config.modules.lstms;
+        const auto& ll = m_config.modules.linear;
+        const auto& lu = m_config.modules.upsample;
 
         if (sig_cvs.size() != 3) {
             throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
@@ -394,7 +394,7 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
             utils::ScopedProfileRange spr("linear", 2);
             z = linear(z).flip(0).permute({1, 0, 2});  // T'NC -> NTC
         }
-        if (m_config.general.modules.upsample.has_value()) {
+        if (m_config.modules.upsample.has_value()) {
             utils::ScopedProfileRange spr2("upsample", 2);
             z = upsample->forward(z);  // NTC -> N(sf*T)C
         }
@@ -409,7 +409,7 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
         return utils::load_tensors(
-                dir, load_modbase_conv_lstm_weights(m_config.general.modules.upsample.has_value()));
+                dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
     }
 
     const config::ConvLSTMV3ModelConfig m_config;
@@ -438,12 +438,12 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
     ModBaseConvLSTMV3CUDAModelImpl(const config::ConvLSTMV3ModelConfig& config,
                                    const int batch_size_)
             : m_config(config), batch_size(batch_size_) {
-        const auto& sig_cvs = m_config.general.modules.signal_convs;
-        const auto& seq_cvs = m_config.general.modules.sequence_convs;
-        const auto& merge_cv = m_config.general.modules.merge_conv;
-        const auto& lstms = m_config.general.modules.lstms;
-        const auto& ll = m_config.general.modules.linear;
-        const auto& lu = m_config.general.modules.upsample;
+        const auto& sig_cvs = m_config.modules.signal_convs;
+        const auto& seq_cvs = m_config.modules.sequence_convs;
+        const auto& merge_cv = m_config.modules.merge_conv;
+        const auto& lstms = m_config.modules.lstms;
+        const auto& ll = m_config.modules.linear;
+        const auto& lu = m_config.modules.upsample;
 
         if (sig_cvs.size() != 3) {
             throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
@@ -471,14 +471,13 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             // Reserve and allocate working memory for everything else
-            const auto& params = m_config.general;
             auto [T, C] = config::get_chunked_signal_input_TC(m_config);
             wm.next_TC(T, C, nn::TensorLayout::NTC);
             sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
             // Buffer for concatenating conv outputs before merge_conv
             const int padding = merge_cv.winlen / 2;
-            const int64_t T_merge_conv = (T / params.modules.signal_stride()) + (2 * padding);
+            const int64_t T_merge_conv = (T / m_config.modules.signal_stride()) + (2 * padding);
             wm.next_TC(T_merge_conv, merge_cv.size, nn::TensorLayout::NTC);
 
             std::optional<nn::TensorLayout> force_dtype = std::nullopt;
@@ -538,7 +537,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
             // Copy the output of seq_convs stored in wm_seq into wm for the merge_conv input buffer.
             utils::ScopedProfileRange spr2("merge_prep", 2);
 
-            const auto& merge_cv = m_config.general.modules.merge_conv;
+            const auto& merge_cv = m_config.modules.merge_conv;
             auto seq_out = wm_seq.current;
             auto sig_out = wm.current;
 
@@ -575,7 +574,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
                                           ? wm.get_current_NTC_view().to(torch::kF16) / 127.0f
                                           : wm.get_current_NTC_view());
         }
-        if (m_config.general.modules.upsample.has_value()) {
+        if (m_config.modules.upsample.has_value()) {
             utils::ScopedProfileRange spr2("upsample", 2);
             out = upsample->forward(out);  // NTC -> N(sf*T)C
         }
@@ -590,7 +589,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
         return utils::load_tensors(
-                dir, load_modbase_conv_lstm_weights(m_config.general.modules.upsample.has_value()));
+                dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
     }
 
     const config::ConvLSTMV3ModelConfig m_config;

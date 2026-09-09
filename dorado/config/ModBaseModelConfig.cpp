@@ -288,16 +288,9 @@ ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
     auto refine = parse_refinement_params(config_toml);
     const auto chunk_size = parse_chunk_size(config_toml, context);
     return ConvLSTMV3ModelConfig{
-            model_path,
-            ConvLSTMV3ModelParams{
-                    std::move(common),
-                    ChunkedModelParams{chunk_size},
-                    sequence_stride,
-                    std::move(modules),
-            },
-            std::move(mods),
-            std::move(context),
-            std::move(refine),
+            model_path,         std::move(common), ChunkedModelParams{chunk_size},
+            std::move(modules), sequence_stride,   std::move(mods),
+            std::move(context), std::move(refine),
     };
 }
 
@@ -399,36 +392,6 @@ CommonModelParams::CommonModelParams(int size_, int kmer_len_, int num_out_, int
 ChunkedModelParams::ChunkedModelParams(int64_t chunk_size_) : chunk_size(chunk_size_) {
     if (chunk_size < 1) {
         throw std::runtime_error(ERR_STR + "chunked model params: 'negative or zero chunk size'.");
-    }
-}
-
-ConvLSTMV3ModelParams::ConvLSTMV3ModelParams(CommonModelParams common_,
-                                             ChunkedModelParams chunked_,
-                                             int sequence_stride_,
-                                             ModulesParams modules_)
-        : common(std::move(common_)),
-          chunked(std::move(chunked_)),
-          modules(std::move(modules_)),
-          sequence_stride(sequence_stride_) {
-    if (sequence_stride < 1) {
-        throw std::runtime_error(ERR_STR + "v3 model params: 'negative or zero sequence stride'.");
-    }
-    if (common.stride % sequence_stride != 0) {
-        throw std::runtime_error(
-                "Modbase model config signal stride must be evenly divisible by sequence stride");
-    }
-    if ((common.size != modules.lstms.front().size) ||
-        (modules.lstms.front().size != modules.lstms.back().size)) {
-        throw std::runtime_error("Modbase model config lstm size mismatch");
-    }
-    if (common.stride != stride_product(modules.signal_convs)) {
-        throw std::runtime_error("Modbase model config signal convolution stride mismatch");
-    }
-    if (sequence_stride != stride_product(modules.sequence_convs)) {
-        throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
-    }
-    if (common.num_out != modules.linear.out_size) {
-        throw std::runtime_error("Modbase model config linear and num_out mismatch");
     }
 }
 
@@ -576,7 +539,10 @@ ConvLSTMV2ModelConfig::ConvLSTMV2ModelConfig(std::filesystem::path model_path_,
 }
 
 ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
-                                             ConvLSTMV3ModelParams general_,
+                                             CommonModelParams general_,
+                                             ChunkedModelParams chunked_,
+                                             ModulesParams modules_,
+                                             int sequence_stride_,
                                              ModificationParams mods_,
                                              ContextParams context_,
                                              RefinementParams refine_)
@@ -584,8 +550,32 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
                std::move(mods_),
                std::move(context_),
                std::move(refine_),
-               general_.common.kmer_len),
-          general(std::move(general_)) {}
+               general_.kmer_len),
+          general(std::move(general_)),
+          chunked(std::move(chunked_)),
+          modules(std::move(modules_)),
+          sequence_stride(sequence_stride_) {
+    if (sequence_stride < 1) {
+        throw std::runtime_error(ERR_STR + "v3 model params: 'negative or zero sequence stride'.");
+    }
+    if (general.stride % sequence_stride != 0) {
+        throw std::runtime_error(
+                "Modbase model config signal stride must be evenly divisible by sequence stride");
+    }
+    if ((general.size != modules.lstms.front().size) ||
+        (modules.lstms.front().size != modules.lstms.back().size)) {
+        throw std::runtime_error("Modbase model config lstm size mismatch");
+    }
+    if (general.stride != stride_product(modules.signal_convs)) {
+        throw std::runtime_error("Modbase model config signal convolution stride mismatch");
+    }
+    if (sequence_stride != stride_product(modules.sequence_convs)) {
+        throw std::runtime_error("Modbase model config sequence convolution stride mismatch");
+    }
+    if (general.num_out != modules.linear.out_size) {
+        throw std::runtime_error("Modbase model config linear and num_out mismatch");
+    }
+}
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
     const auto config_toml = toml::parse(model_path / "config.toml");
@@ -598,20 +588,7 @@ const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& co
 }
 
 const CommonModelParams& get_common_model_params(const ModBaseModelConfig& config) {
-    return std::visit(utils::overloaded{
-                              [](const ConvOnlyModelConfig& model) -> const CommonModelParams& {
-                                  return model.general;
-                              },
-                              [](const ConvLSTMModelConfig& model) -> const CommonModelParams& {
-                                  return model.general;
-                              },
-                              [](const ConvLSTMV2ModelConfig& model) -> const CommonModelParams& {
-                                  return model.general;
-                              },
-                              [](const ConvLSTMV3ModelConfig& model) -> const CommonModelParams& {
-                                  return model.general.common;
-                              },
-                      },
+    return std::visit([](const auto& model) -> const CommonModelParams& { return model.general; },
                       config);
 }
 
@@ -637,7 +614,7 @@ const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& con
                         return model.chunked;
                     },
                     [](const ConvLSTMV3ModelConfig& model) -> const ChunkedModelParams& {
-                        return model.general.chunked;
+                        return model.chunked;
                     },
                     [](const auto&) -> const ChunkedModelParams& {
                         throw std::runtime_error("Modbase model does not accept chunked input");
@@ -651,7 +628,7 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
             utils::overloaded{
                     [](const ConvLSTMV2ModelConfig&) -> int { return 1; },
                     [](const ConvLSTMV3ModelConfig& model) -> int {
-                        return model.general.common.stride / model.general.sequence_stride;
+                        return model.general.stride / model.sequence_stride;
                     },
                     [](const auto&) -> int {
                         throw std::runtime_error("Modbase model does not accept chunked input");
@@ -661,13 +638,12 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
 }
 
 std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ConvLSTMV3ModelConfig& config) {
-    const auto& params = config.general;
-    return {params.chunked.chunk_size / (params.common.stride / params.sequence_stride),
+    return {config.chunked.chunk_size / (config.general.stride / config.sequence_stride),
             config.data.context.kmer_len * 4};
 }
 
 std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ConvLSTMV3ModelConfig& config) {
-    return {config.general.chunked.chunk_size, 1};
+    return {config.chunked.chunk_size, 1};
 }
 
 std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {

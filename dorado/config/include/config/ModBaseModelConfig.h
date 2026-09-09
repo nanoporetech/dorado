@@ -55,17 +55,6 @@ struct ChunkedModelParams {
     explicit ChunkedModelParams(int64_t chunk_size_);
 };
 
-struct ConvLSTMV3ModelParams {
-    const CommonModelParams common;
-    const ChunkedModelParams chunked;
-    const ModulesParams modules;
-    const int sequence_stride;
-    ConvLSTMV3ModelParams(CommonModelParams common_,
-                          ChunkedModelParams chunked_,
-                          int sequence_stride_,
-                          ModulesParams modules_);
-};
-
 struct RefinementParams {
     const bool do_rough_rescale;  ///< Whether to perform rough rescaling
     const size_t center_idx;      ///< The position in the kmer at which to check the levels
@@ -164,9 +153,15 @@ struct ConvLSTMV2ModelConfig {
 
 struct ConvLSTMV3ModelConfig {
     ModBaseModelConfigData data;
-    ConvLSTMV3ModelParams general;
+    CommonModelParams general;
+    ChunkedModelParams chunked;
+    ModulesParams modules;
+    const int sequence_stride;
     ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
-                          ConvLSTMV3ModelParams general_,
+                          CommonModelParams general_,
+                          ChunkedModelParams chunked_,
+                          ModulesParams modules_,
+                          int sequence_stride_,
                           ModificationParams mods_,
                           ContextParams context_,
                           RefinementParams refine_);

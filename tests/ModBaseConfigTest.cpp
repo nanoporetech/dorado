@@ -34,9 +34,8 @@ General get_general(const ModBaseModelConfig& config) {
                     return {ModelType::CONV_LSTM_V2, model.general.size, model.general.kmer_len,
                             model.general.num_out, std::nullopt};
                 } else {
-                    return {ModelType::CONV_LSTM_V3, model.general.common.size,
-                            model.general.common.kmer_len, model.general.common.num_out,
-                            model.general.modules};
+                    return {ModelType::CONV_LSTM_V3, model.general.size, model.general.kmer_len,
+                            model.general.num_out, model.modules};
                 }
             },
             config);
