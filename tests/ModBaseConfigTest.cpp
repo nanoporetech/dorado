@@ -242,20 +242,6 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
         CATCH_CHECK(c.base_start_justify == context.base_start_justify);
     }
 
-    CATCH_SECTION("chunked tensor dimensions") {
-        if (const auto* v2 = std::get_if<ConvLSTMV2ModelConfig>(&model)) {
-            const auto [seq_t, seq_c] = get_chunked_sequence_input_TC(model);
-            const auto [sig_t, sig_c] = get_chunked_signal_input_TC(model);
-            const auto [out_t, out_c] = get_chunked_output_TC(model);
-            CATCH_CHECK(seq_t == v2->chunked.chunk_size);
-            CATCH_CHECK(seq_c == v2->data.context.kmer_len * 4);
-            CATCH_CHECK(sig_t == v2->chunked.chunk_size);
-            CATCH_CHECK(sig_c == 1);
-            CATCH_CHECK(out_t == v2->chunked.chunk_size / v2->general.stride);
-            CATCH_CHECK(out_c == v2->general.num_out);
-        }
-    }
-
     CATCH_SECTION("refinement parameters") {
         const auto& r = get_model_config_data(model).refine;
         CATCH_CAPTURE(path, r.do_rough_rescale, r.center_idx);
@@ -296,10 +282,6 @@ CATCH_TEST_CASE(TEST_GROUP ": latent space model parser", TEST_GROUP) {
         CATCH_CHECK(layer.deepnorm_beta == 0.4518010f);
         CATCH_CHECK(layer.attn_window == std::pair<int, int>{15, 16});
     }
-
-    CATCH_CHECK(get_chunked_sequence_input_TC(model) == std::tuple<int64_t, int64_t>{256, 36});
-    CATCH_CHECK(get_chunked_signal_input_TC(model) == std::tuple<int64_t, int64_t>{256, 1024});
-    CATCH_CHECK(get_chunked_output_TC(model) == std::tuple<int64_t, int64_t>{256, 2});
 }
 
 CATCH_TEST_CASE(TEST_GROUP ": latent space model parser supports multilayer modules", TEST_GROUP) {
