@@ -10,8 +10,10 @@
 #define TEST_GROUP "[modbase_config]"
 
 using namespace dorado::config;
+using namespace dorado::config::modbase;
 
 namespace {
+
 struct General {
     ModelType model_type;
     int size;

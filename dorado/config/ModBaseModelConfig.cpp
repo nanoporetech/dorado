@@ -50,6 +50,7 @@ int get_int_in_range(const toml::value& p,
 }  // namespace
 namespace dorado::config {
 
+namespace modbase {
 namespace {
 // Normalise `v` by `stride` strictly increasing the value if needed.
 int64_t normalise_to_stride(const int64_t v, const int64_t stride) {
@@ -358,10 +359,6 @@ ModelType get_modbase_model_type(const std::filesystem::path& path) {
     }
 }
 
-bool is_modbase_model(const std::filesystem::path& path) {
-    return get_modbase_model_type(path) != ModelType::UNKNOWN;
-}
-
 int ModulesParams::sequence_stride() const { return stride_product(sequence_convs); };
 int ModulesParams::signal_stride() const { return stride_product(signal_convs); };
 int ModulesParams::stride_ratio() const {
@@ -577,46 +574,50 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
     }
 }
 
-ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
-    const auto config_toml = toml::parse(model_path / "config.toml");
-    return parse_model_config(model_path, config_toml);
+}  // namespace modbase
+
+const modbase::ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config) {
+    return std::visit(
+            [](const auto& model) -> const modbase::ModBaseModelConfigData& { return model.data; },
+            config);
 }
 
-const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config) {
-    return std::visit([](const auto& model) -> const ModBaseModelConfigData& { return model.data; },
-                      config);
+const modbase::CommonModelParams& get_common_model_params(const ModBaseModelConfig& config) {
+    return std::visit(
+            [](const auto& model) -> const modbase::CommonModelParams& { return model.general; },
+            config);
 }
 
-const CommonModelParams& get_common_model_params(const ModBaseModelConfig& config) {
-    return std::visit([](const auto& model) -> const CommonModelParams& { return model.general; },
-                      config);
-}
-
-ModelType get_model_type(const ModBaseModelConfig& config) {
-    return std::visit(utils::overloaded{
-                              [](const ConvOnlyModelConfig&) { return ModelType::CONV_V1; },
-                              [](const ConvLSTMModelConfig&) { return ModelType::CONV_LSTM_V1; },
-                              [](const ConvLSTMV2ModelConfig&) { return ModelType::CONV_LSTM_V2; },
-                              [](const ConvLSTMV3ModelConfig&) { return ModelType::CONV_LSTM_V3; },
-                      },
-                      config);
+modbase::ModelType get_model_type(const ModBaseModelConfig& config) {
+    return std::visit(
+            utils::overloaded{
+                    [](const modbase::ConvOnlyModelConfig&) { return modbase::ModelType::CONV_V1; },
+                    [](const modbase::ConvLSTMModelConfig&) {
+                        return modbase::ModelType::CONV_LSTM_V1;
+                    },
+                    [](const modbase::ConvLSTMV2ModelConfig&) {
+                        return modbase::ModelType::CONV_LSTM_V2;
+                    },
+                    [](const modbase::ConvLSTMV3ModelConfig&) {
+                        return modbase::ModelType::CONV_LSTM_V3;
+                    },
+            },
+            config);
 }
 
 bool is_chunked_input_model(const ModBaseModelConfig& config) {
-    return std::holds_alternative<ConvLSTMV2ModelConfig>(config) ||
-           std::holds_alternative<ConvLSTMV3ModelConfig>(config);
+    return std::holds_alternative<modbase::ConvLSTMV2ModelConfig>(config) ||
+           std::holds_alternative<modbase::ConvLSTMV3ModelConfig>(config);
 }
 
-const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
+const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
-                    [](const ConvLSTMV2ModelConfig& model) -> const ChunkedModelParams& {
-                        return model.chunked;
-                    },
-                    [](const ConvLSTMV3ModelConfig& model) -> const ChunkedModelParams& {
-                        return model.chunked;
-                    },
-                    [](const auto&) -> const ChunkedModelParams& {
+                    [](const modbase::ConvLSTMV2ModelConfig& model)
+                            -> const modbase::ChunkedModelParams& { return model.chunked; },
+                    [](const modbase::ConvLSTMV3ModelConfig& model)
+                            -> const modbase::ChunkedModelParams& { return model.chunked; },
+                    [](const auto&) -> const modbase::ChunkedModelParams& {
                         throw std::runtime_error("Modbase model does not accept chunked input");
                     },
             },
@@ -626,8 +627,8 @@ const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& con
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
-                    [](const ConvLSTMV2ModelConfig&) -> int { return 1; },
-                    [](const ConvLSTMV3ModelConfig& model) -> int {
+                    [](const modbase::ConvLSTMV2ModelConfig&) -> int { return 1; },
+                    [](const modbase::ConvLSTMV3ModelConfig& model) -> int {
                         return model.general.stride / model.sequence_stride;
                     },
                     [](const auto&) -> int {
@@ -637,23 +638,25 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
             config);
 }
 
-std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ConvLSTMV3ModelConfig& config) {
+std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(
+        const modbase::ConvLSTMV3ModelConfig& config) {
     return {config.chunked.chunk_size / (config.general.stride / config.sequence_stride),
             config.data.context.kmer_len * 4};
 }
 
-std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ConvLSTMV3ModelConfig& config) {
+std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(
+        const modbase::ConvLSTMV3ModelConfig& config) {
     return {config.chunked.chunk_size, 1};
 }
 
 std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
-                    [](const ConvLSTMV2ModelConfig& model) {
+                    [](const modbase::ConvLSTMV2ModelConfig& model) {
                         return std::tuple{model.chunked.chunk_size,
                                           int64_t(model.data.context.kmer_len * 4)};
                     },
-                    [](const ConvLSTMV3ModelConfig& model) {
+                    [](const modbase::ConvLSTMV3ModelConfig& model) {
                         return get_chunked_sequence_input_TC(model);
                     },
                     [](const auto&) -> std::tuple<int64_t, int64_t> {
@@ -666,10 +669,10 @@ std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelCon
 std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
-                    [](const ConvLSTMV2ModelConfig& model) {
+                    [](const modbase::ConvLSTMV2ModelConfig& model) {
                         return std::tuple{model.chunked.chunk_size, int64_t(1)};
                     },
-                    [](const ConvLSTMV3ModelConfig& model) {
+                    [](const modbase::ConvLSTMV3ModelConfig& model) {
                         return get_chunked_signal_input_TC(model);
                     },
                     [](const auto&) -> std::tuple<int64_t, int64_t> {
@@ -685,12 +688,21 @@ std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& con
     return {params.chunk_size / common.stride, common.num_out};
 }
 
-const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config) {
+const modbase::ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config) {
     assert(!is_chunked_input_model(config));
-    if (const auto* conv_only = std::get_if<ConvOnlyModelConfig>(&config)) {
+    if (const auto* conv_only = std::get_if<modbase::ConvOnlyModelConfig>(&config)) {
         return conv_only->data;
     }
-    return std::get<ConvLSTMModelConfig>(config).data;
+    return std::get<modbase::ConvLSTMModelConfig>(config).data;
+}
+
+bool is_modbase_model(const std::filesystem::path& path) {
+    return modbase::get_modbase_model_type(path) != modbase::ModelType::UNKNOWN;
+}
+
+ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path) {
+    const auto config_toml = toml::parse(model_path / "config.toml");
+    return modbase::parse_model_config(model_path, config_toml);
 }
 
 ModBaseInfo get_modbase_info(

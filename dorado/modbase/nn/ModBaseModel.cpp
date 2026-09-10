@@ -113,7 +113,7 @@ struct ModsConvImpl : Module {
 TORCH_MODULE(ModsConv);
 
 struct ModBaseConvModelImpl : Module {
-    explicit ModBaseConvModelImpl(const config::ConvOnlyModelConfig& config) {
+    explicit ModBaseConvModelImpl(const config::modbase::ConvOnlyModelConfig& config) {
         const auto& params = config.general;
         const auto size = params.size;
         const auto kmer_len = params.kmer_len;
@@ -204,17 +204,17 @@ const std::vector<std::string> ModBaseConvModelImpl::weight_tensors{
 };
 
 struct ModBaseConvLSTMModelImpl : Module {
-    explicit ModBaseConvLSTMModelImpl(const config::ConvLSTMModelConfig& config)
+    explicit ModBaseConvLSTMModelImpl(const config::modbase::ConvLSTMModelConfig& config)
             : m_is_conv_lstm_v2(false) {
         initialise(config.general);
     }
 
-    explicit ModBaseConvLSTMModelImpl(const config::ConvLSTMV2ModelConfig& config)
+    explicit ModBaseConvLSTMModelImpl(const config::modbase::ConvLSTMV2ModelConfig& config)
             : m_is_conv_lstm_v2(true) {
         initialise(config.general);
     }
 
-    void initialise(const config::CommonModelParams& params) {
+    void initialise(const config::modbase::CommonModelParams& params) {
         const int signal_stride = params.stride;
         // conv_lstm_v2 models are padded to ensure the output shape is nicely indexable by the stride
         sig_conv1 = register_module("sig_conv1", ModsConv(1, 4, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
@@ -316,7 +316,7 @@ struct ModBaseConvLSTMModelImpl : Module {
 };
 
 struct ModBaseConvLSTMV3ModelImpl : Module {
-    explicit ModBaseConvLSTMV3ModelImpl(const config::ConvLSTMV3ModelConfig& config)
+    explicit ModBaseConvLSTMV3ModelImpl(const config::modbase::ConvLSTMV3ModelConfig& config)
             : m_config(config) {
         const auto& sig_cvs = m_config.modules.signal_convs;
         const auto& seq_cvs = m_config.modules.sequence_convs;
@@ -412,7 +412,7 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
                 dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
     }
 
-    const config::ConvLSTMV3ModelConfig m_config;
+    const config::modbase::ConvLSTMV3ModelConfig m_config;
 
     ModsConv sig_conv1{nullptr};
     ModsConv sig_conv2{nullptr};
@@ -435,7 +435,7 @@ TORCH_MODULE(ModBaseConvLSTMV3Model);
 #if DORADO_CUDA_BUILD
 
 struct ModBaseConvLSTMV3CUDAModelImpl : Module {
-    ModBaseConvLSTMV3CUDAModelImpl(const config::ConvLSTMV3ModelConfig& config,
+    ModBaseConvLSTMV3CUDAModelImpl(const config::modbase::ConvLSTMV3ModelConfig& config,
                                    const int batch_size_)
             : m_config(config), batch_size(batch_size_) {
         const auto& sig_cvs = m_config.modules.signal_convs;
@@ -592,7 +592,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
                 dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
     }
 
-    const config::ConvLSTMV3ModelConfig m_config;
+    const config::modbase::ConvLSTMV3ModelConfig m_config;
 
     nn::ConvStack sig_convs{nullptr};
     nn::ConvStack seq_convs{nullptr};
@@ -625,22 +625,22 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
 #endif
     return std::visit(
             utils::overloaded{
-                    [&](const config::ConvOnlyModelConfig& model_config) {
+                    [&](const config::modbase::ConvOnlyModelConfig& model_config) {
                         auto model = model::ModBaseConvModel(model_config);
                         return populate_model(std::move(model), model_config.data.model_path,
                                               options);
                     },
-                    [&](const config::ConvLSTMModelConfig& model_config) {
+                    [&](const config::modbase::ConvLSTMModelConfig& model_config) {
                         auto model = model::ModBaseConvLSTMModel(model_config);
                         return populate_model(std::move(model), model_config.data.model_path,
                                               options);
                     },
-                    [&](const config::ConvLSTMV2ModelConfig& model_config) {
+                    [&](const config::modbase::ConvLSTMV2ModelConfig& model_config) {
                         auto model = model::ModBaseConvLSTMModel(model_config);
                         return populate_model(std::move(model), model_config.data.model_path,
                                               options);
                     },
-                    [&](const config::ConvLSTMV3ModelConfig& model_config) {
+                    [&](const config::modbase::ConvLSTMV3ModelConfig& model_config) {
 #if DORADO_CUDA_BUILD
                         static bool use_torch = utils::get_dev_opt("modbase_torch", false);
                         if (options.device().is_cuda() && !use_torch) {

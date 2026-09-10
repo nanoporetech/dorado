@@ -12,12 +12,12 @@
 
 namespace dorado::config {
 
+namespace modbase {
+
 enum class ModelType : std::uint8_t { CONV_LSTM_V1, CONV_LSTM_V2, CONV_LSTM_V3, CONV_V1, UNKNOWN };
 std::string to_string(const ModelType& model_type);
 ModelType model_type_from_string(const std::string& model_type);
 ModelType get_modbase_model_type(const std::filesystem::path& path);
-
-bool is_modbase_model(const std::filesystem::path& path);
 
 struct LinearParams {
     int in_size;
@@ -167,19 +167,25 @@ struct ConvLSTMV3ModelConfig {
                           RefinementParams refine_);
 };
 
-const ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config);
-const CommonModelParams& get_common_model_params(const ModBaseModelConfig& config);
-ModelType get_model_type(const ModBaseModelConfig& config);
+}  // namespace modbase
+
+const modbase::ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config);
+const modbase::CommonModelParams& get_common_model_params(const ModBaseModelConfig& config);
+modbase::ModelType get_model_type(const ModBaseModelConfig& config);
 bool is_chunked_input_model(const ModBaseModelConfig& config);
 
-const ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
+const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ConvLSTMV3ModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ConvLSTMV3ModelConfig& config);
+std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(
+        const modbase::ConvLSTMV3ModelConfig& config);
+std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(
+        const modbase::ConvLSTMV3ModelConfig& config);
 std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config);
 std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config);
 std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config);
-const ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
+const modbase::ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
+
+bool is_modbase_model(const std::filesystem::path& path);
 
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 
