@@ -50,22 +50,9 @@ struct SignalNormalisationParams {
 };
 
 struct TxEncoderParams {
-    // The number of expected features in the encoder/decoder inputs
-    int d_model{-1};
-    // The number of heads in the multi-head attention (MHA) models
-    int nhead{-1};
     // The number of transformer layers
     int depth{-1};
-    // The dimension of the feedforward model
-    int dim_feedforward{-1};
-    // Pair of ints defining (possibly asymmetric) sliding attention window mask
-    std::pair<int, int> attn_window{-1, -1};
-    // The deepnorm normalisation alpha parameter
-    float deepnorm_alpha{1.0};
-    // MHA RoPE theta value
-    float theta{10000.0f};
-    // MHA RoPE maximum sequence length. Initialised in `TxModelImpl::TxModelImpl`
-    int max_seq_len{0};
+    TransformerEncoderLayerParams layer_params;
     std::string to_string() const;
 };
 

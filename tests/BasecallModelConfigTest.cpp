@@ -127,10 +127,13 @@ CATCH_TEST_CASE(CUT_TAG ": test dna_r10.4.1 sup@v5.0.0 transformer model load", 
 
     CATCH_CHECK(config.tx.has_value());
 
-    CATCH_CHECK(config.tx->tx.d_model == 512);
     CATCH_CHECK(config.tx->tx.depth == 18);
-    CATCH_CHECK(config.tx->tx.dim_feedforward == 2048);
-    CATCH_CHECK(config.tx->tx.attn_window == std::pair<int, int>{127, 128});
+    CATCH_CHECK(config.tx->tx.layer_params.d_model == 512);
+    CATCH_CHECK(config.tx->tx.layer_params.nhead == 8);
+    CATCH_CHECK(config.tx->tx.layer_params.dim_feedforward == 2048);
+    CATCH_CHECK(config.tx->tx.layer_params.attn_window == std::pair<int, int>{127, 128});
+    CATCH_CHECK(config.tx->tx.layer_params.deepnorm_alpha == 2.4494897f);
+    CATCH_CHECK(config.tx->tx.layer_params.deepnorm_beta == 0.2886751f);
 
     CATCH_CHECK(config.tx->crf.insize == 512);
     CATCH_CHECK(config.tx->crf.n_base == 4);

@@ -21,6 +21,7 @@ static const std::unordered_map<std::string, SublayerType> sublayer_map = {
         {"linearcrfencoder", SublayerType::LINEAR_CRF_ENCODER},
         {"lstm", SublayerType::LSTM},
         {"permute", SublayerType::PERMUTE},
+        {"transformerencoderlayer", SublayerType::TRANSFORMER_ENCODER},
         {"upsample", SublayerType::UPSAMPLE},
 };
 
@@ -87,11 +88,59 @@ std::vector<ConvParams> parse_convs(const std::vector<toml::value> &sublayers) {
     return convs;
 }
 
+TransformerEncoderLayerParams parse_transformer_encoder_layer_params(const toml::value &layer) {
+    if (sublayer_type(layer) != SublayerType::TRANSFORMER_ENCODER) {
+        throw std::runtime_error("Transformer encoder config contains a non-transformer layer");
+    }
+
+    TransformerEncoderLayerParams params;
+    params.d_model = toml::find<int>(layer, "d_model");
+    params.nhead = toml::find<int>(layer, "nhead");
+    params.dim_feedforward = toml::find<int>(layer, "dim_feedforward");
+    params.deepnorm_alpha = toml::find<float>(layer, "deepnorm_alpha");
+    params.deepnorm_beta = toml::find_or<float>(layer, "deepnorm_beta", 1.0f);
+    params.max_seq_len = toml::find_or<int>(layer, "max_seq_len", 0);
+
+    if (layer.contains("rotary_base") && layer.contains("theta")) {
+        throw std::runtime_error(
+                "Transformer encoder config 'rotary_base' and 'theta' are mutually exclusive");
+    }
+    if (layer.contains("theta")) {
+        params.theta = toml::find<float>(layer, "theta");
+    } else if (layer.contains("rotary_base")) {
+        params.theta = toml::find<float>(layer, "rotary_base");
+    }
+
+    const auto attn_window = toml::find(layer, "attn_window").as_array();
+    if (attn_window.size() != 2) {
+        throw std::runtime_error("Transformer attention window must contain two values");
+    }
+    params.attn_window = {static_cast<int>(attn_window.at(0).as_integer()),
+                          static_cast<int>(attn_window.at(1).as_integer())};
+    return params;
+}
+
 std::string LinearUpsampleParams::to_string() const {
     std::ostringstream oss;
     oss << "LinearUpsampleParams {"
         << " size:" << size << " scale_factor:" << scale_factor << " }";
     return oss.str();
+}
+
+std::string TransformerEncoderLayerParams::to_string() const {
+    std::ostringstream oss;
+    // clang-format off
+    oss << "TransformerLayerEncoderParams {"
+        << " d_model:"          << d_model
+        << " nhead:"            << nhead
+        << " dim_feedforward:"  << dim_feedforward
+        << " theta:"            << theta
+        << " max_seq_len:"      << max_seq_len
+        << " attn_window: ["    << attn_window.first << ", " << attn_window.second << "]"
+        << " deepnorm_alpha:"   << deepnorm_alpha
+        << " deepnorm_beta:"    << deepnorm_beta     << " }";
+    return std::move(oss).str();
+    // clang-format on
 }
 
 }  // namespace dorado::config
