@@ -1,0 +1,75 @@
+[general]
+creation_date = "27/07/2026, 10:34:19"
+model = "latent_space_v1"
+
+[model_params]
+size = 64
+kmer_len = 9
+num_out = 2
+stride = 6
+sequence_stride = 1
+
+[modbases]
+mod_bases = [ "a",]
+offset = 0
+mod_long_names_0 = "6mA"
+motif = "A"
+motif_offset = 0
+reverse_signal = false
+base_start_justify = true
+chunk_context_0 = 150
+chunk_context_1 = 150
+kmer_context_bases_0 = 4
+kmer_context_bases_1 = 4
+multi_prediction_output = true
+chunk_size = 1536
+
+[sequence_encoder]
+[[sequence_encoder.sublayers]]
+type = "convolution"
+insize = 36
+size = 64
+winlen = 5
+stride = 1
+padding = 2
+activation = "tanh"
+
+[proj]
+[[proj.sublayers]]
+type = "linear"
+in_features = 1024
+out_features = 64
+
+[common_encoder]
+[[common_encoder.sublayers]]
+type = "transformerencoderlayer"
+d_model = 64
+nhead = 4
+dim_feedforward = 128
+deepnorm_alpha = 1.5650845
+deepnorm_beta = 0.4518010
+attn_window = [ 15, 16,]
+
+[[common_encoder.sublayers]]
+type = "transformerencoderlayer"
+d_model = 64
+nhead = 4
+dim_feedforward = 128
+deepnorm_alpha = 1.5650845
+deepnorm_beta = 0.4518010
+attn_window = [ 15, 16,]
+
+[[common_encoder.sublayers]]
+type = "transformerencoderlayer"
+d_model = 64
+nhead = 4
+dim_feedforward = 128
+deepnorm_alpha = 1.5650845
+deepnorm_beta = 0.4518010
+attn_window = [ 15, 16,]
+
+[classifier_head]
+[[classifier_head.sublayers]]
+type = "linear"
+in_features = 64
+out_features = 2
