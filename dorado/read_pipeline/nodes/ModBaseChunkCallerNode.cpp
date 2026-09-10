@@ -94,6 +94,10 @@ std::vector<modbase::RunnerPtr> validate_runners(std::vector<modbase::RunnerPtr>
         }
 
         const int modbase_stride = common.stride;
+        if (modbase_stride <= 0) {
+            spdlog::error("{} invalid modbase model stride: {}.", name, modbase_stride);
+            throw std::runtime_error(name + "model stride must be positive and non-zero.");
+        }
         if (canonical_stride % modbase_stride != 0) {
             spdlog::error("{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
                           name, canonical_stride, modbase_stride);
