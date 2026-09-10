@@ -218,7 +218,7 @@ RefinementParams parse_refinement_params(const toml::value& config_toml) {
 
     const auto segment = toml::find(config_toml, "refinement");
 
-    bool do_rough_rescale = toml::find<int>(segment, "refine_do_rough_rescale") == 1;
+    const bool do_rough_rescale = toml::find<int>(segment, "refine_do_rough_rescale") == 1;
     if (!do_rough_rescale) {
         return RefinementParams{};
     }
@@ -486,8 +486,8 @@ ModBaseModelConfigData::ModBaseModelConfigData(std::filesystem::path model_path_
           refine(std::move(refine_)) {
     // Kmer length is duplicated in modbase model configs - check they match
     if (kmer_len_ != context.kmer_len) {
-        auto kl_a = std::to_string(kmer_len_);
-        auto kl_b = std::to_string(context.kmer_len);
+        const auto kl_a = std::to_string(kmer_len_);
+        const auto kl_b = std::to_string(context.kmer_len);
         throw std::runtime_error(ERR_STR + "config: 'inconsistent kmer_len: " + kl_a +
                                  " != " + kl_b + "'.");
     }

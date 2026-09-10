@@ -465,13 +465,13 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             // Reserve and allocate working memory for the sequence convs
-            auto [T, C] = config::get_chunked_sequence_input_TC(m_config);
+            const auto [T, C] = config::get_chunked_sequence_input_TC(m_config);
             wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
             seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
         }
         {
             // Reserve and allocate working memory for everything else
-            auto [T, C] = config::get_chunked_signal_input_TC(m_config);
+            const auto [T, C] = config::get_chunked_signal_input_TC(m_config);
             wm.next_TC(T, C, nn::TensorLayout::NTC);
             sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 

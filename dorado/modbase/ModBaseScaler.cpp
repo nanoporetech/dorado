@@ -21,7 +21,7 @@ std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig&
         return levels;
     }
 
-    std::vector<at::Tensor> tensors =
+    const std::vector<at::Tensor> tensors =
             utils::load_tensors(data.model_path, {"refine_kmer_levels.tensor"});
     if (tensors.empty()) {
         throw std::runtime_error("Failed to load modbase refinement tensors.");
