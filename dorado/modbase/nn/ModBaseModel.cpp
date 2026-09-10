@@ -654,6 +654,11 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
                         return populate_model(std::move(model), model_config.data.model_path,
                                               options);
                     },
+                    [&](const config::LatentSpaceV1ModelConfig&)
+                            -> torch::nn::ModuleHolder<torch::nn::AnyModule> {
+                        throw std::runtime_error(
+                                "Latent space modbase model inference is not implemented");
+                    },
             },
             config);
 }

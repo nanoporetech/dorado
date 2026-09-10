@@ -49,7 +49,9 @@ ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& 
     const bool is_chunked_model =
             !paths.empty() &&
             ((modbase::get_modbase_model_type(paths.front()) == modbase::ModelType::CONV_LSTM_V2) ||
-             (modbase::get_modbase_model_type(paths.front()) == modbase::ModelType::CONV_LSTM_V3));
+             (modbase::get_modbase_model_type(paths.front()) == modbase::ModelType::CONV_LSTM_V3) ||
+             (modbase::get_modbase_model_type(paths.front()) ==
+              modbase::ModelType::LATENT_SPACE_V1));
     const std::size_t batch_size = is_chunked_model
                                            ? DefaultModBaseParameters::batchsize_conv_lstm_v2
                                            : DefaultModBaseParameters::batchsize;

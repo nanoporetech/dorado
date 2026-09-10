@@ -10,6 +10,7 @@
 #include <toml.hpp>
 
 #include <cassert>
+#include <algorithm>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -73,6 +74,24 @@ LinearParams parse_linear(const toml::value& segment) {
     p.in_size = toml::find<int>(segment, "in_features");
     p.out_size = toml::find<int>(segment, "out_features");
     return p;
+}
+
+std::vector<LinearParams> parse_linears(const toml::value& config, const std::string& section) {
+    const auto sublayers = toml::find(config, section, "sublayers").as_array();
+    if (sublayers.empty()) {
+        throw std::runtime_error("Modbase model config " + section + " has no linear layers");
+    }
+
+    std::vector<LinearParams> linears;
+    linears.reserve(sublayers.size());
+    for (const auto& sublayer : sublayers) {
+        if (sublayer_type(sublayer) != SublayerType::LINEAR) {
+            throw std::runtime_error("Modbase model config " + section +
+                                     " contains a non-linear layer");
+        }
+        linears.push_back(parse_linear(sublayer));
+    }
+    return linears;
 }
 
 LinearUpsampleParams parse_linear_upsample(const toml::value& segment) {
@@ -150,6 +169,22 @@ ModulesParams parse_modules_params(const toml::value& config) {
     return m;
 }
 
+LatentSpaceModulesParams parse_latent_space_modules_params(const toml::value& config) {
+    LatentSpaceModulesParams modules;
+    modules.sequence_convs =
+            parse_convs(toml::find(config, "sequence_encoder", "sublayers").as_array());
+    modules.projection = parse_linears(config, "proj");
+
+    const auto encoder_layers = toml::find(config, "common_encoder", "sublayers").as_array();
+    modules.transformer_encoder.reserve(encoder_layers.size());
+    for (const auto& layer : encoder_layers) {
+        modules.transformer_encoder.push_back(parse_transformer_encoder_layer_params(layer));
+    }
+
+    modules.classifier = parse_linears(config, "classifier_head");
+    return modules;
+}
+
 ModificationParams parse_modification_params(const toml::value& config_toml) {
     const auto& params = toml::find(config_toml, keys::MODBASES);
 
@@ -180,8 +215,12 @@ ModificationParams parse_modification_params(const toml::value& config_toml) {
     const auto motif = toml::find<std::string>(params, "motif");
     const auto motif_offset = static_cast<size_t>(
             get_int_in_range(params, "motif_offset", 0, int(motif.size()), REQUIRED));
-
-    return ModificationParams{std::move(codes), std::move(long_names), motif, motif_offset};
+    return ModificationParams{
+            std::move(codes),
+            std::move(long_names),
+            motif,
+            motif_offset,
+    };
 }
 
 ContextParams parse_context_params(const toml::value& config_toml) {
@@ -273,8 +312,7 @@ ConvLSTMV2ModelConfig parse_lstm_v2(const std::filesystem::path& model_path,
                   raw_chunk_size, chunk_size);
     return ConvLSTMV2ModelConfig{
             model_path,      std::move(common),  ChunkedModelParams{chunk_size},
-            std::move(mods), std::move(context), std::move(refine),
-    };
+            std::move(mods), std::move(context), std::move(refine)};
 }
 
 ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
@@ -297,6 +335,26 @@ ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
     };
 }
 
+LatentSpaceV1ModelConfig parse_latent_space_v1(const std::filesystem::path& model_path,
+                                               const toml::value& config_toml) {
+    auto common = parse_common_model_params(config_toml);
+    const auto params = toml::find(config_toml, "model_params");
+    constexpr int max_stride = 6;
+    const auto sequence_stride =
+            get_int_in_range(params, "sequence_stride", 1, max_stride, REQUIRED);
+    auto modules = parse_latent_space_modules_params(config_toml);
+
+    auto mods = parse_modification_params(config_toml);
+    auto context = parse_context_params(config_toml);
+    auto refine = parse_refinement_params(config_toml);
+    const auto chunk_size = parse_chunk_size(config_toml, context);
+    return LatentSpaceV1ModelConfig{
+            model_path,         std::move(common), ChunkedModelParams{chunk_size},
+            std::move(modules), std::move(mods),   std::move(context),
+            std::move(refine),  sequence_stride,
+    };
+}
+
 ModBaseModelConfig parse_model_config(const std::filesystem::path& model_path,
                                       const toml::value& config_toml) {
     const ModelType type =
@@ -310,6 +368,8 @@ ModBaseModelConfig parse_model_config(const std::filesystem::path& model_path,
         return parse_lstm_v2(model_path, config_toml);
     case ModelType::CONV_LSTM_V3:
         return parse_lstm_v3(model_path, config_toml);
+    case ModelType::LATENT_SPACE_V1:
+        return parse_latent_space_v1(model_path, config_toml);
     case ModelType::UNKNOWN:
         throw std::runtime_error(ERR_STR + "general params: 'model type is unknown'");
     }
@@ -327,6 +387,8 @@ std::string to_string(const ModelType& model_type) {
         return std::string("conv_lstm_v3");
     case ModelType::CONV_V1:
         return std::string("conv_v1");
+    case ModelType::LATENT_SPACE_V1:
+        return std::string("latent_space_v1");
     case ModelType::UNKNOWN:
         return std::string("UNKNOWN");
     }
@@ -345,6 +407,9 @@ ModelType model_type_from_string(const std::string& model_type) {
     }
     if (model_type == "conv_only" || model_type == "conv_v1") {
         return ModelType::CONV_V1;
+    }
+    if (model_type == "latent_space_v1") {
+        return ModelType::LATENT_SPACE_V1;
     }
     return ModelType::UNKNOWN;
 }
@@ -579,6 +644,68 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
     }
 }
 
+LatentSpaceV1ModelConfig::LatentSpaceV1ModelConfig(std::filesystem::path model_path_,
+                                                   CommonModelParams general_,
+                                                   ChunkedModelParams chunked_,
+                                                   LatentSpaceModulesParams modules_,
+                                                   ModificationParams mods_,
+                                                   ContextParams context_,
+                                                   RefinementParams refine_,
+                                                   int sequence_stride_)
+        : data(std::move(model_path_),
+               std::move(mods_),
+               std::move(context_),
+               std::move(refine_),
+               general_.kmer_len),
+          general(std::move(general_)),
+          chunked(std::move(chunked_)),
+          modules(std::move(modules_)),
+          sequence_stride(sequence_stride_) {
+    if (sequence_stride < 1 || general.stride % sequence_stride != 0) {
+        throw std::runtime_error(
+                "Modbase latent space model signal stride must be evenly divisible by sequence "
+                "stride");
+    }
+    if (modules.sequence_convs.empty()) {
+        throw std::runtime_error("Modbase latent space model has no sequence convolutions");
+    }
+    if (modules.transformer_encoder.empty()) {
+        throw std::runtime_error("Modbase latent space model has no transformer encoder layers");
+    }
+    if (stride_product(modules.sequence_convs) != sequence_stride) {
+        throw std::runtime_error("Modbase latent space model sequence convolution stride mismatch");
+    }
+    const bool sequence_dimensions_match =
+            std::adjacent_find(modules.sequence_convs.begin(), modules.sequence_convs.end(),
+                               [](const auto& lhs, const auto& rhs) {
+                                   return lhs.size != rhs.insize;
+                               }) == modules.sequence_convs.end();
+    if (!sequence_dimensions_match ||
+        modules.sequence_convs.front().insize != general.kmer_len * 4 ||
+        modules.sequence_convs.back().size != general.size) {
+        throw std::runtime_error(
+                "Modbase latent space model sequence convolution dimensions mismatch");
+    }
+    const auto has_contiguous_dimensions = [](const std::vector<LinearParams>& layers) {
+        return std::adjacent_find(layers.begin(), layers.end(),
+                                  [](const auto& lhs, const auto& rhs) {
+                                      return lhs.out_size != rhs.in_size;
+                                  }) == layers.end();
+    };
+    if (!has_contiguous_dimensions(modules.projection) ||
+        !has_contiguous_dimensions(modules.classifier) ||
+        modules.projection.back().out_size != general.size ||
+        modules.classifier.front().in_size != general.size ||
+        modules.classifier.back().out_size != general.num_out) {
+        throw std::runtime_error("Modbase latent space model linear dimensions mismatch");
+    }
+    for (const auto& layer : modules.transformer_encoder) {
+        if (layer.d_model != general.size) {
+            throw std::runtime_error("Modbase latent space model transformer dimensions mismatch");
+        }
+    }
+}
+
 }  // namespace modbase
 
 const modbase::ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config) {
@@ -606,13 +733,17 @@ modbase::ModelType get_model_type(const ModBaseModelConfig& config) {
                     [](const modbase::ConvLSTMV3ModelConfig&) {
                         return modbase::ModelType::CONV_LSTM_V3;
                     },
+                    [](const modbase::LatentSpaceV1ModelConfig&) {
+                        return modbase::ModelType::LATENT_SPACE_V1;
+                    },
             },
             config);
 }
 
 bool is_chunked_input_model(const ModBaseModelConfig& config) {
     return std::holds_alternative<modbase::ConvLSTMV2ModelConfig>(config) ||
-           std::holds_alternative<modbase::ConvLSTMV3ModelConfig>(config);
+           std::holds_alternative<modbase::ConvLSTMV3ModelConfig>(config) ||
+           std::holds_alternative<modbase::LatentSpaceV1ModelConfig>(config);
 }
 
 const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
@@ -621,6 +752,8 @@ const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelCo
                     [](const modbase::ConvLSTMV2ModelConfig& model)
                             -> const modbase::ChunkedModelParams& { return model.chunked; },
                     [](const modbase::ConvLSTMV3ModelConfig& model)
+                            -> const modbase::ChunkedModelParams& { return model.chunked; },
+                    [](const modbase::LatentSpaceV1ModelConfig& model)
                             -> const modbase::ChunkedModelParams& { return model.chunked; },
                     [](const auto&) -> const modbase::ChunkedModelParams& {
                         throw std::runtime_error("Modbase model does not accept chunked input");
@@ -634,6 +767,9 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
             utils::overloaded{
                     [](const modbase::ConvLSTMV2ModelConfig&) -> int { return 1; },
                     [](const modbase::ConvLSTMV3ModelConfig& model) -> int {
+                        return model.general.stride / model.sequence_stride;
+                    },
+                    [](const modbase::LatentSpaceV1ModelConfig& model) -> int {
                         return model.general.stride / model.sequence_stride;
                     },
                     [](const auto&) -> int {
@@ -654,6 +790,18 @@ std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
     return {config.chunked.chunk_size, 1};
 }
 
+std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(
+        const modbase::LatentSpaceV1ModelConfig& config) {
+    return {config.chunked.chunk_size / (config.general.stride / config.sequence_stride),
+            config.data.context.kmer_len * 4};
+}
+
+std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
+        const modbase::LatentSpaceV1ModelConfig& config) {
+    return {config.chunked.chunk_size / config.general.stride,
+            config.modules.projection.front().in_size};
+}
+
 std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
@@ -662,6 +810,9 @@ std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConf
                                          int64_t(model.data.context.kmer_len * 4)};
                     },
                     [](const modbase::ConvLSTMV3ModelConfig& model) {
+                        return get_chunked_sequence_input_TC(model);
+                    },
+                    [](const modbase::LatentSpaceV1ModelConfig& model) {
                         return get_chunked_sequence_input_TC(model);
                     },
                     [](const auto&) -> std::pair<int64_t, int64_t> {
@@ -678,6 +829,9 @@ std::pair<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig
                         return std::pair{model.chunked.chunk_size, int64_t(1)};
                     },
                     [](const modbase::ConvLSTMV3ModelConfig& model) {
+                        return get_chunked_signal_input_TC(model);
+                    },
+                    [](const modbase::LatentSpaceV1ModelConfig& model) {
                         return get_chunked_signal_input_TC(model);
                     },
                     [](const auto&) -> std::pair<int64_t, int64_t> {
