@@ -9,6 +9,7 @@
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 
+#include <cassert>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -54,6 +55,7 @@ namespace modbase {
 namespace {
 // Normalise `v` by `stride` strictly increasing the value if needed.
 int64_t normalise_to_stride(const int64_t v, const int64_t stride) {
+    assert(stride != 0);
     const int64_t remainder = v % stride;
     if (remainder == 0) {
         return v;
