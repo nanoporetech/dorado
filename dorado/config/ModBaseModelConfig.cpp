@@ -190,8 +190,8 @@ ContextParams parse_context_params(const toml::value& config_toml) {
     const int context_before = get_int_in_range(params, "chunk_context_0", 0, 4096, REQUIRED);
     const int context_after = get_int_in_range(params, "chunk_context_1", 1, 4096, REQUIRED);
 
-    const auto bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
-    const auto bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
+    const int bases_before = get_int_in_range(params, "kmer_context_bases_0", 0, 9, REQUIRED);
+    const int bases_after = get_int_in_range(params, "kmer_context_bases_1", 0, 9, REQUIRED);
 
     const bool reverse = toml::find_or<bool>(params, "reverse_signal", false);
     const bool base_start_justify = toml::find_or<bool>(params, "base_start_justify", false);
