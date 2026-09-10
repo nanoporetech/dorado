@@ -559,6 +559,9 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
         throw std::runtime_error(
                 "Modbase model config signal stride must be evenly divisible by sequence stride");
     }
+    if (modules.lstms.empty()) {
+        throw std::runtime_error("Modbase model config missing lstm layers");
+    }
     if ((general.size != modules.lstms.front().size) ||
         (modules.lstms.front().size != modules.lstms.back().size)) {
         throw std::runtime_error("Modbase model config lstm size mismatch");
