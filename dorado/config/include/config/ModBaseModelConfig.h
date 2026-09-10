@@ -161,10 +161,10 @@ struct ConvLSTMV3ModelConfig {
                           CommonModelParams general_,
                           ChunkedModelParams chunked_,
                           ModulesParams modules_,
-                          int sequence_stride_,
                           ModificationParams mods_,
                           ContextParams context_,
-                          RefinementParams refine_);
+                          RefinementParams refine_,
+                          int sequence_stride_);
 };
 
 }  // namespace modbase

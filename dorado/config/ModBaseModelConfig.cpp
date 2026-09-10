@@ -290,8 +290,8 @@ ConvLSTMV3ModelConfig parse_lstm_v3(const std::filesystem::path& model_path,
     const auto chunk_size = parse_chunk_size(config_toml, context);
     return ConvLSTMV3ModelConfig{
             model_path,         std::move(common), ChunkedModelParams{chunk_size},
-            std::move(modules), sequence_stride,   std::move(mods),
-            std::move(context), std::move(refine),
+            std::move(modules), std::move(mods),   std::move(context),
+            std::move(refine),  sequence_stride,
     };
 }
 
@@ -539,10 +539,10 @@ ConvLSTMV3ModelConfig::ConvLSTMV3ModelConfig(std::filesystem::path model_path_,
                                              CommonModelParams general_,
                                              ChunkedModelParams chunked_,
                                              ModulesParams modules_,
-                                             int sequence_stride_,
                                              ModificationParams mods_,
                                              ContextParams context_,
-                                             RefinementParams refine_)
+                                             RefinementParams refine_,
+                                             int sequence_stride_)
         : data(std::move(model_path_),
                std::move(mods_),
                std::move(context_),
