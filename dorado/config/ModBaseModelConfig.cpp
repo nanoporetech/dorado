@@ -9,8 +9,8 @@
 #include <spdlog/spdlog.h>
 #include <toml.hpp>
 
-#include <cassert>
 #include <algorithm>
+#include <cassert>
 #include <numeric>
 #include <optional>
 #include <stdexcept>
@@ -54,6 +54,12 @@ namespace dorado::config {
 
 namespace modbase {
 namespace {
+
+template <typename T>
+concept has_member_chunked = requires(const T& model) {
+    { model.chunked } -> std::same_as<const ChunkedModelParams&>;
+};
+
 // Normalise `v` by `stride` strictly increasing the value if needed.
 int64_t normalise_to_stride(const int64_t v, const int64_t stride) {
     assert(stride != 0);
@@ -747,17 +753,13 @@ bool is_chunked_input_model(const ModBaseModelConfig& config) {
 }
 
 const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
-    return std::visit(
-            utils::overloaded{
-                    [](const modbase::ConvLSTMV2ModelConfig& model)
-                            -> const modbase::ChunkedModelParams& { return model.chunked; },
-                    [](const modbase::ConvLSTMV3ModelConfig& model)
-                            -> const modbase::ChunkedModelParams& { return model.chunked; },
-                    [](const modbase::LatentSpaceV1ModelConfig& model)
-                            -> const modbase::ChunkedModelParams& { return model.chunked; },
-                    [](const auto&) -> const modbase::ChunkedModelParams& {
-                        throw std::runtime_error("Modbase model does not accept chunked input");
-                    },
+    return std::visit(utils::overloaded{
+            []<typename T>(const T& model) -> const modbase::ChunkedModelParams&
+                requires modbase::has_member_chunked<T>
+            { return model.chunked; },
+            [](const auto&) -> const modbase::ChunkedModelParams& {
+                throw std::runtime_error("Modbase model does not accept chunked input");
+            },
             },
             config);
 }
