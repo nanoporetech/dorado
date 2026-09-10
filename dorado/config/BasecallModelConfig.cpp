@@ -641,7 +641,8 @@ std::string TxEncoderParams::to_string() const {
         << " theta:"            << theta
         << " max_seq_len:"      << max_seq_len
         << " attn_window: ["    << attn_window.first << ", " << attn_window.second << "]"
-        << " deepnorm_alpha:"   << deepnorm_alpha    << " }";
+        << " deepnorm_alpha:"   << deepnorm_alpha
+        << " deepnorm_beta:"    << deepnorm_beta     << " }";
     return std::move(oss).str();
     // clang-format on
 }
