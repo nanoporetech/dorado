@@ -5,6 +5,7 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/overloaded.h"
 
 #include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
@@ -39,8 +40,7 @@ ModuleHolder<AnyModule> populate_model(Model&& model,
     return holder;
 }
 
-std::vector<std::string> load_modbase_conv_lstm_weights(
-        const dorado::config::ModBaseModelConfig& config) {
+std::vector<std::string> load_modbase_conv_lstm_weights(bool has_upsample) {
     std::vector<std::string> tensors{
             "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
             "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
@@ -60,7 +60,7 @@ std::vector<std::string> load_modbase_conv_lstm_weights(
             "fc.weight.tensor",          "fc.bias.tensor",
     };
 
-    if (config.general.modules.has_value() && config.general.modules->upsample.has_value()) {
+    if (has_upsample) {
         tensors.push_back("linear_up.linear.weight.tensor");
         tensors.push_back("linear_up.linear.bias.tensor");
     }
@@ -113,7 +113,11 @@ struct ModsConvImpl : Module {
 TORCH_MODULE(ModsConv);
 
 struct ModBaseConvModelImpl : Module {
-    ModBaseConvModelImpl(int size, int kmer_len, int num_out) {
+    explicit ModBaseConvModelImpl(const config::modbase::ConvOnlyModelConfig& config) {
+        const auto& params = config.general;
+        const auto size = params.size;
+        const auto kmer_len = params.kmer_len;
+        const auto num_out = params.num_out;
         sig_conv1 = register_module("sig_conv1", ModsConv(1, 4, 11, 1, 0));
         sig_conv2 = register_module("sig_conv2", ModsConv(4, 16, 11, 1, 0));
         sig_conv3 = register_module("sig_conv3", ModsConv(16, size, 9, 3, 0));
@@ -200,15 +204,22 @@ const std::vector<std::string> ModBaseConvModelImpl::weight_tensors{
 };
 
 struct ModBaseConvLSTMModelImpl : Module {
-    explicit ModBaseConvLSTMModelImpl(const config::ModBaseModelConfig& config)
-            : m_config(config),
-              //int size, int kmer_len, int num_out, bool is_conv_lstm_v2, int stride
-              m_is_conv_lstm_v2(config.is_chunked_input_model()) {
-        const auto& params = m_config.general;
+    explicit ModBaseConvLSTMModelImpl(const config::modbase::ConvLSTMModelConfig& config)
+            : m_is_conv_lstm_v2(false) {
+        initialise(config.general);
+    }
+
+    explicit ModBaseConvLSTMModelImpl(const config::modbase::ConvLSTMV2ModelConfig& config)
+            : m_is_conv_lstm_v2(true) {
+        initialise(config.general);
+    }
+
+    void initialise(const config::modbase::CommonModelParams& params) {
+        const int signal_stride = params.stride;
         // conv_lstm_v2 models are padded to ensure the output shape is nicely indexable by the stride
         sig_conv1 = register_module("sig_conv1", ModsConv(1, 4, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
         sig_conv2 = register_module("sig_conv2", ModsConv(4, 16, 5, 1, m_is_conv_lstm_v2 ? 2 : 0));
-        sig_conv3 = register_module("sig_conv3", ModsConv(16, params.size, 9, params.stride,
+        sig_conv3 = register_module("sig_conv3", ModsConv(16, params.size, 9, signal_stride,
                                                           m_is_conv_lstm_v2 ? 4 : 0));
 
         seq_conv1 = register_module(
@@ -285,12 +296,10 @@ struct ModBaseConvLSTMModelImpl : Module {
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
-        return utils::load_tensors(dir, load_modbase_conv_lstm_weights(m_config));
+        return utils::load_tensors(dir, load_modbase_conv_lstm_weights(false));
     }
 
-    const config::ModBaseModelConfig m_config;
     const bool m_is_conv_lstm_v2{false};
-    static const std::vector<std::string> weight_tensors;
 
     ModsConv sig_conv1{nullptr};
     ModsConv sig_conv2{nullptr};
@@ -307,14 +316,14 @@ struct ModBaseConvLSTMModelImpl : Module {
 };
 
 struct ModBaseConvLSTMV3ModelImpl : Module {
-    explicit ModBaseConvLSTMV3ModelImpl(const config::ModBaseModelConfig& config)
+    explicit ModBaseConvLSTMV3ModelImpl(const config::modbase::ConvLSTMV3ModelConfig& config)
             : m_config(config) {
-        const auto& sig_cvs = m_config.general.modules->signal_convs;
-        const auto& seq_cvs = m_config.general.modules->sequence_convs;
-        const auto& merge_cv = m_config.general.modules->merge_conv;
-        const auto& lstms = m_config.general.modules->lstms;
-        const auto& ll = m_config.general.modules->linear;
-        const auto& lu = m_config.general.modules->upsample;
+        const auto& sig_cvs = m_config.modules.signal_convs;
+        const auto& seq_cvs = m_config.modules.sequence_convs;
+        const auto& merge_cv = m_config.modules.merge_conv;
+        const auto& lstms = m_config.modules.lstms;
+        const auto& ll = m_config.modules.linear;
+        const auto& lu = m_config.modules.upsample;
 
         if (sig_cvs.size() != 3) {
             throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
@@ -385,7 +394,7 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
             utils::ScopedProfileRange spr("linear", 2);
             z = linear(z).flip(0).permute({1, 0, 2});  // T'NC -> NTC
         }
-        if (m_config.general.modules->upsample.has_value()) {
+        if (m_config.modules.upsample.has_value()) {
             utils::ScopedProfileRange spr2("upsample", 2);
             z = upsample->forward(z);  // NTC -> N(sf*T)C
         }
@@ -399,12 +408,11 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
-        return utils::load_tensors(dir, load_modbase_conv_lstm_weights(m_config));
+        return utils::load_tensors(
+                dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
     }
 
-    static const std::vector<std::string> weight_tensors;
-
-    const config::ModBaseModelConfig m_config;
+    const config::modbase::ConvLSTMV3ModelConfig m_config;
 
     ModsConv sig_conv1{nullptr};
     ModsConv sig_conv2{nullptr};
@@ -427,14 +435,15 @@ TORCH_MODULE(ModBaseConvLSTMV3Model);
 #if DORADO_CUDA_BUILD
 
 struct ModBaseConvLSTMV3CUDAModelImpl : Module {
-    ModBaseConvLSTMV3CUDAModelImpl(const config::ModBaseModelConfig& config, const int batch_size_)
+    ModBaseConvLSTMV3CUDAModelImpl(const config::modbase::ConvLSTMV3ModelConfig& config,
+                                   const int batch_size_)
             : m_config(config), batch_size(batch_size_) {
-        const auto& sig_cvs = m_config.general.modules->signal_convs;
-        const auto& seq_cvs = m_config.general.modules->sequence_convs;
-        const auto& merge_cv = m_config.general.modules->merge_conv;
-        const auto& lstms = m_config.general.modules->lstms;
-        const auto& ll = m_config.general.modules->linear;
-        const auto& lu = m_config.general.modules->upsample;
+        const auto& sig_cvs = m_config.modules.signal_convs;
+        const auto& seq_cvs = m_config.modules.sequence_convs;
+        const auto& merge_cv = m_config.modules.merge_conv;
+        const auto& lstms = m_config.modules.lstms;
+        const auto& ll = m_config.modules.linear;
+        const auto& lu = m_config.modules.upsample;
 
         if (sig_cvs.size() != 3) {
             throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
@@ -456,20 +465,19 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             // Reserve and allocate working memory for the sequence convs
-            auto [T, C] = config.chunked_sequence_input_TC();
+            const auto [T, C] = config::get_chunked_sequence_input_TC(m_config);
             wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
             seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
         }
         {
             // Reserve and allocate working memory for everything else
-            const auto& params = config.general;
-            auto [T, C] = config.chunked_signal_input_TC();
+            const auto [T, C] = config::get_chunked_signal_input_TC(m_config);
             wm.next_TC(T, C, nn::TensorLayout::NTC);
             sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
             // Buffer for concatenating conv outputs before merge_conv
             const int padding = merge_cv.winlen / 2;
-            const int64_t T_merge_conv = (T / params.modules->signal_stride()) + (2 * padding);
+            const int64_t T_merge_conv = (T / m_config.modules.signal_stride()) + (2 * padding);
             wm.next_TC(T_merge_conv, merge_cv.size, nn::TensorLayout::NTC);
 
             std::optional<nn::TensorLayout> force_dtype = std::nullopt;
@@ -493,7 +501,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
 
         {
             utils::ScopedProfileRange spr2("seq_copy", 2);
-            const auto [Tin_seq, Cin_seq] = m_config.chunked_sequence_input_TC();
+            const auto [Tin_seq, Cin_seq] = config::get_chunked_sequence_input_TC(m_config);
             if (!wm_seq.backing_tensor.defined()) {
                 wm_seq.allocate_backing_tensor(seqs_NTC.device());
             }
@@ -502,7 +510,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             utils::ScopedProfileRange spr2("sig_copy", 2);
-            const auto [Tin_sig, Cin_sig] = m_config.chunked_signal_input_TC();
+            const auto [Tin_sig, Cin_sig] = config::get_chunked_signal_input_TC(m_config);
             if (!wm.backing_tensor.defined()) {
                 wm.allocate_backing_tensor(sigs_N1T.device());
             }
@@ -529,7 +537,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
             // Copy the output of seq_convs stored in wm_seq into wm for the merge_conv input buffer.
             utils::ScopedProfileRange spr2("merge_prep", 2);
 
-            const auto& merge_cv = m_config.general.modules->merge_conv;
+            const auto& merge_cv = m_config.modules.merge_conv;
             auto seq_out = wm_seq.current;
             auto sig_out = wm.current;
 
@@ -566,7 +574,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
                                           ? wm.get_current_NTC_view().to(torch::kF16) / 127.0f
                                           : wm.get_current_NTC_view());
         }
-        if (m_config.general.modules->upsample.has_value()) {
+        if (m_config.modules.upsample.has_value()) {
             utils::ScopedProfileRange spr2("upsample", 2);
             out = upsample->forward(out);  // NTC -> N(sf*T)C
         }
@@ -580,12 +588,11 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
-        return utils::load_tensors(dir, load_modbase_conv_lstm_weights(m_config));
+        return utils::load_tensors(
+                dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
     }
 
-    static const std::vector<std::string> weight_tensors;
-
-    const config::ModBaseModelConfig m_config;
+    const config::modbase::ConvLSTMV3ModelConfig m_config;
 
     nn::ConvStack sig_convs{nullptr};
     nn::ConvStack seq_convs{nullptr};
@@ -616,53 +623,39 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
     }
     c10::cuda::OptionalCUDAGuard device_guard(device);
 #endif
-    const auto params = config.general;
-    switch (params.model_type) {
-    case config::ModelType::CONV_LSTM_V1: {
-        auto model = model::ModBaseConvLSTMModel(config);
-        return populate_model(std::move(model), config.model_path, options);
-    }
-    case config::ModelType::CONV_LSTM_V2: {
-        auto model = model::ModBaseConvLSTMModel(config);
-        return populate_model(std::move(model), config.model_path, options);
-    }
-    case config::ModelType::CONV_LSTM_V3: {
+    return std::visit(
+            utils::overloaded{
+                    [&](const config::modbase::ConvOnlyModelConfig& model_config) {
+                        auto model = model::ModBaseConvModel(model_config);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
+                    },
+                    [&](const config::modbase::ConvLSTMModelConfig& model_config) {
+                        auto model = model::ModBaseConvLSTMModel(model_config);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
+                    },
+                    [&](const config::modbase::ConvLSTMV2ModelConfig& model_config) {
+                        auto model = model::ModBaseConvLSTMModel(model_config);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
+                    },
+                    [&](const config::modbase::ConvLSTMV3ModelConfig& model_config) {
 #if DORADO_CUDA_BUILD
-        static bool use_torch = utils::get_dev_opt("modbase_torch", false);
-        if (options.device().is_cuda() && !use_torch) {
-            auto model = model::ModBaseConvLSTMV3CUDAModel(config, batchsize);
-            return populate_model(std::move(model), config.model_path, options);
-        }
+                        static bool use_torch = utils::get_dev_opt("modbase_torch", false);
+                        if (options.device().is_cuda() && !use_torch) {
+                            auto model = model::ModBaseConvLSTMV3CUDAModel(model_config, batchsize);
+                            return populate_model(std::move(model), model_config.data.model_path,
+                                                  options);
+                        }
 #endif
-        spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
-        auto model = model::ModBaseConvLSTMV3Model(config);
-        return populate_model(std::move(model), config.model_path, options);
-    }
-    case config::ModelType::CONV_V1: {
-        auto model = model::ModBaseConvModel(params.size, params.kmer_len, params.num_out);
-        return populate_model(std::move(model), config.model_path, options);
-    }
-    default:
-        throw std::runtime_error("Unknown modbase model type in config file.");
-    }
-}
-
-std::vector<float> load_kmer_refinement_levels(const config::ModBaseModelConfig& config) {
-    std::vector<float> levels;
-    if (!config.refine.do_rough_rescale) {
-        return levels;
-    }
-
-    std::vector<at::Tensor> tensors =
-            utils::load_tensors(config.model_path, {"refine_kmer_levels.tensor"});
-    if (tensors.empty()) {
-        throw std::runtime_error("Failed to load modbase refinement tensors.");
-    }
-    auto& t = tensors.front();
-    t.contiguous();
-    levels.reserve(t.numel());
-    std::copy(t.data_ptr<float>(), t.data_ptr<float>() + t.numel(), std::back_inserter(levels));
-    return levels;
+                        spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
+                        auto model = model::ModBaseConvLSTMV3Model(model_config);
+                        return populate_model(std::move(model), model_config.data.model_path,
+                                              options);
+                    },
+            },
+            config);
 }
 
 }  // namespace dorado::modbase

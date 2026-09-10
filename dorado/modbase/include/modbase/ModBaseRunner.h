@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/ModBaseModelConfigFwd.h"
 #include "utils/stats.h"
 
 #include <ATen/core/TensorBody.h>
@@ -11,10 +12,6 @@
 #if DORADO_CUDA_BUILD
 #include <c10/cuda/CUDAStream.h>
 #endif
-
-namespace dorado::config {
-struct ModBaseModelConfig;
-}
 
 namespace dorado::modbase {
 

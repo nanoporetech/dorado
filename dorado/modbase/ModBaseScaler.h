@@ -1,5 +1,7 @@
 #pragma once
 
+#include "config/ModBaseModelConfigFwd.h"
+
 #include <ATen/core/TensorBody.h>
 
 #include <cstdint>
@@ -12,7 +14,7 @@ namespace dorado::modbase {
 /// Calculates new scaling values for improved modified base detection
 class ModBaseScaler {
 private:
-    const std::vector<float>& m_kmer_levels;
+    const std::vector<float> m_kmer_levels;
     const size_t m_kmer_len;
     const size_t m_centre_index;
 
@@ -57,11 +59,9 @@ public:
                             const std::vector<uint64_t>& seq_to_sig_map) const;
 
     /** Scale calculator for v1 Remora-style modified base detection.
-     *  @param kmer_levels A vector of expected signal levels per kmer.
-     *  @param kmer_len The length of the kmers referred to in kmer_levels.
-     *  @param centre_index The position in the kmer at which to set the levels.
+     *  @param config The configuration data for the associated modbase model.
      */
-    ModBaseScaler(const std::vector<float>& kmer_levels, size_t kmer_len, size_t centre_index);
+    ModBaseScaler(const config::ModBaseModelConfig& config);
 };
 
 }  // namespace dorado::modbase

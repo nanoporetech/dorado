@@ -45,14 +45,81 @@ bool activate_minimal_cg_encoding(const std::vector<modbase::RunnerPtr>& model_r
         return false;
     }
 
-    if (model_runners[0]->model_params(0).mods.motif == "CG" &&
+    if (config::get_model_config_data(model_runners[0]->model_params(0)).mods.motif == "CG" &&
         utils::get_dev_opt("modbase_min_encode", 1)) {
         spdlog::trace("Activated minimal encoding for CG context");
         return true;
     }
 
     return false;
-};
+}
+
+std::vector<modbase::RunnerPtr> validate_runners(std::vector<modbase::RunnerPtr> model_runners,
+                                                 const size_t canonical_stride) {
+    for (const auto& runner : model_runners) {
+        if (!runner->takes_chunk_inputs()) {
+            throw std::logic_error("Modbase model runner invalid for chunked caller: '" +
+                                   runner->get_name() + "'.");
+        }
+    }
+
+    const auto& runner = *model_runners.front();
+    const auto& first_config = runner.model_params(0);
+    const auto& first_context = config::get_model_config_data(first_config).context;
+    const size_t num_models = runner.num_models();
+    for (size_t model_id = 0; model_id < num_models; ++model_id) {
+        const auto& model_config = runner.model_params(model_id);
+        const auto& data = config::get_model_config_data(model_config);
+
+        std::string name = "Modbase '";
+        name.push_back(data.mods.base);
+        name += "' config error - ";
+        if (!config::is_chunked_input_model(model_config)) {
+            throw std::runtime_error(name + "Runner requires chunked input modbase model.");
+        }
+
+        const auto& context = data.context;
+        const auto& common = config::get_common_model_params(model_config);
+        const auto& chunked = config::get_chunked_model_params(model_config);
+        if (chunked.chunk_size < context.samples_before + context.samples_after) {
+            spdlog::error("{} chunk_size:{} is less than samples_before:{} + samples_after:{}.",
+                          name, chunked.chunk_size, context.samples_before, context.samples_after);
+            throw std::runtime_error(name + "chunk_size is smaller than the context window.");
+        }
+
+        if (chunked.chunk_size % canonical_stride != 0) {
+            spdlog::error("{} chunk_size:{} is not divisible by canonical_model_stride:{}.", name,
+                          chunked.chunk_size, canonical_stride);
+            throw std::runtime_error(name + "model strides are not compatible.");
+        }
+
+        const int modbase_stride = common.stride;
+        if (modbase_stride <= 0) {
+            spdlog::error("{} invalid modbase model stride: {}.", name, modbase_stride);
+            throw std::runtime_error(name + "model stride must be positive and non-zero.");
+        }
+        if (canonical_stride % modbase_stride != 0) {
+            spdlog::error("{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
+                          name, canonical_stride, modbase_stride);
+            throw std::runtime_error(name + "model strides are not compatible.");
+        }
+
+        if (chunked.chunk_size % modbase_stride != 0) {
+            spdlog::error("{} chunk_size:{} is not divisible by modbase_stride:{}.", name,
+                          chunked.chunk_size, modbase_stride);
+            throw std::runtime_error(name + "model stride and chunk size are not compatible.");
+        }
+
+        if (context.kmer_len != first_context.kmer_len) {
+            throw std::runtime_error(name + "all models must use the same kmer length.");
+        }
+
+        if (context.reverse != first_context.reverse) {
+            throw std::runtime_error(name + "all models must be exclusively for DNA or RNA.");
+        }
+    }
+    return model_runners;
+}
 
 }  // namespace
 
@@ -129,17 +196,19 @@ ModBaseChunkCallerNode::ModBaseChunkCallerNode(std::vector<modbase::RunnerPtr> m
                                                size_t canonical_stride,
                                                size_t max_reads)
         : MessageSink(max_reads, static_cast<int>(modbase_threads)),
-          m_runners(std::move(model_runners)),
+          m_runners(validate_runners(std::move(model_runners), canonical_stride)),
           m_canonical_stride(canonical_stride),
-          m_sequence_stride_ratio(m_runners.front()->model_params(0).general.stride_ratio()),
+          m_sequence_stride_ratio(
+                  config::get_chunked_model_stride_ratio(m_runners.front()->model_params(0))),
           m_batch_size(m_runners.front()->batch_size()),
-          m_kmer_len(m_runners.front()->model_params(0).context.kmer_len),
-          m_is_rna_model(m_runners.front()->model_params(0).context.reverse),
+          m_kmer_len(config::get_model_config_data(m_runners.front()->model_params(0))
+                             .context.kmer_len),
+          m_is_rna_model(config::get_model_config_data(m_runners.front()->model_params(0))
+                                 .context.reverse),
           m_processed_chunks(m_runners.size() * 8 * m_batch_size),
           m_pad_end_align(utils::get_dev_opt<bool>("modbase_pad_end_align", 0)),
           m_minimal_encode(activate_minimal_cg_encoding(m_runners)) {
     init_modbase_info();
-    validate_runners();
 
     m_processed_chunks.set_name("processed_chunks");
     const size_t num_models = m_runners.front()->num_models();
@@ -239,7 +308,7 @@ void ModBaseChunkCallerNode::init_modbase_info() {
     modbase::ModBaseContext context_handler;
     const size_t num_models = runner.num_models();
     for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        const auto& params = runner.model_params(model_id).mods;
+        const auto& params = config::get_model_config_data(runner.model_params(model_id)).mods;
         if (!params.motif.empty()) {
             context_handler.set_context(params.motif, size_t(params.motif_offset));
         }
@@ -251,61 +320,6 @@ void ModBaseChunkCallerNode::init_modbase_info() {
     m_mod_base_info = std::make_shared<ModBaseInfo>(
             std::move(mod_info.alphabet), std::move(mod_info.long_names), context_handler.encode());
     m_base_prob_offsets = mod_info.base_probs_offsets();
-}
-
-void ModBaseChunkCallerNode::validate_runners() const {
-    for (const auto& runner : m_runners) {
-        if (!runner->takes_chunk_inputs()) {
-            throw std::logic_error("Modbase model runner invalid for chunked caller: '" +
-                                   runner->get_name() + "'.");
-        }
-    }
-
-    const auto& runner = *m_runners.front();
-    const size_t num_models = runner.num_models();
-    for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        const auto& config = runner.model_params(model_id);
-
-        std::string name = "Modbase '";
-        name.push_back(config.mods.base);
-        name += "' config error - ";
-        if (!config.is_chunked_input_model()) {
-            throw std::runtime_error(name + "Runner requires chunked input modbase model.");
-        }
-
-        const auto& ctx = config.context;
-        if (ctx.chunk_size < ctx.samples_before + ctx.samples_after) {
-            spdlog::error("{} chunk_size:{} is less than samples_before:{} + samples_after:{}.",
-                          name, ctx.chunk_size, ctx.samples_before, ctx.samples_after);
-            throw std::runtime_error(name + "chunk_size is smaller than the context window.");
-        }
-
-        if (ctx.chunk_size % m_canonical_stride != 0) {
-            spdlog::error("{} chunk_size:{} is not divisible by canonical_model_stride:{}.", name,
-                          ctx.chunk_size, m_canonical_stride);
-            throw std::runtime_error(name + "model strides are not compatible.");
-        }
-
-        if (m_canonical_stride % config.general.stride != 0) {
-            spdlog::error("{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
-                          name, m_canonical_stride, config.general.stride);
-            throw std::runtime_error(name + "model strides are not compatible.");
-        }
-
-        if (ctx.chunk_size % config.general.stride != 0) {
-            spdlog::error("{} chunk_size:{} is not divisible by modbase_stride:{}.", name,
-                          ctx.chunk_size, config.general.stride);
-            throw std::runtime_error(name + "model stride and chunk size are not compatible.");
-        }
-
-        if (ctx.kmer_len != m_kmer_len) {
-            throw std::runtime_error(name + "all models must use the same kmer length.");
-        }
-
-        if (ctx.reverse != m_is_rna_model) {
-            throw std::runtime_error(name + "all models must be exclusively for DNA or RNA.");
-        }
-    }
 }
 
 void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
@@ -367,7 +381,8 @@ bool ModBaseChunkCallerNode::populate_hits_seq(PerBaseSizeTVec& per_base_hits_se
     bool has_hits = false;
     const size_t num_models = runner.num_models();
     for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        const auto base_id = runner.model_params(model_id).mods.base_id;
+        const auto base_id =
+                config::get_model_config_data(runner.model_params(model_id)).mods.base_id;
         auto& hits_seq = per_base_hits_seq.at(base_id);
         hits_seq = runner.get_motif_hits(model_id, seq);
         has_hits |= !hits_seq.empty();
@@ -383,7 +398,8 @@ void ModBaseChunkCallerNode::populate_hits_sig(PerBaseSizeTVec& per_base_hits_si
     nvtx3::scoped_range range{"pop_hits_sig"};
     const size_t num_models = runner.num_models();
     for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        const int base_id = runner.model_params(model_id).mods.base_id;
+        const int base_id =
+                config::get_model_config_data(runner.model_params(model_id)).mods.base_id;
         const auto& hits_seq = per_base_hits_seq.at(base_id);
         auto& hits_sig = per_base_hits_sig.at(base_id);
 
@@ -431,8 +447,8 @@ std::vector<bool> ModBaseChunkCallerNode::get_minimal_encoding_skips(
     const size_t num_models = runner.num_models();
     chunk_sizes.reserve(num_models);
     for (size_t model_id = 0; model_id < num_models; model_id++) {
-        chunk_sizes.push_back(
-                static_cast<uint64_t>(runner.model_params(model_id).context.chunk_size));
+        chunk_sizes.push_back(static_cast<uint64_t>(
+                config::get_chunked_model_params(runner.model_params(model_id)).chunk_size));
     }
 
     // Get contiguous intervals from all models and chunks.
@@ -595,15 +611,16 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
         auto& chunks_to_enqueue = chunks_to_enqueue_by_model.at(model_id);
 
         const auto& config = runner.model_params(model_id);
-        const auto base_id = config.mods.base_id;
+        const auto& data = dorado::config::get_model_config_data(config);
+        const auto base_id = data.mods.base_id;
 
         const auto& hits_to_sig = modbase_data.per_base_hits_sig[base_id];
 
-        const auto num_states = config.mods.count + 1;
-        const auto& ctx = config.context;
+        const auto num_states = data.mods.count + 1;
+        const auto& ctx = data.context;
         const auto chunk_starts = ModBaseChunkCallerNode::get_chunk_starts(
-                signal_len, hits_to_sig, ctx.chunk_size, ctx.samples_before, ctx.samples_after,
-                m_pad_end_align);
+                signal_len, hits_to_sig, config::get_chunked_model_params(config).chunk_size,
+                ctx.samples_before, ctx.samples_after, m_pad_end_align);
 
         for (const auto& [chunk_start, hit_idx] : chunk_starts) {
             chunks_to_enqueue.emplace_back(
@@ -886,8 +903,9 @@ void ModBaseChunkCallerNode::create_and_submit_chunks(
         const size_t model_id,
         const int64_t previous_chunk_count,
         std::vector<std::unique_ptr<ModBaseChunk>>& batched_chunks) const {
-    const auto& cfg = runner.model_params(model_id);
-    const int64_t chunk_size = cfg.context.chunk_size;
+    const auto& cfg = config::get_model_config_data(runner.model_params(model_id));
+    const int64_t chunk_size =
+            config::get_chunked_model_params(runner.model_params(model_id)).chunk_size;
     const int kmer_size_per_sample = cfg.context.kmer_len * utils::BaseInfo::NUM_BASES;
 
     const int64_t num_chunks = static_cast<int64_t>(batched_chunks.size());
@@ -1104,10 +1122,13 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         auto& read = get_read_common_data(working_read->read);
 
         // Extract useful modbase model parameters
-        const auto& cfg = runner.model_params(chunk->model_id);
+        const auto& model_config = runner.model_params(chunk->model_id);
+        const auto& cfg = config::get_model_config_data(model_config);
+        const auto& common = config::get_common_model_params(model_config);
+        const auto& chunked = config::get_chunked_model_params(model_config);
         const char modbase_model_base = cfg.mods.base;
-        const int64_t modbase_stride = cfg.general.stride;
-        const int64_t chunk_size = cfg.context.chunk_size;
+        const int64_t modbase_stride = common.stride;
+        const int64_t chunk_size = chunked.chunk_size;
         const int64_t context_samples_before = cfg.context.samples_before;
         const int64_t context_samples_after = cfg.context.samples_after;
 

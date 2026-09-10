@@ -42,13 +42,11 @@ ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config
                                         const at::TensorOptions& opts,
                                         const int batch_size_)
         : params(config),
-          kmer_refinement_levels(load_kmer_refinement_levels(config)),
           module_holder(load_modbase_model(params, opts, batch_size_)),
           matcher(params),
           batch_size(batch_size_) {
-    if (params.refine.do_rough_rescale) {
-        scaler = std::make_unique<ModBaseScaler>(kmer_refinement_levels, params.general.kmer_len,
-                                                 params.refine.center_idx);
+    if (config::get_model_config_data(params).refine.do_rough_rescale) {
+        scaler = std::make_unique<ModBaseScaler>(params);
     }
 
 #if DORADO_CUDA_BUILD
@@ -56,7 +54,8 @@ ModBaseCaller::ModBaseData::ModBaseData(const config::ModBaseModelConfig& config
         c10::cuda::CUDAGuard device_guard(opts.device());
         stream = c10::cuda::getStreamFromPool(false, opts.device().index());
 
-        const int channels = utils::BaseInfo::NUM_BASES * params.general.kmer_len;
+        const int channels =
+                utils::BaseInfo::NUM_BASES * config::get_model_config_data(params).context.kmer_len;
 
         // Warmup
         c10::cuda::CUDAStreamGuard guard(*stream);
@@ -76,8 +75,10 @@ int64_t ModBaseCaller::ModBaseData::get_sig_len() const {
     // Depending on the model type, the signal/encoded sequence length either directly
     // defined in the model config, or determined by a chunk size a la canonical base calling.
 
-    const int64_t cs =
-            params.is_chunked_input_model() ? params.context.chunk_size : params.context.samples;
+    const auto& data = config::get_model_config_data(params);
+    const int64_t cs = config::is_chunked_input_model(params)
+                               ? config::get_chunked_model_params(params).chunk_size
+                               : data.context.samples;
     if (cs < 0) {
         throw std::runtime_error("Integer conversion error in ModBaseData::get_sig_len value: '" +
                                  std::to_string(cs) + "'.");
@@ -89,11 +90,11 @@ int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
     // Depending on the model type, the signal/encoded sequence length either directly
     // defined in the model config, or determined by a chunk size a la canonical base calling.
     const auto signal_len = get_sig_len();
-    if (!params.general.modules.has_value()) {
+    if (!config::is_chunked_input_model(params)) {
         return signal_len;
     }
 
-    const int stride_ratio = params.general.modules->stride_ratio();
+    const int stride_ratio = config::get_chunked_model_stride_ratio(params);
     if ((signal_len % stride_ratio) != 0) {
         throw std::runtime_error(
                 "modbase chunk size must be evenly divisible by sequence stride ratio");
@@ -162,7 +163,8 @@ std::vector<at::Tensor> ModBaseCaller::create_input_seq_tensors() const {
     std::vector<at::Tensor> input_seqs;
     input_seqs.reserve(m_model_data.size());
     for (const auto& model_data : m_model_data) {
-        const int channels = model_data->params.context.kmer_len * utils::BaseInfo::NUM_BASES;
+        const int channels = config::get_model_config_data(model_data->params).context.kmer_len *
+                             utils::BaseInfo::NUM_BASES;
         const auto seq_len = model_data->get_seq_len();
         input_seqs.emplace_back(torch::empty({model_data->batch_size, seq_len, channels}, opts));
     }
