@@ -8,6 +8,7 @@
 #include <filesystem>
 #include <optional>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace dorado::config {
@@ -176,13 +177,13 @@ bool is_chunked_input_model(const ModBaseModelConfig& config);
 
 const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(
+std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(
         const modbase::ConvLSTMV3ModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(
+std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
         const modbase::ConvLSTMV3ModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config);
-std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config);
+std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config);
+std::pair<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config);
+std::pair<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config);
 const modbase::ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
 
 bool is_modbase_model(const std::filesystem::path& path);

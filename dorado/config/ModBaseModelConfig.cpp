@@ -641,51 +641,51 @@ int get_chunked_model_stride_ratio(const ModBaseModelConfig& config) {
             config);
 }
 
-std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(
+std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(
         const modbase::ConvLSTMV3ModelConfig& config) {
     return {config.chunked.chunk_size / (config.general.stride / config.sequence_stride),
             config.data.context.kmer_len * 4};
 }
 
-std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(
+std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
         const modbase::ConvLSTMV3ModelConfig& config) {
     return {config.chunked.chunk_size, 1};
 }
 
-std::tuple<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {
+std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
                     [](const modbase::ConvLSTMV2ModelConfig& model) {
-                        return std::tuple{model.chunked.chunk_size,
-                                          int64_t(model.data.context.kmer_len * 4)};
+                        return std::pair{model.chunked.chunk_size,
+                                         int64_t(model.data.context.kmer_len * 4)};
                     },
                     [](const modbase::ConvLSTMV3ModelConfig& model) {
                         return get_chunked_sequence_input_TC(model);
                     },
-                    [](const auto&) -> std::tuple<int64_t, int64_t> {
+                    [](const auto&) -> std::pair<int64_t, int64_t> {
                         throw std::runtime_error("Modbase model does not accept chunked input");
                     },
             },
             config);
 }
 
-std::tuple<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config) {
+std::pair<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config) {
     return std::visit(
             utils::overloaded{
                     [](const modbase::ConvLSTMV2ModelConfig& model) {
-                        return std::tuple{model.chunked.chunk_size, int64_t(1)};
+                        return std::pair{model.chunked.chunk_size, int64_t(1)};
                     },
                     [](const modbase::ConvLSTMV3ModelConfig& model) {
                         return get_chunked_signal_input_TC(model);
                     },
-                    [](const auto&) -> std::tuple<int64_t, int64_t> {
+                    [](const auto&) -> std::pair<int64_t, int64_t> {
                         throw std::runtime_error("Modbase model does not accept chunked input");
                     },
             },
             config);
 }
 
-std::tuple<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config) {
+std::pair<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config) {
     const auto& params = get_chunked_model_params(config);
     const auto& common = get_common_model_params(config);
     return {params.chunk_size / common.stride, common.num_out};
