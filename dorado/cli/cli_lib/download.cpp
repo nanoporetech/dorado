@@ -138,8 +138,8 @@ int download(int argc, char* argv[]) {
                 .help("the model to download");
 
         auto& models_dir_arg = parser.add_argument("--models-directory")
-                                       .default_value(std::string("."))
-                                       .help("the directory to download the models into");
+                                       .help("Set the directory to download the models into."
+                                             " Uses the current working directory if not present.");
         parser.add_hidden_alias_for(models_dir_arg, "--directory");
 
         parser.add_argument("--data")
@@ -192,8 +192,11 @@ int download(int argc, char* argv[]) {
     }
 
     try {
-        const auto models_directory =
-                get_models_directory(parser.get<std::string>("--models-directory"));
+        auto models_directory =
+                get_models_directory(parser.present<std::string>("--models-directory"));
+        if (!models_directory.has_value()) {
+            models_directory = std::filesystem::current_path();
+        }
         model_downloader::ModelDownloader downloader(models_directory, true);
 
         const auto model_arg = parser.get<std::string>("--model");
