@@ -93,15 +93,18 @@ bool download_named_or_path(const models::ModelComplex& complex,
 }
 
 bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
-    const auto data = parser.get<std::string>("--data");
+    const auto data = parser.present<std::string>("--data");
     const auto recursive = parser.get<bool>("--recursive");
 
     try {
         data_loader::InputFiles input_files;
-        if (!data.empty()) {
-            input_files = data_loader::InputFiles::search_pod5s(data, recursive);
+        if (data.has_value()) {
+            if (!std::filesystem::exists(*data)) {
+                spdlog::error("Specified data path does not exist: '{}'.", *data);
+            }
+            input_files = data_loader::InputFiles::search_pod5s(*data, recursive);
             if (input_files.get().empty()) {
-                spdlog::error("No POD5 files found in '{}' recursive:'{}'.", data, recursive);
+                spdlog::error("No POD5 files found in '{}' recursive:'{}'.", *data, recursive);
                 return false;
             }
         }
@@ -136,7 +139,8 @@ int download(int argc, char* argv[]) {
         parser.add_group("model selection");
         parser.add_argument("--model")
                 .default_value(std::string("all"))
-                .help("the model to download");
+                .help("the model to download")
+                .nargs(1);
 
         auto& models_dir_arg = parser.add_argument("--models-directory")
                                        .help("Set the directory to download the models into."
@@ -144,8 +148,8 @@ int download(int argc, char* argv[]) {
         parser.add_hidden_alias_for(models_dir_arg, "--directory");
 
         parser.add_argument("--data")
-                .default_value(std::string())
-                .help("path to POD5 data used to automatically select models");
+                .help("path to POD5 data used to automatically select models")
+                .nargs(1);
         parser.add_argument("-r", "--recursive")
                 .default_value(false)
                 .implicit_value(true)
@@ -153,13 +157,14 @@ int download(int argc, char* argv[]) {
     }
     {
         parser.add_group("model lists");
-        parser.add_argument("--list").default_value(false).implicit_value(true).help(
+        auto& list_group = parser.add_mutually_exclusive_group();
+        list_group.add_argument("--list").default_value(false).implicit_value(true).help(
                 "list the available models for download");
-        parser.add_argument("--list-yaml")
+        list_group.add_argument("--list-yaml")
                 .help("list the available models for download, as yaml, to stdout")
                 .default_value(false)
                 .implicit_value(true);
-        parser.add_argument("--list-structured")
+        list_group.add_argument("--list-structured")
                 .help("list the available models in a structured format, as yaml, to stdout")
                 .default_value(false)
                 .implicit_value(true);
