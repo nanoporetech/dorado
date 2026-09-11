@@ -1,7 +1,6 @@
 #pragma once
 
 #include <ATen/core/TensorBody.h>
-#include <cuda_runtime_api.h>
 
 #include <array>
 #include <utility>
@@ -22,12 +21,10 @@ std::pair<at::Tensor, at::Tensor> to_block_fp4(const at::Tensor& t_in, const flo
 at::Tensor convert_to_nvfp4_tiled(const at::Tensor& t,
                                   const std::array<int64_t, 2>& smem_dims,
                                   const bool is_B,
-                                  const at::TensorOptions i32_opts,
-                                  const cudaStream_t stream_ptr);
+                                  const at::TensorOptions i32_opts);
 
 at::Tensor untile_nvfp4(const at::Tensor& t_nvfp4,
                         const std::array<int64_t, 2>& smem_dims,
-                        const at::TensorOptions f16_opts,
-                        const cudaStream_t stream_ptr);
+                        const at::TensorOptions f16_opts);
 
 }  // namespace dorado::nn

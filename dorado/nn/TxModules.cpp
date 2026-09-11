@@ -644,11 +644,9 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
 #endif
 }
 
-void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4,
-                                      const int N,
-                                      const int T,
-                                      const cudaStream_t stream) {
+void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, const int T) {
 #if DORADO_CUDA_BUILD && !DORADO_ORIN
+    auto stream = at::cuda::getCurrentCUDAStream().stream();
     const int C = params.d_model;
     const int D = params.d_model / params.nhead;
     const int H = params.nhead;
@@ -744,8 +742,8 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4,
                                                .transpose(1, 2)
                                                .contiguous()
                                                .reshape({C, H * D});
-        proj_weight = convert_to_nvfp4_tiled(proj_weight_interleaved, {SMEM_N, SMEM_K}, true,
-                                             i32_opts, stream);
+        proj_weight =
+                convert_to_nvfp4_tiled(proj_weight_interleaved, {SMEM_N, SMEM_K}, true, i32_opts);
 
         // Projection Bias weights
         proj_bias = self_attn->out_proj->bias.view({C});
@@ -765,16 +763,16 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4,
                                          .contiguous()
                                          .reshape({E, C});
 
-        t_fc1_wts_f16.t = convert_to_nvfp4_tiled(fc1_weight_interleaved, {SMEM_N, SMEM_K}, true,
-                                                 i32_opts, stream);
+        t_fc1_wts_f16.t =
+                convert_to_nvfp4_tiled(fc1_weight_interleaved, {SMEM_N, SMEM_K}, true, i32_opts);
 
         // FC2
         auto fc2_weights_interleaved = ff->fc2->weight.view({C / 64, 4, 8, 2, E / 2})
                                                .transpose(1, 2)
                                                .contiguous()
                                                .reshape({C, E / 2});
-        t_fc2_wts = convert_to_nvfp4_tiled(fc2_weights_interleaved, {SMEM_N, SMEM_K}, true,
-                                           i32_opts, stream);
+        t_fc2_wts =
+                convert_to_nvfp4_tiled(fc2_weights_interleaved, {SMEM_N, SMEM_K}, true, i32_opts);
     }
     utils::ScopedProfileRange layer_spr("TxLayerKoiBlackwell12", 2);
 
@@ -1074,7 +1072,6 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] Aux
         const int C = static_cast<int>(x.size(2));
 
         at::Tensor x_tiled_nvfp4;
-        const cudaStream_t stream = at::cuda::getCurrentCUDAStream().stream();
         {
             utils::ScopedProfileRange spr("Tile Input to NVFP4", 2);
             if (test_nvfp4_tx_perf) {
@@ -1083,12 +1080,12 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] Aux
                                         .view(torch::kInt);
             } else {
                 x_tiled_nvfp4 = convert_to_nvfp4_tiled(x.reshape({(N * T), C}), {256, 128}, false,
-                                                       x.options().dtype(torch::kInt), stream);
+                                                       x.options().dtype(torch::kInt));
             }
         }
 
         for (auto &layer : layer_vec) {
-            layer->koi_nvfp4_forward(x_tiled_nvfp4, N, T, stream);
+            layer->koi_nvfp4_forward(x_tiled_nvfp4, N, T);
         }
 
         at::Tensor untiled_f16;
@@ -1099,7 +1096,7 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] Aux
                 untiled_f16 = torch::randn({N, T, C}, x.options().dtype(torch::kHalf));
             } else {
                 untiled_f16 = untile_nvfp4(x_tiled_nvfp4, {256, 128},
-                                           x_tiled_nvfp4.options().dtype(torch::kHalf), stream);
+                                           x_tiled_nvfp4.options().dtype(torch::kHalf));
                 untiled_f16 = untiled_f16.view({N, T, C});
             }
         }

@@ -3,6 +3,7 @@
 #include <ATen/cuda/CUDAContextLight.h>
 #include <ATen/ops/cat.h>
 #include <ATen/ops/empty.h>
+#include <c10/cuda/CUDAStream.h>
 
 namespace {
 
@@ -69,8 +70,9 @@ std::pair<at::Tensor, at::Tensor> to_block_fp4(const at::Tensor& t_in, const flo
 at::Tensor convert_to_nvfp4_tiled(const at::Tensor& t,
                                   const std::array<int64_t, 2>& smem_dims,
                                   const bool is_B,
-                                  const at::TensorOptions i32_opts,
-                                  const cudaStream_t stream_ptr) {
+                                  const at::TensorOptions i32_opts) {
+    const cudaStream_t stream_ptr = at::cuda::getCurrentCUDAStream().stream();
+
     TORCH_CHECK(t.dim() == 2, "convert_to_nvfp4_tiled expects 2 dimensions, [M_or_N, K], got ",
                 t.dim(), " dimensions");
     // Tensors must always be K-major
@@ -107,8 +109,9 @@ at::Tensor convert_to_nvfp4_tiled(const at::Tensor& t,
 
 at::Tensor untile_nvfp4(const at::Tensor& t_nvfp4,
                         const std::array<int64_t, 2>& smem_dims,
-                        const at::TensorOptions f16_opts,
-                        const cudaStream_t stream_ptr) {
+                        const at::TensorOptions f16_opts) {
+    const cudaStream_t stream_ptr = at::cuda::getCurrentCUDAStream().stream();
+
     TORCH_CHECK(t_nvfp4.scalar_type() == c10::kInt);
     TORCH_CHECK(t_nvfp4.dim() == 4, "A koi NVFP4 tensor needs to have 4 dimensions: ",
                 "[M / SMEM_M, N / SMEM_N, (SMEM_M / 32) * (SMEM_N / 64), 288]");
