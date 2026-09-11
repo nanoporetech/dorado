@@ -124,7 +124,7 @@ std::string LinearUpsampleParams::to_string() const {
     std::ostringstream oss;
     oss << "LinearUpsampleParams {"
         << " size:" << size << " scale_factor:" << scale_factor << " }";
-    return oss.str();
+    return std::move(oss).str();
 }
 
 std::string TransformerEncoderLayerParams::to_string() const {
