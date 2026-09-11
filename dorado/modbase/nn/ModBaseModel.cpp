@@ -69,6 +69,23 @@ std::vector<std::string> load_modbase_conv_lstm_weights(bool has_upsample) {
 
 }  // namespace
 
+#if DORADO_CUDA_BUILD
+namespace dorado {
+namespace {
+std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(
+        const config::modbase::ConvLSTMV3ModelConfig& config) {
+    return {config.chunked.chunk_size / (config.general.stride / config.sequence_stride),
+            config.data.context.kmer_len * 4};
+}
+
+std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
+        const config::modbase::ConvLSTMV3ModelConfig& config) {
+    return {config.chunked.chunk_size, 1};
+}
+}  // namespace
+}  // namespace dorado
+#endif
+
 namespace dorado::modbase {
 
 namespace model {
@@ -465,13 +482,13 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             // Reserve and allocate working memory for the sequence convs
-            const auto [T, C] = config::get_chunked_sequence_input_TC(m_config);
+            const auto [T, C] = get_chunked_sequence_input_TC(m_config);
             wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
             seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
         }
         {
             // Reserve and allocate working memory for everything else
-            const auto [T, C] = config::get_chunked_signal_input_TC(m_config);
+            const auto [T, C] = get_chunked_signal_input_TC(m_config);
             wm.next_TC(T, C, nn::TensorLayout::NTC);
             sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
@@ -501,7 +518,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
 
         {
             utils::ScopedProfileRange spr2("seq_copy", 2);
-            const auto [Tin_seq, Cin_seq] = config::get_chunked_sequence_input_TC(m_config);
+            const auto [Tin_seq, Cin_seq] = get_chunked_sequence_input_TC(m_config);
             if (!wm_seq.backing_tensor.defined()) {
                 wm_seq.allocate_backing_tensor(seqs_NTC.device());
             }
@@ -510,7 +527,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
         }
         {
             utils::ScopedProfileRange spr2("sig_copy", 2);
-            const auto [Tin_sig, Cin_sig] = config::get_chunked_signal_input_TC(m_config);
+            const auto [Tin_sig, Cin_sig] = get_chunked_signal_input_TC(m_config);
             if (!wm.backing_tensor.defined()) {
                 wm.allocate_backing_tensor(sigs_N1T.device());
             }
@@ -653,6 +670,11 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
                         auto model = model::ModBaseConvLSTMV3Model(model_config);
                         return populate_model(std::move(model), model_config.data.model_path,
                                               options);
+                    },
+                    [&](const config::modbase::LatentSpaceV1ModelConfig&)
+                            -> torch::nn::ModuleHolder<torch::nn::AnyModule> {
+                        throw std::runtime_error(
+                                "Latent space modbase model inference is not implemented");
                     },
             },
             config);

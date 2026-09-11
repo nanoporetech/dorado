@@ -2,6 +2,7 @@
 
 #include <cmath>
 #include <string>
+#include <utility>
 #include <vector>
 
 // Forward declaration of toml::value taken from toml_fwd.hpp
@@ -28,6 +29,7 @@ enum class SublayerType {
     LINEAR_CRF_ENCODER,
     LSTM,
     PERMUTE,
+    TRANSFORMER_ENCODER,
     UPSAMPLE,
     UNRECOGNISED
 };
@@ -49,6 +51,27 @@ struct ConvParams {
 
 ConvParams parse_conv_params(const toml::value& segment, bool has_clamp_next);
 std::vector<ConvParams> parse_convs(const std::vector<toml::value>& sublayers);
+
+struct TransformerEncoderLayerParams {
+    // The number of expected features in the encoder/decoder inputs.
+    int d_model{-1};
+    // The number of heads in the multi-head attention model.
+    int nhead{-1};
+    // The dimension of the feedforward model.
+    int dim_feedforward{-1};
+    // Pair defining the possibly asymmetric sliding attention window mask.
+    std::pair<int, int> attn_window{-1, -1};
+    // DeepNorm normalization parameters.
+    float deepnorm_alpha{1.0f};
+    float deepnorm_beta{1.0f};
+    // Multi-head attention RoPE parameters.
+    float theta{10000.0f};
+    int max_seq_len{0};
+
+    std::string to_string() const;
+};
+
+TransformerEncoderLayerParams parse_transformer_encoder_layer_params(const toml::value& layer);
 
 struct LinearUpsampleParams {
     int size;             // Number of input features

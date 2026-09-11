@@ -2,6 +2,7 @@
 
 #include "AuxiliaryData.h"
 #include "config/BasecallModelConfig.h"
+#include "config/common.h"
 #include "nn/RMSNorm.h"
 #include "torch_utils/tensor_utils.h"
 
@@ -94,14 +95,15 @@ struct MultiHeadAttentionImpl : torch::nn::Module {
 TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
-    TxEncoderImpl(const config::TxEncoderParams &params, const at::TensorOptions &options);
+    TxEncoderImpl(const config::TransformerEncoderLayerParams &params,
+                  const at::TensorOptions &options);
 
     at::Tensor forward(at::Tensor x);
 
     void koi_forward(utils::ScaledTensor &scaled_tensor, at::Tensor &x_f16, AuxiliaryData *aux);
     void koi_volta_forward(at::Tensor &x_f16);
 
-    config::TxEncoderParams params;
+    config::TransformerEncoderLayerParams params;
 
     // Rearranged weights for Koi tiled codepath
     utils::ScaledTensor wqkv_weights_i8, wqkv_weights_f16, t_fc1_wts_i8, t_fc1_wts_f8,

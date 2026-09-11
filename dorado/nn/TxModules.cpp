@@ -411,7 +411,8 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
     return x;
 };
 
-TxEncoderImpl::TxEncoderImpl(const TxEncoderParams &params_, const at::TensorOptions &options)
+TxEncoderImpl::TxEncoderImpl(const TransformerEncoderLayerParams &params_,
+                             const at::TensorOptions &options)
         : params(params_) {
     self_attn =
             register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
@@ -832,12 +833,13 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
                                        const at::TensorOptions &options) {
 #if DORADO_CUDA_BUILD
     // TODO: make sure these are all the requirements
+    const auto &layers = params.layer_params;
     const bool is_sup_model =
-            (params.d_model == 512) && (params.nhead == 8) && (params.attn_window.first == 127) &&
-            (params.attn_window.second == 128) && (params.dim_feedforward == 2048);
+            (layers.d_model == 512) && (layers.nhead == 8) && (layers.attn_window.first == 127) &&
+            (layers.attn_window.second == 128) && (layers.dim_feedforward == 2048);
     const bool is_hyp_model =
-            (params.d_model == 1536) && (params.nhead == 24) && (params.attn_window.first == 255) &&
-            (params.attn_window.second == 256) && (params.dim_feedforward == 6144);
+            (layers.d_model == 1536) && (layers.nhead == 24) && (layers.attn_window.first == 255) &&
+            (layers.attn_window.second == 256) && (layers.dim_feedforward == 6144);
     use_koi_tiled = (is_sup_model || is_hyp_model) && options.device().is_cuda() &&
                     (koi_tc_is_available(KOI_F16) == KOI_SUCCESS);
     spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
@@ -852,7 +854,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
 
     stack = Sequential();
     for (int i = 0; i < params.depth; ++i) {
-        TxEncoder encoder(params, options);
+        TxEncoder encoder(params.layer_params, options);
         stack->push_back(register_module("transformer_encoder" + std::to_string(i), encoder));
         layer_vec.push_back(encoder);
     }

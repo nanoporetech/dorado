@@ -1,6 +1,7 @@
 #include "TestUtils.h"
 #include "config/ModBaseModelConfig.h"
 #include "config/common.h"
+#include "utils/overloaded.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -24,21 +25,41 @@ struct General {
 
 General get_general(const ModBaseModelConfig& config) {
     return std::visit(
-            [](const auto& model) -> General {
-                using T = std::decay_t<decltype(model)>;
-                if constexpr (std::is_same_v<T, ConvOnlyModelConfig>) {
-                    return {ModelType::CONV_V1, model.general.size, model.general.kmer_len,
-                            model.general.num_out, std::nullopt};
-                } else if constexpr (std::is_same_v<T, ConvLSTMModelConfig>) {
-                    return {ModelType::CONV_LSTM_V1, model.general.size, model.general.kmer_len,
-                            model.general.num_out, std::nullopt};
-                } else if constexpr (std::is_same_v<T, ConvLSTMV2ModelConfig>) {
-                    return {ModelType::CONV_LSTM_V2, model.general.size, model.general.kmer_len,
-                            model.general.num_out, std::nullopt};
-                } else {
-                    return {ModelType::CONV_LSTM_V3, model.general.size, model.general.kmer_len,
-                            model.general.num_out, model.modules};
-                }
+            dorado::utils::overloaded{
+                    [](const ConvOnlyModelConfig& model) -> General {
+                        return {
+                                ModelType::CONV_V1,    model.general.size, model.general.kmer_len,
+                                model.general.num_out, std::nullopt,
+                        };
+                    },
+                    [](const ConvLSTMModelConfig& model) -> General {
+                        return {
+                                ModelType::CONV_LSTM_V1, model.general.size, model.general.kmer_len,
+                                model.general.num_out,   std::nullopt,
+                        };
+                    },
+                    [](const ConvLSTMV2ModelConfig& model) -> General {
+                        return {
+                                ModelType::CONV_LSTM_V2, model.general.size, model.general.kmer_len,
+                                model.general.num_out,   std::nullopt,
+                        };
+                    },
+                    [](const ConvLSTMV3ModelConfig& model) -> General {
+                        return {
+                                ModelType::CONV_LSTM_V3, model.general.size, model.general.kmer_len,
+                                model.general.num_out,   model.modules,
+                        };
+                    },
+                    [](const LatentSpaceV1ModelConfig& model) -> General {
+                        return {
+                                ModelType::LATENT_SPACE_V1,
+                                model.general.size,
+                                model.general.kmer_len,
+                                model.general.num_out,
+                                std::nullopt,
+                        };
+                    },
+                    [](const auto&) -> General { throw std::logic_error("Invalid config type."); },
             },
             config);
 }
@@ -60,6 +81,8 @@ const char config_5mCG_5hmCG_v3[] = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mCG_5hm
 const char config_6mA_v3[] = "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v3";
 const char config_6mA_v4[] = "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_6mA@v4";
 const char config_5mCG_conv_only[] = "dna_r9.4.1_e8_sup@v3.3_5mCG@v0.1";
+const char config_6mA_latent_space[] = "latent_space_6mA";
+const char config_6mA_latent_space_multilayer[] = "latent_space_6mA_multilayer";
 
 const ModulesParams modules_6mA_v4{
         // Sequence Convs
@@ -96,51 +119,58 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
             std::make_tuple(
                 config_5mCG_conv_only,
                 Gen{ModelType::CONV_V1, 64, 9, 2, std::nullopt},
-                Mod{{"m"}, {"5mC"}, "CG", 0,},
+                Mod{{"m"}, {"5mC"}, "CG", 0},
                 Ctx{50, 50, 4, 4, false, false},
                 Rmt{}
             ),
             std::make_tuple(
                 config_5mCG_5hmCG,
                 Gen{ModelType::CONV_LSTM_V1, 256, 9, 3, std::nullopt},
-                Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0,},                
+                Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0},
                 Ctx{50, 50, 4, 4, false, false},
                 Rmt{6}
             ),
             std::make_tuple(
                 config_pseU,
                 Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, std::nullopt},
-                Mod{{"17802"}, {"pseU"}, "T", 0},            
+                Mod{{"17802"}, {"pseU"}, "T", 0},
                 Ctx{150, 150, 4, 4, true, false},
                 Rmt{3}
             ),
             std::make_tuple(
                 config_pseU_j,
                 Gen{ModelType::CONV_LSTM_V1, 128, 9, 2, std::nullopt},
-                Mod{{"17802"}, {"pseU"}, "T", 0},            
+                Mod{{"17802"}, {"pseU"}, "T", 0},
                 Ctx{150, 150, 4, 4, true, true},
                 Rmt{3}
             ),
             std::make_tuple(
                 config_5mCG_5hmCG_v3,
                 Gen{ModelType::CONV_LSTM_V2, 256, 9, 3, std::nullopt},
-                Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0},            
+                Mod{{"h", "m"}, {"5hmC", "5mC"}, "CG", 0},
                 Ctx{96, 96, 4, 4, false, true},
                 Rmt{6}
             ),
             std::make_tuple(
                 config_6mA_v3,
                 Gen{ModelType::CONV_LSTM_V2, 256, 9, 2, std::nullopt},
-                Mod{{"a"}, {"6mA"}, "A", 0},            
+                Mod{{"a"}, {"6mA"}, "A", 0},
                 Ctx{150, 150, 4, 4, false, true},
                 Rmt{6}
             ),
             std::make_tuple(
                 config_6mA_v4,
                 Gen{ModelType::CONV_LSTM_V3, 384, 9, 2, modules_6mA_v4},
-                Mod{{"a"}, {"6mA"}, "A", 0},            
+                Mod{{"a"}, {"6mA"}, "A", 0},
                 Ctx{150, 150, 4, 4, false, true},
                 Rmt{6}
+            ),
+            std::make_tuple(
+                config_6mA_latent_space,
+                Gen{ModelType::LATENT_SPACE_V1, 64, 9, 2, std::nullopt},
+                Mod{{"a"}, {"6mA"}, "A", 0},
+                Ctx{150, 150, 4, 4, false, true},
+                Rmt{}
             ),
             }));
     // clang-format on
@@ -212,20 +242,6 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
         CATCH_CHECK(c.base_start_justify == context.base_start_justify);
     }
 
-    CATCH_SECTION("chunked tensor dimensions") {
-        if (const auto* v2 = std::get_if<ConvLSTMV2ModelConfig>(&model)) {
-            const auto [seq_t, seq_c] = get_chunked_sequence_input_TC(model);
-            const auto [sig_t, sig_c] = get_chunked_signal_input_TC(model);
-            const auto [out_t, out_c] = get_chunked_output_TC(model);
-            CATCH_CHECK(seq_t == v2->chunked.chunk_size);
-            CATCH_CHECK(seq_c == v2->data.context.kmer_len * 4);
-            CATCH_CHECK(sig_t == v2->chunked.chunk_size);
-            CATCH_CHECK(sig_c == 1);
-            CATCH_CHECK(out_t == v2->chunked.chunk_size / v2->general.stride);
-            CATCH_CHECK(out_c == v2->general.num_out);
-        }
-    }
-
     CATCH_SECTION("refinement parameters") {
         const auto& r = get_model_config_data(model).refine;
         CATCH_CAPTURE(path, r.do_rough_rescale, r.center_idx);
@@ -233,4 +249,60 @@ CATCH_TEST_CASE(TEST_GROUP ": modbase model parser", TEST_GROUP) {
         CATCH_CHECK(r.center_idx == refine.center_idx);
         CATCH_CHECK(r.center_idx < static_cast<size_t>(general.kmer_len));
     }
+}
+
+CATCH_TEST_CASE(TEST_GROUP ": latent space model parser", TEST_GROUP) {
+    const auto path = get_data_dir("model_configs") / config_6mA_latent_space;
+    const auto model = load_modbase_model_config(path);
+    const auto& latent = std::get<LatentSpaceV1ModelConfig>(model);
+
+    CATCH_CHECK(get_modbase_model_type(path) == ModelType::LATENT_SPACE_V1);
+    CATCH_CHECK(to_string(ModelType::LATENT_SPACE_V1) == "latent_space_v1");
+    CATCH_CHECK(is_chunked_input_model(model));
+    CATCH_CHECK(latent.chunked.chunk_size == 1536);
+    CATCH_CHECK(latent.sequence_stride == 1);
+
+    const auto& modules = latent.modules;
+    CATCH_REQUIRE(modules.sequence_convs.size() == 1);
+    check_conv_params(modules.sequence_convs.front(),
+                      ConvParams{36, 64, 5, 1, Activation::TANH, 0});
+    CATCH_REQUIRE(modules.projection.size() == 1);
+    CATCH_CHECK(modules.projection.front().in_size == 1024);
+    CATCH_CHECK(modules.projection.front().out_size == 64);
+    CATCH_REQUIRE(modules.classifier.size() == 1);
+    CATCH_CHECK(modules.classifier.front().in_size == 64);
+    CATCH_CHECK(modules.classifier.front().out_size == 2);
+
+    CATCH_REQUIRE(modules.transformer_encoder.size() == 3);
+    for (const auto& layer : modules.transformer_encoder) {
+        CATCH_CHECK(layer.d_model == 64);
+        CATCH_CHECK(layer.nhead == 4);
+        CATCH_CHECK(layer.dim_feedforward == 128);
+        CATCH_CHECK(layer.deepnorm_alpha == 1.5650845f);
+        CATCH_CHECK(layer.deepnorm_beta == 0.4518010f);
+        CATCH_CHECK(layer.attn_window == std::pair<int, int>{15, 16});
+    }
+}
+
+CATCH_TEST_CASE(TEST_GROUP ": latent space model parser supports multilayer modules", TEST_GROUP) {
+    const auto path = get_data_dir("model_configs") / config_6mA_latent_space_multilayer;
+    const auto model = load_modbase_model_config(path);
+    const auto& latent = std::get<LatentSpaceV1ModelConfig>(model);
+    const auto& modules = latent.modules;
+
+    CATCH_REQUIRE(modules.sequence_convs.size() == 2);
+    check_conv_params(modules.sequence_convs.at(0), ConvParams{36, 32, 5, 1, Activation::TANH, 0});
+    check_conv_params(modules.sequence_convs.at(1), ConvParams{32, 64, 3, 1, Activation::TANH, 0});
+
+    CATCH_REQUIRE(modules.projection.size() == 2);
+    CATCH_CHECK(modules.projection.at(0).in_size == 1024);
+    CATCH_CHECK(modules.projection.at(0).out_size == 32);
+    CATCH_CHECK(modules.projection.at(1).in_size == 32);
+    CATCH_CHECK(modules.projection.at(1).out_size == 64);
+
+    CATCH_REQUIRE(modules.classifier.size() == 2);
+    CATCH_CHECK(modules.classifier.at(0).in_size == 64);
+    CATCH_CHECK(modules.classifier.at(0).out_size == 16);
+    CATCH_CHECK(modules.classifier.at(1).in_size == 16);
+    CATCH_CHECK(modules.classifier.at(1).out_size == 2);
 }

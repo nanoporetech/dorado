@@ -48,7 +48,7 @@ bool check_variable_chunk_sizes_supported(
                         [](const int device_id) { return !nn::koi_can_run_tx_vcs(device_id); })) {
             return false;
         }
-        auto& params = model_config.tx->tx;
+        auto& params = model_config.tx->tx.layer_params;
         // TODO: Need a better way to recognise SUP
         const bool is_sup_model = (params.d_model == 512) && (params.nhead == 8) &&
                                   (params.attn_window.first == 127) &&

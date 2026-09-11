@@ -407,27 +407,7 @@ TxEncoderParams parse_tx_encoder_params(const toml::value &cfg) {
     params.depth = toml::find<int>(enc, "depth");
 
     const auto &layer = toml::find(enc, keys::LAYER);
-    params.d_model = toml::find<int>(layer, "d_model");
-    params.nhead = toml::find<int>(layer, "nhead");
-    params.dim_feedforward = toml::find<int>(layer, "dim_feedforward");
-    params.deepnorm_alpha = toml::find<float>(layer, "deepnorm_alpha");
-    if (layer.contains("max_seq_len")) {
-        params.max_seq_len = toml::find<int>(layer, "max_seq_len");
-    }
-
-    if (layer.contains("rotary_base") && layer.contains("theta")) {
-        throw std::runtime_error(
-                "Model Config Error. [model.encoder.transformer_encoder] 'rotary_base' and 'theta' "
-                "are mutually exclusive.");
-    } else if (layer.contains("theta")) {
-        params.theta = toml::find<float>(layer, "theta");
-    } else if (layer.contains("rotary_base")) {
-        params.theta = toml::find<float>(layer, "rotary_base");
-    }
-
-    const auto attn_window_ = toml::find(layer, "attn_window").as_array();
-    params.attn_window = {static_cast<int>(attn_window_[0].as_integer()),
-                          static_cast<int>(attn_window_[1].as_integer())};
+    params.layer_params = parse_transformer_encoder_layer_params(layer);
     return params;
 }
 
@@ -511,8 +491,10 @@ void TxStack::check() const {
             spdlog::warn("Transformer model params check - expected {} but {} != {}", msg, a, b);
         }
     };
-    eq(crf.insize, tx.d_model, "linearcrfencoder.insize == transformer_encoder.layer.d_model");
-    eq(upsample.size, tx.d_model, "linearupsample.d_model == transformer_encoder.layer.d_model");
+    eq(crf.insize, tx.layer_params.d_model,
+       "linearcrfencoder.insize == transformer_encoder.layer.d_model");
+    eq(upsample.size, tx.layer_params.d_model,
+       "linearupsample.d_model == transformer_encoder.layer.d_model");
 }
 
 bool BasecallModelConfig::has_normalised_basecaller_params() const {
@@ -632,18 +614,9 @@ std::string ConvParams::to_string() const {
 
 std::string TxEncoderParams::to_string() const {
     std::ostringstream oss;
-    // clang-format off
     oss << "TxEncoderParams {"
-        << " d_model:"          << d_model
-        << " nhead:"            << nhead
-        << " depth:"            << depth
-        << " dim_feedforward:"  << dim_feedforward
-        << " theta:"            << theta
-        << " max_seq_len:"      << max_seq_len
-        << " attn_window: ["    << attn_window.first << ", " << attn_window.second << "]"
-        << " deepnorm_alpha:"   << deepnorm_alpha    << " }";
+        << " depth:" << depth << " " << layer_params.to_string() << " }";
     return std::move(oss).str();
-    // clang-format on
 }
 
 std::string CRFEncoderParams::to_string() const {

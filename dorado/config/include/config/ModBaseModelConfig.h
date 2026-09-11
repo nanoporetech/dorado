@@ -15,7 +15,14 @@ namespace dorado::config {
 
 namespace modbase {
 
-enum class ModelType : std::uint8_t { CONV_LSTM_V1, CONV_LSTM_V2, CONV_LSTM_V3, CONV_V1, UNKNOWN };
+enum class ModelType : std::uint8_t {
+    CONV_LSTM_V1,
+    CONV_LSTM_V2,
+    CONV_LSTM_V3,
+    CONV_V1,
+    LATENT_SPACE_V1,
+    UNKNOWN
+};
 std::string to_string(const ModelType& model_type);
 ModelType model_type_from_string(const std::string& model_type);
 ModelType get_modbase_model_type(const std::filesystem::path& path);
@@ -54,6 +61,13 @@ struct CommonModelParams {
 struct ChunkedModelParams {
     const int64_t chunk_size;
     explicit ChunkedModelParams(int64_t chunk_size_);
+};
+
+struct LatentSpaceModulesParams {
+    std::vector<ConvParams> sequence_convs;
+    std::vector<LinearParams> projection;
+    std::vector<TransformerEncoderLayerParams> transformer_encoder;
+    std::vector<LinearParams> classifier;
 };
 
 struct RefinementParams {
@@ -168,6 +182,22 @@ struct ConvLSTMV3ModelConfig {
                           int sequence_stride_);
 };
 
+struct LatentSpaceV1ModelConfig {
+    ModBaseModelConfigData data;
+    CommonModelParams general;
+    ChunkedModelParams chunked;
+    LatentSpaceModulesParams modules;
+    const int sequence_stride;
+    LatentSpaceV1ModelConfig(std::filesystem::path model_path_,
+                             CommonModelParams general_,
+                             ChunkedModelParams chunked_,
+                             LatentSpaceModulesParams modules_,
+                             ModificationParams mods_,
+                             ContextParams context_,
+                             RefinementParams refine_,
+                             int sequence_stride_);
+};
+
 }  // namespace modbase
 
 const modbase::ModBaseModelConfigData& get_model_config_data(const ModBaseModelConfig& config);
@@ -177,13 +207,6 @@ bool is_chunked_input_model(const ModBaseModelConfig& config);
 
 const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
-std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(
-        const modbase::ConvLSTMV3ModelConfig& config);
-std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
-        const modbase::ConvLSTMV3ModelConfig& config);
-std::pair<int64_t, int64_t> get_chunked_sequence_input_TC(const ModBaseModelConfig& config);
-std::pair<int64_t, int64_t> get_chunked_signal_input_TC(const ModBaseModelConfig& config);
-std::pair<int64_t, int64_t> get_chunked_output_TC(const ModBaseModelConfig& config);
 const modbase::ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
 
 bool is_modbase_model(const std::filesystem::path& path);

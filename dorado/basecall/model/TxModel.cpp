@@ -12,7 +12,8 @@ TxModelImpl::TxModelImpl(const config::BasecallModelConfig &config,
         : m_options(options) {
     convs = register_module("convs", nn::ConvStack(config.convs));
     auto encoder_params = config.tx->tx;
-    encoder_params.max_seq_len = config.basecaller.chunk_size() / config.stride_inner();
+    encoder_params.layer_params.max_seq_len =
+            config.basecaller.chunk_size() / config.stride_inner();
     tx_encoder =
             register_module("transformer_encoder", nn::TxEncoderStack(encoder_params, m_options));
     tx_decoder = register_module("transformer_decoder", nn::LinearUpsample(config.tx->upsample));
