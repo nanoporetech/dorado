@@ -1,6 +1,10 @@
 #pragma once
 
+#include <ATen/core/TensorBody.h>
 #include <cuda_runtime_api.h>
+
+#include <array>
+#include <utility>
 
 namespace dorado::nn {
 
@@ -14,11 +18,13 @@ bool koi_can_run_tx_vcs(int device_id);
 
 // NVFP4 tx_encoder
 std::pair<at::Tensor, at::Tensor> to_block_fp4(const at::Tensor& t_in, const float maxval);
+
 at::Tensor convert_to_nvfp4_tiled(const at::Tensor& t,
                                   const std::array<int64_t, 2>& smem_dims,
                                   const bool is_B,
                                   const at::TensorOptions i32_opts,
                                   const cudaStream_t stream_ptr);
+
 at::Tensor untile_nvfp4(const at::Tensor& t_nvfp4,
                         const std::array<int64_t, 2>& smem_dims,
                         const at::TensorOptions f16_opts,

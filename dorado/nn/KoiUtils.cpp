@@ -1,6 +1,8 @@
 #include "nn/KoiUtils.h"
 
 #include <ATen/cuda/CUDAContextLight.h>
+#include <ATen/ops/cat.h>
+#include <ATen/ops/empty.h>
 
 namespace {
 
@@ -54,11 +56,11 @@ std::pair<at::Tensor, at::Tensor> to_block_fp4(const at::Tensor& t_in, const flo
     auto t = t_in.abs().to(c10::kFloat);
     auto tmax = t.amax(/*dim=*/-1);
 
-    auto scale_f = tmax / maxval;
+    auto scale_f = tmax.div(maxval);
     auto t_in_sf = scale_f.to(c10::kFloat8_e4m3fn);
 
     auto scale_float = t_in_sf.to(c10::kFloat).unsqueeze(-1);
-    auto x = t / scale_float;
+    auto x = t.div(scale_float);
     auto t_in_scaled = x.mul(si);  // si is promoted to fp32
 
     return {t_in_scaled.reshape({t_in.size(0), t_in.size(1) * 16}).to(c10::kHalf), t_in_sf};
@@ -130,9 +132,10 @@ at::Tensor untile_nvfp4(const at::Tensor& t_nvfp4,
                    .contiguous()
                    .reshape({M, N / 16});
 
-    at::Tensor t_f16 =
-            (t_fp4_sim.view({M, N / 16, 16}).to(c10::kFloat) * t_sf.unsqueeze(-1).to(c10::kFloat))
-                    .reshape({M, N});
+    at::Tensor t_f16 = t_fp4_sim.view({M, N / 16, 16})
+                               .to(c10::kFloat)
+                               .mul(t_sf.unsqueeze(-1).to(c10::kFloat))
+                               .reshape({M, N});
     t_f16 = t_f16.to(c10::kHalf);
 
     return t_f16;
