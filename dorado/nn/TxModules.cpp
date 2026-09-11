@@ -825,6 +825,10 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
     if (res != KOI_SUCCESS) {
         spdlog::error("Koi B12 tiled path failed {}", calls);
     }
+#else
+    (void)x_tiled_nvfp4;
+    (void)N;
+    (void)T;
 #endif
 }
 
@@ -1057,8 +1061,8 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
 
 at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] AuxiliaryData *aux) {
 #if DORADO_CUDA_BUILD
+    if (use_koi_nvfp4_tiled && !DORADO_ORIN) {
 #if !DORADO_ORIN
-    if (use_koi_nvfp4_tiled) {
         bool test_nvfp4_tx_perf = utils::get_dev_opt<bool>("koi_test_nvfp4_tx_perf", true);
 
         if (aux) {
