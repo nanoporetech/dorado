@@ -675,8 +675,14 @@ LatentSpaceV1ModelConfig::LatentSpaceV1ModelConfig(std::filesystem::path model_p
     if (modules.sequence_convs.empty()) {
         throw std::runtime_error("Modbase latent space model has no sequence convolutions");
     }
+    if (modules.projection.empty()) {
+        throw std::runtime_error("Modbase latent space model has no projection layers");
+    }
     if (modules.transformer_encoder.empty()) {
         throw std::runtime_error("Modbase latent space model has no transformer encoder layers");
+    }
+    if (modules.classifier.empty()) {
+        throw std::runtime_error("Modbase latent space model has no classifier layers");
     }
     if (stride_product(modules.sequence_convs) != sequence_stride) {
         throw std::runtime_error("Modbase latent space model sequence convolution stride mismatch");
