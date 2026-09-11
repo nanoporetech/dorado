@@ -77,7 +77,7 @@ add_executable(dorado_tests
     SecondaryEncoderUtilsTest.cpp
     SecondaryKadayashiUtils.cpp
     SecondaryModelConfigValidation.cpp
-    SecondaryMergeVCSamplesTest.cpp
+    SecondaryVCSamplesTest.cpp
     SecondaryModelFactory.cpp
     SecondaryNormalizeVariantsTest.cpp
     SecondaryModelVariantPerceiverTest.cpp

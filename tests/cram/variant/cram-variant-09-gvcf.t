@@ -23,6 +23,7 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   ##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
   ##FORMAT=<ID=MIN_DP,Number=1,Type=Integer,Description="Minimum read depth">
   ##FORMAT=<ID=SRC,Number=1,Type=String,Description="Source of the variant">
+  ##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allele read depth">
   1
   chr20 1 T <*> . END=100 GT:GQ:LEN:MIN_DP:SRC 0/0:60:100:20:R
 
@@ -69,12 +70,12 @@ chr20	1959	1
   20
   chr20 1000 . G <*> . END=1345 GT:GQ:LEN:MIN_DP:SRC 0/0:60:346:20:R
   chr20 1346 . G <*> . END=1471 GT:GQ:LEN:MIN_DP:SRC 0/0:60:126:20:I
-  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC 0/1:42:20:I
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC:AD 0/1:42:20:I:7,13,.
   chr20 1473 . C <*> . END=1555 GT:GQ:LEN:MIN_DP:SRC 0/0:60:83:20:I
   chr20 1556 . C <*> . END=1557 GT:GQ:LEN:MIN_DP:SRC 0/0:50:2:20:I
   chr20 1615 . C <*> . END=1615 GT:GQ:LEN:MIN_DP:SRC 0/0:54:1:20:I
-  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC 0/1:42:20:I
-  chr20 1959 . T G,<*> PASS . GT:GQ:DP:SRC 0/1:44:19:I
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC:AD 0/1:42:20:I:7,13,.
+  chr20 1959 . T G,<*> PASS . GT:GQ:DP:SRC:AD 0/1:44:19:I:6,12,.
 
 Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   $ rm -rf out; mkdir -p out

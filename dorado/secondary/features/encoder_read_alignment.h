@@ -4,6 +4,7 @@
 #include "secondary/common/bam_file.h"
 #include "secondary/consensus/sample.h"
 #include "secondary/features/encoder_base.h"
+#include "secondary/features/feature_columns.h"
 #include "secondary/features/haplotag_source.h"
 #include "secondary/features/kadayashi_options.h"
 

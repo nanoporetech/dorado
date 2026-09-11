@@ -3,6 +3,7 @@
 #include "secondary/common/bam_file.h"
 #include "secondary/consensus/sample.h"
 #include "secondary/features/encoder_base.h"
+#include "secondary/features/feature_columns.h"
 
 #include <ATen/ATen.h>
 

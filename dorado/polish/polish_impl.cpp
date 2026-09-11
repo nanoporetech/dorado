@@ -1270,6 +1270,7 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 std::atomic<bool>& worker_terminate,
                                 secondary::WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
+                                const secondary::FeatureColumnMap& feature_column_map,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data,
@@ -1464,12 +1465,20 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 std::size(item.samples), std::size(split_logits));
                         continue;
                     }
+
                     // Create the variant calling data. Clone the tensor to convert the view to actual data.
                     for (std::size_t i = 0; i < std::size(item.samples); ++i) {
                         thread_vc_data.emplace_back(secondary::VariantCallingSample{
-                                item.samples[i].seq_id, std::move(item.samples[i].positions_major),
-                                std::move(item.samples[i].positions_minor), split_logits[i].clone(),
-                                item.samples[i].depth.clone()});
+                                .seq_id = item.samples[i].seq_id,
+                                .positions_major = std::move(item.samples[i].positions_major),
+                                .positions_minor = std::move(item.samples[i].positions_minor),
+                                .logits = split_logits[i].clone(),
+                                .depth = item.samples[i].depth.clone(),
+                                .read_ids_left = std::move(item.samples[i].read_ids_left),
+                                .read_ids_right = std::move(item.samples[i].read_ids_right),
+                                .basecalls = item.samples[i].select_feature_channel(
+                                        secondary::FeatureColumns::BASE, feature_column_map),
+                        });
                     }
                 }
 

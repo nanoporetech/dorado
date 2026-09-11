@@ -23,6 +23,9 @@ struct VariantCallingSample {
     std::vector<int64_t> positions_minor;
     at::Tensor logits;
     at::Tensor depth;
+    std::vector<std::string> read_ids_left{};
+    std::vector<std::string> read_ids_right{};
+    at::Tensor basecalls{};
 
     void validate() const;
     int64_t start() const;
@@ -63,7 +66,7 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
 
 /**
  * \brief Given a vector of variant calling samples, it returns a new vector of VariantCallingSample objects
- *          where neighboring input samples are merged if hteir positions are adjacent and on the same sequence.
+ *          where neighboring input samples are merged if their positions are adjacent and on the same sequence.
  * \param vc_samples Input variant calling samples. Should be sorted by the start position
  *                   (positions_major[0]). The samples are consumed while constructing the result.
  * \return A new vector of VariantCallingSample where any adjacent samples from the input are merged into a single sample.

@@ -200,6 +200,7 @@ struct variant_fullinfo_t {
     bool is_valid{true};
     bool is_confident{true};
     bool is_multi_allele{false};
+    int ref_depth{0};
     int min_depth{0};
     int median_depth{0};
 
@@ -209,6 +210,7 @@ struct variant_fullinfo_t {
     std::string alt_allele_seq0{};
     bool is_phased0{false};
     char genotype0[3] = {'0', '/', '0'};
+    int alt_depth0{0};
 
     uint32_t pos1{0};  // 0-index
     uint8_t qual1{60};
@@ -216,6 +218,7 @@ struct variant_fullinfo_t {
     std::string alt_allele_seq1{};
     bool is_phased1{false};
     char genotype1[3] = {'0', '/', '0'};
+    int alt_depth1{0};
 };
 
 std::string variant_fullinfo_to_string(const variant_fullinfo_t &v);

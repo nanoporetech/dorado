@@ -1,6 +1,7 @@
 #pragma once
 
 #include "encoder_base.h"
+#include "feature_columns.h"
 #include "haplotag_source.h"
 #include "secondary/features/kadayashi_options.h"
 

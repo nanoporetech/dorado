@@ -7,7 +7,6 @@
 #include "model_variant_perceiver.h"
 #include "secondary/architectures/model_config_validation.h"
 #include "secondary/architectures/model_weights.h"
-#include "secondary/features/encoder_base.h"
 #include "secondary/features/encoder_factory.h"
 #include "utils/container_utils.h"
 

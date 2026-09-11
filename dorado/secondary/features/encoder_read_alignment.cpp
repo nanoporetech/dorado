@@ -87,6 +87,17 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             }
         }
 
+        bool needs_padding = false;
+        for (const auto& chunk : chunks) {
+            if (chunk.size(1) < target_depth) {
+                needs_padding = true;
+                break;
+            }
+        }
+        if (!needs_padding) {
+            return chunks;
+        }
+
         // Pad each chunk to match the target depth
         std::vector<at::Tensor> padded_chunks;
         for (auto& chunk : chunks) {
@@ -127,7 +138,22 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         utils::ScopedProfileRange spr2("merge_adjacent_samples_impl-reorder_reads", 8);
 
         if (std::size(chunks) < 2) {
-            return chunks;
+            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
+                              std::vector<std::string>>{chunks, read_ids_in.front(),
+                                                        read_ids_out.front()};
+        }
+
+        bool already_ordered = true;
+        for (std::size_t n = 1; n < std::size(chunks); ++n) {
+            if (read_ids_out[n - 1] != read_ids_in[n]) {
+                already_ordered = false;
+                break;
+            }
+        }
+        if (already_ordered) {
+            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
+                              std::vector<std::string>>{std::move(chunks), read_ids_in.front(),
+                                                        read_ids_out.back()};
         }
 
         std::vector<at::Tensor> reordered_chunks{chunks[0]};
@@ -149,7 +175,9 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             LOG_TRACE("[reorder_reads] n = {}, done.", n);
         }
 
-        return reordered_chunks;
+        return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
+                          std::vector<std::string>>{reordered_chunks, read_ids_in[0],
+                                                    prev_rids_out};
     };
 
     const auto merge_samples = [&samples, &cat_vectors, &pad_reads,
@@ -185,15 +213,16 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         }
 
         // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
+        auto [reordered_reads, reordered_read_ids_left, reordered_read_ids_right] =
+                reorder_reads(std::move(features), read_ids_left, read_ids_right);
         secondary::Sample ret{
                 seq_id,
-                at::cat(pad_reads(reorder_reads(std::move(features), read_ids_left, read_ids_right),
-                                  -1)),
+                at::cat(pad_reads(reordered_reads, -1)),
                 cat_vectors(positions_major),
                 cat_vectors(positions_minor),
                 at::cat(std::move(depth)),
-                {},
-                {},
+                std::move(reordered_read_ids_left),
+                std::move(reordered_read_ids_right),
         };
 
         return ret;

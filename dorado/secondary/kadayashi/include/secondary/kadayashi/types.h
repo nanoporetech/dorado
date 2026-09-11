@@ -83,6 +83,8 @@ struct ta_t {
     std::vector<std::vector<uint32_t>> allele2readIDs;  // Inverse index: in what reads did we see
                                                         // a given allele at pos. Needed for
                                                         // variant graph construction.
+    std::vector<int> allele_depths{};
+    int ref_depth{0};
     int min_depth{0};
     int median_depth{0};
     uint8_t is_used : 4, type : 4;

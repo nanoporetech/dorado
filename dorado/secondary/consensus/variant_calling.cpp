@@ -2,6 +2,8 @@
 
 #include "secondary/consensus/consensus_result.h"
 #include "secondary/consensus/consensus_utils.h"
+#include "secondary/features/encoder_utils.h"
+#include "secondary/features/medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
 #include "utils/rle.h"
@@ -137,6 +139,74 @@ std::string make_variant_gt(const std::span<const std::string> preds,
     std::sort(std::begin(indices), std::end(indices));
 
     return utils::print_container_as_string(indices, "/", false);
+}
+
+/**
+ * \brief Calculate the number of basecalls supporting each of the alleles.
+ *        It is assumed that alleles has been deduplicated. If any duplicated entries are
+ *        present in alleles, then matches will only be counted for the first matching allele.
+ * \param alleles Gap-compressed allele strings.
+ * \param rstart Search start coordinate in the cumulative position dimension of basecalls.
+ * \param rend Search end coordinate in the cumulative position dimension of basecalls.
+ * \param basecalls Basecall tensor taken from a VariantCallingSample.
+ * \returns Count of basecall reads that match each allele, formatted as a comma-delimited string.
+ */
+std::string calculate_basecall_allele_depths(const std::vector<std::string>& alleles,
+                                             const int64_t rstart,
+                                             const int64_t rend,
+                                             const at::Tensor& basecalls) {
+    if ((!basecalls.defined()) || (basecalls.dim() != 2)) {
+        spdlog::debug(
+                "[add_basecall_allele_depths] Basecall features have incorrect shape, cannot "
+                "calculate allele depth.");
+        return {};
+    }
+    if (basecalls.dtype() != at::kChar) {
+        spdlog::debug("[add_basecall_allele_depths] Basecall features have unexpected dtype: {}",
+                      at::toString(basecalls.dtype()));
+        return {};
+    }
+    if (!basecalls.is_contiguous()) {
+        spdlog::debug("[add_basecall_allele_depths] Basecall features are not contiguous");
+        return {};
+    }
+    const int64_t num_positions = basecalls.size(0);
+    if ((rstart < 0) || (rend <= rstart) || (rstart > num_positions) || (rend > num_positions)) {
+        return {};
+    }
+
+    const int64_t num_reads = basecalls.size(1);
+    const int64_t width = rend - rstart;
+    const size_t start_idx = rstart * num_reads;
+    const std::span<const int8_t> data(basecalls.data_ptr<int8_t>(),
+                                       static_cast<size_t>(num_positions * num_reads));
+
+    std::vector<std::vector<int8_t>> encoded_alleles;
+    encoded_alleles.reserve(std::size(alleles));
+    for (const std::string_view allele : alleles) {
+        encoded_alleles.emplace_back(encode_sequence(allele));
+    }
+    std::vector<int64_t> counts(std::size(alleles), 0);
+
+    for (int64_t read = 0; read < num_reads; ++read) {
+        size_t idx = start_idx + read;
+        std::vector<int8_t> bases;
+        bases.reserve(width);
+        for (int64_t pos = 0; pos < width; ++pos, idx += num_reads) {
+            const int8_t base = data[idx];
+            // Retain missing data 0 values so that reads that don't span the interval
+            // are not counted - 0's should never occur in the target sequences.
+            if (base != DEL_VAL) {
+                bases.emplace_back(base);
+            }
+        }
+        const auto it_alleles =
+                std::find(std::cbegin(encoded_alleles), std::cend(encoded_alleles), bases);
+        if (it_alleles != std::cend(encoded_alleles)) {
+            ++counts[std::distance(std::cbegin(encoded_alleles), it_alleles)];
+        }
+    }
+    return utils::print_container_as_string(counts, ",", false);
 }
 
 /**
@@ -310,7 +380,8 @@ Variant construct_variant(const std::string_view draft,
                           const std::string& variant_source,
                           const at::Tensor& probs_3D,
                           const std::unordered_set<char>& symbol_set,
-                          const std::array<int32_t, 256>& symbol_lookup) {
+                          const std::array<int32_t, 256>& symbol_lookup,
+                          const at::Tensor& basecalls) {
     const auto prepend_major_ref_base = [&positions_major, &positions_minor, &draft](Variant& var) {
         while ((var.rstart > 0) && (positions_minor[var.rstart] != 0)) {
             --var.rstart;
@@ -322,6 +393,10 @@ Variant construct_variant(const std::string_view draft,
             alt = base + std::move(alt);
         }
     };
+
+    if (rend == rstart) {
+        return {};
+    }
 
     // Get the reference and the predictions for the variant stretch.
     const std::string_view var_ref_with_gaps(std::data(ref_seq_with_gaps) + rstart,
@@ -369,11 +444,30 @@ Variant construct_variant(const std::string_view draft,
     };
 
     // Check if variant starts on insert, prepend previous ref base.
+    bool prepended = false;
     if (positions_minor[var.rstart] != 0) {
 #ifdef DEBUG_NORMALIZE_VARIANT
         std::cerr << "[construct_variant] Running prepend_major_ref_base.\n";
 #endif
         prepend_major_ref_base(var);
+        prepended = true;
+    }
+
+    if (basecalls.defined()) {
+        int64_t temp_rstart = var.rstart;
+        int64_t temp_rend = var.rend;
+        std::vector<std::string> temp_alleles;
+        temp_alleles.reserve(std::size(var.alts) + 1);
+        temp_alleles.emplace_back(var.ref);
+        temp_alleles.insert(std::end(temp_alleles), std::begin(var.alts), std::end(var.alts));
+        extend_span(temp_rstart, temp_rend, temp_alleles, prepended, draft, positions_major,
+                    positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps);
+
+        const auto ad =
+                calculate_basecall_allele_depths(temp_alleles, temp_rstart, temp_rend, basecalls);
+        if (!std::empty(ad)) {
+            var.format["AD"] = ad;
+        }
     }
 
     if (normalize) {
@@ -415,7 +509,8 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
                                            const bool normalize,
                                            const at::Tensor& probs_3D,
                                            const std::unordered_set<char>& symbol_set,
-                                           const std::array<int32_t, 256>& symbol_lookup) {
+                                           const std::array<int32_t, 256>& symbol_lookup,
+                                           const at::Tensor& basecalls) {
     if (!merge_overlapping && !merge_adjacent) {
         return variants;
     }
@@ -465,7 +560,7 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             Variant new_var = construct_variant(
                     draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                     variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
-                    variant_source, probs_3D, symbol_set, symbol_lookup);
+                    variant_source, probs_3D, symbol_set, symbol_lookup, basecalls);
 
 #ifdef DEBUG_NORMALIZE_VARIANT
             std::cerr << "[merge_sorted_variants] new_var = " << new_var << '\n';
@@ -492,7 +587,8 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             Variant new_var = construct_variant(
                     draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                     variants[prev_i].seq_id, variants[prev_i].rstart, furthest_rend, true,
-                    ambig_ref, normalize, variant_source, probs_3D, symbol_set, symbol_lookup);
+                    ambig_ref, normalize, variant_source, probs_3D, symbol_set, symbol_lookup,
+                    basecalls);
 
             if (is_valid(new_var)) {
                 filtered.emplace_back(std::move(new_var));
@@ -752,6 +848,77 @@ std::string gq_from_qual(const float qual) {
     return std::to_string(static_cast<int32_t>(std::round(qual)));
 }
 
+void extend_span(int64_t& rstart,
+                 int64_t& rend,
+                 std::vector<std::string>& alleles,
+                 const bool prepended,
+                 const std::string_view draft,
+                 const std::vector<int64_t>& positions_major,
+                 const std::vector<int64_t>& positions_minor,
+                 const std::string_view ref_seq_with_gaps,
+                 const std::vector<ConsensusResult>& cons_seqs_with_gaps) {
+    if ((rstart < 0) || (rend <= rstart)) {
+        throw std::runtime_error("[extend_span] Invalid (rstart, rend): (" +
+                                 std::to_string(rstart) + "," + std::to_string(rend) + ")");
+    }
+    const int64_t ref_len = std::ssize(ref_seq_with_gaps);
+    if (rend > ref_len) {
+        throw std::runtime_error("[extend_span] rend " + std::to_string(rend) +
+                                 " out of range for reference length " + std::to_string(ref_len));
+    }
+    if (std::any_of(std::cbegin(cons_seqs_with_gaps), std::cend(cons_seqs_with_gaps),
+                    [&](const auto& cons_result) { return rend > std::ssize(cons_result.seq); })) {
+        throw std::runtime_error("[extend_span] rend " + std::to_string(rend) +
+                                 " out of range for consensus length");
+    }
+
+    const bool ref_has_front_gap = ref_seq_with_gaps[rstart] == '*';
+    const bool ref_has_back_gap = ref_seq_with_gaps[rend - 1] == '*';
+    const bool cons_has_front_gap = std::any_of(
+            std::cbegin(cons_seqs_with_gaps), std::cend(cons_seqs_with_gaps),
+            [&rstart](const auto& cons_result) { return cons_result.seq[rstart] == '*'; });
+    const bool cons_has_back_gap = std::any_of(
+            std::cbegin(cons_seqs_with_gaps), std::cend(cons_seqs_with_gaps),
+            [&rend](const auto& cons_result) { return cons_result.seq[rend - 1] == '*'; });
+
+    const bool left_indel = ref_has_front_gap || cons_has_front_gap;
+    const bool right_indel = ref_has_back_gap || cons_has_back_gap;
+
+    const int64_t num_positions = std::size(ref_seq_with_gaps);
+
+    // Extend rstart and rend to include all minor positions immediately adjacent to the variant
+    // ref                   A***CG***AC
+    // alt                   A***GA***AC
+    // initial rstart, rend      S E
+    // final rstart, rend     S       E
+    while ((!prepended) && (rstart > 0) && (positions_minor[rstart - 1] != 0)) {
+        --rstart;
+    }
+    while ((rend < num_positions) && (positions_minor[rend] != 0)) {
+        ++rend;
+    }
+    // If the variant is an indel, also include the flanking major base on either side, so we can
+    // catch indels extending beyond the variant span
+    // ref                   ACGTACGT
+    // alt                   AC**ACGT
+    // initial rstart, rend    S E
+    // final rstart, rend     S   E
+    if (left_indel && (!prepended) && (rstart > 0)) {
+        --rstart;
+        const char base = draft[positions_major[rstart]];
+        for (auto& allele : alleles) {
+            allele.insert(std::begin(allele), base);
+        }
+    }
+    if (right_indel && (rend < num_positions)) {
+        const char base = draft[positions_major[rend]];
+        ++rend;
+        for (auto& allele : alleles) {
+            allele.push_back(base);
+        }
+    }
+}
+
 Variant make_gvcf_reference_record(const int32_t seq_id,
                                    const int64_t pos,
                                    const char ref_base,
@@ -796,6 +963,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
     if (any_empty) {
         var.alts = {"."};
         var.format["GT"] = make_reference_gt(ploidy, '0');
+        var.format.erase("AD");
         var.filters = {Filters::NonVariant};
     }
 }
@@ -1245,7 +1413,7 @@ std::vector<Variant> general_decode_variants(
         Variant var = construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
                                         cons_seqs_with_gaps, seq_id, rstart, rend, is_var,
                                         ambig_ref, normalize, VARIANT_SOURCE_INFERENCE, probs_3D,
-                                        symbol_set, symbol_lookup);
+                                        symbol_set, symbol_lookup, vc_sample.basecalls);
 
 #ifdef DEBUG_VARIANT_REGIONS
         {
@@ -1286,7 +1454,7 @@ std::vector<Variant> general_decode_variants(
         variants = merge_sorted_variants(variants, merge_overlapping, merge_adjacent, draft,
                                          positions_major, positions_minor, ref_seq_with_gaps,
                                          cons_seqs_with_gaps, ambig_ref, normalize, probs_3D,
-                                         symbol_set, symbol_lookup);
+                                         symbol_set, symbol_lookup, vc_sample.basecalls);
     }
 
 #ifdef DEBUG_NORMALIZE_VARIANT

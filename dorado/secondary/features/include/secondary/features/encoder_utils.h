@@ -40,15 +40,24 @@ std::tuple<at::Tensor, std::vector<int64_t>, std::vector<int64_t>> filter_empty_
         const std::vector<int64_t>& positions_minor);
 
 /**
- * \brief This function returns a tensor with an integer encoding of a sequence.
+ * \brief This function returns a tensor with an integer encoding of a sequence scattered over
+ *        major positions.
  * \param positions_major Vector of major positions.
  * \param positions_minor Vector of minor positions.
  * \param draft_seq Draft/reference sequence.
  * \returns A tensor with integer encoding of the subsequence (including gaps) spanned by the
-            positions vectors. The length of this tensor is the same as the positions vectors.
+ *          positions vectors. The length of this tensor is the same as the positions vectors.
  */
 at::Tensor draft_encoding_from_seq(const std::vector<int64_t>& positions_major,
                                    const std::vector<int64_t>& positions_minor,
                                    const std::string_view draft_seq);
+
+/**
+ * \brief This function returns a vector with an integer encoding of a sequence.
+ * \param sequence Draft/reference sequence.
+ * \returns A vector with gap-compressed integer encoding of the sequence. Any
+ *          unrecognised characters are ignored.
+ */
+std::vector<int8_t> encode_sequence(const std::string_view sequence);
 
 }  // namespace dorado::secondary

@@ -17,6 +17,7 @@
 #include "secondary/consensus/variant_calling_sample.h"
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
+#include "secondary/features/feature_columns.h"
 #include "secondary/features/kadayashi_options.h"
 #include "secondary/features/variant_candidate_source.h"
 #include "secondary/kadayashi/local_haplotagging.h"
@@ -219,6 +220,7 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                                  utils::AsyncQueue<secondary::VariantCallingSample>& out_queue,
                                  std::atomic<bool>& worker_terminate,
                                  secondary::WorkerReturnStatus& ret_status,
+                                 const secondary::FeatureColumnMap& feature_column_map,
                                  const int32_t num_threads,
                                  const bool continue_on_exception);
 

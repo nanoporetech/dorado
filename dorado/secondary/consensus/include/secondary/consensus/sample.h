@@ -2,6 +2,7 @@
 
 #include "secondary/common/interval.h"
 #include "secondary/common/interval_tree_types.h"
+#include "secondary/features/feature_columns.h"
 
 #include <ATen/core/TensorBody.h>
 
@@ -42,7 +43,18 @@ struct Sample {
     int64_t find_max_depth(int64_t start_idx, int64_t end_idx) const;
 
     void validate() const;
+
+    /**
+     * \brief Select a single feature channel from this->features.
+     * \param feature_column Channel to select
+     * \param feature_column_map Map used to find the channel index
+     * \return A contiguous copy of the feature selected channel, shape=(positions, reads)
+     */
+    at::Tensor select_feature_channel(const FeatureColumns& feature_column,
+                                      const FeatureColumnMap& feature_column_map) const;
 };
+
+std::vector<std::string> placeholder_read_ids(const int64_t n);
 
 Sample slice_sample(const Sample& sample,
                     const int64_t idx_start,

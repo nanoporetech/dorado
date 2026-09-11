@@ -13,6 +13,7 @@
 #include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/window_utils.h"
+#include "secondary/features/feature_columns.h"
 #include "secondary/features/haplotag_source.h"
 #include "secondary/features/variant_candidate_source.h"
 #include "smallvar_progress_tracker.h"
@@ -1415,9 +1416,13 @@ void run_variant_calling(const Options& opt,
             utils::set_thread_name("worker_separate_decode_data");
             const int32_t num_threads = static_cast<int32_t>(
                     std::min(std::ssize(resources.models), std::ssize(resources.encoders)));
+            const secondary::FeatureColumnMap feature_column_map =
+                    (!std::empty(resources.encoders))
+                            ? resources.encoders.front()->get_feature_column_map()
+                            : secondary::FeatureColumnMap{};
             smallvar::worker_separate_decode_data(decode_queue, vc_data_queue, worker_terminate,
-                                                  wrs_separate_infer_output, num_threads,
-                                                  opt.continue_on_error);
+                                                  wrs_separate_infer_output, feature_column_map,
+                                                  num_threads, opt.continue_on_error);
         });
 
         auto thread_call_variants = utils::jthread([&] {
