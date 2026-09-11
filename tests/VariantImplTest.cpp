@@ -542,8 +542,8 @@ CATCH_TEST_CASE("batch and inference workflow functions operate on synthetic sam
         ////////////////////////////////////////
         /// Eval.                            ///
         ////////////////////////////////////////
-        CATCH_REQUIRE(!ret_status.exception_thrown);
-        CATCH_REQUIRE(!worker_terminate.load());
+        CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+        CATCH_REQUIRE_FALSE(worker_terminate.load());
         CATCH_REQUIRE(std::size(output_queue) == 2);
 
         secondary::VariantCallingSample first_sample;
@@ -592,7 +592,7 @@ CATCH_TEST_CASE("worker_separate_decode_data handles basecall fields from featur
                                     feature_column_map, /*num_threads=*/1,
                                     /*continue_on_exception=*/false);
 
-        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
         CATCH_REQUIRE(std::size(output_queue) == 1);
 
         secondary::VariantCallingSample result;
@@ -621,14 +621,14 @@ CATCH_TEST_CASE("worker_separate_decode_data handles basecall fields from featur
                                     feature_column_map, /*num_threads=*/1,
                                     /*continue_on_exception=*/false);
 
-        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
         CATCH_REQUIRE(std::size(output_queue) == 1);
 
         secondary::VariantCallingSample result;
         CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
         CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
         CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
-        CATCH_CHECK(!result.basecalls.defined());
+        CATCH_CHECK_FALSE(result.basecalls.defined());
     }
 
     CATCH_SECTION("Feature map missing basecalls column throws") {
@@ -668,14 +668,14 @@ CATCH_TEST_CASE("worker_separate_decode_data handles basecall fields from featur
                                     feature_column_map, /*num_threads=*/1,
                                     /*continue_on_exception=*/false);
 
-        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
         CATCH_REQUIRE(std::size(output_queue) == 1);
 
         secondary::VariantCallingSample result;
         CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
         CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
         CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
-        CATCH_CHECK(!result.basecalls.defined());
+        CATCH_CHECK_FALSE(result.basecalls.defined());
     }
 
     CATCH_SECTION("Empty features map gives empty basecalls") {
@@ -694,14 +694,14 @@ CATCH_TEST_CASE("worker_separate_decode_data handles basecall fields from featur
                                     feature_column_map, /*num_threads=*/1,
                                     /*continue_on_exception=*/false);
 
-        CATCH_REQUIRE(!ret_status.exception_thrown);
+        CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
         CATCH_REQUIRE(std::size(output_queue) == 1);
 
         secondary::VariantCallingSample result;
         CATCH_REQUIRE(output_queue.try_pop(result) == utils::AsyncQueueStatus::Success);
         CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
         CATCH_CHECK(result.read_ids_right == sample.read_ids_right);
-        CATCH_CHECK(!result.basecalls.defined());
+        CATCH_CHECK_FALSE(result.basecalls.defined());
     }
 }
 
@@ -804,8 +804,8 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
     ////////////////////////////////////////
     /// Eval.                            ///
     ////////////////////////////////////////
-    CATCH_CHECK(!ret_status.exception_thrown);
-    CATCH_CHECK(!worker_terminate.load());
+    CATCH_CHECK_FALSE(ret_status.exception_thrown);
+    CATCH_CHECK_FALSE(worker_terminate.load());
     CATCH_CHECK(output_queue.size() == 0);
     CATCH_CHECK(chrom_reduce_data[0].ready);
     CATCH_CHECK(chrom_reduce_data[0].remaining_bam_regions == 0);
@@ -928,8 +928,8 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
                            /*tiled_ext_major=*/0, /*tiled_ext_min_cov=*/0,
                            /*tiled_ext_cov_fract=*/0.0f, /*min_depth=*/0);
 
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_CHECK(output_queue.size() == 0);
     CATCH_CHECK(chrom_reduce_data[0].ready);
     CATCH_CHECK(chrom_reduce_data[0].remaining_bam_regions == 0);
@@ -1180,8 +1180,8 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                            /*min_depth=*/0);
 
     // Eval.
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_CHECK(reduce_data.ready);
     CATCH_CHECK(reduce_data.remaining_bam_regions == 0);
 
@@ -1255,7 +1255,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
         CATCH_REQUIRE(pop_status == utils::AsyncQueueStatus::Success);
         CATCH_REQUIRE(std::size(item.samples) == 1);
         CATCH_CHECK(item.samples.front().seq_id == 0);
-        CATCH_CHECK(!std::empty(item.samples.front().positions_major));
+        CATCH_CHECK_FALSE(std::empty(item.samples.front().positions_major));
         ++queued_samples;
     }
     CATCH_CHECK(queued_samples == reduce_data.num_samples);
@@ -1366,8 +1366,8 @@ CATCH_TEST_CASE("worker_variant_writer frees per-chromosome output buffers after
     }
 
     // Check that no exceptions were thrown.
-    CATCH_CHECK(!ret_status.exception_thrown);
-    CATCH_CHECK(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
 
     // Check that the chrom_reduce_data buffers were cleared for this chromosome.
     CATCH_CHECK(chrom_reduce_data[0].variants_merged.empty());
@@ -1465,8 +1465,8 @@ CATCH_TEST_CASE(
                                   {}, 30.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_REQUIRE(std::empty(chrom_reduce_data[0].variants_inference));
     CATCH_CHECK(chrom_reduce_data[0].variants_merged == std::vector{simple_variant});
     CATCH_REQUIRE(std::size(chrom_reduce_data[0].processed_regions) == 1);
@@ -1581,8 +1581,8 @@ CATCH_TEST_CASE(
                                   {}, 30.0f, false, false, 2, 5,
                                   secondary::VariantCandidateSource::COMPUTE);
 
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
             secondary::Variant{
@@ -1706,8 +1706,8 @@ CATCH_TEST_CASE(
                                   {}, 30.0f, false, false, 2, 5,
                                   secondary::VariantCandidateSource::COMPUTE);
 
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
 
     const std::vector<secondary::Variant> expected_inference_variants{
             secondary::Variant{
@@ -1820,8 +1820,8 @@ CATCH_TEST_CASE(
 
     // Eval that the run was successful, that the stats processed was capped to 1.0
     // that the output is populated now.
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_CHECK(stats.get_stats().at("processed") == 1.0);
     CATCH_CHECK(std::size(output_queue) == 1);
 }
@@ -1893,8 +1893,8 @@ CATCH_TEST_CASE("worker_variant_calling_reduce tops up progress when no inferenc
                                   secondary::VariantCandidateSource::COMPUTE);
 
     // Eval that the run was successful.
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
 
     // Eval that the progress was incremented to max even though there were zero samples inferred.
     CATCH_CHECK(stats.get_stats().at("processed") == 6.0);
@@ -1999,8 +1999,8 @@ CATCH_TEST_CASE(
                                   hemizygous_regions, 30.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_REQUIRE(std::empty(chrom_reduce_data[0].variants_inference));
     CATCH_CHECK(chrom_reduce_data[0].variants_merged == std::vector{expected_simple_variant});
     CATCH_REQUIRE(std::size(chrom_reduce_data[0].processed_regions) == 1);
@@ -2092,8 +2092,8 @@ CATCH_TEST_CASE(
                                   hemizygous_regions, 30.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_REQUIRE(std::empty(chrom_reduce_data[0].variants_inference));
     CATCH_CHECK(chrom_reduce_data[0].variants_merged == std::vector{simple_variant});
     CATCH_REQUIRE(std::size(chrom_reduce_data[0].processed_regions) == 1);
@@ -2302,8 +2302,8 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
                                   secondary::VariantCandidateSource::COMPUTE);
 
     // clang-format off
-    CATCH_REQUIRE(!ret_status.exception_thrown);
-    CATCH_REQUIRE(!worker_terminate.load());
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
     CATCH_REQUIRE(chrom_reduce_data[0].variants_merged ==
                   std::vector{secondary::Variant{.seq_id = 0, .pos = 0, .ref = "A", .alts = {"<*>"}, .filters = {secondary::Filters::NonVariant},
                                                  .info = {{"END", "1"}}, .qual = 60.0f,
