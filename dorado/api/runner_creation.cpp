@@ -4,10 +4,10 @@
 #include "basecall/ModelRunner.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfig.h"
+#include "utils/dev_utils.h"
 #include "utils/log_utils.h"
 
 #include <thread>
-#include "utils/dev_utils.h"
 
 #if DORADO_CUDA_BUILD
 #include "nn/KoiUtils.h"
