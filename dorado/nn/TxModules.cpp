@@ -784,7 +784,6 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
 
     int res = KOI_SUCCESS;
     int calls = 0;
-    std::stringstream ss;
     if (res == KOI_SUCCESS && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE B12", 3);
