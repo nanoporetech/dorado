@@ -55,8 +55,8 @@ at::Tensor draft_encoding_from_seq(const std::vector<int64_t>& positions_major,
 /**
  * \brief This function returns a vector with an integer encoding of a sequence.
  * \param sequence Draft/reference sequence.
- * \returns A vector with integer encoding of the sequence. Any unrecognised characters are
- *          encoded with DEL_VAL.
+ * \returns A vector with gap-compressed integer encoding of the sequence. Any
+ *          unrecognised characters are ignored.
  */
 std::vector<int8_t> encode_sequence(const std::string_view sequence);
 
