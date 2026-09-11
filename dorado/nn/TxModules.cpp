@@ -1,7 +1,6 @@
 #include "nn/TxModules.h"
 
 #include "config/BasecallModelConfig.h"
-#include "nn/KoiUtils.h"
 #include "nn/TxModules.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/dev_utils.h"
@@ -15,6 +14,8 @@
 #include <cmath>
 
 #if DORADO_CUDA_BUILD
+#include "nn/KoiUtils.h"
+
 extern "C" {
 #include "koi.h"
 }
