@@ -124,7 +124,8 @@ bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
 using namespace models;
 
 int download(int argc, char* argv[]) {
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    argparse::ArgumentParser parser("dorado download", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     int verbosity = 0;
     parser.add_argument("-v", "--verbose")
             .flag()

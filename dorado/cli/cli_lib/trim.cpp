@@ -35,7 +35,8 @@ namespace dorado {
 using OutputMode = dorado::utils::HtsFile::OutputMode;
 
 int trim(int argc, char* argv[]) {
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    argparse::ArgumentParser parser("dorado trim", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     parser.add_description("Adapter/primer trimming tool.");
     parser.add_argument("reads")
             .help("Path to a file with reads to trim. Can be in any HTS format.")

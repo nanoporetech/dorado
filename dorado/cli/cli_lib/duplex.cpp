@@ -146,7 +146,8 @@ int duplex(int argc, char* argv[]) {
     // cached CUBLAS workspace from the stero model. This causes OOM.
     //utils::make_torch_deterministic();
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    argparse::ArgumentParser parser("dorado duplex", DORADO_VERSION,
+                                    argparse::default_arguments::help);
 
     parser.add_argument("model").help(
             "Model selection {fast,hac,sup}@v{version} for automatic model selection including "
