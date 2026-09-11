@@ -614,13 +614,9 @@ std::string ConvParams::to_string() const {
 
 std::string TxEncoderParams::to_string() const {
     std::ostringstream oss;
-    // clang-format off
     oss << "TxEncoderParams {"
-        << " depth:"            << depth
-        << " " << layer_params.to_string()
-         << " }";
+        << " depth:" << depth << " " << layer_params.to_string() << " }";
     return std::move(oss).str();
-    // clang-format on
 }
 
 std::string CRFEncoderParams::to_string() const {
