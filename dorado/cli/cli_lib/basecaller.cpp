@@ -1070,7 +1070,8 @@ int basecaller(int argc, char* argv[]) {
     utils::set_torch_allocator_max_split_size();
     utils::make_torch_deterministic();
 
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    argparse::ArgumentParser parser("dorado basecaller", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     int verbosity = 0;
     set_dorado_basecaller_args(parser, verbosity);
 

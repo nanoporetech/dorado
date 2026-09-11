@@ -21,7 +21,8 @@
 namespace dorado {
 
 int summary(int argc, char *argv[]) {
-    argparse::ArgumentParser parser("dorado", DORADO_VERSION, argparse::default_arguments::help);
+    argparse::ArgumentParser parser("dorado summary", DORADO_VERSION,
+                                    argparse::default_arguments::help);
     parser.add_argument("reads")
             .help("SAM/BAM file produced by dorado basecaller.")
             .nargs(argparse::nargs_pattern::optional)
