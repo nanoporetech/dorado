@@ -1105,9 +1105,8 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] Aux
             }
         }
         return untiled_f16;
-    }
 #endif  // !DORADO_ORIN
-    else if (use_koi_tiled) {
+    } else if (use_koi_tiled) {
         int N, T, C;
         if (aux) {
             // N = total amount of chunk_size_granularity within batch
