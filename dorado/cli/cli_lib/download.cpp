@@ -101,6 +101,7 @@ bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
         if (data.has_value()) {
             if (!std::filesystem::exists(*data)) {
                 spdlog::error("Specified data path does not exist: '{}'.", *data);
+                return false;
             }
             input_files = data_loader::InputFiles::search_pod5s(*data, recursive);
             if (input_files.get().empty()) {
