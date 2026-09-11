@@ -92,7 +92,8 @@ bool download_named_or_path(const models::ModelComplex& complex,
     return false;
 }
 
-bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
+bool download_variant_via_resolver(const argparse::ArgumentParser& parser,
+                                   const std::string& model_directory) {
     const auto data = parser.present<std::string>("--data");
     const auto recursive = parser.get<bool>("--recursive");
 
@@ -110,8 +111,7 @@ bool download_variant_via_resolver(const argparse::ArgumentParser& parser) {
             }
         }
 
-        DownloaderModelResolver resolver{parser.get<std::string>("--model"),
-                                         parser.get<std::string>("--models-directory"),
+        DownloaderModelResolver resolver{parser.get<std::string>("--model"), model_directory,
                                          input_files.get()};
         const Models models(resolver.resolve());
     } catch (const std::exception& e) {
@@ -213,7 +213,7 @@ int download(int argc, char* argv[]) {
         } else {
             const auto model_complex = ModelComplex::parse(model_arg);
             if (model_complex.is_variant_style()) {
-                if (!download_variant_via_resolver(parser)) {
+                if (!download_variant_via_resolver(parser, models_directory->string())) {
                     return EXIT_FAILURE;
                 }
             } else {
