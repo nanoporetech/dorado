@@ -1884,7 +1884,8 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         }
         std::vector<int32_t> gt;
         gt.reserve(std::size(it->second));
-        for (const std::string_view all_idx : dorado::secondary::split_GT_string(it->second)) {
+        const auto [split_gts, phased] = dorado::secondary::split_GT_string(it->second);
+        for (const std::string_view all_idx : split_gts) {
             if (all_idx == ".") {
                 gt.emplace_back(-1);
             } else {

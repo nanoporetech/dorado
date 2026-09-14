@@ -304,13 +304,21 @@ void VCFWriter::write_variant(const Variant& variant) {
             throw std::runtime_error("No genotype information found in variant.format!");
         }
         std::vector<int32_t> genotype_values;
-        for (const std::string_view token : utils::split_view(gt->second, '/')) {
-            if (token == ".") {
-                genotype_values.emplace_back(bcf_gt_missing);
-            } else {
-                genotype_values.emplace_back(
-                        bcf_gt_unphased(utils::from_chars<int32_t>(token).value()));
+        const auto [all_idx, phased] = secondary::split_GT_string(gt->second);
+        for (const std::string_view token : all_idx) {
+            if (std::empty(token)) {
+                continue;
             }
+            int32_t bcf_all_id = bcf_gt_missing;
+            if (token != ".") {
+                const int32_t all_id = utils::from_chars<int32_t>(token).value();
+                if (phased) {
+                    bcf_all_id = bcf_gt_phased(all_id);
+                } else {
+                    bcf_all_id = bcf_gt_unphased(all_id);
+                }
+            }
+            genotype_values.emplace_back(bcf_all_id);
         }
         // Update the genotype.
         if (std::empty(genotype_values)) {

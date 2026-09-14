@@ -1960,20 +1960,24 @@ std::vector<Variant> general_decode_variants(
     return normalized_variants;
 }
 
-std::vector<std::string_view> split_GT_string(const std::string_view gt) {
-    if (std::empty(gt)) {
-        return {};
-    }
+std::pair<std::vector<std::string_view>, bool> split_GT_string(const std::string_view gt) {
     std::vector<std::string_view> indices;
+    if (std::empty(gt)) {
+        return {indices, false};
+    }
+    if (gt.contains('|') && gt.contains('/')) {
+        throw std::runtime_error{
+                "Gentoype strings containing both `|` and `/` separators are unsupported."};
+    }
+    const char separator = gt.contains('|') ? '|' : '/';
+
     indices.reserve(std::size(gt));
-    for (const std::string_view phased_split : utils::split_view(gt, '|')) {
-        if (!std::empty(phased_split)) {
-            const auto unphased_split = utils::split_view(phased_split, '/');
-            indices.insert(std::end(indices), std::cbegin(unphased_split),
-                           std::cend(unphased_split));
+    for (const std::string_view hap : utils::split_view(gt, separator)) {
+        if (!std::empty(hap)) {
+            indices.emplace_back(hap);
         }
     }
-    return indices;
+    return {indices, separator == '|'};
 }
 
 }  // namespace dorado::secondary

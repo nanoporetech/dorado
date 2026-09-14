@@ -173,10 +173,11 @@ std::pair<int64_t, std::span<const std::vector<int32_t>>> lookup_gts(int64_t plo
 
 /**
  * \brief Utility function to split GT string back into allele indices.
- *        Handles both `|` and `/` separators including the mixed case described in the VCF spec.
+ *        Handles `|` or `/` separators but not the mixed case described in the VCF spec.
+ *        If both `|` and `/` are present, this function will throw.
  * \param gt Genotype string
- * \returns Vector of allele indices in the order they appear in gt.
+ * \returns Pair containing: (Vector of allele strings in the order they appear in gt, whether the genotype is phased).
  */
-std::vector<std::string_view> split_GT_string(const std::string_view gt);
+std::pair<std::vector<std::string_view>, bool> split_GT_string(const std::string_view gt);
 
 }  // namespace dorado::secondary

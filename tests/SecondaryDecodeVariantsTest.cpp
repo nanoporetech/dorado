@@ -1362,19 +1362,29 @@ CATCH_TEST_CASE("split GT string", TEST_GROUP) {
         std::string test_name;
         std::string gt;
         std::vector<std::string_view> expected_strings;
+        bool expected_phased{false};
+        bool expect_throw{false};
     };
 
     auto [test_case] = GENERATE_REF(table<TestCase>({
             TestCase{"empty", "", {}},
             TestCase{"haploid", "0", {"0"}},
             TestCase{"diploid unphased", "0/1", {"0", "1"}},
-            TestCase{"diploid phased", "1|2", {"1", "2"}},
+            TestCase{"diploid phased", "1|2", {"1", "2"}, true},
+            TestCase{"diploid phased, optional first indicator present", "|1|2", {"1", "2"}, true},
+            TestCase{"diploid, empty segment dropped", "1//2", {"1", "2"}},
             TestCase{"triploid unphased", "1/2/2", {"1", "2", "2"}},
-            TestCase{"triploid mixed phasing", "|1|2/2", {"1", "2", "2"}},
+            TestCase{"triploid mixed phasing throws", "|1|2/2", {}, false, true},
     }));
 
     CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
-    CATCH_CHECK(split_GT_string(test_case.gt) == test_case.expected_strings);
+    if (test_case.expect_throw) {
+        CATCH_CHECK_THROWS(split_GT_string(test_case.gt));
+    } else {
+        const auto [result_strings, result_phased] = split_GT_string(test_case.gt);
+        CATCH_CHECK(result_strings == test_case.expected_strings);
+        CATCH_CHECK(result_phased == test_case.expected_phased);
+    }
 }
 
 }  // namespace dorado::secondary::tests
