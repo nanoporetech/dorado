@@ -9,6 +9,7 @@
 #include "utils/rle.h"
 #include "utils/sequence_utils.h"
 #include "utils/stl_utils.h"
+#include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -617,9 +618,14 @@ std::vector<float> compute_allele_logprobs_array(const at::Tensor& probs_3D,
 // Currently only enumerated up to num_alleles=3 (alts=2) for ploidy=1 and
 // and num_alleles=4 (alts=3) for ploidy=2.
 // clang-format off
-const std::vector<std::vector<std::string_view>> ALLELE_SETS = {
-    /*ploidy=1*/ {"0", "1", "2"},
-    /*ploidy=2*/ {"00", "01", "11", "02", "12", "22", "03", "13", "23", "33"},
+const std::vector<std::vector<std::vector<int32_t>>> ALLELE_SETS = {
+    /*ploidy=1*/ {{0}, {1}, {2}},
+    /*ploidy=2*/ {
+                     {0, 0},
+                     {0, 1}, {1, 1},
+                     {0, 2}, {1, 2}, {2, 2},
+                     {0, 3}, {1, 3}, {2, 3}, {3, 3},
+                 },
 };
 const std::vector<std::vector<int64_t>> NUM_ELEMENTS = {
     /*ploidy=1*/ {1, 2, 3},
@@ -631,7 +637,7 @@ const std::vector<std::vector<int64_t>> NUM_ELEMENTS = {
  * \brief Calculate total log-probability for all possible permutations of a single genotype.
  */
 float compute_total_genotype_likelihood(const std::vector<float>& hap_allele_logprobs,
-                                        const std::string_view genotype,
+                                        const std::vector<int32_t>& genotype,
                                         const int64_t num_haplotypes) {
     if (std::empty(hap_allele_logprobs)) {
         throw std::runtime_error{"[compute_total_genotype_likelihood] Empty log probs"};
@@ -640,33 +646,27 @@ float compute_total_genotype_likelihood(const std::vector<float>& hap_allele_log
         return NEGINF;
     }
     const int64_t num_alleles = std::ssize(hap_allele_logprobs) / num_haplotypes;
-    std::vector<int32_t> gt;
-    gt.reserve(num_haplotypes);
-    for (const char c : genotype) {
-        if ((c < '0') || (c > '9')) {
-            throw std::runtime_error{
-                    "[compute_total_genotype_likelihood] Genotype contains a non-integer allele: " +
-                    std::string(1, c)};
-        }
-        const int32_t index = static_cast<int32_t>(c - '0');
-        if ((index < 0) || (index >= num_alleles)) {
-            throw std::runtime_error{"[compute_total_genotype_likelihood] Genotype " +
-                                     std::to_string(index) + " out of range for " +
-                                     std::to_string(num_alleles) + " alleles"};
-        }
-        gt.emplace_back(index);
-    }
-    if (std::ssize(gt) != num_haplotypes) {
+    if (std::ssize(genotype) != num_haplotypes) {
         throw std::runtime_error{
                 "[compute_total_genotype_likelihood] Number of genotype entries " +
-                std::to_string(std::ssize(gt)) +
-                "doesn't match expected number of alleles: " + std::to_string(num_haplotypes)};
+                std::to_string(std::ssize(genotype)) +
+                "doesn't match expected number of haplotypes: " + std::to_string(num_haplotypes)};
     }
+    if (std::any_of(std::cbegin(genotype), std::cend(genotype), [&num_alleles](const auto all_id) {
+            return (all_id < 0) || (all_id >= num_alleles);
+        })) {
+        throw std::runtime_error{"[compute_total_genotype_likelihood] Genotype " +
+                                 utils::print_container_as_string(genotype, ",", true) +
+                                 " contains entries out of range for " +
+                                 std::to_string(num_alleles) + " alleles"};
+    }
+    // make local mutable copy
+    std::vector<int32_t> gt = genotype;
     float total_logprobs = NEGINF;
     do {
         float perm_logprobs = 0.f;
-        for (int64_t i = 0; i < std::ssize(gt); ++i) {
-            perm_logprobs += hap_allele_logprobs[gt[i] * num_haplotypes + i];
+        for (int64_t hap_id = 0; hap_id < std::ssize(gt); ++hap_id) {
+            perm_logprobs += hap_allele_logprobs[gt[hap_id] * num_haplotypes + hap_id];
         }
         total_logprobs = logaddexp(total_logprobs, perm_logprobs);
     } while (std::next_permutation(std::begin(gt), std::end(gt)));
@@ -1198,8 +1198,8 @@ void add_depth(Variant& var, const at::Tensor& depth) {
 /**
  * \brief Lookup genotypes list with bounds checking.
  */
-std::pair<int64_t, std::span<const std::string_view>> lookup_gts(const int64_t ploidy,
-                                                                 const int64_t num_alleles) {
+std::pair<int64_t, std::span<const std::vector<int32_t>>> lookup_gts(const int64_t ploidy,
+                                                                     const int64_t num_alleles) {
     if ((ploidy <= 0) || (ploidy > std::ssize(ALLELE_SETS))) {
         throw std::runtime_error{"ALLELE_SETS not implemented for ploidy " +
                                  std::to_string(ploidy)};
@@ -1211,9 +1211,8 @@ std::pair<int64_t, std::span<const std::string_view>> lookup_gts(const int64_t p
                                  " alleles"};
     }
     const int64_t num_elements = NUM_ELEMENTS[ploidy - 1][num_alleles - 1];
-    const std::vector<std::string_view>& genotype_order = ALLELE_SETS[ploidy - 1];
-    const std::span<const std::string_view> genotype_range{std::cbegin(genotype_order),
-                                                           static_cast<size_t>(num_elements)};
+    const std::span<const std::vector<int32_t>> genotype_range{std::cbegin(ALLELE_SETS[ploidy - 1]),
+                                                               static_cast<size_t>(num_elements)};
     return std::make_pair(num_elements, genotype_range);
 }
 
@@ -1959,6 +1958,22 @@ std::vector<Variant> general_decode_variants(
     }
 
     return normalized_variants;
+}
+
+std::vector<std::string_view> split_GT_string(const std::string_view gt) {
+    if (std::empty(gt)) {
+        return {};
+    }
+    std::vector<std::string_view> indices;
+    indices.reserve(std::size(gt));
+    for (const std::string_view phased_split : utils::split_view(gt, '|')) {
+        if (!std::empty(phased_split)) {
+            const auto unphased_split = utils::split_view(phased_split, '/');
+            indices.insert(std::end(indices), std::cbegin(unphased_split),
+                           std::cend(unphased_split));
+        }
+    }
+    return indices;
 }
 
 }  // namespace dorado::secondary

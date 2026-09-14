@@ -1309,21 +1309,34 @@ CATCH_TEST_CASE("lookup GT case lists", TEST_GROUP) {
         std::string test_name;
         int64_t ploidy;
         int64_t num_alleles;
-        std::vector<std::string_view> expected_strings;
+        std::vector<std::vector<int32_t>> expected_gts;
         bool expect_throw = false;
     };
 
     auto [test_case] = GENERATE_REF(table<TestCase>({
-            TestCase{"ploidy 1, num_alleles 1", 1, 1, {"0"}, false},
-            TestCase{"ploidy 1, num_alleles 2", 1, 2, {"0", "1"}, false},
-            TestCase{"ploidy 1, num_alleles 3", 1, 3, {"0", "1", "2"}, false},
-            TestCase{"ploidy 2, num_alleles 1", 2, 1, {"00"}, false},
-            TestCase{"ploidy 2, num_alleles 2", 2, 2, {"00", "01", "11"}, false},
-            TestCase{"ploidy 2, num_alleles 3", 2, 3, {"00", "01", "11", "02", "12", "22"}, false},
+            TestCase{"ploidy 1, num_alleles 1", 1, 1, {{0}}, false},
+            TestCase{"ploidy 1, num_alleles 2", 1, 2, {{0}, {1}}, false},
+            TestCase{"ploidy 1, num_alleles 3", 1, 3, {{0}, {1}, {2}}, false},
+            TestCase{"ploidy 2, num_alleles 1", 2, 1, {{0, 0}}, false},
+            TestCase{"ploidy 2, num_alleles 2", 2, 2, {{0, 0}, {0, 1}, {1, 1}}, false},
+            TestCase{"ploidy 2, num_alleles 3",
+                     2,
+                     3,
+                     {{0, 0}, {0, 1}, {1, 1}, {0, 2}, {1, 2}, {2, 2}},
+                     false},
             TestCase{"ploidy 2, num_alleles 4",
                      2,
                      4,
-                     {"00", "01", "11", "02", "12", "22", "03", "13", "23", "33"},
+                     {{0, 0},
+                      {0, 1},
+                      {1, 1},
+                      {0, 2},
+                      {1, 2},
+                      {2, 2},
+                      {0, 3},
+                      {1, 3},
+                      {2, 3},
+                      {3, 3}},
                      false},
             TestCase{"ploidy 0, invalid", 0, 1, {}, true},
             TestCase{"ploidy out of range", 3, 1, {}, true},
@@ -1337,11 +1350,31 @@ CATCH_TEST_CASE("lookup GT case lists", TEST_GROUP) {
         CATCH_CHECK_THROWS(lookup_gts(test_case.ploidy, test_case.num_alleles));
     } else {
         const auto [num_elements, gt_list] = lookup_gts(test_case.ploidy, test_case.num_alleles);
-        CATCH_CHECK(num_elements == std::ssize(test_case.expected_strings));
+        CATCH_CHECK(num_elements == std::ssize(test_case.expected_gts));
         CATCH_CHECK(num_elements == std::ssize(gt_list));
-        CATCH_CHECK(std::vector<std::string_view>(std::cbegin(gt_list), std::cend(gt_list)) ==
-                    test_case.expected_strings);
+        CATCH_CHECK(std::vector<std::vector<int32_t>>(std::cbegin(gt_list), std::cend(gt_list)) ==
+                    test_case.expected_gts);
     }
+}
+
+CATCH_TEST_CASE("split GT string", TEST_GROUP) {
+    struct TestCase {
+        std::string test_name;
+        std::string gt;
+        std::vector<std::string_view> expected_strings;
+    };
+
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+            TestCase{"empty", "", {}},
+            TestCase{"haploid", "0", {"0"}},
+            TestCase{"diploid unphased", "0/1", {"0", "1"}},
+            TestCase{"diploid phased", "1|2", {"1", "2"}},
+            TestCase{"triploid unphased", "1/2/2", {"1", "2", "2"}},
+            TestCase{"triploid mixed phasing", "|1|2/2", {"1", "2", "2"}},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    CATCH_CHECK(split_GT_string(test_case.gt) == test_case.expected_strings);
 }
 
 }  // namespace dorado::secondary::tests

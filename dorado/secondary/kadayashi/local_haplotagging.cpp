@@ -1882,10 +1882,15 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         if (it == std::cend(ret.format)) {
             throw std::runtime_error{"Variant is missing genotype entry"};
         }
-        std::string gt;
+        std::vector<int32_t> gt;
         gt.reserve(std::size(it->second));
-        std::copy_if(std::cbegin(it->second), std::cend(it->second), std::back_inserter(gt),
-                     [](const char c) { return (c >= '0') && (c <= '9'); });
+        for (const std::string_view all_idx : dorado::secondary::split_GT_string(it->second)) {
+            if (all_idx == ".") {
+                gt.emplace_back(-1);
+            } else {
+                gt.emplace_back(dorado::utils::from_chars<int32_t>(all_idx).value());
+            }
+        }
         std::sort(std::begin(gt), std::end(gt));
         const int32_t ploidy = std::ssize(gt);
         const int64_t num_alleles = std::ssize(ret.alts) + 1;
@@ -1896,7 +1901,9 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         }
         const auto it_go = std::find(std::cbegin(genotype_order), std::cend(genotype_order), gt);
         if (it_go == std::cend(genotype_order)) {
-            throw std::runtime_error{"Genotype " + gt + " not found in genotype_order"};
+            throw std::runtime_error{"Genotype " +
+                                     dorado::utils::print_container_as_string(gt, ",", true) +
+                                     " not found in genotype_order"};
         }
         std::vector<int32_t> pl_values(num_elements, dorado::secondary::VCF_MAX_PL_CAP);
         const size_t idx = std::distance(std::cbegin(genotype_order), it_go);

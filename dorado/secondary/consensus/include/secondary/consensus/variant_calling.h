@@ -166,9 +166,17 @@ std::vector<Variant> general_decode_variants(
  *        of pre-defined genotypes. Throws for invalid inputs.
  * \param ploidy Number of haplotypes.
  * \param num_alleles Number of alleles.
- * \returns Pair containing: (number of genotype combinations, genotype combination strings).
+ * \returns Pair containing: (number of genotype combinations, genotype combinations).
  */
-std::pair<int64_t, std::span<const std::string_view>> lookup_gts(int64_t ploidy,
-                                                                 int64_t num_alleles);
+std::pair<int64_t, std::span<const std::vector<int32_t>>> lookup_gts(int64_t ploidy,
+                                                                     int64_t num_alleles);
+
+/**
+ * \brief Utility function to split GT string back into allele indices.
+ *        Handles both `|` and `/` separators including the mixed case described in the VCF spec.
+ * \param gt Genotype string
+ * \returns Vector of allele indices in the order they appear in gt.
+ */
+std::vector<std::string_view> split_GT_string(const std::string_view gt);
 
 }  // namespace dorado::secondary
