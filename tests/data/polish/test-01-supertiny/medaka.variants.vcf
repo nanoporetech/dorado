@@ -4,7 +4,7 @@
 ##FORMAT=<ID=GT,Number=1,Type=String,Description="Medaka genotype.">
 ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Medaka genotype quality score">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
-contig_1	657	.	G	GT	2.438	LowQual	.	GT:GQ:DP:SRC:AD	1:2:10:I:1,1
-contig_1	3062	.	CG	C	25.554	PASS	.	GT:GQ:DP:SRC:AD	1:26:11:I:2,6
-contig_1	5425	.	CA	C	4.041	PASS	.	GT:GQ:DP:SRC:AD	1:4:10:I:3,3
-contig_1	5855	.	AT	A	3.416	PASS	.	GT:GQ:DP:SRC:AD	1:3:10:I:4,2
+contig_1	657	.	G	GT	2.438	LowQual	.	GT:GQ:DP:SRC:AD:VAF	1:2:10:I:1,1:0.1
+contig_1	3062	.	CG	C	25.554	PASS	.	GT:GQ:DP:SRC:AD:VAF	1:26:11:I:2,6:0.55
+contig_1	5425	.	CA	C	4.041	PASS	.	GT:GQ:DP:SRC:AD:VAF	1:4:10:I:3,3:0.3
+contig_1	5855	.	AT	A	3.416	PASS	.	GT:GQ:DP:SRC:AD:VAF	1:3:10:I:4,2:0.2

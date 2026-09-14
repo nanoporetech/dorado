@@ -1963,6 +1963,8 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
     if ((var.median_depth != var.min_depth) && (ret.ref.length() > 1)) {
         ret.format["MIN_DP"] = std::to_string(var.min_depth);
     }
+    dorado::secondary::add_VAF(ret);
+
     return ret;
 }
 

@@ -123,7 +123,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                             .format = {{"GT", "1/2"},
                                        {"GQ", "31"},
                                        {"MIN_DP", "25"},
-                                       {"AD", "1,14,10"}},
+                                       {"AD", "1,14,10"},
+                                       {"VAF", "0.56,0.4"}},
                             .rstart = 0,
                             .rend = 0,
                     },
@@ -263,7 +264,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                                  "chr1\t11\t.\tN\t<*>\t.\t.\tEND=11\tGT:GQ:LEN:SRC\t./.:.:1:."));
         // Check that extra missing depth added for gVCF <*> record
         CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
-                                           "GT:GQ:MIN_DP:AD:SRC\t1/2:31:25:1,14,10,.:."));
+                                           "GT:GQ:MIN_DP:AD:VAF:SRC\t1/2:31:25:1,14,10,.:0.56,0.4,.:."));
     }
     // clang-format on
 
@@ -326,6 +327,33 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         CATCH_CHECK_THROWS_WITH(
                 writer.write_variant(variant),
                 Catch::Matchers::ContainsSubstring("No genotype information found"));
+    }
+
+    CATCH_SECTION("writes_variant skips empty string") {
+        {
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
+
+            Variant empty_list_variant{
+                    .seq_id = 0,
+                    .pos = 9,
+                    .ref = "A",
+                    .alts = {"C"},
+                    .filters = {Filters::Pass},
+                    .info = {},
+                    .qual = 60.0f,
+                    .format = {{"GT", "0/1"}, {"GQ", "45"}, {"AD", ""}},
+                    .rstart = 0,
+                    .rend = 0,
+            };
+            writer.write_variant(empty_list_variant);
+        }
+
+        const std::string vcf_text = ReadFileIntoString(data.vcf_path);
+
+        CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
+                                           "##FORMAT=<ID=AD,Number=R,Type=Integer"));
+        CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
+                                           "chr1\t10\t.\tA\tC\t60\tPASS\t.\tGT:GQ:SRC\t0/1:45:."));
     }
 }
 
