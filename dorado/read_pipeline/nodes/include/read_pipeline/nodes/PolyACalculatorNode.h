@@ -10,7 +10,7 @@
 
 namespace dorado {
 
-class PolyACalculatorNode : public MessageSink {
+class PolyACalculatorNode final : public MessageSink {
 public:
     static inline constexpr std::size_t MAX_INPUT_QUEUE_SIZE{10000};
     static inline constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};

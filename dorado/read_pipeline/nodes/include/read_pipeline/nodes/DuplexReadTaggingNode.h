@@ -12,7 +12,7 @@ namespace dorado {
 /// and simplex reads based on, post filtering,
 /// whether a simplex read is a parent of a duplex
 /// read or not.
-class DuplexReadTaggingNode : public MessageSink {
+class DuplexReadTaggingNode final : public MessageSink {
 public:
     DuplexReadTaggingNode();
     ~DuplexReadTaggingNode();

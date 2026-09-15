@@ -20,7 +20,7 @@ class ModBaseRunner;
 using RunnerPtr = std::unique_ptr<ModBaseRunner>;
 }  // namespace modbase
 
-class ModBaseCallerNode : public MessageSink {
+class ModBaseCallerNode final : public MessageSink {
     struct ModBaseChunk;
     struct WorkingRead;
 

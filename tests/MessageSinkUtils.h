@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 
-class MessageSinkToVector : public dorado::MessageSink {
+class MessageSinkToVector final : public dorado::MessageSink {
 public:
     MessageSinkToVector(size_t max_messages, std::vector<dorado::Message>& messages)
             : MessageSink(max_messages, 1), m_messages(messages) {}

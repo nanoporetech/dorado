@@ -15,7 +15,7 @@ namespace demux {
 struct BarcodingInfo;
 }
 
-class BarcodeClassifierNode : public MessageSink {
+class BarcodeClassifierNode final : public MessageSink {
 public:
     static inline constexpr std::size_t MAX_INPUT_QUEUE_SIZE{10000};
     static inline constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};

@@ -20,7 +20,7 @@ namespace dorado {
 
 struct ModBaseInfo;
 
-class ModBaseChunkCallerNode : public MessageSink {
+class ModBaseChunkCallerNode final : public MessageSink {
     struct ModBaseData;
     struct WorkingRead;
     struct ModBaseChunk;

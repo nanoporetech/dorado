@@ -4,7 +4,7 @@
 
 namespace dorado {
 
-class CorrectionPafWriterNode : public MessageSink {
+class CorrectionPafWriterNode final : public MessageSink {
 public:
     CorrectionPafWriterNode();
     ~CorrectionPafWriterNode();

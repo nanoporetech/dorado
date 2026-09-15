@@ -7,7 +7,7 @@
 
 namespace dorado {
 
-class ScalerNode : public MessageSink {
+class ScalerNode final : public MessageSink {
 public:
     ScalerNode(const config::SignalNormalisationParams& config,
                models::SampleType model_type,

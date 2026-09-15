@@ -9,7 +9,7 @@
 
 namespace dorado {
 
-class ReadToBamTypeNode : public MessageSink {
+class ReadToBamTypeNode final : public MessageSink {
 public:
     ReadToBamTypeNode(bool emit_moves,
                       size_t num_worker_threads,

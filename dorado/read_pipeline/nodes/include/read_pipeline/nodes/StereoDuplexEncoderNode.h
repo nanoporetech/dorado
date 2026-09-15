@@ -7,7 +7,7 @@
 
 namespace dorado {
 
-class StereoDuplexEncoderNode : public MessageSink {
+class StereoDuplexEncoderNode final : public MessageSink {
 public:
     explicit StereoDuplexEncoderNode(int input_signal_stride);
     ~StereoDuplexEncoderNode();

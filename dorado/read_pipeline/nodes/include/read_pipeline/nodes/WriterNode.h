@@ -13,7 +13,7 @@ namespace hts_writer {
 class IWriter;
 }
 
-class WriterNode : public MessageSink {
+class WriterNode final : public MessageSink {
 public:
     explicit WriterNode(std::vector<std::unique_ptr<hts_writer::IWriter>> writers);
     ~WriterNode();

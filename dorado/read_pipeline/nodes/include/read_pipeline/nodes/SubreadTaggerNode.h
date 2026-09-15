@@ -14,7 +14,7 @@
 
 namespace dorado {
 
-class SubreadTaggerNode : public MessageSink {
+class SubreadTaggerNode final : public MessageSink {
 public:
     SubreadTaggerNode(int num_worker_threads, size_t max_reads);
     ~SubreadTaggerNode();
