@@ -9,6 +9,7 @@
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "secondary/kadayashi/types.h"
+#include "utils/string_utils.h"
 
 #include <cxxpool.h>
 #include <htslib/bgzf.h>
@@ -131,7 +132,7 @@ void insert_bed_line(const std::string &line, std::string_view chrom, std::vecto
     const int col_chrom = 0;
     const int col_s = 1;
     const int col_e = 2;
-    const std::vector<std::string> cols = split_deli_line(line, '\t');
+    const std::vector<std::string> cols = dorado::utils::split(line, '\t');
     if (cols.size() != 3) {
         spdlog::error("[kdys::{}] error parsing BED line: {}", __func__, line);
         return;
@@ -162,7 +163,7 @@ int insert_variant_positions_from_a_vcf_line(const std::string &line,
     }
     int ret = 0;
 
-    const std::vector<std::string> cols = split_deli_line(line, '\t');
+    const std::vector<std::string> cols = dorado::utils::split(line, '\t');
     if (line[0] == '#') {
         if (line[1] == '#') {
             return -1;
@@ -196,8 +197,8 @@ int insert_variant_positions_from_a_vcf_line(const std::string &line,
                 pos -= 1;  // convert to 0-index
             }
             if ((pos >= ref_start) && (pos < ref_end)) {
-                const std::vector<std::string> tags = split_deli_line(cols[8], ':');
-                const std::vector<std::string> values = split_deli_line(cols[9], ':');
+                const std::vector<std::string> tags = dorado::utils::split(cols[8], ':');
+                const std::vector<std::string> values = dorado::utils::split(cols[9], ':');
                 for (size_t i_tag = 0; i_tag < tags.size(); i_tag++) {
                     if (tags[i_tag] == "GT") {
                         if (values[i_tag].size() == 3 && values[i_tag][0] != values[i_tag][2]) {
@@ -1818,7 +1819,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
         if (line[0] == '#') {
             continue;
         }
-        std::vector<std::string> cols = split_deli_line(line, '\t');
+        std::vector<std::string> cols = dorado::utils::split(line, '\t');
         if (cols.size() != 2 || cols[0].empty() || cols[1].empty()) {
             warning++;
             continue;
