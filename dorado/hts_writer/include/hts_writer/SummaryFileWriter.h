@@ -17,7 +17,7 @@ class HtsData;
 
 namespace hts_writer {
 
-class SummaryFileWriter : public IWriter {
+class SummaryFileWriter final : public IWriter {
 public:
     using FieldFlags = uint32_t;
     static constexpr FieldFlags BASECALLING_FIELDS = 1 << 0;

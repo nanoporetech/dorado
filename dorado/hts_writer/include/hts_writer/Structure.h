@@ -21,7 +21,7 @@ protected:
     IStructure &operator=(IStructure &&) = delete;
 };
 
-class SingleFileStructure : public IStructure {
+class SingleFileStructure final : public IStructure {
 public:
     SingleFileStructure(const std::string &output_dir, OutputMode mode);
     std::string get_path([[maybe_unused]] const HtsData &hts_data) override;
@@ -33,7 +33,7 @@ private:
     std::string get_filename() const;
 };
 
-class NestedFileStructure : public IStructure {
+class NestedFileStructure final : public IStructure {
 public:
     NestedFileStructure(const std::string &output_dir, OutputMode mode, bool assume_barcodes)
             : m_output_dir(std::filesystem::weakly_canonical(std::filesystem::path(output_dir))),

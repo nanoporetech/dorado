@@ -11,7 +11,7 @@ namespace dorado {
 
 class Pipeline;
 
-class CorrectionPafReader : public CorrectionAligner {
+class CorrectionPafReader final : public CorrectionAligner {
 public:
     CorrectionPafReader(std::string_view paf_file, std::unordered_set<std::string> skip_set);
     ~CorrectionPafReader() = default;

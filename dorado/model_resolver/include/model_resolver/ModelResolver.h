@@ -83,7 +83,7 @@ public:
                         const std::vector<std::filesystem::directory_entry>& reads);
 };
 
-class DownloaderModelResolver : public ModelResolver {
+class DownloaderModelResolver final : public ModelResolver {
 public:
     DownloaderModelResolver(std::string model_complex_arg,
                             std::optional<std::string> models_directory_arg,

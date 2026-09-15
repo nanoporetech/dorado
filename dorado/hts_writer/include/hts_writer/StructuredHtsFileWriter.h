@@ -10,7 +10,7 @@ namespace dorado {
 
 namespace hts_writer {
 
-class StructuredHtsFileWriter : public HtsFileWriter {
+class StructuredHtsFileWriter final : public HtsFileWriter {
 public:
     StructuredHtsFileWriter(const HtsFileWriterConfig& cfg,
                             std::unique_ptr<IStructure> structure,
