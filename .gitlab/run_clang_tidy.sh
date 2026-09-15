@@ -102,11 +102,6 @@ else
   find ${source_dir}/third_party/* -name .clang-tidy -delete
 fi
 
-run_clang_tidy_args=()
-if [[ -n $source_filter ]] ; then
-  run_clang_tidy_args+=("${source_filter}")
-fi
-
 # Print the current config to make sure it parses correctly.
 clang-tidy --dump-config
 
@@ -117,4 +112,4 @@ run-clang-tidy \
   -j ${num_jobs} \
   ${apply_fixits} \
   -quiet \
-  "${run_clang_tidy_args[@]}"
+  "${source_filter}"
