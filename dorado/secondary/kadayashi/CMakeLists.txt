@@ -6,10 +6,8 @@ target_sources(dorado_secondary
         ${PUBLIC_BASE}/local_haplotagging.h
         ${PUBLIC_BASE}/faidx_utils.h
         ${PUBLIC_BASE}/types.h
-        ${PUBLIC_BASE}/blocked_bloom_filter.h
     PRIVATE
         local_haplotagging.cpp
-        blocked_bloom_filter.cpp
         faidx_utils.cpp
         sequence_utility.cpp
         bam_record_parsing.cpp
