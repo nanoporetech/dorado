@@ -167,7 +167,6 @@ struct pileup_pars_t {
 
     bool retain_het_only{true};
     bool retain_SNP_only{true};
-    bool use_bloomfilter{false};
     bool disable_low_complexity_masking{false};
     bool disable_region_expansion{false};
 };

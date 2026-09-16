@@ -913,7 +913,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
         seen.clear();
         tmp_qav.clear();
         const bool parse_ok = parse_variants_for_one_read(aln.get(), tmp_qav, base_q_min,
-                                                          &left_clip_len, &right_clip_len, 1, NULL);
+                                                          &left_clip_len, &right_clip_len, 1);
 
         if (!parse_ok) {
             spdlog::error(
@@ -2329,9 +2329,8 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
         read.start_pos = static_cast<uint32_t>(aln.get()->core.pos);
         read.end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
         read.strand = !!(flag & 16);
-        const bool parse_ok =
-                parse_variants_for_one_read(aln.get(), read.vars, 0, &read.left_clip_len,
-                                            &read.right_clip_len, 0 /*SNPonly?*/, NULL);
+        const bool parse_ok = parse_variants_for_one_read(
+                aln.get(), read.vars, 0, &read.left_clip_len, &read.right_clip_len, 0 /*SNPonly?*/);
         if (!parse_ok) {
             continue;
         }

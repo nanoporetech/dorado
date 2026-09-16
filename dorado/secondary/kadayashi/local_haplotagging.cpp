@@ -4,7 +4,6 @@
 #include "hts_utils/hts_types.h"
 #include "secondary/consensus/variant_calling.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
-#include "secondary/kadayashi/blocked_bloom_filter.h"
 #include "secondary/kadayashi/faidx_utils.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
@@ -1297,7 +1296,6 @@ phase_return_t kadayashi_simple_single_region_wrapper1(samFile *fp_bam,
             .max_gapcompressed_seqdiv = max_gapcompressed_seqdiv,
             .retain_het_only = true,
             .retain_SNP_only = true,
-            .use_bloomfilter = false,
             .disable_low_complexity_masking = false,
             .disable_region_expansion = static_cast<bool>(!!disable_interval_expansion)};
 
@@ -2020,11 +2018,6 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         }
     }
 
-    BlockedBloomFilter bf(4, 25);
-    if (pp.use_bloomfilter) {
-        bf.enable();  // allocates
-    }
-
     // downsample helper
     int downsample_filtered = 0;
     std::vector<int> downsample_counter;
@@ -2126,9 +2119,9 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         // TODO could be done in parse_variant_for_one_read instead.
         std::vector<qa_t> tmp_read_vars_buffer{};
         std::vector<qa_t> &read_vars_buffer = ht_refvars.empty() ? r.vars : tmp_read_vars_buffer;
-        const bool parse_ok = parse_variants_for_one_read(
-                aln.get(), read_vars_buffer, pp.min_base_quality, &r.left_clip_len,
-                &r.right_clip_len, pp.retain_SNP_only, nullptr);
+        const bool parse_ok = parse_variants_for_one_read(aln.get(), read_vars_buffer,
+                                                          pp.min_base_quality, &r.left_clip_len,
+                                                          &r.right_clip_len, pp.retain_SNP_only);
         if (parse_ok && !read_vars_buffer.empty() && r.left_clip_len < pp.max_clipping &&
             r.right_clip_len < pp.max_clipping) {
             if (!ht_refvars.empty()) {
@@ -2140,11 +2133,6 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
                 }
                 if (r.vars[i].pos >= span_end) {
                     break;
-                }
-                const int is_not_seen_before =
-                        pp.use_bloomfilter ? bf.insert(r.vars[i].pos) : false;
-                if (is_not_seen_before) {
-                    continue;
                 }
 
                 const qa_t &var = r.vars[i];
@@ -2749,7 +2737,6 @@ ck_and_varcall_result_t kadayashi_phase_and_varcall(samFile *fp_bam,
                                         .max_gapcompressed_seqdiv = max_gapcompressed_seqdiv,
                                         .retain_het_only = false,
                                         .retain_SNP_only = false,
-                                        .use_bloomfilter = false,
                                         .disable_low_complexity_masking = false,
                                         .disable_region_expansion = true};
     chunk_t ck = variant_pileup_ht(hf_view, {}, fai, &phasing_result.qname2hp, ref_name, ref_start,
@@ -3086,7 +3073,7 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
         };
         const bool parse_ok = parse_variants_for_one_read(
                 aln.get(), r.vars, 0 /*pp.min_base_quality*/, &r.left_clip_len, &r.right_clip_len,
-                false /*retain_SNP_only*/, nullptr);
+                false /*retain_SNP_only*/);
         const double seqdiv_mismatch_only = get_snp_accuracy_dorado_style(r, qn);
         if ((seqdiv_mismatch_only < gck.options.min_snp_accuracy) || !parse_ok) {
             continue;
