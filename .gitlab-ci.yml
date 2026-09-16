@@ -117,6 +117,9 @@ variables:
 .linux_build_dependencies:
   before_script:
     - echo Dorado dependency stage
+    # Disable the nvidia repo since we only need standard packages.
+    # See https://forums.developer.nvidia.com/t/383373
+    - rm -f /etc/apt/sources.list.d/cuda-ubuntu2604-x86_64.list
     - apt-get update
     - apt-get install -y --no-install-recommends samtools curl libsz2 ccache automake
     - !reference [.linux_run_git_lfs]
