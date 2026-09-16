@@ -47,7 +47,7 @@
 
 .linux_regression_runner_v100:
   tags:
-    - ubuntu-20.04
+    - ubuntu-24.04
     - nvidia-docker
     - on-prem
     - gpu-v100

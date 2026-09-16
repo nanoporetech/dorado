@@ -721,7 +721,7 @@ test:macos:arm:
   extends:
     - .test_archive
   tags:
-    - ubuntu-20.04
+    - ubuntu-24.04
     - ${RUNNER_TAG}
   image: ${IMAGE}
   parallel:
