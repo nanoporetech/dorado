@@ -62,7 +62,6 @@ struct TransformerEncoderLayerParams {
     std::pair<int, int> attn_window{-1, -1};
     // DeepNorm normalization parameters.
     float deepnorm_alpha{1.0f};
-    float deepnorm_beta{1.0f};
     // Multi-head attention RoPE parameters.
     float theta{10000.0f};
     int max_seq_len{0};
