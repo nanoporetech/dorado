@@ -279,7 +279,6 @@ CATCH_TEST_CASE(TEST_GROUP ": latent space model parser", TEST_GROUP) {
         CATCH_CHECK(layer.nhead == 4);
         CATCH_CHECK(layer.dim_feedforward == 128);
         CATCH_CHECK(layer.deepnorm_alpha == 1.5650845f);
-        CATCH_CHECK(layer.deepnorm_beta == 0.4518010f);
         CATCH_CHECK(layer.attn_window == std::pair<int, int>{15, 16});
     }
 }

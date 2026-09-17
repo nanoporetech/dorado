@@ -98,7 +98,6 @@ TransformerEncoderLayerParams parse_transformer_encoder_layer_params(const toml:
     params.nhead = toml::find<int>(layer, "nhead");
     params.dim_feedforward = toml::find<int>(layer, "dim_feedforward");
     params.deepnorm_alpha = toml::find<float>(layer, "deepnorm_alpha");
-    params.deepnorm_beta = toml::find_or<float>(layer, "deepnorm_beta", 1.0f);
     params.max_seq_len = toml::find_or<int>(layer, "max_seq_len", 0);
 
     if (layer.contains("rotary_base") && layer.contains("theta")) {
@@ -137,8 +136,7 @@ std::string TransformerEncoderLayerParams::to_string() const {
         << " theta:"            << theta
         << " max_seq_len:"      << max_seq_len
         << " attn_window: ["    << attn_window.first << ", " << attn_window.second << "]"
-        << " deepnorm_alpha:"   << deepnorm_alpha
-        << " deepnorm_beta:"    << deepnorm_beta     << " }";
+        << " deepnorm_alpha:"   << deepnorm_alpha    << " }";
     return std::move(oss).str();
     // clang-format on
 }
