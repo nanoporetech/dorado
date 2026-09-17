@@ -154,6 +154,8 @@ std::vector<Variant> general_decode_variants(
         const VariantCallingSample& vc_sample,
         const std::string_view draft,
         const float pass_min_qual,
+        const float pass_min_gq,
+        const float pass_min_aq,
         bool ambig_ref,
         bool return_all,
         bool normalize,

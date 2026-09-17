@@ -23,9 +23,11 @@ struct FilterSpec {
 // Other filter strings are locally defined in the VCF header so can be changed if needed.
 inline constexpr std::array KNOWN_FILTERS{
         FilterSpec{"PASS", "All filters passed"},
-        FilterSpec{"LowQual", "Variant quality is below threshold"},
+        FilterSpec{"LowQual", "Variant QUAL is below threshold"},
         FilterSpec{"IncompatZyg", "Predicted zygosity incompatible with ploidy"},
         FilterSpec{".", "Non-variant position"},
+        FilterSpec{"LowGQ", "Variant GQ is below threshold"},
+        FilterSpec{"LowAQ", "Variant AQ is below threshold"},
 };
 
 class Filters {
@@ -37,6 +39,8 @@ public:
         LowQual = 1 << 1,
         IncompatZyg = 1 << 2,
         NonVariant = 1 << 3,
+        LowGQ = 1 << 4,
+        LowAQ = 1 << 5,
     };
 
     Filters() = default;

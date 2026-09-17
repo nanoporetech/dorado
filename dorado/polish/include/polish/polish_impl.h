@@ -162,6 +162,8 @@ std::vector<secondary::Variant> call_variants(
         const std::vector<std::pair<std::string, int64_t>>& draft_lens,
         const secondary::DecoderBase& decoder,
         const float pass_min_qual,
+        const float pass_min_gq,
+        const float pass_min_aq,
         bool ambig_ref,
         bool gvcf,
         int32_t num_threads,

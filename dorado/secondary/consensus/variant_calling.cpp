@@ -734,11 +734,11 @@ float get_qual(const std::vector<float>& genotype_logprobs, bool is_reference) {
 /**
  * \brief GQ is calculated as the likelihood that the predicted genotype is wrong
  */
-std::string construct_GQ_string(const std::vector<float>& genotype_logprobs,
-                                const std::string_view gt,
-                                const int64_t num_alleles) {
+float calculate_GQ(const std::vector<float>& genotype_logprobs,
+                   const std::string_view gt,
+                   const int64_t num_alleles) {
     if (std::empty(genotype_logprobs) || std::empty(gt)) {
-        return {};
+        return -1.0f;
     }
     const auto [all_idx, phased] = split_GT_string(gt);
     std::vector<int32_t> alleles;
@@ -756,7 +756,7 @@ std::string construct_GQ_string(const std::vector<float>& genotype_logprobs,
     const auto [num_elements, genotype_order] =
             dorado::secondary::lookup_gts(num_haplotypes, num_alleles);
     if ((num_elements == 0) || (num_elements > std::ssize(genotype_logprobs))) {
-        return std::string{};
+        return -1.0f;
     }
     const auto it_go = std::find(std::cbegin(genotype_order), std::cend(genotype_order), alleles);
     if (it_go == std::cend(genotype_order)) {
@@ -773,7 +773,33 @@ std::string construct_GQ_string(const std::vector<float>& genotype_logprobs,
         }
     }
     logerr -= logaddexp(logerr, genotype_logprobs[idx]);
-    return q_string_from_float(phred_from_log(logerr, VCF_MAX_GQ_CAP));
+    return phred_from_log(logerr, VCF_MAX_GQ_CAP);
+}
+
+bool fails_AQ_filter(const std::vector<float>& aq_values,
+                     const std::string_view gt,
+                     const float pass_min_aq) {
+    if (std::empty(aq_values) || std::empty(gt)) {
+        return false;
+    }
+
+    const auto [all_idx, phased] = split_GT_string(gt);
+    for (const std::string_view all_str : all_idx) {
+        if (all_str == ".") {
+            continue;
+        }
+        const int32_t allele_id = utils::from_chars<int32_t>(all_str).value();
+        if ((allele_id < 0) || (allele_id >= std::ssize(aq_values))) {
+            throw std::runtime_error{"Genotype " +
+                                     utils::print_container_as_string(all_idx, ",", true) +
+                                     " contains entries out of range for " +
+                                     std::to_string(std::size(aq_values)) + " AQ values"};
+        }
+        if ((aq_values[allele_id] >= 0) && (aq_values[allele_id] < pass_min_aq)) {
+            return true;
+        }
+    }
+    return false;
 }
 
 Variant construct_variant(const std::string_view draft,
@@ -791,7 +817,10 @@ Variant construct_variant(const std::string_view draft,
                           const at::Tensor& probs_3D,
                           const std::unordered_set<char>& symbol_set,
                           const std::array<int32_t, 256>& symbol_lookup,
-                          const at::Tensor& basecalls) {
+                          const at::Tensor& basecalls,
+                          const float pass_min_qual,
+                          const float pass_min_gq,
+                          const float pass_min_aq) {
     const auto prepend_major_ref_base = [&positions_major, &positions_minor, &draft](Variant& var) {
         while ((var.rstart > 0) && (positions_minor[var.rstart] != 0)) {
             --var.rstart;
@@ -850,17 +879,17 @@ Variant construct_variant(const std::string_view draft,
     const std::string pl_str = construct_PL_string(genotype_likelihoods);
     const std::vector<float> aq_values = calculate_AQs(hap_allele_likelihoods, num_haplotypes);
     const std::string aq_str = construct_AQ_string(aq_values);
-    const std::string gq_str =
-            construct_GQ_string(genotype_likelihoods, gt, std::ssize(alleles_lookup));
+    const float gq_val = calculate_GQ(genotype_likelihoods, gt, std::ssize(alleles_lookup));
+    const float qual = get_qual(genotype_likelihoods, false);
 
     Variant var{
             .seq_id = seq_id,
             .pos = positions_major[rstart],
             .ref = var_ref,
             .alts = alts_out,
-            .filters = {Filters::Pass},
+            .filters = {qual < pass_min_qual ? Filters::LowQual : Filters::Pass},
             .info = {},
-            .qual = get_qual(genotype_likelihoods, false),
+            .qual = qual,
             .format = {{"GT", gt}, {FORMAT_TAG_VARIANT_SOURCE, variant_source}},
             .rstart = rstart,
             .rend = rend,
@@ -910,14 +939,20 @@ Variant construct_variant(const std::string_view draft,
 #endif
     }
 
-    if (!std::empty(gq_str)) {
-        var.format["GQ"] = gq_str;
+    if (gq_val >= 0) {
+        var.format["GQ"] = q_string_from_float(gq_val);
+        if (gq_val < pass_min_gq) {
+            var.filters.update(Filters::LowGQ);
+        }
     }
     if (!std::empty(pl_str)) {
         var.format["PL"] = pl_str;
     }
     if (!std::empty(aq_str)) {
         var.format["AQ"] = aq_str;
+        if (fails_AQ_filter(aq_values, gt, pass_min_aq)) {
+            var.filters.update(Filters::LowAQ);
+        }
     }
 
     sanitize_empty_alts(var, num_haplotypes);
@@ -938,7 +973,10 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
                                            const at::Tensor& probs_3D,
                                            const std::unordered_set<char>& symbol_set,
                                            const std::array<int32_t, 256>& symbol_lookup,
-                                           const at::Tensor& basecalls) {
+                                           const at::Tensor& basecalls,
+                                           const float pass_min_qual,
+                                           const float pass_min_gq,
+                                           const float pass_min_aq) {
     if (!merge_overlapping && !merge_adjacent) {
         return variants;
     }
@@ -988,7 +1026,8 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
             Variant new_var = construct_variant(
                     draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                     variants[prev_i].seq_id, v1.rstart, furthest_rend, true, ambig_ref, normalize,
-                    variant_source, probs_3D, symbol_set, symbol_lookup, basecalls);
+                    variant_source, probs_3D, symbol_set, symbol_lookup, basecalls, pass_min_qual,
+                    pass_min_gq, pass_min_aq);
 
 #ifdef DEBUG_NORMALIZE_VARIANT
             std::cerr << "[merge_sorted_variants] new_var = " << new_var << '\n';
@@ -1016,7 +1055,7 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
                     draft, positions_major, positions_minor, ref_seq_with_gaps, cons_seqs_with_gaps,
                     variants[prev_i].seq_id, variants[prev_i].rstart, furthest_rend, true,
                     ambig_ref, normalize, variant_source, probs_3D, symbol_set, symbol_lookup,
-                    basecalls);
+                    basecalls, pass_min_qual, pass_min_gq, pass_min_aq);
 
             if (is_valid(new_var)) {
                 filtered.emplace_back(std::move(new_var));
@@ -1772,6 +1811,8 @@ std::vector<Variant> general_decode_variants(
         const VariantCallingSample& vc_sample,
         const std::string_view draft,
         const float pass_min_qual,
+        const float pass_min_gq,
+        const float pass_min_aq,
         const bool ambig_ref,
         const bool return_all,
         const bool normalize,
@@ -1875,7 +1916,8 @@ std::vector<Variant> general_decode_variants(
         Variant var = construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
                                         cons_seqs_with_gaps, seq_id, rstart, rend, is_var,
                                         ambig_ref, normalize, VARIANT_SOURCE_INFERENCE, probs_3D,
-                                        symbol_set, symbol_lookup, vc_sample.basecalls);
+                                        symbol_set, symbol_lookup, vc_sample.basecalls,
+                                        pass_min_qual, pass_min_gq, pass_min_aq);
 
 #ifdef DEBUG_VARIANT_REGIONS
         {
@@ -1916,7 +1958,8 @@ std::vector<Variant> general_decode_variants(
         variants = merge_sorted_variants(variants, merge_overlapping, merge_adjacent, draft,
                                          positions_major, positions_minor, ref_seq_with_gaps,
                                          cons_seqs_with_gaps, ambig_ref, normalize, probs_3D,
-                                         symbol_set, symbol_lookup, vc_sample.basecalls);
+                                         symbol_set, symbol_lookup, vc_sample.basecalls,
+                                         pass_min_qual, pass_min_gq, pass_min_aq);
     }
 
 #ifdef DEBUG_NORMALIZE_VARIANT
@@ -2022,9 +2065,6 @@ std::vector<Variant> general_decode_variants(
     normalized_variants.reserve(std::size(variants));
     for (const Variant& var : variants) {
         Variant new_var = var;
-        if (!is_reference_record(new_var) && (new_var.qual < pass_min_qual)) {
-            new_var.filters.update(Filters::LowQual);
-        }
         add_depth(new_var, vc_sample.depth);
         add_VAF(new_var);
         // Sanity check.

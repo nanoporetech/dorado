@@ -95,6 +95,8 @@ struct Options {
     bool any_bam = false;
     bool ambig_ref = false;
     float pass_min_qual = 3.0f;
+    float pass_min_gq = 6.6f;
+    float pass_min_aq = 3.8f;
     std::optional<std::string> sample_name{};
 
     secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
@@ -271,14 +273,22 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .default_value(1)
                 .scan<'i', int>();
         parser.add_argument("--pass-qual-filter")
-                .help("Set quality filter for PASS variants.")
+                .help("Set QUAL filter for PASS variants.")
                 .default_value(3.0f)
                 .scan<'g', float>();
+        parser.add_argument("--pass-gq-filter")
+                .help("Set GQ filter for PASS variants.")
+                .default_value(6.6f)
+                .scan<'g', float>();
+        parser.add_argument("--pass-aq-filter")
+                .help("Set AQ filter for PASS variants.")
+                .default_value(3.8f)
+                .scan<'g', float>();
+        parser.add_argument("--sample-name").help("Set sample name in VCF.");
         parser.add_argument("--model-override")
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
                 .default_value("");
-        parser.add_argument("--sample-name").help("Set sample name in VCF.");
     }
     {
         parser.add_group("Phasing options");
@@ -534,6 +544,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.ambig_ref = parser.get<bool>("ambig-ref");
     opt.sample_name = cli::get_optional_argument<std::string>("--sample-name", parser);
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
+    opt.pass_min_gq = parser.get<float>("pass-gq-filter");
+    opt.pass_min_aq = parser.get<float>("pass-aq-filter");
 
     opt.candidate_variants_path = parser.present<std::string>("candidates");
 
@@ -1242,7 +1254,8 @@ void run_variant_calling(const Options& opt,
     // These are the only available FILTER options.
     const secondary::Filters::FilterType vcf_filters =
             secondary::Filters::Pass | secondary::Filters::LowQual |
-            secondary::Filters::IncompatZyg | secondary::Filters::NonVariant;
+            secondary::Filters::IncompatZyg | secondary::Filters::NonVariant |
+            secondary::Filters::LowGQ | secondary::Filters::LowAQ;
 
     // Set the sample name for VCF output
     // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
@@ -1458,7 +1471,7 @@ void run_variant_calling(const Options& opt,
                     vc_data_queue, vc_writer_queue, chrom_reduce_data, worker_terminate,
                     wrs_thread_call_variants, stats, draft_readers, opt.continue_on_error,
                     opt.threads, draft_lens, *resources.decoder, hemizygous_regions,
-                    opt.pass_min_qual, opt.ambig_ref,
+                    opt.pass_min_qual, opt.pass_min_gq, opt.pass_min_aq, opt.ambig_ref,
                     opt.out_format == VariantCallingFormatEnum::GVCF, ploidy, flank_trim_len,
                     variant_candidate_source);
         });

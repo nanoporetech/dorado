@@ -106,6 +106,8 @@ struct Options {
     bool ambig_ref = false;
     bool run_variant_calling = false;
     float pass_min_qual = 3.0f;
+    float pass_min_gq = 6.6f;
+    float pass_min_aq = 3.8f;
     bool write_consensus = false;
     bool continue_on_error = false;
     bool legacy_feature_gen = true;
@@ -230,8 +232,16 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .default_value(1)
                 .scan<'i', int>();
         parser.add_argument("--pass-qual-filter")
-                .help("Set quality filter for PASS variants.")
+                .help("Set QUAL filter for PASS variants.")
                 .default_value(3.0f)
+                .scan<'g', float>();
+        parser.add_argument("--pass-gq-filter")
+                .help("Set GQ filter for PASS variants.")
+                .default_value(6.6f)
+                .scan<'g', float>();
+        parser.add_argument("--pass-aq-filter")
+                .help("Set AQ filter for PASS variants.")
+                .default_value(3.8f)
                 .scan<'g', float>();
         parser.add_argument("--sample-name").help("Set sample name in VCF.");
         parser.add_argument("--model-override")
@@ -383,6 +393,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.ambig_ref = parser.get<bool>("ambig-ref");
 
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
+    opt.pass_min_gq = parser.get<float>("pass-gq-filter");
+    opt.pass_min_aq = parser.get<float>("pass-aq-filter");
 
     opt.sample_name = cli::get_optional_argument<std::string>("--sample-name", parser);
 
@@ -930,9 +942,10 @@ void run_polishing(const Options& opt,
 
     if (opt.run_variant_calling) {
         // These are the only available FILTER options.
-        const secondary::Filters::FilterType filters = secondary::Filters::Pass |
-                                                       secondary::Filters::LowQual |
-                                                       secondary::Filters::NonVariant;
+        const secondary::Filters::FilterType filters =
+                secondary::Filters::Pass | secondary::Filters::LowQual |
+                secondary::Filters::NonVariant | secondary::Filters::LowGQ |
+                secondary::Filters::LowAQ;
 
         // Set the sample name for VCF output
         // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
@@ -1192,9 +1205,9 @@ void run_polishing(const Options& opt,
             if (opt.run_variant_calling) {
                 std::vector<secondary::Variant> variants = polisher::call_variants(
                         worker_terminate, stats, batch_interval, vc_input_data, draft_readers,
-                        draft_lens, *resources.decoder, opt.pass_min_qual, opt.ambig_ref,
-                        opt.vc_type == VariantCallingEnum::GVCF, opt.threads,
-                        opt.continue_on_error);
+                        draft_lens, *resources.decoder, opt.pass_min_qual, opt.pass_min_gq,
+                        opt.pass_min_aq, opt.ambig_ref, opt.vc_type == VariantCallingEnum::GVCF,
+                        opt.threads, opt.continue_on_error);
 
                 std::sort(std::begin(variants), std::end(variants),
                           [](const auto& a, const auto& b) {
