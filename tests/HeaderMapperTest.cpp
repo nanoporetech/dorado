@@ -144,7 +144,7 @@ fs::path write_bam_with_read_group(const fs::path &output_dir,
     return bam_path;
 }
 
-class BamCollectorNode : public dorado::MessageSink {
+class BamCollectorNode final : public dorado::MessageSink {
 public:
     BamCollectorNode() : MessageSink(10, 1) {}
     ~BamCollectorNode() override {

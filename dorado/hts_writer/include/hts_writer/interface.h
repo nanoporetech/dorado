@@ -42,14 +42,5 @@ protected:
     IWriter& operator=(IWriter&&) = delete;
 };
 
-class NullWriter : public IWriter {
-public:
-    void process([[maybe_unused]] const Processable item) override {};
-    void shutdown() override {};
-
-    std::string get_name() const override { return "NullWriter"; }
-    stats::NamedStats sample_stats() const override { return {}; }
-};
-
 }  // namespace hts_writer
 }  // namespace dorado

@@ -1,6 +1,5 @@
 #pragma once
 
-#include "blocked_bloom_filter.h"
 #include "types.h"
 
 #include <cstdint>
@@ -28,7 +27,6 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                                  const int min_base_qv,
                                  int *left_clip_len,
                                  int *right_clip_len,
-                                 const int SNPonly,
-                                 BlockedBloomFilter *bf);
+                                 const int SNPonly);
 
 }  // namespace kadayashi

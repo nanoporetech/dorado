@@ -10,7 +10,7 @@ namespace dorado {
 // Duplex caller node receives a map of template_id to complement_id (typically generated from a pairs file),
 // and a map of `read_id` to `dorado::Read` object. It then performs duplex calling and pushes `dorado::Read`
 // objects to its output queue.
-class BaseSpaceDuplexCallerNode : public MessageSink {
+class BaseSpaceDuplexCallerNode final : public MessageSink {
 public:
     BaseSpaceDuplexCallerNode(std::map<std::string, std::string> template_complement_map,
                               ReadMap reads,

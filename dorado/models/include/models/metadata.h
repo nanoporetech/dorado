@@ -3,7 +3,6 @@
 #include "kits.h"
 
 #include <iosfwd>
-#include <set>
 
 namespace dorado::models {
 
@@ -74,8 +73,6 @@ std::string to_string(const ModelVariant& variant);
 std::string to_string(const ModsVariant& mod);
 std::string to_string(const ModelVersion& version);
 std::string to_string(const Chemistry& chemistry);
-
-std::string to_string(const std::set<ModelVariant>& codes, const std::string& separator);
 
 struct ModelVariantPair {
     ModelVariant variant = ModelVariant::NONE;

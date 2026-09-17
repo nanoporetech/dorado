@@ -11,10 +11,7 @@ dorado_add_library(
         basecaller_utils.h
         benchmark_timer.h
         cigar.h
-        concurrency/async_task_executor.h
         concurrency/AsyncExecutor.h
-        concurrency/detail/priority_task_queue.h
-        concurrency/multi_queue_thread_pool.h
         concurrency/synchronisation.h
         concurrency/task_priority.h
         concurrency/Task.h
@@ -64,10 +61,7 @@ dorado_add_library(
         basecaller_utils.cpp
         benchmark_timer.cpp
         cigar.cpp
-        concurrency/async_task_executor.cpp
         concurrency/AsyncExecutor.cpp
-        concurrency/detail/priority_task_queue.cpp
-        concurrency/multi_queue_thread_pool.cpp
         concurrency/TaskPool.cpp
         concurrency/WorkerPool.cpp
         container_utils.cpp

@@ -95,7 +95,7 @@ CATCH_TEST_CASE("Creation", TEST_GROUP) {
 // Tests destruction order of a random linear pipeline.
 CATCH_TEST_CASE("LinearDestructionOrder", TEST_GROUP) {
     // Node that records destruction order.
-    class OrderTestNode : public MessageSink {
+    class OrderTestNode final : public MessageSink {
     public:
         OrderTestNode(int index, std::vector<NodeHandle>& destruction_order)
                 : MessageSink(1, 0), m_destruction_order(destruction_order), m_index(index) {}
@@ -199,7 +199,7 @@ CATCH_TEST_CASE("TerminateRestart", TEST_GROUP) {
 
 // Check that fast terminate works.
 CATCH_TEST_CASE("TerminateFast", TEST_GROUP) {
-    class TerminateTestNode : public MessageSink {
+    class TerminateTestNode final : public MessageSink {
     public:
         explicit TerminateTestNode(
                 std::optional<dorado::utils::AsyncQueueTerminateFast>& was_fast_terminate)

@@ -126,8 +126,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                                  const int min_base_qv,
                                  int *left_clip_len,
                                  int *right_clip_len,
-                                 const int SNPonly,
-                                 BlockedBloomFilter *bf) {
+                                 const int SNPonly) {
     // MD tag is required: caller ensure that MD tag exists and its sanity.
     // Position of indels: for both insertions and deletions, position refers
     //   to the base before the insertion/deletion.
@@ -184,10 +183,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                 seq[j] = filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, self_pos + j)], min_base_qv);
             }
             if (!SNPonly) {
-                const bool do_insert = check_blockedbloomfilter_to_decide_inserting(bf, ref_pos);
-                if (do_insert) {
-                    add_allele_qa_v(vars, ref_pos - 1, seq, VAR_OP_I);
-                }
+                add_allele_qa_v(vars, ref_pos - 1, seq, VAR_OP_I);
             }
             insertions.push_back(((uint64_t)op_l) << 32 | (self_pos - 1));  // -1: same as above
             self_pos += op_l;
@@ -211,10 +207,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
     prev_md_type = md_op_table[static_cast<uint8_t>(md_s[0])];
     if (prev_md_type == 2) {
         snp_base.push_back(filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, self_pos)], min_base_qv));
-        const bool do_insert = check_blockedbloomfilter_to_decide_inserting(bf, ref_pos);
-        if (do_insert) {
-            add_allele_qa_v(vars, ref_pos, snp_base, VAR_OP_X);
-        }
+        add_allele_qa_v(vars, ref_pos, snp_base, VAR_OP_X);
         ref_pos++;
         self_pos++;
         prev_md_type = -1;
@@ -249,13 +242,8 @@ bool parse_variants_for_one_read(const bam1_t *aln,
             } else if (prev_md_type == 1) {  // prev was del
                 if (md_type == 0) {          // current sees numeric, del run has ended
                     if (!SNPonly) {
-                        const bool do_insert =
-                                check_blockedbloomfilter_to_decide_inserting(bf, ref_pos);
-                        if (do_insert) {
-                            add_allele_qa_v(vars, ref_pos - 1,
-                                            md_ss.substr(prev_md_i + 1, i - prev_md_i - 1),
-                                            VAR_OP_D);
-                        }
+                        add_allele_qa_v(vars, ref_pos - 1,
+                                        md_ss.substr(prev_md_i + 1, i - prev_md_i - 1), VAR_OP_D);
                     }
                     ref_pos += i - prev_md_i - 1;
                     prev_md_type = md_type;
@@ -271,9 +259,7 @@ bool parse_variants_for_one_read(const bam1_t *aln,
                 snp_base.clear();
                 snp_base.push_back(
                         filter_base_by_qv(seq_nt16_str[bam_seqi(seqi, self_pos)], min_base_qv));
-                if (check_blockedbloomfilter_to_decide_inserting(bf, ref_pos)) {
-                    add_allele_qa_v(vars, ref_pos, snp_base, VAR_OP_X);
-                }
+                add_allele_qa_v(vars, ref_pos, snp_base, VAR_OP_X);
                 ref_pos++;
                 self_pos++;
                 prev_md_type = -1;

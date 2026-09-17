@@ -140,10 +140,16 @@ CATCH_TEST_CASE(TEST_TAG " Get simplex model info by name") {
     CATCH_SECTION("Check all models unique") {
         using namespace dorado::models;
         std::set<std::string> all_models;
-        for (const ModelList& models :
-             {simplex_models(), simplex_deprecated_models(), stereo_models(), modified_models(),
-              modified_deprecated_models(), correction_models(), polish_models(),
-              variant_models()}) {
+        for (const auto& models : {
+                     simplex_models(),
+                     simplex_deprecated_models(),
+                     stereo_models(),
+                     modified_models(),
+                     modified_deprecated_models(),
+                     correction_models(),
+                     polish_models(),
+                     variant_models(),
+             }) {
             for (const ModelInfo& model : models) {
                 CATCH_CAPTURE(model.name);
                 auto [_, was_emplaced] = all_models.emplace(model.name);

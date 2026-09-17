@@ -35,12 +35,11 @@ public:
     stats::NamedStats sample_stats() const override;
 
     // Set the alignment reference for CRAM compression
-    void set_cram_reference(const std::string& reference);
+    void set_cram_reference(std::string reference);
     // Set a single header to write to all output files
     void set_shared_header(SamHdrSharedPtr header);
     // Set a lookup for pre-built output headers based indexed on read attributes at file write time.
-    void set_dynamic_header(
-            const std::shared_ptr<const utils::HeaderMapper::HeaderMap>& header_map);
+    void set_dynamic_header(std::shared_ptr<const utils::HeaderMapper::HeaderMap> header_map);
 
     void process(const Processable item) override;
 

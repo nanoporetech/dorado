@@ -15,7 +15,7 @@
 
 namespace dorado {
 
-class CorrectionInferenceNode : public MessageSink {
+class CorrectionInferenceNode final : public MessageSink {
 public:
     CorrectionInferenceNode(const std::string& fastq,
                             int threads,

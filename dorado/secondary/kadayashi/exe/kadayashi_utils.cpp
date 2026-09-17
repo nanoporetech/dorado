@@ -1,5 +1,7 @@
 #include "kadayashi_utils.h"
 
+#include "utils/string_utils.h"
+
 #include <spdlog/spdlog.h>
 
 #include <cassert>
@@ -8,7 +10,6 @@
 #include <ctime>
 #include <fstream>
 #include <limits>
-#include <sstream>
 
 #ifdef NDEBUG
 #define LOG_TRACE(...)
@@ -29,16 +30,6 @@ struct lite_chunk_info_t {
     uint64_t start_pos_in_bin;
 };
 }  // namespace
-
-std::vector<std::string> split_deli_line(const std::string &line, const char delimeter) {
-    std::vector<std::string> fields;
-    std::istringstream ss(line);
-    std::string field;
-    while (std::getline(ss, field, delimeter)) {
-        fields.push_back(field);
-    }
-    return fields;
-}
 
 void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
                             const std::filesystem::path &fn_bin) {
@@ -70,7 +61,7 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
                 continue;
             }
 
-            const std::vector<std::string> cols = split_deli_line(line, '\t');
+            const std::vector<std::string> cols = dorado::utils::split(line, '\t');
 
             if (cols[0] == "C" && pass == 0) {  // encountered a new chunk block
                 chunkinfos.push_back(

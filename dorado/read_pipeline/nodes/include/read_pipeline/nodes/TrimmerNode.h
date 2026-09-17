@@ -7,7 +7,7 @@
 
 namespace dorado {
 
-class TrimmerNode : public MessageSink {
+class TrimmerNode final : public MessageSink {
 public:
     TrimmerNode(int threads, bool is_rna);
     ~TrimmerNode() override;

@@ -22,7 +22,7 @@ bool download_models(const std::string& target_directory, std::string_view selec
     Downloader downloader(target_directory);
 
     bool success = true;
-    auto download_model_set = [&](const models::ModelList& models) {
+    auto download_model_set = [&](std::span<const models::ModelInfo> models) {
         for (const auto& model : models) {
             if (selected_model == "all" || selected_model == model.name) {
                 if (!downloader.download(model)) {

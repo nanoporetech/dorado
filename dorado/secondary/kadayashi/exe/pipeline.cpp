@@ -9,6 +9,7 @@
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "secondary/kadayashi/types.h"
+#include "utils/string_utils.h"
 
 #include <cxxpool.h>
 #include <htslib/bgzf.h>
@@ -131,7 +132,7 @@ void insert_bed_line(const std::string &line, std::string_view chrom, std::vecto
     const int col_chrom = 0;
     const int col_s = 1;
     const int col_e = 2;
-    const std::vector<std::string> cols = split_deli_line(line, '\t');
+    const std::vector<std::string> cols = dorado::utils::split(line, '\t');
     if (cols.size() != 3) {
         spdlog::error("[kdys::{}] error parsing BED line: {}", __func__, line);
         return;
@@ -162,7 +163,7 @@ int insert_variant_positions_from_a_vcf_line(const std::string &line,
     }
     int ret = 0;
 
-    const std::vector<std::string> cols = split_deli_line(line, '\t');
+    const std::vector<std::string> cols = dorado::utils::split(line, '\t');
     if (line[0] == '#') {
         if (line[1] == '#') {
             return -1;
@@ -196,8 +197,8 @@ int insert_variant_positions_from_a_vcf_line(const std::string &line,
                 pos -= 1;  // convert to 0-index
             }
             if ((pos >= ref_start) && (pos < ref_end)) {
-                const std::vector<std::string> tags = split_deli_line(cols[8], ':');
-                const std::vector<std::string> values = split_deli_line(cols[9], ':');
+                const std::vector<std::string> tags = dorado::utils::split(cols[8], ':');
+                const std::vector<std::string> values = dorado::utils::split(cols[9], ':');
                 for (size_t i_tag = 0; i_tag < tags.size(); i_tag++) {
                     if (tags[i_tag] == "GT") {
                         if (values[i_tag].size() == 3 && values[i_tag][0] != values[i_tag][2]) {
@@ -912,7 +913,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
         seen.clear();
         tmp_qav.clear();
         const bool parse_ok = parse_variants_for_one_read(aln.get(), tmp_qav, base_q_min,
-                                                          &left_clip_len, &right_clip_len, 1, NULL);
+                                                          &left_clip_len, &right_clip_len, 1);
 
         if (!parse_ok) {
             spdlog::error(
@@ -1818,7 +1819,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
         if (line[0] == '#') {
             continue;
         }
-        std::vector<std::string> cols = split_deli_line(line, '\t');
+        std::vector<std::string> cols = dorado::utils::split(line, '\t');
         if (cols.size() != 2 || cols[0].empty() || cols[1].empty()) {
             warning++;
             continue;
@@ -2328,9 +2329,8 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
         read.start_pos = static_cast<uint32_t>(aln.get()->core.pos);
         read.end_pos = static_cast<uint32_t>(bam_endpos(aln.get()));
         read.strand = !!(flag & 16);
-        const bool parse_ok =
-                parse_variants_for_one_read(aln.get(), read.vars, 0, &read.left_clip_len,
-                                            &read.right_clip_len, 0 /*SNPonly?*/, NULL);
+        const bool parse_ok = parse_variants_for_one_read(
+                aln.get(), read.vars, 0, &read.left_clip_len, &read.right_clip_len, 0 /*SNPonly?*/);
         if (!parse_ok) {
             continue;
         }

@@ -12,7 +12,7 @@ namespace splitter {
 class ReadSplitter;
 }
 
-class ReadSplitNode : public MessageSink {
+class ReadSplitNode final : public MessageSink {
 public:
     ReadSplitNode(std::unique_ptr<const splitter::ReadSplitter> splitter,
                   int num_worker_threads,

@@ -4,7 +4,7 @@
 
 namespace dorado {
 
-class NullNode : public MessageSink {
+class NullNode final : public MessageSink {
 public:
     // NullNode has no sink - input messages go nowhere
     NullNode();

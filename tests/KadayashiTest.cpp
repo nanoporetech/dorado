@@ -4,7 +4,6 @@
 #include "hts_utils/hts_types.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/features/medaka_read_matrix.h"
-#include "secondary/kadayashi/blocked_bloom_filter.h"
 #include "secondary/kadayashi/local_haplotagging.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "secondary/kadayashi/types.h"
@@ -285,20 +284,6 @@ void compare_feature_matrix_logical_data(const dorado::secondary::ReadAlignmentD
 }
 
 }  // namespace
-
-CATCH_TEST_CASE("kadayashi blocked bloom filter basic operation", TEST_GROUP) {
-    kadayashi::BlockedBloomFilter bf(4, 16);  // tiny
-    const bool enable1 = bf.enable();
-    const bool enable2 = bf.enable();
-    CATCH_CHECK(enable1);
-    CATCH_CHECK_FALSE(enable2);
-
-    bf.insert(42);
-    bool real_is_found = bf.query(42);
-    bool fake_is_found = bf.query(43);
-    CATCH_CHECK(real_is_found);
-    CATCH_CHECK_FALSE(fake_is_found);
-}
 
 CATCH_TEST_CASE("kadayashi max of u32 arr", TEST_GROUP) {
     // Tie breaking actually doesn't matter, though it has been picking the first winner.

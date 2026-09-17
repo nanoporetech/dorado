@@ -23,7 +23,7 @@ namespace {
 
 // Node to mutate reads in the pipeline
 // Updates the subread id for reads with a parent id that aren't duplex
-class SubreadIdTaggerNode : public MessageSink {
+class SubreadIdTaggerNode final : public MessageSink {
 public:
     SubreadIdTaggerNode() : MessageSink(100, 1) {}
     ~SubreadIdTaggerNode() { stop_input_processing(utils::AsyncQueueTerminateFast::Yes); }

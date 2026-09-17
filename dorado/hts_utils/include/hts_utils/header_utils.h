@@ -2,6 +2,7 @@
 
 #include <set>
 #include <string>
+#include <string_view>
 #include <vector>
 
 struct sam_hdr_t;
@@ -23,7 +24,7 @@ struct HeaderLineData {
     std::vector<std::pair<std::string, std::string>> tags;
 };
 
-HeaderLineType parse_header_line_type(const std::string& header_line);
+HeaderLineType parse_header_line_type(std::string_view header_line);
 
 std::vector<utils::HeaderLineData> parse_header(
         sam_hdr_t& header,

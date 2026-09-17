@@ -8,7 +8,7 @@
 namespace dorado {
 
 // Sends on messages that are reads to the supplied callback.
-class ReadForwarderNode : public MessageSink {
+class ReadForwarderNode final : public MessageSink {
 public:
     ReadForwarderNode(size_t max_reads,
                       int num_threads,

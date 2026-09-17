@@ -6,10 +6,12 @@
 #include <spdlog/spdlog.h>
 
 #include <algorithm>
+#include <array>
 #include <exception>
 #include <filesystem>
 #include <iterator>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -61,7 +63,7 @@ void sort_versions(std::vector<ModelInfo>& infos) {
     std::sort(infos.begin(), infos.end(), cmp_version);
 }
 
-void suggest_models(const std::vector<ModelInfo>& models,
+void suggest_models(std::span<const ModelInfo> models,
                     const std::string& description,
                     const Chemistry& chemistry,
                     const ModelVariantPair& model,
@@ -135,7 +137,7 @@ std::string format_msg(const Chemistry& chemistry,
 
 }  // namespace
 
-ModelInfo find_model(const std::vector<ModelInfo>& models,
+ModelInfo find_model(std::span<const ModelInfo> models,
                      const std::string& description,
                      const Chemistry& chemistry,
                      const ModelVariantPair& model,
@@ -164,7 +166,7 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
     return selection;
 }
 
-std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
+std::vector<ModelInfo> find_models(std::span<const ModelInfo> models,
                                    const Chemistry& chemistry,
                                    const ModelVariantPair& model,
                                    const ModsVariantPair& mods) {
@@ -203,13 +205,15 @@ ModelInfo get_modbase_model_simplex_parent(const ModelInfo& modbase) {
     throw std::logic_error("Failed to find modbase model parent '" + modbase.name + "'");
 }
 
+namespace {
+
 using CC = Chemistry;
 using VV = ModelVersion;
 
 // Serialised, released models
 namespace simplex {
 
-const std::vector<ModelInfo> models = {
+const std::array models = {
         // v4.2.0
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_fast@v4.2.0",
@@ -454,7 +458,7 @@ const std::vector<ModelInfo> models = {
         },
 };
 
-const std::vector<ModelInfo> deprecated = {
+const std::array deprecated = {
         // v3.{3,4,6}
         ModelInfo{
                 "dna_r9.4.1_e8_fast@v3.4",
@@ -643,7 +647,7 @@ const std::vector<ModelInfo> deprecated = {
 
 namespace stereo {
 
-const std::vector<ModelInfo> models = {
+const std::array models = {
         ModelInfo{
                 "dna_r10.4.1_e8.2_5khz_stereo@v1.1",
                 "6c16e3917a12ec297a6f5d1dc83c205fc0ac74282fffaf76b765995033e5f3d4",
@@ -685,7 +689,7 @@ const std::vector<ModelInfo> models = {
 
 namespace modified {
 
-const std::vector<ModelInfo> models = {
+const std::array models = {
         // v4.2.0
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_fast@v4.2.0_5mCG_5hmCG@v2",
@@ -1522,7 +1526,7 @@ const std::vector<ModelInfo> models = {
         },
 };
 
-const std::vector<ModelInfo> deprecated = {
+const std::array deprecated = {
         // Deprecated R9.4.1 modbase models - v3.{3,4}
         ModelInfo{
                 "dna_r9.4.1_e8_fast@v3.4_5mCG@v0.1",
@@ -1729,7 +1733,7 @@ const std::vector<ModelInfo> deprecated = {
 
 namespace correction {
 
-const std::vector<ModelInfo> models = {
+const std::array models = {
         ModelInfo{
                 "herro-v1.1",
                 "f9673c7c71e22ee966a207ee1ec8364f99a148427472922451e17b04cf209328",
@@ -1744,7 +1748,7 @@ const std::vector<ModelInfo> models = {
 
 namespace polisher {
 
-const std::vector<ModelInfo> models = {
+const std::array models = {
         // Read-level models.
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl",
@@ -1877,7 +1881,7 @@ const std::vector<ModelInfo> models = {
 
 namespace small_variant_caller {
 
-const std::vector<ModelInfo> models = {
+const std::array models = {
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0",
                 "c65337cc306498d9651f22a0e03224c2626ddc75dad3f14dd133700817ab5f38",
@@ -1898,21 +1902,23 @@ const std::vector<ModelInfo> models = {
 
 }  // namespace small_variant_caller
 
-const std::vector<ModelInfo>& simplex_models() { return simplex::models; }
-const std::vector<ModelInfo>& simplex_deprecated_models() { return simplex::deprecated; }
-const std::vector<ModelInfo>& stereo_models() { return stereo::models; }
-const std::vector<ModelInfo>& modified_models() { return modified::models; }
-const std::vector<ModelInfo>& modified_deprecated_models() { return modified::deprecated; }
-const std::vector<ModelInfo>& correction_models() { return correction::models; }
-const std::vector<ModelInfo>& polish_models() { return polisher::models; }
-const std::vector<ModelInfo>& variant_models() { return small_variant_caller::models; }
+}  // namespace
+
+std::span<const ModelInfo> simplex_models() { return simplex::models; }
+std::span<const ModelInfo> simplex_deprecated_models() { return simplex::deprecated; }
+std::span<const ModelInfo> stereo_models() { return stereo::models; }
+std::span<const ModelInfo> modified_models() { return modified::models; }
+std::span<const ModelInfo> modified_deprecated_models() { return modified::deprecated; }
+std::span<const ModelInfo> correction_models() { return correction::models; }
+std::span<const ModelInfo> polish_models() { return polisher::models; }
+std::span<const ModelInfo> variant_models() { return small_variant_caller::models; }
 
 namespace {
-std::vector<std::string> unpack_names(const std::vector<ModelInfo>& infos) {
+std::vector<std::string> unpack_names(std::span<const ModelInfo> infos) {
     std::vector<std::string> v;
     v.reserve(infos.size());
     for (const auto& item : infos) {
-        v.push_back(std::string(item.name));
+        v.push_back(item.name);
     }
     return v;
 }
@@ -1950,9 +1956,11 @@ std::string_view to_string(ModelType model_type) {
 
 // Returns true if model_name matches any configured model
 bool is_valid_model(std::string_view model_name) {
-    for (const auto& collection :
-         {simplex::models, stereo::models, modified::models, correction::models, polisher::models,
-          small_variant_caller::models}) {
+    const std::span<const ModelInfo> models[] = {
+            simplex::models,    stereo::models,   modified::models,
+            correction::models, polisher::models, small_variant_caller::models,
+    };
+    for (const auto& collection : models) {
         for (const ModelInfo& model_info : collection) {
             if (model_info.name == model_name) {
                 return true;
@@ -1963,7 +1971,11 @@ bool is_valid_model(std::string_view model_name) {
 }
 
 std::optional<ModelInfo> get_deprecated_model(const std::string& model_name) {
-    for (const auto& collection : {simplex::deprecated, modified::deprecated}) {
+    const std::span<const ModelInfo> models[] = {
+            simplex::deprecated,
+            modified::deprecated,
+    };
+    for (const auto& collection : models) {
         for (const ModelInfo& model_info : collection) {
             if (model_info.name == model_name) {
                 return model_info;

@@ -258,9 +258,6 @@ DEFINE_TEST("Empty pools don't crash") {
 
 }  // namespace
 
-#include "utils/concurrency/async_task_executor.h"
-#include "utils/concurrency/multi_queue_thread_pool.h"
-
 #ifndef _WIN32
 #include <sys/resource.h>
 #include <sys/time.h>
@@ -281,27 +278,6 @@ double cpu_rusage() {
     return to_seconds(usage.ru_utime) + to_seconds(usage.ru_stime);
 #endif
 }
-
-// Old style thread pool.
-struct OldThreadPool {
-    static const char *name() { return "OldThreadPool"; }
-
-    using ThreadPool = MultiQueueThreadPool;
-
-    struct Executors {
-        std::vector<std::unique_ptr<AsyncTaskExecutor>> executors;
-
-        Executors(ThreadPool &threads, std::size_t num_producers, std::size_t queue_capacity)
-                : executors(num_producers) {
-            for (auto &executor : executors) {
-                executor = std::make_unique<AsyncTaskExecutor>(threads, TaskPriority::normal,
-                                                               queue_capacity);
-            }
-        }
-
-        AsyncTaskExecutor &get(std::size_t idx) { return *executors.at(idx); }
-    };
-};
 
 // New-style thread pool.
 struct NewThreadPool {
@@ -363,7 +339,7 @@ static void producer_thread(
     }
 };
 
-DEFINE_TEMPLATE_TEST("Benchmarking", NewThreadPool, OldThreadPool) {
+DEFINE_TEMPLATE_TEST("Benchmarking", NewThreadPool) {
     const auto producer_mode =
             GENERATE(ProducerMode::Continuous, ProducerMode::Burst, ProducerMode::BurstHalf);
     const std::size_t num_workers = GENERATE(1, 2, 4, 8, 16);

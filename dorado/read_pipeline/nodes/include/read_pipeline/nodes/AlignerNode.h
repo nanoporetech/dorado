@@ -21,7 +21,7 @@ namespace alignment {
 class Minimap2Index;
 }  // namespace alignment
 
-class AlignerNode : public MessageSink {
+class AlignerNode final : public MessageSink {
 public:
     static inline constexpr std::size_t MAX_INPUT_QUEUE_SIZE{10000};
     static inline constexpr std::size_t MAX_PROCESSING_QUEUE_SIZE{MAX_INPUT_QUEUE_SIZE / 2};

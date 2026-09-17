@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <span>
 
 namespace dorado::models {
 
@@ -30,7 +31,7 @@ struct ModelInfo {
 
 // Search for a model which is configured for use with the given chemistry and other
 // optional params.
-ModelInfo find_model(const std::vector<ModelInfo>& models,
+ModelInfo find_model(std::span<const ModelInfo> models,
                      const std::string& description,
                      const Chemistry& chemistry,
                      const ModelVariantPair& model,
@@ -39,20 +40,19 @@ ModelInfo find_model(const std::vector<ModelInfo>& models,
 
 // Search for models which match the given chemistry and filters. Returns all matches
 // in ascending version order
-std::vector<ModelInfo> find_models(const std::vector<ModelInfo>& models,
+std::vector<ModelInfo> find_models(std::span<const ModelInfo> models,
                                    const Chemistry& chemistry,
                                    const ModelVariantPair& model,
                                    const ModsVariantPair& mods);
 
-using ModelList = std::vector<ModelInfo>;
-const ModelList& simplex_models();
-const ModelList& simplex_deprecated_models();
-const ModelList& stereo_models();
-const ModelList& modified_models();
-const ModelList& modified_deprecated_models();
-const ModelList& correction_models();
-const ModelList& polish_models();
-const ModelList& variant_models();
+std::span<const ModelInfo> simplex_models();
+std::span<const ModelInfo> simplex_deprecated_models();
+std::span<const ModelInfo> stereo_models();
+std::span<const ModelInfo> modified_models();
+std::span<const ModelInfo> modified_deprecated_models();
+std::span<const ModelInfo> correction_models();
+std::span<const ModelInfo> polish_models();
+std::span<const ModelInfo> variant_models();
 
 std::vector<std::string> simplex_model_names();
 std::vector<std::string> stereo_model_names();

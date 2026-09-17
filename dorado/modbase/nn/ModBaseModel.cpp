@@ -185,10 +185,10 @@ struct ModBaseConvModelImpl : Module {
     }
 
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) {
-        return utils::load_tensors(dir, weight_tensors);
+        return utils::load_tensors(dir, weight_tensors());
     }
 
-    static const std::vector<std::string> weight_tensors;
+    static std::vector<std::string> weight_tensors();
 
     ModsConv sig_conv1{nullptr};
     ModsConv sig_conv2{nullptr};
@@ -203,22 +203,24 @@ struct ModBaseConvModelImpl : Module {
     Linear linear{nullptr};
 };
 
-const std::vector<std::string> ModBaseConvModelImpl::weight_tensors{
-        "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
-        "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
-        "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
+std::vector<std::string> ModBaseConvModelImpl::weight_tensors() {
+    return {
+            "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
+            "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
+            "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
 
-        "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
-        "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
-        "seq_conv3.weight.tensor",   "seq_conv3.bias.tensor",
+            "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
+            "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
+            "seq_conv3.weight.tensor",   "seq_conv3.bias.tensor",
 
-        "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
-        "merge_conv2.weight.tensor", "merge_conv2.bias.tensor",
-        "merge_conv3.weight.tensor", "merge_conv3.bias.tensor",
-        "merge_conv4.weight.tensor", "merge_conv4.bias.tensor",
+            "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
+            "merge_conv2.weight.tensor", "merge_conv2.bias.tensor",
+            "merge_conv3.weight.tensor", "merge_conv3.bias.tensor",
+            "merge_conv4.weight.tensor", "merge_conv4.bias.tensor",
 
-        "fc.weight.tensor",          "fc.bias.tensor",
-};
+            "fc.weight.tensor",          "fc.bias.tensor",
+    };
+}
 
 struct ModBaseConvLSTMModelImpl : Module {
     explicit ModBaseConvLSTMModelImpl(const config::modbase::ConvLSTMModelConfig& config)

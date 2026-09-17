@@ -13,7 +13,7 @@ namespace demux {
 struct AdapterInfo;
 }
 
-class AdapterDetectorNode : public MessageSink {
+class AdapterDetectorNode final : public MessageSink {
 public:
     explicit AdapterDetectorNode(int threads);
     ~AdapterDetectorNode() override;

@@ -2,6 +2,8 @@
 
 #include "utils/string_utils.h"
 
+#include <spdlog/fmt/bundled/format.h>
+
 #include <algorithm>
 #include <array>
 #include <stdexcept>
@@ -13,12 +15,8 @@ using FC = Flowcell;
 using KC = KitCode;
 
 template <typename Code, typename Info>
-Code get_code(const std::string& str,
-              Code default_value,
-              const std::unordered_map<Code, Info>& codes) {
-    auto s = str;
-    std::transform(s.begin(), s.end(), s.begin(),
-                   [](unsigned char c) { return static_cast<char>(std::toupper(c)); });
+Code get_code(std::string name, Code default_value, const std::unordered_map<Code, Info>& codes) {
+    std::string s = utils::to_uppercase(std::move(name));
     auto it = std::find_if(std::begin(codes), std::end(codes),
                            [&s](auto&& kv) { return kv.second.name == s; });
 
@@ -30,12 +28,12 @@ Code get_code(const std::string& str,
 
 template <typename Code, typename Info>
 Info get_info(const Code& code,
-              const std::string& description,
+              std::string_view description,
               const std::unordered_map<Code, Info>& codes) {
     auto it = codes.find(code);
     if (it == std::end(codes)) {
-        throw std::logic_error("Unknown " + description +
-                               " enum: " + std::to_string(static_cast<int>(code)));
+        throw std::logic_error(
+                fmt::format("Unknown {} enum: {}", description, fmt::underlying(code)));
     }
     return it->second;
 }
@@ -441,7 +439,7 @@ const std::unordered_map<SampleType, SampleTypeInfo>& sample_types() {
 }
 
 SampleType get_sample_type(const std::string& sample_type) {
-    return get_code(utils::to_uppercase(sample_type), SampleType::UNKNOWN, sample_types());
+    return get_code(sample_type, SampleType::UNKNOWN, sample_types());
 }
 
 SampleType get_sample_type_from_model_name(const std::string& model_name) {

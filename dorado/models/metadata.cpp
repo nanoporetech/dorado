@@ -1,6 +1,6 @@
 #include "models/metadata.h"
 
-#include "utils/string_utils.h"
+#include <spdlog/fmt/bundled/format.h>
 
 #include <algorithm>
 #include <ostream>
@@ -113,14 +113,14 @@ Variant get_variant(const std::string& variant,
 
 template <typename Variant>
 std::string to_string(const Variant& variant,
-                      const std::string& description,
+                      std::string_view description,
                       const std::unordered_map<std::string, Variant>& variants) {
     auto it = std::find_if(std::begin(variants), std::end(variants),
                            [&variant](auto&& kv) { return kv.second == variant; });
 
     if (it == std::end(variants)) {
-        throw std::logic_error("Unknown + " + description +
-                               " enum: " + std::to_string(static_cast<int>(variant)));
+        throw std::logic_error(
+                fmt::format("Unknown {} enum: {}", description, fmt::underlying(variant)));
     }
     return it->first;
 }
@@ -151,15 +151,6 @@ std::string to_string(const ModelVariant& variant) {
 
 std::string to_string(const ModsVariant& variant) {
     return to_string(variant, "modification variant", mods_variants_map());
-}
-
-std::string to_string(const std::set<ModelVariant>& variants, const std::string& separator) {
-    std::vector<std::string> strings;
-    strings.reserve(variants.size());
-    for (const auto& variant : variants) {
-        strings.push_back(to_string(variant, "model variant", model_variants_map()));
-    }
-    return utils::join(strings, separator);
 }
 
 std::string to_string(const ModelVersion& version) {

@@ -14,7 +14,7 @@ namespace hts_writer {
 
 using OutputMode = utils::HtsFile::OutputMode;
 
-class StreamHtsFileWriter : public HtsFileWriter {
+class StreamHtsFileWriter final : public HtsFileWriter {
 public:
     explicit StreamHtsFileWriter(const HtsFileWriterConfig & cfg);
     void shutdown() override;

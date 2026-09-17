@@ -10,25 +10,26 @@
 #include <unordered_map>
 #include <vector>
 
+namespace dorado {
+
+namespace utils {
+
 namespace {
-using namespace dorado::utils;
-static const std::unordered_map<std::string, HeaderLineType> header_type_lut{
+static constexpr std::pair<std::string_view, HeaderLineType> header_type_lut[]{
         {"HD", HeaderLineType::HD}, {"SQ", HeaderLineType::SQ}, {"RG", HeaderLineType::RG},
         {"PG", HeaderLineType::PG}, {"CO", HeaderLineType::CO},
 };
 }  // namespace
 
-namespace dorado {
-
-namespace utils {
-
-HeaderLineType parse_header_line_type(const std::string& header_line) {
+HeaderLineType parse_header_line_type(std::string_view header_line) {
     if (header_line.size() < 3) {
         return HeaderLineType::UNKNOWN;
     }
-    const auto it = header_type_lut.find(header_line.substr(1, 2));
-    if (it != header_type_lut.end()) {
-        return it->second;
+    const auto tag = header_line.substr(1, 2);
+    for (const auto& ht : header_type_lut) {
+        if (ht.first == tag) {
+            return ht.second;
+        }
     }
     return HeaderLineType::UNKNOWN;
 }

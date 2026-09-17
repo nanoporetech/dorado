@@ -22,7 +22,7 @@ namespace dorado {
 
 class Pipeline;
 
-class CorrectionMapper : public CorrectionAligner {
+class CorrectionMapper final : public CorrectionAligner {
 public:
     CorrectionMapper(const std::string &index_file,
                      int32_t threads,

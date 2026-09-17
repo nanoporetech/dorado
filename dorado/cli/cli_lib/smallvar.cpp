@@ -667,7 +667,7 @@ void validate_options(const Options& opt) {
     }
 }
 
-int32_t count_model_hits(const dorado::models::ModelList& model_list,
+int32_t count_model_hits(std::span<const dorado::models::ModelInfo> model_list,
                          const std::string& model_name) {
     return static_cast<int32_t>(std::count_if(
             std::begin(model_list), std::end(model_list),

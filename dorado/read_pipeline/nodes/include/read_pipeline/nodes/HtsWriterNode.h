@@ -9,7 +9,7 @@ struct bam1_t;
 
 namespace dorado {
 
-class HtsWriterNode : public MessageSink {
+class HtsWriterNode final : public MessageSink {
 public:
     HtsWriterNode(utils::HtsFile& file, std::string gpu_names);
     ~HtsWriterNode();

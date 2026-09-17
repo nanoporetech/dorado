@@ -10,7 +10,6 @@ add_executable(dorado_tests
     AdapterDetectorTest.cpp
     AlignerTest.cpp
     arg_parse_ext_test.cpp
-    async_task_executor_test.cpp
     AsyncQueueTest.cpp
     BamReaderTest.cpp
     BamUtilsTest.cpp
@@ -50,7 +49,6 @@ add_executable(dorado_tests
     ModelMetadataTest.cpp
     ModelUtilsTest.cpp
     MotifMatcherTest.cpp
-    multi_queue_thread_pool_test.cpp
     myers_test.cpp
     PafUtilsTest.cpp
     PairingNodeTest.cpp
@@ -58,7 +56,6 @@ add_executable(dorado_tests
     Pod5DataLoaderTest.cpp
     PolyACalculatorTest.cpp
     PostConditionTest.cpp
-    priority_task_queue_test.cpp
     ReadFilterNodeTest.cpp
     ReadForwarderNodeTest.cpp
     ReadTest.cpp
