@@ -9,6 +9,7 @@
 #include "utils/rle.h"
 #include "utils/sequence_utils.h"
 #include "utils/stl_utils.h"
+#include "utils/string_utils.h"
 
 #include <spdlog/spdlog.h>
 
@@ -16,6 +17,7 @@
 #include <cassert>
 #include <cmath>
 #include <cstddef>
+#include <numbers>
 #include <set>
 #include <span>
 #include <sstream>
@@ -30,6 +32,10 @@
 namespace dorado::secondary {
 
 namespace {
+
+constexpr float NEGINF = -std::numeric_limits<float>::infinity();
+constexpr float EPS = 1.e-10f;
+constexpr float LOG_TO_PHRED_FACTOR = -10.0f / std::numbers::ln10_v<float>;
 
 std::string remove_gaps(const std::string_view seq) {
     std::string ret;
@@ -73,6 +79,27 @@ float phred(float err, const float cap) {
     err = std::clamp(err, std::pow(10.0f, -cap / 10.0f), 1.0f);
     const float q = -10.0f * std::log10(err);
     return std::min(q, cap);
+}
+
+/**
+ * \brief Compute phred quality from log-probability, with a max QV cap.
+ */
+float phred_from_log(float logerr, const float cap) {
+    logerr = std::clamp(logerr, cap / LOG_TO_PHRED_FACTOR, 0.0f);
+    const float q = logerr * LOG_TO_PHRED_FACTOR;
+    return std::min(q, cap);
+}
+
+float logaddexp(const float lhs, const float rhs) {
+    if (lhs == NEGINF) {
+        return rhs;
+    }
+    if (rhs == NEGINF) {
+        return lhs;
+    }
+    const float hi = std::max(lhs, rhs);
+    const float lo = std::min(lhs, rhs);
+    return hi + std::log1p(std::exp(lo - hi));
 }
 
 /**
@@ -123,6 +150,27 @@ std::vector<std::string> construct_alts_out(const std::span<const std::string> a
         alts.emplace_back(std::string(alleles[i]));
     }
     return alts;
+}
+
+std::vector<int32_t> make_class_indices(const std::string_view seq,
+                                        const std::array<int32_t, 256>& symbol_lookup,
+                                        const int64_t num_classes,
+                                        const int64_t blank,
+                                        const bool substitute_n,
+                                        const bool keep_blank) {
+    std::vector<int32_t> class_idxs;
+    class_idxs.reserve(std::size(seq));
+    for (const char c : seq) {
+        const char base = (substitute_n && (c == 'N')) ? '*' : c;
+        const int32_t class_id = symbol_lookup[static_cast<uint8_t>(base)];
+        if ((class_id < 0) || (class_id >= num_classes)) {
+            throw std::runtime_error("Sequence contains symbol with invalid class index.");
+        }
+        if (keep_blank || (class_id != blank)) {
+            class_idxs.emplace_back(class_id);
+        }
+    }
+    return class_idxs;
 }
 
 std::string make_variant_gt(const std::span<const std::string> preds,
@@ -213,24 +261,19 @@ std::string calculate_basecall_allele_depths(const std::vector<std::string>& all
  * \brief Utility function to compute a log probability of a subsequence occurring for
  *          a specified haplotype.
  * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
- *                  Dimensions: [seq_len x num_haplotypes x num_classes].
- * \param seq Input sequence, used to access class probabilities.
- * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
+ *                  Dimensions: [total_seq_len x num_haplotypes x num_classes].
+ * \param seq_class_idxs Encoded sequence class indices, including blanks for explicit path scoring.
  * \param rstart Region start (start of the subsequence in seq). Zero-based.
  * \param rend Region end (end of the subsequence in seq). Non-inclusive.
  * \param hap_id Haplotype ID, needed to access class probabilities for that particular haplotype in the probs_3D tensor.
- * \param substitute_n If true, the `N` bases in the input sequence will be replaced with `*` symbols. Useful for computing the probability of a reference.
  * \returns A single value with the log probability of that subsequence occurring for the specified haplotype, given the class probabilities obtained through inference.
  */
 float compute_subseq_log_prob(
         const at::Tensor& probs_3D,  // Tensor sliced to the [rstart, rend] range
-        // const dorado::Span<const float> prob_data,
-        const std::string_view seq,
-        const std::array<int32_t, 256>& symbol_lookup,
+        const std::span<const int32_t> seq_class_idxs,
         const int64_t rstart,
         const int64_t rend,
-        const int64_t hap_id,
-        const bool substitute_n) {
+        const int64_t hap_id) {
     if (std::size(probs_3D.sizes()) != 3) {
         throw std::runtime_error(
                 "Tensor of probabilities given to compute_subseq_quality is of wrong shape. Input "
@@ -242,26 +285,155 @@ float compute_subseq_log_prob(
     const int64_t num_haplotypes = probs_3D.size(1);
     const int64_t num_classes = probs_3D.size(2);
 
+    if ((rstart < 0) || (rstart > rend) || (rstart >= num_pos) || (rend > num_pos)) {
+        throw std::runtime_error{"rstart=" + std::to_string(rstart) +
+                                 ",rend=" + std::to_string(rend) +
+                                 " coordinates are out of range for tensor with " +
+                                 std::to_string(num_pos) + " positions"};
+    }
+    if (hap_id >= num_haplotypes) {
+        throw std::runtime_error{
+                "hap_id=" + std::to_string(hap_id) +
+                " is out of range for tensor with ploidy=" + std::to_string(num_haplotypes)};
+    }
+    if (std::any_of(std::cbegin(seq_class_idxs), std::cend(seq_class_idxs),
+                    [&num_classes](const int32_t t) { return t >= num_classes; })) {
+        throw std::runtime_error{
+                "seq_class_idxs=" + utils::print_container_as_string(seq_class_idxs, ",", true) +
+                " contains out-of-range index for tensor with " + std::to_string(num_haplotypes) +
+                " classes"};
+    }
+
+    if ((rend - rstart) != std::ssize(seq_class_idxs)) {
+        throw std::runtime_error("Target length " + std::to_string(std::size(seq_class_idxs)) +
+                                 " does not span interval " + std::to_string(rstart) + "-" +
+                                 std::to_string(rend));
+    }
+
     const std::span<const float> data(probs_3D.data_ptr<float>(),
-                                      static_cast<size_t>(num_pos * num_haplotypes * num_classes));
+                                      static_cast<size_t>(probs_3D.numel()));
 
     if (std::empty(data)) {
         return 0.0f;
     }
 
     float total = 0.0f;
-    for (int64_t pos = rstart; pos < rend; ++pos) {
-        const char base = (substitute_n && (seq[pos] == 'N')) ? '*' : seq[pos];
-        const int32_t class_id = symbol_lookup[base];
-
-        const int64_t idx = pos * num_haplotypes * num_classes + hap_id * num_classes + class_id;
-        const float prob = std::max(1e-10f, data[idx]);
+    for (int64_t pos = 0; pos < rend - rstart; ++pos) {
+        const int64_t idx = (rstart + pos) * num_haplotypes * num_classes + hap_id * num_classes +
+                            seq_class_idxs[static_cast<size_t>(pos)];
+        const float prob = std::max(EPS, data[idx]);
         const float log_prob = std::log(prob);
 
         total += log_prob;
     }
 
     return total;
+}
+
+/**
+ * \brief Utility function to compute a log probability of a gap-compressed sequence.
+ * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
+ *                  Dimensions: [total_seq_len x num_haplotypes x num_classes].
+ * \param seq_class_idxs Encoded sequence class indices, excluding blanks.
+ * \param blank_class_idx blank class index.
+ * \param rstart Region start (start of the subsequence in seq). Zero-based.
+ * \param rend Region end (end of the subsequence in seq). Non-inclusive.
+ * \param hap_id Haplotype ID, needed to access class probabilities for that particular haplotype in the probs_3D tensor.
+ * \returns A single value with the log probability of that subsequence occurring for the specified haplotype, given the class probabilities obtained through inference.
+ */
+float compute_subseq_log_prob_dp(
+        const at::Tensor& probs_3D,  // Tensor sliced to the [rstart, rend] range
+        const std::span<const int32_t> seq_class_idxs,
+        const int64_t blank_class_idx,
+        const int64_t rstart,
+        const int64_t rend,
+        const int64_t hap_id) {
+    if (std::size(probs_3D.sizes()) != 3) {
+        throw std::runtime_error(
+                "Tensor of probabilities given to compute_subseq_quality is of wrong shape. Input "
+                "shape: " +
+                utils::tensor_shape_as_string(probs_3D) + ", but expected 3 dimensions.");
+    }
+
+    const int64_t num_pos = probs_3D.size(0);
+    const int64_t num_haplotypes = probs_3D.size(1);
+    const int64_t num_classes = probs_3D.size(2);
+    const int64_t rlen = rend - rstart;
+
+    if ((rstart < 0) || (rstart > rend) || (rstart >= num_pos) || (rend > num_pos)) {
+        throw std::runtime_error{"rstart=" + std::to_string(rstart) +
+                                 ",rend=" + std::to_string(rend) +
+                                 " coordinates are out of range for tensor with " +
+                                 std::to_string(num_pos) + " positions"};
+    }
+    if (hap_id >= num_haplotypes) {
+        throw std::runtime_error{
+                "hap_id=" + std::to_string(hap_id) +
+                " is out of range for tensor with ploidy=" + std::to_string(num_haplotypes)};
+    }
+    if (std::any_of(std::cbegin(seq_class_idxs), std::cend(seq_class_idxs),
+                    [&num_classes](const int32_t t) { return t >= num_classes; })) {
+        throw std::runtime_error{
+                "seq_class_idxs=" + utils::print_container_as_string(seq_class_idxs, ",", true) +
+                " containg out-of-range index for tensor with " + std::to_string(num_haplotypes) +
+                " classes"};
+    }
+
+    const std::span<const float> data(probs_3D.data_ptr<float>(),
+                                      static_cast<size_t>(probs_3D.numel()));
+    if (std::empty(data)) {
+        return 0.0f;
+    }
+
+    if ((blank_class_idx < 0) || (blank_class_idx >= num_classes)) {
+        throw std::runtime_error("blank symbol has invalid class index.");
+    }
+
+    const int64_t seq_len = std::ssize(seq_class_idxs);
+    if (seq_len > rlen) {
+        return NEGINF;
+    }
+
+    const int64_t pos_stride = num_haplotypes * num_classes;
+    const int64_t hap_offset = hap_id * num_classes;
+
+    const auto log_prob = [&data](const int64_t offset, const int64_t class_id) {
+        return std::log(std::max(EPS, data[offset + class_id]));
+    };
+
+    if (seq_len == 0) {
+        float total = 0.0f;
+        for (int64_t pos = rstart; pos < rend; ++pos) {
+            const int64_t offset = pos * pos_stride + hap_offset;
+            total += log_prob(offset, blank_class_idx);
+        }
+        return total;
+    }
+
+    std::vector<float> dp(static_cast<size_t>(seq_len + 1), NEGINF);
+    dp[0] = 0.0f;
+
+    for (int64_t rel_pos = 0; rel_pos < rlen; ++rel_pos) {
+        const int64_t offset = (rstart + rel_pos) * pos_stride + hap_offset;
+        const float blank_logprob = log_prob(offset, blank_class_idx);
+        const int64_t min_emitted_after = std::max<int64_t>(0, seq_len - (rlen - rel_pos - 1));
+        const int64_t max_emitted_after = std::min(seq_len, rel_pos + 1);
+
+        for (int64_t emitted = max_emitted_after; emitted >= min_emitted_after; --emitted) {
+            const float stay = dp[static_cast<size_t>(emitted)] + blank_logprob;
+            float emit = NEGINF;
+            if (emitted > 0) {
+                emit = dp[static_cast<size_t>(emitted - 1)] +
+                       log_prob(offset, seq_class_idxs[static_cast<size_t>(emitted - 1)]);
+            }
+            dp[static_cast<size_t>(emitted)] = logaddexp(stay, emit);
+        }
+        if (min_emitted_after > 0) {
+            dp[static_cast<size_t>(min_emitted_after - 1)] = NEGINF;
+        }
+    }
+
+    return dp[static_cast<size_t>(seq_len)];
 }
 
 /**
@@ -290,6 +462,8 @@ float compute_quality_from_probs(
     }
 
     const int64_t num_haplotypes = probs_3D.size(1);
+    const int64_t num_classes = probs_3D.size(2);
+    const int64_t blank_class_idx = symbol_lookup['*'];
 
     if (std::ssize(sequences) != num_haplotypes) {
         throw std::runtime_error(
@@ -301,8 +475,12 @@ float compute_quality_from_probs(
 
     float total = 0.0f;
     for (int64_t hap_id = 0; hap_id < num_haplotypes; ++hap_id) {
-        const float log_prob = compute_subseq_log_prob(probs_3D, sequences[hap_id], symbol_lookup,
-                                                       rstart, rend, hap_id, false);
+        const std::string_view subseq(sequences[hap_id].data() + rstart,
+                                      static_cast<size_t>(rend - rstart));
+        const std::vector<int32_t> seq_class_idxs = make_class_indices(
+                subseq, symbol_lookup, num_classes, blank_class_idx, false, true);
+        const float log_prob =
+                compute_subseq_log_prob(probs_3D, seq_class_idxs, rstart, rend, hap_id);
         total += log_prob;
     }
     total = phred(1.0f - std::exp(total), VCF_MAX_GQ_CAP);
@@ -310,6 +488,32 @@ float compute_quality_from_probs(
     total = std::max(0.0f, total);
 
     return total;
+}
+
+/**
+ * \brief Utility function to compute a quality score for the assertion that the haplotypes in a region are the consensus sequences.
+ *        This is the phred-scaled log-likelihood over the predictions that any predicted allele is wrong.
+ * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
+ *                  Dimensions: [seq_len x num_haplotypes x num_classes].
+ * \param ref_seq_with_gaps Input sequence, used to access class probabilities.
+ * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
+ * \param rstart Region start (start of the subsequence in seq). Zero-based.
+ * \param rend Region end (end of the subsequence in seq). Non-inclusive.
+ * \returns Phred-scaled quality for the predicted haplotype sequences.
+ */
+float compute_consensus_quality(
+        const at::Tensor& probs_3D,  // Probabilities for a single sample (not batch).
+        const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+        const std::array<int32_t, 256>& symbol_lookup,
+        const int64_t rstart,
+        const int64_t rend) {
+    std::vector<std::string_view> seqs;
+    seqs.reserve(std::size(cons_seqs_with_gaps));
+    for (const auto& val : cons_seqs_with_gaps) {
+        seqs.emplace_back(val.seq);
+    }
+
+    return compute_quality_from_probs(probs_3D, seqs, symbol_lookup, rstart, rend);
 }
 
 /**
@@ -341,29 +545,167 @@ float compute_ref_quality(
 }
 
 /**
- * \brief Utility function to compute a quality score for the assertion that the haplotypes in a region are the consensus sequences.
- *        This is the phred-scaled log-likelihood over the predictions that any predicted allele is wrong.
+ * \brief Compute the logprob matrix of all gap-compressed sequences in alleles
+ *        for each haplotype in probs_3D
  * \param probs_3D A 3D tensor of probabilities (output of inference) for a single sample (not batch).
  *                  Dimensions: [seq_len x num_haplotypes x num_classes].
- * \param ref_seq_with_gaps Input sequence, used to access class probabilities.
+ * \param alleles Gap-compressed sequences.
  * \param symbol_lookup Lookup table of symbol chars (bases) -> numeric ID of that symbol, to encode sequence bases into class IDs.
  * \param rstart Region start (start of the subsequence in seq). Zero-based.
  * \param rend Region end (end of the subsequence in seq). Non-inclusive.
- * \returns Phred-scaled quality for the predicted haplotype sequences.
+ * \returns Vector with linear representation of the 2-d array of log-probabilities [num_alleles, num_haplotypes].
  */
-float compute_consensus_quality(
-        const at::Tensor& probs_3D,  // Probabilities for a single sample (not batch).
-        const std::vector<ConsensusResult>& cons_seqs_with_gaps,
-        const std::array<int32_t, 256>& symbol_lookup,
-        const int64_t rstart,
-        const int64_t rend) {
-    std::vector<std::string_view> seqs;
-    seqs.reserve(std::size(cons_seqs_with_gaps));
-    for (const auto& val : cons_seqs_with_gaps) {
-        seqs.emplace_back(val.seq);
-    }
+std::vector<float> compute_allele_logprobs_array(const at::Tensor& probs_3D,
+                                                 const std::span<const std::string> alleles,
+                                                 const std::array<int32_t, 256>& symbol_lookup,
+                                                 const int64_t rstart,
+                                                 const int64_t rend) {
+    const int64_t num_positions = rend - rstart;
+    const std::string padding(num_positions, '*');
+    const int64_t num_haplotypes = probs_3D.size(1);
+    const int64_t num_classes = probs_3D.size(2);
+    const int64_t num_alleles = std::size(alleles);
+    const int64_t blank = symbol_lookup['*'];
 
-    return compute_quality_from_probs(probs_3D, seqs, symbol_lookup, rstart, rend);
+    std::vector<float> allele_logprobs(num_alleles * num_haplotypes, NEGINF);
+
+    for (int64_t all_idx = 0; all_idx < std::ssize(alleles); ++all_idx) {
+        std::string_view allele = alleles[all_idx];
+        const int64_t offset = all_idx * num_haplotypes;
+        const int64_t seq_len = std::ssize(allele);
+        // Test whether there is only one unique decode path through the scores.
+        // This will be the case when either all positions are gaps or there are no gaps.
+        // If so, for speed we compute the log-probability using direct evaluation given
+        // the class indices.
+        // When there is a mixture of gaps and bases in the allele, there will be more
+        // than one valid decode path. In this case, compute the log-probability using
+        // dynamic programming as the sum over all valid paths.
+        if ((seq_len == 0) || (seq_len == num_positions)) {
+            if (seq_len == 0) {
+                allele = std::string_view(padding.c_str(), num_positions);
+            }
+            spdlog::trace(
+                    "[compute_allele_logprobs_array] using explicit path for seq={} in region "
+                    "{}-{}",
+                    allele, rstart, rend);
+            const std::vector<int32_t> seq_class_idxs =
+                    make_class_indices(allele, symbol_lookup, num_classes, blank, true, true);
+            for (int64_t hap_idx = 0; hap_idx < num_haplotypes; ++hap_idx) {
+                allele_logprobs[offset + hap_idx] =
+                        compute_subseq_log_prob(probs_3D, seq_class_idxs, rstart, rend, hap_idx);
+            }
+        } else {
+            spdlog::trace(
+                    "[compute_allele_logprobs_array] using dp path for seq={} in region {}-{}",
+                    allele, rstart, rend);
+            const std::vector<int32_t> seq_class_idxs =
+                    make_class_indices(allele, symbol_lookup, num_classes, blank, true, false);
+            for (int64_t hap_idx = 0; hap_idx < num_haplotypes; ++hap_idx) {
+                allele_logprobs[offset + hap_idx] = compute_subseq_log_prob_dp(
+                        probs_3D, seq_class_idxs, blank, rstart, rend, hap_idx);
+            }
+        }
+    }
+    return allele_logprobs;
+}
+
+// Lookup table for ordering of genotype (Number="G") records as specified in VCF spec.
+// See https://samtools.github.io/hts-specs/VCFv4.4.pdf
+// Outer dimension of ALLELE_SETS is ploidy. Depending on the number of alleles
+// we select a number of elements as specified in NUM_ELEMENTS. Each element
+// shows the corresponding set of alleles contributing to the GL value at that
+// position.
+// Currently only enumerated up to num_alleles=3 (alts=2) for ploidy=1 and
+// and num_alleles=4 (alts=3) for ploidy=2.
+// clang-format off
+const std::vector<std::vector<std::vector<int32_t>>> ALLELE_SETS = {
+    /*ploidy=1*/ {{0}, {1}, {2}},
+    /*ploidy=2*/ {
+                     {0, 0},
+                     {0, 1}, {1, 1},
+                     {0, 2}, {1, 2}, {2, 2},
+                     {0, 3}, {1, 3}, {2, 3}, {3, 3},
+                 },
+};
+const std::vector<std::vector<int64_t>> NUM_ELEMENTS = {
+    /*ploidy=1*/ {1, 2, 3},
+    /*ploidy=2*/ {1, 3, 6, 10},
+};
+// clang-format on
+
+/**
+ * \brief Calculate total log-probability for all possible permutations of a single genotype.
+ */
+float compute_total_genotype_likelihood(const std::vector<float>& hap_allele_logprobs,
+                                        const std::vector<int32_t>& genotype,
+                                        const int64_t num_haplotypes) {
+    if (std::empty(hap_allele_logprobs)) {
+        throw std::runtime_error{"[compute_total_genotype_likelihood] Empty log probs"};
+    }
+    if (std::empty(genotype)) {
+        return NEGINF;
+    }
+    const int64_t num_alleles = std::ssize(hap_allele_logprobs) / num_haplotypes;
+    if (std::ssize(genotype) != num_haplotypes) {
+        throw std::runtime_error{
+                "[compute_total_genotype_likelihood] Number of genotype entries " +
+                std::to_string(std::ssize(genotype)) +
+                "doesn't match expected number of haplotypes: " + std::to_string(num_haplotypes)};
+    }
+    if (std::any_of(std::cbegin(genotype), std::cend(genotype), [&num_alleles](const auto all_id) {
+            return (all_id < 0) || (all_id >= num_alleles);
+        })) {
+        throw std::runtime_error{"[compute_total_genotype_likelihood] Genotype " +
+                                 utils::print_container_as_string(genotype, ",", true) +
+                                 " contains entries out of range for " +
+                                 std::to_string(num_alleles) + " alleles"};
+    }
+    // make local mutable copy
+    std::vector<int32_t> gt = genotype;
+    float total_logprobs = NEGINF;
+    do {
+        float perm_logprobs = 0.f;
+        for (int64_t hap_id = 0; hap_id < std::ssize(gt); ++hap_id) {
+            perm_logprobs += hap_allele_logprobs[gt[hap_id] * num_haplotypes + hap_id];
+        }
+        total_logprobs = logaddexp(total_logprobs, perm_logprobs);
+    } while (std::next_permutation(std::begin(gt), std::end(gt)));
+    return total_logprobs;
+}
+
+/**
+ * \brief Compute an array of GL values from tensor of per-haplotype per-allele log-probabilities.
+ */
+std::vector<float> compute_GLs(const std::vector<float>& hap_allele_logprobs,
+                               const int64_t num_haplotypes) {
+    const int64_t num_alleles = std::ssize(hap_allele_logprobs) / num_haplotypes;
+    const auto [num_elements, genotype_order] = lookup_gts(num_haplotypes, num_alleles);
+
+    std::vector<float> genotype_likelihoods(num_elements, NEGINF);
+    for (int64_t gt = 0; gt < num_elements; ++gt) {
+        genotype_likelihoods[gt] = compute_total_genotype_likelihood(
+                hap_allele_logprobs, genotype_order[gt], num_haplotypes);
+    }
+    return genotype_likelihoods;
+}
+
+/**
+ * \brief Construct PL string from array of GL values.
+ */
+std::string construct_PL_string(const std::vector<float>& genotype_logprobs) {
+    if (std::empty(genotype_logprobs)) {
+        return {};
+    }
+    const int64_t num_genotypes = std::ssize(genotype_logprobs);
+    const float max_gl =
+            *std::max_element(std::cbegin(genotype_logprobs), std::cend(genotype_logprobs));
+    std::vector<int32_t> pl_values;
+    pl_values.reserve(num_genotypes);
+    for (const float gl : genotype_logprobs) {
+        pl_values.emplace_back(
+                static_cast<int32_t>(std::round(phred_from_log(gl - max_gl, VCF_MAX_PL_CAP))));
+    }
+    return utils::print_container_as_string(pl_values, ",", false);
 }
 
 Variant construct_variant(const std::string_view draft,
@@ -398,6 +740,8 @@ Variant construct_variant(const std::string_view draft,
         return {};
     }
 
+    const int64_t num_haplotypes = std::ssize(cons_seqs_with_gaps);
+
     // Get the reference and the predictions for the variant stretch.
     const std::string_view var_ref_with_gaps(std::data(ref_seq_with_gaps) + rstart,
                                              static_cast<size_t>(rend - rstart));
@@ -406,7 +750,7 @@ Variant construct_variant(const std::string_view draft,
     std::string var_ref = remove_gaps(var_ref_with_gaps);
 
     std::vector<std::string> var_preds;
-    for (int64_t hap_id = 0; hap_id < std::ssize(cons_seqs_with_gaps); ++hap_id) {
+    for (int64_t hap_id = 0; hap_id < num_haplotypes; ++hap_id) {
         const std::string_view var_pred_with_gaps(
                 std::data(cons_seqs_with_gaps[hap_id].seq) + rstart,
                 static_cast<size_t>(rend - rstart));
@@ -429,6 +773,13 @@ Variant construct_variant(const std::string_view draft,
 
     const std::vector<std::string> alts_out = construct_alts_out(alleles_lookup);
     const std::string gt = make_variant_gt(var_preds, alleles_lookup);
+
+    // Compute likelihood matrix for alleles across haplotypes
+    const std::vector<float> hap_allele_likelihoods =
+            compute_allele_logprobs_array(probs_3D, alleles_lookup, symbol_lookup, rstart, rend);
+    const std::vector<float> genotype_likelihoods =
+            compute_GLs(hap_allele_likelihoods, num_haplotypes);
+    const std::string pl_str = construct_PL_string(genotype_likelihoods);
 
     Variant var{
             .seq_id = seq_id,
@@ -473,7 +824,7 @@ Variant construct_variant(const std::string_view draft,
     if (normalize) {
         // Create a vector of views for normalize_variant.
         std::vector<std::string_view> cons_view;
-        cons_view.reserve(std::size(cons_seqs_with_gaps));
+        cons_view.reserve(num_haplotypes);
         for (const ConsensusResult& val : cons_seqs_with_gaps) {
             cons_view.emplace_back(val.seq);
         }
@@ -491,8 +842,11 @@ Variant construct_variant(const std::string_view draft,
                                                      var.rstart, var.rend),
                            3);
     var.format["GQ"] = gq_from_qual(var.qual);
+    if (!std::empty(pl_str)) {
+        var.format["PL"] = pl_str;
+    }
 
-    sanitize_empty_alts(var, std::ssize(cons_seqs_with_gaps));
+    sanitize_empty_alts(var, num_haplotypes);
 
     return var;
 }
@@ -841,6 +1195,27 @@ void add_depth(Variant& var, const at::Tensor& depth) {
 
 }  // namespace
 
+/**
+ * \brief Lookup genotypes list with bounds checking.
+ */
+std::pair<int64_t, std::span<const std::vector<int32_t>>> lookup_gts(const int64_t ploidy,
+                                                                     const int64_t num_alleles) {
+    if ((ploidy <= 0) || (ploidy > std::ssize(ALLELE_SETS))) {
+        throw std::runtime_error{"ALLELE_SETS not implemented for ploidy " +
+                                 std::to_string(ploidy)};
+    }
+    if ((ploidy > std::ssize(NUM_ELEMENTS)) || (num_alleles <= 0) ||
+        (num_alleles > std::ssize(NUM_ELEMENTS[ploidy - 1]))) {
+        throw std::runtime_error{"NUM_ELEMENTS not implemented for ploidy " +
+                                 std::to_string(ploidy) + " and " + std::to_string(num_alleles) +
+                                 " alleles"};
+    }
+    const int64_t num_elements = NUM_ELEMENTS[ploidy - 1][num_alleles - 1];
+    const std::span<const std::vector<int32_t>> genotype_range{std::cbegin(ALLELE_SETS[ploidy - 1]),
+                                                               static_cast<size_t>(num_elements)};
+    return std::make_pair(num_elements, genotype_range);
+}
+
 std::string gq_from_qual(const float qual) {
     if (qual < 0.0f) {
         return ".";
@@ -974,6 +1349,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
         var.format["GT"] = make_reference_gt(ploidy, '0');
         var.format.erase("AD");
         var.format.erase("VAF");
+        var.format.erase("PL");
         var.filters = {Filters::NonVariant};
     }
 }
@@ -1582,6 +1958,26 @@ std::vector<Variant> general_decode_variants(
     }
 
     return normalized_variants;
+}
+
+std::pair<std::vector<std::string_view>, bool> split_GT_string(const std::string_view gt) {
+    std::vector<std::string_view> indices;
+    if (std::empty(gt)) {
+        return {indices, false};
+    }
+    if (gt.contains('|') && gt.contains('/')) {
+        throw std::runtime_error{
+                "Gentoype strings containing both `|` and `/` separators are unsupported."};
+    }
+    const char separator = gt.contains('|') ? '|' : '/';
+
+    indices.reserve(std::size(gt));
+    for (const std::string_view hap : utils::split_view(gt, separator)) {
+        if (!std::empty(hap)) {
+            indices.emplace_back(hap);
+        }
+    }
+    return {indices, separator == '|'};
 }
 
 }  // namespace dorado::secondary

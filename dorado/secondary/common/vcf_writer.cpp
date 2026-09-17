@@ -1,6 +1,7 @@
 #include "secondary/common/vcf_writer.h"
 
 #include "dorado_version.h"
+#include "secondary/consensus/variant_calling.h"
 
 #include <htslib/hts.h>
 #include <htslib/vcf.h>
@@ -36,6 +37,7 @@ constexpr std::array FORMAT_FIELD_SPECS{
         FieldSpec{"SRC", FieldType::STRING, "1", "Source of the variant"},
         FieldSpec{"AD", FieldType::INT_LIST, "R", "Allele read depth"},
         FieldSpec{"VAF", FieldType::FLOAT_LIST, "A", "Variant allele fraction"},
+        FieldSpec{"PL", FieldType::INT_LIST, "G", "Phred-scaled genotype likelihood"},
 };
 
 constexpr std::array INFO_FIELD_SPECS{
@@ -296,9 +298,39 @@ void VCFWriter::write_variant(const Variant& variant) {
 
     // Add FORMAT fields.
     {
+        // Handle GT first to ensure that genotype_values gets populated
+        const auto gt = variant.format.find("GT");
+        if (gt == std::cend(variant.format)) {
+            throw std::runtime_error("No genotype information found in variant.format!");
+        }
         std::vector<int32_t> genotype_values;
+        const auto [all_idx, phased] = secondary::split_GT_string(gt->second);
+        for (const std::string_view token : all_idx) {
+            if (std::empty(token)) {
+                continue;
+            }
+            int32_t bcf_all_id = bcf_gt_missing;
+            if (token != ".") {
+                const int32_t all_id = utils::from_chars<int32_t>(token).value();
+                if (phased) {
+                    bcf_all_id = bcf_gt_phased(all_id);
+                } else {
+                    bcf_all_id = bcf_gt_unphased(all_id);
+                }
+            }
+            genotype_values.emplace_back(bcf_all_id);
+        }
+        // Update the genotype.
+        if (std::empty(genotype_values)) {
+            throw std::runtime_error("Failed to decode genotype from variant.format!");
+        }
+        bcf_update_genotypes(m_header.get(), record.get(), std::data(genotype_values),
+                             std::size(genotype_values));
 
         for (const FieldSpec& spec : FORMAT_FIELD_SPECS) {
+            if (spec.key == "GT") {
+                continue;
+            }
             const auto it = variant.format.find(std::string(spec.key));
             if (it == variant.format.cend()) {
                 continue;
@@ -306,16 +338,7 @@ void VCFWriter::write_variant(const Variant& variant) {
             const std::string& value = it->second;
 
             if (spec.type == FieldType::GENOTYPE) {
-                std::istringstream ss(value);
-                std::string token;
-                while (std::getline(ss, token, '/')) {
-                    if (token == ".") {
-                        genotype_values.emplace_back(bcf_gt_missing);
-                    } else {
-                        genotype_values.emplace_back(bcf_gt_unphased(std::stoi(token)));
-                    }
-                }
-                continue;
+                throw std::runtime_error{"Multiple FORMAT fields with Type=GENOTYPE found"};
             }
 
             if (spec.type == FieldType::INT_SCALAR) {
@@ -332,9 +355,19 @@ void VCFWriter::write_variant(const Variant& variant) {
                                   spec.key, variant.seq_id, variant.pos);
                     continue;
                 }
-                if (m_include_gvcf_headers && ((spec.number == "R") || (spec.number == "A"))) {
-                    // Add extra missing entry corresponding to <*> allele
-                    parsed_values.push_back(bcf_int32_missing);
+                if (m_include_gvcf_headers) {
+                    if ((spec.number == "R") || (spec.number == "A")) {
+                        // Add extra missing entry corresponding to <*> allele
+                        parsed_values.push_back(bcf_int32_missing);
+                    } else if (spec.number == "G") {
+                        // Add extra missing entries for genotypes including <*> allele
+                        const int32_t ploidy = std::ssize(genotype_values);
+                        const int32_t num_alts = std::ssize(alts);
+                        const auto [num_elements, _gt] = lookup_gts(ploidy, num_alts + 1);
+                        while (std::ssize(parsed_values) < num_elements) {
+                            parsed_values.push_back(bcf_int32_missing);
+                        }
+                    }
                 }
                 bcf_update_format_int32(m_header.get(), record.get(), spec.key.data(),
                                         parsed_values.data(), parsed_values.size());
@@ -374,13 +407,6 @@ void VCFWriter::write_variant(const Variant& variant) {
             throw std::runtime_error("Unhandled genotype field " + std::string(spec.key) +
                                      " with Type " + std::string(format_field_type(spec.type)));
         }
-
-        // Update the genotype.
-        if (std::empty(genotype_values)) {
-            throw std::runtime_error("No genotype information found in variant.format!");
-        }
-        bcf_update_genotypes(m_header.get(), record.get(), std::data(genotype_values),
-                             std::size(genotype_values));
 
         // The variant is missing the SRC FORMAT field; emit the missing value (".").
         if (variant.format.count(FORMAT_TAG_VARIANT_SOURCE) == 0) {

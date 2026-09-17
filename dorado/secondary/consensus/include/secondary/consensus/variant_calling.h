@@ -22,6 +22,7 @@
 namespace dorado::secondary {
 
 constexpr float VCF_MAX_GQ_CAP = 60.0f;
+constexpr float VCF_MAX_PL_CAP = 990.0f;
 constexpr int32_t VAF_DP = 2;
 constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS{
         {{0, 0.5f}, {10, 5.0f}}};
@@ -159,5 +160,24 @@ std::vector<Variant> general_decode_variants(
         bool merge_overlapping,
         bool merge_adjacent,
         std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins);
+
+/**
+ * \brief Get the set of genotype combinations for (ploidy, num_alleles) from lookup table
+ *        of pre-defined genotypes. Throws for invalid inputs.
+ * \param ploidy Number of haplotypes.
+ * \param num_alleles Number of alleles.
+ * \returns Pair containing: (number of genotype combinations, genotype combinations).
+ */
+std::pair<int64_t, std::span<const std::vector<int32_t>>> lookup_gts(int64_t ploidy,
+                                                                     int64_t num_alleles);
+
+/**
+ * \brief Utility function to split GT string back into allele indices.
+ *        Handles `|` or `/` separators but not the mixed case described in the VCF spec.
+ *        If both `|` and `/` are present, this function will throw.
+ * \param gt Genotype string
+ * \returns Pair containing: (Vector of allele strings in the order they appear in gt, whether the genotype is phased).
+ */
+std::pair<std::vector<std::string_view>, bool> split_GT_string(const std::string_view gt);
 
 }  // namespace dorado::secondary
