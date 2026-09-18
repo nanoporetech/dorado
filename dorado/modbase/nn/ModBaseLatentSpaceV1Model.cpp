@@ -148,7 +148,7 @@ at::Tensor ModBaseLatentSpaceV1CommonModelImpl::forward(at::Tensor sequences,
     const auto conv_dtype = (sequences.device() == torch::kCPU) ? torch::kFloat32 : torch::kFloat16;
     // NTC -> NCT -> NTC
     sequences = sequence_encoder->forward(sequences.permute({0, 2, 1}).to(conv_dtype));
-    sequences = sequences.permute({0, 2, 1});
+    // sequences = sequences.permute({0, 2, 1});
     embedded_features = projection->forward(embedded_features);
     return common_encoder->forward(sequences + embedded_features);
 }
