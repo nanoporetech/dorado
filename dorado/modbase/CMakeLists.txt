@@ -19,8 +19,18 @@ dorado_add_library(
         ModBaseScaler.cpp
         ModBaseScaler.h
         MotifMatcher.cpp
+        nn/ModBaseConvLSTMModel.cpp
+        nn/ModBaseConvLSTMModel.h
+        nn/ModBaseConvLSTMV3Model.cpp
+        nn/ModBaseConvLSTMV3Model.h
+        nn/ModBaseConvModel.cpp
+        nn/ModBaseConvModel.h
+        nn/ModBaseLatentSpaceV1Model.cpp
+        nn/ModBaseLatentSpaceV1Model.h
         nn/ModBaseModel.cpp
         nn/ModBaseModel.h
+        nn/ModBaseModelUtils.cpp
+        nn/ModBaseModelUtils.h
     DEPENDS_PUBLIC
         dorado_config
         torch_lib
