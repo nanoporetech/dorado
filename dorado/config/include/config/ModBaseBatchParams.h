@@ -1,6 +1,7 @@
 #pragma once
 
-#include <filesystem>
+#include "config/ModBaseModelConfigFwd.h"
+
 #include <string>
 #include <vector>
 
@@ -15,7 +16,7 @@ struct ModBaseBatchParams {
     std::string to_string() const;
 };
 
-ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& paths,
+ModBaseBatchParams get_modbase_params(const std::vector<ModBaseModelConfig>& configs,
                                       size_t device_count);
 
 }  // namespace dorado::config

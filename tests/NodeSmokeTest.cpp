@@ -3,6 +3,7 @@
 #include "api/runner_creation.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
+#include "config/ModBaseModelConfig.h"
 #include "demux/adapter_info.h"
 #include "demux/barcoding_info.h"
 #include "demux/parse_custom_kit.h"
@@ -274,7 +275,12 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
 
     // Grab the modbase parameters from the models.
     const std::vector<std::filesystem::path> modbase_paths{modbase_model, modbase_model_6mA};
-    const auto modbase_params = get_modbase_params(modbase_paths, 1);
+    std::vector<ModBaseModelConfig> modbase_configs;
+    modbase_configs.reserve(modbase_paths.size());
+    for (const auto& model : modbase_paths) {
+        modbase_configs.emplace_back(load_modbase_model_config(model));
+    }
+    const auto modbase_params = get_modbase_params(modbase_configs, 1);
 
     // Create runners
     std::string device;
@@ -318,7 +324,7 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     });
 
     auto modbase_runners = dorado::api::create_modbase_runners(
-            modbase_paths, device, modbase_params.runners_per_caller, batch_size);
+            modbase_configs, device, modbase_params.runners_per_caller, batch_size);
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(modbase_runners), 2, model_stride, 1000);
 }

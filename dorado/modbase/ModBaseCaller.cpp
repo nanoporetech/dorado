@@ -3,7 +3,7 @@
 #include "ModBaseScaler.h"
 #include "config/ModBaseModelConfig.h"
 #include "modbase/MotifMatcher.h"
-#include "nn/ModBaseModel.h"
+#include "modbase/nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 
@@ -103,11 +103,10 @@ int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
     return chunk_size;
 }
 
-ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
+ModBaseCaller::ModBaseCaller(const std::vector<config::ModBaseModelConfig>& model_configs,
                              const int batch_size,
-                             const std::string& device)
-        : m_num_models(model_paths.size()) {
-    if (m_num_models == 0) {
+                             const std::string& device) {
+    if (model_configs.empty()) {
         throw std::logic_error("ModBaseCaller given zero models.");
     }
 
@@ -126,11 +125,11 @@ ModBaseCaller::ModBaseCaller(const std::vector<std::filesystem::path>& model_pat
 
     // Allocate enough elements up-front so that m_caller_data.emplace_back() doesn't reallocate while
     // other threads can be referencing elements that it's holding.
-    m_model_data.reserve(m_num_models);
-    m_task_threads.reserve(m_num_models);
+    const size_t num_models = model_configs.size();
+    m_model_data.reserve(num_models);
+    m_task_threads.reserve(num_models);
 
-    for (size_t i = 0; i < m_num_models; ++i) {
-        const auto& config = config::load_modbase_model_config(model_paths[i]);
+    for (const auto& config : model_configs) {
         at::InferenceMode guard;
         auto caller_data = std::make_unique<ModBaseData>(config, m_options, batch_size);
         m_model_data.emplace_back(std::move(caller_data));
@@ -220,7 +219,7 @@ stats::NamedStats ModBaseCaller::sample_stats() const {
 }
 
 void ModBaseCaller::start_threads() {
-    for (size_t model_id = 0; model_id < m_num_models; ++model_id) {
+    for (size_t model_id = 0; model_id < m_model_data.size(); ++model_id) {
         m_task_threads.emplace_back([this, model_id] { modbase_task_thread_fn(model_id); });
     }
 }

@@ -59,6 +59,15 @@ ConvParams parse_conv_params(const toml::value &segment, const bool clamp) {
     params.stride = toml::find<int>(segment, "stride");
     params.inner_dim = 0;
 
+    if (segment.contains("padding")) {
+        const int padding = toml::find<int>(segment, "padding");
+        if (padding != (params.winlen / 2)) {
+            throw std::runtime_error("Modbase conv padding expected to be winlen / 2 (" +
+                                     std::to_string(params.winlen / 2) + "), found " +
+                                     std::to_string(padding));
+        }
+    }
+
     const auto &activation = toml::find<std::string>(segment, keys::ACTIVATION);
     if (activation == "swish") {
         params.activation = clamp ? Activation::SWISH_CLAMP : Activation::SWISH;

@@ -24,10 +24,10 @@ std::shared_ptr<basecall::MetalCaller> create_metal_caller(
 #endif
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
-        const std::vector<std::filesystem::path>& model_paths,
+        const std::vector<config::ModBaseModelConfig>& model_configs,
         int batch_size,
         const std::string& device) {
-    return std::make_shared<modbase::ModBaseCaller>(model_paths, batch_size, device);
+    return std::make_shared<modbase::ModBaseCaller>(model_configs, batch_size, device);
 }
 
 }  // namespace dorado::api

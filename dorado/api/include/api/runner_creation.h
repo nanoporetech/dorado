@@ -2,6 +2,7 @@
 
 #include "api/caller_creation.h"
 #include "basecall/ModelRunnerBase.h"
+#include "config/ModBaseModelConfigFwd.h"
 #include "modbase/ModBaseRunner.h"
 
 #include <filesystem>
@@ -22,7 +23,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t num_cpu_runners);
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
-        const std::vector<std::filesystem::path>& modbase_models,
+        const std::vector<config::ModBaseModelConfig>& model_configs,
         const std::string& device,
         size_t runners_per_caller,
         size_t batch_size);

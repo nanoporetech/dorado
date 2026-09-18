@@ -23,13 +23,13 @@ torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
                                                  const torch::Tensor &mask);
 
 struct GatedMLPImpl : torch::nn::Module {
-    GatedMLPImpl(int in_features, int hidden_features);
+    GatedMLPImpl(int in_features, int hidden_features, bool use_uswiglu_);
 
     at::Tensor forward(const at::Tensor &x);
 
-    bool features_interleaved = false;
-    int in_features;
-    int hidden_features;
+    const int in_features;
+    const int hidden_features;
+    const bool use_uswiglu;
     torch::nn::Linear fc1{nullptr}, fc2{nullptr};
 };
 
@@ -96,7 +96,8 @@ TORCH_MODULE(MultiHeadAttention);
 
 struct TxEncoderImpl : torch::nn::Module {
     TxEncoderImpl(const config::TransformerEncoderLayerParams &params,
-                  const at::TensorOptions &options);
+                  const at::TensorOptions &options,
+                  bool use_uswiglu_);
 
     at::Tensor forward(at::Tensor x);
 
@@ -115,6 +116,7 @@ struct TxEncoderImpl : torch::nn::Module {
     MultiHeadAttention self_attn{nullptr};
     GatedMLP ff{nullptr};
     RMSNorm norm1{nullptr}, norm2{nullptr};
+    const bool use_uswiglu;
 };
 
 TORCH_MODULE(TxEncoder);

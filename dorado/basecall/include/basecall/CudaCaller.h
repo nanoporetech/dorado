@@ -3,6 +3,7 @@
 #include "DecodedChunk.h"
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
+#include "modbase/nn/ModBaseModel.h"
 #include "nn/AuxiliaryData.h"
 #include "nn/KoiThreads.h"
 #include "utils/stats.h"
@@ -85,6 +86,7 @@ private:
     decode::DecoderOptions m_decoder_options;
     const at::TensorOptions m_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
+    std::optional<modbase::ModBaseLatentSpaceModels> m_modbase_modules;
     std::atomic<bool> m_terminate{false};
     std::thread m_cuda_thread;
     int m_num_input_features;
