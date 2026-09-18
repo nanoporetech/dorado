@@ -125,7 +125,7 @@ ModBaseCaller::ModBaseCaller(const std::vector<config::ModBaseModelConfig>& mode
 
     // Allocate enough elements up-front so that m_caller_data.emplace_back() doesn't reallocate while
     // other threads can be referencing elements that it's holding.
-    size_t num_models = model_configs.size();
+    const size_t num_models = model_configs.size();
     m_model_data.reserve(num_models);
     m_task_threads.reserve(num_models);
 

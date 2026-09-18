@@ -60,7 +60,7 @@ ConvParams parse_conv_params(const toml::value &segment, const bool clamp) {
     params.inner_dim = 0;
 
     if (segment.contains("padding")) {
-        int padding = toml::find<int>(segment, "padding");
+        const int padding = toml::find<int>(segment, "padding");
         if (padding != (params.winlen / 2)) {
             throw std::runtime_error("Modbase conv padding expected to be winlen / 2 (" +
                                      std::to_string(params.winlen / 2) + "), found " +
