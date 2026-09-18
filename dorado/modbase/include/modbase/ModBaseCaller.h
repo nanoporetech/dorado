@@ -55,7 +55,7 @@ public:
 #endif
     };
 
-    ModBaseCaller(const std::vector<std::filesystem::path>& model_paths,
+    ModBaseCaller(const std::vector<config::ModBaseModelConfig>& model_configs,
                   const int batch_size,
                   const std::string& device);
     ~ModBaseCaller();
@@ -92,8 +92,6 @@ private:
 private:
     void start_threads();
     void modbase_task_thread_fn(size_t model_id);
-
-    const size_t m_num_models;
 
     at::TensorOptions m_options;
     std::atomic<bool> m_terminate{false};

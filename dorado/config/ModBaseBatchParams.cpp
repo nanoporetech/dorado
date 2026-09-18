@@ -44,14 +44,13 @@ std::string ModBaseBatchParams::to_string() const {
     // clang-format on
 }
 
-ModBaseBatchParams get_modbase_params(const std::vector<std::filesystem::path>& paths,
+ModBaseBatchParams get_modbase_params(const std::vector<ModBaseModelConfig>& configs,
                                       size_t device_count) {
-    const bool is_chunked_model =
-            !paths.empty() &&
-            ((modbase::get_modbase_model_type(paths.front()) == modbase::ModelType::CONV_LSTM_V2) ||
-             (modbase::get_modbase_model_type(paths.front()) == modbase::ModelType::CONV_LSTM_V3) ||
-             (modbase::get_modbase_model_type(paths.front()) ==
-              modbase::ModelType::LATENT_SPACE_V1));
+    if (configs.empty()) {
+        return {};
+    }
+
+    const bool is_chunked_model = is_chunked_input_model(configs.front());
     const std::size_t batch_size = is_chunked_model
                                            ? DefaultModBaseParameters::batchsize_conv_lstm_v2
                                            : DefaultModBaseParameters::batchsize;

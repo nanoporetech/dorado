@@ -1,6 +1,7 @@
 #pragma once
 
 #include "basecall/ModelRunnerBase.h"
+#include "config/ModBaseModelConfigFwd.h"
 
 #include <filesystem>
 #include <memory>
@@ -38,7 +39,7 @@ std::shared_ptr<basecall::MetalCaller> create_metal_caller(
 #endif
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
-        const std::vector<std::filesystem::path>& model_paths,
+        const std::vector<config::ModBaseModelConfig>& model_configs,
         int batch_size,
         const std::string& device);
 

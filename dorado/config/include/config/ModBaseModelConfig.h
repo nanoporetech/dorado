@@ -209,8 +209,6 @@ const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelCo
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);
 const modbase::ModBaseModelConfigData& get_context_model_config(const ModBaseModelConfig& config);
 
-bool is_modbase_model(const std::filesystem::path& path);
-
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
@@ -218,6 +216,6 @@ ModBaseInfo get_modbase_info(
         const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params);
 
 void check_modbase_multi_model_compatibility(
-        const std::vector<std::filesystem::path>& modbase_models);
+        const std::vector<ModBaseModelConfig>& modbase_configs);
 
 }  // namespace dorado::config

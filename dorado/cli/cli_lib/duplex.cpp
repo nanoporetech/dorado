@@ -64,11 +64,11 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+ModBaseBatchParams validate_modbase_params(const std::vector<ModBaseModelConfig>& configs,
                                            argparse::ArgumentParser& parser,
                                            size_t device_count) {
     // Convert path to params.
-    auto params = get_modbase_params(paths, device_count);
+    auto params = get_modbase_params(configs, device_count);
 
     // Allow user to override batchsize.
     if (auto modbase_batchsize = parser.present<int>("--modified-bases-batchsize");
@@ -83,14 +83,6 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
             throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
         }
         params.threshold = *methylation_threshold;
-    }
-
-    // Check that the paths are all valid.
-    for (const auto& mb_path : paths) {
-        if (!is_modbase_model(mb_path)) {
-            throw std::runtime_error("Modified bases model not found in the model path at " +
-                                     std::filesystem::weakly_canonical(mb_path).string());
-        }
     }
 
     // All looks good.
@@ -482,11 +474,11 @@ int duplex(int argc, char* argv[]) {
 #endif
 
             const auto modbase_params =
-                    validate_modbase_params(models.get_modbase_model_paths(), parser, device_count);
+                    validate_modbase_params(models.get_modbase_configs(), parser, device_count);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
             auto mod_base_runners = api::create_modbase_runners(
-                    models.get_modbase_model_paths(), device, modbase_params.runners_per_caller,
+                    models.get_modbase_configs(), device, modbase_params.runners_per_caller,
                     modbase_params.batchsize);
 
             if (!mod_base_runners.empty() && writer_output_mode == OutputMode::FASTQ) {

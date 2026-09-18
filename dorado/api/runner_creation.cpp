@@ -148,15 +148,15 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
 }
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
-        const std::vector<std::filesystem::path>& modbase_models,
+        const std::vector<config::ModBaseModelConfig>& model_configs,
         const std::string& device,
         size_t runners_per_caller,
         size_t batch_size) {
-    if (modbase_models.empty()) {
+    if (model_configs.empty()) {
         return {};
     }
 
-    config::check_modbase_multi_model_compatibility(modbase_models);
+    config::check_modbase_multi_model_compatibility(model_configs);
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<modbase::RunnerPtr> runners;
@@ -180,7 +180,7 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
 #endif
     for (const auto& device_string : modbase_devices) {
         for (int i = 0; i < num_callers; ++i) {
-            auto caller = create_modbase_caller(modbase_models, int(batch_size), device_string);
+            auto caller = create_modbase_caller(model_configs, int(batch_size), device_string);
             for (size_t j = 0; j < runners_per_caller; j++) {
                 runners.push_back(std::make_unique<modbase::ModBaseRunner>(caller));
             }

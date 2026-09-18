@@ -283,7 +283,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
     cli::add_internal_arguments(parser);
 }
 
-ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::path>& paths,
+ModBaseBatchParams validate_modbase_params(const std::vector<config::ModBaseModelConfig>& configs,
                                            const BasecallerOptions& options) {
 #if DORADO_CUDA_BUILD
     const size_t device_count = utils::parse_cuda_device_string(options.device).size();
@@ -292,7 +292,7 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
 #endif
 
     // Convert path to params.
-    auto params = get_modbase_params(paths, device_count);
+    auto params = get_modbase_params(configs, device_count);
 
     // Allow user to override batchsize.
     if (const auto& modbase_batchsize = options.modified_bases_batchsize;
@@ -307,14 +307,6 @@ ModBaseBatchParams validate_modbase_params(const std::vector<std::filesystem::pa
             throw std::runtime_error("--modified-bases-threshold must be between 0 and 1.");
         }
         params.threshold = *methylation_threshold;
-    }
-
-    // Check that the paths are all valid.
-    for (const auto& mb_path : paths) {
-        if (!is_modbase_model(mb_path)) {
-            throw std::runtime_error("Modified bases model not found in the model path at " +
-                                     std::filesystem::weakly_canonical(mb_path).string());
-        }
     }
 
     // All looks good.
@@ -428,7 +420,7 @@ struct Runners {
 };
 Runners create_runners(const BasecallerOptions& options,
                        const BasecallModelConfig& model_config,
-                       const std::vector<std::filesystem::path>& modbase_models,
+                       const std::vector<config::ModBaseModelConfig>& modbase_configs,
                        size_t num_runners,
                        const ModBaseBatchParams& modbase_params) {
 #if DORADO_CUDA_BUILD
@@ -437,7 +429,7 @@ Runners create_runners(const BasecallerOptions& options,
 #endif
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
-    auto modbase_runners = api::create_modbase_runners(modbase_models, options.device,
+    auto modbase_runners = api::create_modbase_runners(modbase_configs, options.device,
                                                        modbase_params.runners_per_caller,
                                                        modbase_params.batchsize);
 
@@ -930,7 +922,7 @@ void run(const BasecallerOptions& options,
     const BasecallModelConfig& model_config = models.get_simplex_config();
     spdlog::trace(model_config.to_string());
 
-    const auto modbase_params = validate_modbase_params(models.get_modbase_model_paths(), options);
+    const auto modbase_params = validate_modbase_params(models.get_modbase_configs(), options);
     spdlog::trace(modbase_params.to_string());
 
     size_t num_reads =
@@ -946,7 +938,7 @@ void run(const BasecallerOptions& options,
     ProgressTracker tracker(ProgressTracker::Mode::SIMPLEX, num_reads);
 
     auto [num_devices, runners, modbase_runners] = create_runners(
-            options, model_config, models.get_modbase_model_paths(), num_runners, modbase_params);
+            options, model_config, models.get_modbase_configs(), num_runners, modbase_params);
     if (options.emit_args.fastq && !modbase_runners.empty()) {
         throw std::runtime_error(
                 "--emit-fastq cannot be used with modbase models as FASTQ cannot store modbase "
