@@ -2,6 +2,27 @@
 
 #include "torch_utils/module_utils.h"
 
+namespace {
+std::vector<std::string> load_modbase_conv_lstm_weights() {
+    return std::vector<std::string>{
+            "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
+            "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
+            "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
+
+            "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
+            "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
+            "seq_conv3.weight.tensor",   "seq_conv3.bias.tensor",
+
+            "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
+            "merge_conv2.weight.tensor", "merge_conv2.bias.tensor",
+            "merge_conv3.weight.tensor", "merge_conv3.bias.tensor",
+            "merge_conv4.weight.tensor", "merge_conv4.bias.tensor",
+
+            "fc.weight.tensor",          "fc.bias.tensor",
+    };
+}
+}  // namespace
+
 namespace dorado::modbase::model {
 
 ModBaseConvModelImpl::ModBaseConvModelImpl(const config::modbase::ConvOnlyModelConfig& config) {
@@ -57,26 +78,7 @@ void ModBaseConvModelImpl::load_state_dict(const std::vector<at::Tensor>& weight
 }
 
 std::vector<at::Tensor> ModBaseConvModelImpl::load_weights(const std::filesystem::path& dir) {
-    return utils::load_tensors(dir, weight_tensors());
-}
-
-std::vector<std::string> ModBaseConvModelImpl::weight_tensors() {
-    return {
-            "sig_conv1.weight.tensor",   "sig_conv1.bias.tensor",
-            "sig_conv2.weight.tensor",   "sig_conv2.bias.tensor",
-            "sig_conv3.weight.tensor",   "sig_conv3.bias.tensor",
-
-            "seq_conv1.weight.tensor",   "seq_conv1.bias.tensor",
-            "seq_conv2.weight.tensor",   "seq_conv2.bias.tensor",
-            "seq_conv3.weight.tensor",   "seq_conv3.bias.tensor",
-
-            "merge_conv1.weight.tensor", "merge_conv1.bias.tensor",
-            "merge_conv2.weight.tensor", "merge_conv2.bias.tensor",
-            "merge_conv3.weight.tensor", "merge_conv3.bias.tensor",
-            "merge_conv4.weight.tensor", "merge_conv4.bias.tensor",
-
-            "fc.weight.tensor",          "fc.bias.tensor",
-    };
+    return utils::load_tensors(dir, load_modbase_conv_lstm_weights());
 }
 
 }  // namespace dorado::modbase::model

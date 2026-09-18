@@ -18,8 +18,6 @@ struct ModBaseConvModelImpl : torch::nn::Module {
     void load_state_dict(const std::vector<at::Tensor>& weights);
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir);
 
-    static std::vector<std::string> weight_tensors();
-
     ModsConv sig_conv1{nullptr};
     ModsConv sig_conv2{nullptr};
     ModsConv sig_conv3{nullptr};
