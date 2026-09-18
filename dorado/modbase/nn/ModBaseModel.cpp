@@ -11,6 +11,7 @@
 #include <spdlog/spdlog.h>
 
 #include <optional>
+#include <string_view>
 
 #if DORADO_CUDA_BUILD
 #include "nn/ConvStack.h"
@@ -63,6 +64,56 @@ std::vector<std::string> load_modbase_conv_lstm_weights(bool has_upsample) {
     if (has_upsample) {
         tensors.push_back("linear_up.linear.weight.tensor");
         tensors.push_back("linear_up.linear.bias.tensor");
+    }
+    return tensors;
+}
+
+std::string indexed_layer_name(const std::string_view name,
+                               const size_t index,
+                               const size_t layer_count) {
+    if (layer_count == 1) {
+        return std::string(name);
+    }
+    return std::string(name) + std::to_string(index + 1);
+}
+
+std::vector<std::string> load_latent_space_v1_common_weight_names(
+        const dorado::config::modbase::LatentSpaceModulesParams& modules) {
+    std::vector<std::string> tensors;
+    tensors.reserve((modules.sequence_convs.size() * 2) + (modules.projection.size() * 2) +
+                    (modules.transformer_encoder.size() * 7));
+
+    for (size_t i = 0; i < modules.sequence_convs.size(); ++i) {
+        const auto prefix = "seq_conv" + std::to_string(i + 1);
+        tensors.push_back(prefix + ".weight.tensor");
+        tensors.push_back(prefix + ".bias.tensor");
+    }
+    for (size_t i = 0; i < modules.projection.size(); ++i) {
+        const auto prefix = indexed_layer_name("proj", i, modules.projection.size());
+        tensors.push_back(prefix + ".weight.tensor");
+        tensors.push_back(prefix + ".bias.tensor");
+    }
+    for (size_t i = 0; i < modules.transformer_encoder.size(); ++i) {
+        const auto prefix = "transformer" + std::to_string(i + 1);
+        tensors.push_back(prefix + ".Wqkv.weight.tensor");
+        tensors.push_back(prefix + ".out_proj.weight.tensor");
+        tensors.push_back(prefix + ".out_proj.bias.tensor");
+        tensors.push_back(prefix + ".fc1.weight.tensor");
+        tensors.push_back(prefix + ".fc2.weight.tensor");
+        tensors.push_back(prefix + ".norm1.weight.tensor");
+        tensors.push_back(prefix + ".norm2.weight.tensor");
+    }
+    return tensors;
+}
+
+std::vector<std::string> load_latent_space_v1_final_weight_names(
+        const dorado::config::modbase::LatentSpaceModulesParams& modules) {
+    std::vector<std::string> tensors;
+    tensors.reserve(modules.classifier.size() * 2);
+    for (size_t i = 0; i < modules.classifier.size(); ++i) {
+        const auto prefix = indexed_layer_name("fc", i, modules.classifier.size());
+        tensors.push_back(prefix + ".weight.tensor");
+        tensors.push_back(prefix + ".bias.tensor");
     }
     return tensors;
 }
