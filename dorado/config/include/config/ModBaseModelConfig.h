@@ -204,6 +204,7 @@ const modbase::ModBaseModelConfigData& get_model_config_data(const ModBaseModelC
 const modbase::CommonModelParams& get_common_model_params(const ModBaseModelConfig& config);
 modbase::ModelType get_model_type(const ModBaseModelConfig& config);
 bool is_chunked_input_model(const ModBaseModelConfig& config);
+bool is_cotrained_model(const ModBaseModelConfig& config);
 
 const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config);
 int get_chunked_model_stride_ratio(const ModBaseModelConfig& config);

@@ -758,6 +758,14 @@ bool is_chunked_input_model(const ModBaseModelConfig& config) {
            std::holds_alternative<modbase::LatentSpaceV1ModelConfig>(config);
 }
 
+bool is_cotrained_model(const ModBaseModelConfig& config) {
+    return std::visit(utils::overloaded{
+                              [](const modbase::LatentSpaceV1ModelConfig&) { return true; },
+                              [](const auto&) { return false; },
+                      },
+                      config);
+}
+
 const modbase::ChunkedModelParams& get_chunked_model_params(const ModBaseModelConfig& config) {
     return std::visit(utils::overloaded{
             []<typename T>(const T& model) -> const modbase::ChunkedModelParams&
@@ -863,12 +871,28 @@ void check_modbase_multi_model_compatibility(
             const auto& query_motif = query_params.mods.motif[query_params.mods.motif_offset];
 
             if (ref_motif == query_motif) {
+                if (!err_msg.empty()) {
+                    err_msg += "\n";
+                }
                 err_msg += ref_params.model_path.string() + " and " +
                            query_params.model_path.string() +
                            " have overlapping motifs on the canonical base '" + ref_motif +
                            "' and only one modbase model motif per canonical base is allowed.";
             }
         }
+    }
+
+    const bool model_type_mismatch =
+            std::adjacent_find(std::begin(modbase_configs), std::end(modbase_configs),
+                               [](const auto& lhs, const auto& rhs) {
+                                   return is_cotrained_model(lhs) != is_cotrained_model(rhs);
+                               }) != std::end(modbase_configs);
+
+    if (model_type_mismatch) {
+        if (!err_msg.empty()) {
+            err_msg += "\n";
+        }
+        err_msg += "Incomptible modbase models detected. All models must be of the same type.";
     }
 
     if (!err_msg.empty()) {
