@@ -8,7 +8,7 @@
 #include "cli/utils/cli_utils.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseBatchParams.h"
-#include "config/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfigFwd.h"
 #include "data_loader/DataLoader.h"
 #include "demux/KitInfoProvider.h"
 #include "demux/adapter_info.h"
