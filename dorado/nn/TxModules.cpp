@@ -117,8 +117,8 @@ torch::Tensor scaled_dot_product_attention_naive(const torch::Tensor &q,
     return torch::matmul(weights, v);
 }
 
-GatedMLPImpl::GatedMLPImpl(int in_features_, int hidden_features_)
-        : in_features(in_features_), hidden_features(hidden_features_) {
+GatedMLPImpl::GatedMLPImpl(int in_features_, int hidden_features_, bool use_uswiglu_)
+        : in_features(in_features_), hidden_features(hidden_features_), use_uswiglu(use_uswiglu_) {
     fc1 = register_module("fc1",
                           Linear(LinearOptions(in_features, 2 * hidden_features).bias(false)));
     fc2 = register_module("fc2", Linear(LinearOptions(hidden_features, in_features).bias(false)));
@@ -132,7 +132,6 @@ at::Tensor GatedMLPImpl::forward(const at::Tensor &x) {
     }
     {
         utils::ScopedProfileRange spr("SILU", 3);
-        const bool use_uswiglu = utils::get_dev_opt("use_uswiglu", false);
         const auto chunks = t.chunk(2, -1);
         if (use_uswiglu) {
             // 1.702 and limit=7.0 are hard-coded for now
@@ -412,13 +411,14 @@ at::Tensor MultiHeadAttentionImpl::forward(at::Tensor x) {
 };
 
 TxEncoderImpl::TxEncoderImpl(const TransformerEncoderLayerParams &params_,
-                             const at::TensorOptions &options)
-        : params(params_) {
+                             const at::TensorOptions &options,
+                             bool use_uswiglu_)
+        : params(params_), use_uswiglu(use_uswiglu_) {
     self_attn =
             register_module("self_attn", MultiHeadAttention(params.d_model, params.nhead, false,
                                                             true, params.attn_window, params.theta,
                                                             params.max_seq_len, options));
-    ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward));
+    ff = register_module("ff", GatedMLP(params.d_model, params.dim_feedforward, use_uswiglu));
     norm1 = register_module("norm1", RMSNorm(params.d_model));
     norm2 = register_module("norm2", RMSNorm(params.d_model));
 
@@ -465,7 +465,6 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
     auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
     bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
                   utils::get_dev_opt<bool>("koi_use_f8", true);
-    const bool use_uswiglu = utils::get_dev_opt("use_uswiglu", false);
 
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
@@ -661,7 +660,6 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     bool useFloatAccumSwiglu = utils::get_dev_opt("volta_f32_accum_swiglu", false);
     bool useFloatAccumfc2 = utils::get_dev_opt("volta_f32_accum_fc2", false);
     bool useBiasfc2 = false;  // No bias for fc2
-    const bool use_uswiglu = utils::get_dev_opt("use_uswiglu", false);
 
     utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
     const float alpha = params.deepnorm_alpha;
@@ -852,9 +850,10 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
 #endif
 #endif
 
+    const bool use_uswiglu = utils::get_dev_opt("use_uswiglu", false);
     stack = Sequential();
     for (int i = 0; i < params.depth; ++i) {
-        TxEncoder encoder(params.layer_params, options);
+        TxEncoder encoder(params.layer_params, options, use_uswiglu);
         stack->push_back(register_module("transformer_encoder" + std::to_string(i), encoder));
         layer_vec.push_back(encoder);
     }

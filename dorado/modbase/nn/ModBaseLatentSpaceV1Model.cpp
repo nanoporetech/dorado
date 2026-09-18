@@ -142,7 +142,7 @@ ModBaseLatentSpaceV1CommonModelImpl::ModBaseLatentSpaceV1CommonModelImpl(
             params.max_seq_len =
                     static_cast<int>(m_config.chunked.chunk_size / m_config.general.stride);
         }
-        common_encoder->push_back(nn::TxEncoder(params, options));
+        common_encoder->push_back(nn::TxEncoder(params, options, false));
     }
 }
 
