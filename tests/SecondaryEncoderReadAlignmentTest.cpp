@@ -184,6 +184,11 @@ std::vector<T> get_unique_sorted_column(const at::Tensor& in_tensor, const int64
     return uniq_vec;
 }
 
+struct EncoderTestCase {
+    std::string test_name;
+    bool legacy_feat_encoder;
+};
+
 }  // namespace
 
 namespace dorado::secondary::tests {
@@ -306,11 +311,17 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10432, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
+                min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+                include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -335,11 +346,17 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10431, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
+                min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+                include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -398,11 +415,17 @@ CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
     const std::vector<int8_t> expected_haptags{0};
 
     // Run UUT.
-    EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
+            min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+            right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -464,20 +487,26 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
         std::vector<int64_t> expected_shape{};
     };
 
+    auto [encoder_test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
     auto [test_case] = GENERATE_REF(table<TestCase>({
             TestCase{"No filter", 0.0, {117, 11, 6}},
             TestCase{"Filter some alignments", 0.99, {113, 9, 6}},
             TestCase{"Filter ALL alignments", 1.0, {0}},
     }));
 
-    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name << ", "
+                          << encoder_test_case.test_name);
 
     // Run UUT.
     EncoderReadAlignment encoder(
             in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
             min_mapq, max_reads, test_case.min_snp_accuracy, row_per_read, include_dwells,
             clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
-            include_snp_qv_column, kadayashi_opt, false);
+            include_snp_qv_column, kadayashi_opt, encoder_test_case.legacy_feat_encoder);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -682,11 +711,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -713,11 +748,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -747,11 +788,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -780,11 +827,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -813,11 +866,18 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -838,11 +898,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         const Sample& expected = expected_total;
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -893,11 +959,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         }
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -1047,11 +1119,17 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     const bool row_per_read{false};
 
     // Run UUT.
-    EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+            read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+            clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
@@ -1212,11 +1290,17 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     const bool row_per_read{true};
 
     // Run UUT.
-    EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+            read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+            clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
@@ -1358,11 +1442,17 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     const int32_t max_reads{1};
 
     // Run UUT.
-    EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+            read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+            clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),
@@ -1518,11 +1608,17 @@ CATCH_TEST_CASE("synthetic_test_05-haplotags", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -1691,11 +1787,17 @@ CATCH_TEST_CASE("synthetic_test_06-calculate_read_alignment_fix_for_high_coverag
         const Sample& expected = expected_total;
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
