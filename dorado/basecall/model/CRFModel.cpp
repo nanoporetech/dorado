@@ -15,7 +15,6 @@
 #include <c10/cuda/CUDAGuard.h>
 #endif
 
-using namespace torch::nn;
 using Slice = torch::indexing::Slice;
 
 namespace dorado::basecall::model {
@@ -51,26 +50,22 @@ CRFModelImpl::CRFModelImpl(const BasecallModelConfig &config, at::TensorOptions 
                     "factorised_linear",
                     FactorisedLinearLayer(lstm_size, decomposition, config.outsize)));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
-            encoder = Sequential(convs, rnns, linear1, clamp1);
         } else {
             linear1 = std::static_pointer_cast<LinearLayerImpl>(register_module(
                     "linear1", LinearCRF(lstm_size, decomposition, config.bias, false)));
             linear2 = register_module("linear2",
                                       LinearCRF(decomposition, config.outsize, false, tanh_x5));
             clamp1 = Clamp(-5.0, 5.0, config.clamp);
-            encoder = Sequential(convs, rnns, linear1, linear2, clamp1);
         }
     } else if ((config.convs[0].size > 4) && (config.num_features == 1)) {
         // v4.x model without linear decomposition
         linear1 = std::static_pointer_cast<LinearLayerImpl>(
                 register_module("linear1", LinearCRF(lstm_size, config.outsize, false, tanh_x5)));
         clamp1 = Clamp(-5.0, 5.0, config.clamp);
-        encoder = Sequential(convs, rnns, linear1, clamp1);
     } else {
         // Pre v4 model
         linear1 = std::static_pointer_cast<LinearLayerImpl>(
                 register_module("linear1", LinearCRF(lstm_size, config.outsize, true, true)));
-        encoder = Sequential(convs, rnns, linear1);
     }
 }
 
@@ -79,7 +74,9 @@ void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
 }
 
 #if DORADO_CUDA_BUILD
-at::Tensor CRFModelImpl::run_koi(const at::Tensor &in, const nn::AuxiliaryData *const aux) {
+at::Tensor CRFModelImpl::run_koi(const at::Tensor &in,
+                                 const nn::AuxiliaryData *const aux,
+                                 at::Tensor *const signal_embeddings) {
     // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
     c10::cuda::CUDAGuard device_guard(in.device());
 
@@ -112,6 +109,14 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in, const nn::AuxiliaryData *
 
     convs->run_koi(wm, aux);
     rnns->run_koi(wm, aux);
+    if (signal_embeddings) {
+        auto embeddings = wm.get_current_NTC_view();
+        // Koi's quantised recurrent kernels use a fixed int8 scale of 127. Convert back to the
+        // floating-point representation expected by the latent-space projection.
+        *signal_embeddings = embeddings.scalar_type() == torch::kInt8
+                                     ? embeddings.to(torch::kFloat16).div_(127.f)
+                                     : embeddings.clone();
+    }
     linear1->run_koi(wm, aux);
     if (linear2) {
         linear2->run_koi(wm, nullptr);
@@ -128,16 +133,29 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in, const nn::AuxiliaryData *
 #endif
 
 at::Tensor CRFModelImpl::forward(const at::Tensor &x,
-                                 [[maybe_unused]] nn::AuxiliaryData *const aux) {
+                                 [[maybe_unused]] nn::AuxiliaryData *const aux,
+                                 at::Tensor *const signal_embeddings) {
     utils::ScopedProfileRange spr("nn_forward", 1);
 #if DORADO_CUDA_BUILD
     if (x.is_cuda() && x.dtype() == torch::kF16) {
         // Output is [N, T, C]
-        return run_koi(x, aux);
+        return run_koi(x, aux, signal_embeddings);
     }
 #endif
-    // Output is [N, T, C]
-    return encoder->forward(x);
+    auto h = convs->forward(x);
+    h = rnns->forward(h);
+    if (signal_embeddings) {
+        *signal_embeddings = h;
+    }
+    h = linear1->forward(h);
+    if (linear2) {
+        h = linear2->forward(h);
+    }
+    if (clamp1) {
+        h = clamp1->forward(h);
+    }
+    // Output is [N, T, C].
+    return h;
 }
 
 }  // namespace dorado::basecall::model
