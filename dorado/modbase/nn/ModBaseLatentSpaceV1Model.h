@@ -35,6 +35,8 @@ struct ModBaseLatentSpaceV1CommonModelImpl : torch::nn::Module {
     torch::nn::Sequential common_encoder{nullptr};
 };
 
+TORCH_MODULE(ModBaseLatentSpaceV1CommonModel);
+
 /** The model-specific classifier applied to the output of a latent-space common model. */
 struct ModBaseLatentSpaceV1ClassifierModelImpl : torch::nn::Module {
     explicit ModBaseLatentSpaceV1ClassifierModelImpl(
@@ -49,7 +51,6 @@ struct ModBaseLatentSpaceV1ClassifierModelImpl : torch::nn::Module {
     torch::nn::Sequential classifier_head{nullptr};
 };
 
-TORCH_MODULE(ModBaseLatentSpaceV1CommonModel);
 TORCH_MODULE(ModBaseLatentSpaceV1ClassifierModel);
 
 }  // namespace dorado::modbase::model
