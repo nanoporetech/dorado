@@ -1,4 +1,4 @@
-#include "ModBaseModel.h"
+#include "modbase/nn/ModBaseModel.h"
 
 #include "ModBaseConvLSTMModel.h"
 #include "ModBaseConvLSTMV3Model.h"

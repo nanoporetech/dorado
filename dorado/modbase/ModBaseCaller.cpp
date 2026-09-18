@@ -3,7 +3,7 @@
 #include "ModBaseScaler.h"
 #include "config/ModBaseModelConfig.h"
 #include "modbase/MotifMatcher.h"
-#include "nn/ModBaseModel.h"
+#include "modbase/nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 

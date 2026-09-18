@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DecodedChunk.h"
+#include "config/ModBaseModelConfigFwd.h"
 #include "utils/stats.h"
 
 #include <string>
@@ -49,6 +50,7 @@ enum class PipelineType { simplex_low_latency, simplex, duplex };
 
 struct BasecallerCreationParams {
     const config::BasecallModelConfig &model_config;
+    const std::vector<config::ModBaseModelConfig> *modbase_configs = nullptr;
     const std::string &device;
     float memory_limit_fraction;
     PipelineType pipeline_type;

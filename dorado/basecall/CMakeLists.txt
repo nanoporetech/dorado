@@ -31,6 +31,7 @@ dorado_add_library(dorado_basecall
         ModelRunnerBase.cpp
     DEPENDS_PUBLIC
         dorado_config
+        dorado_modbase
         dorado_nn
         dorado_torch_utils
         dorado_utils

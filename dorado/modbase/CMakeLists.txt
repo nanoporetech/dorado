@@ -10,6 +10,7 @@ dorado_add_library(
         ModBaseEncoder.h
         ModBaseRunner.h
         MotifMatcher.h
+        nn/ModBaseModel.h
     SOURCES_PRIVATE
         encode_kmer.cpp
         ModBaseCaller.cpp
@@ -28,7 +29,6 @@ dorado_add_library(
         nn/ModBaseLatentSpaceV1Model.cpp
         nn/ModBaseLatentSpaceV1Model.h
         nn/ModBaseModel.cpp
-        nn/ModBaseModel.h
         nn/ModBaseModelUtils.cpp
         nn/ModBaseModelUtils.h
     DEPENDS_PUBLIC
