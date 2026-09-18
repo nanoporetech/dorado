@@ -2,6 +2,7 @@
 
 #include "config/ModBaseModelConfig.h"
 #include "nn/LinearUpsample.h"
+#include "nn/TxModules.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 #include "torch_utils/tensor_utils.h"
@@ -559,10 +560,6 @@ struct ModBaseConvLSTMV3ModelImpl : Module {
     nn::LinearUpsample upsample{nullptr};
 };
 
-TORCH_MODULE(ModBaseConvModel);
-TORCH_MODULE(ModBaseConvLSTMModel);
-TORCH_MODULE(ModBaseConvLSTMV3Model);
-
 #if DORADO_CUDA_BUILD
 
 struct ModBaseConvLSTMV3CUDAModelImpl : Module {
@@ -736,9 +733,107 @@ struct ModBaseConvLSTMV3CUDAModelImpl : Module {
     nn::WorkingMemory wm{batch_size}, wm_seq{batch_size};
 };
 
-TORCH_MODULE(ModBaseConvLSTMV3CUDAModel);
-
 #endif
+
+/**
+ * The reusable part of a latent-space modification model.
+ *
+ * Both inputs use NTC layout. The returned latent-space tensor also uses NTC layout and can be
+ * passed to one or more final models.
+ */
+struct ModBaseLatentSpaceV1CommonModelImpl : Module {
+    explicit ModBaseLatentSpaceV1CommonModelImpl(
+            const config::modbase::LatentSpaceV1ModelConfig& config,
+            const at::TensorOptions& options)
+            : m_config(config) {
+        sequence_encoder = register_module("sequence_encoder", Sequential());
+        for (const auto& conv : m_config.modules.sequence_convs) {
+            sequence_encoder->push_back(ModsConv(conv));
+        }
+
+        projection = register_module("projection", Sequential());
+        for (const auto& linear : m_config.modules.projection) {
+            projection->push_back(Linear(linear.in_size, linear.out_size));
+        }
+
+        common_encoder = register_module("common_encoder", Sequential());
+        for (auto params : m_config.modules.transformer_encoder) {
+            if (params.max_seq_len == 0) {
+                params.max_seq_len =
+                        static_cast<int>(m_config.chunked.chunk_size / m_config.general.stride);
+            }
+            common_encoder->push_back(nn::TxEncoder(params, options));
+        }
+    }
+
+    at::Tensor forward(at::Tensor sequences, at::Tensor embedded_features) {
+        const auto conv_dtype =
+                (sequences.device() == torch::kCPU) ? torch::kFloat32 : torch::kFloat16;
+        // NTC -> NCT -> NTC
+        sequences = sequence_encoder->forward(sequences.permute({0, 2, 1}).to(conv_dtype));
+        sequences = sequences.permute({0, 2, 1});
+        embedded_features = projection->forward(embedded_features);
+        return common_encoder->forward(sequences + embedded_features);
+    }
+
+    void load_state_dict(const std::vector<at::Tensor>& weights) {
+        utils::load_state_dict(*this, weights);
+    }
+
+    std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) const {
+        return utils::load_tensors(dir, load_latent_space_v1_common_weight_names(m_config.modules));
+    }
+
+    bool is_compatible(const ModBaseLatentSpaceV1CommonModelImpl& other) const {
+        return common_configs_equal(m_config, other.m_config) &&
+               model_parameters_equal(*this, other);
+    }
+
+    bool operator==(const ModBaseLatentSpaceV1CommonModelImpl& other) const {
+        return is_compatible(other);
+    }
+
+    const config::modbase::LatentSpaceV1ModelConfig m_config;
+    Sequential sequence_encoder{nullptr};
+    Sequential projection{nullptr};
+    Sequential common_encoder{nullptr};
+};
+
+/** The model-specific classifier applied to the output of a latent-space common model. */
+struct ModBaseLatentSpaceV1ClassifierModelImpl : Module {
+    explicit ModBaseLatentSpaceV1ClassifierModelImpl(
+            const config::modbase::LatentSpaceV1ModelConfig& config) {
+        classifier_head = register_module("classifier_head", Sequential());
+        for (const auto& linear : m_config.modules.classifier) {
+            classifier_head->push_back(Linear(linear.in_size, linear.out_size));
+        }
+    }
+
+    // Input is NTC; output logits are NCT.
+    at::Tensor forward(at::Tensor common_output) {
+        return classifier_head->forward(common_output).permute({0, 2, 1});
+    }
+
+    void load_state_dict(const std::vector<at::Tensor>& weights) {
+        utils::load_state_dict(*this, weights);
+    }
+
+    std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) const {
+        return utils::load_tensors(dir, load_latent_space_v1_final_weight_names(m_config.modules));
+    }
+
+    const config::modbase::LatentSpaceV1ModelConfig m_config;
+    Sequential classifier_head{nullptr};
+};
+
+TORCH_MODULE(ModBaseConvModel);
+TORCH_MODULE(ModBaseConvLSTMModel);
+TORCH_MODULE(ModBaseConvLSTMV3Model);
+#if DORADO_CUDA_BUILD
+TORCH_MODULE(ModBaseConvLSTMV3CUDAModel);
+#endif
+TORCH_MODULE(ModBaseLatentSpaceV1CommonModel);
+TORCH_MODULE(ModBaseLatentSpaceV1ClassifierModel);
 
 }  // namespace model
 
