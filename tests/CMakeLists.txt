@@ -44,6 +44,7 @@ add_executable(dorado_tests
     ModBaseConfigTest.cpp
     ModBaseContextTest.cpp
     ModBaseEncoderTest.cpp
+    ModBaseLatentSpaceV1ModelTest.cpp
     ModelComplexTest.cpp
     ModelKitsTest.cpp
     ModelMetadataTest.cpp

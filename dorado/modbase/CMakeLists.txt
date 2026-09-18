@@ -28,6 +28,8 @@ dorado_add_library(
         nn/ModBaseConvModel.h
         nn/ModBaseLatentSpaceV1Model.cpp
         nn/ModBaseLatentSpaceV1Model.h
+        nn/ModBaseLatentSpaceV1SequenceModel.cpp
+        nn/ModBaseLatentSpaceV1SequenceModel.h
         nn/ModBaseModel.cpp
         nn/ModBaseModelUtils.cpp
         nn/ModBaseModelUtils.h
