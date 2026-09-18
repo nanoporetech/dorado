@@ -113,6 +113,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         for (const auto& device_string : devices) {
             basecall::BasecallerCreationParams per_device_params = {
                     .model_config = params.model_config,
+                    .modbase_configs = params.modbase_configs,
                     .device = device_string,
                     .memory_limit_fraction = params.memory_limit_fraction,
                     .pipeline_type = params.pipeline_type,
@@ -157,6 +158,11 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     }
 
     config::check_modbase_multi_model_compatibility(model_configs);
+
+    if (config::is_cotrained_model(model_configs.front())) {
+        // cotrained modbase models don't need separate runners/callers
+        return {};
+    }
 
     // generate model callers before nodes or it affects the speed calculations
     std::vector<modbase::RunnerPtr> runners;

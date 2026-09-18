@@ -429,6 +429,7 @@ Runners create_runners(const BasecallerOptions& options,
 #endif
 
     // create modbase runners first so basecall runners can pick batch sizes based on available memory
+    // if this is empty there's either no configs to load, or the configs need passing to the basecall runner for construction
     auto modbase_runners = api::create_modbase_runners(modbase_configs, options.device,
                                                        modbase_params.runners_per_caller,
                                                        modbase_params.batchsize);
@@ -448,6 +449,8 @@ Runners create_runners(const BasecallerOptions& options,
                 api::create_basecall_runners(
                         {
                                 .model_config = device_config,
+                                .modbase_configs =
+                                        modbase_runners.empty() ? &modbase_configs : nullptr,
                                 .device = device_id,
                                 .memory_limit_fraction = memory_limit_fraction,
                                 .pipeline_type = api::PipelineType::simplex,

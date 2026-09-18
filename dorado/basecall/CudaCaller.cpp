@@ -145,6 +145,14 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     c10::cuda::CUDACachingAllocator::emptyCache();
 
     at::InferenceMode guard;
+
+    if (params.modbase_configs) {
+        // TODO: check the required dtype here
+        m_modbase_modules =
+                modbase::load_modbase_latent_space_model(*(params.modbase_configs), m_options);
+
+        // TODO: warm up modbase models?
+    }
     m_module = load_crf_model(params.model_config, m_options);
 
     determine_batch_dims(params, m_variable_chunk_sizes);
