@@ -31,6 +31,8 @@ dorado_add_library(
         nn/ModBaseModel.cpp
         nn/ModBaseModelUtils.cpp
         nn/ModBaseModelUtils.h
+        nn/ModsConv.cpp
+        nn/ModsConv.h
     DEPENDS_PUBLIC
         dorado_config
         torch_lib

@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ModBaseModelUtils.h"
+#include "ModsConv.h"
 #include "config/ModBaseModelConfig.h"
 
 #include <torch/nn.h>

@@ -1,5 +1,6 @@
 #include "ModBaseConvLSTMV3Model.h"
 
+#include "ModBaseModelUtils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/module_utils.h"
 
