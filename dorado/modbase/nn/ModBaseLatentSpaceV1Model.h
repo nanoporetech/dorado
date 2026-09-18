@@ -2,6 +2,7 @@
 
 #include "ModBaseModelUtils.h"
 #include "config/ModBaseModelConfig.h"
+#include "nn/ConvStack.h"
 #include "nn/TxModules.h"
 
 #include <torch/nn.h>
@@ -29,7 +30,7 @@ struct ModBaseLatentSpaceV1CommonModelImpl : torch::nn::Module {
     bool operator==(const ModBaseLatentSpaceV1CommonModelImpl& other) const;
 
     const config::modbase::LatentSpaceV1ModelConfig m_config;
-    torch::nn::Sequential sequence_encoder{nullptr};
+    nn::ConvStack sequence_encoder{nullptr};
     torch::nn::Sequential projection{nullptr};
     torch::nn::Sequential common_encoder{nullptr};
 };

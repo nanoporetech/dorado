@@ -126,11 +126,8 @@ ModBaseLatentSpaceV1CommonModelImpl::ModBaseLatentSpaceV1CommonModelImpl(
         const config::modbase::LatentSpaceV1ModelConfig& config,
         const at::TensorOptions& options)
         : m_config(config) {
-    sequence_encoder = register_module("sequence_encoder", torch::nn::Sequential());
-    for (const auto& conv : m_config.modules.sequence_convs) {
-        sequence_encoder->push_back(ModsConv(conv));
-    }
-
+    sequence_encoder =
+            register_module("sequence_encoder", nn::ConvStack(m_config.modules.sequence_convs));
     projection = register_module("projection", torch::nn::Sequential());
     for (const auto& linear : m_config.modules.projection) {
         projection->push_back(torch::nn::Linear(linear.in_size, linear.out_size));
