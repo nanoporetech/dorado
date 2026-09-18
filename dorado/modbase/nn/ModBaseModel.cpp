@@ -10,6 +10,7 @@
 #include <ATen/core/TensorBody.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <optional>
 #include <string_view>
 
@@ -116,6 +117,66 @@ std::vector<std::string> load_latent_space_v1_final_weight_names(
         tensors.push_back(prefix + ".bias.tensor");
     }
     return tensors;
+}
+
+bool conv_params_equal(const dorado::config::ConvParams& lhs,
+                       const dorado::config::ConvParams& rhs) {
+    return std::tie(lhs.insize, lhs.size, lhs.winlen, lhs.stride, lhs.activation, lhs.inner_dim) ==
+           std::tie(rhs.insize, rhs.size, rhs.winlen, rhs.stride, rhs.activation, rhs.inner_dim);
+}
+
+bool linear_params_equal(const dorado::config::modbase::LinearParams& lhs,
+                         const dorado::config::modbase::LinearParams& rhs) {
+    return std::tie(lhs.in_size, lhs.out_size) == std::tie(rhs.in_size, rhs.out_size);
+}
+
+bool transformer_params_equal(const dorado::config::TransformerEncoderLayerParams& lhs,
+                              const dorado::config::TransformerEncoderLayerParams& rhs) {
+    return std::tie(lhs.d_model, lhs.nhead, lhs.dim_feedforward, lhs.attn_window,
+                    lhs.deepnorm_alpha, lhs.theta, lhs.max_seq_len) ==
+           std::tie(rhs.d_model, rhs.nhead, rhs.dim_feedforward, rhs.attn_window,
+                    rhs.deepnorm_alpha, rhs.theta, rhs.max_seq_len);
+}
+
+template <typename T, typename Compare>
+bool vectors_equal(const std::vector<T>& lhs, const std::vector<T>& rhs, Compare compare) {
+    return lhs.size() == rhs.size() && std::equal(lhs.begin(), lhs.end(), rhs.begin(), compare);
+}
+
+bool common_configs_equal(const dorado::config::modbase::LatentSpaceV1ModelConfig& lhs,
+                          const dorado::config::modbase::LatentSpaceV1ModelConfig& rhs) {
+    // num_out and the classifier are intentionally excluded: they belong to the final model.
+    return (std::tie(lhs.general.size, lhs.general.kmer_len, lhs.general.stride,
+                     lhs.chunked.chunk_size, lhs.sequence_stride) ==
+            std::tie(rhs.general.size, rhs.general.kmer_len, rhs.general.stride,
+                     rhs.chunked.chunk_size, rhs.sequence_stride)) &&
+           vectors_equal(lhs.modules.sequence_convs, rhs.modules.sequence_convs,
+                         conv_params_equal) &&
+           vectors_equal(lhs.modules.projection, rhs.modules.projection, linear_params_equal) &&
+           vectors_equal(lhs.modules.transformer_encoder, rhs.modules.transformer_encoder,
+                         transformer_params_equal);
+}
+
+bool model_parameters_equal(const torch::nn::Module& lhs, const torch::nn::Module& rhs) {
+    const auto lhs_params = lhs.parameters();
+    const auto rhs_params = rhs.parameters();
+    if (lhs_params.size() != rhs_params.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < lhs_params.size(); ++i) {
+        const auto& lhs_param = lhs_params.at(i);
+        const auto& rhs_param = rhs_params.at(i);
+        if (lhs_param.sizes() != rhs_param.sizes() ||
+            lhs_param.scalar_type() != rhs_param.scalar_type()) {
+            return false;
+        }
+        const auto lhs_cpu = lhs_param.device().is_cpu() ? lhs_param : lhs_param.cpu();
+        const auto rhs_cpu = rhs_param.device().is_cpu() ? rhs_param : rhs_param.cpu();
+        if (!lhs_cpu.equal(rhs_cpu)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 }  // namespace
