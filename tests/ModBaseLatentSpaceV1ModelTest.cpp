@@ -2,17 +2,21 @@
 #include "TestUtils.h"
 #include "config/ModBaseModelConfig.h"
 #include "modbase/encode_kmer.h"
+#include "modbase/nn/ModBaseModel.h"
 #include "utils/sequence_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers.hpp>  // IWYU: keep for CATCH_CHECK_THROWS_WITH macro
 
 #include <cstdint>
+#include <tuple>
 #include <vector>
 
 #define TEST_GROUP "[modbase_latent_space_v1_model]"
 
 namespace {
+
+static_assert(std::tuple_size_v<dorado::modbase::ModBaseLatentSpaceModels> == 3);
 
 constexpr int64_t COMPONENTS = 3;
 constexpr int64_t BATCH_SIZE = 2;

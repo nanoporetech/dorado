@@ -4,6 +4,7 @@
 #include "ModBaseConvLSTMV3Model.h"
 #include "ModBaseConvModel.h"
 #include "ModBaseLatentSpaceV1Model.h"
+#include "ModBaseLatentSpaceV1SequenceModel.h"
 #include "config/ModBaseModelConfig.h"
 #include "utils/dev_utils.h"
 #include "utils/overloaded.h"
@@ -116,6 +117,7 @@ std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
     c10::cuda::OptionalCUDAGuard device_guard(device);
 #endif
 
+    std::optional<model::ModBaseLatentSpaceV1SequenceModel> sequence;
     std::optional<model::ModBaseLatentSpaceV1CommonModel> common;
     std::filesystem::path common_model_path;
     std::vector<torch::nn::ModuleHolder<torch::nn::AnyModule>> classifiers;
@@ -137,6 +139,7 @@ std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
                                             model_config.data.model_path.string());
                                 }
                             } else {
+                                sequence = model::ModBaseLatentSpaceV1SequenceModel(model_config);
                                 common = std::move(candidate_common);
                                 common_model_path = model_config.data.model_path;
                             }
@@ -155,10 +158,14 @@ std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
                 config);
     }
 
+    configure_model(sequence.value(), options);
     configure_model(common.value(), options);
+    auto sequence_holder = torch::nn::ModuleHolder<torch::nn::AnyModule>(
+            torch::nn::AnyModule(std::move(sequence).value()));
     auto common_holder = torch::nn::ModuleHolder<torch::nn::AnyModule>(
             torch::nn::AnyModule(std::move(common).value()));
-    return ModBaseLatentSpaceModels{std::move(common_holder), std::move(classifiers)};
+    return ModBaseLatentSpaceModels{std::move(sequence_holder), std::move(common_holder),
+                                    std::move(classifiers)};
 }
 
 }  // namespace dorado::modbase
