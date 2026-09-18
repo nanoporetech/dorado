@@ -29,7 +29,7 @@ struct ModBaseLatentSpaceV1CommonModelImpl : torch::nn::Module {
     bool is_compatible(const ModBaseLatentSpaceV1CommonModelImpl& other) const;
     bool operator==(const ModBaseLatentSpaceV1CommonModelImpl& other) const;
 
-    const config::modbase::LatentSpaceV1ModelConfig m_config;
+    const config::modbase::LatentSpaceV1ModelConfig model_config;
     nn::ConvStack sequence_encoder{nullptr};
     torch::nn::Sequential projection{nullptr};
     torch::nn::Sequential common_encoder{nullptr};
@@ -45,7 +45,7 @@ struct ModBaseLatentSpaceV1ClassifierModelImpl : torch::nn::Module {
     void load_state_dict(const std::vector<at::Tensor>& weights);
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir) const;
 
-    const config::modbase::LatentSpaceV1ModelConfig m_config;
+    const config::modbase::LatentSpaceV1ModelConfig model_config;
     torch::nn::Sequential classifier_head{nullptr};
 };
 

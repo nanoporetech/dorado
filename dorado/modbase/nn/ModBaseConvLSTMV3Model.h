@@ -23,7 +23,7 @@ struct ModBaseConvLSTMV3ModelImpl : torch::nn::Module {
     void load_state_dict(const std::vector<at::Tensor>& weights);
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir);
 
-    const config::modbase::ConvLSTMV3ModelConfig m_config;
+    const config::modbase::ConvLSTMV3ModelConfig model_config;
 
     ModsConv sig_conv1{nullptr};
     ModsConv sig_conv2{nullptr};
@@ -50,7 +50,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : torch::nn::Module {
     void load_state_dict(const std::vector<at::Tensor>& weights);
     std::vector<at::Tensor> load_weights(const std::filesystem::path& dir);
 
-    const config::modbase::ConvLSTMV3ModelConfig m_config;
+    const config::modbase::ConvLSTMV3ModelConfig model_config;
 
     nn::ConvStack sig_convs{nullptr};
     nn::ConvStack seq_convs{nullptr};

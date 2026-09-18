@@ -19,13 +19,13 @@ namespace dorado::modbase::model {
 
 ModBaseConvLSTMV3ModelImpl::ModBaseConvLSTMV3ModelImpl(
         const config::modbase::ConvLSTMV3ModelConfig& config)
-        : m_config(config) {
-    const auto& sig_cvs = m_config.modules.signal_convs;
-    const auto& seq_cvs = m_config.modules.sequence_convs;
-    const auto& merge_cv = m_config.modules.merge_conv;
-    const auto& lstms = m_config.modules.lstms;
-    const auto& ll = m_config.modules.linear;
-    const auto& lu = m_config.modules.upsample;
+        : model_config(config) {
+    const auto& sig_cvs = model_config.modules.signal_convs;
+    const auto& seq_cvs = model_config.modules.sequence_convs;
+    const auto& merge_cv = model_config.modules.merge_conv;
+    const auto& lstms = model_config.modules.lstms;
+    const auto& ll = model_config.modules.linear;
+    const auto& lu = model_config.modules.upsample;
 
     if (sig_cvs.size() != 3) {
         throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
@@ -98,7 +98,7 @@ at::Tensor ModBaseConvLSTMV3ModelImpl::forward(at::Tensor sigs, at::Tensor seqs)
         utils::ScopedProfileRange spr("linear", 2);
         z = linear(z).flip(0).permute({1, 0, 2});  // T'NC -> NTC
     }
-    if (m_config.modules.upsample.has_value()) {
+    if (model_config.modules.upsample.has_value()) {
         utils::ScopedProfileRange spr2("upsample", 2);
         z = upsample->forward(z);  // NTC -> N(sf*T)C
     }
@@ -113,7 +113,7 @@ void ModBaseConvLSTMV3ModelImpl::load_state_dict(const std::vector<at::Tensor>& 
 
 std::vector<at::Tensor> ModBaseConvLSTMV3ModelImpl::load_weights(const std::filesystem::path& dir) {
     return utils::load_tensors(
-            dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
+            dir, load_modbase_conv_lstm_weights(model_config.modules.upsample.has_value()));
 }
 
 #if DORADO_CUDA_BUILD
@@ -136,13 +136,13 @@ std::pair<int64_t, int64_t> get_chunked_signal_input_TC(
 ModBaseConvLSTMV3CUDAModelImpl::ModBaseConvLSTMV3CUDAModelImpl(
         const config::modbase::ConvLSTMV3ModelConfig& config,
         const int batch_size_)
-        : m_config(config), batch_size(batch_size_) {
-    const auto& sig_cvs = m_config.modules.signal_convs;
-    const auto& seq_cvs = m_config.modules.sequence_convs;
-    const auto& merge_cv = m_config.modules.merge_conv;
-    const auto& lstms = m_config.modules.lstms;
-    const auto& ll = m_config.modules.linear;
-    const auto& lu = m_config.modules.upsample;
+        : model_config(config), batch_size(batch_size_) {
+    const auto& sig_cvs = model_config.modules.signal_convs;
+    const auto& seq_cvs = model_config.modules.sequence_convs;
+    const auto& merge_cv = model_config.modules.merge_conv;
+    const auto& lstms = model_config.modules.lstms;
+    const auto& ll = model_config.modules.linear;
+    const auto& lu = model_config.modules.upsample;
 
     if (sig_cvs.size() != 3) {
         throw std::runtime_error("ModBaseConvLSTMV3Model expected 3 signal convolutions");
@@ -164,19 +164,19 @@ ModBaseConvLSTMV3CUDAModelImpl::ModBaseConvLSTMV3CUDAModelImpl(
     }
     {
         // Reserve and allocate working memory for the sequence convs
-        const auto [T, C] = get_chunked_sequence_input_TC(m_config);
+        const auto [T, C] = get_chunked_sequence_input_TC(model_config);
         wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
         seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
     }
     {
         // Reserve and allocate working memory for everything else
-        const auto [T, C] = get_chunked_signal_input_TC(m_config);
+        const auto [T, C] = get_chunked_signal_input_TC(model_config);
         wm.next_TC(T, C, nn::TensorLayout::NTC);
         sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
         // Buffer for concatenating conv outputs before merge_conv
         const int padding = merge_cv.winlen / 2;
-        const int64_t T_merge_conv = (T / m_config.modules.signal_stride()) + (2 * padding);
+        const int64_t T_merge_conv = (T / model_config.modules.signal_stride()) + (2 * padding);
         wm.next_TC(T_merge_conv, merge_cv.size, nn::TensorLayout::NTC);
 
         std::optional<nn::TensorLayout> force_dtype = std::nullopt;
@@ -201,7 +201,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
 
     {
         utils::ScopedProfileRange spr2("seq_copy", 2);
-        const auto [Tin_seq, Cin_seq] = get_chunked_sequence_input_TC(m_config);
+        const auto [Tin_seq, Cin_seq] = get_chunked_sequence_input_TC(model_config);
         if (!wm_seq.backing_tensor.defined()) {
             wm_seq.allocate_backing_tensor(seqs_NTC.device());
         }
@@ -210,7 +210,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
     }
     {
         utils::ScopedProfileRange spr2("sig_copy", 2);
-        const auto [Tin_sig, Cin_sig] = get_chunked_signal_input_TC(m_config);
+        const auto [Tin_sig, Cin_sig] = get_chunked_signal_input_TC(model_config);
         if (!wm.backing_tensor.defined()) {
             wm.allocate_backing_tensor(sigs_N1T.device());
         }
@@ -236,7 +236,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
         // Copy the output of seq_convs stored in wm_seq into wm for the merge_conv input buffer.
         utils::ScopedProfileRange spr2("merge_prep", 2);
 
-        const auto& merge_cv = m_config.modules.merge_conv;
+        const auto& merge_cv = model_config.modules.merge_conv;
         auto seq_out = wm_seq.current;
         auto sig_out = wm.current;
 
@@ -275,7 +275,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
                                       ? wm.get_current_NTC_view().to(torch::kF16) / 127.0f
                                       : wm.get_current_NTC_view());
     }
-    if (m_config.modules.upsample.has_value()) {
+    if (model_config.modules.upsample.has_value()) {
         utils::ScopedProfileRange spr2("upsample", 2);
         out = upsample->forward(out);  // NTC -> N(sf*T)C
     }
@@ -291,7 +291,7 @@ void ModBaseConvLSTMV3CUDAModelImpl::load_state_dict(const std::vector<at::Tenso
 std::vector<at::Tensor> ModBaseConvLSTMV3CUDAModelImpl::load_weights(
         const std::filesystem::path& dir) {
     return utils::load_tensors(
-            dir, load_modbase_conv_lstm_weights(m_config.modules.upsample.has_value()));
+            dir, load_modbase_conv_lstm_weights(model_config.modules.upsample.has_value()));
 }
 
 #endif

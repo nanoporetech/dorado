@@ -125,19 +125,19 @@ namespace dorado::modbase::model {
 ModBaseLatentSpaceV1CommonModelImpl::ModBaseLatentSpaceV1CommonModelImpl(
         const config::modbase::LatentSpaceV1ModelConfig& config,
         const at::TensorOptions& options)
-        : m_config(config) {
+        : model_config(config) {
     sequence_encoder =
-            register_module("sequence_encoder", nn::ConvStack(m_config.modules.sequence_convs));
+            register_module("sequence_encoder", nn::ConvStack(model_config.modules.sequence_convs));
     projection = register_module("projection", torch::nn::Sequential());
-    for (const auto& linear : m_config.modules.projection) {
+    for (const auto& linear : model_config.modules.projection) {
         projection->push_back(torch::nn::Linear(linear.in_size, linear.out_size));
     }
 
     common_encoder = register_module("common_encoder", torch::nn::Sequential());
-    for (auto params : m_config.modules.transformer_encoder) {
+    for (auto params : model_config.modules.transformer_encoder) {
         if (params.max_seq_len == 0) {
             params.max_seq_len =
-                    static_cast<int>(m_config.chunked.chunk_size / m_config.general.stride);
+                    static_cast<int>(model_config.chunked.chunk_size / model_config.general.stride);
         }
         common_encoder->push_back(nn::TxEncoder(params, options, false));
     }
@@ -159,12 +159,13 @@ void ModBaseLatentSpaceV1CommonModelImpl::load_state_dict(const std::vector<at::
 
 std::vector<at::Tensor> ModBaseLatentSpaceV1CommonModelImpl::load_weights(
         const std::filesystem::path& dir) const {
-    return utils::load_tensors(dir, load_common_weight_names(m_config.modules));
+    return utils::load_tensors(dir, load_common_weight_names(model_config.modules));
 }
 
 bool ModBaseLatentSpaceV1CommonModelImpl::is_compatible(
         const ModBaseLatentSpaceV1CommonModelImpl& other) const {
-    return common_configs_equal(m_config, other.m_config) && model_parameters_equal(*this, other);
+    return common_configs_equal(model_config, other.model_config) &&
+           model_parameters_equal(*this, other);
 }
 
 bool ModBaseLatentSpaceV1CommonModelImpl::operator==(
@@ -174,9 +175,9 @@ bool ModBaseLatentSpaceV1CommonModelImpl::operator==(
 
 ModBaseLatentSpaceV1ClassifierModelImpl::ModBaseLatentSpaceV1ClassifierModelImpl(
         const config::modbase::LatentSpaceV1ModelConfig& config)
-        : m_config(config) {
+        : model_config(config) {
     classifier_head = register_module("classifier_head", torch::nn::Sequential());
-    for (const auto& linear : m_config.modules.classifier) {
+    for (const auto& linear : model_config.modules.classifier) {
         classifier_head->push_back(torch::nn::Linear(linear.in_size, linear.out_size));
     }
 }
@@ -192,7 +193,7 @@ void ModBaseLatentSpaceV1ClassifierModelImpl::load_state_dict(
 
 std::vector<at::Tensor> ModBaseLatentSpaceV1ClassifierModelImpl::load_weights(
         const std::filesystem::path& dir) const {
-    return utils::load_tensors(dir, load_classifier_weight_names(m_config.modules));
+    return utils::load_tensors(dir, load_classifier_weight_names(model_config.modules));
 }
 
 }  // namespace dorado::modbase::model
