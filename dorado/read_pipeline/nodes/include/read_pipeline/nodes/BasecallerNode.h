@@ -52,7 +52,7 @@ private:
     // Basecall reads
     void basecall_worker_thread(int worker_id);
     // Basecall batch of chunks
-    void basecall_current_batch(BatchedChunks &chunks);
+    void basecall_current_batch(BatchedChunks &chunks, std::atomic<int64_t> &batch_counter);
     // Construct complete reads
     void working_reads_manager();
 

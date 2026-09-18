@@ -186,7 +186,8 @@ void BasecallerNode::input_thread_fn() {
     }
 }
 
-void BasecallerNode::basecall_current_batch(BatchedChunks &current_batch) {
+void BasecallerNode::basecall_current_batch(BatchedChunks &current_batch,
+                                            std::atomic<int64_t> &batch_counter) {
     NVTX3_FUNC_RANGE();
     auto &model_runner = m_model_runners.at(current_batch.worker_id);
     auto &batched_chunks = current_batch.chunks;
@@ -209,11 +210,7 @@ void BasecallerNode::basecall_current_batch(BatchedChunks &current_batch) {
     }
 
     m_num_samples_incl_padding += model_runner->chunk_size() * model_runner->batch_size();
-    if (batched_chunks.size() == model_runner->batch_size()) {
-        ++m_num_batches_called;
-    } else {
-        ++m_num_partial_batches_called;
-    }
+    ++batch_counter;
 
     current_batch.reset();
 }
@@ -385,7 +382,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
             if (!current_batch.empty()) {
                 // get scores for whatever chunks are available.
-                basecall_current_batch(current_batch);
+                basecall_current_batch(current_batch, m_num_partial_batches_called);
             } else {
                 // Nothing to basecall, so just reset the timings.
                 current_batch.reset();
@@ -445,7 +442,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
                     const size_t slice_size = input_slice.size(1);
                     if ((current_batch.chunks_size + slice_size + max_conv_padding) >
                         (batch_size * chunk_size)) {
-                        basecall_current_batch(current_batch);
+                        basecall_current_batch(current_batch, m_num_batches_called);
                         // Add initial padding to chunks_size before filling up new batch
                         current_batch.chunks_size = max_conv_padding;
                     }
@@ -459,7 +456,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
                     if (current_batch.chunks_size == max_worker_chunks_size) {
                         // Input tensor can't accept any more chunks, so let's get_scores.
-                        basecall_current_batch(current_batch);
+                        basecall_current_batch(current_batch, m_num_batches_called);
                     }
 
                     worker_chunks_size_part += slice_size;
@@ -482,13 +479,13 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
 
         if (current_batch.chunks.size() == batch_size && !m_variable_chunk_sizes) {
             // Input tensor is full, let's get_scores.
-            basecall_current_batch(current_batch);
+            basecall_current_batch(current_batch, m_num_batches_called);
         }
     }
 
     if (!current_batch.empty()) {
         spdlog::trace("Submitting batch for worker {} after termination requested.", worker_id);
-        basecall_current_batch(current_batch);
+        basecall_current_batch(current_batch, m_num_partial_batches_called);
     }
 }
 
