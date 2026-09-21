@@ -15,10 +15,11 @@
 ##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allele read depth">
 ##FORMAT=<ID=VAF,Number=A,Type=Float,Description="Variant allele fraction">
 ##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Phred-scaled genotype likelihood">
+##FORMAT=<ID=AQ,Number=R,Type=Integer,Description="Phred-scaled allele quality score">
 #CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE
 chr20	1000	.	G	<*>	60	.	END=1345	GT:GQ:LEN:MIN_DP:SRC	0/0:60:346:20:R
 chr20	1346	.	G	<*>	60	.	END=1471	GT:GQ:LEN:MIN_DP:SRC	0/0:60:126:20:I
-chr20	1472	.	T	G,<*>	42.344	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:42:20:I:7,13,.:0.65,.:50,0,47,.,.,.
+chr20	1472	.	T	G,<*>	42.344	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:42:20:I:7,13,.:0.65,.:50,0,47,.,.,.:45,46,.
 chr20	1473	.	C	<*>	60	.	END=1555	GT:GQ:LEN:MIN_DP:SRC	0/0:60:83:20:I
 chr20	1556	.	C	<*>	49.599	.	END=1557	GT:GQ:LEN:MIN_DP:SRC	0/0:50:2:20:I
 chr20	1558	.	C	<*>	60	.	END=1580	GT:GQ:LEN:MIN_DP:SRC	0/0:60:23:20:I
@@ -29,10 +30,10 @@ chr20	1625	.	A	<*>	54.052	.	END=1625	GT:GQ:LEN:MIN_DP:SRC	0/0:54:1:20:I
 chr20	1626	.	G	<*>	60	.	END=1763	GT:GQ:LEN:MIN_DP:SRC	0/0:60:138:20:I
 chr20	1764	.	C	<*>	60	.	END=1930	GT:GQ:LEN:MIN_DP:SRC	0/0:60:167:19:I
 chr20	1931	.	T	<*>	60	.	END=1958	GT:GQ:LEN:MIN_DP:SRC	0/0:60:28:19:I
-chr20	1959	.	T	G,<*>	44.065	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:44:19:I:6,12,.:0.63,.:52,0,49,.,.,.
+chr20	1959	.	T	G,<*>	44.065	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:44:19:I:6,12,.:0.63,.:52,0,49,.,.,.:45,50,.
 chr20	1960	.	T	<*>	60	.	END=2101	GT:GQ:LEN:MIN_DP:SRC	0/0:60:142:19:I
-chr20	2102	.	A	G,<*>	43.662	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:44:19:I:5,11,.:0.58,.:46,0,51,.,.,.
+chr20	2102	.	A	G,<*>	43.662	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:44:19:I:5,11,.:0.58,.:46,0,51,.,.,.:49,45,.
 chr20	2103	.	A	<*>	60	.	END=2125	GT:GQ:LEN:MIN_DP:SRC	0/0:60:23:19:I
-chr20	2126	.	C	G,<*>	39.763	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:40:19:I:7,10,.:0.53,.:45,0,42,.,.,.
+chr20	2126	.	C	G,<*>	39.763	PASS	.	GT:GQ:DP:SRC:AD:VAF:PL	0/1:40:19:I:7,10,.:0.53,.:45,0,42,.,.,.:42,44,.
 chr20	2127	.	C	<*>	60	.	END=2144	GT:GQ:LEN:MIN_DP:SRC	0/0:60:18:19:I
 chr20	2145	.	T	<*>	60	.	END=2145	GT:GQ:LEN:MIN_DP:SRC	0/0:60:1:19:I

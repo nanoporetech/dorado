@@ -1910,6 +1910,27 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         return dorado::utils::print_container_as_string(pl_values, ",", false);
     };
 
+    const auto get_placeholder_AQ = [&alts, &genotype]() {
+        constexpr int32_t AQ_placeholder = static_cast<int32_t>(dorado::secondary::VCF_MAX_GQ_CAP);
+
+        std::vector<int32_t> aq_values(std::size(alts) + 1, 0);
+        size_t idx = static_cast<int32_t>(genotype.first - '0');
+        if (idx >= std::size(aq_values)) {
+            throw std::runtime_error{
+                    "[get_placeholder_AQ] genotype0=" + std::string(&genotype.first, 1) +
+                    " out of range for " + std::to_string(std::size(alts) + 1) + " alleles"};
+        }
+        aq_values[idx] = AQ_placeholder;
+        idx = static_cast<int32_t>(genotype.second - '0');
+        if (idx >= std::size(aq_values)) {
+            throw std::runtime_error{
+                    "[get_placeholder_AQ] genotype1=" + std::string(&genotype.second, 1) +
+                    " out of range for " + std::to_string(std::size(alts) + 1) + " alleles"};
+        }
+        aq_values[idx] = AQ_placeholder;
+        return dorado::utils::print_container_as_string(aq_values, ",", false);
+    };
+
     if (var.is_multi_allele) {
         std::string alt0 = var.alt_allele_seq0;
         std::string alt1 = var.alt_allele_seq1;
@@ -2002,6 +2023,10 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         const std::string pl_str = get_placeholder_PL(ret);
         if (!std::empty(pl_str)) {
             ret.format["PL"] = pl_str;
+        }
+        const std::string aq_str = get_placeholder_AQ();
+        if (!std::empty(aq_str)) {
+            ret.format["AQ"] = aq_str;
         }
     }
 
