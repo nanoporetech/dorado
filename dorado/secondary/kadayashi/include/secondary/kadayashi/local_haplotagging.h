@@ -377,6 +377,9 @@ struct MedakaFeatureMatrixOptions {
  * @brief Given access to aligned reads, a query interval and
  * optionally a set of desirable read haptags, return a read pileup matrix
  * of the scheme of `dorado::secondary::ReadAlignmentData`.
+ * The returned major positions contain only reference positions covered by
+ * reads retained in the output lanes. Consequently, `positions_major` may
+ * contain discontinuities.
  *
  * @par Thread safety
  * Bam file.
@@ -402,6 +405,9 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
  * Given access to aligned reads, a query interval and
  * optionally a set of desirable read haptags, return a read pileup matrix
  * of the scheme of `dorado::secondary::ReadAlignmentData`.
+ * The returned major positions contain only reference positions covered by
+ * reads retained in the output lanes. Consequently, `positions_major` may
+ * contain discontinuities.
  *
  * @par Thread safety
  * Bam file.

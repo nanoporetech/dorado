@@ -3573,12 +3573,10 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
         }
     }
 
-    // figure out what columns need expansion, and the total size of column expansion
+    // figure out which columns need expansion
     std::vector<medaka_feature_matrix_expansion_entry_t> expansions;
-    uint32_t tot_expansion = 0;
     for (const auto &[pos, var_len] : gck.all_ins) {
         expansions.push_back({.pos = pos, .len = var_len});
-        tot_expansion += var_len;
     }
     std::sort(expansions.begin(), expansions.end(),
               [](const medaka_feature_matrix_expansion_entry_t &a,
@@ -3594,12 +3592,18 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
     std::vector<uint32_t> read2matrix_start_pos(gck.all_reads.size(), 0);
     std::vector<std::string> left_qnames;
     std::vector<std::string> right_qnames;
+    uint32_t covered_major_count = 0;
+    uint32_t covered_expansion = 0;
+    // Index in feature matrix of major position; -1 means uncovered.
+    std::vector<int32_t> position_to_matrix_index(itvl_end - itvl_start, -1);
+
     {
         const int lane_cap = std::min<int>(100, options.max_reads);
         int laneID = 0;
         std::vector<medaka_feature_matrix_lane_tracker_t> lane_lookup;
-        std::unordered_map<uint32_t, std::string> tmp_lane2rightqn;
 
+        // For each read, determine which lane (if any) it will be inserted in
+        // and the start/end coordinates of the inserted segment
         for (size_t i = 0; i < gck.all_reads.size(); i++) {
             const read_t &read = gck.all_reads[i];
 
@@ -3619,16 +3623,12 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
             if (need_new_lane) {
                 if (static_cast<int>(std::size(lane_lookup)) < lane_cap) {
-                    read_laneID = laneID++;
+                    read_laneID = laneID;
+                    ++laneID;
                     read2matrix_start_pos[i] = read.start_pos;
                     lane_lookup.push_back(medaka_feature_matrix_lane_tracker_t{
                             .laneID = read_laneID,
                             .last_pos = read.end_pos + DORADO_FEATURE_MAT_READ_SENTINAL_LEN});
-                    if (read.start_pos <= itvl_start) {
-                        left_qnames.push_back(gck.readID2qn[i]);
-                    } else {
-                        left_qnames.push_back("");
-                    }
                 } else if (!options.disable_read_packing) {
                     auto lane_it =
                             std::min_element(std::begin(lane_lookup), std::end(lane_lookup),
@@ -3647,39 +3647,87 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                     continue;
                 }
             }
-
-            if (read.end_pos >= itvl_end) {  // `>` is wrong because end_pos was capped at itvl_end.
-                tmp_lane2rightqn[read_laneID] = gck.readID2qn[i];
-            }
         }
         n_lanes = static_cast<int>(std::size(lane_lookup));
-
-        // (consolidate qnames on the right)
-        for (int i_lane = 0; i_lane < n_lanes; i_lane++) {
-            right_qnames.push_back(tmp_lane2rightqn[i_lane]);  // the [] here is fine as
-                                                               // we do want an empty string when
-                                                               // there's no known read that
-                                                               // overlaps with the right edge.
-        }
         DORADO_LOG(trace, "[kdys::{}] {}:{}-{} has {} lanes (subject to capping)", __func__,
                    refname, itvl_start, itvl_end, n_lanes);
-    }
 
-    // Give placeholder names 1-index to empty entries in left and right qnames
-    // because of medaka convention.
-    for (uint32_t i = 0, j = 1; i < left_qnames.size(); i++) {
-        if (left_qnames[i].empty()) {
-            left_qnames[i] = "__blank_" + std::to_string(j++);
+        // Determine coverage from reads that were actually retained in a lane. Reads which were
+        // filtered or could not be assigned to a lane must not create output columns.
+        std::vector<bool> covered(itvl_end - itvl_start, false);
+        uint32_t covered_start = itvl_end;
+        uint32_t covered_end = itvl_start;
+        for (size_t i = 0; i < gck.all_reads.size(); ++i) {
+            if (read2lane[i] < 0) {
+                continue;
+            }
+            covered_start = std::min(covered_start, read2matrix_start_pos[i]);
+            covered_end = std::max(covered_end, gck.all_reads[i].end_pos);
+            for (uint32_t pos = read2matrix_start_pos[i]; pos < gck.all_reads[i].end_pos; ++pos) {
+                covered[pos - itvl_start] = true;
+            }
+        }
+
+        // Discard expansions at positions where no reads will appear in the final matrix, e.g.
+        // when a read is excluded due to exceeding max depth.
+        expansions.erase(
+                std::remove_if(std::begin(expansions), std::end(expansions),
+                               [&](const auto &exp) { return !covered[exp.pos - itvl_start]; }),
+                std::end(expansions));
+
+        // Create major position to index mappings excluding positions that will not appear
+        // in the final matrix.
+        // Also count the numbers of major and minor positions that will appear.
+        auto it_expansions = std::begin(expansions);
+        for (uint32_t pos = itvl_start; pos < itvl_end; ++pos) {
+            if (!covered[pos - itvl_start]) {
+                continue;
+            }
+            position_to_matrix_index[pos - itvl_start] = covered_major_count + covered_expansion;
+            ++covered_major_count;
+            while ((it_expansions != std::end(expansions)) && (it_expansions->pos < pos)) {
+                ++it_expansions;
+            }
+            if ((it_expansions != std::end(expansions)) && (it_expansions->pos == pos)) {
+                covered_expansion += it_expansions->len;
+            }
+        }
+
+        // Construct left and right qname arrays
+        // Give placeholder names 1-index to empty entries in left and right qnames
+        // because of medaka convention.
+        {
+            left_qnames.assign(n_lanes, "");
+            right_qnames.assign(n_lanes, "");
+            for (size_t i = 0; i < gck.all_reads.size(); ++i) {
+                if (read2lane[i] < 0) {
+                    continue;
+                }
+                const read_t &read = gck.all_reads[i];
+                const int lane = read2lane[i];
+                if ((read2matrix_start_pos[i] <= covered_start) && std::empty(left_qnames[lane])) {
+                    left_qnames[lane] = gck.readID2qn[i];
+                }
+                if ((read.end_pos >= covered_end) && std::empty(right_qnames[lane])) {
+                    right_qnames[lane] = gck.readID2qn[i];
+                }
+            }
+
+            for (uint32_t i = 0, j = 1; i < left_qnames.size(); i++) {
+                if (left_qnames[i].empty()) {
+                    left_qnames[i] = "__blank_" + std::to_string(j++);
+                }
+            }
+            for (uint32_t i = 0, j = 1; i < right_qnames.size(); i++) {
+                if (right_qnames[i].empty()) {
+                    right_qnames[i] = "__blank_" + std::to_string(j++);
+                }
+            }
         }
     }
-    for (uint32_t i = 0, j = 1; i < right_qnames.size(); i++) {
-        if (right_qnames[i].empty()) {
-            right_qnames[i] = "__blank_" + std::to_string(j++);
-        }
-    }
 
-    // Allocate the matrix and major & minor positions.
-    uint32_t n_pos = tot_expansion + itvl_end - itvl_start;
+    // Allocate the matrix and major & minor positions once at the compact size.
+    const uint32_t n_pos = covered_expansion + covered_major_count;
     MedakaFeatureMatrix ret(n_pos, n_lanes, n_pos, n_lanes, gck.n_features - 4,
                             0);  // medaka impl also hardcodes the last parameter to 0
     ret.read_ids_left = std::move(left_qnames);
@@ -3689,60 +3737,38 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
     std::vector<int64_t> &majors = ret.major;
     std::vector<int64_t> &minors = ret.minor;
     if constexpr (WUT_VERBOSE) {
-        DORADO_LOG(
-                debug,
-                "[wut] alloc: n_pos={} (tot_exp={}) n_reads={} n_lanes(clampped)={} n_feature={}; "
-                "mat and "
-                "poss sizes: {} {} {}\n",
-                n_pos, tot_expansion, gck.all_reads.size(), n_lanes, gck.n_features, matrix.size(),
-                majors.size(), minors.size());
+        DORADO_LOG(debug,
+                   "[wut] alloc: n_pos={} (covered_exp={}) n_reads={} n_lanes(clamped)={} "
+                   "n_feature={}; mat and pos sizes: {} {} {}\n",
+                   n_pos, covered_expansion, gck.all_reads.size(), n_lanes, gck.n_features,
+                   matrix.size(), majors.size(), minors.size());
     }
 
-    // fill major and minor positions
+    // Fill coordinates for covered major positions and their insertion columns.
     {
-        uint32_t pos = itvl_start;
-        uint32_t i = 0;
-
-        // start ~ first expansion
-        {
-            uint32_t pos_right = expansions.empty() ? itvl_end : expansions[0].pos;
-            uint32_t tmp_pad = expansions.empty() ? 0 : 1;
-            while (pos < pos_right + tmp_pad) {
-                majors[i] = pos;
-                minors[i] = 0;
-                i++;
-                pos++;
+        auto it_expansions = std::begin(expansions);
+        uint32_t coordinate_index = 0;
+        for (uint32_t pos = itvl_start; pos < itvl_end; ++pos) {
+            if (position_to_matrix_index[pos - itvl_start] < 0) {
+                continue;
             }
-            if (tmp_pad > 0) {
-                pos--;
+            assert(position_to_matrix_index[pos - itvl_start] ==
+                   static_cast<int32_t>(coordinate_index));
+            majors[coordinate_index] = pos;
+            minors[coordinate_index] = 0;
+            ++coordinate_index;
+            while ((it_expansions != std::end(expansions)) && (it_expansions->pos < pos)) {
+                ++it_expansions;
             }
-        }
-
-        // from the first expansion
-        for (uint32_t j = 0; j < expansions.size(); j++) {
-            const medaka_feature_matrix_expansion_entry_t &exp = expansions[j];
-
-            // in the expansion (the minor cols)
-            for (uint32_t k = 1; k <= exp.len; k++) {
-                minors[i] = k;
-                majors[i] = pos;
-                i++;
-            }
-            pos++;
-
-            // after the expansion
-            uint32_t pos_right = (j + 1 >= expansions.size()) ? itvl_end : expansions[j + 1].pos;
-            uint32_t tmp_pad = (j + 1 >= expansions.size()) ? 0 : 1;
-            while (pos < pos_right + tmp_pad) {
-                majors[i] = pos;
-                minors[i] = 0;
-                i++;
-                pos++;
-            }
-            if (tmp_pad > 0) {
-                pos--;
+            if ((it_expansions != std::end(expansions)) && (it_expansions->pos == pos)) {
+                for (uint32_t k = 1; k <= it_expansions->len; ++k) {
+                    majors[coordinate_index] = pos;
+                    minors[coordinate_index] = k;
+                    ++coordinate_index;
+                }
             }
         }
+        assert(coordinate_index == std::size(majors));
     }
 
     // fill the feature matrix.
@@ -3769,25 +3795,40 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
         const read_t &read = gck.all_reads[i_read];
 
-        // count expanded columns prior to the read's start position
-        uint32_t offset = read.start_pos - itvl_start;
-        for (const medaka_feature_matrix_expansion_entry_t &exp : expansions) {
-            if (exp.pos >= read.start_pos) {
-                break;
-            }
-            offset += exp.len;
+        // get the start position of the read segment to be inserted in matrix column coordinates
+        const int32_t mapped_start =
+                position_to_matrix_index[read2matrix_start_pos[i_read] - itvl_start];
+        if (mapped_start < 0) {
+            DORADO_LOG(error,
+                       "[kdys::{}] r {} start position ({}) has no index mapping in matrix space",
+                       __func__, gck.readID2qn[i_read], read2matrix_start_pos[i_read]);
+            continue;
         }
+        uint32_t offset = static_cast<uint32_t>(mapped_start);
         if constexpr (WUT_VERBOSE) {
             DORADO_LOG(debug, "[wut][r {}] start {} , offset {}, offset-start {}\n",
-                       gck.readID2qn[i_read], read.start_pos, offset, majors[offset]);
+                       gck.readID2qn[i_read], read2matrix_start_pos[i_read], offset,
+                       majors[offset]);
         }
         const uint32_t offset0 = offset;
 
+        // Track the reference position and an index to the start of the portion
+        // of the query sequence to be inserted.
+        // We will iterate through the read and increment pos and j_read until we hit
+        // the first position to be inserted.
+        // Data will only be inserted to `expanded_read` after this.
+        uint32_t pos = 0;
+        uint32_t j_read = 0;
         // fill expanded_read
         // (from start to the first variant)
         {
-            const uint32_t pos_right = read.vars.empty() ? read.end_pos : read.vars[0].pos;
-            for (uint32_t pos = read.start_pos; pos < pos_right; pos++) {
+            const uint32_t pos_right = std::empty(read.vars) ? read.end_pos : read.vars[0].pos;
+            for (pos = read.start_pos; pos < pos_right; ++pos) {
+                if (pos < read2matrix_start_pos[i_read]) {
+                    ++j_read;
+                    continue;
+                }
+                assert(position_to_matrix_index[pos - itvl_start] == static_cast<int32_t>(offset));
                 expanded_read[offset] = 6;
                 offset++;
                 while (offset < minors.size() && minors[offset] != 0) {
@@ -3797,44 +3838,49 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
             }
         }
         // (for each variant and matches after it)
-        for (uint32_t i_var = 0; i_var < read.vars.size();) {
+        for (uint32_t i_var = 0; i_var < read.vars.size(); ++i_var) {
             const qa_t &var = read.vars[i_var];
-            uint32_t i_var_incre = 0;
 
             // the variant
             if (var.allele.back() == VAR_OP_X) {
-                if constexpr (WUT_VERBOSE) {
-                    DORADO_LOG(debug, "[wut][r {}] pushing X: pos {} offset {} val {}\n",
-                               gck.readID2qn[i_read], var.pos, offset, var.allele[0] + 1);
-                }
-                expanded_read[offset] = var.allele[0] + 1;
-                offset++;
-                i_var_incre = 1;
+                if (pos < read2matrix_start_pos[i_read]) {
+                    ++j_read;
+                } else {
+                    if constexpr (WUT_VERBOSE) {
+                        DORADO_LOG(debug, "[wut][r {}] pushing X: pos {} offset {} val {}\n",
+                                   gck.readID2qn[i_read], var.pos, offset, var.allele[0] + 1);
+                    }
+                    assert(position_to_matrix_index[pos - itvl_start] ==
+                           static_cast<int32_t>(offset));
+                    expanded_read[offset] = var.allele[0] + 1;
+                    offset++;
 
-                // if next is col expansion and self doesn't have insertion at
-                // the same position, fastforward
-                if (i_var + 1 >= read.vars.size()) {
-                    while (offset < minors.size() && minors[offset] != 0) {
-                        expanded_read[offset] = 5;
-                        offset++;
-                    }
-                } else if (i_var + 1 < read.vars.size() &&
-                           !((read.vars[i_var + 1].allele.back() == VAR_OP_I) &&
-                             (read.vars[i_var + 1].pos == var.pos))) {
-                    while (offset < minors.size() && minors[offset] != 0) {
-                        expanded_read[offset] = 5;
-                        offset++;
+                    // if next is col expansion and self doesn't have insertion at
+                    // the same position, fastforward
+                    if (((i_var + 1) >= read.vars.size()) ||
+                        !((read.vars[i_var + 1].allele.back() == VAR_OP_I) &&
+                          (read.vars[i_var + 1].pos == var.pos))) {
+                        while ((offset < minors.size()) && (minors[offset] != 0)) {
+                            expanded_read[offset] = 5;
+                            offset++;
+                        }
                     }
                 }
+                ++pos;
             } else if (var.allele.back() == VAR_OP_D) {
                 if constexpr (WUT_VERBOSE) {
                     DORADO_LOG(debug, "[wut][r {}] pushing DEL: pos {} offset {} len {}\n",
                                gck.readID2qn[i_read], var.pos, offset, get_qa_t_allele_len(var));
                 }
-                for (uint32_t i = 0; i < get_qa_t_allele_len(var); i++) {
+                for (uint32_t i = 0; i < get_qa_t_allele_len(var); ++i, ++pos) {
+                    if (pos < read2matrix_start_pos[i_read]) {
+                        continue;
+                    }
                     if (offset >= expanded_read.size()) {
                         break;
                     }
+                    assert(position_to_matrix_index[pos - itvl_start] ==
+                           static_cast<int32_t>(offset));
                     expanded_read[offset] = 5;
                     offset++;
                     // if next is col expansion and self doesn't have insertion at
@@ -3853,7 +3899,6 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                         }
                     }
                 }
-                i_var_incre = 1;
             } else if (var.allele.back() == VAR_OP_I) {
                 // fill in the ref base first , then the right-aligned insertion w/ col exp
                 if constexpr (WUT_VERBOSE) {
@@ -3879,53 +3924,61 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                         skip_ref_base_before_ins = true;
                     }
                 }
-                if (skip_ref_base_before_ins) {
-                    if constexpr (WUT_VERBOSE) {
-                        DORADO_LOG(
-                                debug,
-                                "[wut][r {}] pushing INS(1) first: skipped ref base at offset {} "
-                                "(major pos {}; prev cigar {}; prev pos {}; prev var len {})\n",
-                                gck.readID2qn[i_read], offset, majors[offset], prev_cigar, prev_pos,
-                                prev_len);
-                    }
+                if (pos < read2matrix_start_pos[i_read]) {
+                    j_read += get_qa_t_allele_len(var) + (skip_ref_base_before_ins ? 0 : 1);
                 } else {
-                    if constexpr (WUT_VERBOSE) {
-                        DORADO_LOG(debug,
-                                   "[wut][r {}] pushing INS(1) first: filled ref base at offset {} "
-                                   "(major pos {})\n",
-                                   gck.readID2qn[i_read], offset, majors[offset]);
+                    if (skip_ref_base_before_ins) {
+                        if constexpr (WUT_VERBOSE) {
+                            DORADO_LOG(
+                                    debug,
+                                    "[wut][r {}] pushing INS(1) first: skipped ref base at offset "
+                                    "{} (major pos {}; prev cigar {}; prev pos {}; prev var len "
+                                    "{})\n",
+                                    gck.readID2qn[i_read], offset, majors[offset], prev_cigar,
+                                    prev_pos, prev_len);
+                        }
+                    } else {
+                        if constexpr (WUT_VERBOSE) {
+                            DORADO_LOG(
+                                    debug,
+                                    "[wut][r {}] pushing INS(1) first: filled ref base at offset "
+                                    "{} (major pos {})\n",
+                                    gck.readID2qn[i_read], offset, majors[offset]);
+                        }
+                        if (offset < majors.size()) {
+                            assert(position_to_matrix_index[pos - itvl_start] ==
+                                   static_cast<int32_t>(offset));
+                            expanded_read[offset] = 6;
+                            offset++;
+                        }
                     }
-                    if (offset < majors.size()) {
-                        expanded_read[offset] = 6;
-                        offset++;
-                    }
-                }
-                // (no need to touch i_var_incre)
 
-                // (insertion bases, right-align)
-                const uint32_t exp_size = gck.all_ins[read.vars[i_var].pos];
-                if (options.right_align_insertions) {
-                    const uint32_t space_size = exp_size - (get_qa_t_allele_len(var));
-                    for (uint32_t i = 0; i < space_size && offset < majors.size(); i++, offset++) {
-                        expanded_read[offset] = 5;
-                    }
-                    for (uint32_t i = space_size, j = 0; i < exp_size && offset < majors.size();
-                         i++, j++) {
-                        expanded_read[offset] = var.allele[j] + 1;
-                        offset++;
-                    }
-                } else {  // left-align
-                    const uint32_t var_size = get_qa_t_allele_len(var);
-                    for (uint32_t i = 0, j = 0; i < var_size && offset < majors.size();
-                         i++, j++, offset++) {
-                        expanded_read[offset] = var.allele[j] + 1;
-                    }
-                    for (uint32_t i = var_size; i < exp_size && offset < majors.size();
-                         i++, offset++) {
-                        expanded_read[offset] = 5;
+                    // (insertion bases, right-align)
+                    const uint32_t exp_size = gck.all_ins[read.vars[i_var].pos];
+                    if (options.right_align_insertions) {
+                        const uint32_t space_size = exp_size - (get_qa_t_allele_len(var));
+                        for (uint32_t i = 0; (i < space_size) && (offset < majors.size());
+                             i++, offset++) {
+                            expanded_read[offset] = 5;
+                        }
+                        for (uint32_t i = space_size, j = 0;
+                             (i < exp_size) && (offset < majors.size()); i++, j++) {
+                            expanded_read[offset] = var.allele[j] + 1;
+                            offset++;
+                        }
+                    } else {  // left-align
+                        const uint32_t var_size = get_qa_t_allele_len(var);
+                        for (uint32_t i = 0, j = 0; (i < var_size) && (offset < majors.size());
+                             i++, j++, offset++) {
+                            expanded_read[offset] = var.allele[j] + 1;
+                        }
+                        for (uint32_t i = var_size; (i < exp_size) && (offset < majors.size());
+                             i++, offset++) {
+                            expanded_read[offset] = 5;
+                        }
                     }
                 }
-                i_var_incre = 1;
+                pos += (skip_ref_base_before_ins ? 0 : 1);
             } else {
                 DORADO_LOG(error, "[kdys::{}] r {} has unknown cigar (op {} var pos {})", __func__,
                            gck.readID2qn[i_read], var.allele.back(), var.pos);
@@ -3933,9 +3986,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
             // the matches after it
             if (offset < majors.size()) {
-                const uint32_t pos_right = i_var + i_var_incre >= read.vars.size()
-                                                   ? read.end_pos
-                                                   : read.vars[i_var + i_var_incre].pos;
+                const uint32_t pos_right =
+                        (i_var + 1) >= read.vars.size() ? read.end_pos : read.vars[i_var + 1].pos;
                 if constexpr (WUT_VERBOSE) {
                     DORADO_LOG(
                             debug,
@@ -3944,7 +3996,11 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                             gck.readID2qn[i_read], majors[offset], pos_right, read.end_pos,
                             itvl_end);
                 }
-                for (uint32_t pos = majors[offset]; pos < pos_right; pos++) {
+                for (; pos < pos_right; ++pos) {
+                    if (pos < read2matrix_start_pos[i_read]) {
+                        ++j_read;
+                        continue;
+                    }
                     if constexpr (WUT_VERBOSE) {
                         DORADO_LOG(debug,
                                    "[wut][r {}] push match (offset {} pos {}) (ref base should be "
@@ -3952,6 +4008,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                                    gck.readID2qn[i_read], offset, majors[offset],
                                    "0ACGT-"[gck.refseq_substring[pos - itvl_start]]);
                     }
+                    assert(position_to_matrix_index[pos - itvl_start] ==
+                           static_cast<int32_t>(offset));
                     expanded_read[offset] = 6;
                     offset++;
                     while (offset < minors.size() && minors[offset] != 0) {
@@ -3960,43 +4018,31 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                     }
                 }
             }
-
-            // step forward
-            i_var += i_var_incre;
         }
 
         // We have collected the expanded read.
         // Fill the base quals and dwells.
         const std::vector<uint8_t> &quals = gck.all_reads_quals[i_read];
         const std::vector<int8_t> &dwells = gck.all_dwells[i_read];
-        for (uint32_t i = offset0, j_qual = 0, j_dwell = 0;
-             i < offset && j_qual < quals.size() && j_dwell < dwells.size(); i++) {
+        for (uint32_t i = offset0;
+             (i < offset) && (j_read < quals.size()) && (j_read < dwells.size()); i++) {
             if (expanded_read[i] != 0 && expanded_read[i] != 5) {
-                expanded_read_quals[i] = quals[j_qual];
-                expanded_read_dwells[i] = dwells[j_dwell];
-                j_qual++;
-                j_dwell++;
+                expanded_read_quals[i] = quals[j_read];
+                expanded_read_dwells[i] = dwells[j_read];
+                ++j_read;
             } else {
                 expanded_read_quals[i] = -1;
                 expanded_read_dwells[i] = -1;
             }
         }
 
-        // Copy over to the matrix. Implicit transposition.
-        uint32_t insert_offset0 = offset0;
-        if (read2matrix_start_pos[i_read] > read.start_pos) {
-            insert_offset0 = read2matrix_start_pos[i_read] - itvl_start;
-            for (const medaka_feature_matrix_expansion_entry_t &exp : expansions) {
-                if (exp.pos >= read2matrix_start_pos[i_read]) {
-                    break;
-                }
-                insert_offset0 += exp.len;
-            }
-        }
+        assert(majors[offset0] == static_cast<int64_t>(read2matrix_start_pos[i_read]));
+        assert(pos == static_cast<int64_t>(read.end_pos));
 
-        gen_medaka_feature_matrix_insert_to_matrix(ret, qname2hp, gck, i_read, laneID,
-                                                   insert_offset0, offset, expanded_read,
-                                                   expanded_read_quals, expanded_read_dwells);
+        // Copy over to the matrix. Implicit transposition.
+        gen_medaka_feature_matrix_insert_to_matrix(ret, qname2hp, gck, i_read, laneID, offset0,
+                                                   offset, expanded_read, expanded_read_quals,
+                                                   expanded_read_dwells);
 
         // cleanup buffers
         std::fill(expanded_read.begin() + offset0, expanded_read.begin() + offset, 0);
