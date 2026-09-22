@@ -3575,8 +3575,10 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
     // figure out which columns need expansion
     std::vector<medaka_feature_matrix_expansion_entry_t> expansions;
+    expansions.reserve(std::size(gck.all_ins));
     for (const auto &[pos, var_len] : gck.all_ins) {
-        expansions.push_back({.pos = pos, .len = var_len});
+        expansions.emplace_back(
+                medaka_feature_matrix_expansion_entry_t{.pos = pos, .len = var_len});
     }
     std::sort(expansions.begin(), expansions.end(),
               [](const medaka_feature_matrix_expansion_entry_t &a,
