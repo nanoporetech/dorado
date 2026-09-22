@@ -95,6 +95,7 @@ struct Options {
     bool any_bam = false;
     bool ambig_ref = false;
     float pass_min_qual = 3.0f;
+    std::string sample_name;
 
     secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
     std::optional<std::filesystem::path> phasing_bin_path;
@@ -277,6 +278,9 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
                 .default_value("");
+        parser.add_argument("--sample-name")
+                .help("Set sample name in VCF.")
+                .default_value(secondary::VCF_DEFAULT_SAMPLE);
     }
     {
         parser.add_group("Phasing options");
@@ -530,7 +534,9 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
                                    : std::nullopt;
     opt.min_mapq = parser.present<int32_t>("min-mapq");
     opt.ambig_ref = parser.get<bool>("ambig-ref");
-
+    opt.sample_name =
+            (parser.is_used("--sample-name") ? parser.get<std::string>("sample-name")
+                                             : std::string(secondary::VCF_DEFAULT_SAMPLE));
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
     opt.candidate_variants_path = parser.present<std::string>("candidates");
@@ -669,6 +675,11 @@ void validate_options(const Options& opt) {
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
         DORADO_LOG(error, "Candidate site file '{}' does not exist.",
                    opt.candidate_variants_path->string());
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (std::empty(opt.sample_name)) {
+        DORADO_LOG(error, "The --sample-name option was specified but no name was provided.");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -1245,7 +1256,7 @@ void run_variant_calling(const Options& opt,
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer = std::make_unique<secondary::VCFWriter>(
             out_vcf_fn, vcf_filters, draft_lens, opt.out_format == VariantCallingFormatEnum::GVCF,
-            command_line);
+            opt.sample_name, command_line);
 
     // Optionally write Kadayashi variants.
     std::optional<secondary::VCFWriter> vcf_writer_kadayashi;
@@ -1254,13 +1265,13 @@ void run_variant_calling(const Options& opt,
         const std::string out_vcf_kadayashi_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf").string();
         vcf_writer_kadayashi.emplace(out_vcf_kadayashi_fn, vcf_filters, draft_lens, false,
-                                     command_line);
+                                     opt.sample_name, command_line);
 
         const std::string out_vcf_inference_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf").string();
         vcf_writer_inference.emplace(out_vcf_inference_fn, vcf_filters, draft_lens,
                                      opt.out_format == VariantCallingFormatEnum::GVCF,
-                                     command_line);
+                                     opt.sample_name, command_line);
     }
 
     // Compute the minimum usable memory across all devices and use that as the batch size.

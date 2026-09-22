@@ -110,6 +110,7 @@ struct Options {
     bool continue_on_error = false;
     bool legacy_feature_gen = true;
     const secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::UNPHASED;
+    std::string sample_name;
 };
 
 /// \brief Define the CLI options.
@@ -232,6 +233,9 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Set quality filter for PASS variants.")
                 .default_value(3.0f)
                 .scan<'g', float>();
+        parser.add_argument("--sample-name")
+                .help("Set sample name in VCF.")
+                .default_value(secondary::VCF_DEFAULT_SAMPLE);
         parser.add_argument("--model-override")
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
@@ -382,6 +386,10 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
 
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
+    opt.sample_name =
+            (parser.is_used("--sample-name") ? parser.get<std::string>("sample-name")
+                                             : std::string(secondary::VCF_DEFAULT_SAMPLE));
+
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
         opt.write_consensus = true;
@@ -455,6 +463,11 @@ void validate_options(const Options& opt) {
         DORADO_LOG(error,
                    "Model override file path '{}' is specified, but the file does not exist.",
                    opt.model_str);
+        std::exit(EXIT_FAILURE);
+    }
+
+    if (std::empty(opt.sample_name)) {
+        DORADO_LOG(error, "The --sample-name option was specified but no name was provided.");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -927,7 +940,7 @@ void run_polishing(const Options& opt,
 
         vcf_writer = std::make_unique<secondary::VCFWriter>(out_vcf_fn, filters, draft_lens,
                                                             opt.vc_type == VariantCallingEnum::GVCF,
-                                                            command_line);
+                                                            opt.sample_name, command_line);
     }
 
     // Prepare regions for processing.

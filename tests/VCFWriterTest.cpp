@@ -150,7 +150,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         // Write data to a file.
         {
             const std::string command_line = "dorado smallvar reads.bam reference.fa --device cpu";
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, command_line);
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
+                             command_line);
             writer.write_variant(data.first_variant);
             writer.write_variant(data.second_variant);
             writer.write_variant(data.third_variant);
@@ -235,7 +236,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     // clang-format off
     CATCH_SECTION("writes gVCF header metadata when requested and tests that the writer sets the variant source FORMAT field to the missing value (\".\") when not provided") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, true, std::string_view{});
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, true, "SAMPLE", std::string_view{});
             writer.write_variant(data.first_variant);
 
             Variant no_call_variant{
@@ -278,7 +279,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             "preserves an explicit variant source FORMAT field instead of defaulting to the "
             "missing value") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
+                             std::string_view{});
             Variant variant = data.first_variant;
             variant.format = {
                     {"GT", "0/1"},
@@ -300,14 +302,16 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects filters missing from the header") {
-        VCFWriter writer(data.vcf_path, Filters::LowQual, data.contigs, false, std::string_view{});
+        VCFWriter writer(data.vcf_path, Filters::LowQual, data.contigs, false, "SAMPLE",
+                         std::string_view{});
 
         CATCH_CHECK_THROWS_WITH(writer.write_variant(data.third_variant),
                                 Catch::Matchers::ContainsSubstring("not found in header"));
     }
 
     CATCH_SECTION("write_variant rejects unexpected INFO fields") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
+                         std::string_view{});
         Variant variant = data.first_variant;
         variant.info = {{"PIZZA", "1"}};
 
@@ -316,7 +320,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects unexpected FORMAT fields") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
+                         std::string_view{});
         Variant variant = data.first_variant;
         variant.format = {{"GT", "0/1"}, {"PIZZA", "1"}};
 
@@ -326,7 +331,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant requires GT genotype information") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
+                         std::string_view{});
         Variant variant = data.first_variant;
         variant.format = {{"GQ", "45"}};
 
@@ -337,7 +343,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
     CATCH_SECTION("writes_variant skips empty string") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, std::string_view{});
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
+                             std::string_view{});
 
             Variant empty_list_variant{
                     .seq_id = 0,
@@ -360,6 +367,61 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
                                            "##FORMAT=<ID=AD,Number=R,Type=Integer"));
         CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
                                            "chr1\t10\t.\tA\tC\t60\tPASS\t.\tGT:GQ:SRC\t0/1:45:."));
+    }
+
+    CATCH_SECTION("sample name is set appropriately") {
+        // Write data to a file.
+        {
+            const std::string command_line = "dorado smallvar reads.bam reference.fa --device cpu";
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "TEST_HUMAN",
+                             command_line);
+            writer.write_variant(data.first_variant);
+            writer.write_variant(data.second_variant);
+            writer.write_variant(data.third_variant);
+        }
+
+        // Check that the VCF text file contains the important lines.
+        {
+            const std::string vcf_text = ReadFileIntoString(data.vcf_path);
+            CATCH_CHECK_THAT(
+                    vcf_text,
+                    Catch::Matchers::ContainsSubstring(
+                            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tTEST_HUMAN"));
+        }
+
+        // Parse the VCF with Htslib to check that it is valid.
+        {
+            HtsFilePtr vcf_file{hts_open(data.vcf_path.string().c_str(), "r")};
+            CATCH_REQUIRE(vcf_file);
+
+            BcfHdrPtr header{bcf_hdr_read(vcf_file.get()), BcfHdrDestructor{}};
+
+            CATCH_REQUIRE(header);
+            CATCH_CHECK(bcf_hdr_nsamples(header.get()) == 1);
+            CATCH_CHECK(std::string(header->samples[0]) == "TEST_HUMAN");
+            CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr1") == 0);
+            CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr2") == 1);
+
+            BcfRecordPtr first_record{bcf_init(), BcfRecordDestructor{}};
+            BcfRecordPtr second_record{bcf_init(), BcfRecordDestructor{}};
+            BcfRecordPtr third_record{bcf_init(), BcfRecordDestructor{}};
+
+            CATCH_REQUIRE(first_record);
+            CATCH_REQUIRE(second_record);
+            CATCH_REQUIRE(third_record);
+
+            CATCH_REQUIRE(bcf_read(vcf_file.get(), header.get(), first_record.get()) == 0);
+            check_record(header.get(), first_record.get(), data.first_variant, "chr1", {0, 1}, 45);
+
+            CATCH_REQUIRE(bcf_read(vcf_file.get(), header.get(), second_record.get()) == 0);
+            check_record(header.get(), second_record.get(), data.second_variant, "chr2", {1, 2},
+                         31);
+
+            CATCH_REQUIRE(bcf_read(vcf_file.get(), header.get(), third_record.get()) == 0);
+            check_record(header.get(), third_record.get(), data.third_variant, "chr2", {1}, 31);
+
+            CATCH_CHECK(bcf_read(vcf_file.get(), header.get(), third_record.get()) < 0);
+        }
     }
 }
 
