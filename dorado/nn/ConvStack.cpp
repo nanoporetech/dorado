@@ -190,24 +190,25 @@ ConvStackImpl::ConvLayer::ConvLayer(const config::ConvParams &conv_params) : par
 void ConvStackImpl::ConvLayer::reserve_working_memory(WorkingMemory &wm,
                                                       const AuxiliaryData *const aux) {
     assert(wm.layout == TensorLayout::NTC);
+    int N_out = wm.N;
     const int T_in = wm.T;
     int T_out = T_in / params.stride;
     const int C_in = wm.C;
     const int C_out = params.size;
     if (output_layout == TensorLayout::NTC && C_out > 16) {
-        wm.next_TC(T_out, params.winlen * C_in, TensorLayout::NTC);
+        wm.next_NTC(-1, T_out, params.winlen * C_in, TensorLayout::NTC);
     } else if (cutlass_conv) {
         if (aux) {
-            wm.next_N(aux->N());
+            N_out = aux->N();
             T_out = aux->T_lstm();
         }
     } else if (output_layout != TensorLayout::NTC) {
-        wm.next_TC(T_out, params.winlen * C_in, TensorLayout::TNC);
+        wm.next_NTC(-1, T_out, params.winlen * C_in, TensorLayout::TNC);
         if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
-            wm.next_TC(T_out, C_out, TensorLayout::TNC);
+            wm.next_NTC(-1, T_out, C_out, TensorLayout::TNC);
         }
     }
-    wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
+    wm.next_NTC(N_out, T_out + 2 * output_T_padding, C_out, output_layout);
 }
 
 void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
@@ -237,7 +238,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *c
 
     if (output_layout == TensorLayout::NTC && C_out <= 16) {
         utils::ScopedProfileRange spr2("small conv", 3);
-        auto out = wm.next_TC(T_out + 2 * output_T_padding, C_out, output_layout);
+        auto out = wm.next_NTC(-1, T_out + 2 * output_T_padding, C_out, output_layout);
         out = out.narrow(1, output_T_padding, T_out);
         if (host_convolution_f16(stream, wm.N, C_in, C_out, T_in, params.winlen, params.stride,
                                  params.winlen / 2, int(out.stride(0)), in.data_ptr(),
@@ -268,12 +269,11 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *c
         at::Tensor out_ntc;
         void *out_layout = nullptr;
         if (aux) {
-            wm.next_N(aux->N());
-            wm.next_TC(aux->T_lstm(), C_out, output_layout);
+            wm.next_NTC(aux->N(), aux->T_lstm(), C_out, output_layout);
             out_ntc = wm.current.narrow(0, 1, wm.T + 1);
             out_layout = aux->device_in_layout.data_ptr();
         } else {
-            wm.next_TC(T_out, C_out, output_layout);
+            wm.next_NTC(-1, T_out, C_out, output_layout);
             out_ntc = wm.get_current_NTC_view();
         }
         const bool try_fast_conv = utils::get_dev_opt<bool>("koi_conv", true);
@@ -326,7 +326,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *c
         // The window tensor is either NTC or TNC, depending on whether the first two
         // dimensions of the output layout are NT or TN.
         bool is_NT = (output_layout == TensorLayout::NTC);
-        wm.next_TC(T_out, params.winlen * C_in, is_NT ? TensorLayout::NTC : TensorLayout::TNC);
+        wm.next_NTC(-1, T_out, params.winlen * C_in, is_NT ? TensorLayout::NTC : TensorLayout::TNC);
         auto window_mat = wm.get_current_NTC_view();
         auto res = host_window_ntwc_f16(stream, wm.N, T_in, C_in, params.winlen, params.stride,
                                         int(window_mat.stride(0)), int(window_mat.stride(1)),
@@ -340,11 +340,11 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *c
         auto mm_in = wm.current.flatten(0, 1);
         at::Tensor mm_out;
         if (output_layout == TensorLayout::NTC) {
-            mm_out = wm.next_TC(T_out, C_out, output_layout);
+            mm_out = wm.next_NTC(-1, T_out, C_out, output_layout);
         } else if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
-            mm_out = wm.next_TC(T_out, C_out, TensorLayout::TNC);
+            mm_out = wm.next_NTC(-1, T_out, C_out, TensorLayout::TNC);
         } else {
-            wm.next_TC(T_out, C_out, output_layout);
+            wm.next_NTC(-1, T_out, C_out, output_layout);
             mm_out = wm.get_current_NTC_view().transpose(0, 1);
         }
 
@@ -362,7 +362,7 @@ void ConvStackImpl::ConvLayer::run_koi(WorkingMemory &wm, const AuxiliaryData *c
         }
 
         if (output_layout == TensorLayout::CUTLASS_TNC_I8) {
-            wm.next_TC(T_out, C_out, output_layout);
+            wm.next_NTC(-1, T_out, C_out, output_layout);
             auto conv_out = wm.get_current_NTC_view().transpose(0, 1).view({-1, C_out});
             host_convert(stream, mm_out.data_ptr(), 0, int(mm_out.stride(0)), int(mm_out.stride(1)),
                          KOI_F16, conv_out.data_ptr(), 0, int(conv_out.stride(0)),

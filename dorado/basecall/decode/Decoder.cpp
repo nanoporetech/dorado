@@ -13,7 +13,8 @@ std::unique_ptr<Decoder> create_decoder(c10::Device device,
                                         const config::BasecallModelConfig& config) {
 #if DORADO_CUDA_BUILD
     if (device.is_cuda()) {
-        return std::make_unique<decode::CUDADecoder>(config.clamp ? 5.f : 0.f);
+        return std::make_unique<decode::CUDADecoder>(
+                config.clamp ? 5.f : ((config.scale != 1.f) ? config.scale : 0.f));
     }
 #else
     (void)config;  // unused in other build types

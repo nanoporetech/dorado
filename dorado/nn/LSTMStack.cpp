@@ -42,10 +42,12 @@ at::Tensor LSTMStackImpl::forward(at::Tensor x) {
 void LSTMStackImpl::reserve_working_memory(WorkingMemory &wm) {
     if (wm.layout == TensorLayout::NTC) {
         wm.temp({wm.N * wm.T, 4 * layer_size}, torch::kF16);
+        wm.next_is_current();
     } else if (wm.layout == TensorLayout::CUTLASS_TNC_F16) {
-        wm.next_TC(wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
+        wm.next_NTC(-1, wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
     } else if (wm.layout == TensorLayout::CUBLAS_TN2C) {
         wm.temp({wm.N, 4 * layer_size}, torch::kF16);
+        wm.next_is_current();
     }
 }
 
@@ -120,6 +122,7 @@ void LSTMStackImpl::forward_cublas(WorkingMemory &wm) {
         }
         wm.is_input_to_rev_lstm = !reverse;
     }
+    wm.next_is_current();
 }
 
 void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *const aux) {
@@ -203,7 +206,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *cons
 
         if (type_id == KOI_F16) {
             utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
-            auto out = wm.next_TC(wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
+            auto out = wm.next_NTC(-1, wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
             host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
                          int(in.stride(2)), KOI_F16, out.data_ptr(), int(out.stride(0)),
                          int(out.stride(1)), int(out.stride(2)), KOI_I8, int(in.size(0)),
@@ -239,6 +242,7 @@ void LSTMStackImpl::forward_quantized(WorkingMemory &wm) {
                 stream, wm.N, wm.T, layer_size, dir, mm_out.data_ptr(), device_w_hh[i].data_ptr(),
                 device_bias[i].data_ptr(), device_scale[i].data_ptr(), inout.data_ptr()));
     }
+    wm.next_is_current();
 }
 #endif  // if DORADO_CUDA_BUILD
 

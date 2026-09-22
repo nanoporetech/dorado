@@ -36,15 +36,17 @@ at::Tensor LinearCRFImpl::forward(const at::Tensor x) {
 
 #if DORADO_CUDA_BUILD
 void LinearCRFImpl::reserve_working_memory(WorkingMemory &wm, const AuxiliaryData *const aux) {
+    int C_out = int(linear->weight.size(0));
     bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
-    if (use_torch && wm.layout != TensorLayout::NTC) {
-        wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
-    }
-    if (aux) {
-        wm.next_N(1);
-        wm.next_TC(aux->NT_out_max(), int(linear->weight.size(0)), TensorLayout::NTC);
+    if (use_torch || (wm.layout == TensorLayout::NTC && !activation)) {
+        if (wm.layout != TensorLayout::NTC) {
+            wm.next_NTC(-1, wm.T, wm.C, TensorLayout::NTC);
+        }
+        wm.next_NTC(-1, wm.T, C_out, TensorLayout::NTC);
+    } else if (aux) {
+        wm.next_NTC(1, aux->NT_out(), C_out, TensorLayout::NTC);
     } else {
-        wm.next_TC(wm.T, int(linear->weight.size(0)), TensorLayout::NTC);
+        wm.next_NTC(-1, wm.T, C_out, TensorLayout::NTC);
     }
 }
 void LinearCRFImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
@@ -66,7 +68,7 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
             // Convert/transpose input layout to NTC, F16 if necessary
             utils::ScopedProfileRange spr_convert("convert_to_f16_ntc", 3);
             auto in = wm.get_current_NTC_view();
-            auto out = wm.next_TC(wm.T, wm.C, TensorLayout::NTC);
+            auto out = wm.next_NTC(-1, wm.T, wm.C, TensorLayout::NTC);
             host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
                          int(in.stride(2)), type_id, out.data_ptr(), int(out.stride(0)),
                          int(out.stride(1)), int(out.stride(2)), KOI_F16, int(in.size(0)),
@@ -74,7 +76,7 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
         }
 
         auto in = wm.current;
-        auto out = wm.next_TC(wm.T, C_out, TensorLayout::NTC);
+        auto out = wm.next_NTC(-1, wm.T, C_out, TensorLayout::NTC);
         auto out_2D = out.view({-1, C_out});
         if (!w_device.defined()) {
             w_device = linear->weight.t().contiguous().to(in.device());
@@ -93,11 +95,10 @@ void LinearCRFImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *const aux) {
         if (aux) {
             in_ntc = wm.current.narrow(0, 3, wm.T);
             out_layout = aux->device_out_layout.data_ptr();
-            wm.next_N(1);
-            wm.next_TC(aux->NT_out(), C_out, TensorLayout::NTC);
+            wm.next_NTC(1, aux->NT_out(), C_out, TensorLayout::NTC);
         } else {
             in_ntc = wm.get_current_NTC_view();
-            wm.next_TC(wm.T, C_out, TensorLayout::NTC);
+            wm.next_NTC(-1, wm.T, C_out, TensorLayout::NTC);
         }
         at::Tensor out = wm.current;
 

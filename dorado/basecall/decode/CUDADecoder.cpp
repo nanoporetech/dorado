@@ -19,6 +19,10 @@ namespace dorado::basecall::decode {
 
 DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     auto scores = data.data;
+    if (scores.dtype() == at::kChar && utils::get_dev_opt("convert_scores_f16", false)) {
+        utils::ScopedProfileRange spr{"convert_scores", 2};
+        scores = scores.to(at::kHalf).mul_(m_score_range / 127.f);
+    }
     auto &options = data.options;
 
     c10::cuda::CUDAGuard device_guard(scores.device());
@@ -29,9 +33,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
 
     auto tensor_options_int32 =
             at::TensorOptions().dtype(at::kInt).device(scores.device()).requires_grad(false);
-
-    auto tensor_options_int8 =
-            at::TensorOptions().dtype(at::kChar).device(scores.device()).requires_grad(false);
+    auto tensor_options_int8 = tensor_options_int32.dtype(at::kChar);
 
     at::Tensor chunks;
     at::Tensor chunk_results;
@@ -93,37 +95,44 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     auto qstring = moves_sequence_qstring[2];
 
     auto stream = at::cuda::getCurrentCUDAStream().stream();
-    {
-        utils::ScopedProfileRange spr{"back_guides", 2};
-        dorado::utils::handle_cuda_result(host_back_guide_step(
-                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
-                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
-                int(options.beam_width), options.beam_cut, options.blank_score));
+    KoiTypeId scores_type_id = (scores.dtype() == at::kChar) ? KOI_I8 : KOI_F16;
+    if (utils::get_dev_opt("fused_decode", true)) {
+        {
+            utils::ScopedProfileRange spr{"fused_beam_search", 2};
+            int flags = utils::get_dev_opt("fused_decode_flags", 1);
+            dorado::utils::handle_cuda_result(koi_fused_beam_search(
+                    stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                    m_score_range, C, scores_type_id, aux.data_ptr(), int(options.beam_width),
+                    options.beam_cut, options.blank_score, flags));
+        }
+    } else {
+        {
+            utils::ScopedProfileRange spr{"back_guides", 2};
+            dorado::utils::handle_cuda_result(koi_compute_back_guides(
+                    stream, chunks.data_ptr(), N, scores.data_ptr(), m_score_range, C,
+                    scores_type_id, aux.data_ptr(), options.blank_score));
+        }
+        {
+            utils::ScopedProfileRange spr{"beam_search", 2};
+            dorado::utils::handle_cuda_result(koi_beam_search(
+                    stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                    m_score_range, C, scores_type_id, aux.data_ptr(), int(options.beam_width),
+                    options.beam_cut, options.blank_score));
+        }
+        {
+            utils::ScopedProfileRange spr{"compute_posts", 2};
+            dorado::utils::handle_cuda_result(koi_compute_posts(
+                    stream, chunks.data_ptr(), N, scores.data_ptr(), m_score_range, C,
+                    scores_type_id, aux.data_ptr(), options.blank_score));
+        }
     }
     {
-        utils::ScopedProfileRange spr{"beam_search", 2};
-        dorado::utils::handle_cuda_result(host_beam_search_step(
-                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
-                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
-                int(options.beam_width), options.beam_cut, options.blank_score));
-    }
-    {
-        utils::ScopedProfileRange spr{"compute_posts", 2};
-        dorado::utils::handle_cuda_result(host_compute_posts_step(
-                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
-                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
-                int(options.beam_width), options.beam_cut, options.blank_score));
-    }
-    {
-        utils::ScopedProfileRange spr{"decode", 2};
-        dorado::utils::handle_cuda_result(host_run_decode(
-                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
-                m_score_clamp_val, C, aux.data_ptr(), path.data_ptr(), moves.data_ptr(), NULL,
-                sequence.data_ptr(), qstring.data_ptr(), options.q_scale, options.q_shift,
-                int(options.beam_width), options.beam_cut, options.blank_score, options.move_pad));
+        utils::ScopedProfileRange spr{"beam_decode", 2};
+        dorado::utils::handle_cuda_result(koi_beam_decode(
+                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(), C,
+                scores_type_id, aux.data_ptr(), int(options.beam_width), path.data_ptr(),
+                moves.data_ptr(), sequence.data_ptr(), qstring.data_ptr(), options.q_scale,
+                options.q_shift, options.move_pad));
     }
     if (data.aux) {
         data.data = moves_sequence_qstring;

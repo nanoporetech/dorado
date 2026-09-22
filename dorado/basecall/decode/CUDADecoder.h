@@ -8,7 +8,7 @@ namespace dorado::basecall::decode {
 
 class CUDADecoder final : public Decoder {
 public:
-    explicit CUDADecoder(float score_clamp_val) : m_score_clamp_val(score_clamp_val) {}
+    explicit CUDADecoder(float score_range) : m_score_range(score_range) {}
 
     // We split beam_search into two parts, the first one running on the GPU and the second
     // one on the CPU. While the second part is running we can submit more commands to the GPU
@@ -19,7 +19,7 @@ public:
     at::ScalarType dtype() const override { return at::ScalarType::Half; }
 
 private:
-    float m_score_clamp_val;
+    float m_score_range;
 };
 
 }  // namespace dorado::basecall::decode

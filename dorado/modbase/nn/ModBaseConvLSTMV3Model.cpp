@@ -166,19 +166,19 @@ ModBaseConvLSTMV3CUDAModelImpl::ModBaseConvLSTMV3CUDAModelImpl(
     {
         // Reserve and allocate working memory for the sequence convs
         const auto [T, C] = get_chunked_sequence_input_TC(model_config);
-        wm_seq.next_TC(T, C, nn::TensorLayout::NTC);
+        wm_seq.next_NTC(batch_size, T, C, nn::TensorLayout::NTC);
         seq_convs->reserve_working_memory(wm_seq, nullptr, nn::TensorLayout::NTC);
     }
     {
         // Reserve and allocate working memory for everything else
         const auto [T, C] = get_chunked_signal_input_TC(model_config);
-        wm.next_TC(T, C, nn::TensorLayout::NTC);
+        wm.next_NTC(batch_size, T, C, nn::TensorLayout::NTC);
         sig_convs->reserve_working_memory(wm, nullptr, nn::TensorLayout::NTC);
 
         // Buffer for concatenating conv outputs before merge_conv
         const int padding = merge_cv.winlen / 2;
         const int64_t T_merge_conv = (T / model_config.modules.signal_stride()) + (2 * padding);
-        wm.next_TC(T_merge_conv, merge_cv.size, nn::TensorLayout::NTC);
+        wm.next_NTC(-1, T_merge_conv, merge_cv.size, nn::TensorLayout::NTC);
 
         std::optional<nn::TensorLayout> force_dtype = std::nullopt;
         if (nn::koi_can_use_cutlass()) {
@@ -206,7 +206,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
         if (!wm_seq.backing_tensor.defined()) {
             wm_seq.allocate_backing_tensor(seqs_NTC.device());
         }
-        auto wm_seq_in = wm_seq.next_TC(Tin_seq, Cin_seq, nn::TensorLayout::NTC);
+        auto wm_seq_in = wm_seq.next_NTC(batch_size, Tin_seq, Cin_seq, nn::TensorLayout::NTC);
         wm_seq_in.index({torch::indexing::Slice()}) = seqs_NTC;
     }
     {
@@ -215,7 +215,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
         if (!wm.backing_tensor.defined()) {
             wm.allocate_backing_tensor(sigs_N1T.device());
         }
-        auto wm_in = wm.next_TC(Tin_sig, Cin_sig, nn::TensorLayout::NTC);
+        auto wm_in = wm.next_NTC(batch_size, Tin_sig, Cin_sig, nn::TensorLayout::NTC);
         // This transpose is free because C is 1
         wm_in.index({torch::indexing::Slice()}) = sigs_N1T.transpose(1, 2);
     }
@@ -253,7 +253,7 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
 
         // Performing torch::cat({sig, seq}, 1) but with optional padding
         auto merge_conv_in =
-                wm.next_TC(Tp, C_sum, nn::TensorLayout::NTC).view({batch_size, Tp, 2, -1});
+                wm.next_NTC(-1, Tp, C_sum, nn::TensorLayout::NTC).view({batch_size, Tp, 2, -1});
         merge_conv_in.index({torch::indexing::Slice(), torch::indexing::Slice(padding, T + padding),
                              0}) = sig_out;
         merge_conv_in.index({torch::indexing::Slice(), torch::indexing::Slice(padding, T + padding),
