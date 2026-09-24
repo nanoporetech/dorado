@@ -14,6 +14,7 @@ struct BamInfo {
     bool has_dwells = false;
     std::unordered_set<std::string> read_groups;
     std::unordered_set<std::string> basecaller_models;
+    std::unordered_set<std::string> sample_names;
     std::vector<std::pair<std::string, int64_t>> ref_seqs;
 };
 

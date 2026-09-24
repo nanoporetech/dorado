@@ -78,6 +78,10 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
                 }
             }
 
+            // Parse the smaple name.
+            const auto& it_lb = tags.find("LB");
+            const std::string lb = (it_lb != std::end(tags)) ? it_lb->second : "";
+
             if (std::empty(id)) {
                 continue;
             }
@@ -90,6 +94,9 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
 
             ret.read_groups.emplace(id);
             ret.basecaller_models.emplace(basecaller_model);
+            if (!std::empty(lb)) {
+                ret.sample_names.emplace(lb);
+            }
         } else if (line.header_type == utils::HeaderLineType::SQ) {
             const auto& it_sn = tags.find("SN");
             const std::string sn = (it_sn != std::end(tags)) ? it_sn->second : "";

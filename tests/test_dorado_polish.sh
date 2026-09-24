@@ -70,6 +70,13 @@ if [[ ! -d "${MODEL_DIR}" ]]; then
     ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
 fi
 
+# Download the model once.
+MODEL_NAME_v52="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl_mv"
+MODEL_DIR_v52=${MODEL_ROOT_DIR}/${MODEL_NAME_v52}
+if [[ ! -d "${MODEL_DIR_v52}" ]]; then
+    ${DORADO_BIN} download --model "${MODEL_NAME_v52}" --models-directory ${output_dir}
+fi
+
 export DORADO_BIN
 export TEST_DATA_DIR
 export MODEL_NAME

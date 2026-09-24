@@ -19,6 +19,7 @@
 #include "smallvar_progress_tracker.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"
+#include "utils/container_utils.h"
 #include "utils/jthread.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -1090,7 +1091,8 @@ void run_variant_calling(const Options& opt,
                          const secondary::BamInfo& bam_info,
                          const secondary::ModelConfig& model_config,
                          smallvar::VariantResources& resources,
-                         secondary::Stats& stats) {
+                         secondary::Stats& stats,
+                         const std::string_view sample_name) {
     DORADO_LOG(info, "Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
                opt.infer_threads, std::size(resources.devices));
 
@@ -1256,7 +1258,7 @@ void run_variant_calling(const Options& opt,
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer = std::make_unique<secondary::VCFWriter>(
             out_vcf_fn, vcf_filters, draft_lens, opt.out_format == VariantCallingFormatEnum::GVCF,
-            opt.sample_name, command_line);
+            sample_name, command_line);
 
     // Optionally write Kadayashi variants.
     std::optional<secondary::VCFWriter> vcf_writer_kadayashi;
@@ -1265,13 +1267,13 @@ void run_variant_calling(const Options& opt,
         const std::string out_vcf_kadayashi_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf").string();
         vcf_writer_kadayashi.emplace(out_vcf_kadayashi_fn, vcf_filters, draft_lens, false,
-                                     opt.sample_name, command_line);
+                                     sample_name, command_line);
 
         const std::string out_vcf_inference_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf").string();
         vcf_writer_inference.emplace(out_vcf_inference_fn, vcf_filters, draft_lens,
-                                     opt.out_format == VariantCallingFormatEnum::GVCF,
-                                     opt.sample_name, command_line);
+                                     opt.out_format == VariantCallingFormatEnum::GVCF, sample_name,
+                                     command_line);
     }
 
     // Compute the minimum usable memory across all devices and use that as the batch size.
@@ -1536,6 +1538,10 @@ int small_variant_caller(int argc, char* argv[]) {
             for (const auto& rg : bam_info.basecaller_models) {
                 DORADO_LOG(debug, "    - {}", rg);
             }
+            DORADO_LOG(debug, "bam_info.sample_names:");
+            for (const auto& rg : bam_info.sample_names) {
+                DORADO_LOG(debug, "    - {}", rg);
+            }
             if (!std::empty(opt.read_group)) {
                 DORADO_LOG(debug,
                            "Only the user-requested RG was selected from the input bam. RG: '{}'",
@@ -1551,6 +1557,23 @@ int small_variant_caller(int argc, char* argv[]) {
         // Validate the read groups in the BAM file.
         if (!std::empty(opt.read_group) || !opt.ignore_read_groups) {
             secondary::check_read_groups(bam_info, opt.read_group);
+        }
+
+        // Set the sample name for VCF output
+        // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
+        // If the BAM contains multiple sample names, exit and ask for user instruction.
+        std::string_view sample_name = opt.sample_name;
+        if (!parser.is_used("--sample-name") && !std::empty(bam_info.sample_names)) {
+            if (std::size(bam_info.sample_names) > 1) {
+                DORADO_LOG(error, "BAM read groups contain multiple sample names: {}",
+                           utils::print_container_as_string(bam_info.sample_names, ",", true));
+                DORADO_LOG(error, "Please specify a sample name with the `--sample-name` option.");
+                std::exit(EXIT_FAILURE);
+            }
+            sample_name = *std::begin(bam_info.sample_names);
+            DORADO_LOG(info, "Using sample name from BAM read groups: {}", sample_name);
+        } else {
+            DORADO_LOG(info, "Setting sample name: {}", sample_name);
         }
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
@@ -1599,7 +1622,8 @@ int small_variant_caller(int argc, char* argv[]) {
             DORADO_LOG(info, "Using half precision!");
         }
 
-        run_variant_calling(opt, command_line, bam_info, model_config, resources, stats);
+        run_variant_calling(opt, command_line, bam_info, model_config, resources, stats,
+                            sample_name);
 
         tracker.finalize();
         stats_sampler->terminate();
