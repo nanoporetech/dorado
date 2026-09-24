@@ -99,7 +99,7 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     if (utils::get_dev_opt("fused_decode", true)) {
         {
             utils::ScopedProfileRange spr{"fused_beam_search", 2};
-            int flags = utils::get_dev_opt("fused_decode_flags", 1);
+            int flags = utils::get_dev_opt("fused_decode_flags", (C == 1024) ? 1 : 0);
             dorado::utils::handle_cuda_result(koi_fused_beam_search(
                     stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
                     m_score_range, C, scores_type_id, aux.data_ptr(), int(options.beam_width),
