@@ -103,9 +103,10 @@ class TestDorado(unittest.TestCase):
 
         test_name = "basecalling"
         with self.context.open_test(self, test_name) as context:
-            validation_settings = deepcopy(VALIDATION_OPTIONS)
-
             for run in runs:
+                validation_settings = deepcopy(VALIDATION_OPTIONS)
+                if run.estimate_poly_a:
+                    validation_settings["estimate_polya_tail_enabled"] = True
                 suffix = "cram" if run.emit_cram else "bam"
                 expected_files = {"txt": 1, "tsv": 1}
                 if USE_PYSAM:
