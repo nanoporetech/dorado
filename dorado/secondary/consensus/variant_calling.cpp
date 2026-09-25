@@ -1524,7 +1524,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         // Assign.
         var.ref = seqs[0];
         var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
-        var.pos += start_pos;
+        var.pos += (rev ? 0 : start_pos);
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
