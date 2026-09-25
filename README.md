@@ -13,7 +13,7 @@ Detailed information about Dorado and its features is available in the [Dorado D
 * Simplex [barcode classification](https://software-docs.nanoporetech.com/dorado/latest/barcoding/barcoding/).
 * Support for aligned read output in SAM/BAM.
 * Initial support for [poly(A) tail estimation](https://software-docs.nanoporetech.com/dorado/latest/basecaller/polya_estimation/).
-* Support for [single-read error correction](https://software-docs.nanoporetech.com/dorado/latest/assembly/correct/).
+* Support for [single-read error correction](https://software-docs.nanoporetech.com/dorado/latest/secondary/correct/).
 * [POD5](https://github.com/nanoporetech/pod5-file-format) support for highest basecalling performance ([documentation](https://software-docs.nanoporetech.com/pod5/latest/)).
 * Based on libtorch, the C++ API for pytorch.
 * Multiple custom optimisations in CUDA and Metal for maximising inference performance.
@@ -173,7 +173,7 @@ To correct reads, run:
 dorado correct reads.fastq > corrected_reads.fasta
 ```
 
-Checkout the [Dorado `correct` documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/correct/) for all the details.
+Checkout the [Dorado `correct` documentation](https://software-docs.nanoporetech.com/dorado/latest/secondary/correct/) for all the details.
 
 ### Polishing
 
@@ -183,9 +183,9 @@ It takes as input a draft assembly produced by a tool such as [Hifiasm](https://
 
 Additionally, Dorado `polish` can output a VCF file containing records for all variants discovered during polishing, or a gVCF file containing records for all locations in the input draft sequences.
 
-Note that Dorado `polish` is a **haploid** polishing tool and does _not_ implement any sort of phasing internally. It will take input alignment data _as is_ and run it through the polishing model to produce the consensus sequences. For more information, please take a look at [this section](https://software-docs.nanoporetech.com/dorado/latest/assembly/polish/#polishing-diploidpolyploid-assemblies) of Dorado Docs.
+Note that Dorado `polish` is a **haploid** polishing tool and does _not_ implement any sort of phasing internally. It will take input alignment data _as is_ and run it through the polishing model to produce the consensus sequences. For more information, please take a look at [this section](https://software-docs.nanoporetech.com/dorado/latest/secondary/polish/#polishing-diploidpolyploid-assemblies) of Dorado Docs.
 
-For more information on how to get started, head to the [Dorado `polish` documentation](https://software-docs.nanoporetech.com/dorado/latest/assembly/polish/).
+For more information on how to get started, head to the [Dorado `polish` documentation](https://software-docs.nanoporetech.com/dorado/latest/secondary/polish/).
 
 ## Available basecalling models
 
