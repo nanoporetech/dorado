@@ -63,7 +63,7 @@ std::vector<bool> variant_columns(const std::vector<int64_t>& minor,
 
     bool is_var = (reference[0] != prediction[0]);  // Assume start on major.
     ret[0] = is_var;
-    int64_t insert_length = 0;
+    int64_t insert_length = (minor[0] > 0) ? 1 : 0;
 
     for (int64_t i = 1; i < len; ++i) {
         if (minor[i] == 0) {
