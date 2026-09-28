@@ -1444,6 +1444,7 @@ call_variants_single_chrom(const std::string& draft,
                            const float pass_min_qual,
                            const float pass_min_gq,
                            const float pass_min_aq,
+                           const float pass_min_vq,
                            const bool ambig_ref,
                            const bool gvcf) {
     if (std::empty(vc_input_data)) {
@@ -1521,8 +1522,9 @@ call_variants_single_chrom(const std::string& draft,
 
     for (const auto& vc_sample : joined_samples) {
         std::vector<secondary::Variant> variants = secondary::general_decode_variants(
-                decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq, ambig_ref, gvcf,
-                true, true, false, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq, pass_min_vq,
+                ambig_ref, gvcf, true, true, false,
+                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
 
         results.insert(std::end(results), std::make_move_iterator(std::begin(variants)),
                        std::make_move_iterator(std::end(variants)));
@@ -1766,6 +1768,7 @@ void worker_variant_calling_reduce(
         const float pass_min_qual,
         const float pass_min_gq,
         const float pass_min_aq,
+        const float pass_min_vq,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t ploidy,
@@ -1828,7 +1831,7 @@ void worker_variant_calling_reduce(
             std::tie(variants, merge_regions) = call_variants_single_chrom(
                     *draft, std::move(vc_decode_data), decoder, simple_variants,
                     merge_with_simple ? flank_trim : 0, pass_min_qual, pass_min_gq, pass_min_aq,
-                    ambig_ref, gvcf);
+                    pass_min_vq, ambig_ref, gvcf);
         }
 
         DORADO_LOG(debug,

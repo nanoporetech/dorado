@@ -156,6 +156,7 @@ std::vector<Variant> general_decode_variants(
         const float pass_min_qual,
         const float pass_min_gq,
         const float pass_min_aq,
+        const float pass_min_vq,
         bool ambig_ref,
         bool return_all,
         bool normalize,

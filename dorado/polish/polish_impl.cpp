@@ -1654,6 +1654,7 @@ std::vector<secondary::Variant> call_variants(
         const float pass_min_qual,
         const float pass_min_gq,
         const float pass_min_aq,
+        const float pass_min_vq,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t num_threads,
@@ -1727,7 +1728,7 @@ std::vector<secondary::Variant> call_variants(
                 for (const auto& vc_sample : joined_samples) {
                     std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                             decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq,
-                            ambig_ref, gvcf, true, true, true,
+                            pass_min_vq, ambig_ref, gvcf, true, true, true,
                             secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
 
                     for (auto& v : variants) {

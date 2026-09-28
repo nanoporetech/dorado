@@ -28,6 +28,7 @@ inline constexpr std::array KNOWN_FILTERS{
         FilterSpec{".", "Non-variant position"},
         FilterSpec{"LowGQ", "Variant GQ is below threshold"},
         FilterSpec{"LowAQ", "Variant AQ is below threshold"},
+        FilterSpec{"LowVQ", "Variant VQ is below threshold"},
 };
 
 class Filters {
@@ -41,6 +42,7 @@ public:
         NonVariant = 1 << 3,
         LowGQ = 1 << 4,
         LowAQ = 1 << 5,
+        LowVQ = 1 << 6,
     };
 
     Filters() = default;

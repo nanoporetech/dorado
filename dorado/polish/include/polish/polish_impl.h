@@ -164,6 +164,7 @@ std::vector<secondary::Variant> call_variants(
         const float pass_min_qual,
         const float pass_min_gq,
         const float pass_min_aq,
+        const float pass_min_vq,
         bool ambig_ref,
         bool gvcf,
         int32_t num_threads,

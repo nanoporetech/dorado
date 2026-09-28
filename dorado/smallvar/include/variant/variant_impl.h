@@ -243,6 +243,7 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
  * \param pass_min_qual Minimum QUAL required to mark decoded variants as PASS.
  * \param pass_min_gq Minimum GQ required to mark decoded variants as PASS.
  * \param pass_min_aq Minimum AQ required to mark decoded variants as PASS.
+ * \param pass_min_vq Minimum VQ required to mark decoded variants as PASS.
  * \param ambig_ref Whether ambiguous reference bases are allowed during variant decoding.
  * \param gvcf Whether non-variant positions should be emitted as gVCF records.
  * \param ploidy Ploidy used for gVCF reference genotypes.
@@ -265,6 +266,7 @@ void worker_variant_calling_reduce(
         const float pass_min_qual,
         const float pass_min_gq,
         const float pass_min_aq,
+        const float pass_min_vq,
         const bool ambig_ref,
         const bool gvcf,
         const int32_t ploidy,

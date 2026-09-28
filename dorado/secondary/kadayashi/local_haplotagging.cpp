@@ -2086,6 +2086,7 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         if (!std::empty(aq_str)) {
             ret.format["AQ"] = aq_str;
         }
+        ret.format["VQ"] = std::format("{:.2f}", dorado::secondary::VCF_MAX_GQ_CAP);
     }
 
     return ret;

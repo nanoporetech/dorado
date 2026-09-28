@@ -1194,15 +1194,19 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filters = {secondary::Filters::Pass},
                     .info = {},
                     .qual = 60.0f,
-                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
-                                secondary::VARIANT_SOURCE_KADAYASHI},
-                               {"GT", "0/1"},
-                               {"GQ", "60"},
-                               {"DP", "20"},
-                               {"AD", "13,7"},
-                               {"VAF", "0.35"},
-                               {"PL", "990,0,990"},
-                               {"AQ", "60,60"}},
+                    .format =
+                            {
+                                    {secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                     secondary::VARIANT_SOURCE_KADAYASHI},
+                                    {"GT", "0/1"},
+                                    {"GQ", "60"},
+                                    {"DP", "20"},
+                                    {"AD", "13,7"},
+                                    {"VAF", "0.35"},
+                                    {"PL", "990,0,990"},
+                                    {"AQ", "60,60"},
+                                    {"VQ", "60.00"},
+                            },
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1214,15 +1218,19 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filters = {secondary::Filters::Pass},
                     .info = {},
                     .qual = 60.0f,
-                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
-                                secondary::VARIANT_SOURCE_KADAYASHI},
-                               {"GT", "0/1"},
-                               {"GQ", "60"},
-                               {"DP", "20"},
-                               {"AD", "7,13"},
-                               {"VAF", "0.65"},
-                               {"PL", "990,0,990"},
-                               {"AQ", "60,60"}},
+                    .format =
+                            {
+                                    {secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                     secondary::VARIANT_SOURCE_KADAYASHI},
+                                    {"GT", "0/1"},
+                                    {"GQ", "60"},
+                                    {"DP", "20"},
+                                    {"AD", "7,13"},
+                                    {"VAF", "0.65"},
+                                    {"PL", "990,0,990"},
+                                    {"AQ", "60,60"},
+                                    {"VQ", "60.00"},
+                            },
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1234,15 +1242,19 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                     .filters = {secondary::Filters::Pass},
                     .info = {},
                     .qual = 60.0f,
-                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
-                                secondary::VARIANT_SOURCE_KADAYASHI},
-                               {"GT", "0/1"},
-                               {"GQ", "60"},
-                               {"DP", "15"},
-                               {"AD", "8,7"},
-                               {"VAF", "0.47"},
-                               {"PL", "990,0,990"},
-                               {"AQ", "60,60"}},
+                    .format =
+                            {
+                                    {secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                     secondary::VARIANT_SOURCE_KADAYASHI},
+                                    {"GT", "0/1"},
+                                    {"GQ", "60"},
+                                    {"DP", "15"},
+                                    {"AD", "8,7"},
+                                    {"VAF", "0.47"},
+                                    {"PL", "990,0,990"},
+                                    {"AQ", "60,60"},
+                                    {"VQ", "60.00"},
+                            },
                     .rstart = 0,
                     .rend = 0,
             },
@@ -1632,7 +1644,7 @@ CATCH_TEST_CASE(
 
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  {}, 30.0f, 0.0f, 0.0f, false, false, 2, 1,
+                                  {}, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
@@ -1748,7 +1760,7 @@ CATCH_TEST_CASE(
 
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  {}, 30.0f, 0.0f, 0.0f, false, false, 2, 5,
+                                  {}, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 5,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
@@ -1763,13 +1775,17 @@ CATCH_TEST_CASE(
                     .filters = {secondary::Filters::Pass},
                     .info = {},
                     .qual = 60.f,
-                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
-                                secondary::VARIANT_SOURCE_INFERENCE},
-                               {"GT", "1/1"},
-                               {"GQ", "60"},
-                               {"DP", "1"},
-                               {"PL", "264,129,0"},
-                               {"AQ", "0,60"}},
+                    .format =
+                            {
+                                    {secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                     secondary::VARIANT_SOURCE_INFERENCE},
+                                    {"GT", "1/1"},
+                                    {"GQ", "60"},
+                                    {"DP", "1"},
+                                    {"PL", "264,129,0"},
+                                    {"AQ", "0,60"},
+                                    {"VQ", "53.92"},
+                            },
                     .rstart = 0,
                     .rend = 2,
             },
@@ -1875,7 +1891,7 @@ CATCH_TEST_CASE(
 
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  {}, 30.0f, 0.0f, 0.0f, false, false, 2, 5,
+                                  {}, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 5,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
@@ -1890,14 +1906,18 @@ CATCH_TEST_CASE(
                     .filters = {secondary::Filters::Pass},
                     .info = {},
                     .qual = 60.f,
-                    .format = {{secondary::FORMAT_TAG_VARIANT_SOURCE,
-                                secondary::VARIANT_SOURCE_INFERENCE},
-                               {"GT", "1/1"},
-                               {"GQ", "60"},
-                               {"DP", "9"},
-                               {"MIN_DP", "8"},
-                               {"PL", "396,195,0"},
-                               {"AQ", "0,60"}},
+                    .format =
+                            {
+                                    {secondary::FORMAT_TAG_VARIANT_SOURCE,
+                                     secondary::VARIANT_SOURCE_INFERENCE},
+                                    {"GT", "1/1"},
+                                    {"GQ", "60"},
+                                    {"DP", "9"},
+                                    {"MIN_DP", "8"},
+                                    {"PL", "396,195,0"},
+                                    {"AQ", "0,60"},
+                                    {"VQ", "52.16"},
+                            },
                     .rstart = 0,
                     .rend = 3,
             },
@@ -1989,7 +2009,7 @@ CATCH_TEST_CASE(
     // Run the unit under test.
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  {}, 30.0f, 0.0f, 0.0f, false, false, 2, 1,
+                                  {}, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     // Eval that the run was successful, that the stats processed was capped to 1.0
@@ -2063,7 +2083,7 @@ CATCH_TEST_CASE("worker_variant_calling_reduce tops up progress when no inferenc
     // Run the unit under test.
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  {}, 30.0f, 0.0f, 0.0f, false, false, 2, 1,
+                                  {}, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     // Eval that the run was successful.
@@ -2170,7 +2190,7 @@ CATCH_TEST_CASE(
 
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  hemizygous_regions, 30.0f, 0.0f, 0.0f, false, false, 2, 1,
+                                  hemizygous_regions, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
@@ -2263,7 +2283,7 @@ CATCH_TEST_CASE(
 
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  hemizygous_regions, 30.0f, 0.0f, 0.0f, false, false, 2, 1,
+                                  hemizygous_regions, 30.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
@@ -2472,7 +2492,7 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
 
     worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
                                   ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
-                                  {}, 30.0f, 0.0f, 0.0f, false, true, 2, 1,
+                                  {}, 30.0f, 0.0f, 0.0f, 0.0f, false, true, 2, 1,
                                   secondary::VariantCandidateSource::COMPUTE);
 
     // clang-format off
