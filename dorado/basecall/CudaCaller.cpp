@@ -51,10 +51,11 @@ c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
 
 void run_modbase_models(modbase::ModBaseLatentSpaceModels &models,
                         const at::Tensor &decoded_data,
-                        const at::Tensor &signal_embeddings) {
+                        at::Tensor signal_embeddings) {
     auto &[sequence_model, common_model, classifier_models] = models;
     auto encoded_sequence = sequence_model->forward(decoded_data);
-    auto common_output = common_model->forward(encoded_sequence, signal_embeddings);
+    auto common_output =
+            common_model->forward(std::move(encoded_sequence), std::move(signal_embeddings));
     for (auto &classifier_model : classifier_models) {
         classifier_model->forward(common_output);
     }
