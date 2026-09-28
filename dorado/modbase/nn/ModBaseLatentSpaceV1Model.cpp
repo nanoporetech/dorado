@@ -183,7 +183,7 @@ ModBaseLatentSpaceV1ClassifierModelImpl::ModBaseLatentSpaceV1ClassifierModelImpl
 }
 
 at::Tensor ModBaseLatentSpaceV1ClassifierModelImpl::forward(const at::Tensor& common_output) {
-    return classifier_head->forward(common_output).permute({0, 2, 1}).softmax(2);
+    return classifier_head->forward(common_output).permute({0, 2, 1}).softmax(1);
 }
 
 void ModBaseLatentSpaceV1ClassifierModelImpl::load_state_dict(
