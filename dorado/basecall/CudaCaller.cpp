@@ -163,6 +163,11 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
             throw std::runtime_error(
                     "Latent-space modbase models require an FLSTM basecalling model");
         }
+        if (m_variable_chunk_sizes) {
+            throw std::runtime_error(
+                    "Variable chunk sizes are not currently supported with latent space modbase "
+                    "models.");
+        }
         // TODO: check the required dtype here
         m_modbase_modules =
                 modbase::load_modbase_latent_space_model(*(params.modbase_configs), m_options);
