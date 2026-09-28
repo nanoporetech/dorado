@@ -146,10 +146,10 @@ ModBaseLatentSpaceV1CommonModelImpl::ModBaseLatentSpaceV1CommonModelImpl(
 at::Tensor ModBaseLatentSpaceV1CommonModelImpl::forward(at::Tensor sequences,
                                                         at::Tensor embedded_features) {
     const auto conv_dtype = (sequences.device() == torch::kCPU) ? torch::kFloat32 : torch::kFloat16;
+    // perform projection first to reduce memory footprint
+    embedded_features = projection->forward(embedded_features);
     // NTC -> NCT -> NTC
     sequences = sequence_encoder->forward(sequences.permute({0, 2, 1}).to(conv_dtype));
-    // sequences = sequences.permute({0, 2, 1});
-    embedded_features = projection->forward(embedded_features);
     return common_encoder->forward(sequences + embedded_features);
 }
 
@@ -183,7 +183,7 @@ ModBaseLatentSpaceV1ClassifierModelImpl::ModBaseLatentSpaceV1ClassifierModelImpl
 }
 
 at::Tensor ModBaseLatentSpaceV1ClassifierModelImpl::forward(const at::Tensor& common_output) {
-    return classifier_head->forward(common_output).permute({0, 2, 1});
+    return classifier_head->forward(common_output).permute({0, 2, 1}).softmax(2);
 }
 
 void ModBaseLatentSpaceV1ClassifierModelImpl::load_state_dict(
