@@ -766,9 +766,10 @@ void CudaCaller::cuda_thread_fn() {
                                   ? m_module->forward(task->input, task->aux, &signal_embeddings)
                                   : m_module->forward(task->input, task->aux);
             task->out = m_decoder->beam_search_part_1(
-                    {scores, task->num_chunks, m_decoder_options, task->aux});
+                    {std::move(scores), task->num_chunks, m_decoder_options, task->aux});
             if (m_modbase_modules) {
-                run_modbase_models(*m_modbase_modules, task->out.data, signal_embeddings);
+                run_modbase_models(*m_modbase_modules, task->out.data,
+                                   std::move(signal_embeddings));
             }
             m_stream.synchronize();
             m_model_decode_ms += timer.GetElapsedMS();
