@@ -172,8 +172,8 @@ std::vector<int32_t> make_class_indices(const std::string_view seq,
     return class_idxs;
 }
 
-std::string make_variant_gt(const std::span<const std::string> preds,
-                            const std::span<const std::string> alleles_lookup) {
+std::vector<int32_t> get_gt_indices(const std::span<const std::string> preds,
+                                    const std::span<const std::string> alleles_lookup) {
     std::vector<int32_t> indices;
     indices.reserve(std::size(preds));
     for (const auto& pred : preds) {
@@ -183,9 +183,7 @@ std::string make_variant_gt(const std::span<const std::string> preds,
         };
         indices.emplace_back(std::distance(std::cbegin(alleles_lookup), idx));
     }
-    std::sort(std::begin(indices), std::end(indices));
-
-    return utils::print_container_as_string(indices, "/", false);
+    return indices;
 }
 
 /**
@@ -483,7 +481,7 @@ float compute_quality_from_probs(
                 compute_subseq_log_prob(probs_3D, seq_class_idxs, rstart, rend, hap_id);
         total += log_prob;
     }
-    total = phred(1.0f - std::exp(total), VCF_MAX_GQ_CAP);
+    total = phred(-std::expm1(total), VCF_MAX_GQ_CAP);
 
     total = std::max(0.0f, total);
 
@@ -735,33 +733,21 @@ float get_qual(const std::vector<float>& genotype_logprobs, bool is_reference) {
  * \brief GQ is calculated as the likelihood that the predicted genotype is wrong
  */
 float calculate_GQ(const std::vector<float>& genotype_logprobs,
-                   const std::string_view gt,
+                   const std::vector<int32_t>& gt,
                    const int64_t num_alleles) {
     if (std::empty(genotype_logprobs) || std::empty(gt)) {
         return -1.0f;
     }
-    const auto [all_idx, phased] = split_GT_string(gt);
-    std::vector<int32_t> alleles;
-    alleles.reserve(std::size(all_idx));
-    for (const std::string_view allele : all_idx) {
-        if (allele == ".") {
-            alleles.emplace_back(-1);
-        } else {
-            alleles.emplace_back(dorado::utils::from_chars<int32_t>(allele).value());
-        }
-    }
-    std::sort(std::begin(alleles), std::end(alleles));
 
-    const int32_t num_haplotypes = std::ssize(alleles);
+    const int32_t num_haplotypes = std::ssize(gt);
     const auto [num_elements, genotype_order] =
             dorado::secondary::lookup_gts(num_haplotypes, num_alleles);
     if ((num_elements == 0) || (num_elements > std::ssize(genotype_logprobs))) {
         return -1.0f;
     }
-    const auto it_go = std::find(std::cbegin(genotype_order), std::cend(genotype_order), alleles);
+    const auto it_go = std::find(std::cbegin(genotype_order), std::cend(genotype_order), gt);
     if (it_go == std::cend(genotype_order)) {
-        throw std::runtime_error{"Genotype " +
-                                 utils::print_container_as_string(alleles, ",", true) +
+        throw std::runtime_error{"Genotype " + utils::print_container_as_string(gt, "/", true) +
                                  " not found in genotype_order"};
     }
     const int64_t idx = std::distance(std::cbegin(genotype_order), it_go);
@@ -776,30 +762,27 @@ float calculate_GQ(const std::vector<float>& genotype_logprobs,
     return phred_from_log(logerr, VCF_MAX_GQ_CAP);
 }
 
-bool fails_AQ_filter(const std::vector<float>& aq_values,
-                     const std::string_view gt,
-                     const float pass_min_aq) {
-    if (std::empty(aq_values) || std::empty(gt)) {
-        return false;
+/**
+ * \brief Get the minimum AQ value over the alleles in a specific genotype.
+ */
+float get_min_AQ(const std::vector<float>& aq_values, const std::vector<int32_t>& gt) {
+    if (std::empty(aq_values)) {
+        return -1.0f;
     }
 
-    const auto [all_idx, phased] = split_GT_string(gt);
-    for (const std::string_view all_str : all_idx) {
-        if (all_str == ".") {
-            continue;
-        }
-        const int32_t allele_id = utils::from_chars<int32_t>(all_str).value();
-        if ((allele_id < 0) || (allele_id >= std::ssize(aq_values))) {
+    float min_aq = VCF_MAX_GQ_CAP;
+    for (int32_t allele_idx : gt) {
+        if ((allele_idx < 0) || (allele_idx >= std::ssize(aq_values))) {
             throw std::runtime_error{"Genotype " +
-                                     utils::print_container_as_string(all_idx, ",", true) +
+                                     utils::print_container_as_string(gt, "/", false) +
                                      " contains entries out of range for " +
                                      std::to_string(std::size(aq_values)) + " AQ values"};
         }
-        if ((aq_values[allele_id] >= 0) && (aq_values[allele_id] < pass_min_aq)) {
-            return true;
+        if (aq_values[allele_idx] < min_aq) {
+            min_aq = aq_values[allele_idx];
         }
     }
-    return false;
+    return min_aq;
 }
 
 Variant construct_variant(const std::string_view draft,
@@ -869,7 +852,6 @@ Variant construct_variant(const std::string_view draft,
     }
 
     const std::vector<std::string> alts_out = construct_alts_out(alleles_lookup);
-    const std::string gt = make_variant_gt(var_preds, alleles_lookup);
 
     // Compute likelihood matrix for alleles across haplotypes
     const std::vector<float> hap_allele_likelihoods =
@@ -879,8 +861,18 @@ Variant construct_variant(const std::string_view draft,
     const std::string pl_str = construct_PL_string(genotype_likelihoods);
     const std::vector<float> aq_values = calculate_AQs(hap_allele_likelihoods, num_haplotypes);
     const std::string aq_str = construct_AQ_string(aq_values);
-    const float gq_val = calculate_GQ(genotype_likelihoods, gt, std::ssize(alleles_lookup));
     const float qual = get_qual(genotype_likelihoods, false);
+
+    // gt_ints preserves local haplotype phasing
+    // VQ calculated before sorting gt_ints
+    std::vector<int32_t> gt_ints = get_gt_indices(var_preds, alleles_lookup);
+    const float min_aq = get_min_AQ(aq_values, gt_ints);
+
+    // sort gt_ints before calculating GQ so we can directly look up in ALLELE_SETS
+    // and GT string is ordered
+    std::sort(std::begin(gt_ints), std::end(gt_ints));
+    const float gq_val = calculate_GQ(genotype_likelihoods, gt_ints, std::ssize(alleles_lookup));
+    const std::string gt = utils::print_container_as_string(gt_ints, "/", false);
 
     Variant var{
             .seq_id = seq_id,
@@ -950,7 +942,7 @@ Variant construct_variant(const std::string_view draft,
     }
     if (!std::empty(aq_str)) {
         var.format["AQ"] = aq_str;
-        if (fails_AQ_filter(aq_values, gt, pass_min_aq)) {
+        if ((min_aq >= 0) && (min_aq < pass_min_aq)) {
             var.filters.update(Filters::LowAQ);
         }
     }
