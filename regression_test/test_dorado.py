@@ -75,6 +75,7 @@ class TestDorado(unittest.TestCase):
             model: str
             emit_cram: bool = False
             barcode_kit: str | None = None
+            estimate_poly_a: bool = False
 
         runs = [
             Run("Kit14_fast", "SQK-LSK114", "fast"),
@@ -91,13 +92,21 @@ class TestDorado(unittest.TestCase):
                 "hac",
                 barcode_kit="SQK-DRB004-24",
             ),
+            Run(
+                "Kit14_cDNA_PolyA_hac",
+                "SQK-PCS114-PolyA",
+                "hac",
+                barcode_kit="SQK-PCB114-24",
+                estimate_poly_a=True,
+            ),
         ]
 
         test_name = "basecalling"
         with self.context.open_test(self, test_name) as context:
-            validation_settings = deepcopy(VALIDATION_OPTIONS)
-
             for run in runs:
+                validation_settings = deepcopy(VALIDATION_OPTIONS)
+                if run.estimate_poly_a:
+                    validation_settings["estimate_polya_tail_enabled"] = True
                 suffix = "cram" if run.emit_cram else "bam"
                 expected_files = {"txt": 1, "tsv": 1}
                 if USE_PYSAM:
@@ -116,6 +125,7 @@ class TestDorado(unittest.TestCase):
                         emit_summary=True,
                         emit_cram=run.emit_cram,
                         barcode_kit=run.barcode_kit,
+                        estimate_poly_a=run.estimate_poly_a,
                     )
 
                     # Temporary fix for DOR-1428. Fix SUP batchsize for orin to 32 to
@@ -292,6 +302,7 @@ class TestDorado(unittest.TestCase):
         emit_summary: bool,
         barcode_kit: str | None = None,
         recursive: bool = False,
+        estimate_poly_a: bool = False,
     ) -> list:
         device = "metal" if PLATFORM == "osx_arm" else "cuda:0"
         args = ["doradod"] if DEBUG else ["dorado"]
@@ -329,6 +340,8 @@ class TestDorado(unittest.TestCase):
                     str(barcode_kit),
                 ]
             )
+        if estimate_poly_a:
+            args.append("--estimate-poly-a")
         return args
 
 
