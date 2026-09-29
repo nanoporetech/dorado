@@ -11,7 +11,7 @@
 
 namespace dorado::secondary {
 
-static constexpr std::string_view VCF_DEFAULT_SAMPLE{"SAMPLE"};
+static const std::string VCF_DEFAULT_SAMPLE{"SAMPLE"};
 
 class VCFWriter {
 public:
@@ -27,7 +27,7 @@ public:
               const Filters::FilterType filters,
               const std::vector<std::pair<std::string, int64_t>>& contigs,
               bool include_gvcf_headers,
-              std::string_view sample_name,
+              const std::string& sample_name,
               std::string_view command_line);
 
     void write_variant(const Variant& variant);

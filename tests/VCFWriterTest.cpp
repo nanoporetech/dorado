@@ -150,8 +150,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         // Write data to a file.
         {
             const std::string command_line = "dorado smallvar reads.bam reference.fa --device cpu";
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
-                             command_line);
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                             secondary::VCF_DEFAULT_SAMPLE, command_line);
             writer.write_variant(data.first_variant);
             writer.write_variant(data.second_variant);
             writer.write_variant(data.third_variant);
@@ -207,7 +207,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
             CATCH_REQUIRE(header);
             CATCH_CHECK(bcf_hdr_nsamples(header.get()) == 1);
-            CATCH_CHECK(std::string(header->samples[0]) == "SAMPLE");
+            CATCH_CHECK(header->samples[0] == secondary::VCF_DEFAULT_SAMPLE);
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr1") == 0);
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr2") == 1);
 
@@ -236,7 +236,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     // clang-format off
     CATCH_SECTION("writes gVCF header metadata when requested and tests that the writer sets the variant source FORMAT field to the missing value (\".\") when not provided") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, true, "SAMPLE", std::string_view{});
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, true, secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
             writer.write_variant(data.first_variant);
 
             Variant no_call_variant{
@@ -279,8 +279,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             "preserves an explicit variant source FORMAT field instead of defaulting to the "
             "missing value") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
-                             std::string_view{});
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                             secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
             Variant variant = data.first_variant;
             variant.format = {
                     {"GT", "0/1"},
@@ -302,16 +302,16 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects filters missing from the header") {
-        VCFWriter writer(data.vcf_path, Filters::LowQual, data.contigs, false, "SAMPLE",
-                         std::string_view{});
+        VCFWriter writer(data.vcf_path, Filters::LowQual, data.contigs, false,
+                         secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
 
         CATCH_CHECK_THROWS_WITH(writer.write_variant(data.third_variant),
                                 Catch::Matchers::ContainsSubstring("not found in header"));
     }
 
     CATCH_SECTION("write_variant rejects unexpected INFO fields") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
-                         std::string_view{});
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                         secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
         Variant variant = data.first_variant;
         variant.info = {{"PIZZA", "1"}};
 
@@ -320,8 +320,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant rejects unexpected FORMAT fields") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
-                         std::string_view{});
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                         secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
         Variant variant = data.first_variant;
         variant.format = {{"GT", "0/1"}, {"PIZZA", "1"}};
 
@@ -331,8 +331,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
     }
 
     CATCH_SECTION("write_variant requires GT genotype information") {
-        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
-                         std::string_view{});
+        VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                         secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
         Variant variant = data.first_variant;
         variant.format = {{"GQ", "45"}};
 
@@ -343,8 +343,8 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
     CATCH_SECTION("writes_variant skips empty string") {
         {
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "SAMPLE",
-                             std::string_view{});
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                             secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
 
             Variant empty_list_variant{
                     .seq_id = 0,

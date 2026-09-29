@@ -535,9 +535,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
                                    : std::nullopt;
     opt.min_mapq = parser.present<int32_t>("min-mapq");
     opt.ambig_ref = parser.get<bool>("ambig-ref");
-    opt.sample_name =
-            (parser.is_used("--sample-name") ? parser.get<std::string>("sample-name")
-                                             : std::string(secondary::VCF_DEFAULT_SAMPLE));
+    opt.sample_name = parser.get<std::string>("sample-name");
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
     opt.candidate_variants_path = parser.present<std::string>("candidates");
@@ -1092,7 +1090,7 @@ void run_variant_calling(const Options& opt,
                          const secondary::ModelConfig& model_config,
                          smallvar::VariantResources& resources,
                          secondary::Stats& stats,
-                         const std::string_view sample_name) {
+                         const std::string& sample_name) {
     DORADO_LOG(info, "Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
                opt.infer_threads, std::size(resources.devices));
 
@@ -1562,7 +1560,7 @@ int small_variant_caller(int argc, char* argv[]) {
         // Set the sample name for VCF output
         // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
         // If the BAM contains multiple sample names, exit and ask for user instruction.
-        std::string_view sample_name = opt.sample_name;
+        std::string sample_name = opt.sample_name;
         if (!parser.is_used("--sample-name") && !std::empty(bam_info.sample_names)) {
             if (std::size(bam_info.sample_names) > 1) {
                 DORADO_LOG(error, "BAM read groups contain multiple sample names: {}",

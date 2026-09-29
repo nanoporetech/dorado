@@ -387,9 +387,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
 
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
-    opt.sample_name =
-            (parser.is_used("--sample-name") ? parser.get<std::string>("sample-name")
-                                             : std::string(secondary::VCF_DEFAULT_SAMPLE));
+    opt.sample_name = parser.get<std::string>("sample-name");
 
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
@@ -868,7 +866,7 @@ void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
                    secondary::Stats& stats,
-                   const std::string_view sample_name) {
+                   const std::string& sample_name) {
     DORADO_LOG(info, "Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
                opt.infer_threads, std::size(resources.devices));
 
@@ -1298,7 +1296,7 @@ int polish(int argc, char* argv[]) {
         }
 
         // Set the sample name for VCF output
-        std::string_view sample_name = opt.sample_name;
+        std::string sample_name = opt.sample_name;
         if (opt.run_variant_calling) {
             // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
             // If the BAM contains multiple sample names, exit and ask for user instruction.

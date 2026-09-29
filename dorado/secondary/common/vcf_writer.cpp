@@ -144,7 +144,7 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
                      const Filters::FilterType filters,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
                      const bool include_gvcf_headers,
-                     const std::string_view sample_name,
+                     const std::string& sample_name,
                      const std::string_view command_line)
         : m_vcf_fp{hts_open(in_fn.string().c_str(), "w")},
           m_header{bcf_hdr_init("w")},
@@ -205,8 +205,8 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
     }
 
     // string cast to ensure null-termination
-    if (bcf_hdr_add_sample(m_header.get(), std::string(sample_name).c_str()) != 0) {
-        throw std::runtime_error("Failed to add sample: " + std::string(sample_name));
+    if (bcf_hdr_add_sample(m_header.get(), sample_name.c_str()) != 0) {
+        throw std::runtime_error("Failed to add sample: " + sample_name);
     }
 
     // Write the header to the file
