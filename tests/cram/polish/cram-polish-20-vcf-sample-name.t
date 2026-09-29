@@ -51,7 +51,7 @@ Test fallback when no other source of sample name.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > in_bam=${in_dir}/in.aln.norg.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --any-bam > out/out.vcf 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'

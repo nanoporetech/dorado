@@ -124,7 +124,7 @@ Resolve the model from a local Polishing model path.
 Resolve the model from a local path.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model="${MODEL_DIR:-${MODEL_ROOT_DIR}/dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv}"
+  > model="${POLISH_MODEL:-${MODEL_ROOT_DIR}/dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv}"
   > ### Run the unit under test.
   > ${DORADO_BIN} polish -v --device cpu data/in.micro.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 --model-override "${model}" > out/out.fasta 2> out/out.fasta.stderr
   > ### Eval.
@@ -208,7 +208,7 @@ Passing test with warnings: Basecaller model specified in the BAM does not match
 The `--model-override` option allows this, but emits a warning.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > ### Create the mocked data for a non-supported basecaller version (1.0.0).
   > samtools view -h data/in.micro.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
@@ -255,7 +255,7 @@ Incompatible label scheme should fail even with `--model-override`.
 Using `--model-override`.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > model="${SMALLVAR_MODEL_DIR}"
+  > model="${SMALLVAR_MODEL}"
   > ### Run the unit under test.
   > ${DORADO_BIN} polish --device cpu data/in.micro.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 -vv --model-override "${model}" > out/out.fasta 2> out/out.fasta.stderr
   > ### Eval.

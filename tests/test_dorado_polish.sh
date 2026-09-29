@@ -40,50 +40,39 @@ fi
 CRAM=$(pwd)/cram-0.6/cram.py
 popd
 
-MODEL_ROOT_DIR=${output_dir}
-
-# Download the model once.
 SMALLVAR_MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0"
-SMALLVAR_MODEL_DIR=${output_dir}/${SMALLVAR_MODEL_NAME}
-if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${SMALLVAR_MODEL_NAME}" --models-directory ${output_dir}
-fi
+POLISH_MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv"
 
-# Download the model once.
-MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish"
-MODEL_DIR=${MODEL_ROOT_DIR}/${MODEL_NAME}
-if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
-fi
-
-# Download the model once.
-MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl"
-MODEL_DIR=${MODEL_ROOT_DIR}/${MODEL_NAME}
-if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
-fi
-
-# Download the model once.
-MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv"
-MODEL_DIR=${MODEL_ROOT_DIR}/${MODEL_NAME}
-if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
-fi
-
-# Download the model once.
-MODEL_NAME_v52="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl_mv"
-MODEL_DIR_v52=${MODEL_ROOT_DIR}/${MODEL_NAME_v52}
-if [[ ! -d "${MODEL_DIR_v52}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME_v52}" --models-directory ${output_dir}
-fi
+# Download the models once.
+for model in \
+  "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish" \
+  "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish" \
+  "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl" \
+  ${POLISH_MODEL_NAME} \
+  "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl" \
+  "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_polish_rl_mv" \
+  "dna_r10.4.1_e8.2_400bps_hac@v6.0.0_polish_rl" \
+  "dna_r10.4.1_e8.2_400bps_hac@v6.0.0_polish_rl_mv" \
+  "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish" \
+  "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish" \
+  "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl" \
+  "dna_r10.4.1_e8.2_400bps_sup@v5.0.0_polish_rl_mv" \
+  "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl" \
+  "dna_r10.4.1_e8.2_400bps_sup@v5.2.0_polish_rl_mv" \
+  "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0" \
+  ${SMALLVAR_MODEL_NAME} \
+; do
+  model_dir=${output_dir}/${model}
+  if [[ ! -d "${model_dir}" ]]; then
+      ${DORADO_BIN} download --model "${model}" --models-directory ${output_dir}
+  fi
+done
 
 export DORADO_BIN
 export TEST_DATA_DIR
-export MODEL_NAME
-export MODEL_DIR
-export MODEL_ROOT_DIR
-export SMALLVAR_MODEL_NAME
-export SMALLVAR_MODEL_DIR
+export MODEL_ROOT_DIR=${output_dir}
+export POLISH_MODEL=${MODEL_ROOT_DIR}/${POLISH_MODEL_NAME}
+export SMALLVAR_MODEL=${MODEL_ROOT_DIR}/${SMALLVAR_MODEL_NAME}
 export OUTPUT_DIR=${output_dir}
 python3 \
     ${CRAM} \
