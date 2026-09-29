@@ -371,9 +371,10 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
     CATCH_SECTION("sample name is set appropriately") {
         // Write data to a file.
+        const std::string test_sample_name{"TEST_HUMAN"};
         {
             const std::string command_line = "dorado smallvar reads.bam reference.fa --device cpu";
-            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, "TEST_HUMAN",
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false, test_sample_name,
                              command_line);
             writer.write_variant(data.first_variant);
             writer.write_variant(data.second_variant);
@@ -383,10 +384,10 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
         // Check that the VCF text file contains the important lines.
         {
             const std::string vcf_text = ReadFileIntoString(data.vcf_path);
-            CATCH_CHECK_THAT(
-                    vcf_text,
-                    Catch::Matchers::ContainsSubstring(
-                            "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\tTEST_HUMAN"));
+            CATCH_CHECK_THAT(vcf_text,
+                             Catch::Matchers::ContainsSubstring(
+                                     "#CHROM\tPOS\tID\tREF\tALT\tQUAL\tFILTER\tINFO\tFORMAT\t" +
+                                     test_sample_name));
         }
 
         // Parse the VCF with Htslib to check that it is valid.
@@ -398,7 +399,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
             CATCH_REQUIRE(header);
             CATCH_CHECK(bcf_hdr_nsamples(header.get()) == 1);
-            CATCH_CHECK(std::string(header->samples[0]) == "TEST_HUMAN");
+            CATCH_CHECK(header->samples[0] == test_sample_name);
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr1") == 0);
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr2") == 1);
 
