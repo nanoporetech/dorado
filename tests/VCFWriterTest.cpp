@@ -211,9 +211,9 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr1") == 0);
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr2") == 1);
 
-            BcfRecordPtr first_record{bcf_init(), BcfRecordDestructor{}};
-            BcfRecordPtr second_record{bcf_init(), BcfRecordDestructor{}};
-            BcfRecordPtr third_record{bcf_init(), BcfRecordDestructor{}};
+            BcfRecordPtr first_record{bcf_init()};
+            BcfRecordPtr second_record{bcf_init()};
+            BcfRecordPtr third_record{bcf_init()};
 
             CATCH_REQUIRE(first_record);
             CATCH_REQUIRE(second_record);
@@ -402,9 +402,9 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr1") == 0);
             CATCH_CHECK(bcf_hdr_name2id(header.get(), "chr2") == 1);
 
-            BcfRecordPtr first_record{bcf_init(), BcfRecordDestructor{}};
-            BcfRecordPtr second_record{bcf_init(), BcfRecordDestructor{}};
-            BcfRecordPtr third_record{bcf_init(), BcfRecordDestructor{}};
+            BcfRecordPtr first_record{bcf_init()};
+            BcfRecordPtr second_record{bcf_init()};
+            BcfRecordPtr third_record{bcf_init()};
 
             CATCH_REQUIRE(first_record);
             CATCH_REQUIRE(second_record);
