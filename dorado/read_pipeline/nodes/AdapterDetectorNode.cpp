@@ -110,9 +110,9 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         auto adapter_res = detector->find_adapters(seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
-    AdapterScoreResult primer_res;
     if (adapter_info->trim_primers) {
-        primer_res = detector->find_primers(seq, kit_name, adapter_info->primer_aux);
+        AdapterScoreResult primer_res =
+                detector->find_primers(seq, kit_name, adapter_info->primer_aux);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
         bam_message.data->primer_classification =
                 detector->classify_primers(primer_res, primer_trim_interval, seq);
@@ -163,9 +163,8 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         auto adapter_res = detector->find_adapters(read.read_common.seq, kit_name);
         adapter_trim_interval = Trimmer::determine_trim_interval(adapter_res, seqlen);
     }
-    AdapterScoreResult primer_res;
     if (adapter_info->trim_primers) {
-        primer_res =
+        AdapterScoreResult primer_res =
                 detector->find_primers(read.read_common.seq, kit_name, adapter_info->primer_aux);
         primer_trim_interval = Trimmer::determine_trim_interval(primer_res, seqlen);
         read.read_common.primer_classification =
