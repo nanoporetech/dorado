@@ -1536,7 +1536,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
 #endif
             std::vector<std::string> seqs{v.ref};
             seqs.insert(std::end(seqs), std::cbegin(v.alts), std::cend(v.alts));
-            return std::make_pair(v, seqs);
+            return std::make_pair(v, std::move(seqs));
         };
 
         std::vector<std::string> seqs{var.ref};

@@ -1064,7 +1064,7 @@ BarcodeClassifier::calculate_barcode_score_double_ends_dual(
 
     edlibFreeAlignResult(top_result);
     edlibFreeAlignResult(bottom_result);
-    return std::make_pair(results, results_inner);
+    return std::make_pair(std::move(results), std::move(results_inner));
 }
 
 float BarcodeClassifier::find_midstrand_barcode_double_ends(
@@ -1325,7 +1325,7 @@ BarcodeClassifier::calculate_barcode_score_dual(std::string_view read_seq,
     if (!candidate.top_context_inner.empty()) {
         edlibFreeAlignResult(top_result_inner);
     }
-    return std::make_pair(results, results_inner);
+    return std::make_pair(std::move(results), std::move(results_inner));
 }
 
 float BarcodeClassifier::find_midstrand_barcode_single_end(std::string_view read_seq,

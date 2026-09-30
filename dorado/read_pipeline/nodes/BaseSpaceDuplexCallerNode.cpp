@@ -62,7 +62,7 @@ std::pair<std::vector<char>, std::vector<char>> compute_basespace_consensus(
             query_cursor++;
         }
     }
-    return std::make_pair(consensus, quality_scores_phred);
+    return std::make_pair(std::move(consensus), std::move(quality_scores_phred));
 }
 }  // namespace
 
