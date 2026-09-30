@@ -1421,17 +1421,14 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
             if (dual_barcode) {
                 throw std::runtime_error("Unimplemented: Dual barcodes with different ends");
             }
-            std::vector<BarcodeScoreResult> out = calculate_barcode_score_different_double_ends(
-                    fwd, *candidate, allowed_barcodes);
-            results.insert(results.end(), out.begin(), out.end());
+            results = calculate_barcode_score_different_double_ends(fwd, *candidate,
+                                                                    allowed_barcodes);
         } else {
             if (dual_barcode) {
                 std::tie(results, results_inner) =
                         calculate_barcode_score_double_ends_dual(fwd, *candidate, allowed_barcodes);
             } else {
-                std::vector<BarcodeScoreResult> out =
-                        calculate_barcode_score_double_ends(fwd, *candidate, allowed_barcodes);
-                results.insert(results.end(), out.begin(), out.end());
+                results = calculate_barcode_score_double_ends(fwd, *candidate, allowed_barcodes);
             }
         }
     } else {
@@ -1439,9 +1436,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
             std::tie(results, results_inner) = calculate_barcode_score_dual(
                     fwd, *candidate, allowed_barcodes, kit.rear_only_barcodes);
         } else {
-            std::vector<BarcodeScoreResult> out = calculate_barcode_score(
-                    fwd, *candidate, allowed_barcodes, kit.rear_only_barcodes);
-            results.insert(results.end(), out.begin(), out.end());
+            results = calculate_barcode_score(fwd, *candidate, allowed_barcodes,
+                                              kit.rear_only_barcodes);
         }
     }
 
