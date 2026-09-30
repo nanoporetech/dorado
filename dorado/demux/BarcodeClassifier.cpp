@@ -590,9 +590,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
             read_seq.substr(bottom_start, m_scoring_params.rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
-    EdlibAlignConfig mask_config = init_edlib_config_for_mask();
+    const EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
     std::string_view top_context_v1 = candidate.top_context;
     const auto& top_context_v1_left_buffer = candidate.top_context_left_buffer;
@@ -778,7 +778,7 @@ float BarcodeClassifier::find_midstrand_barcode_different_double_ends(
             read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
     int barcode_len = int(candidate.barcodes1[0].length());
 
@@ -830,9 +830,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
             read_seq.substr(bottom_start, m_scoring_params.rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
-    EdlibAlignConfig mask_config = init_edlib_config_for_mask();
+    const EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
     std::string_view top_context = candidate.top_context;
     const auto& top_left_buffer = candidate.top_context_left_buffer;
@@ -930,9 +930,9 @@ BarcodeClassifier::calculate_barcode_score_double_ends_dual(
             read_seq.substr(bottom_start, m_scoring_params.rear_barcode_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
-    EdlibAlignConfig mask_config = init_edlib_config_for_mask();
+    const EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
     std::string_view top_context = candidate.top_context;
     const auto& top_left_buffer = candidate.top_context_left_buffer;
@@ -1092,7 +1092,7 @@ float BarcodeClassifier::find_midstrand_barcode_double_ends(
             read_seq.substr(m_scoring_params.front_barcode_window, length_without_end_windows);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
     int barcode_len = int(candidate.barcodes1[0].length());
 
@@ -1131,9 +1131,9 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
     }
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
-    EdlibAlignConfig mask_config = init_edlib_config_for_mask();
+    const EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
     std::string_view top_context = candidate.top_context;
     int barcode_len = int(candidate.barcodes1[0].length());
@@ -1220,9 +1220,9 @@ BarcodeClassifier::calculate_barcode_score_dual(std::string_view read_seq,
     }
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
-    EdlibAlignConfig mask_config = init_edlib_config_for_mask();
+    const EdlibAlignConfig mask_config = init_edlib_config_for_mask();
 
     std::string_view top_context = candidate.top_context;
     int barcode_len = int(candidate.barcodes1[0].length());
@@ -1354,7 +1354,7 @@ float BarcodeClassifier::find_midstrand_barcode_single_end(std::string_view read
                                                     length_without_end_window);
 
     // Try to find the location of the barcode + flanks in the top and bottom windows.
-    EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
+    const EdlibAlignConfig placement_config = init_edlib_config_for_flanks();
 
     int barcode_len = int(candidate.barcodes1[0].length());
 
