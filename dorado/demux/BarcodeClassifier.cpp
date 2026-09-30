@@ -1414,68 +1414,78 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 
     // Then find the best barcode hit within that kit.
-    std::vector<BarcodeScoreResult> results;
-    std::vector<BarcodeScoreResult> results_inner;
+    std::vector<BarcodeScoreResult> results_unsorted;
+    std::vector<BarcodeScoreResult> results_inner_unsorted;
     if (kit.double_ends) {
         if (kit.ends_different) {
             if (dual_barcode) {
                 throw std::runtime_error("Unimplemented: Dual barcodes with different ends");
             }
-            results = calculate_barcode_score_different_double_ends(fwd, *candidate,
-                                                                    allowed_barcodes);
+            results_unsorted = calculate_barcode_score_different_double_ends(fwd, *candidate,
+                                                                             allowed_barcodes);
         } else {
             if (dual_barcode) {
-                std::tie(results, results_inner) =
+                std::tie(results_unsorted, results_inner_unsorted) =
                         calculate_barcode_score_double_ends_dual(fwd, *candidate, allowed_barcodes);
             } else {
-                results = calculate_barcode_score_double_ends(fwd, *candidate, allowed_barcodes);
+                results_unsorted =
+                        calculate_barcode_score_double_ends(fwd, *candidate, allowed_barcodes);
             }
         }
     } else {
         if (dual_barcode) {
-            std::tie(results, results_inner) = calculate_barcode_score_dual(
+            std::tie(results_unsorted, results_inner_unsorted) = calculate_barcode_score_dual(
                     fwd, *candidate, allowed_barcodes, kit.rear_only_barcodes);
         } else {
-            results = calculate_barcode_score(fwd, *candidate, allowed_barcodes,
-                                              kit.rear_only_barcodes);
+            results_unsorted = calculate_barcode_score(fwd, *candidate, allowed_barcodes,
+                                                       kit.rear_only_barcodes);
         }
     }
 
-    if (results.empty()) {
+    if (results_unsorted.empty()) {
         spdlog::warn("Barcode unclassified because no barcodes found in kit.");
         return UNCLASSIFIED;
     }
 
+    // Sort by reference rather than by value since swapping |BarcodeScoreResult| are expensive.
+    // TODO: revisit this after we reduce the complexity of |BarcodeScoreResult|
+    std::vector<const BarcodeScoreResult*> results(results_unsorted.size());
+    std::vector<const BarcodeScoreResult*> results_inner(results_inner_unsorted.size());
+    std::transform(results_unsorted.begin(), results_unsorted.end(), results.begin(),
+                   [](const BarcodeScoreResult& result) { return &result; });
+    std::transform(results_inner_unsorted.begin(), results_inner_unsorted.end(),
+                   results_inner.begin(), [](const BarcodeScoreResult& result) { return &result; });
+
     // Sort the scores windows by their barcode score.
     std::sort(results.begin(), results.end(),
-              [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
+              [](const auto* l, const auto* r) { return l->penalty < r->penalty; });
     std::sort(results_inner.begin(), results_inner.end(),
-              [](const auto& l, const auto& r) { return l.penalty < r.penalty; });
+              [](const auto* l, const auto* r) { return l->penalty < r->penalty; });
 
 #if ENABLE_PER_READ_TRACE
     {
         std::string scores;
         for (const auto& s : results) {
-            scores.append(s.barcode_name)
+            scores.append(s->barcode_name)
                     .append(" ")
-                    .append(std::to_string(s.penalty))
+                    .append(std::to_string(s->penalty))
                     .append(", ");
         }
         utils::trace_log("Scores: {}", scores);
     }
 #endif
 
-    const auto are_penalties_acceptable = [this](const auto& proposal) {
+    const auto are_penalties_acceptable = [this](const BarcodeScoreResult& proposal) {
         // If barcode penalty is 0, it's a perfect match. Consider it a pass.
         return (proposal.penalty == 0) ||
                ((proposal.penalty <= m_scoring_params.max_barcode_penalty) &&
                 (proposal.flank_score >= m_scoring_params.min_flank_score));
     };
     const auto first_result_matches =
-            [this,
-             &are_penalties_acceptable](const std::vector<BarcodeScoreResult>& barcode_results) {
-                const BarcodeScoreResult& best_result = barcode_results.at(0);
-                const BarcodeScoreResult& second_best_result = barcode_results.at(1);
+            [this, &are_penalties_acceptable](
+                    const std::vector<const BarcodeScoreResult*>& barcode_results) {
+                const BarcodeScoreResult& best_result = *barcode_results.at(0);
+                const BarcodeScoreResult& second_best_result = *barcode_results.at(1);
                 const int penalty_dist = second_best_result.penalty - best_result.penalty;
 
                 // If the first result is far enough ahead of the second and the penalty is low then it's a clear winner.
@@ -1490,23 +1500,23 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
                 return first_is_clear_winner || first_beats_second;
             };
 
-    auto best_result = results.begin();
+    const BarcodeScoreResult& best_result = *results.front();
     BarcodeScoreResult out = UNCLASSIFIED;
     if (results.size() == 1) {
-        if (are_penalties_acceptable(*best_result)) {
-            out = *best_result;
+        if (are_penalties_acceptable(best_result)) {
+            out = best_result;
         }
     } else {
         // NB: this test will pass if _either_ barcode is close enough to the end of the read for a both ends kit.
         const bool barcode_proximity_ok =
-                (best_result->top_barcode_pos.first >= 0 &&
-                 best_result->top_barcode_pos.first <= m_scoring_params.barcode_end_proximity) ||
-                (best_result->bottom_barcode_pos.second >= 0 &&
-                 best_result->bottom_barcode_pos.second >=
+                (best_result.top_barcode_pos.first >= 0 &&
+                 best_result.top_barcode_pos.first <= m_scoring_params.barcode_end_proximity) ||
+                (best_result.bottom_barcode_pos.second >= 0 &&
+                 best_result.bottom_barcode_pos.second >=
                          int(read_seq.length() - m_scoring_params.barcode_end_proximity));
 
         if (first_result_matches(results) && barcode_proximity_ok) {
-            out = *best_result;
+            out = best_result;
         } else {
             return UNCLASSIFIED;
         }
@@ -1514,7 +1524,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
 
     // If the kit has dual barcodes, check them and add them into the result if it passes.
     if (dual_barcode) {
-        auto best_result_inner = results_inner.begin();
+        const BarcodeScoreResult* const best_result_inner = results_inner.front();
         if (results.size() == 1) {
             if (!are_penalties_acceptable(*best_result_inner)) {
                 return UNCLASSIFIED;
@@ -1548,7 +1558,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         }
 
         if (dual_barcode) {
-            auto best_result_inner = results_inner.begin();
+            const BarcodeScoreResult* const best_result_inner = results_inner.front();
             if (std::max(best_result_inner->top_penalty, best_result_inner->bottom_penalty) >
                 m_scoring_params.max_barcode_penalty) {
                 utils::trace_log(
@@ -1564,32 +1574,32 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     if (kit.double_ends) {
         // For more stringent classification, ensure that neither end of a read has a higher scoring
         //  barcode, if any of the barcodes at that end are better than the threshold.
-        auto best_top_result = std::min_element(
+        const BarcodeScoreResult* const best_top_result = *std::min_element(
                 results.begin(), results.end(),
-                [](const auto& l, const auto& r) { return l.top_penalty < r.top_penalty; });
-        auto best_bottom_result = std::min_element(
+                [](const auto* l, const auto* r) { return l->top_penalty < r->top_penalty; });
+        const BarcodeScoreResult* const best_bottom_result = *std::min_element(
                 results.begin(), results.end(),
-                [](const auto& l, const auto& r) { return l.bottom_penalty < r.bottom_penalty; });
+                [](const auto* l, const auto* r) { return l->bottom_penalty < r->bottom_penalty; });
 
-        if (best_result->barcode_name != UNCLASSIFIED.barcode_name &&
-            (((best_result->barcode_name != best_top_result->barcode_name) &&
+        if (best_result.barcode_name != UNCLASSIFIED.barcode_name &&
+            (((best_result.barcode_name != best_top_result->barcode_name) &&
               (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
-             ((best_result->barcode_name != best_bottom_result->barcode_name) &&
+             ((best_result.barcode_name != best_bottom_result->barcode_name) &&
               (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty)))) {
             utils::trace_log(
                     "Superior barcode found for arrangement {} : top best bc {}, bottom best bc {}",
-                    best_result->barcode_name, best_top_result->barcode_name,
+                    best_result.barcode_name, best_top_result->barcode_name,
                     best_bottom_result->barcode_name);
             return UNCLASSIFIED;
         }
         if (dual_barcode) {
-            auto best_result_inner = results_inner.begin();
-            auto best_top_result_inner = std::min_element(
+            const BarcodeScoreResult* const best_result_inner = results_inner.front();
+            const BarcodeScoreResult* const best_top_result_inner = *std::min_element(
                     results_inner.begin(), results_inner.end(),
-                    [](const auto& l, const auto& r) { return l.top_penalty < r.top_penalty; });
-            auto best_bottom_result_inner = std::min_element(
-                    results_inner.begin(), results_inner.end(), [](const auto& l, const auto& r) {
-                        return l.bottom_penalty < r.bottom_penalty;
+                    [](const auto* l, const auto* r) { return l->top_penalty < r->top_penalty; });
+            const BarcodeScoreResult* const best_bottom_result_inner = *std::min_element(
+                    results_inner.begin(), results_inner.end(), [](const auto* l, const auto* r) {
+                        return l->bottom_penalty < r->bottom_penalty;
                     });
 
             if (best_result_inner->barcode_name != UNCLASSIFIED.barcode_name &&
