@@ -1,6 +1,5 @@
 #include "demux/BarcodeClassifier.h"
 
-#include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
@@ -15,6 +14,10 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
+
+#if ENABLE_PER_READ_TRACE
+#include "utils/alignment_utils.h"
+#endif
 
 namespace dorado {
 
@@ -119,19 +122,22 @@ std::pair<int, int> extract_dual_mask_location(EdlibAlignResult aln, std::string
 // Helper function to locally align the flanks with barcode mask
 // against a subsequence of the read (either front or rear window)
 // and return the alignment, score & barcode position.
-std::tuple<EdlibAlignResult, float, int> extract_flank_fit(std::string_view strand,
-                                                           std::string_view read,
-                                                           int barcode_len,
-                                                           const EdlibAlignConfig& placement_config,
-                                                           const char* debug_prefix) {
+std::tuple<EdlibAlignResult, float, int> extract_flank_fit(
+        std::string_view strand,
+        std::string_view read,
+        int barcode_len,
+        const EdlibAlignConfig& placement_config,
+        [[maybe_unused]] const char* debug_prefix) {
     EdlibAlignResult result = edlibAlign(strand.data(), int(strand.length()), read.data(),
                                          int(read.length()), placement_config);
     float score = 1.f - static_cast<float>(result.editDistance) / (strand.length() - barcode_len);
     int bc_loc = extract_mask_location(result, strand);
+#if ENABLE_PER_READ_TRACE
     utils::trace_log("{} dist {} position {} bc_loc {} score {}", debug_prefix, result.editDistance,
                      result.startLocations[0], bc_loc, score);
     // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
     utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
+#endif
     return {result, score, bc_loc};
 }
 
@@ -143,15 +149,17 @@ std::tuple<EdlibAlignResult, float, int, int> extract_flank_fit_dual(
         std::string_view read,
         int barcode_len,
         const EdlibAlignConfig& placement_config,
-        const char* debug_prefix) {
+        [[maybe_unused]] const char* debug_prefix) {
     EdlibAlignResult result = edlibAlign(strand.data(), int(strand.length()), read.data(),
                                          int(read.length()), placement_config);
     float score = 1.f - static_cast<float>(result.editDistance) / (strand.length() - barcode_len);
     auto [bc_loc, bc_loc_inner] = extract_dual_mask_location(result, strand);
+#if ENABLE_PER_READ_TRACE
     utils::trace_log("{} dist {} position {} bc_loc {} bc_loc_inner {} score {}", debug_prefix,
                      result.editDistance, result.startLocations[0], bc_loc, bc_loc_inner, score);
     // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
     utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
+#endif
     return {result, score, bc_loc, bc_loc_inner};
 }
 
@@ -160,14 +168,16 @@ std::tuple<EdlibAlignResult, float, int, int> extract_flank_fit_dual(
 int extract_barcode_penalty(std::string_view barcode,
                             std::string_view read,
                             const EdlibAlignConfig& config,
-                            const char* debug_prefix) {
+                            [[maybe_unused]] const char* debug_prefix) {
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto penalty = result.editDistance;
+#if ENABLE_PER_READ_TRACE
     utils::trace_log(
             "{} {}\n{}", debug_prefix, penalty,
             // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
             utils::alignment_to_str(barcode.data(), read.data(), result));
+#endif
     edlibFreeAlignResult(result);
     return penalty;
 }
