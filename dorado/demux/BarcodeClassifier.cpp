@@ -43,7 +43,7 @@ EdlibAlignConfig init_edlib_config_for_mask() {
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
     mask_config.task =
-            (spdlog::get_level() == spdlog::level::trace) ? EDLIB_TASK_PATH : EDLIB_TASK_LOC;
+            (spdlog::get_level() == spdlog::level::trace) ? EDLIB_TASK_PATH : EDLIB_TASK_DISTANCE;
     return mask_config;
 }
 
