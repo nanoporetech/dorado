@@ -4,6 +4,7 @@
 #include "utils/math_utils.h"
 #include "utils/string_utils.h"
 
+#include <algorithm>
 #include <cassert>
 #include <numeric>
 #include <span>
@@ -26,6 +27,29 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
     std::vector<uint8_t> moves;
     std::vector<std::string_view> sequences;
     std::vector<std::string_view> qstrings;
+    std::vector<uint8_t> base_mod_probs;
+    std::vector<bool> base_mod_simplex_motif_hits;
+
+    const auto mod_chunk = std::find_if(called_chunks.begin(), called_chunks.end(),
+                                        [](auto chunk) { return !chunk->base_mod_probs.empty(); });
+    const size_t num_states =
+            mod_chunk == called_chunks.end()
+                    ? 0
+                    : (*mod_chunk)->base_mod_probs.size() / (*mod_chunk)->seq.size();
+
+    auto append_modbase_data = [&](const Chunk& chunk, size_t start, size_t length) {
+        if (num_states != 0) {
+            assert(chunk.base_mod_probs.size() == chunk.seq.size() * num_states);
+            const auto begin = chunk.base_mod_probs.begin() + start * num_states;
+            base_mod_probs.insert(base_mod_probs.end(), begin, begin + length * num_states);
+        }
+        if (!chunk.base_mod_simplex_motif_hits.empty()) {
+            assert(chunk.base_mod_simplex_motif_hits.size() == chunk.seq.size());
+            const auto begin = chunk.base_mod_simplex_motif_hits.begin() + start;
+            base_mod_simplex_motif_hits.insert(base_mod_simplex_motif_hits.end(), begin,
+                                               begin + length);
+        }
+    };
 
     sequences.reserve(called_chunks.size());
     qstrings.reserve(called_chunks.size());
@@ -50,6 +74,7 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
         const std::string_view qstring = current_chunk->qstring;
         sequences.push_back(seq.substr(start_pos, trimmed_len));
         qstrings.push_back(qstring.substr(start_pos, trimmed_len));
+        append_modbase_data(*current_chunk, start_pos, trimmed_len);
 
         moves.insert(moves.end(), std::next(current_chunk->moves.begin(), mid_point_front),
                      std::prev(current_chunk->moves.end(), mid_point_rear));
@@ -79,16 +104,20 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
         const int end = std::reduce(last_moves.begin(), last_moves.end(), 0);
         sequences.push_back(last_seq.substr(start_pos, end));
         qstrings.push_back(last_qstring.substr(start_pos, end));
+        append_modbase_data(*last_chunk, start_pos, end);
 
     } else {
         sequences.push_back(last_seq.substr(start_pos));
         qstrings.push_back(last_qstring.substr(start_pos));
+        append_modbase_data(*last_chunk, start_pos, last_seq.size() - start_pos);
         last_moves = last_moves.subspan(mid_point_front);
     }
 
     // Set the read seq and qstring
     read_common.seq = utils::join(sequences, {});
     read_common.qstring = utils::join(qstrings, {});
+    read_common.base_mod_probs = std::move(base_mod_probs);
+    read_common.base_mod_simplex_motif_hits = std::move(base_mod_simplex_motif_hits);
     read_common.moves = std::move(moves);
     read_common.moves.insert(std::end(read_common.moves), std::begin(last_moves),
                              std::end(last_moves));
@@ -100,11 +129,22 @@ void stitch_chunks(ReadCommon& read_common, std::span<const Chunk*> called_chunk
         if (read_common.moves.back() == 1) {
             read_common.seq.pop_back();
             read_common.qstring.pop_back();
+            if (num_states != 0) {
+                read_common.base_mod_probs.resize(read_common.base_mod_probs.size() - num_states);
+            }
+            if (!read_common.base_mod_simplex_motif_hits.empty()) {
+                read_common.base_mod_simplex_motif_hits.pop_back();
+            }
         }
         read_common.moves.pop_back();
         assert(size_t(std::reduce(read_common.moves.begin(), read_common.moves.end(), 0)) ==
                read_common.seq.size());
     }
+
+    assert(num_states == 0 ||
+           read_common.base_mod_probs.size() == read_common.seq.size() * num_states);
+    assert(read_common.base_mod_simplex_motif_hits.empty() ||
+           read_common.base_mod_simplex_motif_hits.size() == read_common.seq.size());
 }
 
 }  // namespace dorado::utils
