@@ -10,6 +10,8 @@ struct DecodedChunk {
     std::string sequence;
     std::string qstring;
     std::vector<uint8_t> moves;
+    std::vector<uint8_t> base_mod_probs{};
+    std::vector<bool> base_mod_simplex_motif_hits{};
 };
 
 struct DecoderOptions {

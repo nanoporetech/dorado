@@ -140,9 +140,9 @@ std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(const DecodeData& data)
                         options.beam_cut, options.blank_score, options.q_shift, options.q_scale,
                         1.0f);
                 chunk_results[t_first_chunk + chunk_idx] = DecodedChunk{
-                        std::move(sequence),
-                        std::move(qstring),
-                        std::move(moves),
+                        .sequence = std::move(sequence),
+                        .qstring = std::move(qstring),
+                        .moves = std::move(moves),
                 };
             }
         });
