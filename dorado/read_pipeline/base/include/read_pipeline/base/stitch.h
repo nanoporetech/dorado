@@ -28,6 +28,8 @@ struct Chunk {
     std::string seq;
     std::string qstring;
     std::vector<uint8_t> moves;  // For stitching.
+    std::vector<uint8_t> base_mod_probs;
+    std::vector<bool> base_mod_simplex_motif_hits;
 };
 
 // Given a read and its unstitched chunks, stitch the chunks (accounting for overlap) and assign basecalled read and
