@@ -90,7 +90,7 @@ private:
     std::atomic<int> m_alignments_processed{0};
     std::atomic<size_t> m_reads_to_infer{0};
 
-    std::atomic<bool> m_copy_terminate{false};
+    bool m_copy_terminate{false};
 
     std::string m_furthest_skip_header;
     std::unordered_set<std::string> m_skip_set;
