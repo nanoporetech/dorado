@@ -203,6 +203,9 @@ void BasecallerNode::basecall_current_batch(BatchedChunks &current_batch,
         batched_chunks[i]->seq = std::move(decode_results[i].sequence);
         batched_chunks[i]->qstring = std::move(decode_results[i].qstring);
         batched_chunks[i]->moves = std::move(decode_results[i].moves);
+        batched_chunks[i]->base_mod_probs = std::move(decode_results[i].base_mod_probs);
+        batched_chunks[i]->base_mod_simplex_motif_hits =
+                std::move(decode_results[i].base_mod_simplex_motif_hits);
     }
 
     for (auto &complete_chunk : batched_chunks) {
