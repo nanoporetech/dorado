@@ -65,6 +65,17 @@ std::vector<const dorado::utils::Chunk *> make_chunk_ptrs(
     return chunks;
 }
 
+void add_modbase_data(dorado::utils::Chunk &chunk, uint8_t chunk_id) {
+    constexpr size_t NUM_STATES = 6;
+    for (size_t base = 0; base < chunk.seq.size(); ++base) {
+        for (size_t state = 0; state < NUM_STATES; ++state) {
+            chunk.base_mod_probs.push_back(
+                    static_cast<uint8_t>(chunk_id * 32 + base * NUM_STATES + state));
+        }
+        chunk.base_mod_simplex_motif_hits.push_back(base % 2 == 0);
+    }
+}
+
 }  // namespace
 
 CATCH_TEST_CASE("Test stitch_chunks", TEST_GROUP) {
@@ -124,6 +135,7 @@ CATCH_TEST_CASE("Test stitch_chunks trims non-full final chunks", TEST_GROUP) {
         called_chunks[0].seq = "ACGT";
         called_chunks[0].qstring = "abcd";
         called_chunks[0].moves = {1, 1, 0, 1, 1};
+        add_modbase_data(called_chunks[0], 0);
 
         auto read_common = make_read_common(7, STRIDE);
         auto chunks = make_chunk_ptrs(called_chunks);
@@ -132,6 +144,9 @@ CATCH_TEST_CASE("Test stitch_chunks trims non-full final chunks", TEST_GROUP) {
         CATCH_CHECK(read_common.seq == "AC");
         CATCH_CHECK(read_common.qstring == "ab");
         CATCH_CHECK(read_common.moves == std::vector<uint8_t>{1, 1, 0});
+        CATCH_CHECK(read_common.base_mod_probs ==
+                    std::vector<uint8_t>{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11});
+        CATCH_CHECK(read_common.base_mod_simplex_motif_hits == std::vector<bool>{true, false});
     }
 
     CATCH_SECTION("multiple VCS chunks trim the padded tail of the final chunk") {
@@ -166,4 +181,36 @@ CATCH_TEST_CASE("Test stitch_chunks trims non-full final chunks", TEST_GROUP) {
         CATCH_CHECK(read_common.qstring == "ab");
         CATCH_CHECK(read_common.moves == std::vector<uint8_t>{1, 1, 0});
     }
+}
+
+CATCH_TEST_CASE("Test stitch_chunks stitches modification base data", TEST_GROUP) {
+    constexpr int STRIDE = 1;
+    constexpr size_t NUM_STATES = 6;
+
+    std::vector<dorado::utils::Chunk> called_chunks{{0, 6}, {4, 6}};
+    called_chunks[0].seq = "ACGT";
+    called_chunks[0].qstring = "abcd";
+    called_chunks[0].moves = {1, 0, 1, 0, 1, 1};
+    add_modbase_data(called_chunks[0], 0);
+    called_chunks[1].seq = "TGCA";
+    called_chunks[1].qstring = "wxyz";
+    called_chunks[1].moves = {1, 0, 1, 1, 0, 1};
+    add_modbase_data(called_chunks[1], 1);
+
+    auto read_common = make_read_common(10, STRIDE);
+    auto chunks = make_chunk_ptrs(called_chunks);
+    CATCH_REQUIRE_NOTHROW(dorado::utils::stitch_chunks(read_common, chunks, false));
+
+    CATCH_REQUIRE(read_common.seq == "ACGGCA");
+    CATCH_REQUIRE(read_common.base_mod_probs.size() == read_common.seq.size() * NUM_STATES);
+    CATCH_CHECK(std::vector<uint8_t>(read_common.base_mod_probs.begin(),
+                                     read_common.base_mod_probs.begin() + 3 * NUM_STATES) ==
+                std::vector<uint8_t>(called_chunks[0].base_mod_probs.begin(),
+                                     called_chunks[0].base_mod_probs.begin() + 3 * NUM_STATES));
+    CATCH_CHECK(std::vector<uint8_t>(read_common.base_mod_probs.begin() + 3 * NUM_STATES,
+                                     read_common.base_mod_probs.end()) ==
+                std::vector<uint8_t>(called_chunks[1].base_mod_probs.begin() + NUM_STATES,
+                                     called_chunks[1].base_mod_probs.end()));
+    CATCH_CHECK(read_common.base_mod_simplex_motif_hits ==
+                std::vector<bool>{true, false, true, false, true, false});
 }
