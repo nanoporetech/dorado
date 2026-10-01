@@ -206,7 +206,7 @@ std::pair<std::string, barcode_kits::KitInfo> parse_custom_arrangement(
         new_kit.rna_barcodes = toml::find<bool>(config, "rna_barcodes");
     }
 
-    return std::make_pair(kit_name, new_kit);
+    return std::make_pair(std::move(kit_name), std::move(new_kit));
 }
 
 dorado::barcode_kits::BarcodeKitScoringParams parse_scoring_params(
@@ -276,8 +276,9 @@ bool try_configure_custom_barcode_sequences(const std::optional<std::string>& cu
     try {
         std::unordered_map<std::string, std::string> custom_barcodes;
         auto custom_sequences = parse_custom_sequences(*custom_seqs);
-        for (const auto& entry : custom_sequences) {
-            custom_barcodes.emplace(std::make_pair(entry.name, entry.sequence));
+        for (auto& entry : custom_sequences) {
+            custom_barcodes.emplace(
+                    std::make_pair(std::move(entry.name), std::move(entry.sequence)));
         }
         barcode_kits::add_custom_barcodes(custom_barcodes);
     } catch (const std::exception& e) {

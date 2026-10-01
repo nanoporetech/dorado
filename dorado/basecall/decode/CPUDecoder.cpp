@@ -135,14 +135,14 @@ std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(const DecodeData& data)
 
             // Iter over n in nTC, passing TC tensors to beam_search_decode
             for (int chunk_idx = 0; chunk_idx < t_num_chunks; chunk_idx++) {
-                auto decode_result = beam_search_decode(t_scores[chunk_idx], bwd[chunk_idx],
-                                                        posts[chunk_idx], options.beam_width,
-                                                        options.beam_cut, options.blank_score,
-                                                        options.q_shift, options.q_scale, 1.0f);
+                auto [sequence, qstring, moves] = beam_search_decode(
+                        t_scores[chunk_idx], bwd[chunk_idx], posts[chunk_idx], options.beam_width,
+                        options.beam_cut, options.blank_score, options.q_shift, options.q_scale,
+                        1.0f);
                 chunk_results[t_first_chunk + chunk_idx] = DecodedChunk{
-                        std::get<0>(decode_result),
-                        std::get<1>(decode_result),
-                        std::get<2>(decode_result),
+                        std::move(sequence),
+                        std::move(qstring),
+                        std::move(moves),
                 };
             }
         });
