@@ -16,12 +16,6 @@
 
 // #define DEBUG_VARIANT_PERCEIVER_DATA_TYPES
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 #ifndef DEBUG_VARIANT_PERCEIVER_DATA_TYPES
 #define LOG_TRACE_DTYPE(...)
 #else
@@ -966,7 +960,7 @@ ModelVariantPerceiver::ModelVariantPerceiver(const MustConstructWithFactory& cto
         m_latent_init = torch::empty(m_dimension);
         register_parameter("latent_init", m_latent_init);
     }
-    LOG_TRACE("Model requires reference: {}", m_latent_ref_init);
+    DORADO_LOG(trace, "Model requires reference: {}", m_latent_ref_init);
 
     // Mandatory feature columns.
     m_column_base = get_feature_column_or_throw(feature_column_map, FeatureColumns::BASE);

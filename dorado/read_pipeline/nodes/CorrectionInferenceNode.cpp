@@ -123,7 +123,7 @@ namespace dorado {
 
 void CorrectionInferenceNode::concat_features_and_send(const std::vector<std::string>& to_decode,
                                                        const std::string& read_name) {
-    LOG_TRACE("decoding window for {}", read_name);
+    DORADO_LOG(trace, "decoding window for {}", read_name);
     auto corrected_seqs = concatenate_corrected_windows(to_decode);
     if (corrected_seqs.size() == 1) {
         auto hts_data =
@@ -378,7 +378,7 @@ void CorrectionInferenceNode::input_thread_fn() {
             // Get the windows
             const int32_t tlen = alignments.overlaps[0].tlen;
             const size_t n_windows = (tlen + window_size - 1) / window_size;
-            LOG_TRACE("num windows {} for read {}", n_windows, alignments.read_name);
+            DORADO_LOG(trace, "num windows {} for read {}", n_windows, alignments.read_name);
             std::vector<std::vector<OverlapWindow>> windows;
             windows.resize(n_windows);
 
@@ -454,7 +454,7 @@ void CorrectionInferenceNode::input_thread_fn() {
             }
             // Push the ones that need inference to another thread.
             for (auto& wf : features_to_infer) {
-                LOG_TRACE("Pushing window idx {} to features queue", wf.window_idx);
+                DORADO_LOG(trace, "Pushing window idx {} to features queue", wf.window_idx);
                 m_features_queue.try_push(std::move(wf));
             }
             num_reads++;

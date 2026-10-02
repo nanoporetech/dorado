@@ -33,14 +33,6 @@
 #include <unordered_set>
 #include <utility>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#define LOG_DEBUG(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#define LOG_DEBUG(...) DORADO_LOG(debug, __VA_ARGS__)
-#endif
-
 namespace kadayashi {
 
 constexpr uint32_t MAX_READS = 134217727;  // note: need to modify pg_t to increase this
@@ -219,18 +211,18 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
     std::vector<uint64_t> intervals;
     if (ds.empty()) {
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}] ds is empty (ds0 was {})", __func__, ds0.size());
+            DORADO_LOG(trace, "[kdys::{}] ds is empty (ds0 was {})", __func__, ds0.size());
             for (size_t i = 0; i < ds0.size(); i++) {
-                LOG_TRACE("[kdys::{}] ds0 #{} is {}", __func__, i, ds0[i]);
+                DORADO_LOG(trace, "[kdys::{}] ds0 #{} is {}", __func__, i, ds0[i]);
             }
         }
 
     } else {
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}] there are {} candidate distances (raw: {})", __func__, ds.size(),
-                      ds0.size());
+            DORADO_LOG(trace, "[kdys::{}] there are {} candidate distances (raw: {})", __func__,
+                       ds.size(), ds0.size());
             for (size_t i = 0; i < ds.size(); i++) {
-                LOG_TRACE("[kdys::{}] ds #{} is {}", __func__, i, ds[i]);
+                DORADO_LOG(trace, "[kdys::{}] ds #{} is {}", __func__, i, ds[i]);
             }
         }
 
@@ -310,8 +302,8 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                                 intervals_buf.push_back(start << 1);
                                 intervals_buf.push_back(end << 1 | 1);
                                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                                    LOG_TRACE("[kdys::{}] d={} mer={} saw start-end: {}-{}",
-                                              __func__, d, i_mer, start, end);
+                                    DORADO_LOG(trace, "[kdys::{}] d={} mer={} saw start-end: {}-{}",
+                                               __func__, d, i_mer, start, end);
                                 }
                                 mer_is_used = 1;
                             }
@@ -336,10 +328,10 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
         if (failed /*impossible seen when parsing mers*/
             || intervals_buf.empty()) {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE(
-                        "[kdys::{}] failed parsing mers (failed={}) or intervals_buf is empty "
-                        "({})",
-                        __func__, failed ? "true" : "false", intervals_buf.size());
+                DORADO_LOG(trace,
+                           "[kdys::{}] failed parsing mers (failed={}) or intervals_buf is empty "
+                           "({})",
+                           __func__, failed ? "true" : "false", intervals_buf.size());
             }
             intervals.clear();
         } else {
@@ -361,8 +353,8 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                 const int lbreak = 0;
 
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_TRACE("[kdys::{}] current_pos={} stat={} depth={} lbreak={}", __func__,
-                              current_pos, intervals_buf[i] & 1, depth, lbreak);
+                    DORADO_LOG(trace, "[kdys::{}] current_pos={} stat={} depth={} lbreak={}",
+                               __func__, current_pos, intervals_buf[i] & 1, depth, lbreak);
                 }
 
                 if (depth >= TRF_MIN_TANDAM_DEPTH && !lbreak) {
@@ -413,10 +405,11 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                 }
             }
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG("[kdys::{}] had {} intervals", __func__, intervals.size());
+                DORADO_LOG(debug, "[kdys::{}] had {} intervals", __func__, intervals.size());
                 for (size_t i = 0; i < intervals.size(); i++) {
-                    LOG_DEBUG("[kdys::{}]    itvl#{} {}-{}", __func__, i, intervals[i] >> 32,
-                              intervals[i] & std::numeric_limits<uint32_t>::max());
+                    DORADO_LOG(debug, "[kdys::{}]    itvl#{} {}-{}", __func__, i,
+                               intervals[i] >> 32,
+                               intervals[i] & std::numeric_limits<uint32_t>::max());
                 }
             }
         }
@@ -600,20 +593,20 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
         if (qname2hp && var.alleles.size() >= 2 && tot_cov_alt > MIN_COV_TOT &&
             suf_alt >= MIN_COV_ONE && tot_cov_alt / tot_cov_any > MIN_ALT_FRAC) {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG(
-                        "[kdys::{}] let pos {} set to unsure although flag is bad, due to its "
-                        "many alleles & sufficient coverage in alt ({}/{})",
-                        __func__, pos, tot_cov_alt, tot_cov_any);
+                DORADO_LOG(debug,
+                           "[kdys::{}] let pos {} set to unsure although flag is bad, due to its "
+                           "many alleles & sufficient coverage in alt ({}/{})",
+                           __func__, pos, tot_cov_alt, tot_cov_any);
             }
             var.is_accepted = FLAG_VARSTAT_UNSURE;
             var.type = FLAG_VAR_NA;
             return true;
         } else {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG(
-                        "[kdys::{}] straight ignore pos {} (flag is bad; size is {}, tot cov is "
-                        "{})",
-                        __func__, pos, var.alleles.size(), tot_cov_alt);
+                DORADO_LOG(debug,
+                           "[kdys::{}] straight ignore pos {} (flag is bad; size is {}, tot cov is "
+                           "{})",
+                           __func__, pos, var.alleles.size(), tot_cov_alt);
             }
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
@@ -663,7 +656,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG("[kdys::{}] ignore pos {} (first two are REF sentinels)", __func__, pos);
+                DORADO_LOG(debug, "[kdys::{}] ignore pos {} (first two are REF sentinels)",
+                           __func__, pos);
             }
             return true;
         }
@@ -685,11 +679,11 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                     var.is_accepted = FLAG_VARSTAT_UNSURE;
                     var.type = FLAG_VAR_HOM;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG(
-                                "[kdys::{}] set pos {} as unsure (due to unphased) "
-                                "tot_all_non_refs={} "
-                                "totcov={}",
-                                __func__, pos, tot_all_non_refs, tot_cov);
+                        DORADO_LOG(debug,
+                                   "[kdys::{}] set pos {} as unsure (due to unphased) "
+                                   "tot_all_non_refs={} "
+                                   "totcov={}",
+                                   __func__, pos, tot_all_non_refs, tot_cov);
                     }
                     return true;
                 }
@@ -704,7 +698,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                         &fisher_left_p_nounphased, &fisher_right_p_nounphased,
                         &fisher_twosided_p_nounphased);
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_DEBUG(
+            DORADO_LOG(
+                    debug,
                     "[kdys::{}] pos {} in prefiltering fisher: phased-only, twosided p: {:.4f} ({} "
                     "{}, {} {})",
                     __func__, pos, fisher_twosided_p_nounphased, a0.cov.cov_hap0, a0.cov.cov_hap1,
@@ -718,8 +713,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                 if (top_cov_1 / tot_cov >= 0.7f && tot_cov >= LOW_COV2) {
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2, unphased; {}/{})", __func__,
-                                  pos, top_cov_1, tot_cov);
+                        DORADO_LOG(debug, "[kdys::{}] set pos {} as hom (2, unphased; {}/{})",
+                                   __func__, pos, top_cov_1, tot_cov);
                     }
                 }
             } else {
@@ -748,8 +743,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                     hap0 / hap0_tot >= threshold && hap1 / hap1_tot >= threshold) {
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2, phased; {}/{}, {}/{})",
-                                  __func__, pos, hap0, hap0_tot, hap1, hap1_tot);
+                        DORADO_LOG(debug, "[kdys::{}] set pos {} as hom (2, phased; {}/{}, {}/{})",
+                                   __func__, pos, hap0, hap0_tot, hap1, hap1_tot);
                     }
                 } else if (
                         hap_all / tot_cov2 >= MIN_HOMALT_FRAC ||
@@ -758,17 +753,18 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                                  LOW_COV)) {  // alternatively, as long as we have almost all bases being the one alt allele, call hom regardless of phasing quality
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2b; hap_all={} tot_cov2={})",
-                                  __func__, pos, hap_all, tot_cov2);
+                        DORADO_LOG(debug,
+                                   "[kdys::{}] set pos {} as hom (2b; hap_all={} tot_cov2={})",
+                                   __func__, pos, hap_all, tot_cov2);
                     }
                 } else if (hap_all / tot_cov2 > 0.8f &&
                            (int)(tot_cov2 - tot_all_non_refs) < SMALL_COV_DIFF) {
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG(
-                                "[kdys::{}] set pos {} as hom (2c; allel0all={}, tot_cov2={}, "
-                                "totallnonref={})",
-                                __func__, pos, hap_all, tot_cov2, tot_all_non_refs);
+                        DORADO_LOG(debug,
+                                   "[kdys::{}] set pos {} as hom (2c; allel0all={}, tot_cov2={}, "
+                                   "totallnonref={})",
+                                   __func__, pos, hap_all, tot_cov2, tot_all_non_refs);
                     }
                 }
             }
@@ -781,11 +777,11 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             if (is_at_repeat || fisher_twosided_p_nounphased < 0.05f) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_DEBUG(
-                            "[kdys::{}] pos {} was set to accepted hom, but flipping this to "
-                            "unsure "
-                            "due to nearby repeat; type flag is now {}",
-                            __func__, pos, var.type);
+                    DORADO_LOG(debug,
+                               "[kdys::{}] pos {} was set to accepted hom, but flipping this to "
+                               "unsure "
+                               "due to nearby repeat; type flag is now {}",
+                               __func__, pos, var.type);
                 }
             }
             return true;
@@ -795,16 +791,17 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             if (std::min(top_cov_1, top_cov_2) >= 5 || tot_all_non_refs >= 10 || is_at_repeat) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_DEBUG(
-                            "[kdys::{}] set pos {} unsure (1a: weird coverage (top1={} top2={}; "
-                            "all "
-                            "alts={}))",
-                            __func__, pos, top_cov_1, top_cov_2, tot_all_non_refs);
+                    DORADO_LOG(debug,
+                               "[kdys::{}] set pos {} unsure (1a: weird coverage (top1={} top2={}; "
+                               "all "
+                               "alts={}))",
+                               __func__, pos, top_cov_1, top_cov_2, tot_all_non_refs);
                 }
             } else {
                 var.is_accepted = FLAG_VARSTAT_REJECTED;
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_DEBUG(
+                    DORADO_LOG(
+                            debug,
                             "[kdys::{}] reject pos {} (1a: weird coverage ({} alleles) and they "
                             "are "
                             "low: {} (base_int={}) and {} (base_int={}) while top2 cov={}, tot cov "
@@ -818,7 +815,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
 
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
             if (qname2hp) {
-                LOG_DEBUG(
+                DORADO_LOG(
+                        debug,
                         "[kdys::{}] pos {} remained, two top covs: phased=({} and {}) unphased=({} "
                         "and "
                         "{})",
@@ -1247,7 +1245,8 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     }
 
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_DEBUG(
+        DORADO_LOG(
+                debug,
                 "[kdys::{}] pos={} is_accepted={} type={} code={}; fisher_p={}; is_at_repeat={}; "
                 "a0({}{})=[{} {}] a1({}{})=[{} {}] "
                 "proper: {} {}; strand covs: {} {} {} {}",
@@ -2061,8 +2060,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
             .vg = {},
     };
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_DEBUG("[kdys::{}] pileup at {}:{}-{} (1-index, close-open)", __func__, refname,
-                  ck.abs_start + 1, ck.abs_end);
+        DORADO_LOG(debug, "[kdys::{}] pileup at {}:{}-{} (1-index, close-open)", __func__, refname,
+                   ck.abs_start + 1, ck.abs_end);
     }
 
     // note: use `span_{start,end}` rather than `ck.abs_{start,end}`
@@ -2082,8 +2081,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
 
         bamitr = dorado::secondary::HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()));
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_DEBUG("[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__, itvl2,
-                      pp.disable_region_expansion);
+            DORADO_LOG(debug, "[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__,
+                       itvl2, pp.disable_region_expansion);
         }
     }
 
@@ -2108,7 +2107,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         }
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
             if (n_reads % 1000 == 0) {
-                LOG_DEBUG(
+                DORADO_LOG(
+                        debug,
                         "[kdys::{}] piled {} reads (read start pos is {}) ht size {}, seen size {}",
                         __func__, n_reads, aln.get()->core.pos, ht.size(), ck.reads.size());
             }
@@ -2338,8 +2338,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
                                  {SENTINEL_REF_ALLELE_INT, VAR_OP_X}});
             candidate_poss.push_back(pos);
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG("[kdys::{}] pos {} will collect ref ({} pileup)", __func__, pos,
-                          qname2hp ? "phased" : "unphased");
+                DORADO_LOG(debug, "[kdys::{}] pos {} will collect ref ({} pileup)", __func__, pos,
+                           qname2hp ? "phased" : "unphased");
             }
         } else {
             q.is_accepted = FLAG_VARSTAT_REJECTED;
@@ -2384,9 +2384,9 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         }
 
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_DEBUG("[kdys::{}] qn {} candidate alts bewtween: {} - {} (aln_end is {})", __func__,
-                      ck.qnames[i_read], candidate_poss[i_lower], candidate_poss[i_higher],
-                      aln_end);
+            DORADO_LOG(debug, "[kdys::{}] qn {} candidate alts bewtween: {} - {} (aln_end is {})",
+                       __func__, ck.qnames[i_read], candidate_poss[i_lower],
+                       candidate_poss[i_higher], aln_end);
         }
 
         // scan
@@ -2511,13 +2511,13 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
                 }
             }
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG(
-                        "[kdys::{}] unphased pileup pos {} : c0={} ({:c}) c1={} ({:c}) "
-                        "ratio={:.2f} -> "
-                        "type={} "
-                        "is_accepted={}",
-                        __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
-                        "ACGT_R"[q.alleles[1].allele[0]], ratio, q.type, q.is_accepted);
+                DORADO_LOG(debug,
+                           "[kdys::{}] unphased pileup pos {} : c0={} ({:c}) c1={} ({:c}) "
+                           "ratio={:.2f} -> "
+                           "type={} "
+                           "is_accepted={}",
+                           __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
+                           "ACGT_R"[q.alleles[1].allele[0]], ratio, q.type, q.is_accepted);
             }
         }
     }  // iter through variant candidate positions
@@ -3391,8 +3391,8 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
         n_reads++;
     }  // iterate through all reads
     if (gck.n_md_tag_filtered > 0) {
-        LOG_DEBUG("[kdys::{}] skipped {} reads without valid MD tags", __func__,
-                  gck.n_md_tag_filtered);
+        DORADO_LOG(debug, "[kdys::{}] skipped {} reads without valid MD tags", __func__,
+                   gck.n_md_tag_filtered);
     }
 }
 
@@ -3558,8 +3558,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
     gen_medaka_feature_matrix_store_reads_from_bam(hf, gck);
 
     if (gck.all_reads.empty()) {
-        LOG_DEBUG("[kdys::{}] requested interval {}:{}-{} inserted no reads", __func__, refname,
-                  itvl_start, itvl_end);
+        DORADO_LOG(debug, "[kdys::{}] requested interval {}:{}-{} inserted no reads", __func__,
+                   refname, itvl_start, itvl_end);
         MedakaFeatureMatrix ret(0, 0, 0, 0, 1, 0);
         return ret;
     } else {

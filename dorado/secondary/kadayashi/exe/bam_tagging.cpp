@@ -13,12 +13,6 @@
 
 #include <cassert>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace kadayashi {
 
 int write_haptagged_bam_given_hashtable_and_itvl(
@@ -209,7 +203,7 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
             query_itvl_s.append(std::to_string(query_itvl.first));
             query_itvl_s.append("-");
             query_itvl_s.append(std::to_string(query_itvl.second));
-            LOG_TRACE("[kdys::{}] writing bam: {}\n", __func__, query_itvl_s);
+            DORADO_LOG(trace, "[kdys::{}] writing bam: {}\n", __func__, query_itvl_s);
 
             dorado::secondary::HtsItrPtr bamitr(
                     sam_itr_querys(hf.idx(), hf.hdr(), query_itvl_s.c_str()));

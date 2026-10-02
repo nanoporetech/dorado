@@ -2,20 +2,13 @@
 
 #include "secondary/features/medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/container_utils.h"
+#include "utils/log_utils.h"
 
 #include <cstddef>
 #include <span>
 #include <unordered_map>
 #include <unordered_set>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#include "utils/container_utils.h"
-#include "utils/log_utils.h"
-
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
 
 namespace dorado::secondary {
 
@@ -32,10 +25,10 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
         return {chunk, rids_out};
     }
 
-    LOG_TRACE(
-            "[reorder_chunk] prev_rids_out.size() = {}, rids_in.size() = {}, "
-            "chunk.shape = [{}]",
-            std::size(prev_rids_out), std::size(rids_in), utils::tensor_shape_as_string(chunk));
+    DORADO_LOG(trace,
+               "[reorder_chunk] prev_rids_out.size() = {}, rids_in.size() = {}, "
+               "chunk.shape = [{}]",
+               std::size(prev_rids_out), std::size(rids_in), utils::tensor_shape_as_string(chunk));
 
     // Create a lookup.
     std::unordered_map<std::string_view, int64_t> rids_in_map;
@@ -69,14 +62,14 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
         }
     }
 
-    LOG_TRACE(
-            "[reorder_chunk] missing_in_indices.size() = {}, "
-            "missing_out_indices.size() = {}",
-            std::size(missing_in_indices), std::size(missing_out_indices));
-    LOG_TRACE("[reorder_chunk] missing_in_indices: {}",
-              utils::print_container_as_string(missing_in_indices, ", ", true));
-    LOG_TRACE("[reorder_chunk] missing_out_indices: {}",
-              utils::print_container_as_string(missing_out_indices, ", ", true));
+    DORADO_LOG(trace,
+               "[reorder_chunk] missing_in_indices.size() = {}, "
+               "missing_out_indices.size() = {}",
+               std::size(missing_in_indices), std::size(missing_out_indices));
+    DORADO_LOG(trace, "[reorder_chunk] missing_in_indices: {}",
+               utils::print_container_as_string(missing_in_indices, ", ", true));
+    DORADO_LOG(trace, "[reorder_chunk] missing_out_indices: {}",
+               utils::print_container_as_string(missing_out_indices, ", ", true));
 
     // Fill out the gaps in the array with some of the extra indices.
     for (size_t i = 0; i < std::min(std::size(missing_out_indices), std::size(missing_in_indices));

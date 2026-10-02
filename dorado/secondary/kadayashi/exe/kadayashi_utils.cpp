@@ -10,12 +10,6 @@
 #include <fstream>
 #include <limits>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace kadayashi {
 
 namespace {
@@ -115,12 +109,12 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
         // if first pass is done, write the header part of the binary file now
         // and let second pass write storages.
         if (pass == 0) {
-            LOG_TRACE(
-                    "[kdys::{}] to write header: {} refs, {} chunks (sancheck: chunkinfo buf "
-                    "length "
-                    "{})\n",
-                    __func__, tot_refs, static_cast<int>(chunkID),
-                    static_cast<int>(chunkinfos.size()));
+            DORADO_LOG(trace,
+                       "[kdys::{}] to write header: {} refs, {} chunks (sancheck: chunkinfo buf "
+                       "length "
+                       "{})\n",
+                       __func__, tot_refs, static_cast<int>(chunkID),
+                       static_cast<int>(chunkinfos.size()));
             uint32_t header_offset1 =
                     static_cast<uint32_t>(sizeof(uint32_t)) +
                     static_cast<uint32_t>(refnames.size())  // tot_refs and refnames_s_concat
@@ -217,7 +211,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
             }
             if (refname == chrom) {  // done; don't break
                 if (debug_print) {
-                    LOG_TRACE("[kdys::{}] found ref {}\n", __func__, refname);
+                    DORADO_LOG(trace, "[kdys::{}] found ref {}\n", __func__, refname);
                 }
                 ref_i = i;
             }
@@ -259,7 +253,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
             }
             if (ref_end >= start && ref_start < end) {
                 if (debug_print) {
-                    LOG_TRACE("[kdys::{}] checking {}-{}\n", __func__, start, end);
+                    DORADO_LOG(trace, "[kdys::{}] checking {}-{}\n", __func__, start, end);
                 }
                 uint32_t l = 0;
                 if (start < ref_start) {
@@ -269,10 +263,10 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
                 }
                 if (l > best_ovlp_len) {
                     if (debug_print) {
-                        LOG_TRACE(
-                                "[kdys::{}] update best hit to: {}-{} with {} reads (l: {} => "
-                                "{})\n",
-                                __func__, start, end, n_reads, (int)best_ovlp_len, (int)l);
+                        DORADO_LOG(trace,
+                                   "[kdys::{}] update best hit to: {}-{} with {} reads (l: {} => "
+                                   "{})\n",
+                                   __func__, start, end, n_reads, (int)best_ovlp_len, (int)l);
                     }
                     best_ovlp_len = l;
                     best_ovlp_chunk_start = pos_chunk_start;
@@ -281,8 +275,8 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
                     best_ovlp_end = end;
                 } else {
                     if (debug_print) {
-                        LOG_TRACE("[kdys::{}] hit (worse): {}-{} with {} reads\n", __func__, start,
-                                  end, n_reads);
+                        DORADO_LOG(trace, "[kdys::{}] hit (worse): {}-{} with {} reads\n", __func__,
+                                   start, end, n_reads);
                     }
                 }
             } else if (start > ref_end) {
@@ -315,12 +309,12 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
 
                 if (qname2hp.find(qn) != qname2hp.end()) {
                     if (debug_print) {
-                        LOG_TRACE("[kdys::{}] qn {} already seen\n", __func__, qn);
+                        DORADO_LOG(trace, "[kdys::{}] qn {} already seen\n", __func__, qn);
                     }
                 } else {
                     qname2hp[qn] = haptag;
                     if (debug_print > 1) {
-                        LOG_TRACE("[kdys::{}] insert qn {} tag {}\n", __func__, qn, haptag);
+                        DORADO_LOG(trace, "[kdys::{}] insert qn {} tag {}\n", __func__, qn, haptag);
                     }
                 }
             }

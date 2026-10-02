@@ -9,12 +9,6 @@
 
 #include <filesystem>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace dorado::correction {
 
 // Custom collate function. Replacement for torch::utils::rnn::pad_sequence
@@ -49,8 +43,8 @@ at::Tensor collate(std::vector<at::Tensor>& tensors,
         slice.copy_(tensors[i]);
     }
 
-    LOG_TRACE("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
-              batch.numel(), batch.sum().item<T>());
+    DORADO_LOG(trace, "size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
+               batch.numel(), batch.sum().item<T>());
 
     return batch;
 }

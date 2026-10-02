@@ -16,12 +16,6 @@
 #include <stdexcept>
 #include <unordered_map>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace {
 
 static constexpr int32_t BASE_FEATLEN = 4;  // Minimal number of feature channels.

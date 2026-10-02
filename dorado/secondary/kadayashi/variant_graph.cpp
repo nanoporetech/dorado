@@ -7,14 +7,6 @@
 #include <array>
 #include <cstdio>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#define LOG_DEBUG(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#define LOG_DEBUG(...) DORADO_LOG(debug, __VA_ARGS__)
-#endif
-
 namespace kadayashi {
 
 namespace {
@@ -122,8 +114,8 @@ infer_readhp_stat_t variant_graph_infer_readhp_given_vars_ht(
             hp1 += pos2counter[pos][0] / pos2counter[pos][2];
         }
         if (debug_print) {
-            LOG_TRACE("[kdys::{}]   try qn {} : pos {} hp0={:.1f} hp1={:.1f}", __func__,
-                      ck.qnames[readID], pos, hp0, hp1);
+            DORADO_LOG(trace, "[kdys::{}]   try qn {} : pos {} hp0={:.1f} hp1={:.1f}", __func__,
+                       ck.qnames[readID], pos, hp0, hp1);
         }
 
         updated++;
@@ -322,15 +314,15 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
         for (int k = var_idx - 1; k > 0; k--) {
             const uint32_t pos2 = ck.varcalls[k].pos;
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE("[kdys::{}] trying pos_resume {} (k={})", __func__, pos2, k);
+                DORADO_LOG(trace, "[kdys::{}] trying pos_resume {} (k={})", __func__, pos2, k);
             }
             if (pos - pos2 > 50000) {
                 break;  // too far
             }
             if (!vg.next_link_is_broken[k - 1]) {
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_TRACE("[kdys::{}] trying pos_resume {} (k={}) checkpoint 1", __func__, pos2,
-                              k);
+                    DORADO_LOG(trace, "[kdys::{}] trying pos_resume {} (k={}) checkpoint 1",
+                               __func__, pos2, k);
                 }
                 if (pos - pos2 > 300 && (pos - pos2 < 5000 ||
                                          i == 0)) {  // search within 5kb or until finally found one
@@ -344,11 +336,11 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
         }
         if (i > 0) {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE("[kdys::{}] *maybe* re-init pos {} using pos {}", __func__, pos,
-                          ck.varcalls[i].pos);
+                DORADO_LOG(trace, "[kdys::{}] *maybe* re-init pos {} using pos {}", __func__, pos,
+                           ck.varcalls[i].pos);
                 for (uint8_t comb = 0; comb < 4; comb++) {
-                    LOG_TRACE("[kdys::{}] original {} : {}", __func__, i,
-                              static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
+                    DORADO_LOG(trace, "[kdys::{}] original {} : {}", __func__, i,
+                               static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
                 }
             }
             variant_graph_get_edge_values(ck, static_cast<uint32_t>(i),
@@ -364,7 +356,8 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
                 do_wipeout = true;
             } else {
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_TRACE(
+                    DORADO_LOG(
+                            trace,
                             "[kdys::{}] *maybe* not wiping; edge counts are {} {} {} {}; var idx "
                             "are {} and {}",
                             __func__, counter[0], counter[1], counter[2], counter[3], i, var_idx);
@@ -382,14 +375,15 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
 
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
                     for (uint8_t comb = 0; comb < 4; comb++) {
-                        LOG_TRACE("[kdys::{}] new {} : {}", __func__, static_cast<int>(comb),
-                                  static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
+                        DORADO_LOG(
+                                trace, "[kdys::{}] new {} : {}", __func__, static_cast<int>(comb),
+                                static_cast<int>(variant_graph_get_node_val2(vg, var_idx, comb)));
                     }
                 }
             }
         } else {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE("[kdys::{}] tried but failed to find resume point", __func__);
+                DORADO_LOG(trace, "[kdys::{}] tried but failed to find resume point", __func__);
             }
             do_wipeout = true;  // did not find a good resume point, will hard re-init
         }
@@ -398,7 +392,7 @@ int variant_graph_init_scores_for_a_location(chunk_t &ck, const uint32_t var_idx
     if (var_idx == 0 || do_wipeout) {
         ret = 1;
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}] hard re-init for pos {}", __func__, pos);
+            DORADO_LOG(trace, "[kdys::{}] hard re-init for pos {}", __func__, pos);
         }
         for (int i = 0; i < 4; i++) {
             counter[i] = 0;
@@ -456,9 +450,9 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
 
     std::array<uint32_t, 4> bests = {0};
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_TRACE("[kdys::{}] i_self={} (pos={} a1={} a2={}):", __func__, i_self,
-                  ck.varcalls[i_self].pos, nt4seq2seq(ck.varcalls[i_self].alleles[0]),
-                  nt4seq2seq(ck.varcalls[i_self].alleles[1]));
+        DORADO_LOG(trace, "[kdys::{}] i_self={} (pos={} a1={} a2={}):", __func__, i_self,
+                   ck.varcalls[i_self].pos, nt4seq2seq(ck.varcalls[i_self].alleles[0]),
+                   nt4seq2seq(ck.varcalls[i_self].alleles[1]));
     }
 
     // check whether we have a coverage dropout
@@ -479,8 +473,8 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
         }
         *i_prev_ = i_self;
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}]    phasing broke at {} (coverage dropout)", __func__,
-                      ck.varcalls[i_self].pos);
+            DORADO_LOG(trace, "[kdys::{}]    phasing broke at {} (coverage dropout)", __func__,
+                       ck.varcalls[i_self].pos);
         }
     }
 
@@ -497,7 +491,8 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
 
             score[prev_combo] = s1 + s2 + s3;
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE(
+                DORADO_LOG(
+                        trace,
                         "[kdys::{}]  self combo {}, {} + {} + {} = {}(i_prev={}; key1={} key2={})",
                         __func__, self_combo, s1, s2, s3, score[prev_combo], i_prev,
                         (prev_combo >> 1) << 1 | (self_combo >> 1),
@@ -526,15 +521,15 @@ void variant_graph_propogate_one_step(chunk_t &ck, int *i_prev_, const int i_sel
             vg.next_link_is_broken[i_self] = 1;
         }
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}]    ! phasing broke at {} (hom decision = {})", __func__,
-                      ck.varcalls[i_self].pos, best_i);
+            DORADO_LOG(trace, "[kdys::{}]    ! phasing broke at {} (hom decision = {})", __func__,
+                       ck.varcalls[i_self].pos, best_i);
         }
     }
 
     *i_prev_ = i_self;
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_TRACE("[kdys::{}]    best i: {} (bests: {} {} {} {})", __func__, best_i, bests[0],
-                  bests[1], bests[2], bests[3]);
+        DORADO_LOG(trace, "[kdys::{}]    best i: {} (bests: {} {} {} {})", __func__, best_i,
+                   bests[0], bests[1], bests[2], bests[3]);
     }
 }
 
@@ -620,7 +615,8 @@ bool variant_graph_check_if_phasing_succeeded(const chunk_t &ck) {
         if (source == 0 || source == 3) {
             is_ok = false;
             if constexpr (VERBOSE) {
-                LOG_TRACE("[kdys::{}] phasing broke at pos {} ", __func__, ck.varcalls[i_pos].pos);
+                DORADO_LOG(trace, "[kdys::{}] phasing broke at pos {} ", __func__,
+                           ck.varcalls[i_pos].pos);
             } else {
                 return false;
             }
@@ -634,8 +630,8 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
                                const chunk_t &ck) {
     if (arr_read2hp.size() <= 1) {
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}] nothing done (arr_read2hp.size={})", __func__,
-                      arr_read2hp.size());
+            DORADO_LOG(trace, "[kdys::{}] nothing done (arr_read2hp.size={})", __func__,
+                       arr_read2hp.size());
         }
         return;
     }
@@ -726,8 +722,9 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
                         sampleqID = qID;
                     }
                 }
-                LOG_TRACE("[kdys::{}] no change for iter#{} (sample qn: {} , pos is : {}-{})",
-                          __func__, i, ck.qnames[sampleqID], left_pos, right_pos);
+                DORADO_LOG(trace,
+                           "[kdys::{}] no change for iter#{} (sample qn: {} , pos is : {}-{})",
+                           __func__, i, ck.qnames[sampleqID], left_pos, right_pos);
             }
 
             j_cutoff = i;
@@ -803,7 +800,8 @@ void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested
         prev_seedID = seedreadID;
 
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE(
+            DORADO_LOG(
+                    trace,
                     "[kdys::{}] collected a seed (iter# {}/{}), qn {}, range {}:{}-{}, max_var = "
                     "{} var_size={}",
                     __func__, i_iter, n_iter, ck.qnames[i_max_var], ck.refname,
@@ -842,8 +840,8 @@ void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested
             }
 
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE("[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__,
-                          ck.qnames[i_read], ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
+                DORADO_LOG(trace, "[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__,
+                           ck.qnames[i_read], ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
             }
         }
     }
@@ -951,7 +949,7 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
 
     assert(seedreadID >= 0 && (uint32_t)seedreadID < ck.reads.size());
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_TRACE("[kdys::{}] start from qn {}", __func__, ck.qnames[seedreadID]);
+        DORADO_LOG(trace, "[kdys::{}] start from qn {}", __func__, ck.qnames[seedreadID]);
     }
 
     // counter of allele0-as-hp0, allele0-as-hp1 and the sum

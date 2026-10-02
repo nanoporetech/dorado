@@ -10,12 +10,6 @@
 #include <cstdio>
 #include <stdexcept>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace kadayashi {
 
 namespace {

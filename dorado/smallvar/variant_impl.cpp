@@ -41,12 +41,6 @@
 // #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
 constexpr bool DEBUG_VC_SAMPLES = false;
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace dorado::smallvar {
 
 namespace {
@@ -655,10 +649,10 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
         try {
             utils::ScopedProfileRange spr3("batch_producer-while", 4);
 
-            LOG_TRACE(
-                    "[batch_producer] Waiting to pop a sample from the input_queue. Queue size: "
-                    "{}",
-                    std::size(input_queue));
+            DORADO_LOG(trace,
+                       "[batch_producer] Waiting to pop a sample from the input_queue. Queue size: "
+                       "{}",
+                       std::size(input_queue));
 
             // Pop an element.
             InferenceData item;
@@ -668,8 +662,8 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
                 break;
             }
 
-            LOG_TRACE("[batch_producer] Popped an item of {} samples from the input queue.",
-                      std::ssize(item.samples));
+            DORADO_LOG(trace, "[batch_producer] Popped an item of {} samples from the input queue.",
+                       std::ssize(item.samples));
 
             for (int64_t i = 0; i < std::ssize(item.samples); ++i) {
                 auto& sample = item.samples[i];

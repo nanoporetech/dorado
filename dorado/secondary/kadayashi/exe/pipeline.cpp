@@ -34,12 +34,6 @@
 #include <thread>
 #include <unordered_set>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 namespace kadayashi {
 
 namespace {
@@ -675,7 +669,7 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
 
     if constexpr (DEBUG_PRINT) {
         for (const ta_t &var : ck.varcalls) {
-            LOG_TRACE("[kdys::{}] info site pos {}", __func__, var.pos);
+            DORADO_LOG(trace, "[kdys::{}] info site pos {}", __func__, var.pos);
         }
     }
 
@@ -686,7 +680,7 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
     std::unordered_set<uint32_t> knownseeds;
     std::vector<std::pair<size_t, uint32_t>> buf_readvarcnt;
 
-    LOG_TRACE("[kdys::{}] requested {} iters", __func__, n_iter);
+    DORADO_LOG(trace, "[kdys::{}] requested {} iters", __func__, n_iter);
     for (uint32_t i_iter = 0; i_iter < n_iter; i_iter++) {
         // used the read with the most number of phasing variants within
         // the current bin
@@ -712,17 +706,19 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
             }
             seedreadIDs.push_back(i_max_var);
             if constexpr (DEBUG_PRINT) {
-                LOG_TRACE(
+                DORADO_LOG(
+                        trace,
                         "[kdys::{}] collected a seed (iter#{}), qn {}, range {}:{}-{}, max_var = "
                         "{} var_size={}",
                         __func__, (int)seedreadIDs.size() - 1, ck.qnames[i_max_var], ck.refname,
                         (int)ck.reads[i_max_var].start_pos, (int)ck.reads[i_max_var].end_pos,
                         max_var, (int)ck.reads[i_max_var].vars.size());
                 for (int tmpi = 0; tmpi < std::ssize(ck.reads[i_max_var].vars); tmpi++) {
-                    LOG_TRACE("[kdys::{}] qn {} range {}-{}, variant#{} pos={} char={}", __func__,
-                              ck.qnames[i_max_var], ck.reads[i_max_var].start_pos,
-                              ck.reads[i_max_var].end_pos, tmpi, ck.reads[i_max_var].vars[tmpi].pos,
-                              "ACGT_R"[ck.reads[i_max_var].vars[tmpi].allele[0]]);
+                    DORADO_LOG(trace, "[kdys::{}] qn {} range {}-{}, variant#{} pos={} char={}",
+                               __func__, ck.qnames[i_max_var], ck.reads[i_max_var].start_pos,
+                               ck.reads[i_max_var].end_pos, tmpi,
+                               ck.reads[i_max_var].vars[tmpi].pos,
+                               "ACGT_R"[ck.reads[i_max_var].vars[tmpi].allele[0]]);
                 }
             }
         }
@@ -764,8 +760,8 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
         if (ck.reads[tmpreadID].vars.size() > 0) {
             const uint32_t pos = ck.reads[tmpreadID].vars[0].pos;
             breakpoints[pos] = 1;
-            LOG_TRACE("[kdys::{}] log phaseblock break point from read {} : {}:{}", __func__,
-                      ck.qnames[tmpreadID], ck.refname, pos);
+            DORADO_LOG(trace, "[kdys::{}] log phaseblock break point from read {} : {}:{}",
+                       __func__, ck.qnames[tmpreadID], ck.refname, pos);
         }
     }
     if constexpr (DEBUG_PRINT) {
@@ -799,8 +795,8 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
             }
         }
 
-        LOG_TRACE("[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__, ck.qnames[i_read],
-                  ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
+        DORADO_LOG(trace, "[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__,
+                   ck.qnames[i_read], ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
     }
 
     DORADO_LOG(info, "[kdys::{}] reads tagged, used {:.1f} s", __func__,
@@ -925,14 +921,14 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                        __func__, qn);
             exit(1);
         } else {
-            LOG_TRACE("[kdys::{}] qn {} (hp {})", __func__, qn, hp_raw);
+            DORADO_LOG(trace, "[kdys::{}] qn {} (hp {})", __func__, qn, hp_raw);
             std::stable_sort(tmp_qav.begin(), tmp_qav.end());
             for (qa_t &q : tmp_qav) {
                 uint32_t qpos = q.pos;
 
                 // check position
                 if constexpr (DEBUG_PRINT) {
-                    LOG_TRACE("kdys::[{}]   pos={}", __func__, qpos);
+                    DORADO_LOG(trace, "kdys::[{}]   pos={}", __func__, qpos);
                 }
                 auto it_vars = vars.find(qpos);
                 if (it_vars == vars.cend()) {
@@ -944,8 +940,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 const variant_t &t = it_vars->second;
                 if (q.allele.back() != t.op) {
                     if constexpr (DEBUG_PRINT) {
-                        LOG_TRACE("[kdys::{}]   ^ failed cigar op check (q:{} t:{})", __func__,
-                                  q.allele.back(), t.op);
+                        DORADO_LOG(trace, "[kdys::{}]   ^ failed cigar op check (q:{} t:{})",
+                                   __func__, q.allele.back(), t.op);
                     }
                     continue;
                 }
@@ -954,8 +950,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 const std::string alt = nt4seq2seq(q.allele);  // last slot is cigar op
                 if (alt != t.alt_allele) {
                     if constexpr (DEBUG_PRINT) {
-                        LOG_TRACE("[kdys::{}]   failed alt allele check (q:{} t:{})", __func__, alt,
-                                  t.alt_allele);
+                        DORADO_LOG(trace, "[kdys::{}]   failed alt allele check (q:{} t:{})",
+                                   __func__, alt, t.alt_allele);
                     }
 
                     // this counter is neede for indels and sv when we do not have proper consensus
@@ -971,7 +967,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 }
 
                 if constexpr (DEBUG_PRINT) {
-                    LOG_TRACE("[kdys::{}]   ^ok", __func__);
+                    DORADO_LOG(trace, "[kdys::{}]   ^ok", __func__);
                 }
             }
         }
@@ -990,7 +986,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 continue;
             }
             if constexpr (DEBUG_PRINT) {
-                LOG_TRACE("[kdys::{}] read allele at pos {} (hp: {})", __func__, pos, hp_raw);
+                DORADO_LOG(trace, "[kdys::{}] read allele at pos {} (hp: {})", __func__, pos,
+                           hp_raw);
             }
             if (hp_raw == HAPTAG_UNPHASED) {
                 counter[pos2idx[pos]][2] += 1;
@@ -999,7 +996,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
             }
         }
         if constexpr (DEBUG_PRINT) {
-            LOG_TRACE("[kdys::{}] end of qn {}", __func__, qn);
+            DORADO_LOG(trace, "[kdys::{}] end of qn {}", __func__, qn);
         }
     }
 
@@ -1007,10 +1004,11 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
         const uint32_t pos = poss[i];
         uint8_t hp = HAPTAG_UNPHASED;
         if constexpr (DEBUG_PRINT) {
-            LOG_TRACE(
-                    "[kdys::{}] pos={} counter: hap0={}, hap1={}, unphased={}, "
-                    "unmatched_allele={}",
-                    __func__, (int)pos, counter[i][0], counter[i][1], counter[i][2], counter[i][3]);
+            DORADO_LOG(trace,
+                       "[kdys::{}] pos={} counter: hap0={}, hap1={}, unphased={}, "
+                       "unmatched_allele={}",
+                       __func__, (int)pos, counter[i][0], counter[i][1], counter[i][2],
+                       counter[i][3]);
         }
 
         const bool ambiguous =  // ambiguous
@@ -1138,24 +1136,26 @@ void vcfio_alter_phasings(
                     if (ref2hap[pos] != HAPTAG_UNPHASED) {
                         hp = ref2hap[pos];
                         if constexpr (DEBUG_PRINT) {
-                            LOG_TRACE("[kdys::{}] pos {}, phased as hp {}", __func__, pos, hp);
+                            DORADO_LOG(trace, "[kdys::{}] pos {}, phased as hp {}", __func__, pos,
+                                       hp);
                         }
                         if (phaseblockID < 0 || prev_is_phase_gap) {
                             phaseblockID = pos + 1;  // use 1-index
                             if constexpr (DEBUG_PRINT) {
-                                LOG_TRACE("[kdys::{}] update phaseblock ID at {}:{} (0-index)",
-                                          __func__, chrom, pos);
+                                DORADO_LOG(trace,
+                                           "[kdys::{}] update phaseblock ID at {}:{} (0-index)",
+                                           __func__, chrom, pos);
                             }
                         }
                     } else {
                         if constexpr (DEBUG_PRINT) {
-                            LOG_TRACE("[kdys::{}] pos {}, in record but is unphased", __func__,
-                                      pos);
+                            DORADO_LOG(trace, "[kdys::{}] pos {}, in record but is unphased",
+                                       __func__, pos);
                         }
                     }
                 } else {
                     if constexpr (DEBUG_PRINT) {
-                        LOG_TRACE("[kdys::{}] pos {}, not found", __func__, pos);
+                        DORADO_LOG(trace, "[kdys::{}] pos {}, not found", __func__, pos);
                     }
                     hp = HAPTAG_UNPHASED;
                 }
@@ -1367,8 +1367,8 @@ std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1
                 counter[2]++;
             }
         }
-        LOG_TRACE("[kdys::{}] {} variants: hap0={} hap1={} unphased={}", __func__, chrom,
-                  counter[0], counter[1], counter[2]);
+        DORADO_LOG(trace, "[kdys::{}] {} variants: hap0={} hap1={} unphased={}", __func__, chrom,
+                   counter[0], counter[1], counter[2]);
     }
 
     // optional: alter vcf
@@ -1649,8 +1649,8 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
                 break;
             }
 
-            LOG_TRACE("[kdys::{}] worker got jobID starting from {}",
-                      "kadayashi_phase_and_varcall_multiregionthreaded", (int)jobID_start);
+            DORADO_LOG(trace, "[kdys::{}] worker got jobID starting from {}",
+                       "kadayashi_phase_and_varcall_multiregionthreaded", (int)jobID_start);
 
             const int jobID_end = std::min<int>(jobID_start + JOB_CHUNK_SIZE, n_jobs);
             for (int jobID = jobID_start; jobID < jobID_end; jobID++) {

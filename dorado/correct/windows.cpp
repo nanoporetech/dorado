@@ -11,12 +11,6 @@
 #include <stdexcept>
 #include <utility>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
-#endif
-
 // #define DORADO_CORRECT_DEBUG_WINDOWS
 // #define DEBUG_CORRECT_EXTRACT_LIMITED_WINDOWS_2
 // #define DEBUG_CORRECTION_SPLIT_ALIGNMENT_ID -1
@@ -147,14 +141,14 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             continue;
         }
 
-        LOG_TRACE("qlen {} qstart {} qend {} strand {} tlen {} tstart {} tend {}", overlap.qlen,
-                  overlap.qstart, overlap.qend, overlap.fwd, overlap.tlen, overlap.tstart,
-                  overlap.tend);
+        DORADO_LOG(trace, "qlen {} qstart {} qend {} strand {} tlen {} tstart {} tend {}",
+                   overlap.qlen, overlap.qstart, overlap.qend, overlap.fwd, overlap.tlen,
+                   overlap.tstart, overlap.tend);
 
         int zeroth_window_thresh = static_cast<int>(0.1f * window_size);
         int nth_window_thresh = overlap.tlen - zeroth_window_thresh;
 
-        LOG_TRACE("zeroth {} nth {}", zeroth_window_thresh, nth_window_thresh);
+        DORADO_LOG(trace, "zeroth {} nth {}", zeroth_window_thresh, nth_window_thresh);
 
         // Keep the first and last windows for only 10% of the read length to capture
         // overhangs from query alignments on either end.
@@ -179,8 +173,8 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         int tpos = overlap.tstart;
         int qpos = 0;
 
-        LOG_TRACE("first window {} last window {} tstart {} tpos {}", first_window, last_window,
-                  tstart, tpos);
+        DORADO_LOG(trace, "first window {} last window {} tstart {} tpos {}", first_window,
+                   last_window, tstart, tpos);
 
         if (last_window - first_window < 1) {
             continue;
@@ -191,7 +185,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
         int cigar_start_idx = -1;
         int cigar_start_offset = -1;
 
-        LOG_TRACE("tpos {} qpos {}", tpos, qpos);
+        DORADO_LOG(trace, "tpos {} qpos {}", tpos, qpos);
 
         if ((tpos % window_size == 0) || (tstart < zeroth_window_thresh)) {
             t_window_start = tpos;
@@ -200,8 +194,9 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             cigar_start_offset = 0;
         }
 
-        LOG_TRACE("t_window_start {} q_window_start {} cigar_start_idx {} cigar_start_offset {}",
-                  t_window_start, q_window_start, cigar_start_idx, cigar_start_offset);
+        DORADO_LOG(trace,
+                   "t_window_start {} q_window_start {} cigar_start_idx {} cigar_start_offset {}",
+                   t_window_start, q_window_start, cigar_start_idx, cigar_start_offset);
 
         for (int cigar_idx = 0; cigar_idx < (int)cigar.size(); cigar_idx++) {
             auto op = cigar[cigar_idx];
@@ -212,22 +207,22 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             case CigarOpType::X:
                 tnew = tpos + op.len;
                 qnew = qpos + op.len;
-                LOG_TRACE("{} {}", op.len, "M");
+                DORADO_LOG(trace, "{} {}", op.len, "M");
                 break;
             case CigarOpType::D:
                 tnew = tpos + op.len;
-                LOG_TRACE("{} {}", op.len, "D");
+                DORADO_LOG(trace, "{} {}", op.len, "D");
                 break;
             case CigarOpType::I:
                 qpos += op.len;
-                LOG_TRACE("{} {}", op.len, "I");
+                DORADO_LOG(trace, "{} {}", op.len, "I");
                 continue;
             default:
                 throw std::runtime_error("Unexpected CigarOpType in extract_windows: " +
                                          std::string(1, convert_cigar_op_to_char(op.op)));
             }
 
-            LOG_TRACE("tpos {} qpos {} tnew {} qnew {}", tpos, qpos, tnew, qnew);
+            DORADO_LOG(trace, "tpos {} qpos {} tnew {} qnew {}", tpos, qpos, tnew, qnew);
 
             const int current_w = tpos / window_size;
             const int new_w = tnew / window_size;
@@ -256,11 +251,11 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                              q_window_start, q_start_new, cigar_start_idx, cigar_start_offset,
                              (int)cigar_idx, offset, 0.f, 0});
 
-                    LOG_TRACE(
-                            "pushed t_window_start {} q_window_start {} q_start_new {} "
-                            "cigar_start_idx {} cigar_start_offseet {} cigar_idx {} offset {}",
-                            t_window_start, q_window_start, q_start_new, cigar_start_idx,
-                            cigar_start_offset, cigar_idx, offset);
+                    DORADO_LOG(trace,
+                               "pushed t_window_start {} q_window_start {} q_start_new {} "
+                               "cigar_start_idx {} cigar_start_offseet {} cigar_idx {} offset {}",
+                               t_window_start, q_window_start, q_start_new, cigar_start_idx,
+                               cigar_start_offset, cigar_idx, offset);
 
                     t_window_start = tpos + offset;
 
@@ -286,12 +281,12 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                 }
             }
 
-            LOG_TRACE("new_w {} window size {} tpos {}", new_w, window_size, tpos);
+            DORADO_LOG(trace, "new_w {} window size {} tpos {}", new_w, window_size, tpos);
             const int offset = new_w * window_size - tpos;
 
             int qend = (op.op == CigarOpType::EQ || op.op == CigarOpType::X) ? qpos + offset : qpos;
 
-            LOG_TRACE("offset {} qend {}", offset, qend);
+            DORADO_LOG(trace, "offset {} qend {}", offset, qend);
 
             int cigar_end_idx = -1;
             int cigar_end_offset = -1;
@@ -311,7 +306,7 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                 cigar_end_offset = offset;
             }
 
-            LOG_TRACE("offset {} qend {}", offset, qend);
+            DORADO_LOG(trace, "offset {} qend {}", offset, qend);
 
             if (cigar_start_idx >= 0) {
                 const int32_t current_w_start = (t_window_start / window_size) * window_size;
@@ -320,11 +315,11 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                                               t_window_start, tpos + offset, q_window_start, qend,
                                               cigar_start_idx, cigar_start_offset, cigar_end_idx,
                                               cigar_end_offset, 0.f, 0});
-                LOG_TRACE(
-                        "pushed t_window_start {} q_window_start {} qend {} cigar_start_idx {} "
-                        "cigar_start_offseet {} cigar_end_idx {} cigar_end_offset {}",
-                        t_window_start, q_window_start, qend, cigar_start_idx, cigar_start_offset,
-                        cigar_end_idx, cigar_end_offset);
+                DORADO_LOG(trace,
+                           "pushed t_window_start {} q_window_start {} qend {} cigar_start_idx {} "
+                           "cigar_start_offseet {} cigar_end_idx {} cigar_end_offset {}",
+                           t_window_start, q_window_start, qend, cigar_start_idx,
+                           cigar_start_offset, cigar_end_idx, cigar_end_offset);
 
                 t_window_start = tpos + offset;
                 q_window_start = qend;
@@ -348,11 +343,11 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
             windows[last_window - 1].push_back(
                     {aln_idx, current_w_start, current_w_end, t_window_start, tlen, q_window_start,
                      qpos, cigar_start_idx, cigar_start_offset, (int)cigar.size(), 0, 0.f, 0});
-            LOG_TRACE(
-                    "pushed t_window_start {} q_window_start {} qpos {} cigar_start_idx {} "
-                    "cigar_start_offseet {} cigar len {} 0",
-                    t_window_start, q_window_start, qpos, cigar_start_idx, cigar_start_offset,
-                    cigar.size());
+            DORADO_LOG(trace,
+                       "pushed t_window_start {} q_window_start {} qpos {} cigar_start_idx {} "
+                       "cigar_start_offseet {} cigar len {} 0",
+                       t_window_start, q_window_start, qpos, cigar_start_idx, cigar_start_offset,
+                       cigar.size());
         }
     }
 
