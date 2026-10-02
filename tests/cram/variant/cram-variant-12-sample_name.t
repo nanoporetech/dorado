@@ -104,5 +104,4 @@ Multiple LB values causes early exit
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\]\ \[/\[/'
   Exit code: 1
-  [error] BAM read groups contain multiple sample names: [extra_sample,K36A_400bps_1]
-  [error] Please specify a sample name with the `--sample-name` option.
+  [error] BAM read groups contain multiple sample names: [extra_sample,K36A_400bps_1]. Please specify a sample name with the `--sample-name` option.

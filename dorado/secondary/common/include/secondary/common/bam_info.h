@@ -27,4 +27,10 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
 
 void check_read_groups(const BamInfo& bam_info, const std::string& cli_read_group);
 
+/**
+ * \brief Get the sample name if exactly one is present in bam_info.sample_names.
+ *        Throws if there is not exactly one sample name.
+ */
+const std::string& unique_sample_name_or_throw(const BamInfo& bam_info);
+
 }  // namespace dorado::secondary

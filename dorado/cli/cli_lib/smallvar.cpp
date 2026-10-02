@@ -19,7 +19,6 @@
 #include "smallvar_progress_tracker.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"
-#include "utils/container_utils.h"
 #include "utils/jthread.h"
 #include "utils/log_utils.h"
 #include "utils/string_utils.h"
@@ -1082,8 +1081,7 @@ void run_variant_calling(const Options& opt,
                          const secondary::BamInfo& bam_info,
                          const secondary::ModelConfig& model_config,
                          smallvar::VariantResources& resources,
-                         secondary::Stats& stats,
-                         const std::string& sample_name) {
+                         secondary::Stats& stats) {
     DORADO_LOG(info, "Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
                opt.infer_threads, std::size(resources.devices));
 
@@ -1245,6 +1243,20 @@ void run_variant_calling(const Options& opt,
     const secondary::Filters::FilterType vcf_filters =
             secondary::Filters::Pass | secondary::Filters::LowQual |
             secondary::Filters::IncompatZyg | secondary::Filters::NonVariant;
+
+    // Set the sample name for VCF output
+    // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
+    // If the BAM contains multiple sample names, exit and ask for user instruction.
+    const std::string& sample_name = [&opt, &bam_info]() {
+        if (opt.sample_name.has_value()) {
+            return opt.sample_name.value();
+        }
+        if (bam_info.sample_names.empty()) {
+            return secondary::VCF_DEFAULT_SAMPLE;
+        }
+        return unique_sample_name_or_throw(bam_info);
+    }();
+    DORADO_LOG(info, "Setting sample name for VCF output: {}", sample_name);
 
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer = std::make_unique<secondary::VCFWriter>(
@@ -1550,26 +1562,6 @@ int small_variant_caller(int argc, char* argv[]) {
             secondary::check_read_groups(bam_info, opt.read_group);
         }
 
-        // Set the sample name for VCF output
-        // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
-        // If the BAM contains multiple sample names, exit and ask for user instruction.
-        std::string sample_name;
-        if (opt.sample_name.has_value()) {
-            sample_name = opt.sample_name.value();
-        } else if (!std::empty(bam_info.sample_names)) {
-            if (std::size(bam_info.sample_names) > 1) {
-                DORADO_LOG(error, "BAM read groups contain multiple sample names: {}",
-                           utils::print_container_as_string(bam_info.sample_names, ",", true));
-                DORADO_LOG(error, "Please specify a sample name with the `--sample-name` option.");
-                std::exit(EXIT_FAILURE);
-            }
-            sample_name = *std::begin(bam_info.sample_names);
-            DORADO_LOG(info, "Using sample name from BAM read groups: {}", sample_name);
-        } else {
-            sample_name = secondary::VCF_DEFAULT_SAMPLE;
-        }
-        DORADO_LOG(info, "Setting sample name: {}", sample_name);
-
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
         utils::initialise_torch();
 
@@ -1616,8 +1608,7 @@ int small_variant_caller(int argc, char* argv[]) {
             DORADO_LOG(info, "Using half precision!");
         }
 
-        run_variant_calling(opt, command_line, bam_info, model_config, resources, stats,
-                            sample_name);
+        run_variant_calling(opt, command_line, bam_info, model_config, resources, stats);
 
         tracker.finalize();
         stats_sampler->terminate();

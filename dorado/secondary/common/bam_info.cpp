@@ -141,4 +141,19 @@ void check_read_groups(const BamInfo& bam_info, const std::string& cli_read_grou
     }
 }
 
+const std::string& unique_sample_name_or_throw(const BamInfo& bam_info) {
+    if (bam_info.sample_names.empty()) {
+        throw std::runtime_error{
+                "BAM read groups contain no sample names. Please specify a sample name with "
+                "the `--sample-name` option."};
+    }
+    if (bam_info.sample_names.size() > 1) {
+        throw std::runtime_error{
+                "BAM read groups contain multiple sample names: " +
+                utils::print_container_as_string(bam_info.sample_names, ",", true) +
+                ". Please specify a sample name with the `--sample-name` option."};
+    }
+    return *bam_info.sample_names.begin();
+}
+
 }  // namespace dorado::secondary
