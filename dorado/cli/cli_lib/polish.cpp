@@ -461,6 +461,11 @@ void validate_options(const Options& opt) {
                    opt.model_str);
         std::exit(EXIT_FAILURE);
     }
+
+    if (opt.sample_name.has_value() && !opt.run_variant_calling) {
+        DORADO_LOG(warn,
+                   "The --sample-name option will be ignored as not running variant calling.");
+    }
 }
 
 /**

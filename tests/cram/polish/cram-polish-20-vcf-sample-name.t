@@ -100,3 +100,15 @@ Multiple LB values proceed if not running variant calling
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --ignore-read-groups > out/out.vcf 2> out/stderr
   > echo "Exit code: $?"
   Exit code: 0
+
+Sample name ignored if not running variant calling
+  $ rm -rf out; mkdir -p out
+  > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
+  > in_bam=${in_dir}/in.aln.extrarg.bam
+  > in_ref=${in_dir}/in.ref.fasta.gz
+  > model_var=${MODEL_ROOT_DIR:+--models-directory ${MODEL_ROOT_DIR}}
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --ignore-read-groups --sample-name SAMPLE > out/out.vcf 2> out/stderr
+  > echo "Exit code: $?"
+  > grep "\[warning\] The --sample-name option will be ignored" out/stderr | wc -l
+  Exit code: 0
+  1
