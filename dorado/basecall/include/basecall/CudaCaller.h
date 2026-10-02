@@ -87,7 +87,7 @@ private:
     const at::TensorOptions m_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::optional<modbase::ModBaseLatentSpaceModels> m_modbase_modules;
-    std::atomic<bool> m_terminate{false};
+    bool m_terminate{false};
     std::thread m_cuda_thread;
     int m_num_input_features;
     const bool m_low_latency;
