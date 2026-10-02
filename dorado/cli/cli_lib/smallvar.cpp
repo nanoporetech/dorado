@@ -96,7 +96,7 @@ struct Options {
     bool any_bam = false;
     bool ambig_ref = false;
     float pass_min_qual = 3.0f;
-    std::string sample_name;
+    std::optional<std::string> sample_name{};
 
     secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
     std::optional<std::filesystem::path> phasing_bin_path;
@@ -279,9 +279,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
                 .default_value("");
-        parser.add_argument("--sample-name")
-                .help("Set sample name in VCF.")
-                .default_value(secondary::VCF_DEFAULT_SAMPLE);
+        parser.add_argument("--sample-name").help("Set sample name in VCF.");
     }
     {
         parser.add_group("Phasing options");
@@ -535,7 +533,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
                                    : std::nullopt;
     opt.min_mapq = parser.present<int32_t>("min-mapq");
     opt.ambig_ref = parser.get<bool>("ambig-ref");
-    opt.sample_name = parser.get<std::string>("sample-name");
+    opt.sample_name = cli::get_optional_argument<std::string>("--sample-name", parser);
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
     opt.candidate_variants_path = parser.present<std::string>("candidates");
@@ -674,11 +672,6 @@ void validate_options(const Options& opt) {
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
         DORADO_LOG(error, "Candidate site file '{}' does not exist.",
                    opt.candidate_variants_path->string());
-        std::exit(EXIT_FAILURE);
-    }
-
-    if (std::empty(opt.sample_name)) {
-        DORADO_LOG(error, "The --sample-name option was specified but no name was provided.");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -1560,8 +1553,10 @@ int small_variant_caller(int argc, char* argv[]) {
         // Set the sample name for VCF output
         // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
         // If the BAM contains multiple sample names, exit and ask for user instruction.
-        std::string sample_name = opt.sample_name;
-        if (!parser.is_used("--sample-name") && !std::empty(bam_info.sample_names)) {
+        std::string sample_name;
+        if (opt.sample_name.has_value()) {
+            sample_name = opt.sample_name.value();
+        } else if (!std::empty(bam_info.sample_names)) {
             if (std::size(bam_info.sample_names) > 1) {
                 DORADO_LOG(error, "BAM read groups contain multiple sample names: {}",
                            utils::print_container_as_string(bam_info.sample_names, ",", true));
@@ -1571,8 +1566,9 @@ int small_variant_caller(int argc, char* argv[]) {
             sample_name = *std::begin(bam_info.sample_names);
             DORADO_LOG(info, "Using sample name from BAM read groups: {}", sample_name);
         } else {
-            DORADO_LOG(info, "Setting sample name: {}", sample_name);
+            sample_name = secondary::VCF_DEFAULT_SAMPLE;
         }
+        DORADO_LOG(info, "Setting sample name: {}", sample_name);
 
         // Set the number of threads so that libtorch doesn't cause a thread bomb.
         utils::initialise_torch();

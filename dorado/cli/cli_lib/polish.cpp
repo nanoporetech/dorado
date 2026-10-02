@@ -111,7 +111,7 @@ struct Options {
     bool continue_on_error = false;
     bool legacy_feature_gen = true;
     const secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::UNPHASED;
-    std::string sample_name;
+    std::optional<std::string> sample_name{};
 };
 
 /// \brief Define the CLI options.
@@ -234,9 +234,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Set quality filter for PASS variants.")
                 .default_value(3.0f)
                 .scan<'g', float>();
-        parser.add_argument("--sample-name")
-                .help("Set sample name in VCF.")
-                .default_value(secondary::VCF_DEFAULT_SAMPLE);
+        parser.add_argument("--sample-name").help("Set sample name in VCF.");
         parser.add_argument("--model-override")
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
@@ -387,7 +385,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
 
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
-    opt.sample_name = parser.get<std::string>("sample-name");
+    opt.sample_name = cli::get_optional_argument<std::string>("--sample-name", parser);
 
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
@@ -462,11 +460,6 @@ void validate_options(const Options& opt) {
         DORADO_LOG(error,
                    "Model override file path '{}' is specified, but the file does not exist.",
                    opt.model_str);
-        std::exit(EXIT_FAILURE);
-    }
-
-    if (std::empty(opt.sample_name)) {
-        DORADO_LOG(error, "The --sample-name option was specified but no name was provided.");
         std::exit(EXIT_FAILURE);
     }
 }
@@ -1296,11 +1289,13 @@ int polish(int argc, char* argv[]) {
         }
 
         // Set the sample name for VCF output
-        std::string sample_name = opt.sample_name;
+        std::string sample_name;
         if (opt.run_variant_calling) {
             // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
             // If the BAM contains multiple sample names, exit and ask for user instruction.
-            if (!parser.is_used("--sample-name") && !std::empty(bam_info.sample_names)) {
+            if (opt.sample_name.has_value()) {
+                sample_name = opt.sample_name.value();
+            } else if (!std::empty(bam_info.sample_names)) {
                 if (std::size(bam_info.sample_names) > 1) {
                     DORADO_LOG(error, "BAM read groups contain multiple sample names: {}",
                                utils::print_container_as_string(bam_info.sample_names, ",", true));
@@ -1311,8 +1306,9 @@ int polish(int argc, char* argv[]) {
                 sample_name = *std::begin(bam_info.sample_names);
                 DORADO_LOG(info, "Using sample name from BAM read groups: {}", sample_name);
             } else {
-                DORADO_LOG(info, "Setting sample name: {}", sample_name);
+                sample_name = secondary::VCF_DEFAULT_SAMPLE;
             }
+            DORADO_LOG(info, "Setting sample name: {}", sample_name);
         }
 
         // Resolve the model.
