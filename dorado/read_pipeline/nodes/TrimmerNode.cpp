@@ -55,9 +55,8 @@ std::tuple<bool, bool, Interval> get_trim_interval(dorado::ClientInfo& client_in
     }
 
     if (trim_interval.second <= trim_interval.first) {
-        dorado::utils::trace_log(
-                "Invalid trim interval for read id {}: {}-{}. Trimming will be skipped.", read_id,
-                trim_interval.first, trim_interval.second);
+        DORADO_LOG(trace, "Invalid trim interval for read id {}: {}-{}. Trimming will be skipped.",
+                   read_id, trim_interval.first, trim_interval.second);
         return {false, false, {0, 0}};
     }
 

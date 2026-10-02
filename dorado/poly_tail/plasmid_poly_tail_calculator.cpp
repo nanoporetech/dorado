@@ -42,7 +42,7 @@ std::vector<SignalAnchorInfo> PlasmidPolyTailCalculator::determine_signal_anchor
                            int(seq_view.length()), align_config);
         Result result;
         result.score = 1.f - align_result.editDistance / float(query.length());
-        dorado::utils::trace_log("Flank score: {} {}", desc, result.score);
+        DORADO_LOG(trace, "Flank score: {} {}", desc, result.score);
         if (result.score >= threshold) {
             result.start = align_result.startLocations[0];
             result.end = align_result.endLocations[0];

@@ -44,24 +44,4 @@ void SetVerboseLogging(VerboseLogLevel level);
 /// </remarks>
 void EnsureInfoLoggingEnabled(VerboseLogLevel level);
 
-/// Note that enabling this can impact short-read and adaptive-sampling performance.
-#if ENABLE_PER_READ_TRACE
-template <typename... Args>
-void trace_log(spdlog::format_string_t<Args...> fmt_str, Args &&...args) {
-    DORADO_LOG(trace, fmt_str, std::forward<Args>(args)...);
-}
-
-template <typename T>
-void trace_log(T &&msg) {
-    DORADO_LOG(trace, std::forward<T>(msg));
-}
-
-#else  // Per-read trace logging is disabled.
-template <typename... Args>
-void trace_log(fmt::format_string<Args...>, Args &&...) {}
-
-template <typename T>
-void trace_log(T &&) {}
-#endif
-
 }  // namespace dorado::utils

@@ -20,8 +20,8 @@ RNAReadSplitter::ExtRead RNAReadSplitter::create_ext_read(SimplexReadPtr r) cons
             ext_read.read->read_common.raw_data, m_settings.pore_thr, m_settings.pore_cl_dist,
             m_settings.expect_pore_prefix, m_settings.duration_thr);
     for (const auto& range : ext_read.possible_pore_regions) {
-        utils::trace_log("Pore range {}-{} {}", range.start_sample, range.end_sample,
-                         ext_read.read->read_common.read_id);
+        DORADO_LOG(trace, "Pore range {}-{} {}", range.start_sample, range.end_sample,
+                   ext_read.read->read_common.read_id);
     }
     return ext_read;
 }
@@ -65,17 +65,17 @@ std::vector<SimplexReadPtr> RNAReadSplitter::split(SimplexReadPtr init_read) con
 
     auto start_ts = high_resolution_clock::now();
     auto read_id = init_read->read_common.read_id;
-    utils::trace_log("Processing read {}", read_id);
+    DORADO_LOG(trace, "Processing read {}", read_id);
 
     std::vector<ExtRead> to_split;
     to_split.push_back(create_ext_read(std::move(init_read)));
     for (const auto& [description, split_f] : m_split_finders) {
-        utils::trace_log("Running {}", description);
+        DORADO_LOG(trace, "Running {}", description);
         std::vector<ExtRead> split_round_result;
         for (auto& r : to_split) {
             auto spacers = split_f(r);
-            utils::trace_log("RSN: {} strategy {} splits in read {}", description, spacers.size(),
-                             read_id);
+            DORADO_LOG(trace, "RSN: {} strategy {} splits in read {}", description, spacers.size(),
+                       read_id);
 
             if (spacers.empty()) {
                 split_round_result.push_back(std::move(r));
@@ -116,12 +116,12 @@ std::vector<SimplexReadPtr> RNAReadSplitter::split(SimplexReadPtr init_read) con
         split_result.push_back(std::move(ext_read.read));
     }
 
-    utils::trace_log("Read {} split into {} subreads: {}", read_id, split_result.size(),
-                     log_output.str());
+    DORADO_LOG(trace, "Read {} split into {} subreads: {}", read_id, split_result.size(),
+               log_output.str());
 
     auto stop_ts = high_resolution_clock::now();
-    utils::trace_log("READ duration: {} microseconds (ID: {})",
-                     duration_cast<microseconds>(stop_ts - start_ts).count(), read_id);
+    DORADO_LOG(trace, "READ duration: {} microseconds (ID: {})",
+               duration_cast<microseconds>(stop_ts - start_ts).count(), read_id);
 
     return split_result;
 }

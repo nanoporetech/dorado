@@ -105,10 +105,10 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
     float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
     if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
         min_seq_len >= 5000) {
-        utils::trace_log(
-                "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
-                len_ratio, delta, temp.read_common.seq.length(), comp.read_common.seq.length(),
-                temp.read_common.read_id, comp.read_common.read_id);
+        DORADO_LOG(trace,
+                   "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
+                   len_ratio, delta, temp.read_common.seq.length(), comp.read_common.seq.length(),
+                   temp.read_common.read_id, comp.read_common.read_id);
         m_early_accepted_pairs++;
         return {true, 0, int(temp.read_common.seq.length() - 1), 0,
                 int(comp.read_common.seq.length() - 1)};
@@ -158,13 +158,14 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
         bool cond =
                 (meets_mapq && meets_length && rev && ends_anchored && meets_min_overlap_length);
 
-        utils::trace_log(
-                "mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
-                "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
-                "comp start {} comp end {}, {} and {}",
-                mapq, temp_end - temp_start, overlap_frac, delta, temp.read_common.seq.length(),
-                comp.read_common.seq.length(), rev ? "-" : "+", cond, !allow_rejection, temp_start,
-                temp_end, comp_start, comp_end, temp.read_common.read_id, comp.read_common.read_id);
+        DORADO_LOG(trace,
+                   "mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
+                   "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
+                   "comp start {} comp end {}, {} and {}",
+                   mapq, temp_end - temp_start, overlap_frac, delta, temp.read_common.seq.length(),
+                   comp.read_common.seq.length(), rev ? "-" : "+", cond, !allow_rejection,
+                   temp_start, temp_end, comp_start, comp_end, temp.read_common.read_id,
+                   comp.read_common.read_id);
 
         if (cond || !allow_rejection) {
             m_overlap_accepted_pairs++;

@@ -112,7 +112,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
     auto [left_end, right_end] =
             signal_range(signal_anchor, signal_len, num_samples_per_base, direction);
-    utils::trace_log("Bounds left {}, right {}", left_end, right_end);
+    DORADO_LOG(trace, "Bounds left {}, right {}", left_end, right_end);
 
     std::vector<Interval> intervals;
     const int kStride = 3;
@@ -122,7 +122,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
         auto [avg, stdev] = calc_stats(s, e);
         if (avg > kMinAvgVal && stdev < kVar) {
             if (intervals.empty()) {
-                utils::trace_log("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
+                DORADO_LOG(trace, "Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                 intervals.push_back({s, e, avg});
             } else {
                 // If new interval overlaps with the previous interval and
@@ -132,12 +132,12 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                     std::abs(avg - last_interval.avg) < kMeanValueProximity) {
                     // recalc stats for new interval
                     std::tie(avg, stdev) = calc_stats(last_interval.start, e);
-                    utils::trace_log("extend interval {}-{} to {}-{} avg {} stdev {}",
-                                     last_interval.start, last_interval.end, last_interval.start, e,
-                                     avg, stdev);
+                    DORADO_LOG(trace, "extend interval {}-{} to {}-{} avg {} stdev {}",
+                               last_interval.start, last_interval.end, last_interval.start, e, avg,
+                               stdev);
                     last_interval = Interval{last_interval.start, e, avg};
                 } else {
-                    utils::trace_log("Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
+                    DORADO_LOG(trace, "Add new interval {}-{} avg {} stdev {}", s, e, avg, stdev);
                     intervals.push_back({s, e, avg});
                 }
             }
@@ -148,7 +148,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     for (const auto& in : intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
-    utils::trace_log("found intervals {}", int_str);
+    DORADO_LOG(trace, "found intervals {}", int_str);
 
     // Cluster intervals if there are interrupted poly tails that should
     // be combined. Interruption length is specified through a config file.
@@ -210,7 +210,7 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     for (const auto& in : intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
-    utils::trace_log("clustered intervals {}", int_str);
+    DORADO_LOG(trace, "clustered intervals {}", int_str);
 
     // Once the clustered intervals are available, filter them by how
     // close they are to the anchor.
@@ -236,10 +236,10 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     for (const auto& in : filtered_intervals) {
         int_str += std::to_string(in.start) + "-" + std::to_string(in.end) + ", ";
     }
-    utils::trace_log("filtered intervals {}", int_str);
+    DORADO_LOG(trace, "filtered intervals {}", int_str);
 
     if (filtered_intervals.empty()) {
-        utils::trace_log("Anchor {} No range within anchor proximity found", signal_anchor);
+        DORADO_LOG(trace, "Anchor {} No range within anchor proximity found", signal_anchor);
         return {-1, -1};
     }
 
@@ -262,8 +262,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                                               }
                                           });
 
-    utils::trace_log("Anchor {} Range {} {}", signal_anchor, best_interval->start,
-                     best_interval->end);
+    DORADO_LOG(trace, "Anchor {} Range {} {}", signal_anchor, best_interval->start,
+               best_interval->end);
 
     return std::make_pair(best_interval->start, best_interval->end);
 }

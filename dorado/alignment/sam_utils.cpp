@@ -39,7 +39,7 @@ public:
     template <typename T>
     SamLineStream& operator>>(T& val) {
         if (m_stream.peek().value_or("").empty()) {
-            utils::trace_log("Empty sam line field in stream. Continuing anyway.");
+            DORADO_LOG(trace, "Empty sam line field in stream. Continuing anyway.");
             val = default_value<T>();
             // Consume the empty field.
             (void)m_stream.getline();
@@ -132,7 +132,7 @@ std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
         std::string_view sq, reference, length_field;
         header_line >> sq >> reference >> length_field;
         if (sq == "@SQ") {
-            utils::trace_log("{} length_field: {}", __func__, length_field);
+            DORADO_LOG(trace, "{} length_field: {}", __func__, length_field);
             int ref_length =
                     utils::from_chars<int>(length_field.substr(3, length_field.size())).value();
             reference_length[reference.substr(3, reference.size())] = ref_length;
@@ -241,8 +241,8 @@ std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
                     throw std::runtime_error("Input SAM line for read ID " + std::string(seq_name) +
                                              " does not contain required 'NM' tag");
                 }
-                utils::trace_log("{} opt_values.at(\"NM\").Value: {}", __func__,
-                                 opt_NM->second.Value);
+                DORADO_LOG(trace, "{} opt_values.at(\"NM\").Value: {}", __func__,
+                           opt_NM->second.Value);
                 int edit_distance = utils::from_chars<int>(opt_values.at("NM").Value).value();
                 int num_mismatches = edit_distance - res.num_insertions - res.num_deletions;
                 res.num_correct = res.num_aligned - num_mismatches;
@@ -251,8 +251,8 @@ std::vector<AlignmentResult> parse_sam_lines(std::string_view sam_content,
                                float(res.num_aligned + res.num_insertions + res.num_deletions);
                 auto opt_AS = opt_values.find("AS");
                 if (opt_AS != opt_values.end()) {
-                    utils::trace_log("{} opt_values.at(\"AS\").Value: {}", __func__,
-                                     opt_AS->second.Value);
+                    DORADO_LOG(trace, "{} opt_values.at(\"AS\").Value: {}", __func__,
+                               opt_AS->second.Value);
                     res.strand_score = utils::from_chars<int>(opt_AS->second.Value).value();
                 } else {
                     res.strand_score = 0;
