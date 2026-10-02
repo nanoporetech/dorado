@@ -42,36 +42,28 @@ popd
 
 MODEL_ROOT_DIR=${output_dir}
 
-# Download the model once.
-MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v6.0.0_smallvar@v1.0"
-MODEL_DIR=${output_dir}/${MODEL_NAME}
-if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
-fi
-MODEL_v600=${MODEL_NAME}
-
-# Download the model once.
-MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0"
-MODEL_DIR=${output_dir}/${MODEL_NAME}
-if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${output_dir}
-fi
-
+SMALLVAR_MODEL_NAME_v520="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0"
+SMALLVAR_MODEL_NAME_v600="dna_r10.4.1_e8.2_400bps_hac@v6.0.0_smallvar@v1.0"
 POLISH_MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv"
-POLISH_MODEL_DIR=${output_dir}/${POLISH_MODEL_NAME}
-if [[ ! -d "${POLISH_MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${POLISH_MODEL_NAME}" --models-directory ${output_dir}
-fi
+
+# Download the models once.
+for model in \
+  ${POLISH_MODEL_NAME} \
+  ${SMALLVAR_MODEL_NAME_v520} \
+  ${SMALLVAR_MODEL_NAME_v600} \
+; do
+  model_dir=${output_dir}/${model}
+  if [[ ! -d "${model_dir}" ]]; then
+      ${DORADO_BIN} download --model "${model}" --models-directory ${output_dir}
+  fi
+done
 
 export DORADO_BIN
 export TEST_DATA_DIR
 export TEST_DIR
-export MODEL_DIR
-export MODEL_NAME
-export MODEL_ROOT_DIR
-export MODEL_v600
-export POLISH_MODEL_DIR
-export POLISH_MODEL_NAME
+export MODEL_ROOT_DIR=${output_dir}
+export POLISH_MODEL=${MODEL_ROOT_DIR}/${POLISH_MODEL_NAME}
+export SMALLVAR_MODEL_v600=${MODEL_ROOT_DIR}/${SMALLVAR_MODEL_NAME_v600}
 export OUTPUT_DIR=${output_dir}
 python3 \
     ${CRAM} \

@@ -56,7 +56,7 @@ gVCF run: reference-block (R) and inference (I) sources.
   > in_bam=${in_dir_1}/in.aln.bam
   > in_ref=${in_dir_1}/in.ref.fasta.gz
   > in_candidates=${in_dir_2}/in.varcall.unsr.list
-  > model_var="--model-override ${MODEL_ROOT_DIR}/${MODEL_v600}"
+  > model_var="--model-override ${SMALLVAR_MODEL_v600}"
   > ${DORADO_BIN} smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --candidate-filtering true --candidates ${in_candidates} --window-len 300 --window-overlap 100 --variant-flanking-bases 100 --regions "chr20:1000-2145" --ignore-read-groups --gvcf -o out 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
