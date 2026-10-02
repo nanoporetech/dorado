@@ -18,7 +18,7 @@ ScopedTraceLog::~ScopedTraceLog() { write_log_message(SCOPED_LOG_EXIT, {}); }
 
 void ScopedTraceLog::write_log_message(const std::string &message_type,
                                        const std::string &message) {
-    spdlog::trace("{} {} {}", m_context, message_type, message);
+    DORADO_LOG(trace, "{} {} {}", m_context, message_type, message);
 }
 
 void ScopedTraceLog::write(const std::string &message) {

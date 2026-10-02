@@ -79,7 +79,7 @@ int trim(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -88,12 +88,12 @@ int trim(int argc, char* argv[]) {
     }
 
     if (!parser.is_used("--sequencing-kit")) {
-        spdlog::error("The sequencing kit name must be specified with --sequencing-kit.");
+        DORADO_LOG(error, "The sequencing kit name must be specified with --sequencing-kit.");
         return EXIT_FAILURE;
     }
     auto kit_name = parser.get<std::string>("--sequencing-kit");
     if (kit_name.empty()) {
-        spdlog::error("Sequencing kit name must be non-empty.");
+        DORADO_LOG(error, "Sequencing kit name must be non-empty.");
         return EXIT_FAILURE;
     }
 
@@ -108,8 +108,8 @@ int trim(int argc, char* argv[]) {
     // generation and rest for trimming.
     auto [trim_threads, trim_writer_threads] =
             cli::worker_vs_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> adapter/primer trimming threads {}, writer threads {}", trim_threads,
-                  trim_writer_threads);
+    DORADO_LOG(debug, "> adapter/primer trimming threads {}, writer threads {}", trim_threads,
+               trim_writer_threads);
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -120,7 +120,7 @@ int trim(int argc, char* argv[]) {
         }
         reads.push_back("-");
     } else if (reads.size() > 1) {
-        spdlog::error("> multi file input not yet handled");
+        DORADO_LOG(error, "> multi file input not yet handled");
         return EXIT_FAILURE;
     }
 
@@ -138,7 +138,8 @@ int trim(int argc, char* argv[]) {
     auto emit_fastq = parser.get<bool>("--emit-fastq");
 
     if (emit_fastq) {
-        spdlog::info(" - Note: FASTQ output is not recommended as not all data can be preserved.");
+        DORADO_LOG(info,
+                   " - Note: FASTQ output is not recommended as not all data can be preserved.");
         output_mode = OutputMode::FASTQ;
     } else if (utils::is_fd_tty(stdout)) {
         output_mode = OutputMode::SAM;
@@ -199,7 +200,7 @@ int trim(int argc, char* argv[]) {
     std::vector<dorado::stats::StatsReporter> stats_reporters;
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
-        spdlog::error("Failed to create pipeline");
+        DORADO_LOG(error, "Failed to create pipeline");
         return EXIT_FAILURE;
     }
 
@@ -215,7 +216,7 @@ int trim(int argc, char* argv[]) {
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
 
-    spdlog::info("> starting adapter/primer trimming");
+    DORADO_LOG(info, "> starting adapter/primer trimming");
     reader.read(*pipeline, max_reads, false, nullptr, false);
 
     // Wait for the pipeline to complete.  When it does, we collect
@@ -231,7 +232,7 @@ int trim(int argc, char* argv[]) {
     });
     tracker.summarize();
 
-    spdlog::info("> finished adapter/primer trimming");
+    DORADO_LOG(info, "> finished adapter/primer trimming");
 
     return EXIT_SUCCESS;
 }

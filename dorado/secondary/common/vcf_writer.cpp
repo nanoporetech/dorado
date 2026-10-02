@@ -352,8 +352,9 @@ void VCFWriter::write_variant(const Variant& variant) {
             if (spec.type == FieldType::INT_LIST) {
                 std::vector<int32_t> parsed_values = parse_vcf_int_list(value);
                 if (std::empty(parsed_values)) {
-                    spdlog::debug("[write_variant] FORMAT {} list is empty for variant at {}:{}.",
-                                  spec.key, variant.seq_id, variant.pos);
+                    DORADO_LOG(debug,
+                               "[write_variant] FORMAT {} list is empty for variant at {}:{}.",
+                               spec.key, variant.seq_id, variant.pos);
                     continue;
                 }
                 if (m_include_gvcf_headers) {
@@ -385,8 +386,9 @@ void VCFWriter::write_variant(const Variant& variant) {
             if (spec.type == FieldType::FLOAT_LIST) {
                 std::vector<float> parsed_values = parse_vcf_float_list(value);
                 if (std::empty(parsed_values)) {
-                    spdlog::debug("[write_variant] FORMAT {} list is empty for variant at {}:{}.",
-                                  spec.key, variant.seq_id, variant.pos);
+                    DORADO_LOG(debug,
+                               "[write_variant] FORMAT {} list is empty for variant at {}:{}.",
+                               spec.key, variant.seq_id, variant.pos);
                     continue;
                 }
                 if (m_include_gvcf_headers && ((spec.number == "R") || (spec.number == "A"))) {

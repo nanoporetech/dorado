@@ -40,7 +40,7 @@ double available_host_memory_GB() {
 
     std::ifstream ifs("/proc/meminfo");
     if (!ifs) {
-        spdlog::warn("Cannot open /proc/meminfo to get memory statistics!");
+        DORADO_LOG(warn, "Cannot open /proc/meminfo to get memory statistics!");
         return 0.0;
     }
 

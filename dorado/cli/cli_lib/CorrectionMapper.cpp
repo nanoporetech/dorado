@@ -74,20 +74,20 @@ void CorrectionMapper::extract_alignments(const mm_reg1_t* reg,
         ovlp.tlen = ref.len;
 
         if (ovlp.qlen < ovlp.qstart || ovlp.qlen < ovlp.qend) {
-            spdlog::warn(
-                    "Inconsistent query alignment detected: tname {} tlen {} tstart {} tend {} "
-                    "qname {} qlen {} qstart {} qend {}",
-                    tname, ovlp.tlen, ovlp.tstart, ovlp.tend, qname, ovlp.qlen, ovlp.qstart,
-                    ovlp.qend);
+            DORADO_LOG(warn,
+                       "Inconsistent query alignment detected: tname {} tlen {} tstart {} tend {} "
+                       "qname {} qlen {} qstart {} qend {}",
+                       tname, ovlp.tlen, ovlp.tstart, ovlp.tend, qname, ovlp.qlen, ovlp.qstart,
+                       ovlp.qend);
             continue;
         }
 
         if (ovlp.tlen < ovlp.tstart || ovlp.tlen < ovlp.tend) {
-            spdlog::warn(
-                    "Inconsistent target alignment detected: tname {} tlen {} tstart {} tend {} "
-                    "qname {} qlen {} qstart {} qend {}",
-                    tname, ovlp.tlen, ovlp.tstart, ovlp.tend, qname, ovlp.qlen, ovlp.qstart,
-                    ovlp.qend);
+            DORADO_LOG(warn,
+                       "Inconsistent target alignment detected: tname {} tlen {} tstart {} tend {} "
+                       "qname {} qlen {} qstart {} qend {}",
+                       tname, ovlp.tlen, ovlp.tstart, ovlp.tend, qname, ovlp.qlen, ovlp.qstart,
+                       ovlp.qend);
             continue;
         }
 
@@ -123,8 +123,8 @@ void CorrectionMapper::input_thread_fn() {
             for (auto& [_, r] : m_correction_records) {
                 total += r.size();
             }
-            spdlog::debug("Alignments processed {}, total m_corrected_records size {} MB",
-                          m_alignments_processed.load(), (float)total / (1024 * 1024));
+            DORADO_LOG(debug, "Alignments processed {}, total m_corrected_records size {} MB",
+                       m_alignments_processed.load(), (float)total / (1024 * 1024));
         }
 
         for (int j = 0; j < hits; j++) {
@@ -143,7 +143,7 @@ void CorrectionMapper::load_read_fn() {
         m_reads_read++;
         // TODO: Remove and move to ProgressTracker
         if (m_reads_read.load() % 10000 == 0) {
-            spdlog::debug("Read {} reads", m_reads_read.load());
+            DORADO_LOG(debug, "Read {} reads", m_reads_read.load());
         }
     }
 }
@@ -161,12 +161,12 @@ void CorrectionMapper::send_data_fn(Pipeline& pipeline) {
         }
 
         for (auto& shadow_data : m_shadow_correction_records) {
-            spdlog::debug("Pushing {} records downstream of mapping.", shadow_data.size());
+            DORADO_LOG(debug, "Pushing {} records downstream of mapping.", shadow_data.size());
             int64_t num_pushed{0};
             for (auto& [tname, r] : shadow_data) {
                 // Skip reads which were already processed.
                 if (m_skip_set.count(tname) > 0) {
-                    spdlog::trace("Resuming in mapping: skipping read '{}'.", tname);
+                    DORADO_LOG(trace, "Resuming in mapping: skipping read '{}'.", tname);
                     continue;
                 }
                 pipeline.push_message(
@@ -174,7 +174,7 @@ void CorrectionMapper::send_data_fn(Pipeline& pipeline) {
                 ++num_pushed;
             }
             m_reads_to_infer.fetch_add(num_pushed);
-            spdlog::debug("Pushed {} non-skipped records for correction.", num_pushed);
+            DORADO_LOG(debug, "Pushed {} non-skipped records for correction.", num_pushed);
         }
         m_shadow_correction_records.clear();
     }
@@ -190,9 +190,9 @@ bool CorrectionMapper::load_next_index_block() {
 
 void CorrectionMapper::process(Pipeline& pipeline) {
     if (m_current_index < 0) {
-        spdlog::debug(
-                "Not processing because selected block is out of bounds. m_current_index = {}",
-                m_current_index);
+        DORADO_LOG(debug,
+                   "Not processing because selected block is out of bounds. m_current_index = {}",
+                   m_current_index);
         return;
     }
 
@@ -203,7 +203,7 @@ void CorrectionMapper::process(Pipeline& pipeline) {
 
     // If needed, skip all index chunks until we find the one containing this read.
     if (!std::empty(m_furthest_skip_header)) {
-        spdlog::debug("Resuming overlaps from target read: {}", m_furthest_skip_header);
+        DORADO_LOG(debug, "Resuming overlaps from target read: {}", m_furthest_skip_header);
 
         size_t total_skipped = 0;
 
@@ -213,20 +213,20 @@ void CorrectionMapper::process(Pipeline& pipeline) {
             for (uint32_t i = 0; i < index->n_seq; ++i) {
                 if (index->seq[i].name == m_furthest_skip_header) {
                     found = true;
-                    spdlog::debug("Resume: found header {} in index chunk ID {}.",
-                                  m_furthest_skip_header, m_current_index);
+                    DORADO_LOG(debug, "Resume: found header {} in index chunk ID {}.",
+                               m_furthest_skip_header, m_current_index);
                     break;
                 }
             }
             if (found) {
-                spdlog::debug("Resume: stopping the initial iteration.");
+                DORADO_LOG(debug, "Resume: stopping the initial iteration.");
                 break;
             }
 
             ++m_current_index;
             total_skipped += index->n_seq;
-            spdlog::debug("Resume: skipping index batch of {} reads. Total skipped: {}",
-                          index->n_seq, total_skipped);
+            DORADO_LOG(debug, "Resume: skipping index batch of {} reads. Total skipped: {}",
+                       index->n_seq, total_skipped);
 
         } while (m_index->load_next_chunk(m_num_threads) !=
                  alignment::IndexLoadResult::end_of_index);
@@ -238,7 +238,7 @@ void CorrectionMapper::process(Pipeline& pipeline) {
             break;
         }
 
-        spdlog::debug("Align with index {}", m_current_index);
+        DORADO_LOG(debug, "Align with index {}", m_current_index);
         m_reads_read.store(0);
         m_alignments_processed.store(0);
         m_reads_queue.restart();
@@ -315,9 +315,9 @@ CorrectionMapper::CorrectionMapper(const std::string& index_file,
     mapping_options.flag |= MM_F_EQX;
     mapping_options.mid_occ_frac = mid_occ_frac;
 
-    spdlog::trace(
-            "CorrectionMapper options: k = {}, w = {}, min_chain_score = {}, mid_occ_frac = {}",
-            kmer_size, window_size, min_chain_score, mid_occ_frac);
+    DORADO_LOG(trace,
+               "CorrectionMapper options: k = {}, w = {}, min_chain_score = {}, mid_occ_frac = {}",
+               kmer_size, window_size, min_chain_score, mid_occ_frac);
 
     // --cs short
     alignment::mm2::apply_cs_option(options, "short");
@@ -335,20 +335,20 @@ CorrectionMapper::CorrectionMapper(const std::string& index_file,
     if (!m_index->initialise(options)) {
         throw std::runtime_error("Failed to initialize with options.");
     } else {
-        spdlog::debug("Initialized index options.");
+        DORADO_LOG(debug, "Initialized index options.");
     }
-    spdlog::debug("Loading index...");
+    DORADO_LOG(debug, "Loading index...");
     if (m_index->load(index_file, threads, true) != alignment::IndexLoadResult::success) {
         throw std::runtime_error("Failed to load index file " + index_file);
     } else {
-        spdlog::debug("Loaded mm2 index.");
+        DORADO_LOG(debug, "Loaded mm2 index.");
     }
     m_index_seqs = m_index->index()->n_seq;
 
     // If a specific block has been selected, skip all earlier blocks.
     while ((run_block_id >= 0) && (m_current_index < run_block_id)) {
-        spdlog::debug("Skipping index block: {}. Looking for block: {}", m_current_index,
-                      run_block_id);
+        DORADO_LOG(debug, "Skipping index block: {}. Looking for block: {}", m_current_index,
+                   run_block_id);
         const bool rv = load_next_index_block();
         if (!rv) {
             // Not found, the entire index has been looped through.
@@ -356,7 +356,7 @@ CorrectionMapper::CorrectionMapper(const std::string& index_file,
             break;
         }
     }
-    spdlog::debug("Initial index block set to: {}", m_current_index);
+    DORADO_LOG(debug, "Initial index block set to: {}", m_current_index);
 }
 
 CorrectionMapper::~CorrectionMapper() = default;

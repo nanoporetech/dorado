@@ -26,10 +26,10 @@ bool flash_attention3_device_supported() {
     if (!supported) {
         static std::once_flag log_once;
         std::call_once(log_once, [major = dprops->major, minor = dprops->minor]() {
-            spdlog::info(
-                    "FlashAttention3 disabled on CUDA compute capability {}.{}; this build only "
-                    "contains {} kernels. Falling back to SDPA.",
-                    major, minor, flash_attention3_supported_arch_description());
+            DORADO_LOG(info,
+                       "FlashAttention3 disabled on CUDA compute capability {}.{}; this build only "
+                       "contains {} kernels. Falling back to SDPA.",
+                       major, minor, flash_attention3_supported_arch_description());
         });
     }
 

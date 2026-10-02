@@ -19,7 +19,7 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 namespace {

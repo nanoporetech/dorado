@@ -43,7 +43,7 @@ void show_report(const ReportInfo& info) {
         << ", " << 0
         << ", " << info.estimated_percentage;
     // clang-format on
-    spdlog::info(oss.str());
+    DORADO_LOG(info, oss.str());
 }
 
 auto get_num_reads_written(const stats::NamedStats& stats) {
@@ -83,7 +83,7 @@ ReadOutputProgressStats::ReadOutputProgressStats(std::chrono::seconds interval_d
         << ", interval reads processed"
         << ", interval bases processed"
         << ", estimated %";
-    spdlog::info(oss.str());
+    DORADO_LOG(info, oss.str());
 }
 
 ReadOutputProgressStats::~ReadOutputProgressStats() {
@@ -275,9 +275,10 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
                                                    ? current_reads_count - m_total_known_readcount
                                                    : 0;
 
-    spdlog::trace("num reads known: {} | processed: {} | current file: {} | estimate per file {}",
-                  m_total_known_readcount, current_reads_count, current_input_file_reads,
-                  m_estimated_num_reads_per_file);
+    DORADO_LOG(trace,
+               "num reads known: {} | processed: {} | current file: {} | estimate per file {}",
+               m_total_known_readcount, current_reads_count, current_input_file_reads,
+               m_estimated_num_reads_per_file);
     // If the reads processed from the current file is less than our expected reads
     // per file we can simply return an estimate based on this expectation
     // per file.
@@ -293,9 +294,9 @@ std::size_t ReadOutputProgressStats::calc_total_reads_single_collector(
     const auto num_known_files_including_current = m_num_files_where_readcount_known + 1;
     const auto adjusted_estimated_reads_per_file =
             static_cast<float>(count_including_current_file) / num_known_files_including_current;
-    spdlog::trace("ADJUSTED num reads known: {} | current file: {} | estimate per file {}",
-                  count_including_current_file, current_input_file_reads,
-                  adjusted_estimated_reads_per_file);
+    DORADO_LOG(trace, "ADJUSTED num reads known: {} | current file: {} | estimate per file {}",
+               count_including_current_file, current_input_file_reads,
+               adjusted_estimated_reads_per_file);
     return to_size_t(adjusted_estimated_reads_per_file * m_num_input_files);
 }
 
@@ -337,9 +338,9 @@ void ReadOutputProgressStats::update_reads_per_file_estimate(std::size_t num_rea
     m_estimated_num_reads_per_file =
             static_cast<float>(m_total_known_readcount) / m_num_files_where_readcount_known;
 
-    spdlog::trace("num known files: {}, reads input: {}, estimate per file {}",
-                  m_num_files_where_readcount_known, m_total_known_readcount,
-                  m_estimated_num_reads_per_file);
+    DORADO_LOG(trace, "num known files: {}, reads input: {}, estimate per file {}",
+               m_num_files_where_readcount_known, m_total_known_readcount,
+               m_estimated_num_reads_per_file);
 }
 
 void ReadOutputProgressStats::notify_post_processing_completed() {

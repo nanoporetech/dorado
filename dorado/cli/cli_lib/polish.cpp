@@ -281,7 +281,7 @@ int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -358,10 +358,10 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
     opt.min_mapq = parser.present<int32_t>("min-mapq");
 
     if (opt.bam_subchunk > opt.bam_chunk) {
-        spdlog::warn(
-                "BAM sub-chunk size is larger than bam_chunk size. Limiting to bam_chunk size. "
-                "bam_subchunk = {}, bam_chunk = {}",
-                opt.bam_chunk, opt.bam_subchunk);
+        DORADO_LOG(warn,
+                   "BAM sub-chunk size is larger than bam_chunk size. Limiting to bam_chunk size. "
+                   "bam_subchunk = {}, bam_chunk = {}",
+                   opt.bam_chunk, opt.bam_subchunk);
         opt.bam_subchunk = opt.bam_chunk;
     }
 
@@ -397,48 +397,50 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_aln_bam_fn)) {
-        spdlog::error("Input draft file {} does not exist!", opt.in_aln_bam_fn.string());
+        DORADO_LOG(error, "Input draft file {} does not exist!", opt.in_aln_bam_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_draft_fastx_fn)) {
-        spdlog::error("Input reads file {} does not exist!", opt.in_draft_fastx_fn.string());
+        DORADO_LOG(error, "Input reads file {} does not exist!", opt.in_draft_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (opt.batch_size < 0) {
-        spdlog::error("Batch size should be >= 0. Given: {}.", opt.batch_size);
+        DORADO_LOG(error, "Batch size should be >= 0. Given: {}.", opt.batch_size);
         std::exit(EXIT_FAILURE);
     }
     if (opt.draft_batch_size <= 0) {
-        spdlog::error("Draft batch size should be > 0. Given: {}.", opt.draft_batch_size);
+        DORADO_LOG(error, "Draft batch size should be > 0. Given: {}.", opt.draft_batch_size);
         std::exit(EXIT_FAILURE);
     }
     if (opt.bam_chunk <= 0) {
-        spdlog::error("BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
+        DORADO_LOG(error, "BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
         std::exit(EXIT_FAILURE);
     }
     if (opt.bam_subchunk <= 0) {
-        spdlog::error("BAM sub-chunk size should be > 0. Given: {}.", opt.bam_chunk);
+        DORADO_LOG(error, "BAM sub-chunk size should be > 0. Given: {}.", opt.bam_chunk);
         std::exit(EXIT_FAILURE);
     }
 
     if (!std::filesystem::exists(opt.in_aln_bam_fn) ||
         std::filesystem::is_empty(opt.in_aln_bam_fn)) {
-        spdlog::error("Input file {} does not exist or is empty.", opt.in_aln_bam_fn.string());
+        DORADO_LOG(error, "Input file {} does not exist or is empty.", opt.in_aln_bam_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_draft_fastx_fn) ||
         std::filesystem::is_empty(opt.in_draft_fastx_fn)) {
-        spdlog::error("Input file {} does not exist or is empty.", opt.in_draft_fastx_fn.string());
+        DORADO_LOG(error, "Input file {} does not exist or is empty.",
+                   opt.in_draft_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
 
     if (opt.queue_size <= 0) {
-        spdlog::error("Queue size needs to be > 0, given: {}.", opt.queue_size);
+        DORADO_LOG(error, "Queue size needs to be > 0, given: {}.", opt.queue_size);
         std::exit(EXIT_FAILURE);
     }
 
     if ((std::size(opt.tag_name) == 1) || (std::size(opt.tag_name) > 2)) {
-        spdlog::error(
+        DORADO_LOG(
+                error,
                 "The tag_name is specified, but it needs to contain exactly two characters. Given: "
                 "'{}'.",
                 opt.tag_name);
@@ -446,13 +448,14 @@ void validate_options(const Options& opt) {
     }
 
     if (opt.regions_str && std::empty(opt.regions)) {
-        spdlog::error("Option --regions is specified, but an empty set of regions is given!");
+        DORADO_LOG(error, "Option --regions is specified, but an empty set of regions is given!");
         std::exit(EXIT_FAILURE);
     }
 
     if (!std::empty(opt.model_str) && !std::filesystem::exists(opt.model_str)) {
-        spdlog::error("Model override file path '{}' is specified, but the file does not exist.",
-                      opt.model_str);
+        DORADO_LOG(error,
+                   "Model override file path '{}' is specified, but the file does not exist.",
+                   opt.model_str);
         std::exit(EXIT_FAILURE);
     }
 }
@@ -637,7 +640,7 @@ const std::filesystem::path resolve_model(
         const secondary::BamInfo& bam_info,
         const std::optional<std::filesystem::path>& models_directory,
         const bool bacteria) {
-    spdlog::info("Auto resolving the model.");
+    DORADO_LOG(info, "Auto resolving the model.");
 
     // Check that there is at least one basecaller listed in the BAM. Otherwise, no auto resolving.
     if (std::size(bam_info.basecaller_models) != 1) {
@@ -676,7 +679,7 @@ const std::filesystem::path resolve_model(
         throw std::runtime_error{"Resolved model '" + model_name + "' not found!"};
     }
 
-    spdlog::debug("Resolved model from input data: {}", model_name);
+    DORADO_LOG(debug, "Resolved model from input data: {}", model_name);
 
     model_downloader::ModelDownloader downloader(models_directory, false);
     const std::filesystem::path model_dir = downloader.get(model_name, "polish");
@@ -690,9 +693,9 @@ std::filesystem::path resolve_model_advanced(
         const std::string& model_str,
         const bool any_model) {
     if (bam_info.has_dwells) {
-        spdlog::info("Input data contains move tables.");
+        DORADO_LOG(info, "Input data contains move tables.");
     } else {
-        spdlog::info("Input data does not contain move tables.");
+        DORADO_LOG(info, "Input data does not contain move tables.");
     }
 
     // Check if any of the input models is a stereo, to report a clear error that this is not supported.
@@ -704,7 +707,7 @@ std::filesystem::path resolve_model_advanced(
             if (!any_model) {
                 throw std::runtime_error{oss.str()};
             } else {
-                spdlog::warn("{} This may produce inferior results.", oss.str());
+                DORADO_LOG(warn, "{} This may produce inferior results.", oss.str());
             }
         }
     }
@@ -728,16 +731,17 @@ std::filesystem::path resolve_model_advanced(
     std::filesystem::path model_dir;
 
     if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
-        spdlog::warn(
-                "Skipping basecaller compatibility checks for user-specified model: '{}'. The "
-                "accuracy of the results is not guaranteed.",
-                model_str);
-        spdlog::debug("Resolved model from user-specified path: {}", model_str);
+        DORADO_LOG(warn,
+                   "Skipping basecaller compatibility checks for user-specified model: '{}'. The "
+                   "accuracy of the results is not guaranteed.",
+                   model_str);
+        DORADO_LOG(debug, "Resolved model from user-specified path: {}", model_str);
         model_dir = model_str;
 
     } else if (count_model_hits(models::polish_models(), model_str) == 1) {
         const std::string& model_name = model_str;
-        spdlog::debug("Resolved model from user-specified polishing model name: {}", model_name);
+        DORADO_LOG(debug, "Resolved model from user-specified polishing model name: {}",
+                   model_name);
         model_downloader::ModelDownloader downloader(models_directory, false);
         model_dir = downloader.get(model_name, "polish");
 
@@ -825,20 +829,21 @@ void validate_bam_model(const secondary::BamInfo& bam_info,
     } else {
         // Allow to use a polishing model trained on a wrong basecaller model, but emit a warning.
         if (!check_models_supported(bam_info.basecaller_models)) {
-            spdlog::warn(
-                    "Polishing model is not compatible with the input BAM. This may produce "
-                    "inferior results.");
+            DORADO_LOG(warn,
+                       "Polishing model is not compatible with the input BAM. This may produce "
+                       "inferior results.");
         }
 
         // Allow to use a mismatched model, but emit a warning.
         if (run_dwell_check && bam_info.has_dwells && !model_uses_dwells) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "Input data has move tables, but a model without move table support has been "
                     "chosen. This may produce inferior results.");
         } else if (!bam_info.has_dwells && model_uses_dwells) {
-            spdlog::warn(
-                    "Input data does not contain move tables, but a model which requires move "
-                    "tables has been chosen. This may produce inferior results.");
+            DORADO_LOG(warn,
+                       "Input data does not contain move tables, but a model which requires move "
+                       "tables has been chosen. This may produce inferior results.");
         }
     }
 }
@@ -850,21 +855,21 @@ void run_polishing(const Options& opt,
                    polisher::PolisherResources& resources,
                    polisher::PolishProgressTracker& tracker,
                    secondary::Stats& stats) {
-    spdlog::info("Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
-                 opt.infer_threads, std::size(resources.devices));
+    DORADO_LOG(info, "Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
+               opt.infer_threads, std::size(resources.devices));
 
     at::InferenceMode infer_guard;
 
     // Create a .fai index if it doesn't exist.
     const bool rv_fai = utils::create_fai_index(opt.in_draft_fastx_fn);
     if (!rv_fai) {
-        spdlog::error("Failed to create/verify a .fai index for input file: '{}'!",
-                      opt.in_draft_fastx_fn.string());
+        DORADO_LOG(error, "Failed to create/verify a .fai index for input file: '{}'!",
+                   opt.in_draft_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
 
     // Load sequence lengths.
-    spdlog::debug("[run_polishing] Loading draft sequence lengths.");
+    DORADO_LOG(debug, "[run_polishing] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             utils::load_seq_lengths(opt.in_draft_fastx_fn);
 
@@ -969,10 +974,10 @@ void run_polishing(const Options& opt,
     const double usable_mem = (min_avail_mem * AVAILABLE_MEMORY_FACTOR) / opt.infer_threads;
 
     if (opt.batch_size > 0) {
-        spdlog::info("Using fixed batch size: {}", opt.batch_size);
+        DORADO_LOG(info, "Using fixed batch size: {}", opt.batch_size);
     } else {
-        spdlog::info("Using auto computed batch size. Usable per-worker memory: {:.2f} GB",
-                     usable_mem);
+        DORADO_LOG(info, "Using auto computed batch size. Usable per-worker memory: {:.2f} GB",
+                   usable_mem);
     }
 
     int64_t total_batch_bases = 0;
@@ -997,12 +1002,12 @@ void run_polishing(const Options& opt,
                 [](const int64_t a, const auto& b) { return a + b.end - b.start; });
 
         // Debug print.
-        spdlog::debug("[run_polishing] =============================");
-        spdlog::debug("[run_polishing] Processing batch interval of drafts: [{}, {})",
-                      batch_interval.start, batch_interval.end);
+        DORADO_LOG(debug, "[run_polishing] =============================");
+        DORADO_LOG(debug, "[run_polishing] Processing batch interval of drafts: [{}, {})",
+                   batch_interval.start, batch_interval.end);
         for (std::size_t i = 0; i < std::size(region_batch); ++i) {
-            spdlog::debug("[run_polishing] region_batch i = {}: {}", i,
-                          secondary::to_string(region_batch[i]));
+            DORADO_LOG(debug, "[run_polishing] region_batch i = {}: {}", i,
+                       secondary::to_string(region_batch[i]));
         }
 
         std::vector<std::vector<secondary::ConsensusResult>> all_results_cons;
@@ -1016,17 +1021,17 @@ void run_polishing(const Options& opt,
 
                 // Split the sequences into larger BAM windows, like Medaka.
                 // NOTE: the window.seq_id is the _absolute_ sequence ID of the input draft sequences.
-                spdlog::debug("Creating BAM windows.");
+                DORADO_LOG(debug, "Creating BAM windows.");
                 const std::vector<secondary::Window> bam_regions =
                         secondary::create_windows_from_regions(region_batch, draft_lookup,
                                                                opt.bam_chunk, window_overlap);
 
-                spdlog::debug(
-                        "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
-                        "(number: {}, total "
-                        "length: {:.2f} Mbp)",
-                        batch_interval.start, batch_interval.end, std::size(input_regions),
-                        std::size(region_batch), batch_bases / (1000.0 * 1000.0));
+                DORADO_LOG(debug,
+                           "[run_polishing] Starting to produce consensus for regions: {}-{}/{} "
+                           "(number: {}, total "
+                           "length: {:.2f} Mbp)",
+                           batch_interval.start, batch_interval.end, std::size(input_regions),
+                           std::size(region_batch), batch_bases / (1000.0 * 1000.0));
 
                 // Update the tracker title.
                 {
@@ -1098,7 +1103,8 @@ void run_polishing(const Options& opt,
             if (!opt.continue_on_error) {
                 throw;
             } else {
-                spdlog::warn(
+                DORADO_LOG(
+                        warn,
                         "Exception caught when running inference on the batch interval of drafts: "
                         "[{}, {}). Skipping this batch and optionally outputting unpolished "
                         "sequences. Original exception: \"{}\"",
@@ -1116,15 +1122,16 @@ void run_polishing(const Options& opt,
             total_batch_bases += batch_bases;
             stats.set("processed", static_cast<double>(total_batch_bases));
 
-            spdlog::debug(
-                    "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
-                    "length: {:.2f} Mbp), parts: {}",
-                    batch_interval.start, batch_interval.end, std::size(input_regions),
-                    std::size(region_batch), batch_bases / (1000.0 * 1000.0),
-                    std::size(all_results_cons));
+            DORADO_LOG(debug,
+                       "[run_polishing] Stitching sequences: {}-{}/{} (number: {}, total "
+                       "length: {:.2f} Mbp), parts: {}",
+                       batch_interval.start, batch_interval.end, std::size(input_regions),
+                       std::size(region_batch), batch_bases / (1000.0 * 1000.0),
+                       std::size(all_results_cons));
 
-            spdlog::debug("Data for variant calling: num elements = {}, num consensus results = {}",
-                          std::size(vc_input_data), std::size(all_results_cons));
+            DORADO_LOG(debug,
+                       "Data for variant calling: num elements = {}, num consensus results = {}",
+                       std::size(vc_input_data), std::size(all_results_cons));
 
             // Construct the consensus sequences, only if they will be written.
             if (opt.write_consensus) {
@@ -1146,7 +1153,8 @@ void run_polishing(const Options& opt,
             if (!opt.continue_on_error) {
                 throw;
             } else {
-                spdlog::warn(
+                DORADO_LOG(
+                        warn,
                         "Exception caught when writing consensus sequences on interval of drafts: "
                         "[{}, {}). Skipping this batch. Original exception: \"{}\"",
                         batch_interval.start, batch_interval.end, e.what());
@@ -1185,7 +1193,8 @@ void run_polishing(const Options& opt,
             if (!opt.continue_on_error) {
                 throw;
             } else {
-                spdlog::warn(
+                DORADO_LOG(
+                        warn,
                         "Exception caught when calling variants in the batch interval of drafts: "
                         "[{}, {}). Not producing variant calls for this batch of drafts. Original "
                         "exception: \"{}\"",
@@ -1243,20 +1252,20 @@ int polish(int argc, char* argv[]) {
 
         // Debug printing.
         {
-            spdlog::debug("bam_info.uses_dorado_aligner = {}", bam_info.uses_dorado_aligner);
-            spdlog::debug("bam_info.has_dwells = {}", bam_info.has_dwells);
-            spdlog::debug("bam_info.read_groups:");
+            DORADO_LOG(debug, "bam_info.uses_dorado_aligner = {}", bam_info.uses_dorado_aligner);
+            DORADO_LOG(debug, "bam_info.has_dwells = {}", bam_info.has_dwells);
+            DORADO_LOG(debug, "bam_info.read_groups:");
             for (const auto& rg : bam_info.read_groups) {
-                spdlog::debug("    - {}", rg);
+                DORADO_LOG(debug, "    - {}", rg);
             }
-            spdlog::debug("bam_info.basecaller_models:");
+            DORADO_LOG(debug, "bam_info.basecaller_models:");
             for (const auto& rg : bam_info.basecaller_models) {
-                spdlog::debug("    - {}", rg);
+                DORADO_LOG(debug, "    - {}", rg);
             }
             if (!std::empty(opt.read_group)) {
-                spdlog::debug(
-                        "Only the user-requested RG was selected from the input bam. RG: '{}'",
-                        opt.read_group);
+                DORADO_LOG(debug,
+                           "Only the user-requested RG was selected from the input bam. RG: '{}'",
+                           opt.read_group);
             }
         }
 
@@ -1315,13 +1324,13 @@ int polish(int argc, char* argv[]) {
 
         // Hack to clear the last line from the progress bar. The library automatically does '\r'.
         std::cerr << std::string(200, ' ') << '\r';
-        spdlog::info("Done!");
+        DORADO_LOG(info, "Done!");
 
     } catch (const std::exception& e) {
-        spdlog::error(e.what());
+        DORADO_LOG(error, e.what());
         return EXIT_FAILURE;
     } catch (...) {
-        spdlog::error("Caught an unknown exception!");
+        DORADO_LOG(error, "Caught an unknown exception!");
         return EXIT_FAILURE;
     }
 

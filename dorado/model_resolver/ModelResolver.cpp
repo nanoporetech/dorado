@@ -29,7 +29,7 @@ std::optional<ModelInfo> get_model_info_from_path(const std::filesystem::path& p
     try {
         return models::get_model_info(name);
     } catch (const std::exception& e) {
-        spdlog::debug("Failed to get ModelInfo from path '{}' - '{}'", name, e.what());
+        DORADO_LOG(debug, "Failed to get ModelInfo from path '{}' - '{}'", name, e.what());
         return std::nullopt;
     }
 }
@@ -49,21 +49,22 @@ std::optional<fs::path> get_models_directory(
                     fmt::format("--models-directory path does not exist at: '{}'.", path.string()));
         }
         path = fs::canonical(path);
-        spdlog::trace("Set models directory to: '{}'.", path.string());
+        DORADO_LOG(trace, "Set models directory to: '{}'.", path.string());
         return path;
     } else if (env_path != nullptr) {
         auto path = fs::path(env_path);
         if (!fs::exists(path)) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "Ignoring environment variable 'DORADO_MODELS_DIRECTORY' - path does not exist "
                     "at: '{}'.",
                     path.string());
         } else {
             path = fs::canonical(path);
-            spdlog::trace(
-                    "Set models directory to: '{}' from 'DORADO_MODELS_DIRECTORY' "
-                    "environment variable.",
-                    path.string());
+            DORADO_LOG(trace,
+                       "Set models directory to: '{}' from 'DORADO_MODELS_DIRECTORY' "
+                       "environment variable.",
+                       path.string());
             return path;
         }
     }
@@ -289,8 +290,8 @@ ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) c
         const auto models_dir_path = m_models_directory.value() / model_info.name;
         if (fs::exists(models_dir_path)) {
             // Model exists in models directory
-            spdlog::trace(" - found model '{}' at '{}'.", model_info.name,
-                          models_dir_path.string());
+            DORADO_LOG(trace, " - found model '{}' at '{}'.", model_info.name,
+                       models_dir_path.string());
             return ModelSource{models_dir_path, model_info, false};
         }
 
@@ -302,7 +303,7 @@ ModelSource ModelResolver::find_or_download_model(const ModelInfo& model_info) c
     const auto cwd_path = fs::current_path() / model_info.name;
     if (fs::exists(cwd_path)) {
         // Model found in current working directory
-        spdlog::trace(" - found model '{}' at '{}'.", model_info.name, cwd_path.string());
+        DORADO_LOG(trace, " - found model '{}' at '{}'.", model_info.name, cwd_path.string());
         return ModelSource{cwd_path, model_info, false};
     }
 
@@ -322,10 +323,10 @@ void ModelResolver::model_compatibility_check(ModelSources& model_sources) const
     try {
         data_sample_rate = static_cast<int>(file_info::get_sample_rate(m_reads));
     } catch (const std::exception& e) {
-        spdlog::warn(
-                "Could not check that model sampling rate and data sampling rate match. "
-                "Proceed with caution. Reason: {}",
-                e.what());
+        DORADO_LOG(warn,
+                   "Could not check that model sampling rate and data sampling rate match. "
+                   "Proceed with caution. Reason: {}",
+                   e.what());
     }
     if (data_sample_rate != 0) {
         if (!utils::eq_with_tolerance(data_sample_rate, simplex_sample_rate, 100)) {
@@ -348,9 +349,9 @@ void ModelResolver::warn_rna_model(const ModelSource& simplex) const {
     }
 
     if (is_rna) {
-        spdlog::info(
-                " - BAM format does not support `U`, so RNA output files will include `T` "
-                "instead of `U` for all file types.");
+        DORADO_LOG(info,
+                   " - BAM format does not support `U`, so RNA output files will include `T` "
+                   "instead of `U` for all file types.");
     }
 };
 
@@ -362,7 +363,7 @@ void ModelResolver::warn_stereo_fast(const std::optional<ModelSource>& stereo) c
     const auto& stereo_info = stereo.value().info;
     if (stereo_info.has_value()) {
         if (stereo_info.value().simplex.variant == ModelVariant::FAST) {
-            spdlog::warn("Duplex is not supported for fast models.");
+            DORADO_LOG(warn, "Duplex is not supported for fast models.");
         }
     }
 };

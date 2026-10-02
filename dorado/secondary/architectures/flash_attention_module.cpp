@@ -278,7 +278,7 @@ at::Tensor FlashAttentionModuleImpl::forward(
         v_work = v.to(at::ScalarType::BFloat16);
         static std::once_flag logged_bf16_cast;
         std::call_once(logged_bf16_cast, []() {
-            spdlog::trace("FlashAttentionModuleImpl: forward using BF16 on CUDA.");
+            DORADO_LOG(trace, "FlashAttentionModuleImpl: forward using BF16 on CUDA.");
         });
     }
 
@@ -296,8 +296,8 @@ at::Tensor FlashAttentionModuleImpl::forward(
     if (use_flashattention) {
         static std::once_flag logged_flashattention_path;
         std::call_once(logged_flashattention_path, [use_varlen]() {
-            spdlog::trace("Using FlashAttention ({}) attention).",
-                          (use_varlen ? "varlen" : "batched"));
+            DORADO_LOG(trace, "Using FlashAttention ({}) attention).",
+                       (use_varlen ? "varlen" : "batched"));
         });
 
         // Note: Intentionally not catching exceptions in case FlashAttention is impure and leaves
@@ -306,10 +306,10 @@ at::Tensor FlashAttentionModuleImpl::forward(
     } else {
         static std::once_flag logged_flashattention_unavailable;
         std::call_once(logged_flashattention_unavailable, [use_varlen]() {
-            spdlog::trace(
-                    "FlashAttention not available for {} attention. Falling back to "
-                    "SDPA.",
-                    (use_varlen ? "varlen" : "batched"));
+            DORADO_LOG(trace,
+                       "FlashAttention not available for {} attention. Falling back to "
+                       "SDPA.",
+                       (use_varlen ? "varlen" : "batched"));
         });
 
         out = use_varlen ? scaled_dot_product_attention_varlen_fallback(

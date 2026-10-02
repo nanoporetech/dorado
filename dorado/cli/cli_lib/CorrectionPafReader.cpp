@@ -34,10 +34,10 @@ void CorrectionPafReader::process(Pipeline& pipeline) {
 
         if (alignments->read_name != entry.tname) {
             if (m_reads_to_infer) {
-                spdlog::trace(
-                        "Pushed {} alignments for correction for "
-                        "target {}. Number of alignment piles pushed until now: {}.",
-                        std::size(alignments->qnames), alignments->read_name, m_reads_to_infer);
+                DORADO_LOG(trace,
+                           "Pushed {} alignments for correction for "
+                           "target {}. Number of alignment piles pushed until now: {}.",
+                           std::size(alignments->qnames), alignments->read_name, m_reads_to_infer);
                 pipeline.push_message(std::move(alignments));
             }
             alignments = std::make_unique<CorrectionAlignments>();
@@ -63,21 +63,21 @@ void CorrectionPafReader::process(Pipeline& pipeline) {
 
         ++count_records;
         if ((count_records % 1000000) == 0) {
-            spdlog::debug(
-                    "Parsed {} PAF records in {} alignment piles. "
-                    "Time: {:.2f} s",
-                    count_records, m_reads_to_infer, timer.GetElapsedMilliseconds() / 1000.0f);
+            DORADO_LOG(debug,
+                       "Parsed {} PAF records in {} alignment piles. "
+                       "Time: {:.2f} s",
+                       count_records, m_reads_to_infer, timer.GetElapsedMilliseconds() / 1000.0f);
         }
     }
     if (!std::empty(alignments->qnames)) {
-        spdlog::trace(
-                "Final pushed {} alignments for correction for "
-                "target {}. Number of piles pushed until now: {}.",
-                std::size(alignments->qnames), alignments->read_name, m_reads_to_infer);
+        DORADO_LOG(trace,
+                   "Final pushed {} alignments for correction for "
+                   "target {}. Number of piles pushed until now: {}.",
+                   std::size(alignments->qnames), alignments->read_name, m_reads_to_infer);
         pipeline.push_message(std::move(alignments));
     }
 
-    spdlog::debug("PAF reading done in: {:.2f} s", timer.GetElapsedMilliseconds() / 1000.0f);
+    DORADO_LOG(debug, "PAF reading done in: {:.2f} s", timer.GetElapsedMilliseconds() / 1000.0f);
 }
 
 CorrectionPafReader::CorrectionPafReader(const std::string_view paf_file,

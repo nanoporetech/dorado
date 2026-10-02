@@ -110,7 +110,7 @@ const std::vector<uint32_t>& MergeHeaders::get_sq_mapping(const std::string& fil
 
     const auto it = std::find(m_filepaths.cbegin(), m_filepaths.cend(), filename);
     if (it == m_filepaths.cend()) {
-        spdlog::error("Couldn't find '{}' in MergedHeaders.", filename);
+        DORADO_LOG(error, "Couldn't find '{}' in MergedHeaders.", filename);
         throw std::runtime_error("Error in MergeHeaders. get_sq_mapping() couldn't find file.");
     }
 

@@ -29,7 +29,7 @@ DEFINE_TEST("matmul_f16") {
 
     // Setup tensors
     if (!at::hasCUDA()) {
-        spdlog::warn("No Nvidia driver present - Test skipped");
+        DORADO_LOG(warn, "No Nvidia driver present - Test skipped");
         return;
     }
 

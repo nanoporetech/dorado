@@ -467,10 +467,10 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
 
         // This shouldn't be possible.
         if ((std::size(c) != 1) || (std::empty(c.front()))) {
-            spdlog::warn(
-                    "Unexpected number of consensus sequences generated from a single sample: "
-                    "c.size = {}, c[0].size = {}. Skipping consensus of this sample.",
-                    std::size(c), (std::empty(c) ? -1 : std::size(c.front())));
+            DORADO_LOG(warn,
+                       "Unexpected number of consensus sequences generated from a single sample: "
+                       "c.size = {}, c[0].size = {}. Skipping consensus of this sample.",
+                       std::size(c), (std::empty(c) ? -1 : std::size(c.front())));
             continue;
         }
 
@@ -572,7 +572,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
             std::ostringstream oss;
             oss << "Sample not valid in trim_vc_samples! Skipping the sample. Sample: " << s
                 << ", trim: " << t << ", exception: '" << e.what();
-            spdlog::warn(oss.str());
+            DORADO_LOG(warn, oss.str());
             continue;
         }
 

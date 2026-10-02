@@ -334,9 +334,10 @@ CATCH_TEST_CASE(TEST_GROUP ": benchmarks") {
     const double total_processed =
             std::accumulate(processed_counts.begin(), processed_counts.end(), std::size_t{0});
     const double speed = total_processed * 1000.0 / run_for_ms;
-    spdlog::info(TEST_GROUP
-                 ": Speed for unbounded={}, producers={}, consumers={}: {:.2e} items in {}ms "
-                 "({:.2e}items/s)",
-                 unbounded, num_producers, num_consumers, total_processed, run_for_ms, speed);
+    DORADO_LOG(info,
+               TEST_GROUP
+               ": Speed for unbounded={}, producers={}, consumers={}: {:.2e} items in {}ms "
+               "({:.2e}items/s)",
+               unbounded, num_producers, num_consumers, total_processed, run_for_ms, speed);
 }
 #endif

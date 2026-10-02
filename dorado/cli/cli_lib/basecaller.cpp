@@ -196,8 +196,9 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
                 .action([mods_codes](const std::string& value) {
                     const auto& mods = models::modified_model_variants();
                     if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
-                        spdlog::error("'{}' is not a supported modification please select from {}",
-                                      value, mods_codes);
+                        DORADO_LOG(error,
+                                   "'{}' is not a supported modification please select from {}",
+                                   value, mods_codes);
                         std::exit(EXIT_FAILURE);
                     }
                     return value;
@@ -322,7 +323,7 @@ std::optional<Infos> validate_infos(const argparse::ArgumentParser& parser) {
     auto trim_options = parser.get<std::string>("--trim");
     if (parser.get<bool>("--no-trim")) {
         if (!trim_options.empty()) {
-            spdlog::error("Only one of --no-trim and --trim can be used.");
+            DORADO_LOG(error, "Only one of --no-trim and --trim can be used.");
             return std::nullopt;
         }
         trim_barcodes = trim_primers = trim_adapters = false;
@@ -332,7 +333,7 @@ std::optional<Infos> validate_infos(const argparse::ArgumentParser& parser) {
     } else if (trim_options == "adapters") {
         trim_barcodes = trim_primers = false;
     } else if (!trim_options.empty() && trim_options != "all") {
-        spdlog::error("Unsupported --trim value '{}'.", trim_options);
+        DORADO_LOG(error, "Unsupported --trim value '{}'.", trim_options);
         return std::nullopt;
     }
 
@@ -361,10 +362,10 @@ std::optional<Infos> validate_infos(const argparse::ArgumentParser& parser) {
         }
 
         if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
-            spdlog::error(
-                    "{} is not a valid barcode kit name. Please run the help "
-                    "command to find out available barcode kits.",
-                    barcoding_info->kit_name);
+            DORADO_LOG(error,
+                       "{} is not a valid barcode kit name. Please run the help "
+                       "command to find out available barcode kits.",
+                       barcoding_info->kit_name);
             return std::nullopt;
         }
     }
@@ -405,11 +406,11 @@ void set_config_batch_params(BasecallModelConfig& config,
         config.basecaller.set_batch_size(batch_size.value());
         config.normalise_basecaller_params();
     } else {
-        spdlog::info(
-                "Failed to find optimal batch size for {}. Consider generating a benchmark with "
-                "--run-batchsize-benchmarks, or loading an existing benchmark with "
-                "--batchsize-benchmarks-file",
-                device);
+        DORADO_LOG(info,
+                   "Failed to find optimal batch size for {}. Consider generating a benchmark with "
+                   "--run-batchsize-benchmarks, or loading an existing benchmark with "
+                   "--batchsize-benchmarks-file",
+                   device);
     }
 }
 
@@ -594,7 +595,7 @@ NewPipeline create_pipeline(
         PipelineWorkers& worker_pools,
         bool adapter_trimming_enabled,
         const BasecallModelConfig& model_config) {
-    spdlog::info("> Creating basecall pipeline");
+    DORADO_LOG(info, "> Creating basecall pipeline");
 
     const bool enable_aligner = !options.alignment_reference.empty();
 
@@ -714,10 +715,11 @@ std::optional<int> load_and_generate_benchmarks(const Models& models,
     const bool quit_after_benchmarks = run_benchmark_option == "break";
 
     if (run_benchmarks && !benchmarks_file.has_value()) {
-        spdlog::error("--run-batchsize-benchmarks requires --batchsize-benchmarks-file to be set");
+        DORADO_LOG(error,
+                   "--run-batchsize-benchmarks requires --batchsize-benchmarks-file to be set");
         return EXIT_FAILURE;
     } else if (run_benchmarks && device_string == "cpu") {
-        spdlog::error("CPU isn't a supported device for generating benchmarks");
+        DORADO_LOG(error, "CPU isn't a supported device for generating benchmarks");
         return EXIT_FAILURE;
     }
 
@@ -728,7 +730,7 @@ std::optional<int> load_and_generate_benchmarks(const Models& models,
             if (run_benchmarks && !std::filesystem::exists(path)) {
                 // If we're running benchmarks for the first time then the file doesn't need to exist.
             } else {
-                spdlog::error("Failed to load benchmark cache: {}", path);
+                DORADO_LOG(error, "Failed to load benchmark cache: {}", path);
                 return EXIT_FAILURE;
             }
         }
@@ -760,7 +762,7 @@ std::optional<int> load_and_generate_benchmarks(const Models& models,
         const std::size_t num_devices = devices.size();
         bars_storage = std::make_unique<SimpleProgressBar[]>(num_devices);
         {
-            spdlog::info("Running benchmark generation. This may take a while");
+            DORADO_LOG(info, "Running benchmark generation. This may take a while");
 
             std::vector<std::future<void>> results(num_devices);
             cxxpool::thread_pool pool(num_devices);
@@ -776,7 +778,7 @@ std::optional<int> load_and_generate_benchmarks(const Models& models,
                 try {
                     future.get();
                 } catch (const std::exception& e) {
-                    spdlog::error(e.what());
+                    DORADO_LOG(error, e.what());
                     return EXIT_FAILURE;
                 }
             }
@@ -786,9 +788,9 @@ std::optional<int> load_and_generate_benchmarks(const Models& models,
             (void)progress_bar[0];
         }
 
-        spdlog::info("Benchmarking finished");
+        DORADO_LOG(info, "Benchmarking finished");
         if (!batchsize_benchmarks::export_cache(benchmarks_file.value())) {
-            spdlog::warn("Failed to write out benchmark cache: {}", benchmarks_file.value());
+            DORADO_LOG(warn, "Failed to write out benchmark cache: {}", benchmarks_file.value());
         }
 
         if (quit_after_benchmarks) {
@@ -864,7 +866,7 @@ std::unordered_set<std::string> process_resume_file(const BasecallerOptions& opt
         throw std::runtime_error("--resume-from cannot be used with --output-dir.");
     }
 
-    spdlog::info("> Inspecting resume file...");
+    DORADO_LOG(info, "> Inspecting resume file...");
     // Turn off warning logging as header info is fetched.
     auto initial_hts_log_level = hts_get_log_level();
     hts_set_log_level(HTS_LOG_OFF);
@@ -876,7 +878,7 @@ std::unordered_set<std::string> process_resume_file(const BasecallerOptions& opt
     try {
         tokens = cli::extract_token_from_cli(pg_keys["CL"]);
     } catch (const std::exception& e) {
-        spdlog::debug("Caught error: '{}'", e.what());
+        DORADO_LOG(debug, "Caught error: '{}'", e.what());
         throw std::runtime_error(
                 "Failed to parse resume parameters as --resume-from file 'CL' (Command Line) "
                 "header is invalid. This might happen if the HTS file headers were dropped "
@@ -923,10 +925,10 @@ void run(const BasecallerOptions& options,
          const std::shared_ptr<const dorado::demux::BarcodingInfo>& barcoding_info,
          const std::shared_ptr<const dorado::demux::AdapterInfo>& adapter_info) {
     const BasecallModelConfig& model_config = models.get_simplex_config();
-    spdlog::trace(model_config.to_string());
+    DORADO_LOG(trace, model_config.to_string());
 
     const auto modbase_params = validate_modbase_params(models.get_modbase_configs(), options);
-    spdlog::trace(modbase_params.to_string());
+    DORADO_LOG(trace, modbase_params.to_string());
 
     size_t num_reads =
             file_info::get_num_reads(options.pod5_folder_info.files().get(), read_list, {});
@@ -1015,7 +1017,7 @@ void run(const BasecallerOptions& options,
     if (options.run_for > 0) {
         ShutdownCallback shutdown_callback = [&pipeline]() {
             pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::Yes});
-            spdlog::info("Benchmarking time-limit reached. Shutting down.");
+            DORADO_LOG(info, "Benchmarking time-limit reached. Shutting down.");
         };
         benchmark_timer_ptr = std::make_unique<BenchmarkTimer>(
                 std::chrono::seconds(options.run_for), std::move(shutdown_callback));
@@ -1079,7 +1081,7 @@ int basecaller(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -1096,19 +1098,19 @@ int basecaller(int argc, char* argv[]) {
     try {
         input_pod5s = data_loader::InputFiles::search_pod5s(data_path, recursive_file_loading);
     } catch (const std::exception& e) {
-        spdlog::error("Failed to load pod5 data: '{}'", e.what());
+        DORADO_LOG(error, "Failed to load pod5 data: '{}'", e.what());
         return EXIT_FAILURE;
     }
     const InputPod5FolderInfo pod5_folder_info(data_path, std::move(input_pod5s));
 
     if (!file_info::is_pod5_data_present(pod5_folder_info.files().get())) {
-        spdlog::error("No POD5 data found in path: {}", pod5_folder_info.path().string());
+        DORADO_LOG(error, "No POD5 data found in path: {}", pod5_folder_info.path().string());
         return EXIT_FAILURE;
     }
 
     if (parser.get<std::string>("--reference").empty() &&
         !parser.get<std::string>("--bed-file").empty()) {
-        spdlog::error("--bed-file cannot be used without --reference.");
+        DORADO_LOG(error, "--bed-file cannot be used without --reference.");
         return EXIT_FAILURE;
     }
 
@@ -1120,14 +1122,14 @@ int basecaller(int argc, char* argv[]) {
 
     if (parser.is_used("--barcode-sequences")) {
         if (!parser.is_used("--kit-name") || !parser.is_used("--barcode-arrangement")) {
-            spdlog::error("--barcode-sequences requires --barcode-arrangement and --kit-name.");
+            DORADO_LOG(error, "--barcode-sequences requires --barcode-arrangement and --kit-name.");
             return EXIT_FAILURE;
         }
     }
 
     if (parser.is_used("--barcode-arrangement")) {
         if (!parser.is_used("--kit-name")) {
-            spdlog::error("--barcode-arrangement requires --kit-name.");
+            DORADO_LOG(error, "--barcode-arrangement requires --kit-name.");
             return EXIT_FAILURE;
         }
     }
@@ -1140,7 +1142,7 @@ int basecaller(int argc, char* argv[]) {
     std::string err_msg{};
     auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
     if (!minimap_options) {
-        spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+        DORADO_LOG(error, "{}\n{}", err_msg, alignment::mm2::get_help_message());
         return EXIT_FAILURE;
     }
 
@@ -1155,7 +1157,7 @@ int basecaller(int argc, char* argv[]) {
 
     auto run_for_arg = parser.get<int>("--run-for");
     if (run_for_arg < 0) {
-        spdlog::error("Invalid value for --run-for: {}", run_for_arg);
+        DORADO_LOG(error, "Invalid value for --run-for: {}", run_for_arg);
         return EXIT_FAILURE;
     }
 
@@ -1190,11 +1192,11 @@ int basecaller(int argc, char* argv[]) {
             utils::load_read_list(parser.get<std::string>("--read-ids")), *minimap_options,
             infos->barcoding_info, infos->adapter_info);
     } catch (const std::exception& e) {
-        spdlog::error("{}", e.what());
+        DORADO_LOG(error, "{}", e.what());
         return EXIT_FAILURE;
     }
 
-    spdlog::info("> Finished");
+    DORADO_LOG(info, "> Finished");
     return EXIT_SUCCESS;
 }
 

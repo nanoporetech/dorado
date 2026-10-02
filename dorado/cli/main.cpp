@@ -108,7 +108,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Log cmd
-    spdlog::info("Running: \"{}\"", dorado::utils::join(arguments, "\" \""));
+    DORADO_LOG(info, "Running: \"{}\"", dorado::utils::join(arguments, "\" \""));
 
     const auto& subcommand = arguments[0];
 

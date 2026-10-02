@@ -22,7 +22,7 @@ void update_alignment_counts(HtsReader& file, AlignmentCounts& alignment_counts)
     std::size_t num_reads = 0;
     while (file.read()) {
         if (++num_reads % 50'000 == 0) {
-            spdlog::debug("Preprocessed {} reads", num_reads);
+            DORADO_LOG(debug, "Preprocessed {} reads", num_reads);
         }
 
         const auto& record = file.record;
@@ -50,7 +50,7 @@ std::tuple<hts_writer::SummaryFileWriter::FieldFlags, AlignmentCounts> make_summ
             SummaryFileWriter::BASECALLING_FIELDS | SummaryFileWriter::EXPERIMENT_FIELDS;
     AlignmentCounts alignment_counts;
     if (!(all_files.size() == 1 && all_files[0] == "-")) {
-        spdlog::info("Preprocessing records...");
+        DORADO_LOG(info, "Preprocessing records...");
 
         // We're the only thing running, so use all the threads.
         const std::size_t num_threads = std::thread::hardware_concurrency();
@@ -82,7 +82,7 @@ std::tuple<hts_writer::SummaryFileWriter::FieldFlags, AlignmentCounts> make_summ
             }
         }
 
-        spdlog::info("Preprocessing complete");
+        DORADO_LOG(info, "Preprocessing complete");
     }
 
     return {flags, std::move(alignment_counts)};

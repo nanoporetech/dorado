@@ -70,14 +70,14 @@ bool populate_alignments(dorado::CorrectionAlignments& alignments,
         const std::string& qname = alignments.qnames[i];
         alignments.seqs[i] = reader->fetch_seq(qname);
         if ((int)alignments.seqs[i].length() != alignments.overlaps[i].qlen) {
-            spdlog::error("qlen from before {} and qlen from after {} don't match for {}",
-                          alignments.overlaps[i].qlen, alignments.seqs[i].length(), qname);
+            DORADO_LOG(error, "qlen from before {} and qlen from after {} don't match for {}",
+                       alignments.overlaps[i].qlen, alignments.seqs[i].length(), qname);
             return false;
         }
         alignments.quals[i] = reader->fetch_qual(qname);
         if (alignments.overlaps[i].tlen != tlen) {
-            spdlog::error("tlen from before {} and tlen from after {} don't match for {}",
-                          alignments.overlaps[i].tlen, tlen, tname);
+            DORADO_LOG(error, "tlen from before {} and tlen from after {} don't match for {}",
+                       alignments.overlaps[i].tlen, tlen, tname);
             return false;
         }
     }
@@ -143,7 +143,7 @@ void CorrectionInferenceNode::concat_features_and_send(const std::vector<std::st
 
 void CorrectionInferenceNode::decode_fn() {
     utils::set_thread_name("corr_decode");
-    spdlog::debug("Starting decode thread!");
+    DORADO_LOG(debug, "Starting decode thread!");
 
     WindowFeatures item;
     while (m_inferred_features_queue.try_pop(item) != utils::AsyncQueueStatus::Terminate) {
@@ -156,7 +156,7 @@ void CorrectionInferenceNode::decode_fn() {
             std::lock_guard<std::mutex> lock(m_features_mutex);
             auto find_iter = m_features_by_id.find(read_name);
             if (find_iter == m_features_by_id.end()) {
-                spdlog::error("Decoded feature list not found for {}.", read_name);
+                DORADO_LOG(error, "Decoded feature list not found for {}.", read_name);
                 continue;
             }
             auto& output_features = find_iter->second;
@@ -179,7 +179,7 @@ void CorrectionInferenceNode::decode_fn() {
 
 void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_idx, int batch_size) {
     utils::set_thread_name("corr_infer");
-    spdlog::debug("Starting process thread for {}!", device_str);
+    DORADO_LOG(debug, "Starting process thread for {}!", device_str);
 
     torch::Device device = torch::Device(device_str);
 
@@ -194,13 +194,13 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
 
     at::InferenceMode infer_guard;
 
-    spdlog::debug("Loading model on {}...", device_str);
+    DORADO_LOG(debug, "Loading model on {}...", device_str);
     validate_herro_model_config(m_model_config);
     std::shared_ptr<secondary::ModelHerro> model =
             secondary::load_model_herro(m_model_config.model_dir / m_model_config.weights_file);
     model->eval();
     model->to(device);
-    spdlog::debug("Loaded model on {}!", device_str);
+    DORADO_LOG(debug, "Loaded model on {}!", device_str);
 
     std::vector<at::Tensor> bases_batch;
     std::vector<at::Tensor> quals_batch;
@@ -274,7 +274,8 @@ void CorrectionInferenceNode::infer_fn(const std::string& device_str, int mtx_id
                                     length_tensor_device, indices_batch);
         } catch (std::runtime_error& e) {
 #if DORADO_CUDA_BUILD
-            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.what());
+            DORADO_LOG(warn, "Caught Torch error '{}', clearing CUDA cache and retrying.",
+                       e.what());
             c10::cuda::CUDACachingAllocator::emptyCache();
             output = model->forward(batched_bases_device, batched_quals_device,
                                     length_tensor_device, indices_batch);
@@ -447,7 +448,7 @@ void CorrectionInferenceNode::input_thread_fn() {
                     m_features_by_id.insert({tname, std::move(corrected_seqs)});
                     m_pending_features_by_id.insert({tname, (int)features_to_infer.size()});
                 } else {
-                    spdlog::error("Features for {} already exist! Skipping.", tname);
+                    DORADO_LOG(error, "Features for {} already exist! Skipping.", tname);
                     continue;
                 }
             }
@@ -460,8 +461,8 @@ void CorrectionInferenceNode::input_thread_fn() {
 
             // TODO: Remove this and move to ProgressTracker
             if (num_reads.load() % 10000 == 0) {
-                spdlog::debug("Sent {} reads to inference, decoded {} reads early.",
-                              num_reads.load(), num_early_reads.load());
+                DORADO_LOG(debug, "Sent {} reads to inference, decoded {} reads early.",
+                           num_reads.load(), num_early_reads.load());
             }
         } else {
             send_message_to_sink(std::move(message));
@@ -520,8 +521,8 @@ CorrectionInferenceNode::CorrectionInferenceNode(
                     throw std::runtime_error("Insufficient memory to run inference on " + dev);
                 }
             }
-            spdlog::info("Using batch size {} on device {} in inference thread {}.",
-                         device_batch_size, dev, i);
+            DORADO_LOG(info, "Using batch size {} on device {} in inference thread {}.",
+                       device_batch_size, dev, i);
             m_infer_threads.push_back(std::thread(&CorrectionInferenceNode::infer_fn, this, dev,
                                                   (int)d, device_batch_size));
         }
@@ -531,13 +532,13 @@ CorrectionInferenceNode::CorrectionInferenceNode(
     }
     // Create index for fastq file.
     char* idx_name = fai_path(fastq.c_str());
-    spdlog::debug("Looking for idx {}", idx_name);
+    DORADO_LOG(debug, "Looking for idx {}", idx_name);
     if (idx_name && !std::filesystem::exists(idx_name)) {
         if (fai_build(fastq.c_str()) != 0) {
-            spdlog::error("Failed to build index for file {}", fastq);
+            DORADO_LOG(error, "Failed to build index for file {}", fastq);
             throw std::runtime_error{"Failed to build index for file " + fastq + "."};
         }
-        spdlog::debug("Created fastq index.");
+        DORADO_LOG(debug, "Created fastq index.");
     }
     hts_free(idx_name);
 }

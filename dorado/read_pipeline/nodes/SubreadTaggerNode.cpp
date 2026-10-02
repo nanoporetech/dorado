@@ -14,8 +14,8 @@ void SubreadTaggerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         if (!is_read_message(message)) {
-            spdlog::warn("SubreadTaggerNode received unexpected message type: {}.",
-                         message.index());
+            DORADO_LOG(warn, "SubreadTaggerNode received unexpected message type: {}.",
+                       message.index());
             continue;
         }
 

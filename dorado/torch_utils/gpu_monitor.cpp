@@ -117,7 +117,7 @@ class NvmlApi final {
     bool platform_load_symbol(T *&func_ptr, const char *name, bool optional) {
         func_ptr = reinterpret_cast<T *>(GetProcAddress(m_handle, name));
         if (func_ptr == nullptr && !optional) {
-            spdlog::warn("Failed to load NVML symbol {}: {}", name, GetLastError());
+            DORADO_LOG(warn, "Failed to load NVML symbol {}: {}", name, GetLastError());
             return false;
         }
         return true;
@@ -145,7 +145,7 @@ class NvmlApi final {
     bool platform_load_symbol(T *&func_ptr, const char *name, bool optional) {
         func_ptr = reinterpret_cast<T *>(dlsym(m_handle, name));
         if (func_ptr == nullptr && !optional) {
-            spdlog::warn("Failed to load NVML symbol {}: {}", name, dlerror());
+            DORADO_LOG(warn, "Failed to load NVML symbol {}: {}", name, dlerror());
             return false;
         }
         return true;
@@ -177,7 +177,7 @@ class NvmlApi final {
 
     void init() {
         if (!platform_open() || !load_symbols()) {
-            spdlog::info("Failed to load NVML");
+            DORADO_LOG(info, "Failed to load NVML");
             clear_symbols();
             platform_close();
             return;
@@ -195,13 +195,14 @@ class NvmlApi final {
             if (result == NVML_SUCCESS) {
                 break;
             }
-            spdlog::warn("Failed to initialize NVML: {}, retrying in 1s...", m_ErrorString(result));
+            DORADO_LOG(warn, "Failed to initialize NVML: {}, retrying in 1s...",
+                       m_ErrorString(result));
             std::this_thread::sleep_for(std::chrono::seconds(1));
         } while ((std::chrono::system_clock::now() - start) < wait_seconds);
 
         if (result != NVML_SUCCESS) {
-            spdlog::warn("Failed to initialize NVML after {} seconds: {}", wait_seconds.count(),
-                         m_ErrorString(result));
+            DORADO_LOG(warn, "Failed to initialize NVML after {} seconds: {}", wait_seconds.count(),
+                       m_ErrorString(result));
             clear_symbols();
             platform_close();
         }
@@ -485,15 +486,15 @@ class DeviceInfoCache final {
         // NVML doesn't respect CUDA_VISIBLE_DEVICES envvar, so check this separately
         const char *cuda_visible_devices_env = std::getenv("CUDA_VISIBLE_DEVICES");
         if (cuda_visible_devices_env != nullptr) {
-            spdlog::debug("Found CUDA_VISIBLE_DEVICES={}", cuda_visible_devices_env);
+            DORADO_LOG(debug, "Found CUDA_VISIBLE_DEVICES={}", cuda_visible_devices_env);
             std::set<int> used_ids;
             auto device_ids = utils::split(cuda_visible_devices_env, ',');
             if (device_ids.size() > device_count) {
-                spdlog::error(
-                        "CUDA_VISIBLE_DEVICES={} specifies more device ids than the number of "
-                        "GPUs "
-                        "present",
-                        cuda_visible_devices_env);
+                DORADO_LOG(error,
+                           "CUDA_VISIBLE_DEVICES={} specifies more device ids than the number of "
+                           "GPUs "
+                           "present",
+                           cuda_visible_devices_env);
                 throw std::runtime_error("Invalid device ids");
             }
 
@@ -503,21 +504,21 @@ class DeviceInfoCache final {
                     nvmlDevice_t device;
                     if (auto rc = m_nvml.m_DeviceGetHandleByUUID(id.c_str(), &device);
                         rc != NVML_SUCCESS) {
-                        spdlog::warn(
-                                "Unable to identify GPU device '{}' - skipping further device "
-                                "enumeration",
-                                id);
+                        DORADO_LOG(warn,
+                                   "Unable to identify GPU device '{}' - skipping further device "
+                                   "enumeration",
+                                   id);
                         // stop parsing on error
                         break;
                     }
 
                     unsigned int index = 0;
                     if (auto rc = m_nvml.m_DeviceGetIndex(device, &index); rc != NVML_SUCCESS) {
-                        spdlog::warn(
-                                "Unable to retrieve index for GPU device '{}' - skipping "
-                                "further "
-                                "device enumeration",
-                                id);
+                        DORADO_LOG(warn,
+                                   "Unable to retrieve index for GPU device '{}' - skipping "
+                                   "further "
+                                   "device enumeration",
+                                   id);
                         // stop parsing on error
                         break;
                     };
@@ -531,11 +532,11 @@ class DeviceInfoCache final {
                         last_device_id = id;
                         int index = std::stoi(id);
                         if (index < 0 || index >= static_cast<int>(device_count)) {
-                            spdlog::warn(
-                                    "Invalid index '{}' for GPU device - skipping further "
-                                    "device "
-                                    "enumeration",
-                                    index);
+                            DORADO_LOG(warn,
+                                       "Invalid index '{}' for GPU device - skipping further "
+                                       "device "
+                                       "enumeration",
+                                       index);
                             // stop parsing on invalid id
                             break;
                         }
@@ -545,15 +546,15 @@ class DeviceInfoCache final {
                     }
                 } catch (const std::exception &) {
                     // stop parsing on error
-                    spdlog::warn(
-                            "Unable to parse id '{}' for GPU device - skipping further device "
-                            "enumeration",
-                            last_device_id);
+                    DORADO_LOG(warn,
+                               "Unable to parse id '{}' for GPU device - skipping further device "
+                               "enumeration",
+                               last_device_id);
                 }
             }
             if (used_ids.size() != m_visible_device_indices.size()) {
                 // passing the same id twice should return no devices
-                spdlog::warn("Duplicate GPU ids detected - no GPUs identified");
+                DORADO_LOG(warn, "Duplicate GPU ids detected - no GPUs identified");
                 m_visible_device_indices.clear();
             }
         } else {
@@ -568,14 +569,14 @@ class DeviceInfoCache final {
             auto result = m_nvml.DeviceGetCount(&device_count);
             if (result != NVML_SUCCESS) {
                 device_count = 0;
-                spdlog::warn("Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
+                DORADO_LOG(warn, "Call to DeviceGetCount failed: {}", m_nvml.ErrorString(result));
             }
         }
 #if DORADO_ORIN
         if (device_count == 0) {
             // Orin may not have NVML, in which case ask torch how many devices it thinks there are.
             device_count = torch::cuda::device_count();
-            spdlog::info("Setting device count to {} as reported from torch", device_count);
+            DORADO_LOG(info, "Setting device count to {} as reported from torch", device_count);
         }
 #endif
         map_visible_devices(device_count);
@@ -583,11 +584,11 @@ class DeviceInfoCache final {
                 static_cast<unsigned int>(m_visible_device_indices.size());
 
         if (cuda_visible_devices_count > device_count) {
-            spdlog::warn(
-                    "CUDA_VISIBLE_DEVICES contains more device ids ({}) than devices found by "
-                    "NVML "
-                    "({}).",
-                    cuda_visible_devices_count, device_count);
+            DORADO_LOG(warn,
+                       "CUDA_VISIBLE_DEVICES contains more device ids ({}) than devices found by "
+                       "NVML "
+                       "({}).",
+                       cuda_visible_devices_count, device_count);
         }
         m_device_count = std::min(cuda_visible_devices_count, device_count);
     }
@@ -671,7 +672,7 @@ std::optional<std::string> read_version_from_nvml() {
     if (result == NVML_SUCCESS) {
         return version;
     } else {
-        spdlog::warn("Failed to query driver version: {}", nvml_api.ErrorString(result));
+        DORADO_LOG(warn, "Failed to query driver version: {}", nvml_api.ErrorString(result));
         return std::nullopt;
     }
 }
@@ -683,7 +684,7 @@ std::optional<std::string> read_version_from_proc() {
     std::ifstream version_file("/proc/driver/nvidia/version",
                                std::ios_base::in | std::ios_base::binary);
     if (!version_file.is_open()) {
-        spdlog::warn("No NVIDIA version file found in /proc");
+        DORADO_LOG(warn, "No NVIDIA version file found in /proc");
         return std::nullopt;
     }
 
@@ -697,7 +698,7 @@ std::optional<std::string> read_version_from_proc() {
         }
     }
 
-    spdlog::warn("No version line found in /proc version file");
+    DORADO_LOG(warn, "No version line found in /proc version file");
     return std::nullopt;
 }
 #endif

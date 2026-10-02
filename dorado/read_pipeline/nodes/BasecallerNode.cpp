@@ -84,7 +84,7 @@ struct BasecallerNode::BatchedChunks {
         chunks.clear();
         chunks_size = 0;
 
-        spdlog::trace("Resetting chunk reserve times for worker {}", worker_id);
+        DORADO_LOG(trace, "Resetting chunk reserve times for worker {}", worker_id);
         first_chunk_reserve_time = Clock::now();
         last_chunk_reserve_time = first_chunk_reserve_time;
     }
@@ -192,8 +192,9 @@ void BasecallerNode::basecall_current_batch(BatchedChunks &current_batch,
     auto &model_runner = m_model_runners.at(current_batch.worker_id);
     auto &batched_chunks = current_batch.chunks;
 
-    spdlog::trace("Basecalling batch T={}, N={}, chunks={}, worker={}", model_runner->chunk_size(),
-                  model_runner->batch_size(), batched_chunks.size(), current_batch.worker_id);
+    DORADO_LOG(trace, "Basecalling batch T={}, N={}, chunks={}, worker={}",
+               model_runner->chunk_size(), model_runner->batch_size(), batched_chunks.size(),
+               current_batch.worker_id);
 
     dorado::stats::Timer timer;
     auto decode_results = model_runner->call_chunks(int(batched_chunks.size()));
@@ -406,7 +407,8 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
         // Update timings.
         current_batch.last_chunk_reserve_time = Clock::now();
         if (current_batch.empty()) {
-            spdlog::trace(
+            DORADO_LOG(
+                    trace,
                     "Resetting first_chunk_reserve_time for worker {} after adding first chunk to "
                     "batch.",
                     worker_id);
@@ -487,7 +489,7 @@ void BasecallerNode::basecall_worker_thread(int worker_id) {
     }
 
     if (!current_batch.empty()) {
-        spdlog::trace("Submitting batch for worker {} after termination requested.", worker_id);
+        DORADO_LOG(trace, "Submitting batch for worker {} after termination requested.", worker_id);
         basecall_current_batch(current_batch, m_num_partial_batches_called);
     }
 }
@@ -544,8 +546,8 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
     if (high_priority_batch_timeout_env) {
         // Override batch timeout for high-priority pipelines.
         m_low_latency_batch_timeout_ms = atoi(high_priority_batch_timeout_env);
-        spdlog::info("Overriding batch timeout for high-priority pipeline to {} ms.",
-                     m_low_latency_batch_timeout_ms);
+        DORADO_LOG(info, "Overriding batch timeout for high-priority pipeline to {} ms.",
+                   m_low_latency_batch_timeout_ms);
     } else {
         m_low_latency_batch_timeout_ms = 0;
     }
@@ -558,7 +560,7 @@ BasecallerNode::BasecallerNode(std::vector<basecall::RunnerPtr> model_runners,
                 std::make_unique<utils::AsyncQueue<std::unique_ptr<BasecallingChunk>>>(
                         chunk_queue_size));
         queue->set_name("chunk_queue_size_" + std::to_string(s));
-        spdlog::debug("BasecallerNode chunk size {}", s);
+        DORADO_LOG(debug, "BasecallerNode chunk size {}", s);
     }
 }
 

@@ -48,12 +48,12 @@ void EnsureInfoLoggingEnabled(VerboseLogLevel level);
 #if ENABLE_PER_READ_TRACE
 template <typename... Args>
 void trace_log(spdlog::format_string_t<Args...> fmt_str, Args &&...args) {
-    spdlog::trace(fmt_str, std::forward<Args>(args)...);
+    DORADO_LOG(trace, fmt_str, std::forward<Args>(args)...);
 }
 
 template <typename T>
 void trace_log(T &&msg) {
-    spdlog::trace(std::forward<T>(msg));
+    DORADO_LOG(trace, std::forward<T>(msg));
 }
 
 #else  // Per-read trace logging is disabled.

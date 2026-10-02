@@ -460,7 +460,7 @@ int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -579,27 +579,29 @@ void validate_options(const Options& opt) {
     }
     if (!std::filesystem::exists(opt.in_aln_bam_fn) ||
         std::filesystem::is_empty(opt.in_aln_bam_fn)) {
-        spdlog::error("Input file '{}' does not exist or is empty.", opt.in_aln_bam_fn.string());
+        DORADO_LOG(error, "Input file '{}' does not exist or is empty.",
+                   opt.in_aln_bam_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_ref_fastx_fn) ||
         std::filesystem::is_empty(opt.in_ref_fastx_fn)) {
-        spdlog::error("Input file '{}' does not exist or is empty.", opt.in_ref_fastx_fn.string());
+        DORADO_LOG(error, "Input file '{}' does not exist or is empty.",
+                   opt.in_ref_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
     if (opt.batch_size < 0) {
-        spdlog::error("Batch size should be >= 0. Given: {}.", opt.batch_size);
+        DORADO_LOG(error, "Batch size should be >= 0. Given: {}.", opt.batch_size);
         std::exit(EXIT_FAILURE);
     }
     if (opt.bam_chunk <= 0) {
-        spdlog::error("BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
+        DORADO_LOG(error, "BAM chunk size should be > 0. Given: {}.", opt.bam_chunk);
         std::exit(EXIT_FAILURE);
     }
 
     const auto validate_queue_size = [](const std::string_view option_name,
                                         const std::optional<int32_t>& queue_size) {
         if (queue_size && (*queue_size <= 0)) {
-            spdlog::error("{} needs to be > 0, given: {}.", option_name, *queue_size);
+            DORADO_LOG(error, "{} needs to be > 0, given: {}.", option_name, *queue_size);
             std::exit(EXIT_FAILURE);
         }
     };
@@ -611,58 +613,62 @@ void validate_options(const Options& opt) {
     validate_queue_size("--vc-writer-queue-size", opt.vc_writer_queue_size);
 
     if ((std::size(opt.tag_name) == 1) || (std::size(opt.tag_name) > 2)) {
-        spdlog::error(
-                "The --tag-name is specified, but it needs to contain exactly two characters. "
-                "Given: '{}'.",
-                opt.tag_name);
+        DORADO_LOG(error,
+                   "The --tag-name is specified, but it needs to contain exactly two characters. "
+                   "Given: '{}'.",
+                   opt.tag_name);
         std::exit(EXIT_FAILURE);
     }
 
     if (opt.regions_str && std::empty(opt.regions)) {
-        spdlog::error("Option --regions is specified, but an empty set of regions is given!");
+        DORADO_LOG(error, "Option --regions is specified, but an empty set of regions is given!");
         std::exit(EXIT_FAILURE);
     }
 
     if (opt.hemizygous_regions_str && std::empty(opt.hemizygous_regions)) {
-        spdlog::error(
+        DORADO_LOG(
+                error,
                 "Option --hemizygous-regions is specified, but an empty set of regions is given!");
         std::exit(EXIT_FAILURE);
     }
 
     if (opt.phasing_bin_path && !std::filesystem::exists(*opt.phasing_bin_path)) {
-        spdlog::error("Phasing bin path file '{}' does not exist.", opt.phasing_bin_path->string());
+        DORADO_LOG(error, "Phasing bin path file '{}' does not exist.",
+                   opt.phasing_bin_path->string());
         std::exit(EXIT_FAILURE);
     }
 
     // If multiple opposing haplotagging options are selected, report an error.
     if (((opt.phasing_bin_path != std::nullopt) + opt.hp_tag_from_bam + opt.unphased) > 1) {
-        spdlog::error(
-                "Selected multiple haplotagging options (phasing-bin, hp-tag or unphased). Only "
-                "one is allowed.");
+        DORADO_LOG(error,
+                   "Selected multiple haplotagging options (phasing-bin, hp-tag or unphased). Only "
+                   "one is allowed.");
         std::exit(EXIT_FAILURE);
     }
 
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
-        spdlog::error("Candidate site file '{}' does not exist.",
-                      opt.candidate_variants_path->string());
+        DORADO_LOG(error, "Candidate site file '{}' does not exist.",
+                   opt.candidate_variants_path->string());
         std::exit(EXIT_FAILURE);
     }
 
     if (opt.dump_variants && std::empty(opt.output_dir)) {
-        spdlog::error(
+        DORADO_LOG(
+                error,
                 "The --dump-variants option only works when the output is to a directory, but the "
                 "output directory is not specified.");
         std::exit(EXIT_FAILURE);
     }
 
     if ((opt.min_snp_accuracy < 0.0) || (opt.min_snp_accuracy > 1.0)) {
-        spdlog::error("The --min-snp-acc value needs to be in range [0.0, 1.0]. Specified: '{}'.",
-                      opt.min_snp_accuracy);
+        DORADO_LOG(error,
+                   "The --min-snp-acc value needs to be in range [0.0, 1.0]. Specified: '{}'.",
+                   opt.min_snp_accuracy);
     }
 
     if (opt.candidate_variants_path && !std::filesystem::exists(*opt.candidate_variants_path)) {
-        spdlog::error("Candidate site file '{}' does not exist.",
-                      opt.candidate_variants_path->string());
+        DORADO_LOG(error, "Candidate site file '{}' does not exist.",
+                   opt.candidate_variants_path->string());
         std::exit(EXIT_FAILURE);
     }
 }
@@ -712,7 +718,7 @@ std::string determine_model_name(const std::string& basecaller_model, const bool
 const std::filesystem::path resolve_model(
         const secondary::BamInfo& bam_info,
         const std::optional<std::filesystem::path>& models_directory) {
-    spdlog::info("Auto resolving the model.");
+    DORADO_LOG(info, "Auto resolving the model.");
 
     // Check that there is exactly one basecaller listed in the BAM. Otherwise, no auto resolving.
     if (std::size(bam_info.basecaller_models) != 1) {
@@ -750,7 +756,7 @@ const std::filesystem::path resolve_model(
         throw std::runtime_error{"Resolved model '" + model_name + "' not found!"};
     }
 
-    spdlog::debug("Resolved model from input data: '{}'", model_name);
+    DORADO_LOG(debug, "Resolved model from input data: '{}'", model_name);
 
     model_downloader::ModelDownloader downloader(models_directory, false);
     const std::filesystem::path model_dir = downloader.get(model_name, "smallvar");
@@ -764,9 +770,9 @@ std::filesystem::path resolve_model_advanced(
         const std::string& model_str,
         const bool any_model) {
     if (bam_info.has_dwells) {
-        spdlog::info("Input data contains move tables.");
+        DORADO_LOG(info, "Input data contains move tables.");
     } else {
-        spdlog::info("Input data does not contain move tables.");
+        DORADO_LOG(info, "Input data does not contain move tables.");
     }
 
     // Check if any of the input models is a stereo, to report a clear error that this is not supported.
@@ -778,7 +784,7 @@ std::filesystem::path resolve_model_advanced(
             if (!any_model) {
                 throw std::runtime_error{oss.str()};
             } else {
-                spdlog::warn("{} This may produce inferior results.", oss.str());
+                DORADO_LOG(warn, "{} This may produce inferior results.", oss.str());
             }
         }
     }
@@ -801,18 +807,20 @@ std::filesystem::path resolve_model_advanced(
     std::filesystem::path model_dir;
 
     if (!std::empty(model_str)) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Skipping basecaller compatibility checks for user-specified model override. The "
                 "accuracy of the results is not guaranteed.");
     }
 
     if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
-        spdlog::debug("Resolved model from user-specified path: '{}'", model_str);
+        DORADO_LOG(debug, "Resolved model from user-specified path: '{}'", model_str);
         model_dir = model_str;
 
     } else if (count_model_hits(models::variant_models(), model_str) == 1) {
         const std::string& model_name = model_str;
-        spdlog::debug("Resolved model from user-specified smallvar model name: '{}'", model_name);
+        DORADO_LOG(debug, "Resolved model from user-specified smallvar model name: '{}'",
+                   model_name);
         model_downloader::ModelDownloader downloader(models_directory, false);
         model_dir = downloader.get(model_name, "smallvar");
 
@@ -823,7 +831,8 @@ std::filesystem::path resolve_model_advanced(
         // Example: dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0
         const std::string model_name = determine_model_name(basecaller_model, false);
 
-        spdlog::debug("Resolved model from user-specified basecaller model name: '{}'", model_name);
+        DORADO_LOG(debug, "Resolved model from user-specified basecaller model name: '{}'",
+                   model_name);
         model_downloader::ModelDownloader downloader(models_directory, false);
         model_dir = downloader.get(model_name, "smallvar");
 
@@ -837,7 +846,7 @@ std::filesystem::path resolve_model_advanced(
 secondary::ModelConfig load_model(const std::filesystem::path& model_dir,
                                   const bool load_scripted_model) {
     // Load the model.
-    spdlog::info("Parsing the model config: '{}'", (model_dir / "config.toml").string());
+    DORADO_LOG(info, "Parsing the model config: '{}'", (model_dir / "config.toml").string());
     const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
     return secondary::parse_model_config(model_dir / "config.toml", model_file);
 }
@@ -891,16 +900,17 @@ void validate_bam_model(const secondary::BamInfo& bam_info,
     } else {
         // Allow to use a model trained on a wrong basecaller model, but emit a warning.
         if (!check_models_supported(bam_info.basecaller_models)) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "Variant calling model is not compatible with the input BAM. This may produce "
                     "inferior results.");
         }
 
         // Allow to use a mismatched model, but emit a warning.
         if (!bam_info.has_dwells && model_uses_dwells) {
-            spdlog::warn(
-                    "Input data does not contain move tables, but a model which requires move "
-                    "tables has been chosen. This may produce inferior results.");
+            DORADO_LOG(warn,
+                       "Input data does not contain move tables, but a model which requires move "
+                       "tables has been chosen. This may produce inferior results.");
         }
     }
 }
@@ -934,7 +944,8 @@ create_candidate_interval_trees(
     for (const auto& [ref_name, positions] : candidate_sites) {
         const auto it = draft_lookup.find(ref_name);
         if (it == std::cend(draft_lookup)) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "Candidate variant reference name '{}' not found in the input reference file! "
                     "Skipping candidates for this reference.",
                     ref_name);
@@ -1014,7 +1025,7 @@ std::vector<std::string> load_reference_sequences(
                 ", input_regions.size = " + std::to_string(std::size(input_regions))};
     }
 
-    spdlog::debug("[run_variant_calling] Loading full draft sequences.");
+    DORADO_LOG(debug, "[run_variant_calling] Loading full draft sequences.");
     hts_io::FastxRandomReader fastx_reader(in_ref_fastx_fn, true);
 
     // Dense vector by seq_id. Unused sequence IDs stay as empty strings.
@@ -1069,8 +1080,8 @@ void run_variant_calling(const Options& opt,
                          const secondary::ModelConfig& model_config,
                          smallvar::VariantResources& resources,
                          secondary::Stats& stats) {
-    spdlog::info("Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
-                 opt.infer_threads, std::size(resources.devices));
+    DORADO_LOG(info, "Threads: {}, inference threads: {}, number of devices: {}", opt.threads,
+               opt.infer_threads, std::size(resources.devices));
 
     at::InferenceMode infer_guard;
 
@@ -1107,23 +1118,23 @@ void run_variant_calling(const Options& opt,
                 std::to_string(window_overlap) + ", window_len = " + std::to_string(window_len)};
     }
 
-    spdlog::debug(
-            "Using windowing parameters: window_len = {}, window_overlap = {}, "
-            "variant_flanking_bases = {}",
-            window_len, window_overlap, variant_flanking_bases);
-    spdlog::debug("Using candidate region filtering: {}, source = {}", candidate_filtering,
-                  secondary::variant_region_source_to_string(variant_candidate_source));
+    DORADO_LOG(debug,
+               "Using windowing parameters: window_len = {}, window_overlap = {}, "
+               "variant_flanking_bases = {}",
+               window_len, window_overlap, variant_flanking_bases);
+    DORADO_LOG(debug, "Using candidate region filtering: {}, source = {}", candidate_filtering,
+               secondary::variant_region_source_to_string(variant_candidate_source));
 
     // Create a .fai index if it doesn't exist.
     const bool rv_fai = utils::create_fai_index(opt.in_ref_fastx_fn);
     if (!rv_fai) {
-        spdlog::error("Failed to create/verify a .fai index for input file: '{}'!",
-                      opt.in_ref_fastx_fn.string());
+        DORADO_LOG(error, "Failed to create/verify a .fai index for input file: '{}'!",
+                   opt.in_ref_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
 
     // Load sequence lengths.
-    spdlog::debug("[run_variant_calling] Loading draft sequence lengths.");
+    DORADO_LOG(debug, "[run_variant_calling] Loading draft sequence lengths.");
     const std::vector<std::pair<std::string, int64_t>> draft_lens =
             utils::load_seq_lengths(opt.in_ref_fastx_fn);
 
@@ -1170,7 +1181,7 @@ void run_variant_calling(const Options& opt,
                 ref_regions = std::move(merged_regions);
             }
             for (const auto& region : ref_regions) {
-                spdlog::debug("Added {} to hemizygous regions", secondary::to_string(region));
+                DORADO_LOG(debug, "Added {} to hemizygous regions", secondary::to_string(region));
             }
         }
     }
@@ -1269,10 +1280,10 @@ void run_variant_calling(const Options& opt,
     const double usable_mem = (min_avail_mem * AVAILABLE_MEMORY_FACTOR) / opt.infer_threads;
 
     if (opt.batch_size > 0) {
-        spdlog::info("Using fixed batch size: {}", opt.batch_size);
+        DORADO_LOG(info, "Using fixed batch size: {}", opt.batch_size);
     } else {
-        spdlog::info("Using auto computed batch size. Usable per-worker memory: {:.2f} GB",
-                     usable_mem);
+        DORADO_LOG(info, "Using auto computed batch size. Usable per-worker memory: {:.2f} GB",
+                   usable_mem);
     }
 
     const int32_t ploidy = secondary::label_scheme_type_to_ploidy(
@@ -1297,11 +1308,11 @@ void run_variant_calling(const Options& opt,
     }
 
     const QueueSizes queue_sizes = resolve_queue_sizes(opt, std::size(resources.models));
-    spdlog::debug(
-            "Queue sizes: bam_region = {}, sample = {}, batch = {}, decode = {}, vc_data = {}, "
-            "vc_writer = {}",
-            queue_sizes.bam_region, queue_sizes.sample, queue_sizes.batch, queue_sizes.decode,
-            queue_sizes.vc_data, queue_sizes.vc_writer);
+    DORADO_LOG(debug,
+               "Queue sizes: bam_region = {}, sample = {}, batch = {}, decode = {}, vc_data = {}, "
+               "vc_writer = {}",
+               queue_sizes.bam_region, queue_sizes.sample, queue_sizes.batch, queue_sizes.decode,
+               queue_sizes.vc_data, queue_sizes.vc_writer);
 
     utils::AsyncQueue<secondary::Window> bam_region_queue(queue_sizes.bam_region);
     utils::AsyncQueue<smallvar::InferenceData> sample_queue(queue_sizes.sample);
@@ -1504,20 +1515,20 @@ int small_variant_caller(int argc, char* argv[]) {
 
         // Debug printing.
         {
-            spdlog::debug("bam_info.uses_dorado_aligner = {}", bam_info.uses_dorado_aligner);
-            spdlog::debug("bam_info.has_dwells = {}", bam_info.has_dwells);
-            spdlog::debug("bam_info.read_groups:");
+            DORADO_LOG(debug, "bam_info.uses_dorado_aligner = {}", bam_info.uses_dorado_aligner);
+            DORADO_LOG(debug, "bam_info.has_dwells = {}", bam_info.has_dwells);
+            DORADO_LOG(debug, "bam_info.read_groups:");
             for (const auto& rg : bam_info.read_groups) {
-                spdlog::debug("    - {}", rg);
+                DORADO_LOG(debug, "    - {}", rg);
             }
-            spdlog::debug("bam_info.basecaller_models:");
+            DORADO_LOG(debug, "bam_info.basecaller_models:");
             for (const auto& rg : bam_info.basecaller_models) {
-                spdlog::debug("    - {}", rg);
+                DORADO_LOG(debug, "    - {}", rg);
             }
             if (!std::empty(opt.read_group)) {
-                spdlog::debug(
-                        "Only the user-requested RG was selected from the input bam. RG: '{}'",
-                        opt.read_group);
+                DORADO_LOG(debug,
+                           "Only the user-requested RG was selected from the input bam. RG: '{}'",
+                           opt.read_group);
             }
         }
 
@@ -1574,7 +1585,7 @@ int small_variant_caller(int argc, char* argv[]) {
 
         // Log that that half-precision will be used.
         if (!opt.full_precision) {
-            spdlog::info("Using half precision!");
+            DORADO_LOG(info, "Using half precision!");
         }
 
         run_variant_calling(opt, command_line, bam_info, model_config, resources, stats);
@@ -1584,13 +1595,13 @@ int small_variant_caller(int argc, char* argv[]) {
 
         // Hack to clear the last line from the progress bar. The library automatically does '\r'.
         std::cerr << std::string(200, ' ') << '\r';
-        spdlog::info("Done!");
+        DORADO_LOG(info, "Done!");
 
     } catch (const std::exception& e) {
-        spdlog::error(e.what());
+        DORADO_LOG(error, e.what());
         return EXIT_FAILURE;
     } catch (...) {
-        spdlog::error("Caught an unknown exception!");
+        DORADO_LOG(error, "Caught an unknown exception!");
         return EXIT_FAILURE;
     }
 

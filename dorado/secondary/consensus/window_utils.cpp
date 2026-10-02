@@ -17,7 +17,8 @@ std::vector<Window> create_windows(const int32_t seq_id,
                                    const int32_t window_overlap,
                                    const int32_t source_region_id) {
     if (window_overlap >= (window_len / 2)) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Window overlap cannot be larger than the (window_len / 2) because of transitive "
                 "overlaps. Returning empty. seq_id = {}, seq_start = {}, seq_end = {}, seq_len = "
                 "{}, window_len = {}, "
@@ -26,16 +27,17 @@ std::vector<Window> create_windows(const int32_t seq_id,
         return {};
     }
     if (window_len <= 0) {
-        spdlog::warn(
-                "Invalid window_len given to create_windows, should be > 0. Returning empty. "
-                "seq_id = {}, seq_start = {}, seq_end = {}, seq_len = "
-                "{}, window_len = {}, "
-                "window_overlap = {}",
-                seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
+        DORADO_LOG(warn,
+                   "Invalid window_len given to create_windows, should be > 0. Returning empty. "
+                   "seq_id = {}, seq_start = {}, seq_end = {}, seq_len = "
+                   "{}, window_len = {}, "
+                   "window_overlap = {}",
+                   seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
         return {};
     }
     if (window_overlap < 0) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Invalid window_overlap given to create_windows, should be >= 0. Returning empty. "
                 "seq_id = {}, seq_start = {}, seq_end = {}, seq_len = "
                 "{}, window_len = {}, "
@@ -45,7 +47,8 @@ std::vector<Window> create_windows(const int32_t seq_id,
     }
     if ((seq_start < 0) || (seq_end < 0) || (seq_start >= seq_len) || (seq_end > seq_len) ||
         (seq_start >= seq_end)) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Invalid start/end coordinates for creating windows. Returning empty. seq_id = {}, "
                 "seq_start = {}, seq_end = {}, seq_len = {}, window_len = {}, "
                 "window_overlap = {}",
@@ -53,11 +56,11 @@ std::vector<Window> create_windows(const int32_t seq_id,
         return {};
     }
     if (seq_len <= 0) {
-        spdlog::warn(
-                "Invalid sequence length given to create_windows. Returning empty. seq_id = {}, "
-                "seq_start = {}, seq_end = {}, seq_len = {}, window_len = {}, "
-                "window_overlap = {}",
-                seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
+        DORADO_LOG(warn,
+                   "Invalid sequence length given to create_windows. Returning empty. seq_id = {}, "
+                   "seq_start = {}, seq_end = {}, seq_len = {}, window_len = {}, "
+                   "window_overlap = {}",
+                   seq_id, seq_start, seq_end, seq_len, window_len, window_overlap);
         return {};
     }
 
@@ -95,7 +98,7 @@ std::vector<Window> create_windows_from_regions(
     for (int64_t i = 0; i < std::ssize(regions); ++i) {
         Region region = regions[i];
 
-        spdlog::debug("Creating windows for region: '{}'.", to_string(region));
+        DORADO_LOG(debug, "Creating windows for region: '{}'.", to_string(region));
 
         const auto it = draft_lookup.find(region.name);
         if (it == std::end(draft_lookup)) {
@@ -119,8 +122,8 @@ std::vector<Window> create_windows_from_regions(
                 create_windows(static_cast<int32_t>(seq_id), region.start, region.end, seq_length,
                                bam_chunk_len, window_overlap, static_cast<int32_t>(i));
 
-        spdlog::debug("Generated {} windows for region: '{}'.", std::size(new_windows),
-                      to_string(region));
+        DORADO_LOG(debug, "Generated {} windows for region: '{}'.", std::size(new_windows),
+                   to_string(region));
         windows.reserve(std::size(windows) + std::size(new_windows));
         windows.insert(std::end(windows), std::begin(new_windows), std::end(new_windows));
     }

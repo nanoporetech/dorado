@@ -37,7 +37,8 @@ void StructuredHtsFileWriter::shutdown() {
     const size_t n_files = m_hts_files.size();
     for (auto &[path, hts_file] : m_hts_files) {
         if (hts_file == nullptr) {
-            spdlog::debug(
+            DORADO_LOG(
+                    debug,
                     "StructuredHtsFileWriter::shutdown called on uninitialised hts_file - nothing "
                     "to do for '{}'",
                     path);
@@ -58,7 +59,7 @@ bool StructuredHtsFileWriter::finalise_is_noop() const {
 
 void StructuredHtsFileWriter::handle(const HtsData &item) {
     if (m_has_shutdown) {
-        spdlog::debug("HtsFileWriter has shutdown and cannot process more work.");
+        DORADO_LOG(debug, "HtsFileWriter has shutdown and cannot process more work.");
         return;
     }
 
@@ -91,9 +92,9 @@ void StructuredHtsFileWriter::set_hts_file_header(const HtsData &item,
     if (m_dynamic_header != nullptr) {
         const auto &it = m_dynamic_header->find(item.read_attrs);
         if (it == m_dynamic_header->cend()) {
-            spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
-                          utils::get_read_group_tag(item.bam_ptr.get()),
-                          item.read_attrs.protocol_run_id);
+            DORADO_LOG(error, "Failed to find dynamic header: RG='{}', runid='{}'",
+                       utils::get_read_group_tag(item.bam_ptr.get()),
+                       item.read_attrs.protocol_run_id);
             throw std::runtime_error("StructuredHtsFileWriter - Failed to load dynamic header.");
         }
         hts_file.set_header(it->second->get_merged_header());

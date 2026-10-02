@@ -308,7 +308,7 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
             ++m_num_non_mod_base_reads_pushed;
         }
     } catch (const std::exception& e) {
-        spdlog::error("{}", e.what());
+        DORADO_LOG(error, "{}", e.what());
     }
 }
 

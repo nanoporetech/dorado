@@ -105,9 +105,9 @@ void set_ssl_cert_file() {
         }
     }
     if (!ssl_cert_file) {
-        spdlog::warn(
-                "Unknown certs location for current distribution. If you hit download issues, "
-                "use the envvar `SSL_CERT_FILE` to specify the location manually.");
+        DORADO_LOG(warn,
+                   "Unknown certs location for current distribution. If you hit download issues, "
+                   "use the envvar `SSL_CERT_FILE` to specify the location manually.");
     }
 
 #elif defined(__APPLE__)
@@ -119,7 +119,7 @@ void set_ssl_cert_file() {
 
     // Update the envvar.
     if (ssl_cert_file) {
-        spdlog::info("Assuming cert location is {}", ssl_cert_file);
+        DORADO_LOG(info, "Assuming cert location is {}", ssl_cert_file);
         setenv("SSL_CERT_FILE", ssl_cert_file, 1);
     }
 #endif  // _WIN32
@@ -134,7 +134,7 @@ auto Downloader::create_client() {
 
     const char* dorado_cdn_url = std::getenv("DORADO_CDN_URL_OVERRIDE");
     if (dorado_cdn_url) {
-        spdlog::info("Using model download override location \"{}\"", dorado_cdn_url);
+        DORADO_LOG(info, "Using model download override location \"{}\"", dorado_cdn_url);
     }
     auto http = std::make_unique<httplib::Client>(urls::URL_ROOT);
     http->set_follow_location(true);
@@ -149,7 +149,7 @@ auto Downloader::create_client() {
     }
 
     if (proxy_url) {
-        spdlog::info("using proxy: {}:{}", proxy_url, proxy_port);
+        DORADO_LOG(info, "using proxy: {}:{}", proxy_url, proxy_port);
         http->set_proxy(proxy_url, proxy_port);
     }
 
@@ -213,20 +213,20 @@ bool Downloader::validate_checksum(std::string_view data, const models::ModelInf
     // Check that this matches the hash we expect.
     const auto checksum = calculate_checksum(data);
     if (checksum != info.checksum) {
-        spdlog::error("Model download failed checksum validation: {} - {} != {}", info.name,
-                      checksum, info.checksum);
+        DORADO_LOG(error, "Model download failed checksum validation: {} - {} != {}", info.name,
+                   checksum, info.checksum);
         return false;
     }
     return true;
 }
 
 void Downloader::extract(const fs::path& archive) const {
-    spdlog::trace("Extracting model archive: '{}'.", archive.string());
+    DORADO_LOG(trace, "Extracting model archive: '{}'.", archive.string());
 
     try {
         elz::extractZip(archive, m_directory);
     } catch (const elz::zip_exception& e) {
-        spdlog::error("Failed to unzip model archive: '{}'.", e.what());
+        DORADO_LOG(error, "Failed to unzip model archive: '{}'.", e.what());
         throw;
     }
 
@@ -235,10 +235,10 @@ void Downloader::extract(const fs::path& archive) const {
 
 #if DORADO_MODELS_HAS_HTTPLIB
 bool Downloader::download_httplib(const models::ModelInfo& model, const fs::path& archive) {
-    spdlog::info(" - downloading {} with httplib", model.name);
+    DORADO_LOG(info, " - downloading {} with httplib", model.name);
     httplib::Result res = m_client->Get(get_url(model.name));
     if (!res) {
-        spdlog::error("Failed to download {}: {}", model.name, to_string(res.error()));
+        DORADO_LOG(error, "Failed to download {}: {}", model.name, to_string(res.error()));
         return false;
     }
 
@@ -252,13 +252,13 @@ bool Downloader::download_httplib(const models::ModelInfo& model, const fs::path
     output << res->body;
     output.close();
     if (!output) {
-        spdlog::error("Failed to save downloaded file to disk");
+        DORADO_LOG(error, "Failed to save downloaded file to disk");
         return false;
     }
 
     // Check that all of it was saved.
     if (fs::file_size(archive) != res->body.size()) {
-        spdlog::error("Size mismatch between file in memory and file on disk");
+        DORADO_LOG(error, "Size mismatch between file in memory and file on disk");
         return false;
     }
 
@@ -268,14 +268,14 @@ bool Downloader::download_httplib(const models::ModelInfo& model, const fs::path
 
 #if DORADO_MODELS_HAS_CURL_EXE
 bool Downloader::download_curl(const models::ModelInfo& model, const fs::path& archive) {
-    spdlog::info(" - downloading {} with curl", model.name);
+    DORADO_LOG(info, " - downloading {} with curl", model.name);
 
     // Note: it's safe to call system() here since we're only going to be called with known models.
     std::string args = "curl -L " + get_url(model.name) + " -o " + archive.string();
     errno = 0;
     int ret = system(args.c_str());
     if (ret != 0) {
-        spdlog::error("Failed to download {}: ret={}, errno={}", model.name, ret, errno);
+        DORADO_LOG(error, "Failed to download {}: ret={}, errno={}", model.name, ret, errno);
         return false;
     }
 

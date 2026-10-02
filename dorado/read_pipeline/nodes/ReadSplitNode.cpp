@@ -25,7 +25,7 @@ void validate_split_results(const std::vector<SimplexReadPtr>& split_reads,
                           [tag](const auto& read) { return read->read_common.read_tag == tag; });
     if (matches == 0 || matches < split_reads.size() ||
         matches != split_reads[0]->read_common.split_count) {
-        spdlog::error("ReadSplitNode failed to forward read id: {}", original_read_id);
+        DORADO_LOG(error, "ReadSplitNode failed to forward read id: {}", original_read_id);
         throw std::runtime_error("ReadSplitNode failed to forward read id: " + original_read_id);
     }
 }

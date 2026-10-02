@@ -118,15 +118,15 @@ void DuplexModels::set_basecaller_batch_params(const config::BatchParams& batch_
 }
 
 void Models::print(const std::string& context) const {
-    spdlog::info("{} simplex model: '{}'", context, get_simplex_model_name());
+    DORADO_LOG(info, "{} simplex model: '{}'", context, get_simplex_model_name());
     for (const auto& mod : get_modbase_model_names()) {
-        spdlog::info("{} modbase model: '{}'", context, mod);
+        DORADO_LOG(info, "{} modbase model: '{}'", context, mod);
     }
 }
 
 void DuplexModels::print(const std::string& context) const {
     Models::print(context);
-    spdlog::info("{} stereo model : '{}'", context, get_stereo_model_name());
+    DORADO_LOG(info, "{} stereo model : '{}'", context, get_stereo_model_name());
 }
 
 }  // namespace dorado::model_resolution

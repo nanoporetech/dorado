@@ -105,7 +105,7 @@ DuplexModels load_duplex_models(const argparse::ArgumentParser& parser,
 
         return DuplexModels(resolver.resolve());
     } catch (const std::exception& e) {
-        spdlog::error("Failed to resolve {} models: {}", context, e.what());
+        DORADO_LOG(error, "Failed to resolve {} models: {}", context, e.what());
         std::exit(EXIT_FAILURE);
     }
 }
@@ -204,8 +204,9 @@ int duplex(int argc, char* argv[]) {
                 .action([&options](const std::string& value) {
                     const auto& mods = models::modified_model_variants();
                     if (std::find(mods.begin(), mods.end(), value) == mods.end()) {
-                        spdlog::error("'{}' is not a supported modification please select from {}.",
-                                      value, options);
+                        DORADO_LOG(error,
+                                   "'{}' is not a supported modification please select from {}.",
+                                   value, options);
                         std::exit(EXIT_FAILURE);
                     }
                     return value;
@@ -273,13 +274,13 @@ int duplex(int argc, char* argv[]) {
         std::unordered_set<std::string> read_list_from_pairs;
 
         if (!pairs_file.empty()) {
-            spdlog::info("> Loading pairs file");
+            DORADO_LOG(info, "> Loading pairs file");
             template_complement_map = utils::load_pairs_file(pairs_file);
             read_list_from_pairs = utils::get_read_list_from_pairs(template_complement_map);
-            spdlog::info("> Pairs file loaded with {} reads.", read_list_from_pairs.size());
+            DORADO_LOG(info, "> Pairs file loaded with {} reads.", read_list_from_pairs.size());
         } else {
-            spdlog::info(
-                    "> No duplex pairs file provided, pairing will be performed automatically");
+            DORADO_LOG(info,
+                       "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
         const cli::EmitArgs emit = cli::get_emit_args(parser);
@@ -289,7 +290,7 @@ int duplex(int argc, char* argv[]) {
 
         if (parser.get<std::string>("--reference").empty() &&
             !parser.get<std::string>("--bed-file").empty()) {
-            spdlog::error("--bed-file cannot be used without --reference.");
+            DORADO_LOG(error, "--bed-file cannot be used without --reference.");
             return EXIT_FAILURE;
         }
 
@@ -303,7 +304,7 @@ int duplex(int argc, char* argv[]) {
         try {
             input_pod5_files = data_loader::InputFiles::search_pod5s(reads, recursive_file_loading);
         } catch (const std::exception& e) {
-            spdlog::error("Failed to load pod5 data: '{}'", e.what());
+            DORADO_LOG(error, "Failed to load pod5 data: '{}'", e.what());
             return EXIT_FAILURE;
         }
 
@@ -315,11 +316,11 @@ int duplex(int argc, char* argv[]) {
         } else {
             num_reads = file_info::get_num_reads(input_pod5_files.get(), read_list, {});
             if (num_reads == 0) {
-                spdlog::error("No reads found in path: " + reads);
+                DORADO_LOG(error, "No reads found in path: " + reads);
                 return EXIT_FAILURE;
             }
         }
-        spdlog::debug("> Reads to process: {}", num_reads);
+        DORADO_LOG(debug, "> Reads to process: {}", num_reads);
 
         SamHdrPtr hdr(sam_hdr_init());
         cli::add_pg_hdr(hdr.get(), "duplex", args, device);
@@ -349,7 +350,7 @@ int duplex(int argc, char* argv[]) {
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             if (hts_file_writer == nullptr) {
-                spdlog::error("Failed to create hts file writer");
+                DORADO_LOG(error, "Failed to create hts file writer");
                 std::exit(EXIT_FAILURE);
             }
             writer_output_mode = hts_file_writer->get_mode();
@@ -374,7 +375,7 @@ int duplex(int argc, char* argv[]) {
             std::string err_msg{};
             auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
             if (!minimap_options) {
-                spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+                DORADO_LOG(error, "{}\n{}", err_msg, alignment::mm2::get_help_message());
                 return EXIT_FAILURE;
             }
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
@@ -425,18 +426,18 @@ int duplex(int argc, char* argv[]) {
 
         if (basespace_duplex) {  // Execute a Basespace duplex pipeline.
             if (pairs_file.empty()) {
-                spdlog::error("The --pairs argument is required for the basespace model.");
+                DORADO_LOG(error, "The --pairs argument is required for the basespace model.");
                 return EXIT_FAILURE;  // Exit with an error code
             }
 
             auto mod_bases_models = parser.get<std::string>("--modified-bases-models");
             auto mod_bases = parser.get<std::vector<std::string>>("--modified-bases");
             if (!mod_bases.empty() || !mod_bases_models.empty()) {
-                spdlog::error("Basespace duplex does not support modbase models");
+                DORADO_LOG(error, "Basespace duplex does not support modbase models");
                 return EXIT_FAILURE;
             }
 
-            spdlog::info("> Loading reads");
+            DORADO_LOG(info, "> Loading reads");
             threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
             auto read_map = read_bam(reads, read_list_from_pairs, threads);
 
@@ -444,14 +445,14 @@ int duplex(int argc, char* argv[]) {
                 client_info_init_func(read->read_common);
             }
 
-            spdlog::info("> Starting Basespace Duplex Pipeline");
+            DORADO_LOG(info, "> Starting Basespace Duplex Pipeline");
             pipeline_desc.add_node<BaseSpaceDuplexCallerNode>({read_filter_node},
                                                               std::move(template_complement_map),
                                                               std::move(read_map), threads);
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
-                spdlog::error("Failed to create pipeline");
+                DORADO_LOG(error, "Failed to create pipeline");
                 return EXIT_FAILURE;
             }
 
@@ -462,7 +463,6 @@ int duplex(int argc, char* argv[]) {
             stats_sampler = std::make_unique<dorado::stats::StatsSampler>(
                     kStatsPeriod, stats_reporters, stats_callables, max_stats_records);
         } else {  // Execute a Stereo Duplex pipeline.
-
             DuplexModels models = load_duplex_models(parser, input_pod5_files, "duplex");
             models.set_basecaller_batch_params(cli::get_batch_params(parser), device);
 
@@ -609,7 +609,7 @@ int duplex(int argc, char* argv[]) {
                         num_runners, 0);
             }
 
-            spdlog::info("> Starting Stereo Duplex pipeline");
+            DORADO_LOG(info, "> Starting Stereo Duplex pipeline");
 
             PairingParameters pairing_parameters;
             if (template_complement_map.empty()) {
@@ -630,7 +630,7 @@ int duplex(int argc, char* argv[]) {
 
             pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
             if (pipeline == nullptr) {
-                spdlog::error("Failed to create pipeline");
+                DORADO_LOG(error, "Failed to create pipeline");
                 return EXIT_FAILURE;
             }
 
@@ -678,7 +678,7 @@ int duplex(int argc, char* argv[]) {
                                               : std::optional<std::regex>(dump_stats_filter));
         }
     } catch (const std::exception& e) {
-        spdlog::error(e.what());
+        DORADO_LOG(error, e.what());
         return EXIT_FAILURE;
     }
     return EXIT_SUCCESS;

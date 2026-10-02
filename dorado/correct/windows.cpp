@@ -15,7 +15,7 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 // #define DORADO_CORRECT_DEBUG_WINDOWS
@@ -166,13 +166,13 @@ bool extract_windows(std::vector<std::vector<OverlapWindow>>& windows,
                                                             : overlap.tend / window_size);
 
         if (first_window < 0 || (last_window - 1) >= (int)windows.size()) {
-            spdlog::error(
-                    "{} zeroth thres {} nth thres {} first win {} last win {} windows size {} "
-                    "overlap "
-                    "tlen {} overlsp tstart {} overlap tend {} qlen {} qstart {} qend {}",
-                    alignments.read_name, zeroth_window_thresh, nth_window_thresh, first_window,
-                    last_window, windows.size(), overlap.tlen, overlap.tstart, overlap.tend,
-                    overlap.qlen, overlap.qstart, overlap.qend);
+            DORADO_LOG(error,
+                       "{} zeroth thres {} nth thres {} first win {} last win {} windows size {} "
+                       "overlap "
+                       "tlen {} overlsp tstart {} overlap tend {} qlen {} qstart {} qend {}",
+                       alignments.read_name, zeroth_window_thresh, nth_window_thresh, first_window,
+                       last_window, windows.size(), overlap.tlen, overlap.tstart, overlap.tend,
+                       overlap.qlen, overlap.qstart, overlap.qend);
             return false;
         }
 
@@ -706,10 +706,10 @@ std::vector<secondary::Interval> extract_limited_windows(
 
         // Sanity check. One input window was given, one output window is expected.
         if (std::size(new_windows) != 1) {
-            spdlog::warn(
-                    "Expected exactly 1 output window, but {} were generated after "
-                    "split_alignments_into_windows!",
-                    std::size(new_windows));
+            DORADO_LOG(warn,
+                       "Expected exactly 1 output window, but {} were generated after "
+                       "split_alignments_into_windows!",
+                       std::size(new_windows));
             windows.clear();
             return {};
         }
@@ -744,10 +744,10 @@ std::vector<secondary::Interval> extract_limited_windows(
         // The new_windows are updated by filter_features.
         // Sanity check. There should still be just one window.
         if (std::size(new_windows) != 1) {
-            spdlog::warn(
-                    "Expected exactly 1 output window, but {} were generated after "
-                    "filter_features!",
-                    std::size(new_windows));
+            DORADO_LOG(warn,
+                       "Expected exactly 1 output window, but {} were generated after "
+                       "filter_features!",
+                       std::size(new_windows));
             windows.clear();
             return {};
         }
@@ -789,10 +789,10 @@ std::vector<secondary::Interval> extract_limited_windows(
                                                     {secondary::Interval{win_start, new_win_end}},
                                                     window_size, aln_ids, cigar_points);
         if (std::size(new_windows) != 1) {
-            spdlog::warn(
-                    "Expected exactly 1 output window, but {} were generated after second "
-                    "split_alignments_into_windows!",
-                    std::size(new_windows));
+            DORADO_LOG(warn,
+                       "Expected exactly 1 output window, but {} were generated after second "
+                       "split_alignments_into_windows!",
+                       std::size(new_windows));
             windows.clear();
             return {};
         }

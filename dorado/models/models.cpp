@@ -34,22 +34,22 @@ bool model_info_is_similar(const ModelInfo& info,
     const bool is_auto_variant_match = model.variant == ModelVariant::AUTO && info.simplex.is_auto;
     if (model.has_variant() && info.simplex.has_variant() &&
         info.simplex.variant != model.variant && !is_auto_variant_match) {
-        spdlog::trace("Reject {} on model type: {}", info.name, to_string(model.variant));
+        DORADO_LOG(trace, "Reject {} on model type: {}", info.name, to_string(model.variant));
         return false;
     }
     if (model.has_ver() && info.simplex.has_ver() && model.ver != info.simplex.ver) {
-        spdlog::trace("Reject {} on versions: {}, {}", info.name, to_string(info.simplex.ver),
-                      to_string(model.ver));
+        DORADO_LOG(trace, "Reject {} on versions: {}, {}", info.name, to_string(info.simplex.ver),
+                   to_string(model.ver));
         return false;
     }
     if (mods.has_variant() && info.mods.has_variant() && mods.variant != info.mods.variant) {
-        spdlog::trace("Reject {} on mods: {}, {}", info.name, to_string(info.mods.variant),
-                      to_string(mods.variant));
+        DORADO_LOG(trace, "Reject {} on mods: {}, {}", info.name, to_string(info.mods.variant),
+                   to_string(mods.variant));
         return false;
     }
     if (mods.has_ver() && info.mods.has_ver() && mods.ver != info.mods.ver) {
-        spdlog::trace("Reject {} on mods versions: {}, {}", info.name, to_string(info.mods.ver),
-                      to_string(mods.ver));
+        DORADO_LOG(trace, "Reject {} on mods versions: {}, {}", info.name, to_string(info.mods.ver),
+                   to_string(mods.ver));
         return false;
     }
     return true;
@@ -76,10 +76,10 @@ void suggest_models(std::span<const ModelInfo> models,
         const auto no_variant = ModsVariantPair{ModsVariant::NONE, mods.ver};
         const auto matches = find_models(models, chemistry, model, no_variant);
         if (matches.size() > 0) {
-            spdlog::info("Found {} {} models without mods variant: {}", matches.size(), description,
-                         to_string(mods.variant));
+            DORADO_LOG(info, "Found {} {} models without mods variant: {}", matches.size(),
+                       description, to_string(mods.variant));
             for (const auto& m : matches) {
-                spdlog::info("- {} - mods variant: {}", m.name, to_string(m.mods.variant));
+                DORADO_LOG(info, "- {} - mods variant: {}", m.name, to_string(m.mods.variant));
             }
         }
     }
@@ -87,10 +87,10 @@ void suggest_models(std::span<const ModelInfo> models,
         const auto no_ver = ModsVariantPair{mods.variant, ModelVersion::NONE};
         const auto matches = find_models(models, chemistry, model, no_ver);
         if (matches.size() > 0) {
-            spdlog::info("Found {} {} models without mods version: {}", matches.size(), description,
-                         to_string(mods.ver));
+            DORADO_LOG(info, "Found {} {} models without mods version: {}", matches.size(),
+                       description, to_string(mods.ver));
             for (const auto& m : matches) {
-                spdlog::info("- {} - mods version: {}", m.name, to_string(m.mods.ver));
+                DORADO_LOG(info, "- {} - mods version: {}", m.name, to_string(m.mods.ver));
             }
         }
     }
@@ -103,10 +103,10 @@ void suggest_models(std::span<const ModelInfo> models,
         const auto no_variant = ModelVariantPair{ModelVariant::NONE, model.ver};
         const auto matches = find_models(models, chemistry, no_variant, mods);
         if (matches.size() > 0) {
-            spdlog::info("Found {} {} models without model variant: {}", matches.size(),
-                         description, to_string(model.variant));
+            DORADO_LOG(info, "Found {} {} models without model variant: {}", matches.size(),
+                       description, to_string(model.variant));
             for (const auto& m : matches) {
-                spdlog::info("- {} - model variant: {}", m.name, to_string(m.simplex.variant));
+                DORADO_LOG(info, "- {} - model variant: {}", m.name, to_string(m.simplex.variant));
             }
         }
     }
@@ -114,10 +114,10 @@ void suggest_models(std::span<const ModelInfo> models,
         const auto no_ver = ModelVariantPair{model.variant, ModelVersion::NONE};
         const auto matches = find_models(models, chemistry, no_ver, mods);
         if (matches.size() > 0) {
-            spdlog::info("Found {} {} models without model version: {}", matches.size(),
-                         description, to_string(model.ver));
+            DORADO_LOG(info, "Found {} {} models without model version: {}", matches.size(),
+                       description, to_string(model.ver));
             for (const auto& m : matches) {
-                spdlog::info("- {} - model version: {}", m.name, to_string(m.simplex.ver));
+                DORADO_LOG(info, "- {} - model version: {}", m.name, to_string(m.simplex.ver));
             }
         }
     }
@@ -150,7 +150,7 @@ ModelInfo find_model(std::span<const ModelInfo> models,
     const std::vector<ModelInfo> matches = find_models(models, chemistry, model, mods);
 
     if (matches.empty()) {
-        spdlog::error("Failed to get {} model", description);
+        DORADO_LOG(error, "Failed to get {} model", description);
         if (suggestions) {
             suggest_models(models, description, chemistry, model, mods);
         }
@@ -160,8 +160,8 @@ ModelInfo find_model(std::span<const ModelInfo> models,
     // Get the only match or the latest model as models are sorted in ascending version order
     const ModelInfo& selection = matches.back();
     if (matches.size() > 1) {
-        spdlog::trace("Selected {} model: '{}' from {} matches.", description, selection.name,
-                      matches.size());
+        DORADO_LOG(trace, "Selected {} model: '{}' from {} matches.", description, selection.name,
+                   matches.size());
     }
     return selection;
 }
@@ -174,7 +174,7 @@ std::vector<ModelInfo> find_models(std::span<const ModelInfo> models,
         throw std::logic_error("Cannot get models without chemistry");
     }
 
-    spdlog::trace("Searching for: {}", format_msg(chemistry, model, mods));
+    DORADO_LOG(trace, "Searching for: {}", format_msg(chemistry, model, mods));
 
     auto is_match = [&chemistry, &model, &mods](const ModelInfo& info) {
         return model_info_is_similar(info, chemistry, model, mods);
@@ -184,9 +184,9 @@ std::vector<ModelInfo> find_models(std::span<const ModelInfo> models,
     std::copy_if(models.begin(), models.end(), std::back_inserter(matches), is_match);
     sort_versions(matches);
 
-    spdlog::trace("Found {} model matches:", matches.size());
+    DORADO_LOG(trace, "Found {} model matches:", matches.size());
     for (const auto& m : matches) {
-        spdlog::trace("- {}", m.name);
+        DORADO_LOG(trace, "- {}", m.name);
     }
     return matches;
 }
@@ -2076,7 +2076,7 @@ std::optional<ModelInfo> try_get_model_info(const std::string& model_name) {
     try {
         return get_model_info(model_name);
     } catch (const std::exception& e) {
-        spdlog::trace("Failed to get model info for {}: {}", model_name, e.what());
+        DORADO_LOG(trace, "Failed to get model info for {}: {}", model_name, e.what());
     }
     return std::nullopt;
 }

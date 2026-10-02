@@ -111,8 +111,8 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
             auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
             name_mtl_object(buffer, fmt::format("conv_args_{}", i).c_str());
         }
-        spdlog::debug("conv3 output_time_step_count {} => {} kernel launches",
-                      output_time_step_count, num_pieces);
+        DORADO_LOG(debug, "conv3 output_time_step_count {} => {} kernel launches",
+                   output_time_step_count, num_pieces);
     }
 
     auto weight = torch::empty({out_size, in_size, win_size}, torch::kF32);
@@ -239,7 +239,8 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
             auto &buffer = m_args_lstm.emplace_back(create_vec_buffer(m_device, args));
             name_mtl_object(buffer, fmt::format("lstm_args_{}", i).c_str());
         }
-        spdlog::debug("lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size, num_pieces);
+        DORADO_LOG(debug, "lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size,
+                   num_pieces);
     }
 
     // args for final (possibly only) linear layer kernel.

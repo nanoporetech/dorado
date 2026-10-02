@@ -18,9 +18,9 @@
 namespace {
 
 void print_end_summary(int argc, char *argv[], double timestamp) {
-    spdlog::info("\n[M::{}] ELAPSED: {:.1f}s , PeakRSS: {:.1f} GiB", __func__,
-                 kadayashi::get_timestamp() - timestamp, kadayashi::get_peakrss());
-    spdlog::info("[M::{}] kadayashi {}", __func__, KADAYASHI_VERSION);
+    DORADO_LOG(info, "\n[M::{}] ELAPSED: {:.1f}s , PeakRSS: {:.1f} GiB", __func__,
+               kadayashi::get_timestamp() - timestamp, kadayashi::get_peakrss());
+    DORADO_LOG(info, "[M::{}] kadayashi {}", __func__, KADAYASHI_VERSION);
     std::string cmd = "[M::";
     cmd += __func__;
     cmd += "] CMD: ";
@@ -28,7 +28,7 @@ void print_end_summary(int argc, char *argv[], double timestamp) {
         cmd += argv[i];
         cmd += ' ';
     }
-    spdlog::info(cmd);
+    DORADO_LOG(info, cmd);
 }
 
 int main_phase(cliopt_t &clio) {
@@ -59,7 +59,7 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
         const bool itvl_str_parse_ok =
                 kadayashi::split_region_string(itvl_str, ref_name, ref_start, ref_end);
         if (!itvl_str_parse_ok) {
-            spdlog::error("[kdys::{}] interval string parsing failed: {}", __func__, itvl_str);
+            DORADO_LOG(error, "[kdys::{}] interval string parsing failed: {}", __func__, itvl_str);
             return 1;
         }
         dorado::secondary::BamFile hf{fn_bam, 4};
@@ -80,8 +80,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                   mfm_options.min_snp_accuracy)
                         : kadayashi::gen_medaka_feature_matrix(hf_view, ref_name, ref_start,
                                                                ref_end, qname2hp, mfm_options);
-        spdlog::info("[time::{}] feature matrix generation used {:.2f}s\n", __func__,
-                     kadayashi::get_timestamp() - timestamp);
+        DORADO_LOG(info, "[time::{}] feature matrix generation used {:.2f}s\n", __func__,
+                   kadayashi::get_timestamp() - timestamp);
 
         kadayashi::print_medaka_feature_matrix(fn_out, mfm);
     } else {  //  all of the bam file
@@ -105,7 +105,7 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
         }
 
         for (const std::string &chrom : ref_names) {
-            spdlog::debug("[dbg::{}] ---- at {} ----\n", __func__, chrom.c_str());
+            DORADO_LOG(debug, "[dbg::{}] ---- at {} ----\n", __func__, chrom.c_str());
 
             const std::string refseq = kadayashi::hts_utils::fetch_seq(fai, chrom);
 
@@ -146,9 +146,9 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                                         : kadayashi::gen_medaka_feature_matrix(
                                                   hf_view, chrom, ref_start, ref_end, qname2hp,
                                                   mfm_options);
-                        spdlog::debug("[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(),
-                                      "main_featmatgen", ref_start, ref_end,
-                                      mfm.matrix.size() > 0 ? mfm.matrix[0] : -1);
+                        DORADO_LOG(debug, "[dbg::{}] {} {}-{} done; junk {}\n", chrom.c_str(),
+                                   "main_featmatgen", ref_start, ref_end,
+                                   mfm.matrix.size() > 0 ? mfm.matrix[0] : -1);
                     }
                 }
             };
@@ -162,8 +162,8 @@ int main_featmatgen(const std::filesystem::path &fn_ref,
                 th.join();
             }
         }
-        spdlog::info("[M::{}] total time used: {:.2f}s\n", __func__,
-                     kadayashi::get_timestamp() - timestamp);
+        DORADO_LOG(info, "[M::{}] total time used: {:.2f}s\n", __func__,
+                   kadayashi::get_timestamp() - timestamp);
     }
 
     return 0;
@@ -189,8 +189,8 @@ int main(int argc, char *argv[]) {
         ret = main_phase(clio);
 
         if (ret != 0) {
-            spdlog::error("[kdys::{}] phasing failed; not generating bin file from tsv output",
-                          __func__);
+            DORADO_LOG(error, "[kdys::{}] phasing failed; not generating bin file from tsv output",
+                       __func__);
             print_end_summary(argc, argv, timestamp);
             return ret;
         }
@@ -203,10 +203,10 @@ int main(int argc, char *argv[]) {
                     clio.fn_bam, fn_out_binary, clio.one_region_str.c_str(), fn_out_bam,
                     clio.n_threads, BAM_THREAD_MULT);
             if (writebam_err) {
-                spdlog::error("[kdys::{}] failed to write debug haptagged bam, check code!",
-                              __func__);
+                DORADO_LOG(error, "[kdys::{}] failed to write debug haptagged bam, check code!",
+                           __func__);
             } else {
-                spdlog::info("[kdys::{}] wrote debug haptagged bam", __func__);
+                DORADO_LOG(info, "[kdys::{}] wrote debug haptagged bam", __func__);
             }
         }
     } else if (subcommand == "modifytag") {
@@ -226,17 +226,17 @@ int main(int argc, char *argv[]) {
     } else if (subcommand == "phaseglobal") {
         cliopt_phaseglobal_t &clio = clio_pack.clio_phaseglobal;
 
-        spdlog::info("[kdys::{}] start phasing with {} threads...", __func__, clio.n_threads);
+        DORADO_LOG(info, "[kdys::{}] start phasing with {} threads...", __func__, clio.n_threads);
         auto qname2hp = kadayashi::kadayashi_global_phasing_simple_modify_vcf(
                 clio.fn_ref, clio.fn_bam, clio.fn_vcf, clio.output_name, clio.n_threads);
 
         if (!clio.fn_out_bam.empty()) {
-            spdlog::info("[kdys::{}] To write haptagged bam...", __func__);
+            DORADO_LOG(info, "[kdys::{}] To write haptagged bam...", __func__);
             double timestamp = kadayashi::get_timestamp();
             kadayashi::write_haptagged_bam_given_hashtable_and_itvl(
                     clio.fn_bam, ".", clio.fn_out_bam, qname2hp, clio.n_threads);
-            spdlog::info("[kdys::{}] haptagged bam written, used {:.1f}s", __func__,
-                         kadayashi::get_timestamp() - timestamp);
+            DORADO_LOG(info, "[kdys::{}] haptagged bam written, used {:.1f}s", __func__,
+                       kadayashi::get_timestamp() - timestamp);
         }
         ret = 0;
     } else if (subcommand == "varcall") {
@@ -251,16 +251,16 @@ int main(int argc, char *argv[]) {
                 clio.pp.min_strand_cov, clio.pp.min_strand_cov_frac,
                 clio.pp.max_gapcompressed_seqdiv, clio.ambig_ref, clio.pp.disable_region_expansion,
                 clio.bed_flanking);
-        spdlog::info("[kdys::{}] varcall main routine done, used {:.1f}s", __func__,
-                     kadayashi::get_timestamp() - timestamp);
+        DORADO_LOG(info, "[kdys::{}] varcall main routine done, used {:.1f}s", __func__,
+                   kadayashi::get_timestamp() - timestamp);
 
         if (clio.write_dbg_bam) {
             timestamp = kadayashi::get_timestamp();
             std::string fn_out_bam = clio.output_prefix.string() + ".kadayashi.bam";
             kadayashi::write_haptagged_bam_given_hashtable_and_multiple_itvls(
                     clio.fn_bam, clio.varcall_regions, fn_out_bam, qname2hp, clio.n_threads);
-            spdlog::info("[kdys::{}] haptagged bam written, used {:.1f}s", __func__,
-                         kadayashi::get_timestamp() - timestamp);
+            DORADO_LOG(info, "[kdys::{}] haptagged bam written, used {:.1f}s", __func__,
+                       kadayashi::get_timestamp() - timestamp);
         }
         ret = 0;
     } else if (subcommand == "featmatgen") {
@@ -285,7 +285,7 @@ int main(int argc, char *argv[]) {
                               clio.n_threads, clio.is_use_medaka, mfm_options);
     } else {
         // (should not reach here)
-        spdlog::error("[E::{}] unknown subcommand: {}", __func__, subcommand);
+        DORADO_LOG(error, "[E::{}] unknown subcommand: {}", __func__, subcommand);
     }
 
     print_end_summary(argc, argv, timestamp);

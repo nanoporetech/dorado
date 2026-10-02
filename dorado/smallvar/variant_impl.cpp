@@ -44,7 +44,7 @@ constexpr bool DEBUG_VC_SAMPLES = false;
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 namespace dorado::smallvar {
@@ -63,7 +63,7 @@ std::vector<secondary::DeviceInfo> init_devices(const std::string& devices_str) 
     }
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(devices_str, "cuda")) {
-        spdlog::debug("Parsing CUDA device string.");
+        DORADO_LOG(debug, "Parsing CUDA device string.");
         const std::vector<std::string> parsed_devices =
                 dorado::utils::parse_cuda_device_string(devices_str);
         if (std::empty(parsed_devices)) {
@@ -123,21 +123,21 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
                                   const bool legacy_feature_gen) {
     VariantResources resources;
 
-    spdlog::info("Initializing the devices.");
+    DORADO_LOG(info, "Initializing the devices.");
     resources.devices = init_devices(device_str);
     if (std::empty(resources.devices)) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
     }
 
-    spdlog::debug("Initialized devices:");
+    DORADO_LOG(debug, "Initialized devices:");
     for (std::size_t device_id = 0; device_id < std::size(resources.devices); ++device_id) {
         const secondary::DeviceInfo& dev_info = resources.devices[device_id];
-        spdlog::debug("    - [device_id = {}] name = {}, available_memory = {:.2f} GB", device_id,
-                      dev_info.name, dev_info.available_memory_GB);
+        DORADO_LOG(debug, "    - [device_id = {}] name = {}, available_memory = {:.2f} GB",
+                   device_id, dev_info.name, dev_info.available_memory_GB);
     }
 
     // Construct the model.
-    spdlog::debug("[create_resources] Loading the model.");
+    DORADO_LOG(debug, "[create_resources] Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<secondary::ModelTorchBase>> ret;
         std::vector<c10::optional<c10::Stream>> ret_streams;
@@ -154,28 +154,28 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
                 }
 #endif
 
-                spdlog::debug("[create_resources] Creating a model from the config.");
+                DORADO_LOG(debug, "[create_resources] Creating a model from the config.");
                 auto model = secondary::model_factory(model_config);
 
-                spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
-                              device_info.name);
+                DORADO_LOG(debug, "[create_resources] About to load model to device {}: {}",
+                           device_id, device_info.name);
                 model->to_device(device_info.device);
 
                 // Half-precision if needed.
                 if (device_info.device.is_cuda() && !full_precision) {
-                    spdlog::debug("[create_resources] Converting the model to half precision.");
+                    DORADO_LOG(debug, "[create_resources] Converting the model to half precision.");
                     model->to_half();
                 } else {
-                    spdlog::debug("[create_resources] Using full precision.");
+                    DORADO_LOG(debug, "[create_resources] Using full precision.");
                 }
 
-                spdlog::debug("[create_resources] Switching model to eval mode.");
+                DORADO_LOG(debug, "[create_resources] Switching model to eval mode.");
                 model->set_eval();
 
                 ret.emplace_back(std::move(model));
                 ret_streams.emplace_back(std::move(stream));
 
-                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
+                DORADO_LOG(info, "Loaded model to device {}: {}", device_id, device_info.name);
             }
 
             const int32_t last_model = static_cast<int32_t>(std::size(ret)) - 1;
@@ -189,7 +189,7 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
                 }
 #endif
                 ret_streams.emplace_back(std::move(stream));
-                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
+                DORADO_LOG(info, "Loaded model to device {}: {}", device_id, device_info.name);
             }
         }
 
@@ -200,7 +200,7 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
     // Open the BAM file for each thread.
     const int32_t max_num_encoders =
             std::max(num_bam_threads, static_cast<int32_t>(std::size(resources.models)));
-    spdlog::info("Creating {} encoders.", max_num_encoders);
+    DORADO_LOG(info, "Creating {} encoders.", max_num_encoders);
     for (int32_t i = 0; i < max_num_encoders; ++i) {
         resources.encoders.emplace_back(encoder_factory(
                 model_config, in_ref_fn, in_aln_bam_fn, read_group, tag_name, tag_value, true,
@@ -208,7 +208,7 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
                 phasing_bin_fn, kadayashi_opt, legacy_feature_gen));
     }
 
-    spdlog::info("Creating the decoder.");
+    DORADO_LOG(info, "Creating the decoder.");
     resources.decoder = decoder_factory(model_config);
 
     return resources;
@@ -260,10 +260,10 @@ BamWindowResult process_single_bam_window(
 
     const std::string& ref_name = draft_lens[bam_window.seq_id].first;
 
-    spdlog::trace(
-            "[process_single_bam_window tid = {}] Starting to generate the sample for region: "
-            "{}:{}-{}",
-            tid, ref_name, (bam_window.start + 1), bam_window.end);
+    DORADO_LOG(trace,
+               "[process_single_bam_window tid = {}] Starting to generate the sample for region: "
+               "{}:{}-{}",
+               tid, ref_name, (bam_window.start + 1), bam_window.end);
 
     kadayashi::varcall_result_t kadayashi_result =
             encoder.produce_haplotags(ref_name, bam_window.start, bam_window.end);
@@ -306,12 +306,13 @@ BamWindowResult process_single_bam_window(
         }
     }
 
-    spdlog::trace(
-            "[process_single_bam_window tid = {}] Done haplotagging and calling simple variants "
-            "for region: {}:{}-{}",
-            tid, ref_name, (bam_window.start + 1), bam_window.end);
+    DORADO_LOG(trace,
+               "[process_single_bam_window tid = {}] Done haplotagging and calling simple variants "
+               "for region: {}:{}-{}",
+               tid, ref_name, (bam_window.start + 1), bam_window.end);
 
-    spdlog::trace(
+    DORADO_LOG(
+            trace,
             "[process_single_bam_window tid = {}] About to generate the feature matrix for region: "
             "{}:{}-{}",
             tid, ref_name, (bam_window.start + 1), bam_window.end);
@@ -319,7 +320,8 @@ BamWindowResult process_single_bam_window(
     secondary::Sample sample = encoder.encode_region(ref_name, bam_window.start, bam_window.end,
                                                      bam_window.seq_id, kadayashi_result.qname2hp);
 
-    spdlog::debug(
+    DORADO_LOG(
+            debug,
             "[process_single_bam_window tid = {}] Generated sample for region: {}:{}-{}, sample: "
             "[{}]",
             tid, ref_name, (bam_window.start + 1), bam_window.end,
@@ -349,18 +351,18 @@ BamWindowResult process_single_bam_window(
                MIN_SAMPLE_POSITIONS_FOR_VARIANT_INFERENCE;
     });
 
-    spdlog::trace(
-            "[process_single_bam_window tid = {}] After splitting on min-depth/discontinuities: "
-            "{}:{}-{}, "
-            "local_samples.size = {}",
-            tid, ref_name, (bam_window.start + 1), bam_window.end, std::size(local_samples));
+    DORADO_LOG(trace,
+               "[process_single_bam_window tid = {}] After splitting on min-depth/discontinuities: "
+               "{}:{}-{}, "
+               "local_samples.size = {}",
+               tid, ref_name, (bam_window.start + 1), bam_window.end, std::size(local_samples));
 
     // Candidate variants, if needed.
     secondary::IntervalTreesInt64Map candidate_trees;
     if (candidate_trees_from_file &&
         (candidate_source == secondary::VariantCandidateSource::FILE)) {
         // // There are no simple variants to merge in this case, merging should be handled outside.
-        spdlog::debug("Using candidate sites from an input file.");
+        DORADO_LOG(debug, "Using candidate sites from an input file.");
 
         const auto it = candidate_trees_from_file->find(bam_window.seq_id);
         if (it == std::cend(*candidate_trees_from_file)) {
@@ -400,10 +402,10 @@ BamWindowResult process_single_bam_window(
         }
     }
 
-    spdlog::trace(
-            "[process_single_bam_window tid = {}] After final sample extraction: {}:{}-{}, "
-            "local_samples.size = {}",
-            tid, ref_name, (bam_window.start + 1), bam_window.end, std::size(local_samples));
+    DORADO_LOG(trace,
+               "[process_single_bam_window tid = {}] After final sample extraction: {}:{}-{}, "
+               "local_samples.size = {}",
+               tid, ref_name, (bam_window.start + 1), bam_window.end, std::size(local_samples));
 
     return {std::move(local_samples), std::move(pass_variants),
             std::move(kadayashi_result.read_endpoints)};
@@ -449,9 +451,9 @@ void worker_sample_producer(
         while (!worker_terminate) {
             utils::ScopedProfileRange spr3("sample_producer-worker-while", 4);
 
-            spdlog::trace(
-                    "[sample_producer::worker {}] Waiting to pop a BAM region. Queue size: {}", tid,
-                    std::size(input_queue));
+            DORADO_LOG(trace,
+                       "[sample_producer::worker {}] Waiting to pop a BAM region. Queue size: {}",
+                       tid, std::size(input_queue));
 
             secondary::Window bam_window;
             const auto pop_status = input_queue.try_pop(bam_window);
@@ -462,7 +464,8 @@ void worker_sample_producer(
 
             std::ostringstream oss;
             oss << bam_window;
-            spdlog::trace("[sample_producer::worker {}] Popped BAM window: [{}]", tid, oss.str());
+            DORADO_LOG(trace, "[sample_producer::worker {}] Popped BAM window: [{}]", tid,
+                       oss.str());
 
             bool reduce_data_updated = false;
             try {
@@ -495,14 +498,14 @@ void worker_sample_producer(
                     }
                     rd.num_samples += num_outgoing_samples;
 
-                    spdlog::trace(
-                            "[sample_producer::worker {}] bam_window = [{}], rd.ready = {}, "
-                            "rd.num_bam_regions = {}, "
-                            "rd.remaining_bam_regions = "
-                            "{}, rd.num_samples = {}, bam_regions[bam_window.seq_id].size = {}",
-                            tid, secondary::window_to_string(bam_window), rd.ready,
-                            rd.num_bam_regions, rd.remaining_bam_regions, rd.num_samples,
-                            std::size(bam_regions[bam_window.seq_id]));
+                    DORADO_LOG(trace,
+                               "[sample_producer::worker {}] bam_window = [{}], rd.ready = {}, "
+                               "rd.num_bam_regions = {}, "
+                               "rd.remaining_bam_regions = "
+                               "{}, rd.num_samples = {}, bam_regions[bam_window.seq_id].size = {}",
+                               tid, secondary::window_to_string(bam_window), rd.ready,
+                               rd.num_bam_regions, rd.remaining_bam_regions, rd.num_samples,
+                               std::size(bam_regions[bam_window.seq_id]));
 
                     if (rd.remaining_bam_regions == 0) {
                         rd.ready = true;
@@ -555,10 +558,10 @@ void worker_sample_producer(
                     }
                 }
 
-                spdlog::warn(
-                        "Caught exception while producing samples. Skipping this BAM window. "
-                        "Exception: {}",
-                        e.what());
+                DORADO_LOG(warn,
+                           "Caught exception while producing samples. Skipping this BAM window. "
+                           "Exception: {}",
+                           e.what());
             }
         }
     };
@@ -598,7 +601,7 @@ void worker_sample_producer(
             signal_worker_terminate(worker_terminate);
             return;
         } else {
-            spdlog::warn(rv.message);
+            DORADO_LOG(warn, rv.message);
         }
     }
 }
@@ -672,19 +675,19 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
                 auto& sample = item.samples[i];
 
                 if (!sample_has_inference_features(sample)) {
-                    spdlog::trace(
-                            "[batch_producer] Skipping sample without inferable feature rows. "
-                            "Sample: [{}].",
-                            secondary::sample_to_string(sample));
+                    DORADO_LOG(trace,
+                               "[batch_producer] Skipping sample without inferable feature rows. "
+                               "Sample: [{}].",
+                               secondary::sample_to_string(sample));
                     continue;
                 }
 
                 // Odd samples will be processed alone.
                 if (std::ssize(sample.positions_major) != window_len) {
-                    spdlog::trace(
-                            "[batch_producer] Pushing a remainder batch of data to infer_data "
-                            "queue. Sample: [{}].",
-                            secondary::sample_to_string(sample));
+                    DORADO_LOG(trace,
+                               "[batch_producer] Pushing a remainder batch of data to infer_data "
+                               "queue. Sample: [{}].",
+                               secondary::sample_to_string(sample));
                     InferenceData remainder_buffer;
                     remainder_buffer.samples.emplace_back(std::move(sample));
                     output_queue.try_push(std::move(remainder_buffer));
@@ -710,23 +713,23 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
 
                     if (!std::empty(buffer.samples) &&
                         (estimated_memory_next >= max_available_mem)) {
-                        spdlog::trace(
-                                "[batch_producer] Estimating batch memory for auto batch size:");
-                        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
-                        spdlog::trace("    - estimated_memory_next = {} GB", estimated_memory_next);
-                        spdlog::trace(
-                                "    - next_batch_shape = {}",
-                                utils::print_container_as_string(next_batch_shape, ",", true));
-                        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
-                        spdlog::trace(
-                                "    - curr_batch_shape = {}",
-                                utils::print_container_as_string(curr_batch_shape, ",", true));
+                        DORADO_LOG(trace,
+                                   "[batch_producer] Estimating batch memory for auto batch size:");
+                        DORADO_LOG(trace, "    - max_available_mem = {} GB", max_available_mem);
+                        DORADO_LOG(trace, "    - estimated_memory_next = {} GB",
+                                   estimated_memory_next);
+                        DORADO_LOG(trace, "    - next_batch_shape = {}",
+                                   utils::print_container_as_string(next_batch_shape, ",", true));
+                        DORADO_LOG(trace, "    - estimated_memory_curr = {} GB",
+                                   estimated_memory_curr);
+                        DORADO_LOG(trace, "    - curr_batch_shape = {}",
+                                   utils::print_container_as_string(curr_batch_shape, ",", true));
 
-                        spdlog::trace(
-                                "[batch_producer] Pushing a batch of data to infer_data queue "
-                                "(1a). "
-                                "buffer.samples.size() = {}",
-                                std::size(buffer.samples));
+                        DORADO_LOG(trace,
+                                   "[batch_producer] Pushing a batch of data to infer_data queue "
+                                   "(1a). "
+                                   "buffer.samples.size() = {}",
+                                   std::size(buffer.samples));
 
                         move_buffer_data_to_queue(buffer, output_queue, false);
                     }
@@ -734,20 +737,20 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
                 } else {
                     if (std::ssize(buffer.samples) >= batch_size) {
                         // Fixed batch size.
-                        spdlog::trace(
-                                "[batch_producer] Estimating batch memory for fixed batch "
-                                "size:");
-                        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
-                        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
-                        spdlog::trace(
-                                "    - curr_batch_shape = {}",
-                                utils::print_container_as_string(curr_batch_shape, ",", true));
+                        DORADO_LOG(trace,
+                                   "[batch_producer] Estimating batch memory for fixed batch "
+                                   "size:");
+                        DORADO_LOG(trace, "    - max_available_mem = {} GB", max_available_mem);
+                        DORADO_LOG(trace, "    - estimated_memory_curr = {} GB",
+                                   estimated_memory_curr);
+                        DORADO_LOG(trace, "    - curr_batch_shape = {}",
+                                   utils::print_container_as_string(curr_batch_shape, ",", true));
 
-                        spdlog::trace(
-                                "[batch_producer] Pushing a batch of data to infer_data queue "
-                                "(1b). "
-                                "buffer.samples.size() = {}",
-                                std::size(buffer.samples));
+                        DORADO_LOG(trace,
+                                   "[batch_producer] Pushing a batch of data to infer_data queue "
+                                   "(1b). "
+                                   "buffer.samples.size() = {}",
+                                   std::size(buffer.samples));
 
                         move_buffer_data_to_queue(buffer, output_queue, true);
                     }
@@ -764,7 +767,7 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
                 signal_worker_terminate(worker_terminate);
                 return;
             }
-            spdlog::warn("Caught exception in the batch producer. Skipping the current item.");
+            DORADO_LOG(warn, "Caught exception in the batch producer. Skipping the current item.");
             continue;
         }
     }
@@ -775,16 +778,16 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
         const double estimated_memory_curr =
                 std::empty(curr_batch_shape) ? 0.0 : model.estimate_batch_memory(curr_batch_shape);
 
-        spdlog::trace("[batch_producer] Estimating batch memory for the final batch:");
-        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
-        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
-        spdlog::trace("    - curr_batch_shape = {}",
-                      utils::print_container_as_string(curr_batch_shape, ",", true));
+        DORADO_LOG(trace, "[batch_producer] Estimating batch memory for the final batch:");
+        DORADO_LOG(trace, "    - max_available_mem = {} GB", max_available_mem);
+        DORADO_LOG(trace, "    - estimated_memory_curr = {} GB", estimated_memory_curr);
+        DORADO_LOG(trace, "    - curr_batch_shape = {}",
+                   utils::print_container_as_string(curr_batch_shape, ",", true));
 
-        spdlog::trace(
-                "[batch_producer] Pushing a batch of data to infer_data queue (2). "
-                "buffer.samples.size() = {} (final)",
-                std::size(buffer.samples));
+        DORADO_LOG(trace,
+                   "[batch_producer] Pushing a batch of data to infer_data queue (2). "
+                   "buffer.samples.size() = {} (final)",
+                   std::size(buffer.samples));
 
         // First, push the N*8 elements to the queue for efficiency.
         move_buffer_data_to_queue(buffer, output_queue, false);
@@ -792,7 +795,7 @@ void worker_batch_producer(utils::AsyncQueue<InferenceData>& input_queue,
         // Next, push the remainder if the buffer is not empty.
         move_buffer_data_to_queue(buffer, output_queue, true);
 
-        spdlog::debug("[batch_producer] Pushed final batch for inference to infer_data queue.");
+        DORADO_LOG(debug, "[batch_producer] Pushed final batch for inference to infer_data queue.");
     }
 
     if (!worker_terminate.load(std::memory_order_acquire)) {
@@ -855,7 +858,7 @@ void worker_infer_samples_in_parallel(
             batched_data.features =
                     encoders[tid]->collate(std::move(batch_features), use_pinned_memory);
 
-            spdlog::trace("In batching, model requires ref: {}", model.requires_ref());
+            DORADO_LOG(trace, "In batching, model requires ref: {}", model.requires_ref());
             if (model.requires_ref()) {
                 if (!batch.samples[0].draft_seq) {
                     throw std::runtime_error{
@@ -870,7 +873,8 @@ void worker_infer_samples_in_parallel(
                                                 ->collate(std::move(refseqs), use_pinned_memory)
                                                 .view({std::ssize(batch.samples), -1})};
             }
-            spdlog::trace("Post-batching, batch has refs: {}", batched_data.refseqs ? true : false);
+            DORADO_LOG(trace, "Post-batching, batch has refs: {}",
+                       batched_data.refseqs ? true : false);
 
             // Decoding does not need draft_seq. Release the source tensor once their
             // collated representations own the inference input data.
@@ -887,7 +891,7 @@ void worker_infer_samples_in_parallel(
             const bool non_blocking = (model.get_device().type() == torch::kCUDA);
             batched_data = model.prepare_batch_input(std::move(batched_data), non_blocking);
             time_move_to_device = timer_move_to_device.GetElapsedMilliseconds();
-            spdlog::trace("Post-move, batch has refs: {}", batched_data.refseqs ? true : false);
+            DORADO_LOG(trace, "Post-move, batch has refs: {}", batched_data.refseqs ? true : false);
         }
 
         const std::string input_batch_tensor_shape_str =
@@ -898,7 +902,8 @@ void worker_infer_samples_in_parallel(
             const std::vector<int64_t> input_batch_tensor_shape =
                     batched_data.features.sizes().vec();
             const double estimated_memory = model.estimate_batch_memory(input_batch_tensor_shape);
-            spdlog::debug(
+            DORADO_LOG(
+                    debug,
                     "[consumer {}] Running inference: batch tensor shape = [{}], estimated memory "
                     "= {:.2f} GB",
                     tid, input_batch_tensor_shape_str, estimated_memory);
@@ -936,7 +941,7 @@ void worker_infer_samples_in_parallel(
             try {
                 output_on_device = model.predict_on_device_batch(batched_data);
             } catch (const std::exception& e) {
-                spdlog::error("Exception caught: {}", e.what());
+                DORADO_LOG(error, "Exception caught: {}", e.what());
                 throw;
             }
 
@@ -978,12 +983,12 @@ void worker_infer_samples_in_parallel(
         {
             const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-            spdlog::trace(
-                    "[consumer {}] Computed batch inference. Timings - collate: {} ms, "
-                    "move_to_device: {} ms, forward: {} ms, move_to_host: {} ms, "
-                    "total = {}, batched_data.features.shape = [{}]",
-                    tid, time_collate, time_move_to_device, time_forward, time_move_to_host,
-                    time_total, input_batch_tensor_shape_str);
+            DORADO_LOG(trace,
+                       "[consumer {}] Computed batch inference. Timings - collate: {} ms, "
+                       "move_to_device: {} ms, forward: {} ms, move_to_host: {} ms, "
+                       "total = {}, batched_data.features.shape = [{}]",
+                       tid, time_collate, time_move_to_device, time_forward, time_move_to_host,
+                       time_total, input_batch_tensor_shape_str);
         }
 
         return output;
@@ -1003,14 +1008,14 @@ void worker_infer_samples_in_parallel(
         while (!worker_terminate) {
             utils::ScopedProfileRange spr3("infer_samples_in_parallel-worker-while", 4);
 
-            spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
-                          std::size(batch_queue));
+            DORADO_LOG(trace, "[consumer {}] Waiting to pop data for inference. Queue size: {}",
+                       tid, std::size(batch_queue));
 
             InferenceData item;
             const auto pop_status = batch_queue.try_pop(item);
 
-            spdlog::trace("[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
-                          tid, std::size(item.samples), batch_queue.size());
+            DORADO_LOG(trace, "[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
+                       tid, std::size(item.samples), batch_queue.size());
 
             if (pop_status == utils::AsyncQueueStatus::Terminate) {
                 break;
@@ -1030,16 +1035,17 @@ void worker_infer_samples_in_parallel(
                 out_item.samples = std::move(item.samples);
                 out_item.logits = std::move(logits);
 
-                spdlog::trace(
-                        "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
-                        "out_item.samples.size() = {}, decode queue size: {}",
-                        tid, utils::tensor_shape_as_string(out_item.logits),
-                        std::size(out_item.samples), std::size(decode_queue));
+                DORADO_LOG(trace,
+                           "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
+                           "out_item.samples.size() = {}, decode queue size: {}",
+                           tid, utils::tensor_shape_as_string(out_item.logits),
+                           std::size(out_item.samples), std::size(decode_queue));
                 decode_queue.try_push(std::move(out_item));
 
             } catch (const std::exception& e) {
                 if (continue_on_exception) {
-                    spdlog::warn(
+                    DORADO_LOG(
+                            warn,
                             "Caught exception while inferring a batch of samples: '{}'. Skipping "
                             "this batch.",
                             e.what());
@@ -1055,7 +1061,8 @@ void worker_infer_samples_in_parallel(
     };
 
     if (std::size(models) > std::size(encoders)) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "There are more models than there are encoders! Num models: {}, num_encoders: {}. "
                 "Using fewer models.",
                 std::size(models), std::size(encoders));
@@ -1093,11 +1100,11 @@ void worker_infer_samples_in_parallel(
             signal_worker_terminate(worker_terminate);
             return;
         } else {
-            spdlog::warn("(infer-samples) {}", rv.message);
+            DORADO_LOG(warn, "(infer-samples) {}", rv.message);
         }
     }
 
-    spdlog::debug("[infer_samples_in_parallel] Finished running inference.");
+    DORADO_LOG(debug, "[infer_samples_in_parallel] Finished running inference.");
 }
 
 void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
@@ -1127,11 +1134,11 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                 const int64_t tensor_batch_size =
                         (item.logits.sizes().size() == 0) ? 0 : item.logits.size(0);
 
-                spdlog::trace(
-                        "[separate_decode_data {}] Popped data: item.logits.shape = {}, "
-                        "tensor_batch_size = {}, queue size: {}",
-                        tid, utils::tensor_shape_as_string(item.logits), tensor_batch_size,
-                        std::size(input_queue));
+                DORADO_LOG(trace,
+                           "[separate_decode_data {}] Popped data: item.logits.shape = {}, "
+                           "tensor_batch_size = {}, queue size: {}",
+                           tid, utils::tensor_shape_as_string(item.logits), tensor_batch_size,
+                           std::size(input_queue));
 
                 // This should handle the timeout case too.
                 if (tensor_batch_size == 0) {
@@ -1152,8 +1159,9 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                 }
 
                 // Create the variant calling data.
-                spdlog::trace("[separate_decode_data {}] About to push {} items to vc_data_queue.",
-                              tid, std::ssize(item.samples));
+                DORADO_LOG(trace,
+                           "[separate_decode_data {}] About to push {} items to vc_data_queue.",
+                           tid, std::ssize(item.samples));
                 for (int64_t i = 0; i < std::ssize(item.samples); ++i) {
                     out_queue.try_push(secondary::VariantCallingSample{
                             .seq_id = item.samples[i].seq_id,
@@ -1167,8 +1175,8 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                                     secondary::FeatureColumns::BASE, feature_column_map),
                     });
                 }
-                spdlog::trace("[separate_decode_data {}] Pushed {} items to vc_data_queue.", tid,
-                              std::ssize(item.samples));
+                DORADO_LOG(trace, "[separate_decode_data {}] Pushed {} items to vc_data_queue.",
+                           tid, std::ssize(item.samples));
 
             } catch (const std::exception& e) {
                 if (!continue_on_exception) {
@@ -1180,10 +1188,10 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
                     return;
                 }
 
-                spdlog::warn(
-                        "Caught an exception while separating samples. Skipping this "
-                        "batch. Exception: {}",
-                        e.what());
+                DORADO_LOG(warn,
+                           "Caught an exception while separating samples. Skipping this "
+                           "batch. Exception: {}",
+                           e.what());
             }
         }
     };
@@ -1218,11 +1226,11 @@ void worker_separate_decode_data(utils::AsyncQueue<DecodeData>& input_queue,
             signal_worker_terminate(worker_terminate);
             return;
         } else {
-            spdlog::warn(rv.message);
+            DORADO_LOG(warn, rv.message);
         }
     }
 
-    spdlog::debug("[separate_decode_data] Finished separating the decoded variant output.");
+    DORADO_LOG(debug, "[separate_decode_data] Finished separating the decoded variant output.");
 }
 
 namespace {
@@ -1470,11 +1478,11 @@ call_variants_single_chrom(const std::string& draft,
 
     // Debug print.
     if constexpr (DEBUG_VC_SAMPLES == true) {
-        spdlog::trace("[call_variants_single_chrom seq_id = {}] vc_input_data: size = {}", seq_id,
-                      std::size(vc_input_data));
+        DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] vc_input_data: size = {}",
+                   seq_id, std::size(vc_input_data));
         for (int64_t i = 0; i < std::ssize(vc_input_data); ++i) {
-            spdlog::trace("[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
-                          secondary::to_string(vc_input_data[i], false));
+            DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
+                       secondary::to_string(vc_input_data[i], false));
         }
     }
 
@@ -1484,11 +1492,11 @@ call_variants_single_chrom(const std::string& draft,
 
     // Debug print.
     if constexpr (DEBUG_VC_SAMPLES == true) {
-        spdlog::trace("[call_variants_single_chrom seq_id = {}] trimmed_vc_samples: size = {}",
-                      seq_id, std::size(trimmed_vc_samples));
+        DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] trimmed_vc_samples: size = {}",
+                   seq_id, std::size(trimmed_vc_samples));
         for (int64_t i = 0; i < std::ssize(trimmed_vc_samples); ++i) {
-            spdlog::trace("[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
-                          secondary::to_string(trimmed_vc_samples[i], false));
+            DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
+                       secondary::to_string(trimmed_vc_samples[i], false));
         }
     }
 
@@ -1501,11 +1509,11 @@ call_variants_single_chrom(const std::string& draft,
 
     // Debug print.
     if constexpr (DEBUG_VC_SAMPLES == true) {
-        spdlog::trace("[call_variants_single_chrom seq_id = {}] callable_vc_samples: size = {}",
-                      seq_id, std::size(callable_vc_samples));
+        DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] callable_vc_samples: size = {}",
+                   seq_id, std::size(callable_vc_samples));
         for (int64_t i = 0; i < std::ssize(callable_vc_samples); ++i) {
-            spdlog::trace("[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
-                          secondary::to_string(callable_vc_samples[i], false));
+            DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
+                       secondary::to_string(callable_vc_samples[i], false));
         }
     }
 
@@ -1729,10 +1737,10 @@ std::vector<secondary::Variant> filter_hemizygous_variants(
             // variant overlaps the region end
             if ((var_start < iter_regions->start) ||
                 ((var_end > iter_regions->end) && (iter_regions->end > 0))) {
-                spdlog::debug(
-                        "[filter_hemizygous_variants] Variant {} {} overlaps hemizygous region "
-                        "end, leaving it unchanged.",
-                        iter_regions->name, var.pos);
+                DORADO_LOG(debug,
+                           "[filter_hemizygous_variants] Variant {} {} overlaps hemizygous region "
+                           "end, leaving it unchanged.",
+                           iter_regions->name, var.pos);
             } else {
                 new_var = secondary::collapse_to_haploid(var, true);
             }
@@ -1791,7 +1799,8 @@ void worker_variant_calling_reduce(
         }
 
         if (allow_incomplete && !all_expected_samples_received) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "[variant_calling_reduce tid = {}] Finalizing sequence '{}' with partial "
                     "variant-calling input under continue-on-error. received = {}, expected = {}",
                     tid, reduce_data.seq_name, std::size(chrom_vc_samples[seq_id]),
@@ -1821,11 +1830,11 @@ void worker_variant_calling_reduce(
                     merge_with_simple ? flank_trim : 0, pass_min_qual, ambig_ref, gvcf);
         }
 
-        spdlog::debug(
-                "[variant_calling_reduce tid = {}] Finished calling variants "
-                "for sequence: {}, variants: {}, "
-                "reduce_data.ready = {}, reduce_data.num_samples = {}",
-                tid, seq_name, std::size(variants), reduce_data.ready, reduce_data.num_samples);
+        DORADO_LOG(debug,
+                   "[variant_calling_reduce tid = {}] Finished calling variants "
+                   "for sequence: {}, variants: {}, "
+                   "reduce_data.ready = {}, reduce_data.num_samples = {}",
+                   tid, seq_name, std::size(variants), reduce_data.ready, reduce_data.num_samples);
 
         // Store inference variants.
         reduce_data.variants_inference = std::move(variants);
@@ -1927,7 +1936,8 @@ void worker_variant_calling_reduce(
                     return;
                 }
 
-                spdlog::warn(
+                DORADO_LOG(
+                        warn,
                         "Caught an exception while reducing the variant calling results. Skipping "
                         "this "
                         "batch. Exception: {}",
@@ -1974,10 +1984,10 @@ void worker_variant_calling_reduce(
                 return;
             }
 
-            spdlog::warn(
-                    "Caught an exception while finalizing the variant calling results. Skipping "
-                    "this chromosome. Exception: {}",
-                    e.what());
+            DORADO_LOG(warn,
+                       "Caught an exception while finalizing the variant calling results. Skipping "
+                       "this chromosome. Exception: {}",
+                       e.what());
         }
     }
 
@@ -1996,11 +2006,11 @@ void worker_variant_calling_reduce(
             signal_worker_terminate(worker_terminate);
             return;
         } else {
-            spdlog::warn(rv.message);
+            DORADO_LOG(warn, rv.message);
         }
     }
 
-    spdlog::debug("[variant_calling_reduce] Finished reducing the decoded variant output.");
+    DORADO_LOG(debug, "[variant_calling_reduce] Finished reducing the decoded variant output.");
 }
 
 void worker_variant_writer(
@@ -2045,10 +2055,10 @@ void worker_variant_writer(
                 // Non-const so we can free the results for this chromosome.
                 auto& results = chrom_reduce_data[seq_id];
 
-                spdlog::debug(
-                        "[variant_writer tid = {}] Writing variants for sequence: {}, seq_id = "
-                        "{}",
-                        tid, results.seq_name, seq_id);
+                DORADO_LOG(debug,
+                           "[variant_writer tid = {}] Writing variants for sequence: {}, seq_id = "
+                           "{}",
+                           tid, results.seq_name, seq_id);
 
                 // Write the results and free the data.
                 {
@@ -2100,10 +2110,10 @@ void worker_variant_writer(
                     return;
                 }
 
-                spdlog::warn(
-                        "Caught an exception while writing variants. Skipping this "
-                        "item. Exception: {}",
-                        e.what());
+                DORADO_LOG(warn,
+                           "Caught an exception while writing variants. Skipping this "
+                           "item. Exception: {}",
+                           e.what());
             }
         }
     };
@@ -2136,11 +2146,11 @@ void worker_variant_writer(
             signal_worker_terminate(worker_terminate);
             return;
         } else {
-            spdlog::warn(rv.message);
+            DORADO_LOG(warn, rv.message);
         }
     }
 
-    spdlog::debug("[variant_writer] Finished writing the variant output.");
+    DORADO_LOG(debug, "[variant_writer] Finished writing the variant output.");
 }
 
 }  // namespace dorado::smallvar

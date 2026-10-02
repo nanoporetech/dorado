@@ -41,19 +41,20 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
         const auto file_path = entry.path().string();
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            DORADO_LOG(error, "Failed to open file {}: {}", file_path, pod5_get_error_string());
             continue;
         }
         auto cleanup_file = utils::PostCondition([&file] {
             if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader: {}", pod5_get_error_string());
+                DORADO_LOG(error, "Failed to close and free POD5 reader: {}",
+                           pod5_get_error_string());
             }
         });
 
         // First get the run info count
         run_info_index_t run_info_count = 0;
         if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
-            spdlog::error("Failed to query run info count: {}", pod5_get_error_string());
+            DORADO_LOG(error, "Failed to query run info count: {}", pod5_get_error_string());
             continue;
         }
 
@@ -64,7 +65,7 @@ std::unordered_map<std::string, ReadGroup> load_read_groups(
             }
             auto cleanup_run_info = utils::PostCondition([&run_info_data] {
                 if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                    spdlog::error("Failed to free run info: {}", pod5_get_error_string());
+                    DORADO_LOG(error, "Failed to free run info: {}", pod5_get_error_string());
                 }
             });
 
@@ -133,19 +134,20 @@ size_t get_num_reads(const std::vector<std::filesystem::directory_entry>& dir_fi
         const auto file_path = entry.path().string();
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            DORADO_LOG(error, "Failed to open file {}: {}", file_path, pod5_get_error_string());
             continue;
         }
         auto cleanup_file = utils::PostCondition([&file] {
             if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader: {}", pod5_get_error_string());
+                DORADO_LOG(error, "Failed to close and free POD5 reader: {}",
+                           pod5_get_error_string());
             }
         });
 
         size_t read_count = 0;
         if (pod5_get_read_count(file, &read_count) != POD5_OK) {
-            spdlog::error("Failed to query read count of {}: {}", file_path,
-                          pod5_get_error_string());
+            DORADO_LOG(error, "Failed to query read count of {}: {}", file_path,
+                       pod5_get_error_string());
             continue;
         }
 
@@ -192,36 +194,37 @@ uint16_t get_sample_rate(const std::vector<std::filesystem::directory_entry>& di
         auto file_path = entry.path().string();
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            DORADO_LOG(error, "Failed to open file {}: {}", file_path, pod5_get_error_string());
             continue;
         }
         auto cleanup_file = utils::PostCondition([&file, &file_path]() {
             if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader for file {}: {}", file_path,
-                              pod5_get_error_string());
+                DORADO_LOG(error, "Failed to close and free POD5 reader for file {}: {}", file_path,
+                           pod5_get_error_string());
             }
         });
 
         // First get the run info count
         run_info_index_t run_info_count = 0;
         if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
-            spdlog::error("Failed to fetch POD5 run info count for file {} : {}", file_path,
-                          pod5_get_error_string());
+            DORADO_LOG(error, "Failed to fetch POD5 run info count for file {} : {}", file_path,
+                       pod5_get_error_string());
             continue;
         }
         if (run_info_count > static_cast<run_info_index_t>(0)) {
             RunInfoDictData_t* run_info_data = nullptr;
             if (pod5_get_file_run_info(file, 0, &run_info_data) != POD5_OK) {
-                spdlog::error(
+                DORADO_LOG(
+                        error,
                         "Failed to fetch POD5 run info dict for file {} and run info index 0: {}",
                         file_path, pod5_get_error_string());
                 continue;
             }
             auto cleanup_run_info = utils::PostCondition([&run_info_data, &file_path] {
                 if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                    spdlog::error(
-                            "Failed to free POD5 run info for file {} and run info index 0: {}",
-                            file_path, pod5_get_error_string());
+                    DORADO_LOG(error,
+                               "Failed to free POD5 run info for file {} and run info index 0: {}",
+                               file_path, pod5_get_error_string());
                 }
             });
 
@@ -251,43 +254,44 @@ static std::set<models::ChemistryKey> get_sequencing_chemistries(
         // Open the file
         Pod5FileReader_t* file = pod5_open_file(file_path.c_str());
         if (!file) {
-            spdlog::error("Failed to open file {}: {}", file_path, pod5_get_error_string());
+            DORADO_LOG(error, "Failed to open file {}: {}", file_path, pod5_get_error_string());
             continue;
         }
         auto cleanup_file = utils::PostCondition([&file, &file_path] {
             if (pod5_close_and_free_reader(file) != POD5_OK) {
-                spdlog::error("Failed to close and free POD5 reader for file {}: {}", file_path,
-                              pod5_get_error_string());
+                DORADO_LOG(error, "Failed to close and free POD5 reader for file {}: {}", file_path,
+                           pod5_get_error_string());
             }
         });
 
         // First get the run info count
         run_info_index_t run_info_count = 0;
         if (pod5_get_file_run_info_count(file, &run_info_count) != POD5_OK) {
-            spdlog::error("Failed to fetch POD5 run info count for file {} : {}", file_path,
-                          pod5_get_error_string());
+            DORADO_LOG(error, "Failed to fetch POD5 run info count for file {} : {}", file_path,
+                       pod5_get_error_string());
             continue;
         }
 
         for (run_info_index_t ri_idx = 0; ri_idx < run_info_count; ri_idx++) {
             RunInfoDictData_t* run_info_data = nullptr;
             if (pod5_get_file_run_info(file, ri_idx, &run_info_data) != POD5_OK) {
-                spdlog::error(
+                DORADO_LOG(
+                        error,
                         "Failed to fetch POD5 run info dict for file {} and run info index {}: {}",
                         file_path, ri_idx, pod5_get_error_string());
                 continue;
             }
             auto cleanup_run_info = utils::PostCondition([&run_info_data, &file_path] {
                 if (pod5_free_run_info(run_info_data) != POD5_OK) {
-                    spdlog::error("Failed to free POD5 run info for file {}: {}", file_path,
-                                  pod5_get_error_string());
+                    DORADO_LOG(error, "Failed to free POD5 run info for file {}: {}", file_path,
+                               pod5_get_error_string());
                 }
             });
 
             const auto chemistry_key = models::get_chemistry_key(
                     run_info_data->flow_cell_product_code, run_info_data->sequencing_kit,
                     run_info_data->sample_rate);
-            spdlog::trace("POD5: {} {}", file_path, to_string(chemistry_key));
+            DORADO_LOG(trace, "POD5: {} {}", file_path, to_string(chemistry_key));
             chemistries.insert(chemistry_key);
         }
     }
@@ -309,10 +313,10 @@ models::Chemistry get_unique_sequencing_chemistry(
     for (const auto& dc : data_chemistries) {
         const auto chemistry = models::get_chemistry(dc);
         if (chemistry == models::Chemistry::UNKNOWN) {
-            spdlog::error("No supported chemistry found for {}", to_string(dc));
-            spdlog::error(
-                    "This is typically seen when using prototype kits. Please download an "
-                    "appropriate model for your data and select it by model path");
+            DORADO_LOG(error, "No supported chemistry found for {}", to_string(dc));
+            DORADO_LOG(error,
+                       "This is typically seen when using prototype kits. Please download an "
+                       "appropriate model for your data and select it by model path");
 
             throw std::runtime_error("Could not resolve chemistry from data: Unknown chemistry");
         }
@@ -322,9 +326,9 @@ models::Chemistry get_unique_sequencing_chemistry(
         throw std::runtime_error("Could not resolve chemistry from data: No data");
     }
     if (found.size() > 1) {
-        spdlog::error("Multiple sequencing chemistries found in data");
+        DORADO_LOG(error, "Multiple sequencing chemistries found in data");
         for (auto f : found) {
-            spdlog::error("Found: {}", to_string(f));
+            DORADO_LOG(error, "Found: {}", to_string(f));
         }
 
         throw std::runtime_error("Could not uniquely resolve chemistry from inhomogeneous data");

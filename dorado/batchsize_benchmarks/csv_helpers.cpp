@@ -24,13 +24,13 @@ std::optional<ParsedLine> csv_try_parse_line(std::string_view line) {
     const auto memory_used_str = stream.getline();
     if (stream.eof()) {
         // Ignore this line if any of the components are missing.
-        spdlog::warn("Line doesn't have enough entries: {}", line);
+        DORADO_LOG(warn, "Line doesn't have enough entries: {}", line);
         return std::nullopt;
     }
 
     // Check that the GPU and model are set.
     if (gpu_name.value().empty() || model_name.value().empty()) {
-        spdlog::warn("Failed to parse line: {}", line);
+        DORADO_LOG(warn, "Failed to parse line: {}", line);
         return std::nullopt;
     }
 
@@ -40,7 +40,7 @@ std::optional<ParsedLine> csv_try_parse_line(std::string_view line) {
     const auto memory_used = utils::from_chars<std::uint64_t>(memory_used_str.value());
     if (!batch_size.has_value() || !basecall_speed.has_value() || !memory_used.has_value()) {
         // Ignore this line if the values failed to parse.
-        spdlog::warn("Failed to parse line: {}", line);
+        DORADO_LOG(warn, "Failed to parse line: {}", line);
         return std::nullopt;
     }
 

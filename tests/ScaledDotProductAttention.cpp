@@ -29,8 +29,8 @@ CATCH_TEST_CASE(TEST_TAG " Test Scaled Dot Product Attention", TEST_TAG) {
 
     if ((device_type == c10::kCUDA && !torch::hasCUDA()) ||
         (device_type == c10::kMPS && !torch::hasMPS())) {
-        spdlog::warn("Test skipped - Scaled Dot Product Attention: no support for {}",
-                     c10::DeviceTypeName(device_type));
+        DORADO_LOG(warn, "Test skipped - Scaled Dot Product Attention: no support for {}",
+                   c10::DeviceTypeName(device_type));
         return;
     }
 

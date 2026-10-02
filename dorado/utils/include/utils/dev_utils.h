@@ -26,7 +26,7 @@ T get_dev_opt(const std::string& name, T default_value) {
     if (auto it = details::g_dev_options.find(name); it != details::g_dev_options.end()) {
         if (it->second.second) {
             // Output debug message the first time we look up a dev variable
-            spdlog::debug("DEVOPTS: using '{}' = {}", name, T(it->second.first));
+            DORADO_LOG(debug, "DEVOPTS: using '{}' = {}", name, T(it->second.first));
             it->second.second = false;
         }
         return T(it->second.first);

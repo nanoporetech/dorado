@@ -56,7 +56,7 @@ std::vector<secondary::DeviceInfo> init_devices(const std::string& devices_str) 
     }
 #if DORADO_CUDA_BUILD
     else if (utils::starts_with(devices_str, "cuda")) {
-        spdlog::debug("Parsing CUDA device string.");
+        DORADO_LOG(debug, "Parsing CUDA device string.");
         const std::vector<std::string> parsed_devices =
                 dorado::utils::parse_cuda_device_string(devices_str);
         if (std::empty(parsed_devices)) {
@@ -100,21 +100,21 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                                    const bool legacy_feature_gen) {
     PolisherResources resources;
 
-    spdlog::info("Initializing the devices.");
+    DORADO_LOG(info, "Initializing the devices.");
     resources.devices = init_devices(device_str);
     if (std::empty(resources.devices)) {
         throw std::runtime_error("Zero devices initialized! Need at least one device to run.");
     }
 
-    spdlog::debug("Initialized devices:");
+    DORADO_LOG(debug, "Initialized devices:");
     for (std::size_t device_id = 0; device_id < std::size(resources.devices); ++device_id) {
         const secondary::DeviceInfo& dev_info = resources.devices[device_id];
-        spdlog::debug("    - [device_id = {}] name = {}, available_memory = {:.2f} GB", device_id,
-                      dev_info.name, dev_info.available_memory_GB);
+        DORADO_LOG(debug, "    - [device_id = {}] name = {}, available_memory = {:.2f} GB",
+                   device_id, dev_info.name, dev_info.available_memory_GB);
     }
 
     // Construct the model.
-    spdlog::debug("[create_resources] Loading the model.");
+    DORADO_LOG(debug, "[create_resources] Loading the model.");
     const auto create_models = [&]() {
         std::vector<std::shared_ptr<secondary::ModelTorchBase>> ret;
         std::vector<c10::optional<c10::Stream>> ret_streams;
@@ -129,8 +129,8 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                 return model;
             };
 
-            spdlog::debug("[create_resources] About to load model to device {}: {}", 0,
-                          device_info.name);
+            DORADO_LOG(debug, "[create_resources] About to load model to device {}: {}", 0,
+                       device_info.name);
 
             std::size_t infer_threads = static_cast<std::size_t>(num_inference_threads);
             std::vector<std::future<std::shared_ptr<secondary::ModelTorchBase>>> futures;
@@ -146,9 +146,9 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                 ret_streams.emplace_back(c10::nullopt);
             }
 
-            spdlog::debug("[create_resources] Using full precision.");
-            spdlog::debug("[create_resources] Switching model to eval mode.");
-            spdlog::info("Loaded model to {}", device_info.name);
+            DORADO_LOG(debug, "[create_resources] Using full precision.");
+            DORADO_LOG(debug, "[create_resources] Switching model to eval mode.");
+            DORADO_LOG(info, "Loaded model to {}", device_info.name);
             return std::make_pair(std::move(ret), std::move(ret_streams));
         }
 
@@ -164,28 +164,28 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                 }
 #endif
 
-                spdlog::debug("[create_resources] Creating a model from the config.");
+                DORADO_LOG(debug, "[create_resources] Creating a model from the config.");
                 auto model = secondary::model_factory(model_config);
 
-                spdlog::debug("[create_resources] About to load model to device {}: {}", device_id,
-                              device_info.name);
+                DORADO_LOG(debug, "[create_resources] About to load model to device {}: {}",
+                           device_id, device_info.name);
                 model->to_device(device_info.device);
 
                 // Half-precision if needed.
                 if (device_info.device.is_cuda() && !full_precision) {
-                    spdlog::debug("[create_resources] Converting the model to half precision.");
+                    DORADO_LOG(debug, "[create_resources] Converting the model to half precision.");
                     model->to_half();
                 } else {
-                    spdlog::debug("[create_resources] Using full precision.");
+                    DORADO_LOG(debug, "[create_resources] Using full precision.");
                 }
 
-                spdlog::debug("[create_resources] Switching model to eval mode.");
+                DORADO_LOG(debug, "[create_resources] Switching model to eval mode.");
                 model->set_eval();
 
                 ret.emplace_back(std::move(model));
                 ret_streams.emplace_back(std::move(stream));
 
-                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
+                DORADO_LOG(info, "Loaded model to device {}: {}", device_id, device_info.name);
             }
 
             const int32_t last_model = static_cast<int32_t>(std::size(ret)) - 1;
@@ -199,7 +199,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                 }
 #endif
                 ret_streams.emplace_back(std::move(stream));
-                spdlog::info("Loaded model to device {}: {}", device_id, device_info.name);
+                DORADO_LOG(info, "Loaded model to device {}: {}", device_id, device_info.name);
             }
         }
 
@@ -210,7 +210,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
     // Open the BAM file for each thread.
     const int32_t max_num_encoders =
             std::max(num_bam_threads, static_cast<int32_t>(std::size(resources.models)));
-    spdlog::info("Creating {} encoders.", max_num_encoders);
+    DORADO_LOG(info, "Creating {} encoders.", max_num_encoders);
     for (int32_t i = 0; i < max_num_encoders; ++i) {
         resources.encoders.emplace_back(encoder_factory(
                 model_config, in_ref_fn, in_aln_bam_fn, read_group, tag_name, tag_value, true,
@@ -218,7 +218,7 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
                 phasing_bin_fn, kadayashi_opt, legacy_feature_gen));
     }
 
-    spdlog::info("Creating the decoder.");
+    DORADO_LOG(info, "Creating the decoder.");
     resources.decoder = decoder_factory(model_config);
 
     return resources;
@@ -226,10 +226,10 @@ PolisherResources create_resources(const secondary::ModelConfig& model_config,
 
 void remove_deletions(secondary::ConsensusResult& cons) {
     if (std::size(cons.seq) != std::size(cons.quals)) {
-        spdlog::error(
-                "[remove_deletions] Sequence and quality string length mismatch! Not removing "
-                "anything. seq.size = {}, quals.size = {}",
-                std::size(cons.seq), std::size(cons.quals));
+        DORADO_LOG(error,
+                   "[remove_deletions] Sequence and quality string length mismatch! Not removing "
+                   "anything. seq.size = {}, quals.size = {}",
+                   std::size(cons.seq), std::size(cons.quals));
         return;
     }
     size_t n = 0;
@@ -256,17 +256,17 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
     const int64_t draft_len = std::ssize(draft);
 
     if (fill_gaps && std::empty(samples_for_seq)) {
-        spdlog::debug(
-                "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
-                "from input.",
-                header, std::size(draft));
+        DORADO_LOG(debug,
+                   "Sequence '{}' of length {} has zero inferred samples. Copying contig verbatim "
+                   "from input.",
+                   header, std::size(draft));
         std::string dummy_quals(std::size(draft), '!');
         return {{secondary::ConsensusResult{header, draft, std::move(dummy_quals)}}};
     } else if (!fill_gaps && std::empty(samples_for_seq)) {
-        spdlog::debug(
-                "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
-                "verbatim from input because fill_gaps == false.",
-                header, std::size(draft));
+        DORADO_LOG(debug,
+                   "Sequence '{}' of length {} has zero inferred samples. NOT copying contig "
+                   "verbatim from input because fill_gaps == false.",
+                   header, std::size(draft));
         return {};
     }
 
@@ -300,7 +300,8 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
         const std::vector<secondary::ConsensusResult>& sample_haps = sample_results[sample_index];
 
         if (!std::empty(sample_haps) && (std::ssize(sample_haps) != max_haps)) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "Unexpected number of haplotype sequences found for a sample. Expected that "
                     "all samples have the same number of generated haplotype consensus sequences, "
                     "but max_haps = {}, and number of haplotypes for the current sample: {}. "
@@ -375,7 +376,7 @@ std::vector<std::vector<secondary::ConsensusResult>> stitch_sequence(
         ret.emplace_back(std::move(part));
     }
 
-    spdlog::trace("[stitch_sequence] header = '{}', final.", header);
+    DORADO_LOG(trace, "[stitch_sequence] header = '{}', final.", header);
 
     return ret;
 }
@@ -451,8 +452,8 @@ merge_and_split_bam_regions_in_parallel(
                 interval.start -= window_interval_offset;
                 interval.end -= window_interval_offset;
 
-                spdlog::trace("- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
-                              bam_region_id, interval.start, interval.end);
+                DORADO_LOG(trace, "- [bam_region_id = {}] (0) Before merging: interval = [{}, {}]",
+                           bam_region_id, interval.start, interval.end);
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 debug_print_samples(std::cerr, window_samples, interval.start, interval.end, -1);
 #endif
@@ -472,10 +473,10 @@ merge_and_split_bam_regions_in_parallel(
                                          std::make_move_iterator(std::end(disc_samples)));
                 }
 
-                spdlog::trace(
-                        "- [bam_region_id = {}] (1) After splitting on discontinuities: "
-                        "local_samples = {}",
-                        bam_region_id, std::size(local_samples));
+                DORADO_LOG(trace,
+                           "- [bam_region_id = {}] (1) After splitting on discontinuities: "
+                           "local_samples = {}",
+                           bam_region_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
@@ -483,9 +484,9 @@ merge_and_split_bam_regions_in_parallel(
                 // Merge adjacent samples.
                 local_samples = encoders[tid]->merge_adjacent_samples(local_samples);
 
-                spdlog::trace(
-                        "- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
-                        bam_region_id, std::size(local_samples));
+                DORADO_LOG(trace,
+                           "- [bam_region_id = {}] (2) After merging adjacent: local_samples = {}",
+                           bam_region_id, std::size(local_samples));
 #ifdef DEBUG_POLISH_SAMPLE_CONSTRUCTION
                 debug_print_samples(std::cerr, local_samples, 0, -1, -1);
 #endif
@@ -507,7 +508,8 @@ merge_and_split_bam_regions_in_parallel(
                             split_samples(std::move(local_samples), window_len, window_overlap);
                 }
 
-                spdlog::trace(
+                DORADO_LOG(
+                        trace,
                         "- [bam_region_id = {}] (3) After splitting samples: local_samples = {}, "
                         "window_len = {}, window_overlap = {}",
                         bam_region_id, std::size(local_samples), window_len, window_overlap);
@@ -540,7 +542,8 @@ merge_and_split_bam_regions_in_parallel(
                 results_trims[bam_region_id] = std::move(filt_trims);
             } catch (const std::exception& e) {
                 if (continue_on_exception) {
-                    spdlog::warn("Caught exception in merge_and_split_bam_regions: '{}'", e.what());
+                    DORADO_LOG(warn, "Caught exception in merge_and_split_bam_regions: '{}'",
+                               e.what());
                 } else {
                     ret_val = {.exception_thrown = true,
                                .message = "Caught exception in merge_and_split_bam_regions: '" +
@@ -562,8 +565,8 @@ merge_and_split_bam_regions_in_parallel(
     const std::vector<secondary::Interval> thread_chunks = secondary::compute_partitions(
             static_cast<int32_t>(std::size(bam_region_intervals)), max_num_threads);
 
-    spdlog::trace("Starting to merge samples for {} BAM windows using {} threads.",
-                  std::size(bam_region_intervals), std::size(thread_chunks));
+    DORADO_LOG(trace, "Starting to merge samples for {} BAM windows using {} threads.",
+               std::size(bam_region_intervals), std::size(thread_chunks));
 
     // Parallel processing of BAM regions.
     cxxpool::thread_pool pool{std::size(thread_chunks)};
@@ -588,7 +591,7 @@ merge_and_split_bam_regions_in_parallel(
         if (!continue_on_exception) {
             throw std::runtime_error{"(merge-samples) " + rv.message};
         } else {
-            spdlog::warn("(merge-samples) {}", rv.message);
+            DORADO_LOG(warn, "(merge-samples) {}", rv.message);
         }
     }
 
@@ -680,11 +683,11 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
                 const std::string& name = draft_lens[window.seq_id].first;
 
                 if (thread_id == 0) {
-                    spdlog::trace(
-                            "[encoder {}] encoding window_id = {}, region = "
-                            "{}:{}-{} ({} %).",
-                            thread_id, window_id, name, window.start, window.end,
-                            100.0 * static_cast<double>(window_id) / n_windows);
+                    DORADO_LOG(trace,
+                               "[encoder {}] encoding window_id = {}, region = "
+                               "{}:{}-{} ({} %).",
+                               thread_id, window_id, name, window.start, window.end,
+                               100.0 * static_cast<double>(window_id) / n_windows);
                 }
 
                 results[window_id] = encoders[thread_id]->encode_region(
@@ -692,7 +695,7 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
 
             } catch (const std::exception& e) {
                 if (continue_on_exception) {
-                    spdlog::warn(e.what());
+                    DORADO_LOG(warn, e.what());
                 } else {
                     ret_val = {.exception_thrown = true, .message = e.what()};
                     worker_terminate = true;
@@ -720,8 +723,8 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
     std::vector<secondary::Sample> results(std::size(windows));
     std::vector<secondary::WorkerReturnStatus> worker_return_vals(actual_threads);
 
-    spdlog::debug("Starting to encode regions for {} windows using {} threads.", std::size(windows),
-                  actual_threads);
+    DORADO_LOG(debug, "Starting to encode regions for {} windows using {} threads.",
+               std::size(windows), actual_threads);
 
     // Add jobs to the pool.
     for (int32_t tid = 0; tid < static_cast<int32_t>(actual_threads); ++tid) {
@@ -740,7 +743,7 @@ std::vector<secondary::Sample> encode_windows_in_parallel(
         if (!continue_on_exception) {
             throw std::runtime_error{rv.message};
         } else {
-            spdlog::warn(rv.message);
+            DORADO_LOG(warn, rv.message);
         }
     }
 
@@ -774,7 +777,7 @@ void sample_producer(
         secondary::WorkerReturnStatus& ret_status) {
     utils::ScopedProfileRange spr1("sample_producer", 2);
 
-    spdlog::debug("[producer] Input: {} BAM windows.", std::size(bam_regions));
+    DORADO_LOG(debug, "[producer] Input: {} BAM windows.", std::size(bam_regions));
 
     const auto move_buffer_data_to_queue = [](InferenceData& buffer,
                                               utils::AsyncQueue<InferenceData>& queue,
@@ -866,7 +869,8 @@ void sample_producer(
                                                        num_windows),
                     num_threads, continue_on_exception);
 
-            spdlog::trace(
+            DORADO_LOG(
+                    trace,
                     "[producer] Merging the samples into {} BAM chunks. parallel_results.size() = "
                     "{}",
                     num_regions, std::size(region_samples));
@@ -896,7 +900,8 @@ void sample_producer(
                     InferenceData remainder_buffer;
                     remainder_buffer.samples.emplace_back(std::move(samples[i]));
                     remainder_buffer.trims.emplace_back(std::move(trims[i]));
-                    spdlog::trace(
+                    DORADO_LOG(
+                            trace,
                             "[producer] Pushing a remainder batch of data to infer_data queue. "
                             "remainder_buffer.samples.size() = {}. i = {}, size(positions_major) = "
                             "{}, window_len = {}, size(samples) = {}",
@@ -924,21 +929,22 @@ void sample_producer(
 
                     if (!std::empty(buffer.samples) &&
                         (estimated_memory_next >= max_available_mem)) {
-                        spdlog::trace("[producer] Estimating batch memory for auto batch size:");
-                        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
-                        spdlog::trace("    - estimated_memory_next = {} GB", estimated_memory_next);
-                        spdlog::trace(
-                                "    - next_batch_shape = {}",
-                                utils::print_container_as_string(next_batch_shape, ",", true));
-                        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
-                        spdlog::trace(
-                                "    - curr_batch_shape = {}",
-                                utils::print_container_as_string(curr_batch_shape, ",", true));
+                        DORADO_LOG(trace,
+                                   "[producer] Estimating batch memory for auto batch size:");
+                        DORADO_LOG(trace, "    - max_available_mem = {} GB", max_available_mem);
+                        DORADO_LOG(trace, "    - estimated_memory_next = {} GB",
+                                   estimated_memory_next);
+                        DORADO_LOG(trace, "    - next_batch_shape = {}",
+                                   utils::print_container_as_string(next_batch_shape, ",", true));
+                        DORADO_LOG(trace, "    - estimated_memory_curr = {} GB",
+                                   estimated_memory_curr);
+                        DORADO_LOG(trace, "    - curr_batch_shape = {}",
+                                   utils::print_container_as_string(curr_batch_shape, ",", true));
 
-                        spdlog::trace(
-                                "[producer] Pushing a batch of data to infer_data queue (1a). "
-                                "buffer.samples.size() = {}",
-                                std::size(buffer.samples));
+                        DORADO_LOG(trace,
+                                   "[producer] Pushing a batch of data to infer_data queue (1a). "
+                                   "buffer.samples.size() = {}",
+                                   std::size(buffer.samples));
 
                         move_buffer_data_to_queue(buffer, infer_data, false);
                     }
@@ -946,17 +952,18 @@ void sample_producer(
                 } else {
                     if (std::ssize(buffer.samples) >= batch_size) {
                         // Fixed batch size.
-                        spdlog::trace("[producer] Estimating batch memory for fixed batch size:");
-                        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
-                        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
-                        spdlog::trace(
-                                "    - curr_batch_shape = {}",
-                                utils::print_container_as_string(curr_batch_shape, ",", true));
+                        DORADO_LOG(trace,
+                                   "[producer] Estimating batch memory for fixed batch size:");
+                        DORADO_LOG(trace, "    - max_available_mem = {} GB", max_available_mem);
+                        DORADO_LOG(trace, "    - estimated_memory_curr = {} GB",
+                                   estimated_memory_curr);
+                        DORADO_LOG(trace, "    - curr_batch_shape = {}",
+                                   utils::print_container_as_string(curr_batch_shape, ",", true));
 
-                        spdlog::trace(
-                                "[producer] Pushing a batch of data to infer_data queue (1b). "
-                                "buffer.samples.size() = {}",
-                                std::size(buffer.samples));
+                        DORADO_LOG(trace,
+                                   "[producer] Pushing a batch of data to infer_data queue (1b). "
+                                   "buffer.samples.size() = {}",
+                                   std::size(buffer.samples));
 
                         move_buffer_data_to_queue(buffer, infer_data, true);
                     }
@@ -976,11 +983,11 @@ void sample_producer(
                 return;
             }
 
-            spdlog::warn(
-                    "Caught exception in the sample producer. Skipping the remaining regions "
-                    "in "
-                    "current batch (region_id_start = {}, region_id_end = {}). Exception: {}",
-                    region_id_start, region_id_end, e.what());
+            DORADO_LOG(warn,
+                       "Caught exception in the sample producer. Skipping the remaining regions "
+                       "in "
+                       "current batch (region_id_start = {}, region_id_end = {}). Exception: {}",
+                       region_id_start, region_id_end, e.what());
             continue;
         }
     }
@@ -991,16 +998,16 @@ void sample_producer(
         const double estimated_memory_curr =
                 std::empty(curr_batch_shape) ? 0.0 : model->estimate_batch_memory(curr_batch_shape);
 
-        spdlog::trace("[producer] Estimating batch memory for the final batch:");
-        spdlog::trace("    - max_available_mem = {} GB", max_available_mem);
-        spdlog::trace("    - estimated_memory_curr = {} GB", estimated_memory_curr);
-        spdlog::trace("    - curr_batch_shape = {}",
-                      utils::print_container_as_string(curr_batch_shape, ",", true));
+        DORADO_LOG(trace, "[producer] Estimating batch memory for the final batch:");
+        DORADO_LOG(trace, "    - max_available_mem = {} GB", max_available_mem);
+        DORADO_LOG(trace, "    - estimated_memory_curr = {} GB", estimated_memory_curr);
+        DORADO_LOG(trace, "    - curr_batch_shape = {}",
+                   utils::print_container_as_string(curr_batch_shape, ",", true));
 
-        spdlog::trace(
-                "[producer] Pushing a batch of data to infer_data queue (2). "
-                "buffer.samples.size() = {} (final)",
-                std::size(buffer.samples));
+        DORADO_LOG(trace,
+                   "[producer] Pushing a batch of data to infer_data queue (2). "
+                   "buffer.samples.size() = {} (final)",
+                   std::size(buffer.samples));
 
         // First, push the N*8 elements to the queue for efficiency.
         move_buffer_data_to_queue(buffer, infer_data, false);
@@ -1008,7 +1015,7 @@ void sample_producer(
         // Next, push the remainder if the buffer is not empty.
         move_buffer_data_to_queue(buffer, infer_data, true);
 
-        spdlog::debug("[producer] Pushed final batch for inference to infer_data queue.");
+        DORADO_LOG(debug, "[producer] Pushed final batch for inference to infer_data queue.");
     }
 
     infer_data.terminate(utils::AsyncQueueTerminateFast::No);
@@ -1072,7 +1079,8 @@ void infer_samples_in_parallel(
 
         // Debug output.
         {
-            spdlog::trace(
+            DORADO_LOG(
+                    trace,
                     "[consumer {}] About to call forward(): batched_data.features.size() = [{}], "
                     "approx "
                     "size: {} MB.",
@@ -1109,7 +1117,7 @@ void infer_samples_in_parallel(
             try {
                 output = model.predict_on_batch(std::move(batched_data));
             } catch (const std::exception& e) {
-                spdlog::error("Exception caught: {}", e.what());
+                DORADO_LOG(error, "Exception caught: {}", e.what());
                 throw;
             }
 
@@ -1143,7 +1151,8 @@ void infer_samples_in_parallel(
             const int64_t time_forward = timer_forward.GetElapsedMilliseconds();
             const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-            spdlog::trace(
+            DORADO_LOG(
+                    trace,
                     "[consumer {}] Computed batch inference. Timings - collate: {} ms, forward: {} "
                     "ms, "
                     "total = {}, batched_data.features.shape = [{}]",
@@ -1167,14 +1176,14 @@ void infer_samples_in_parallel(
         while (!worker_terminate) {
             utils::ScopedProfileRange spr3("infer_samples_in_parallel-worker-while", 4);
 
-            spdlog::trace("[consumer {}] Waiting to pop data for inference. Queue size: {}", tid,
-                          std::size(batch_queue));
+            DORADO_LOG(trace, "[consumer {}] Waiting to pop data for inference. Queue size: {}",
+                       tid, std::size(batch_queue));
 
             InferenceData item;
             const auto pop_status = batch_queue.try_pop(item);
 
-            spdlog::trace("[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
-                          tid, std::size(item.samples), batch_queue.size());
+            DORADO_LOG(trace, "[consumer {}] Popped data: item.samples.size() = {}, queue size: {}",
+                       tid, std::size(item.samples), batch_queue.size());
 
             if (pop_status == utils::AsyncQueueStatus::Terminate) {
                 break;
@@ -1195,16 +1204,17 @@ void infer_samples_in_parallel(
                 out_item.logits = std::move(logits);
                 out_item.trims = std::move(item.trims);
 
-                spdlog::trace(
-                        "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
-                        "out_item.samples.size() = {}, decode queue size: {}",
-                        tid, utils::tensor_shape_as_string(out_item.logits),
-                        std::size(out_item.samples), std::size(decode_queue));
+                DORADO_LOG(trace,
+                           "[consumer {}] Pushing data to decode_queue: out_item.logits.shape = {} "
+                           "out_item.samples.size() = {}, decode queue size: {}",
+                           tid, utils::tensor_shape_as_string(out_item.logits),
+                           std::size(out_item.samples), std::size(decode_queue));
                 decode_queue.try_push(std::move(out_item));
 
             } catch (const std::exception& e) {
                 if (continue_on_exception) {
-                    spdlog::warn(
+                    DORADO_LOG(
+                            warn,
                             "Caught exception while inferring a batch of samples: '{}'. Skipping "
                             "this batch.",
                             e.what());
@@ -1220,7 +1230,8 @@ void infer_samples_in_parallel(
     };
 
     if (std::size(models) > std::size(encoders)) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "There are more models than there are encoders! Num models: {}, num_encoders: {}. "
                 "Using fewer models.",
                 std::size(models), std::size(encoders));
@@ -1256,11 +1267,11 @@ void infer_samples_in_parallel(
             worker_terminate = true;
             return;
         } else {
-            spdlog::warn("(infer-samples) {}", rv.message);
+            DORADO_LOG(warn, "(infer-samples) {}", rv.message);
         }
     }
 
-    spdlog::debug("[infer_samples_in_parallel] Finished running inference.");
+    DORADO_LOG(debug, "[infer_samples_in_parallel] Finished running inference.");
 }
 
 void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResult>>& results_cons,
@@ -1311,10 +1322,10 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
 
             if ((trim.start < 0) || (trim.start >= num_positions) || (trim.end <= 0) ||
                 (trim.end > num_positions)) {
-                spdlog::debug(
-                        "Trim coordinate is < 0. j = {}, trim.start = {}, trim.end = {}, "
-                        "trim.heuristic = {}, num_positions = {}",
-                        j, trim.start, trim.end, trim.heuristic, num_positions);
+                DORADO_LOG(debug,
+                           "Trim coordinate is < 0. j = {}, trim.start = {}, trim.end = {}, "
+                           "trim.heuristic = {}, num_positions = {}",
+                           j, trim.start, trim.end, trim.heuristic, num_positions);
                 continue;
             }
 
@@ -1400,10 +1411,10 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
         const int64_t time_trim = timer_trim.GetElapsedMilliseconds();
         const int64_t time_total = timer_total.GetElapsedMilliseconds();
 
-        spdlog::trace(
-                "[decoder {}] Computed batch decode. Timings - decode = {} "
-                "ms, trim = {} ms, total = {}",
-                tid, time_decode, time_trim, time_total);
+        DORADO_LOG(trace,
+                   "[decoder {}] Computed batch decode. Timings - decode = {} "
+                   "ms, trim = {} ms, total = {}",
+                   tid, time_decode, time_trim, time_total);
 
         return final_results;
     };
@@ -1431,7 +1442,8 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
 
                 assert(tensor_batch_size == std::ssize(item.trims));
 
-                spdlog::trace(
+                DORADO_LOG(
+                        trace,
                         "[decoder {}] Popped data: item.logits.shape = {}, item.trims.size = {}, "
                         "tensor_batch_size = {}, queue size: {}",
                         tid, utils::tensor_shape_as_string(item.logits), std::ssize(item.trims),
@@ -1455,14 +1467,14 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                     // Split logits for each input sample in the batch, and check that the number matches.
                     const std::vector<torch::Tensor> split_logits = item.logits.unbind(0);
                     if (std::size(item.samples) != std::size(split_logits)) {
-                        spdlog::error(
-                                "The number of logits produced by the batch inference does not "
-                                "match "
-                                "the "
-                                "input batch size! Variant calling for this batch will not be "
-                                "possible. "
-                                "samples.size = {}, split_logits.size = {}",
-                                std::size(item.samples), std::size(split_logits));
+                        DORADO_LOG(error,
+                                   "The number of logits produced by the batch inference does not "
+                                   "match "
+                                   "the "
+                                   "input batch size! Variant calling for this batch will not be "
+                                   "possible. "
+                                   "samples.size = {}, split_logits.size = {}",
+                                   std::size(item.samples), std::size(split_logits));
                         continue;
                     }
 
@@ -1491,10 +1503,10 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                     return;
                 }
 
-                spdlog::warn(
-                        "Caught an exception when decoding a batch of samples. Skipping this "
-                        "batch. Exception: {}",
-                        e.what());
+                DORADO_LOG(warn,
+                           "Caught an exception when decoding a batch of samples. Skipping this "
+                           "batch. Exception: {}",
+                           e.what());
             }
         }
     };
@@ -1531,7 +1543,7 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
             worker_terminate = true;
             return;
         } else {
-            spdlog::warn(rv.message);
+            DORADO_LOG(warn, rv.message);
         }
     }
 
@@ -1569,7 +1581,7 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
         }
     }
 
-    spdlog::debug("[decode_samples_in_parallel] Finished decoding the output.");
+    DORADO_LOG(debug, "[decode_samples_in_parallel] Finished decoding the output.");
 }
 
 std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_consensus_seqs(
@@ -1600,10 +1612,10 @@ std::vector<std::vector<std::vector<secondary::ConsensusResult>>> construct_cons
 
         if ((draft_id >= std::ssize(draft_lens)) || (local_id < 0) ||
             (local_id >= std::ssize(groups))) {
-            spdlog::error(
-                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
-                    "groups.size = {}",
-                    draft_id, std::size(draft_lens), std::size(groups));
+            DORADO_LOG(error,
+                       "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                       "groups.size = {}",
+                       draft_id, std::size(draft_lens), std::size(groups));
             continue;
         }
         groups[local_id].emplace_back(hap_results.front().draft_start, i);
@@ -1658,10 +1670,10 @@ std::vector<secondary::Variant> call_variants(
 
         if ((vc_sample.seq_id >= std::ssize(draft_lens)) || (local_id < 0) ||
             (local_id >= std::ssize(groups))) {
-            spdlog::error(
-                    "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
-                    "groups.size = {}",
-                    vc_sample.seq_id, std::size(draft_lens), std::size(groups));
+            DORADO_LOG(error,
+                       "Draft ID out of bounds! r.draft_id = {}, draft_lens.size = {}, "
+                       "groups.size = {}",
+                       vc_sample.seq_id, std::size(draft_lens), std::size(groups));
             continue;
         }
         groups[local_id].emplace_back(i);
@@ -1742,7 +1754,7 @@ std::vector<secondary::Variant> call_variants(
                     return;
                 }
 
-                spdlog::warn(oss.str());
+                DORADO_LOG(warn, oss.str());
             }
         }
     };
@@ -1827,7 +1839,7 @@ std::vector<secondary::Variant> call_variants(
         if (!continue_on_exception) {
             throw std::runtime_error{"(call variants) " + rv.message};
         } else {
-            spdlog::warn("(call variants) {}", rv.message);
+            DORADO_LOG(warn, "(call variants) {}", rv.message);
         }
     }
 
@@ -1853,7 +1865,7 @@ secondary::ModelConfig load_model(const std::filesystem::path& model_dir,
     const std::filesystem::path model_config_file = model_dir / "config.toml";
     const std::string model_file = load_scripted_model ? "model.pt" : "weights.pt";
 
-    spdlog::info("Parsing the model config: {}", (model_config_file).string());
+    DORADO_LOG(info, "Parsing the model config: {}", (model_config_file).string());
     secondary::ModelConfig model_config =
             secondary::parse_model_config(model_config_file, model_file);
     return model_config;

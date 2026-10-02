@@ -58,11 +58,11 @@ TempDir::~TempDir() {
                 tries++;
                 deleted = std::filesystem::remove_all(m_path);
             } catch (const std::exception& e) {
-                spdlog::warn("{}", e.what());
+                DORADO_LOG(warn, "{}", e.what());
             }
         }
         if (!deleted) {
-            spdlog::warn("Could not delete {} after 5 retries!", m_path.string());
+            DORADO_LOG(warn, "Could not delete {} after 5 retries!", m_path.string());
         }
     }
 }

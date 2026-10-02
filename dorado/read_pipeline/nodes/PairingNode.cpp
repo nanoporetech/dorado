@@ -248,9 +248,9 @@ void PairingNode::pair_list_worker_thread(int tid) {
 
                     send_message_to_sink(std::move(read_pair));
                 } else {
-                    spdlog::debug("- rejected explicitly requested read pair: {} and {}",
-                                  template_read->read_common.read_id,
-                                  complement_read->read_common.read_id);
+                    DORADO_LOG(debug, "- rejected explicitly requested read pair: {} and {}",
+                               template_read->read_common.read_id,
+                               complement_read->read_common.read_id);
                 }
             }
         }
@@ -460,11 +460,11 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
         // If the way the cache is structured is changed the ont_basecall_client code will also
         // need to be updated otherwise there is a risk of deadlock.
         m_max_num_keys = pairing_params.cache_depth;
-        spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
+        DORADO_LOG(debug, "Using dorado duplex channel count of {}", m_max_num_keys);
         break;
     case ReadOrder::BY_TIME:
         m_max_num_reads = pairing_params.cache_depth;
-        spdlog::debug("Using dorado duplex read-per-channel count of {}", m_max_num_reads);
+        DORADO_LOG(debug, "Using dorado duplex read-per-channel count of {}", m_max_num_reads);
         break;
     default:
         throw std::runtime_error("Unsupported read order detected: " +

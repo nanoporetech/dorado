@@ -19,13 +19,13 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 #ifndef DEBUG_VARIANT_PERCEIVER_DATA_TYPES
 #define LOG_TRACE_DTYPE(...)
 #else
-#define LOG_TRACE_DTYPE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE_DTYPE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 namespace dorado::secondary {

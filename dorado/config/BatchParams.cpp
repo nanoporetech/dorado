@@ -37,7 +37,8 @@ void BatchParams::update(const std::filesystem::path &path) {
         }
         const int value = toml::find<int>(b, name);
         if (value < 0) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "invalid config - basecaller.{} must not be negative - got: {} - using default",
                     name, value);
             return std::nullopt;
@@ -46,9 +47,9 @@ void BatchParams::update(const std::filesystem::path &path) {
     };
 
     if (b.contains("batchsize")) {
-        spdlog::trace(
-                "config parameter basecaller.batchsize is ignored "
-                "- to set it, use the '--batchsize' command line argument");
+        DORADO_LOG(trace,
+                   "config parameter basecaller.batchsize is ignored "
+                   "- to set it, use the '--batchsize' command line argument");
     }
 
     update(Priority::CONFIG, parse("chunksize"), parse("overlap"), std::nullopt);
@@ -64,7 +65,7 @@ void BatchParams::update(Priority priority,
         }
         const int before_val = self.val;
         if (set_value(self, Value{val.value(), priority})) {
-            spdlog::trace("Parsed: {} {} -> {}", name, before_val, val.value());
+            DORADO_LOG(trace, "Parsed: {} {} -> {}", name, before_val, val.value());
         }
     };
 
@@ -77,7 +78,7 @@ void BatchParams::update(const BatchParams &other) {
     // Apply updated value with other.priority
     auto merge = [&](Value &self, const Value &oth, const std::string &name) {
         if (set_value(self, oth)) {
-            spdlog::trace("Merged: {} {} -> {}", name, self.val, oth.val);
+            DORADO_LOG(trace, "Merged: {} {} -> {}", name, self.val, oth.val);
         }
     };
 
@@ -91,7 +92,7 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     const int old_overlap = m_overlap.val;
     const int new_overlap = std::max(1, old_overlap / stride) * stride;
     if (set_value(m_overlap, Value{new_overlap, Priority::FORCE})) {
-        spdlog::trace("Normalised: overlap {} -> {}", old_overlap, new_overlap);
+        DORADO_LOG(trace, "Normalised: overlap {} -> {}", old_overlap, new_overlap);
     }
 
     // Make sure chunk size is a multiple of `chunk_size_granularity`, and greater than `overlap`
@@ -100,7 +101,7 @@ void BatchParams::normalise(int chunk_size_granularity, int stride) {
     const int new_chunk_size = (std::max(min_chunk_size, old_chunk_size) / chunk_size_granularity) *
                                chunk_size_granularity;
     if (set_value(m_chunk_size, Value{new_chunk_size, Priority::FORCE})) {
-        spdlog::trace("Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
+        DORADO_LOG(trace, "Normalised: chunksize {} -> {}", old_chunk_size, new_chunk_size);
     }
 }
 

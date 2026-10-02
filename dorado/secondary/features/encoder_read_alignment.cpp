@@ -19,7 +19,7 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 namespace dorado::secondary {
@@ -336,8 +336,8 @@ kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
             fmt::format("produce_haplotags-{}-{}-{}", ref_name, ref_start, ref_end);
     utils::ScopedProfileRange spr1(spr_label.c_str(), 5);
 
-    spdlog::trace("Haplotagging region: {}:{}-{}, source = {}", ref_name, (ref_start + 1), ref_end,
-                  secondary::haplotag_source_to_string(m_hap_source));
+    DORADO_LOG(trace, "Haplotagging region: {}:{}-{}, source = {}", ref_name, (ref_start + 1),
+               ref_end, secondary::haplotag_source_to_string(m_hap_source));
 
     if (m_hap_source == secondary::HaplotagSource::BIN_FILE) {
         LOG_TRACE("Loading haplotags from a Kadayashi bin file for region: {}:{}-{}", ref_name,
@@ -429,8 +429,9 @@ secondary::Sample EncoderReadAlignment::encode_region(
     if (!tensors.counts.numel()) {
         const std::string region =
                 ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
-        spdlog::debug("Pileup-feature is zero-length for {} indicating no reads in this region.",
-                      region);
+        DORADO_LOG(debug,
+                   "Pileup-feature is zero-length for {} indicating no reads in this region.",
+                   region);
         return {};
     }
 
@@ -476,7 +477,7 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch,
 
     // Process read-level features if the shape indicates a 3D tensor.
     if (std::size(feature_shape) == 3) {
-        // spdlog::info("About to merge tensors.");
+        // DORADO_LOG(info, "About to merge tensors.");
 
         int64_t max_npos = 0;
         int64_t max_nfeats = 0;
@@ -509,10 +510,10 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch,
                     data);
         }
     } else {
-        spdlog::warn(
-                "Unsupported feature shape when collating samples. Shape: [{}], expected 3 "
-                "dimensions. Returning an uninitialized features tensor.",
-                utils::tensor_shape_as_string(batch.front()));
+        DORADO_LOG(warn,
+                   "Unsupported feature shape when collating samples. Shape: [{}], expected 3 "
+                   "dimensions. Returning an uninitialized features tensor.",
+                   utils::tensor_shape_as_string(batch.front()));
     }
 
     return features;

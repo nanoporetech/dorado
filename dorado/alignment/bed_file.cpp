@@ -219,7 +219,7 @@ bool BedFile::load(const std::string& bed_filename) {
     // Read in each line and parse it into the BedFile structure
     std::ifstream file_stream(m_file_name);
     if (file_stream.fail()) {
-        spdlog::error("Failed to open Bed file for reading: '{}'", m_file_name);
+        DORADO_LOG(error, "Failed to open Bed file for reading: '{}'", m_file_name);
         return false;
     }
     return load(file_stream);
@@ -238,8 +238,8 @@ bool BedFile::load(std::istream& input_stream) {
     }
 
     if (!parser.is_valid()) {
-        spdlog::error("Invalid data reading bed file '{}' at line {}. {}", m_file_name, line_number,
-                      parser.error_reason());
+        DORADO_LOG(error, "Invalid data reading bed file '{}' at line {}. {}", m_file_name,
+                   line_number, parser.error_reason());
         return false;
     }
 

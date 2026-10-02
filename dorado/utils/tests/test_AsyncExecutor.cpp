@@ -386,9 +386,9 @@ DEFINE_TEMPLATE_TEST("Benchmarking", NewThreadPool) {
         const auto rusage_after = cpu_rusage();
         const auto cpu_used = rusage_after - rusage_before;
 
-        spdlog::info("[SPEED] [{}] mode={}, workers={}, producers={}: {} ({} CPU)",
-                     TestType::name(), fmt::underlying(producer_mode), num_workers, num_producers,
-                     processed, cpu_used);
+        DORADO_LOG(info, "[SPEED] [{}] mode={}, workers={}, producers={}: {} ({} CPU)",
+                   TestType::name(), fmt::underlying(producer_mode), num_workers, num_producers,
+                   processed, cpu_used);
     }
 }
 

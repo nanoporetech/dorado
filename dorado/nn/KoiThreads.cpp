@@ -18,7 +18,7 @@ KoiThreads::KoiThreads(int num_threads) {
 KoiThreads::~KoiThreads() {
     const int ret = koi_destroy_thread_pool(&m_thread_pool);
     if (ret != KOI_SUCCESS) {
-        spdlog::error("Failed to destroy koi thread pool");
+        DORADO_LOG(error, "Failed to destroy koi thread pool");
     }
 }
 

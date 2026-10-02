@@ -80,15 +80,15 @@ MatmulMode get_cuda_matmul_fp16_mode() {
     const char *env_matmul_fp16_mode = std::getenv("DORADO_MATMUL_FP16_MODE");
     if (env_matmul_fp16_mode != nullptr) {
         std::string_view matmul_fp16_mode_str(env_matmul_fp16_mode);
-        spdlog::debug("> Found DORADO_MATMUL_FP16_MODE={}", matmul_fp16_mode_str);
+        DORADO_LOG(debug, "> Found DORADO_MATMUL_FP16_MODE={}", matmul_fp16_mode_str);
         if (matmul_fp16_mode_str == "TORCH") {
-            spdlog::debug(">   Using torch::matmul");
+            DORADO_LOG(debug, ">   Using torch::matmul");
             return MatmulMode::TORCH;
         } else if (matmul_fp16_mode_str == "CUBLAS") {
-            spdlog::debug(">   Using cublasGemmEx");
+            DORADO_LOG(debug, ">   Using cublasGemmEx");
             return MatmulMode::CUBLAS;
         }
-        spdlog::debug(">   Ignoring unrecognized option. Select from TORCH or CUBLAS.");
+        DORADO_LOG(debug, ">   Ignoring unrecognized option. Select from TORCH or CUBLAS.");
     }
 
     // torch::matmul() is a bit slower than cublasGemmEx() on A100 and V100, and 2x slower on TX2
@@ -388,7 +388,7 @@ void matmul_f16_cublas(const at::Tensor &A, const at::Tensor &B, at::Tensor &C) 
                             int(A.stride(0)), &HALF_ZERO, C.data_ptr(), CUDA_R_16F,
                             int(C.stride(0)), CUDA_R_16F, CUBLAS_GEMM_DEFAULT_TENSOR_OP);
     if (res != CUBLAS_STATUS_SUCCESS) {
-        spdlog::error("CuBLAS error {}", int(res));
+        DORADO_LOG(error, "CuBLAS error {}", int(res));
         exit(EXIT_FAILURE);
     }
 }

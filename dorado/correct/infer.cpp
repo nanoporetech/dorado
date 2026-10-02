@@ -49,7 +49,7 @@ int calculate_batch_size(const std::string& device, float memory_fraction) {
         throw std::runtime_error("Unsupported device: " + device);
     }
 
-    spdlog::debug("Usable memory for dev {}: {} GB", device, usable_memory);
+    DORADO_LOG(debug, "Usable memory for dev {}: {} GB", device, usable_memory);
     usable_memory -= model_mem;
     if (usable_memory <= 0.f) {
         return 0;

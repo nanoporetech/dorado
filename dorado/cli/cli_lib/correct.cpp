@@ -166,7 +166,7 @@ int parse_args(int argc, char** argv, argparse::ArgumentParser& parser) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -233,7 +233,7 @@ std::filesystem::path download_model(const std::string& model_name) {
     const std::filesystem::path tmp_dir = utils::get_downloads_path(std::nullopt);
     const bool success = model_downloader::download_models(tmp_dir.string(), model_name);
     if (!success) {
-        spdlog::error("Could not download model: {}", model_name);
+        DORADO_LOG(error, "Could not download model: {}", model_name);
         std::exit(EXIT_FAILURE);
     }
     return (tmp_dir / "herro-v1.1");
@@ -283,8 +283,8 @@ std::tuple<std::string, int64_t> find_furthest_skipped_read(
 
     const bool rv_fai = utils::create_fai_index(in_fastx_fn);
     if (!rv_fai) {
-        spdlog::error("Failed to create/verify a .fai index for input file: '{}'!",
-                      in_fastx_fn.string());
+        DORADO_LOG(error, "Failed to create/verify a .fai index for input file: '{}'!",
+                   in_fastx_fn.string());
         std::exit(EXIT_FAILURE);
     }
 
@@ -331,41 +331,42 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
     if (opt.in_reads_fns.size() > 1) {
-        spdlog::error("Multi file input not yet handled");
+        DORADO_LOG(error, "Multi file input not yet handled");
         std::exit(EXIT_FAILURE);
     }
     if (std::empty(opt.in_reads_fns)) {
-        spdlog::error("At least one input reads file needs to be specified.");
+        DORADO_LOG(error, "At least one input reads file needs to be specified.");
         std::exit(EXIT_FAILURE);
     }
     if (!std::filesystem::exists(opt.in_reads_fns.front())) {
-        spdlog::error("Input reads file {} does not exist!", opt.in_reads_fns.front());
+        DORADO_LOG(error, "Input reads file {} does not exist!", opt.in_reads_fns.front());
         std::exit(EXIT_FAILURE);
     }
     if (!std::empty(opt.in_paf_fn) && !std::filesystem::exists(opt.in_paf_fn)) {
-        spdlog::error("Input PAF path {} does not exist!", opt.in_paf_fn);
+        DORADO_LOG(error, "Input PAF path {} does not exist!", opt.in_paf_fn);
         std::exit(EXIT_FAILURE);
     }
     if (!std::empty(opt.model_path) && !std::filesystem::exists(opt.model_path)) {
-        spdlog::error("Input model directory {} does not exist!", opt.model_path);
+        DORADO_LOG(error, "Input model directory {} does not exist!", opt.model_path);
         std::exit(EXIT_FAILURE);
     }
     if (!std::empty(opt.resume_path_fn) && !std::filesystem::exists(opt.resume_path_fn)) {
-        spdlog::error("Input resume index file {} does not exist!", opt.resume_path_fn);
+        DORADO_LOG(error, "Input resume index file {} does not exist!", opt.resume_path_fn);
         std::exit(EXIT_FAILURE);
     }
     if (opt.compute_num_blocks && !std::empty(opt.resume_path_fn)) {
-        spdlog::error("The --compute-num-blocks option cannot be used together with --resume-from.",
-                      opt.resume_path_fn);
+        DORADO_LOG(error,
+                   "The --compute-num-blocks option cannot be used together with --resume-from.",
+                   opt.resume_path_fn);
         std::exit(EXIT_FAILURE);
     }
     if ((opt.run_block_id) && (*opt.run_block_id < 0)) {
-        spdlog::error("The --run-block-id option cannot be negative.");
+        DORADO_LOG(error, "The --run-block-id option cannot be negative.");
         std::exit(EXIT_FAILURE);
     }
     if ((opt.run_block_id) && (*opt.run_block_id >= 0) && !std::empty(opt.resume_path_fn)) {
-        spdlog::error("The --run-block-id option cannot be used together with --resume-from.",
-                      opt.resume_path_fn);
+        DORADO_LOG(error, "The --run-block-id option cannot be used together with --resume-from.",
+                   opt.resume_path_fn);
         std::exit(EXIT_FAILURE);
     }
 }
@@ -400,7 +401,7 @@ int correct(int argc, char* argv[]) {
     // Check if input options are good.
     validate_options(opt);
 
-    spdlog::info("Selected device: {}", opt.device);
+    DORADO_LOG(info, "Selected device: {}", opt.device);
 
 #if DORADO_CUDA_BUILD
     cli::log_requested_cuda_devices(opt.device);
@@ -417,8 +418,8 @@ int correct(int argc, char* argv[]) {
     const int correct_threads =
             (!std::empty(opt.debug_tnames)) ? 1 : std::max(4, static_cast<int>(opt.threads / 4));
     const int correct_writer_threads = 1;
-    spdlog::debug("Aligner threads {}, corrector threads {}, writer threads {}", aligner_threads,
-                  correct_threads, correct_writer_threads);
+    DORADO_LOG(debug, "Aligner threads {}, corrector threads {}, writer threads {}",
+               aligner_threads, correct_threads, correct_writer_threads);
 
     // If model dir is not specified, download the model.
     const auto [model_dir, remove_tmp_dir] = [&opt]() {
@@ -434,7 +435,7 @@ int correct(int argc, char* argv[]) {
     // Load the resume list if it exists.
     try {
         if (opt.compute_num_blocks) {
-            spdlog::debug("Only computing the number of index blocks.");
+            DORADO_LOG(debug, "Only computing the number of index blocks.");
 
             CorrectionMapper aligner(in_reads_fn, aligner_threads, opt.index_size, {}, {}, -1,
                                      opt.kmer_size, opt.ovl_window_size, opt.min_chain_score,
@@ -460,8 +461,8 @@ int correct(int argc, char* argv[]) {
         // Find the furthest processed input read in the skip set. If skip_set is empty,
         const auto [furthest_skip_header, furthest_skip_id] =
                 find_furthest_skipped_read(in_reads_fn, skip_set);
-        spdlog::debug("furthest_skip_header = '{}', furthest_skip_id = {}", furthest_skip_header,
-                      furthest_skip_id);
+        DORADO_LOG(debug, "furthest_skip_header = '{}', furthest_skip_id = {}",
+                   furthest_skip_header, furthest_skip_id);
 
         // Workflow construction.
         // The overall pipeline will be as follows:
@@ -501,7 +502,7 @@ int correct(int argc, char* argv[]) {
         std::vector<dorado::stats::StatsReporter> stats_reporters;
         auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
         if (!pipeline) {
-            spdlog::error("Failed to create pipeline");
+            DORADO_LOG(error, "Failed to create pipeline");
             return EXIT_FAILURE;
         }
 
@@ -531,7 +532,7 @@ int correct(int argc, char* argv[]) {
                 kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
         // End stats counting setup.
 
-        spdlog::info("Starting");
+        DORADO_LOG(info, "Starting");
 
         // Start the pipeline.
         aligner->process(*pipeline);
@@ -546,17 +547,17 @@ int correct(int argc, char* argv[]) {
         // Report progress during output file finalisation.
         tracker.summarize();
 
-        spdlog::info("Finished");
+        DORADO_LOG(info, "Finished");
 
         if (remove_tmp_dir) {
             std::filesystem::remove_all(model_dir.parent_path());
         }
 
     } catch (const std::exception& e) {
-        spdlog::error("Caught exception: {}.", e.what());
+        DORADO_LOG(error, "Caught exception: {}.", e.what());
         return EXIT_FAILURE;
     } catch (...) {
-        spdlog::error("Caught an unknown exception!");
+        DORADO_LOG(error, "Caught an unknown exception!");
         return EXIT_FAILURE;
     }
 

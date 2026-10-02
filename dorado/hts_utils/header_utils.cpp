@@ -39,7 +39,7 @@ std::vector<utils::HeaderLineData> parse_header(
         const std::set<HeaderLineType>& selected_line_types) {
     const char* hdr_text = sam_hdr_str(&header);
     if (!hdr_text) {
-        spdlog::warn("Could not retrieve BAM header text!");
+        DORADO_LOG(warn, "Could not retrieve BAM header text!");
         return {};
     }
     return parse_header(hdr_text, selected_line_types);

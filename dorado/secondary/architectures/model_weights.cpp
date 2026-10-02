@@ -86,13 +86,13 @@ void trace_model_tensors(torch::nn::Module& model,
     }
 
     for (const auto& weight : model.named_parameters()) {
-        spdlog::trace("[model_params] w.key() = {}", weight.key());
+        DORADO_LOG(trace, "[model_params] w.key() = {}", weight.key());
     }
     for (const auto& buffer : model.named_buffers()) {
-        spdlog::trace("[model_params] Buffer key: {}, shape: {}, persistent: {}", buffer.key(),
-                      (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
-                                                : "undefined"),
-                      ((non_persistent_buffers.count(buffer.key()) != 0) ? "no" : "yes"));
+        DORADO_LOG(trace, "[model_params] Buffer key: {}, shape: {}, persistent: {}", buffer.key(),
+                   (buffer.value().defined() ? utils::tensor_shape_as_string(buffer.value())
+                                             : "undefined"),
+                   ((non_persistent_buffers.count(buffer.key()) != 0) ? "no" : "yes"));
     }
 }
 
@@ -102,7 +102,7 @@ void trace_loaded_tensors(const c10::Dict<c10::IValue, c10::IValue>& weights) {
     }
 
     for (const auto& weight : weights) {
-        spdlog::trace("[loaded pt_param] w.key() = {}", weight.key().toStringRef());
+        DORADO_LOG(trace, "[loaded pt_param] w.key() = {}", weight.key().toStringRef());
     }
 }
 
@@ -111,7 +111,7 @@ void trace_loaded_tensors(const c10::Dict<c10::IValue, c10::IValue>& weights) {
 void load_state_dict(torch::nn::Module& model,
                      const std::filesystem::path& weights_path,
                      const std::unordered_set<std::string>& non_persistent_buffers) {
-    spdlog::debug("Loading model weights from file: {}", weights_path.string());
+    DORADO_LOG(debug, "Loading model weights from file: {}", weights_path.string());
     trace_model_tensors(model, non_persistent_buffers);
 
     try {

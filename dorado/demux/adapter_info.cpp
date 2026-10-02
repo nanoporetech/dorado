@@ -50,11 +50,11 @@ bool AdapterInfo::set_primer_sequences(const std::string& primer_sequences) {
     auto aux_code_entry = primer_set_map.find(primer_sequences);
     if (aux_code_entry == primer_set_map.end()) {
         const std::string extended_primer_codes = utils::join(demux::extended_primer_names(), ", ");
-        spdlog::error(
-                "Error: Invalid value {} for --primer_sequences option. This must be either the "
-                "full path of a fasta file, or a supported 3rd-party primer set code. Supported "
-                "codes are: {}",
-                primer_sequences, extended_primer_codes);
+        DORADO_LOG(error,
+                   "Error: Invalid value {} for --primer_sequences option. This must be either the "
+                   "full path of a fasta file, or a supported 3rd-party primer set code. Supported "
+                   "codes are: {}",
+                   primer_sequences, extended_primer_codes);
         return false;
     }
     primer_aux = aux_code_entry->second;

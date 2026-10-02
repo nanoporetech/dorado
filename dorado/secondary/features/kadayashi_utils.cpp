@@ -69,7 +69,8 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     }
 
     if ((chrom_start < 0) || (chrom_end <= 0) || (chrom_end <= chrom_start)) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Input to query_bin_file_get_qname2tag is not valid. chrom_start = {}, chrom_end = "
                 "{}. Returning an empty haplotag lookup.",
                 chrom_start, chrom_end);
@@ -97,7 +98,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
             // Found the ref.
             if (ref_name == chrom) {
                 if (DEBUG_PRINT) {
-                    spdlog::debug("[dbg::{}] found ref {}\n", __func__, ref_name);
+                    DORADO_LOG(debug, "[dbg::{}] found ref {}\n", __func__, ref_name);
                 }
                 ref_i = static_cast<int32_t>(i);
             }
@@ -109,7 +110,8 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
 
     // Sanity check.
     if (ref_i < 0) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Reference '{}' not found in the input haplotag bin file: '{}'! Returning an empty "
                 "haplotag lookup.",
                 chrom, in_haplotag_bin_fn.string());
@@ -143,15 +145,15 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
 
         if ((chrom_end_uint > start) && (chrom_start_uint < end)) {
             if (DEBUG_PRINT) {
-                spdlog::debug("[dbg::{}] checking {}-{}\n", __func__, start, end);
+                DORADO_LOG(debug, "[dbg::{}] checking {}-{}\n", __func__, start, end);
             }
             const uint64_t l = std::min(static_cast<uint64_t>(end), chrom_end_uint) -
                                std::max(static_cast<uint64_t>(start), chrom_start_uint);
             if (l > best_ovlp_len) {
                 if (DEBUG_PRINT) {
-                    spdlog::debug(
-                            "[dbg::{}] update best hit to: {}-{} with {} reads (l: {} => {})\n",
-                            __func__, start, end, n_reads, best_ovlp_len, l);
+                    DORADO_LOG(debug,
+                               "[dbg::{}] update best hit to: {}-{} with {} reads (l: {} => {})\n",
+                               __func__, start, end, n_reads, best_ovlp_len, l);
                 }
                 best_ovlp_len = l;
                 best_ovlp_chunk_start = pos_chunk_start;
@@ -160,8 +162,8 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
                 best_ovlp_end = end;
             } else {
                 if (DEBUG_PRINT) {
-                    spdlog::debug("[dbg::{}] hit (worse): {}-{} with {} reads\n", __func__, start,
-                                  end, n_reads);
+                    DORADO_LOG(debug, "[dbg::{}] hit (worse): {}-{} with {} reads\n", __func__,
+                               start, end, n_reads);
                 }
             }
         } else if (start > chrom_end_uint) {
@@ -170,7 +172,8 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     }
 
     if (best_ovlp_chunk_start == 0) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Reference '{}' found, but requested interval not found ({}:{}-{}). Returning an "
                 "empty "
                 "haplotag lookup.",
@@ -182,7 +185,8 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
     seek_checked(ifs, best_ovlp_chunk_start, std::ios::beg, "best_ovlp_chunk_start");
 
     if (DEBUG_PRINT) {
-        spdlog::debug("[dbg::{}] use interval {}-{}\n", __func__, best_ovlp_start, best_ovlp_end);
+        DORADO_LOG(debug, "[dbg::{}] use interval {}-{}\n", __func__, best_ovlp_start,
+                   best_ovlp_end);
     }
 
     // Read the chunk.
@@ -198,7 +202,7 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
         const uint8_t haptag = read_checked_pod<uint8_t>(ifs, "haptag");
 
         if (qname2tag.count(qn) != 0) {
-            spdlog::warn("Query name '{}' already seen in the haplotag file. Skipping.", qn);
+            DORADO_LOG(warn, "Query name '{}' already seen in the haplotag file. Skipping.", qn);
             continue;
         }
 
@@ -206,16 +210,16 @@ std::unordered_map<std::string, int32_t> query_bin_file_get_qname2tag(
         found = true;
 
         if (DEBUG_PRINT) {
-            spdlog::debug("[dbg::{}] insert qn '{}' tag '{}'\n", __func__, qn, haptag);
+            DORADO_LOG(debug, "[dbg::{}] insert qn '{}' tag '{}'\n", __func__, qn, haptag);
         }
     }
 
     if (!found) {
-        spdlog::warn(
-                "Reference '{}' found, but there are no queries in the requested interval "
-                "({}:{}-{}). Returning an empty "
-                "haplotag lookup.",
-                chrom, chrom, chrom_start, chrom_end);
+        DORADO_LOG(warn,
+                   "Reference '{}' found, but there are no queries in the requested interval "
+                   "({}:{}-{}). Returning an empty "
+                   "haplotag lookup.",
+                   chrom, chrom, chrom_start, chrom_end);
         return {};
     }
 

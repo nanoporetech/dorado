@@ -14,7 +14,7 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 namespace kadayashi {
@@ -87,8 +87,8 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
             } else if (cols[0] == "R" && pass == 0) {  // collect size of storages
                 const std::string &qn = cols[2];
                 if (qn.size() > std::numeric_limits<uint8_t>::max()) {
-                    spdlog::error("[kdys::{}] read name too long (l={})\n", __func__,
-                                  (int)qn.size());
+                    DORADO_LOG(error, "[kdys::{}] read name too long (l={})\n", __func__,
+                               (int)qn.size());
                     exit(1);
                 }
                 int size = sizeof(uint8_t) /*length of qname*/ +
@@ -175,7 +175,7 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
             assert(fp_bin.tellp() == (header_offset1 + header_offset2));
         }  // end of header write
     }
-    spdlog::info("[kdys::{}] wrote bin file\n", __func__);
+    DORADO_LOG(info, "[kdys::{}] wrote bin file\n", __func__);
 
     fp_tsv.close();
     fp_bin.close();
@@ -195,7 +195,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
     uint32_t n_ref;
     size_t fret = fread(&n_ref, sizeof(uint32_t), 1, fp);
     if (fret != 1) {
-        spdlog::error("[kdys::{}] fread failed", __func__);
+        DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
         exit(1);
     }
 
@@ -206,14 +206,14 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
         uint8_t tn_l;
         fret = fread(&tn_l, 1, 1, fp);
         if (fret != 1) {
-            spdlog::error("[kdys::{}] fread failed", __func__);
+            DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
             exit(1);
         }
         if (ref_i < 0) {  // haven't found the chrom yet
             refname.resize(tn_l);
             fret = fread(&refname[0], 1, tn_l, fp);
             if (fret != tn_l) {
-                spdlog::error("[kdys::{}] fread failed", __func__);
+                DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
                 exit(1);
             }
             if (refname == chrom) {  // done; don't break
@@ -235,7 +235,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
         fret = fread(&pos_intervals_start, sizeof(uint64_t), 1, fp);
         fret += fread(&n_intervals, sizeof(uint32_t), 1, fp);
         if (fret != 2) {
-            spdlog::error("[kdys::{}] fread failed", __func__);
+            DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
             exit(1);
         }
         fret = fseek(fp, pos_intervals_start, SEEK_SET);
@@ -255,7 +255,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
             fret += fread(&pos_chunk_start, sizeof(uint64_t), 1, fp);
             fret += fread(&n_reads, sizeof(uint32_t), 1, fp);
             if (fret != 4) {
-                spdlog::error("[kdys::{}] fread failed", __func__);
+                DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
                 exit(1);
             }
             if (ref_end >= start && ref_start < end) {
@@ -292,8 +292,8 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
         }
         if (best_ovlp_chunk_start > 0) {
             fseek(fp, best_ovlp_chunk_start, SEEK_SET);
-            spdlog::info("[kdys::{}] use interval {}-{}\n", __func__, best_ovlp_start,
-                         best_ovlp_end);
+            DORADO_LOG(info, "[kdys::{}] use interval {}-{}\n", __func__, best_ovlp_start,
+                       best_ovlp_end);
 
             // read the chunk
             uint8_t qn_l, haptag;
@@ -310,7 +310,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
 
                 fret += fread(&haptag, 1, 1, fp);
                 if (fret != 3) {
-                    spdlog::error("[kdys::{}] fread failed", __func__);
+                    DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
                     exit(1);
                 }
 
@@ -328,12 +328,12 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
             found = 1;
         }
         if (!found) {
-            spdlog::warn("[kdys::{}] ref found, but requested interval not found ({}:{}-{})\n",
-                         __func__, chrom, ref_start, ref_end);
+            DORADO_LOG(warn, "[kdys::{}] ref found, but requested interval not found ({}:{}-{})\n",
+                       __func__, chrom, ref_start, ref_end);
         }
     } else {
         if (!silent) {
-            spdlog::warn("[kdys::{}] ref {} not found in bin's header\n", __func__, chrom);
+            DORADO_LOG(warn, "[kdys::{}] ref {} not found in bin's header\n", __func__, chrom);
         }
     }
 

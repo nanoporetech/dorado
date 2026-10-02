@@ -131,10 +131,10 @@ std::size_t HtsReader::read(Pipeline& pipeline,
             break;
         }
         if (num_reads % 50000 == 0) {
-            spdlog::debug("Processed {} reads", num_reads);
+            DORADO_LOG(debug, "Processed {} reads", num_reads);
         }
     }
-    spdlog::debug("Total reads processed: {}", num_reads);
+    DORADO_LOG(debug, "Total reads processed: {}", num_reads);
     return num_reads;
 }
 

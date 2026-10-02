@@ -54,7 +54,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
     }
 
     if (model_type == ModelType::GRU) {
-        spdlog::debug("Constructing a GRU model.");
+        DORADO_LOG(debug, "Constructing a GRU model.");
 
         const int32_t num_features = std::stoi(get_value("num_features"));
         const int32_t num_classes = std::stoi(get_value("num_classes"));
@@ -66,7 +66,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
                                          bidirectional);
 
     } else if (model_type == ModelType::LATENT_SPACE_LSTM) {
-        spdlog::debug("Constructing a LATENT_SPACE_LSTM model.");
+        DORADO_LOG(debug, "Constructing a LATENT_SPACE_LSTM model.");
 
         const int32_t num_classes = std::stoi(get_value("num_classes"));
         const int32_t lstm_size = std::stoi(get_value("lstm_size"));
@@ -84,7 +84,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
                 bases_alphabet_size, bases_embedding_size, bidirectional, feature_column_map);
 
     } else if (model_type == ModelType::SLOT_ATTENTION_CONSENSUS) {
-        spdlog::debug("Constructing a SLOT_ATTENTION_CONSENSUS model.");
+        DORADO_LOG(debug, "Constructing a SLOT_ATTENTION_CONSENSUS model.");
 
         const int32_t num_slots = std::stoi(get_value("num_slots"));
         const int32_t classes_per_slot = std::stoi(get_value("classes_per_slot"));
@@ -115,7 +115,7 @@ std::shared_ptr<ModelTorchBase> model_factory(const ModelConfig& config,
         model->set_normalise(false);
 
     } else if (model_type == ModelType::VARIANT_PERCEIVER) {
-        spdlog::debug("Constructing a VARIANT_PERCEIVER model.");
+        DORADO_LOG(debug, "Constructing a VARIANT_PERCEIVER model.");
 
         const int32_t read_max_depth = std::stoi(get_value("read_max_depth"));
         const int32_t ploidy = std::stoi(get_value("ploidy"));

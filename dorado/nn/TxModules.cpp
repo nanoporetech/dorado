@@ -58,7 +58,7 @@ struct KoiTensorExt : public KoiTensor {
         ndims = static_cast<int>(t.dim());
         type_id = type_id_from_tensor(t);
         if (ndims > KOI_TENSOR_MAX_DIMS || size_t(ndims) != dim_tags.size()) {
-            spdlog::error("KoiTensor dimension mismatch");
+            DORADO_LOG(error, "KoiTensor dimension mismatch");
             exit(EXIT_FAILURE);
         }
         for (int i = 0; i < ndims; ++i) {
@@ -261,18 +261,18 @@ void RotaryEmbeddingImpl::assert_forward_dims(const at::Tensor &qkv) const {
     bool has_error = false;
     if (seq_len > max_seq_len) {
         has_error = true;
-        spdlog::error(
-                "RotE - maximum sequence length exceeded (len:{} > max:{}) - "
-                "Your chunksize may be too large",
-                seq_len, max_seq_len);
+        DORADO_LOG(error,
+                   "RotE - maximum sequence length exceeded (len:{} > max:{}) - "
+                   "Your chunksize may be too large",
+                   seq_len, max_seq_len);
     }
     if (three != 3) {
         has_error = true;
-        spdlog::error("RotE - expected constant size:3 at dim:2 found:{}", three);
+        DORADO_LOG(error, "RotE - expected constant size:3 at dim:2 found:{}", three);
     }
     if (head_dim != dim) {
         has_error = true;
-        spdlog::error("RotE - expected head_dim size:{} at dim:4 found:{}", dim, head_dim);
+        DORADO_LOG(error, "RotE - expected head_dim size:{} at dim:4 found:{}", dim, head_dim);
     }
     if (has_error) {
         throw std::runtime_error("RotE - input dimensions invalid");
@@ -637,7 +637,7 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
     }
     // TODO: handle result
     if (res != KOI_SUCCESS) {
-        spdlog::error("Koi tiled path failed {}", calls);
+        DORADO_LOG(error, "Koi tiled path failed {}", calls);
     }
 #endif
 }
@@ -773,7 +773,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
                 x_f16.data_ptr(), alpha, N * T);
     }
     if (res != KOI_SUCCESS) {
-        spdlog::error("Koi Volta tiled path failed {}", calls);
+        DORADO_LOG(error, "Koi Volta tiled path failed {}", calls);
     }
 #endif
 }
@@ -840,13 +840,13 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
             (layers.attn_window.second == 256) && (layers.dim_feedforward == 6144);
     use_koi_tiled = (is_sup_model || is_hyp_model) && options.device().is_cuda() &&
                     (koi_tc_is_available(KOI_F16) == KOI_SUCCESS);
-    spdlog::debug("TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
+    DORADO_LOG(debug, "TxEncoderStack: use_koi_tiled {}.", use_koi_tiled);
 
 #if !DORADO_ORIN && (CUDA_VERSION / 1000) < 13
     // Custom Volta flag
     use_koi_volta_tiled = is_sup_model && options.device().is_cuda() &&
                           (koi_volta_tc_is_available(KOI_F16) == KOI_SUCCESS);
-    spdlog::debug("TxEncoderStack: use_koi_volta_tiled {}.", use_koi_volta_tiled);
+    DORADO_LOG(debug, "TxEncoderStack: use_koi_volta_tiled {}.", use_koi_volta_tiled);
 #endif
 #endif
 

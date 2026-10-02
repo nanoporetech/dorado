@@ -190,7 +190,7 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
                "ovl_start_ind1 = "
             << ovl_start_ind1 << ", ovl_end_ind2 = " << ovl_end_ind2 << ", s1 = {" << s1
             << "}, s2 = {" << s2 << "}. Marking the second sample as filtered.";
-        spdlog::warn(oss.str());
+        DORADO_LOG(warn, oss.str());
         return {std::ssize(s1.positions_major), -1, false};
     }
 
@@ -348,7 +348,7 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
     // Sanity check the input pointers.
     for (size_t i = 0; i < std::size(samples); ++i) {
         if (!samples[i]) {
-            spdlog::warn("Nullptr sample provided to trim_samples. Returning empty.");
+            DORADO_LOG(warn, "Nullptr sample provided to trim_samples. Returning empty.");
             return {};
         }
     }
@@ -379,10 +379,10 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
             std::ostringstream oss;
             oss << "Sample 1 (index = " << idx_s1 << "): " << s1 << ", sample 2 (index = " << idx_s2
                 << "): " << s2 << ", trim 1 = " << trim1 << ", trim 2 = " << trim2;
-            spdlog::warn(
-                    "Cannot trim samples with relationship: {}. Marking the second "
-                    "sample as filtered. {}",
-                    relationship_to_string(rel), oss.str());
+            DORADO_LOG(warn,
+                       "Cannot trim samples with relationship: {}. Marking the second "
+                       "sample as filtered. {}",
+                       relationship_to_string(rel), oss.str());
         };
 
         switch (rel) {
@@ -461,14 +461,15 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
     // Trim each sample to the region.
     if (region) {
         if ((region->seq_id < 0) || (region->start < 0) || (region->end <= 0)) {
-            spdlog::warn(
+            DORADO_LOG(
+                    warn,
                     "Region trimming coordinates are not valid. Region: seq_id = {}, start = {} , "
                     "end = {}. Skipping trimming to region in trim_samples.",
                     region->seq_id, region->start, region->end);
             return result;
         }
 
-        spdlog::trace("[trim_samples] Trimming to region.");
+        DORADO_LOG(trace, "[trim_samples] Trimming to region.");
 
         for (size_t i = 0; i < std::size(samples); ++i) {
             const secondary::Sample& sample = *samples[i];
@@ -507,12 +508,12 @@ std::vector<TrimInfo> trim_samples(const std::vector<const secondary::Sample*>& 
             }
         }
     } else {
-        spdlog::trace("[trim_samples] Not trimming to region.");
+        DORADO_LOG(trace, "[trim_samples] Not trimming to region.");
     }
 
     assert(std::size(result) == std::size(samples));
 
-    spdlog::trace("[trim_samples] num_heuristic = {}", num_heuristic);
+    DORADO_LOG(trace, "[trim_samples] num_heuristic = {}", num_heuristic);
 
     return result;
 }

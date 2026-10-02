@@ -561,7 +561,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         candidates_list.push_back(std::move(candidate));
     }
-    spdlog::debug("> Kits to evaluate: {}", candidates_list.size());
+    DORADO_LOG(debug, "> Kits to evaluate: {}", candidates_list.size());
     return candidates_list;
 }
 
@@ -1439,7 +1439,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 
     if (results_unsorted.empty()) {
-        spdlog::warn("Barcode unclassified because no barcodes found in kit.");
+        DORADO_LOG(warn, "Barcode unclassified because no barcodes found in kit.");
         return UNCLASSIFIED;
     }
 

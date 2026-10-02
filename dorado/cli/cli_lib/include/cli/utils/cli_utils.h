@@ -191,20 +191,21 @@ inline bool validate_device_string(const std::string& device) {
         if (utils::try_parse_cuda_device_string(device, devices, error_message)) {
             return true;
         }
-        spdlog::error(error_message);
+        DORADO_LOG(error, error_message);
         return false;
     }
 #endif
-    spdlog::error("Invalid device string: {}\n{}", device, DEVICE_HELP);
+    DORADO_LOG(error, "Invalid device string: {}\n{}", device, DEVICE_HELP);
     return false;
 }
 
 #if DORADO_CUDA_BUILD
 inline void log_requested_cuda_devices(const std::vector<utils::CUDADeviceInfo>& cuda_device_info) {
     if (!cuda_device_info.empty()) {
-        spdlog::info("Using CUDA devices:");
+        DORADO_LOG(info, "Using CUDA devices:");
         for (const auto& device_info : cuda_device_info) {
-            spdlog::info("cuda:{} - {}", device_info.device_id, device_info.device_properties.name);
+            DORADO_LOG(info, "cuda:{} - {}", device_info.device_id,
+                       device_info.device_properties.name);
         }
     }
 }
@@ -253,7 +254,8 @@ inline std::vector<std::filesystem::path> collect_inputs(const std::string& inpu
 
     if (input_folder.empty()) {
         if (recursive) {
-            spdlog::warn("--recursive is not valid if input is stdin. This argument is ignored.");
+            DORADO_LOG(warn,
+                       "--recursive is not valid if input is stdin. This argument is ignored.");
         }
         return {fs::path("-")};
     }
@@ -269,8 +271,8 @@ inline std::vector<std::filesystem::path> collect_inputs(const std::string& inpu
         inputs.push_back(dir_entry.path());
     }
 
-    spdlog::trace("Collected {} valid input files from '{}'{}.", inputs.size(), input_folder,
-                  recursive ? " recursively" : "");
+    DORADO_LOG(trace, "Collected {} valid input files from '{}'{}.", inputs.size(), input_folder,
+               recursive ? " recursively" : "");
     return inputs;
 }
 

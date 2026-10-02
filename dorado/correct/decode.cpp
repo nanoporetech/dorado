@@ -9,7 +9,7 @@
 #define LOG_TRACE(...)
 #else
 #include <spdlog/spdlog.h>
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 
 struct base_count_t {

@@ -12,8 +12,8 @@
 #define LOG_TRACE(...)
 #define LOG_DEBUG(...)
 #else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#define LOG_DEBUG(...) spdlog::debug(__VA_ARGS__)
+#define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
+#define LOG_DEBUG(...) DORADO_LOG(debug, __VA_ARGS__)
 #endif
 
 namespace kadayashi {
@@ -219,7 +219,8 @@ bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
     }
     for (int64_t i = 0; i < std::ssize(data) - 1; i++) {
         if (data[i].size() != data[i + 1].size()) {
-            spdlog::error(
+            DORADO_LOG(
+                    error,
                     "[kdys::{}] data entries have at least 1 pair of unequal lengths, should not "
                     "happen. Will do nothing.",
                     __func__);
@@ -233,12 +234,12 @@ bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
         for (size_t j = 0; j < i; j++) {  // find a previous one as the reference for flipping
             const int comparable = normalize_readtaggings_count(data[j], data[i]);
             if (comparable < 0) {
-                spdlog::error(
-                        "[kdys::{}] entries have unequal lengths, should not happen, check code",
-                        __func__);
+                DORADO_LOG(error,
+                           "[kdys::{}] entries have unequal lengths, should not happen, check code",
+                           __func__);
                 for (size_t ii = 0; ii < data.size(); ii++) {
-                    spdlog::error("[kdys::{}]   data[{}] is length {}", __func__, ii,
-                                  data[ii].size());
+                    DORADO_LOG(error, "[kdys::{}]   data[{}] is length {}", __func__, ii,
+                               data[ii].size());
                 }
                 continue;
             }
@@ -253,8 +254,8 @@ bool normalize_readtaggings(std::vector<std::vector<uint8_t>> &data) {
 
         const std::pair<int, int> counts = normalize_readtaggings1(data[i_ref], data[i]);
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            spdlog::debug("[kdys::{}] read haplotag normalization: score raw={} flip={}", __func__,
-                          counts.first, counts.second);
+            DORADO_LOG(debug, "[kdys::{}] read haplotag normalization: score raw={} flip={}",
+                       __func__, counts.first, counts.second);
         }
     }
     return true;
@@ -295,7 +296,8 @@ void variant_graph_get_edge_values(chunk_t &ck,
                 i1 = r.vars[i1].allele_idx;
                 i2 = r.vars[i2].allele_idx;
                 if ((i1 != 0 && i1 != 1) || (i2 != 0 && i2 != 1)) {
-                    spdlog::error(
+                    DORADO_LOG(
+                            error,
                             "[kdys::{}] 2-allele diploid sancheck failed, impossible, check code. "
                             "Results may be wrong.",
                             __func__);
@@ -573,7 +575,8 @@ bool variant_graph_gen(chunk_t &ck) {
                 const uint8_t i1 = static_cast<uint8_t>(r.vars[i].allele_idx);
                 const uint8_t i2 = static_cast<uint8_t>(r.vars[i + 1].allele_idx);
                 if (((i1 != 0) && (i1 != 1)) || ((i2 != 0) && (i2 != 1))) {
-                    spdlog::error(
+                    DORADO_LOG(
+                            error,
                             "[kdys::{}] 2-allele diploid assumption violated? Should not happen. "
                             "Not "
                             "incrementing edge weight.",
@@ -702,10 +705,10 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
             if (firstreadID != std::numeric_limits<uint32_t>::max()) {
                 breakpoint_reads[firstreadID] = 1;
             } else {
-                spdlog::error(
-                        "[kdys::{}] should not happen: failed to get first read ID at phasing "
-                        "breakpoint? Giving up haptag normalization.",
-                        __func__);
+                DORADO_LOG(error,
+                           "[kdys::{}] should not happen: failed to get first read ID at phasing "
+                           "breakpoint? Giving up haptag normalization.",
+                           __func__);
                 return;
             }
 
@@ -748,7 +751,8 @@ void normalize_readtaggings_ht(std::vector<std::unordered_map<uint32_t, uint8_t>
                         sampleqID = qID;
                     }
                 }
-                spdlog::trace(
+                DORADO_LOG(
+                        trace,
                         "[kdys::{}] flip iter#{} (ref: iter#{}, n_comparable={}, sample qn: {} , "
                         "pos is "
                         ": {}-{})",
@@ -816,7 +820,7 @@ void variant_graph_do_simple_haptag(chunk_t &ck, const uint32_t n_iter_requested
 
     const bool norm_ok = normalize_readtaggings(results);
     if (!norm_ok) {
-        spdlog::error("[kdys::{}] normalization of read haptags failed", __func__);
+        DORADO_LOG(error, "[kdys::{}] normalization of read haptags failed", __func__);
     } else {
         for (uint32_t i_read = 0; i_read < ck.reads.size(); i_read++) {
             float cnt[3] = {0, 0, 0};
@@ -854,8 +858,8 @@ std::vector<uint8_t> variant_graph_do_simple_haptag1(chunk_t &ck, const uint32_t
     variant_graph_t &vg = ck.vg;
 
     if (seedreadID >= ck.reads.size()) {  // should not happen
-        spdlog::error("[kdys::{}] should not happen: seedreadID ({}) >= ck reads size ({})",
-                      __func__, seedreadID, ck.reads.size());
+        DORADO_LOG(error, "[kdys::{}] should not happen: seedreadID ({}) >= ck reads size ({})",
+                   __func__, seedreadID, ck.reads.size());
         return {};
     }
 
@@ -930,9 +934,9 @@ std::vector<uint8_t> variant_graph_do_simple_haptag1(chunk_t &ck, const uint32_t
             readhps[i_best] = hp_best;
             variant_graph_update_varhp_given_read(ck, varhps, i_best, hp_best);
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                spdlog::trace("[kdys::{}] updated qn {} (i={}) as hp {}, score={:.5f}, updated={}",
-                              __func__, ck.qnames[i_best], i_best, hp_best, score_best,
-                              updated_best);
+                DORADO_LOG(trace,
+                           "[kdys::{}] updated qn {} (i={}) as hp {}, score={:.5f}, updated={}",
+                           __func__, ck.qnames[i_best], i_best, hp_best, score_best, updated_best);
             }
         } else {
             break;
@@ -959,8 +963,8 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
     variant_graph_update_varhp_given_read_ht(ck, pos2counter, seedreadID, 0);
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
         for (const auto &pair : pos2counter) {
-            spdlog::trace("[kdys::{}] (init) pos {} : {:.1f}, {:.1f}", __func__, pair.first,
-                          std::get<0>(pair.second), std::get<1>(pair.second));
+            DORADO_LOG(trace, "[kdys::{}] (init) pos {} : {:.1f}, {:.1f}", __func__, pair.first,
+                       std::get<0>(pair.second), std::get<1>(pair.second));
         }
     }
 
@@ -1029,12 +1033,12 @@ std::unordered_map<uint32_t, uint8_t> variant_graph_do_simple_haptag1_give_ht(
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
                 infer_readhp_stat_t stat =
                         variant_graph_infer_readhp_given_vars_ht(ck, pos2counter, i_best, 1);
-                spdlog::trace(
-                        "[kdys::{}] updated qn {} (i={} pos {}-{}) as hp {}, score={:.5f}, "
-                        "updated={} (stat: {:.2f}, {}, {})",
-                        __func__, ck.qnames[i_best], i_best, ck.reads[i_best].start_pos,
-                        ck.reads[i_best].end_pos, hp_best, score_best, updated_best,
-                        stat.score_best, stat.updated_best, stat.hp_best);
+                DORADO_LOG(trace,
+                           "[kdys::{}] updated qn {} (i={} pos {}-{}) as hp {}, score={:.5f}, "
+                           "updated={} (stat: {:.2f}, {}, {})",
+                           __func__, ck.qnames[i_best], i_best, ck.reads[i_best].start_pos,
+                           ck.reads[i_best].end_pos, hp_best, score_best, updated_best,
+                           stat.score_best, stat.updated_best, stat.hp_best);
             }
             readID2hp[i_best] = hp_best;
             variant_graph_update_varhp_given_read_ht(ck, pos2counter, i_best, hp_best);
