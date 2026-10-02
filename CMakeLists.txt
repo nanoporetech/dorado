@@ -188,9 +188,6 @@ else()
     set(DORADO_ENABLE_PCH TRUE)
 endif()
 
-# By default, make per-read trace-logging a no-op. Turn this option on to enable it.
-option(DORADO_PER_READ_TRACE "Enable per-read trace logging" OFF)
-
 # Bring in 3rdparty libs
 include(cmake/Zlib.cmake)
 include(cmake/Koi.cmake)
