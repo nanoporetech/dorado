@@ -3,12 +3,12 @@
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "torch_utils/duplex_utils.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 
 #include <cxxpool.h>
 #include <edlib.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>

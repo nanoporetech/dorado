@@ -1,6 +1,6 @@
 #include "secondary/consensus/sample_trimming.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <ostream>
 #include <sstream>

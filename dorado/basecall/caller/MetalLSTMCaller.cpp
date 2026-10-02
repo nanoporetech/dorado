@@ -5,10 +5,9 @@
 #include "decode/beam_search.h"
 #include "model/MetalCRFModel.h"
 #include "torch_utils/metal_utils.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>

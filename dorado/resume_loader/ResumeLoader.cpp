@@ -2,11 +2,11 @@
 
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
+#include "utils/log_utils.h"
 #include "utils/tty_utils.h"
 
 #include <htslib/sam.h>
 #include <indicators/indeterminate_progress_bar.hpp>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <memory>

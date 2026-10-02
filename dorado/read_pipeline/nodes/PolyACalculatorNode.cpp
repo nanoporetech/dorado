@@ -5,9 +5,8 @@
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "utils/context_container.h"
+#include "utils/log_utils.h"
 #include "utils/types.h"
-
-#include <spdlog/spdlog.h>
 
 namespace dorado {
 

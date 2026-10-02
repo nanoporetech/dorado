@@ -1,9 +1,9 @@
 #include "medaka_counts.h"
 
 #include "medaka_bamiter.h"
+#include "utils/log_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cerrno>

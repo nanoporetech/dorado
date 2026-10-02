@@ -3,8 +3,7 @@
 #include "downloader.h"
 #include "models/models.h"
 #include "utils/fs_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <filesystem>
 #include <vector>

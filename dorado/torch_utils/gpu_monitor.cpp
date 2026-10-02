@@ -8,11 +8,11 @@
 
 #if HAS_NVML
 
+#include "utils/log_utils.h"
 #include "utils/scoped_trace_log.h"
 #include "utils/string_utils.h"
 
 #include <nvml.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <numeric>

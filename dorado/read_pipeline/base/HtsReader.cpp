@@ -5,9 +5,9 @@
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
+#include "utils/log_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <functional>

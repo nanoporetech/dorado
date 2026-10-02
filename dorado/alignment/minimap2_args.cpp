@@ -2,12 +2,12 @@
 
 #include "alignment/minimap2_wrappers.h"  // IWYU pragma: keep for Minimap2IdxOptHolder
 #include "utils/arg_parse_ext.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <minimap.h>
 #include <mmpriv.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <stdexcept>

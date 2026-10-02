@@ -11,12 +11,12 @@
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/timer_high_res.h"
 
 #include <cxxpool.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>

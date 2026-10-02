@@ -10,7 +10,6 @@
 
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
-#include <spdlog/spdlog.h>
 #include <torch/version.h>
 
 #include <iostream>

@@ -2,11 +2,11 @@
 
 #include "hts_utils/bam_utils.h"
 #include "utils/PostCondition.h"
+#include "utils/log_utils.h"
 
 #include <htslib/hts.h>
 #include <htslib/sam.h>
 #include <htslib/thread_pool.h>
-#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cassert>

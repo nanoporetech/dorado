@@ -10,12 +10,12 @@
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/base/messages/CorrectionAlignments.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 
 #include <htslib/sam.h>
 #include <minimap.h>
-#include <spdlog/spdlog.h>
 
 namespace dorado {
 

@@ -3,7 +3,6 @@
 #include "utils/tty_utils.h"
 
 #include <spdlog/sinks/stdout_color_sinks.h>
-#include <spdlog/spdlog.h>
 
 #ifdef __APPLE__
 #include <fcntl.h>

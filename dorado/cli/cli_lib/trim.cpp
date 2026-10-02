@@ -18,8 +18,6 @@
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 
-#include <spdlog/spdlog.h>
-
 #include <memory>
 #include <optional>
 #include <string>

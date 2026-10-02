@@ -1,6 +1,6 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <memory>
 #include <stdexcept>

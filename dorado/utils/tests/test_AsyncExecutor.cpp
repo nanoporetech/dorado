@@ -15,10 +15,10 @@
 
 #if DORADO_ENABLE_BENCHMARK_TESTS
 #include "utils/jthread.h"
+#include "utils/log_utils.h"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <random>
 #endif

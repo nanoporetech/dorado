@@ -3,10 +3,10 @@
 #include "flash_attention3_backend.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 
 #include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/util/Exception.h>
-#include <spdlog/spdlog.h>
 #include <torch/headeronly/core/ScalarType.h>
 
 #include <algorithm>

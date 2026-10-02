@@ -20,12 +20,12 @@
 #include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"
 #include "utils/jthread.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
 #include "variant/variant_impl.h"
 
 #include <IntervalTree.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>

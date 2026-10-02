@@ -2,10 +2,10 @@
 
 #include "torch_utils/gpu_profiling.h"
 #include "types.h"
+#include "utils/log_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <ATen/ops/empty.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 

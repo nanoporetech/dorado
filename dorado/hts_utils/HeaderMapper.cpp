@@ -8,10 +8,10 @@
 #include "hts_utils/hts_types.h"
 #include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
+#include "utils/log_utils.h"
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <stdexcept>

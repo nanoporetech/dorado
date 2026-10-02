@@ -2,10 +2,9 @@
 
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/base/messages/CorrectionAlignments.h"
+#include "utils/log_utils.h"
 #include "utils/paf_utils.h"
 #include "utils/timer_high_res.h"
-
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <vector>

@@ -12,8 +12,7 @@
 #include "read_pipeline/nodes/StereoDuplexEncoderNode.h"
 #include "splitter/DuplexReadSplitter.h"
 #include "splitter/RNAReadSplitter.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <stdexcept>
 

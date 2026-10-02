@@ -5,11 +5,11 @@
 #include "pipeline.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/kadayashi/local_haplotagging.h"
+#include "utils/log_utils.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/hts.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 

@@ -2,9 +2,8 @@
 
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
+#include "utils/log_utils.h"
 #include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 namespace dorado {
 

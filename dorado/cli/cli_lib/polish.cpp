@@ -24,10 +24,9 @@
 #include "utils/arg_parse_ext.h"
 #include "utils/io_utils.h"
 #include "utils/jthread.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>

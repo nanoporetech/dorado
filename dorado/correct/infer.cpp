@@ -1,9 +1,9 @@
 #include "correct/infer.h"
 
 #include "correct/types.h"
+#include "utils/log_utils.h"
 #include "utils/memory_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #if DORADO_METAL_BUILD

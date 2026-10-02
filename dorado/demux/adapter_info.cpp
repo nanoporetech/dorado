@@ -1,8 +1,7 @@
 #include "demux/adapter_info.h"
 
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <map>
 

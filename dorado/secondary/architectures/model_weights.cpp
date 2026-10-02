@@ -2,8 +2,8 @@
 
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <torch/serialize.h>
 
 #include <fstream>

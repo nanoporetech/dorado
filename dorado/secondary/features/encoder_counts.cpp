@@ -1,8 +1,8 @@
 #include "encoder_counts.h"
 
 #include "medaka_counts.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <torch/types.h>
 
 #include <cassert>

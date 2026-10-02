@@ -13,7 +13,6 @@
 #include "utils/tty_utils.h"
 
 #include <argparse/argparse.hpp>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <string>

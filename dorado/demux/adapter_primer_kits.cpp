@@ -2,9 +2,8 @@
 
 #include "demux/parse_custom_sequences.h"
 #include "models/kits.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <set>
 #include <sstream>

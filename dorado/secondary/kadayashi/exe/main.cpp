@@ -7,10 +7,10 @@
 #include "secondary/common/bam_file.h"
 #include "secondary/kadayashi/faidx_utils.h"
 #include "secondary/kadayashi/local_haplotagging.h"
+#include "utils/log_utils.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <string>
 #include <string_view>

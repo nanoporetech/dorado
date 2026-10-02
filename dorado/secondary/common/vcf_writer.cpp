@@ -2,10 +2,10 @@
 
 #include "dorado_version.h"
 #include "secondary/consensus/variant_calling.h"
+#include "utils/log_utils.h"
 
 #include <htslib/hts.h>
 #include <htslib/vcf.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>

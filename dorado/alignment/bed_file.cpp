@@ -1,9 +1,8 @@
 #include "alignment/bed_file.h"
 
 #include "utils/PostCondition.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <iomanip>

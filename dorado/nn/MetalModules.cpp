@@ -1,8 +1,7 @@
 #include "nn/MetalModules.h"
 
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <stdexcept>
 #include <string>

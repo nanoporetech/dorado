@@ -4,8 +4,7 @@
 #include "encoder_read_alignment.h"
 #include "secondary/architectures/model_config.h"
 #include "secondary/architectures/model_config_validation.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <stdexcept>
 #include <unordered_map>

@@ -9,6 +9,7 @@
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "secondary/kadayashi/types.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <cxxpool.h>
@@ -17,7 +18,6 @@
 #include <htslib/hts.h>
 #include <htslib/sam.h>
 #include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>

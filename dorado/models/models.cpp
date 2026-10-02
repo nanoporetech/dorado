@@ -2,8 +2,7 @@
 
 #include "models/kits.h"
 #include "models/metadata.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <array>

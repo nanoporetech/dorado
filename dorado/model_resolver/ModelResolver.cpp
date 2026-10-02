@@ -7,10 +7,9 @@
 #include "models/metadata.h"
 #include "models/model_complex.h"
 #include "models/models.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <optional>

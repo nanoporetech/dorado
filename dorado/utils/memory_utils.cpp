@@ -3,7 +3,8 @@
 #if defined(WIN32)
 #include <windows.h>
 #elif defined(__linux__)
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
+
 #include <sys/sysinfo.h>
 
 #include <fstream>

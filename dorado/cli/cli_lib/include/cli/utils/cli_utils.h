@@ -8,11 +8,11 @@
 #include "torch_utils/auto_detect_device.h"
 #include "utils/dev_utils.h"
 #include "utils/fs_utils.h"
+#include "utils/log_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <htslib/sam.h>
 #include <minimap.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cctype>

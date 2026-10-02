@@ -4,10 +4,9 @@
 #include "model/CRFModel.h"
 #include "model/TxModel.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstddef>

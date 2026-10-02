@@ -1,9 +1,8 @@
 #include "secondary/common/variant.h"
 
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <ostream>

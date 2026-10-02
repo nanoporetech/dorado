@@ -1,9 +1,8 @@
 #include "csv_helpers.h"
 
 #include "utils/SeparatedStream.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 namespace dorado::batchsize_benchmarks {
 

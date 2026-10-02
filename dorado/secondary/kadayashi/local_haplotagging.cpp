@@ -8,13 +8,13 @@
 #include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "variant_graph.h"
 
 #include <htslib/faidx.h>
 #include <htslib/hts.h>
 #include <htslib/kfunc.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>

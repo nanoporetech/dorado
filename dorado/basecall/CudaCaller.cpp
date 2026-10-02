@@ -5,13 +5,13 @@
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "torch_utils/cuda_utils.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/thread_utils.h"
 
 #include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 #include <torch/cuda.h>
 
 #include <algorithm>

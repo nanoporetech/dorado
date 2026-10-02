@@ -1,9 +1,8 @@
 #pragma once
 
 #include "MessageSink.h"
+#include "utils/log_utils.h"
 #include "utils/stats.h"
-
-#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <utility>

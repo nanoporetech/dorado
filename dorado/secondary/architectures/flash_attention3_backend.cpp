@@ -3,9 +3,10 @@
 #include <optional>
 
 #if DORADO_HAS_FLASHATTENTION3
+#include "utils/log_utils.h"
+
 #include <ATen/cuda/CUDAContextLight.h>
 #include <flash_api.h>
-#include <spdlog/spdlog.h>
 #endif
 
 namespace dorado::secondary {

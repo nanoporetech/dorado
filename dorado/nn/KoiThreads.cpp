@@ -1,8 +1,7 @@
 #include "nn/KoiThreads.h"
 
 #include "koi_thread_pool.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <stdexcept>
 

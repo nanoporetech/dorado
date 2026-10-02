@@ -11,7 +11,7 @@
 #include <thread>
 
 #if DORADO_ENABLE_BENCHMARK_TESTS
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <latch>
 #endif

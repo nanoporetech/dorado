@@ -8,7 +8,7 @@
 #ifdef NDEBUG
 #define LOG_TRACE(...)
 #else
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 #define LOG_TRACE(...) DORADO_LOG(trace, __VA_ARGS__)
 #endif
 

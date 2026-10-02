@@ -7,9 +7,8 @@
 #include "ModBaseLatentSpaceV1SequenceModel.h"
 #include "config/ModBaseModelConfig.h"
 #include "utils/dev_utils.h"
+#include "utils/log_utils.h"
 #include "utils/overloaded.h"
-
-#include <spdlog/spdlog.h>
 
 #include <optional>
 #include <stdexcept>

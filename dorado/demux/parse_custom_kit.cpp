@@ -1,8 +1,8 @@
 #include "demux/parse_custom_kit.h"
 
 #include "demux/parse_custom_sequences.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <algorithm>

@@ -1,7 +1,7 @@
 
 #include "utils/fs_utils.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <exception>
 #include <filesystem>

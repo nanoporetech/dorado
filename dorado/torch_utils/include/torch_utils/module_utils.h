@@ -1,8 +1,8 @@
 #pragma once
 
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <torch/nn.h>
 
 #include <stdexcept>

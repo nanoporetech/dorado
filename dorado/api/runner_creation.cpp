@@ -3,8 +3,7 @@
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <thread>
 

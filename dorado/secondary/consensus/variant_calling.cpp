@@ -6,12 +6,11 @@
 #include "secondary/features/medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "utils/rle.h"
 #include "utils/sequence_utils.h"
 #include "utils/stl_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>

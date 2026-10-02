@@ -14,8 +14,7 @@
 
 #ifndef NDEBUG
 #include "utils/dev_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 #endif
 
 namespace dorado::utils {

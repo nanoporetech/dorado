@@ -7,11 +7,11 @@
 #include <IOKit/IOKitLib.h>
 #pragma clang diagnostic pop
 
+#include "utils/log_utils.h"
 #include "utils/overloaded.h"
 
 #include <mach-o/dyld.h>
 #include <objc/objc-runtime.h>
-#include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
 

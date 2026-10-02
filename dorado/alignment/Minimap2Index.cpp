@@ -4,8 +4,7 @@
 #include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/header_sq_record.h"
 #include "hts_utils/sequence_file_format.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
 //Ask lh3 t  make some of these funcs publicly available?

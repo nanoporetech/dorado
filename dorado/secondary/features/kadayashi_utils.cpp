@@ -1,6 +1,6 @@
 #include "secondary/features/kadayashi_utils.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <cassert>
 #include <cstdio>

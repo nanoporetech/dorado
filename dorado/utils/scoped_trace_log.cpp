@@ -1,6 +1,6 @@
 #include "utils/scoped_trace_log.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 namespace dorado::utils {
 

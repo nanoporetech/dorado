@@ -30,7 +30,6 @@
 
 #include <argparse/argparse.hpp>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <memory>

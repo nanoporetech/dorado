@@ -4,9 +4,8 @@
 #include "MetalCallerTask.h"
 #include "MetalLSTMCaller.h"
 #include "torch_utils/metal_utils.h"
+#include "utils/log_utils.h"
 #include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <chrono>

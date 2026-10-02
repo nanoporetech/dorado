@@ -2,8 +2,7 @@
 
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/base/MessageSink.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <array>
 #include <atomic>

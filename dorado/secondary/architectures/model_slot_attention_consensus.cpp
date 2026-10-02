@@ -1,8 +1,7 @@
 #include "model_slot_attention_consensus.h"
 
 #include "torch_utils/tensor_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <cmath>
 #include <random>

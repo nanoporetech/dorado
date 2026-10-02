@@ -1,7 +1,8 @@
 #include "hts_utils/fai_utils.h"
 
+#include "utils/log_utils.h"
+
 #include <htslib/faidx.h>
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <string>

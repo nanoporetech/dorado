@@ -2,9 +2,9 @@
 
 #include "models/models.h"
 #include "utils/crypto_utils.h"
+#include "utils/log_utils.h"
 
 #include <elzip/elzip.hpp>
-#include <spdlog/spdlog.h>
 #include <url.hpp>
 
 #include <filesystem>

@@ -9,8 +9,7 @@
 #include "secondary/architectures/model_weights.h"
 #include "secondary/features/encoder_factory.h"
 #include "utils/container_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <filesystem>
 #include <unordered_map>

@@ -1,11 +1,11 @@
 #include "nn/TxModules.h"
+#include "utils/log_utils.h"
 
 #include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/core/DeviceType.h>
 #include <c10/core/TensorOptions.h>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators_range.hpp>
-#include <spdlog/spdlog.h>
 
 #include <vector>
 

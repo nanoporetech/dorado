@@ -25,7 +25,6 @@
 #include "utils/tty_utils.h"
 
 #include <minimap.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <filesystem>

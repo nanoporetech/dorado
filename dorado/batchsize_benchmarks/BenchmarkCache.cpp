@@ -2,9 +2,8 @@
 
 #include "compiled_timings.h"
 #include "csv_helpers.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <optional>

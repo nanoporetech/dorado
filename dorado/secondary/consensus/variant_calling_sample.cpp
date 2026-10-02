@@ -6,8 +6,7 @@
 #include "secondary/features/decoder_base.h"
 #include "secondary/features/encoder_utils.h"
 #include "torch_utils/tensor_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <sstream>

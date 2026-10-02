@@ -4,9 +4,8 @@
 #include "correct/types.h"
 #include "read_pipeline/base/messages/CorrectionAlignments.h"
 #include "torch_utils/gpu_profiling.h"
+#include "utils/log_utils.h"
 #include "utils/paf_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <sstream>
 #include <stdexcept>

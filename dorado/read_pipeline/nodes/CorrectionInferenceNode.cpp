@@ -9,12 +9,12 @@
 #include "read_pipeline/base/messages/CorrectionAlignments.h"
 #include "secondary/architectures/model_herro.h"
 #include "torch_utils/gpu_profiling.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 #include "utils/thread_utils.h"
 
 #include <htslib/faidx.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <filesystem>

@@ -6,8 +6,7 @@
 #include "hts_writer/HtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "hts_writer_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <memory>

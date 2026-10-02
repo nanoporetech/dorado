@@ -1,7 +1,7 @@
 #include "downloader.h"
+#include "utils/log_utils.h"
 
 #include <Foundation/Foundation.h>
-#include <spdlog/spdlog.h>
 
 namespace dorado::model_downloader {
 

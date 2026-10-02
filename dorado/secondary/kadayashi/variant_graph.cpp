@@ -1,8 +1,7 @@
 #include "variant_graph.h"
 
 #include "secondary/kadayashi/sequence_utility.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <array>

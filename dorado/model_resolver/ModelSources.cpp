@@ -1,6 +1,6 @@
 #include "model_resolver/ModelSources.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <ios>

@@ -50,7 +50,6 @@
 #include <argparse/argparse.hpp>
 #include <cxxpool.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdlib>

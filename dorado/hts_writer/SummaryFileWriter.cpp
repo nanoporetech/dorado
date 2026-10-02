@@ -2,10 +2,10 @@
 
 #include "hts_utils/bam_utils.h"
 #include "hts_writer_utils.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <array>
 #include <fstream>

@@ -5,9 +5,8 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "hts_writer/StructuredHtsFileWriter.h"
+#include "utils/log_utils.h"
 #include "utils/tty_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <optional>

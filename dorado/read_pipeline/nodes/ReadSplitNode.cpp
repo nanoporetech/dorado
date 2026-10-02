@@ -2,8 +2,7 @@
 
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "splitter/ReadSplitter.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 

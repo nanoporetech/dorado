@@ -2,8 +2,7 @@
 
 #include "correct/types.h"
 #include "read_pipeline/base/MessageSink.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <atomic>
 #include <filesystem>

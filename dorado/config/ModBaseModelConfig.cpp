@@ -3,10 +3,10 @@
 #include "config/common.h"
 #include "hts_utils/bam_utils.h"
 #include "utils/dev_utils.h"
+#include "utils/log_utils.h"
 #include "utils/overloaded.h"
 #include "utils/sequence_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <algorithm>

@@ -3,9 +3,9 @@
 #include "hts_utils/KString.h"
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
+#include "utils/log_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <iterator>

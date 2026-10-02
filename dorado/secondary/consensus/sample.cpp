@@ -2,9 +2,9 @@
 
 #include "secondary/common/interval.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <spdlog/spdlog.h>
 
 #include <ostream>
 #include <span>

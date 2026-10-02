@@ -11,9 +11,9 @@
 #if DORADO_CUDA_BUILD
 #include "nn/KoiUtils.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 
 #include <c10/cuda/CUDAGuard.h>
-#include <spdlog/spdlog.h>
 #endif
 
 namespace dorado::modbase::model {

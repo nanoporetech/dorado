@@ -2,8 +2,8 @@
 
 #include "models/kits.h"
 #include "models/models.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <cstddef>

@@ -1,10 +1,10 @@
 #include "cli.h"
 
 #include "resources.h"
+#include "utils/log_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <exception>
 #include <sstream>

@@ -1,8 +1,7 @@
 #include "read_output_progress_stats.h"
 
+#include "utils/log_utils.h"
 #include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>

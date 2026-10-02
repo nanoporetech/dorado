@@ -35,7 +35,6 @@
 #include "utils/types.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cstdlib>
 #include <exception>

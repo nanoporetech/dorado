@@ -4,12 +4,12 @@
 #include "nn/TxModules.h"
 #include "torch_utils/gpu_profiling.h"
 #include "utils/dev_utils.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <ATen/ops/scaled_dot_product_attention.h>
 #include <c10/core/ScalarType.h>
-#include <spdlog/spdlog.h>
 
 #include <cmath>
 

@@ -1,10 +1,9 @@
 #include "ProgressTracker.h"
 
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 #include "utils/types.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <sstream>
