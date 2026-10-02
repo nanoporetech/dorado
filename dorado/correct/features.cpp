@@ -150,9 +150,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
     const int32_t win_tstart = overlaps.front().win_tstart;
 
     static auto base_encoding = gen_base_encoding();
-#ifndef NDEBUG
     static auto base_decoding = gen_base_decoding();
-#endif
     auto bases_options = at::TensorOptions().dtype(at::kInt).device(at::kCPU);
     auto quals_options = at::TensorOptions().dtype(at::kFloat).device(at::kCPU);
 
