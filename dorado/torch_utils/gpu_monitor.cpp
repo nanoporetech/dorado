@@ -236,7 +236,7 @@ public:
         nvmlDevice_t device;
         auto *get_handle = m_DeviceGetHandleByIndex_v2 ? m_DeviceGetHandleByIndex_v2
                                                        : m_DeviceGetHandleByIndex;
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         nvmlReturn_t result = get_handle(device_index, &device);
         if (result != NVML_SUCCESS) {
             return std::nullopt;
@@ -245,7 +245,7 @@ public:
     }
 
     nvmlReturn_t SystemGetDriverVersion(char *version, unsigned int length) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_SystemGetDriverVersion(version, length);
     }
 
@@ -253,12 +253,12 @@ public:
     nvmlReturn_t DeviceGetTemperature(const nvmlDevice_t &device,
                                       nvmlTemperatureSensors_t sensorType,
                                       unsigned int *temp) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetTemperature(device, sensorType, temp);
     }
 #else
     nvmlReturn_t DeviceGetTemperatureV(const nvmlDevice_t &device, nvmlTemperature_t *temperature) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetTemperatureV(device, temperature);
     }
 #endif
@@ -266,13 +266,13 @@ public:
     nvmlReturn_t DeviceGetTemperatureThreshold(const nvmlDevice_t &device,
                                                nvmlTemperatureThresholds_t thresholdType,
                                                unsigned int *temp) {
-        ScopedTraceLog log{__func__};
-        log.write("nvmlTemperatureThresholds_t: " + std::to_string(thresholdType));
+        DORADO_TRACE_SCOPE(log);
+        DORADO_TRACE_MSG(log, "nvmlTemperatureThresholds_t: {}", static_cast<int>(thresholdType));
         return m_DeviceGetTemperatureThreshold(device, thresholdType, temp);
     }
 
     nvmlReturn_t DeviceGetPerformanceState(const nvmlDevice_t &device, unsigned int *limit) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         nvmlPstates_t state;
         auto result = m_DeviceGetPerformanceState(device, &state);
         *limit = static_cast<unsigned int>(state);
@@ -281,44 +281,44 @@ public:
 
     nvmlReturn_t DeviceGetPowerManagementDefaultLimit(const nvmlDevice_t &device,
                                                       unsigned int *limit) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetPowerManagementDefaultLimit(device, limit);
     }
 
     nvmlReturn_t DeviceGetPowerUsage(const nvmlDevice_t &device, unsigned int *power) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetPowerUsage(device, power);
     }
 
     nvmlReturn_t DeviceGetUtilizationRates(const nvmlDevice_t &device,
                                            nvmlUtilization_t *utilization) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetUtilizationRates(device, utilization);
     }
 
 #if NVML_API_VERSION < 13
     nvmlReturn_t DeviceGetCurrentClocksThrottleReasons(const nvmlDevice_t &device,
                                                        unsigned long long *clocksEventReasons) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetCurrentClocksThrottleReasons(device, clocksEventReasons);
     }
 #else
 
     nvmlReturn_t DeviceGetCurrentClocksEventReasons(const nvmlDevice_t &device,
                                                     unsigned long long *clocksEventReasons) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetCurrentClocksEventReasons(device, clocksEventReasons);
     }
 #endif
 
     nvmlReturn_t DeviceGetName(const nvmlDevice_t &device, char *name, unsigned int length) {
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return m_DeviceGetName(device, name, length);
     }
 
     nvmlReturn_t DeviceGetCount(unsigned int *count) {
         auto *device_count_op = m_DeviceGetCount_v2 ? m_DeviceGetCount_v2 : m_DeviceGetCount;
-        ScopedTraceLog log{__func__};
+        DORADO_TRACE_SCOPE(log);
         return device_count_op(count);
     }
 

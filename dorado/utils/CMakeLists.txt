@@ -77,7 +77,6 @@ dorado_add_library(
         parameters.cpp
         ResourceLimiter.cpp
         SampleSheet.cpp
-        scoped_trace_log.cpp
         sequence_utils.cpp
         stats.cpp
         sys_stats.cpp
