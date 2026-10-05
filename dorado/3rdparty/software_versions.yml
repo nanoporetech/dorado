@@ -59,7 +59,7 @@ date:
 edlib:
     description: >
         C/C++ library for sequence alignment using edit distance
-    version: "1.3.9.post1"
+    version: "0ddc23ea06abd95ab6227442acb4c27bd7607b68"
     url: https://github.com/martinsos/edlib
     license: edlib/LICENSE
     files:
