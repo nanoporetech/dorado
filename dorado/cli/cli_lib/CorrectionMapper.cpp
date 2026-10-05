@@ -152,11 +152,10 @@ void CorrectionMapper::send_data_fn(Pipeline& pipeline) {
     utils::set_thread_name("errcorr_copy");
     while (true) {
         std::unique_lock<std::mutex> lock(m_copy_mtx);
-        m_copy_cv.wait(lock, [&] {
-            return (!m_shadow_correction_records.empty() || m_copy_terminate.load());
-        });
+        m_copy_cv.wait(lock,
+                       [&] { return (!m_shadow_correction_records.empty() || m_copy_terminate); });
 
-        if (m_shadow_correction_records.empty() && m_copy_terminate.load()) {
+        if (m_shadow_correction_records.empty() && m_copy_terminate) {
             break;
         }
 
@@ -277,7 +276,10 @@ void CorrectionMapper::process(Pipeline& pipeline) {
         m_current_index++;
     } while (m_index->load_next_chunk(m_num_threads) != alignment::IndexLoadResult::end_of_index);
 
-    m_copy_terminate.store(true);
+    {
+        std::lock_guard<std::mutex> lock(m_copy_mtx);
+        m_copy_terminate = true;
+    }
     m_copy_cv.notify_all();
     if (copy_thread.joinable()) {
         copy_thread.join();

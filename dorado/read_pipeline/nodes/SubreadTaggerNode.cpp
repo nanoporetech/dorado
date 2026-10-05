@@ -65,10 +65,13 @@ void SubreadTaggerNode::input_thread_fn() {
 
 void SubreadTaggerNode::check_duplex_thread() {
     utils::set_thread_name("subread_duplex");
-    while (!m_terminate.load()) {
+    while (true) {
         std::unique_lock lock(m_duplex_reads_mutex);
-        m_check_duplex_cv.wait(lock,
-                               [&] { return !m_updated_read_tags.empty() || m_terminate.load(); });
+        m_check_duplex_cv.wait(lock, [&] { return !m_updated_read_tags.empty() || m_terminate; });
+
+        if (m_terminate) {
+            break;
+        }
 
         if (m_updated_read_tags.empty()) {
             continue;
@@ -127,7 +130,10 @@ void SubreadTaggerNode::terminate(const TerminateOptions& terminate_options) {
 void SubreadTaggerNode::restart() { start_threads(); }
 
 void SubreadTaggerNode::start_threads() {
-    m_terminate.store(false);
+    {
+        std::lock_guard<std::mutex> lock(m_duplex_reads_mutex);
+        m_terminate = false;
+    }
     m_duplex_thread = std::thread([this] { check_duplex_thread(); });
     start_input_processing([this] { input_thread_fn(); }, "subread_tagger");
 }
@@ -135,7 +141,11 @@ void SubreadTaggerNode::start_threads() {
 void SubreadTaggerNode::terminate_impl(utils::AsyncQueueTerminateFast fast) {
     stop_input_processing(fast);
 
-    m_terminate.store(true);
+    {
+        std::lock_guard<std::mutex> lock(m_duplex_reads_mutex);
+        m_terminate = true;
+    }
+
     m_check_duplex_cv.notify_one();
 
     if (m_duplex_thread.joinable()) {

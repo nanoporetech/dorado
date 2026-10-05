@@ -22,6 +22,7 @@
 #include <mutex>
 #include <queue>
 #include <set>
+#include <utility>
 
 namespace dorado::basecall {
 
@@ -330,8 +331,11 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
 }
 
 void CudaCaller::terminate() {
-    m_terminate.store(true);
     auto &task_queue = get_task_queue();
+    {
+        std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
+        m_terminate = true;
+    }
     task_queue.m_input_cv.notify_all();
     if (m_cuda_thread.joinable()) {
         m_cuda_thread.join();
@@ -340,7 +344,9 @@ void CudaCaller::terminate() {
 
 void CudaCaller::restart() {
     // This can be called more than once, via multiple runners.
-    if (m_terminate.exchange(false)) {
+    auto &task_queue = get_task_queue();
+    std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
+    if (std::exchange(m_terminate, false)) {
         start_threads();
     }
 }
@@ -721,11 +727,11 @@ void CudaCaller::cuda_thread_fn() {
         task_queue.m_input_cv.wait(input_lock, [&] {
             return (!task_queue.m_input_queue.empty() &&
                     task_queue.m_input_queue.front()->caller == this) ||
-                   (task_queue.m_input_queue.empty() && m_terminate.load());
+                   (task_queue.m_input_queue.empty() && m_terminate);
         });
         nvtxRangePop();
 
-        if (task_queue.m_input_queue.empty() && m_terminate.load()) {
+        if (task_queue.m_input_queue.empty() && m_terminate) {
             return;
         }
 

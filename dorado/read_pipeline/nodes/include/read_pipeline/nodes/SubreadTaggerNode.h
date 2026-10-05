@@ -54,7 +54,7 @@ private:
     std::unordered_map<uint64_t, std::pair<std::vector<SimplexReadPtr>, size_t>>
             m_full_subread_groups;
 
-    std::atomic_bool m_terminate{false};
+    bool m_terminate{false};
 };
 
 }  // namespace dorado
