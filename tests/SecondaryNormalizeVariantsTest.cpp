@@ -1,6 +1,5 @@
 #include "secondary/common/variant.h"
 #include "secondary/consensus/variant_calling.h"
-#include "utils/log_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -14,8 +13,6 @@ namespace dorado::secondary::consensus::tests {
 #define TEST_GROUP "[SecondaryConsensus]"
 
 CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
-    spdlog::set_level(spdlog::level::trace);
-
     const std::string reference_1{"GGGGCATGGGG"};
     const std::vector<std::string_view> consensus_1{"GGGGTGCGGGG"};
     const std::vector<int64_t> pos_major_1{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
@@ -302,7 +299,6 @@ CATCH_TEST_CASE("normalize_variant", TEST_GROUP) {
 }
 
 CATCH_TEST_CASE("collapse_to_haploid", TEST_GROUP) {
-    spdlog::set_level(spdlog::level::trace);
     struct TestCase {
         std::string test_name;
         Variant variant;

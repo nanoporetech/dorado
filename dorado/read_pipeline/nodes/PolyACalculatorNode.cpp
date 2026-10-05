@@ -5,8 +5,9 @@
 #include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "utils/context_container.h"
-#include "utils/log_utils.h"
 #include "utils/types.h"
+
+#include <spdlog/spdlog.h>
 
 namespace dorado {
 
@@ -77,7 +78,7 @@ void PolyACalculatorNode::process_read(SimplexRead &read) {
             // Update debug stats.
             total_tail_lengths_called += polya_tail_info.num_bases;
             ++num_called;
-            if (spdlog::get_level() <= spdlog::level::debug) {
+            if (spdlog::should_log(spdlog::level::debug)) {
                 std::lock_guard<std::mutex> lock(m_mutex);
                 tail_length_counts[polya_tail_info.num_bases]++;
             }
@@ -122,7 +123,7 @@ stats::NamedStats PolyACalculatorNode::sample_stats() const {
     stats["average_tail_length"] = static_cast<double>(
             num_called.load() > 0 ? total_tail_lengths_called.load() / num_called.load() : 0);
 
-    if (spdlog::get_level() <= spdlog::level::debug) {
+    if (spdlog::should_log(spdlog::level::debug)) {
         std::lock_guard<std::mutex> lock(m_mutex);
         for (const auto &[len, count] : tail_length_counts) {
             std::string key = "pt." + std::to_string(len);
