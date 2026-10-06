@@ -690,7 +690,7 @@ clio_pack_t parse_cli_main(int argc, char *argv[]) {
     if (argc == 1) {
         std::ostringstream msg;
         msg << p;
-        DORADO_LOG(info, "{}", msg.str());
+        DORADO_LOG(info, msg.str());
         clio_pack.is_good = false;
         return clio_pack;
     }
@@ -699,10 +699,8 @@ clio_pack_t parse_cli_main(int argc, char *argv[]) {
     try {
         p.parse_args(argc, argv);
     } catch (const std::exception &err) {
-        std::ostringstream msg;
-        msg << err.what();
         DORADO_LOG(error, "[kdys::{}] cli parsing failed. Use -h to print help.", __func__);
-        DORADO_LOG(error, "{}", msg.str());
+        DORADO_LOG(error, err.what());
         clio_pack.is_good = false;
         return clio_pack;
     }
@@ -729,11 +727,9 @@ clio_pack_t parse_cli_main(int argc, char *argv[]) {
             clio_pack.is_good = false;
         }
     } catch (const std::exception &err) {
-        std::ostringstream msg;
-        msg << err.what();
         DORADO_LOG(error, "[kdys::{}] cli subcommand parsing failed. Use -h to print help.",
                    __func__);
-        DORADO_LOG(error, "{}", msg.str());
+        DORADO_LOG(error, err.what());
         clio_pack.is_good = false;
     }
 

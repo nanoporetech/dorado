@@ -1191,7 +1191,7 @@ int basecaller(int argc, char* argv[]) {
             utils::load_read_list(parser.get<std::string>("--read-ids")), *minimap_options,
             infos->barcoding_info, infos->adapter_info);
     } catch (const std::exception& e) {
-        DORADO_LOG(error, "{}", e.what());
+        DORADO_LOG(error, e.what());
         return EXIT_FAILURE;
     }
 

@@ -38,7 +38,7 @@ bool has_write_permission(const fs::path& directory) {
         try {
             fs::create_directories(directory);
         } catch (const fs::filesystem_error& e) {
-            DORADO_LOG(error, "{}", e.code().message());
+            DORADO_LOG(error, e.code().message());
             return false;
         }
     }
@@ -56,7 +56,7 @@ bool has_write_permission(const fs::path& directory) {
     try {
         fs::remove(directory / fname);
     } catch (const fs::filesystem_error& e) {
-        DORADO_LOG(error, "{}", e.code().message());
+        DORADO_LOG(error, e.code().message());
         return false;
     }
     return true;
