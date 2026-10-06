@@ -78,7 +78,7 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
                 }
             }
 
-            // Parse the smaple name.
+            // Parse the sample name.
             const auto& it_lb = tags.find("LB");
             const std::string lb = (it_lb != std::end(tags)) ? it_lb->second : "";
 

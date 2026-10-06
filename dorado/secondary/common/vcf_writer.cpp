@@ -204,7 +204,6 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
         bcf_hdr_append(m_header.get(), format_entry.c_str());
     }
 
-    // string cast to ensure null-termination
     if (bcf_hdr_add_sample(m_header.get(), sample_name.c_str()) != 0) {
         throw std::runtime_error("Failed to add sample: " + sample_name);
     }
