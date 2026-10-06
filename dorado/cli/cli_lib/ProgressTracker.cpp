@@ -232,7 +232,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     // Collect per barcode stats.
     if (m_num_barcodes_demuxed > 0 && spdlog::should_log(spdlog::level::debug)) {
         for (const auto& [stat, val] : stats) {
-            const std::string prefix = "BarcodeClassifierNode.bc.";
+            const std::string_view prefix = "BarcodeClassifierNode.bc.";
             if (utils::starts_with(stat, prefix)) {
                 auto bc_name = stat.substr(prefix.length());
                 m_barcode_count[bc_name] = static_cast<int>(val);
@@ -243,7 +243,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0 &&
         spdlog::should_log(spdlog::level::debug)) {
         for (const auto& [stat, val] : stats) {
-            const std::string prefix = "PolyACalculator.pt.";
+            const std::string_view prefix = "PolyACalculator.pt.";
             if (utils::starts_with(stat, prefix)) {
                 auto len = std::stoi(stat.substr(prefix.length()));
                 m_poly_a_tail_length_count[len] = static_cast<int>(val);
