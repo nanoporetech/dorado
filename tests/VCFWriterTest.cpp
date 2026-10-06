@@ -203,7 +203,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             HtsFilePtr vcf_file{hts_open(data.vcf_path.string().c_str(), "r")};
             CATCH_REQUIRE(vcf_file);
 
-            BcfHdrPtr header{bcf_hdr_read(vcf_file.get()), BcfHdrDestructor{}};
+            BcfHdrPtr header{bcf_hdr_read(vcf_file.get())};
 
             CATCH_REQUIRE(header);
             CATCH_CHECK(bcf_hdr_nsamples(header.get()) == 1);
@@ -395,7 +395,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             HtsFilePtr vcf_file{hts_open(data.vcf_path.string().c_str(), "r")};
             CATCH_REQUIRE(vcf_file);
 
-            BcfHdrPtr header{bcf_hdr_read(vcf_file.get()), BcfHdrDestructor{}};
+            BcfHdrPtr header{bcf_hdr_read(vcf_file.get())};
 
             CATCH_REQUIRE(header);
             CATCH_CHECK(bcf_hdr_nsamples(header.get()) == 1);
