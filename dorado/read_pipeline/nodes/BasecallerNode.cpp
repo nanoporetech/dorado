@@ -230,10 +230,15 @@ void BasecallerNode::working_reads_manager() {
         nvtx3::scoped_range loop{"working_reads_manager"};
 
         auto working_read = std::move(chunk->owning_read);
-        auto idx_in_read = chunk->idx_in_read;
+        const auto idx_in_read = chunk->idx_in_read;
         working_read->called_chunks[idx_in_read] = std::move(chunk);
-        auto num_chunks_called = ++working_read->num_chunks_called;
-        if (num_chunks_called == working_read->called_chunks.size()) {
+
+        // The final chunk will call |called_chunks.clear()| which resets its size, so read
+        // that now before adding to the call count (which is an atomic fence).
+        const auto total_chunks = working_read->called_chunks.size();
+        const auto num_chunks_called =
+                working_read->num_chunks_called.fetch_add(1, std::memory_order_seq_cst) + 1;
+        if (num_chunks_called == total_chunks) {
             // Finalise the read.
             auto source_read = std::move(working_read->read);
 
@@ -247,7 +252,7 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.model_q_scale = m_model_runners[0]->config().qscale;
 
             chunks_to_stitch.clear();
-            chunks_to_stitch.reserve(working_read->called_chunks.size());
+            chunks_to_stitch.reserve(total_chunks);
             for (const auto &called_chunk : working_read->called_chunks) {
                 chunks_to_stitch.emplace_back(called_chunk.get());
             }
