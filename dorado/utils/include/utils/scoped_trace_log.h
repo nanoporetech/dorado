@@ -3,10 +3,12 @@
 #include <spdlog/spdlog.h>
 
 #define DORADO_TRACE_SCOPE(scope) ::dorado::utils::detail::ScopedTraceLog scope(__func__)
-#define DORADO_TRACE_MSG(scope, fmt, ...)                             \
-    if (scope.enabled()) {                                            \
-        spdlog::trace("{} [MSG] " fmt, scope.context(), __VA_ARGS__); \
-    }
+#define DORADO_TRACE_MSG(scope, fmt, ...)                                 \
+    do {                                                                  \
+        if (scope.enabled()) {                                            \
+            spdlog::trace("{} [MSG] " fmt, scope.context(), __VA_ARGS__); \
+        }                                                                 \
+    } while (false)
 
 namespace dorado::utils::detail {
 
@@ -25,10 +27,14 @@ public:
     explicit ScopedTraceLog(const char *context)
             : m_context(context), m_enabled(spdlog::should_log(spdlog::level::level_enum::trace)) {
         if (m_enabled) {
-            spdlog::trace("[ENTRY] {}", m_context);
+            spdlog::trace("{} [ENTRY]", m_context);
         }
     }
-    ~ScopedTraceLog() { spdlog::trace("[EXIT] {}", m_context); }
+    ~ScopedTraceLog() {
+        if (m_enabled) {
+            spdlog::trace("{} [EXIT]", m_context);
+        }
+    }
 
     const char *context() const { return m_context; }
     bool enabled() const { return m_enabled; }
