@@ -81,7 +81,7 @@ void copy_tensor(const std::string& name,
 
 void trace_model_tensors(torch::nn::Module& model,
                          const std::unordered_set<std::string>& non_persistent_buffers) {
-    if (!spdlog::default_logger()->should_log(spdlog::level::trace)) {
+    if (!spdlog::should_log(spdlog::level::trace)) {
         return;
     }
 
@@ -97,7 +97,7 @@ void trace_model_tensors(torch::nn::Module& model,
 }
 
 void trace_loaded_tensors(const c10::Dict<c10::IValue, c10::IValue>& weights) {
-    if (!spdlog::default_logger()->should_log(spdlog::level::trace)) {
+    if (!spdlog::should_log(spdlog::level::trace)) {
         return;
     }
 
