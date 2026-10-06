@@ -93,7 +93,7 @@ void ProgressTracker::summarize() const {
                    rate_str.str());
         // Report how many reads were classified into each
         // barcode.
-        if (spdlog::get_level() <= spdlog::level::debug) {
+        if (spdlog::should_log(spdlog::level::debug)) {
             DORADO_LOG(debug, "Barcode distribution :");
             size_t unclassified = 0;
             size_t total = 0;
@@ -230,7 +230,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     }
 
     // Collect per barcode stats.
-    if (m_num_barcodes_demuxed > 0 && (spdlog::get_level() <= spdlog::level::debug)) {
+    if (m_num_barcodes_demuxed > 0 && spdlog::should_log(spdlog::level::debug)) {
         for (const auto& [stat, val] : stats) {
             const std::string prefix = "BarcodeClassifierNode.bc.";
             if (utils::starts_with(stat, prefix)) {
@@ -241,7 +241,7 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     }
 
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0 &&
-        (spdlog::get_level() <= spdlog::level::debug)) {
+        spdlog::should_log(spdlog::level::debug)) {
         for (const auto& [stat, val] : stats) {
             const std::string prefix = "PolyACalculator.pt.";
             if (utils::starts_with(stat, prefix)) {
