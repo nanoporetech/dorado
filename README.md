@@ -50,15 +50,15 @@ See [DEV.md](DEV.md) for details about building Dorado for development.
 
 ## Platforms
 
-Dorado is heavily-optimised for Nvidia A100 and H100 GPUs and will deliver maximal performance on systems with these GPUs.
+Dorado is heavily-optimised for Nvidia A100, H100 and Blackwell GPUs and will deliver maximal performance on systems with these GPUs.
 
 Dorado has been tested extensively and supported on the following systems:
 
 | Platform | GPU/CPU | Minimum Software Requirements |
 | --- |---------|--------------|
-| Linux x86_64  | (G)V100, A100, H100 | CUDA Driver ≥525.105 |
+| Linux x86_64  | (G)V100, A100, H100<br>RTX Pro 5000, RTX Pro 6000 (Max-Q) | CUDA Driver ≥525.105<br> CUDA Driver ≥570.26 |
 | Linux arm64 | Jetson Orin, Jetson Thor, DGX Spark* | Linux for Tegra ≥36.4.3 (JetPack ≥6.2) |
-| Windows x86_64 | (G)V100, A100, H100 | CUDA Driver ≥529.19 |
+| Windows x86_64 | (G)V100, A100, H100<br>RTX 5070 Ti | CUDA Driver ≥529.19<br>CUDA Driver ≥570.65 |
 | Apple | Apple Silicon (M series) | macOS ≥14 |
 
 **DGX Spark supports all Dorado commands **except** Dorado `correct`. Support for Dorado `correct` will be added in a future release.*
@@ -66,8 +66,6 @@ Dorado has been tested extensively and supported on the following systems:
 Linux x64 or Windows systems not listed above but which have Nvidia GPUs with ≥8 GB VRAM and architecture from Pascal onwards (except P100/GP100) have not been widely tested but are expected to work. When basecalling with Apple devices, we recommend systems with ≥16 GB of unified memory.
 
 If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
-
-AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
 
 ## Performance tips
 
