@@ -20,6 +20,7 @@ constexpr auto debug = spdlog::level::level_enum::debug;
 constexpr auto info = spdlog::level::level_enum::info;
 constexpr auto warn = spdlog::level::level_enum::warn;
 constexpr auto error = spdlog::level::level_enum::err;
+constexpr auto critical = spdlog::level::level_enum::critical;
 }  // namespace spdlog_level
 
 // Initialises the default logger to point to stderr.

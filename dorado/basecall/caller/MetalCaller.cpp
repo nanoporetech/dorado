@@ -177,7 +177,7 @@ void MetalCaller::metal_thread_fn() {
 
             // If we repeatedly submitted CBs without success, we give up.
             if (!cb_success) {
-                spdlog::critical("Exiting. Failed to successfully submit GPU command buffers.");
+                DORADO_LOG(critical, "Exiting. Failed to successfully submit GPU command buffers.");
                 std::exit(EXIT_FAILURE);
             }
         }
