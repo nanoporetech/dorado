@@ -2,12 +2,12 @@
 
 #include "alignment/minimap2_wrappers.h"  // IWYU pragma: keep for Minimap2IdxOptHolder
 #include "utils/arg_parse_ext.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <minimap.h>
 #include <mmpriv.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -168,7 +168,7 @@ void apply_mapping_options(const argparse::ArgumentParser& parser, mm_mapopt_t& 
 
     auto best_n_secondary = parser.present<int>("N");
     if (best_n_secondary.value_or(1) == 0) {
-        spdlog::warn("Ignoring '-N 0', using preset default");
+        DORADO_LOG(warn, "Ignoring '-N 0', using preset default");
         print_secondary = true;
     } else {
         options.best_n = best_n_secondary.value_or(options.best_n);
@@ -254,7 +254,7 @@ Minimap2Options parse_options(const std::string& minimap2_option_string) {
     std::string error_message{};
     auto minimap2_options = try_parse_options(minimap2_option_string, error_message);
     if (!minimap2_options) {
-        spdlog::error("{}\n{}", error_message, get_help_message());
+        DORADO_LOG(error, "{}\n{}", error_message, get_help_message());
         throw std::runtime_error(error_message);
     }
     return *minimap2_options;
@@ -311,7 +311,7 @@ void apply_cs_option(Minimap2Options& options, std::string_view cs_opt) {
     } else if (cs_opt == "none") {
         flag &= ~MM_F_OUT_CS;
     } else {
-        spdlog::warn("Unrecognized options for --cs={}", cs_opt);
+        DORADO_LOG(warn, "Unrecognized options for --cs={}", cs_opt);
     }
 }
 
@@ -325,7 +325,7 @@ void apply_dual_option(Minimap2Options& options, std::string_view dual) {
     } else if (dual == "no") {
         options.mapping.mapping_options->get().flag |= MM_F_NO_DUAL;
     } else {
-        spdlog::warn("Unrecognized options for --dual={}", dual);
+        DORADO_LOG(warn, "Unrecognized options for --dual={}", dual);
     }
 }
 

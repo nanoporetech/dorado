@@ -1,9 +1,9 @@
 #include "medaka_counts.h"
 
 #include "medaka_bamiter.h"
+#include "utils/log_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cerrno>
@@ -95,15 +95,15 @@ std::vector<float> get_weibull_scores(const bam_pileup1_t *p,
             const auto it = bad_reads.find(read_id);
             if (it == std::end(bad_reads)) {  // a new bad read
                 bad_reads.emplace(read_id);
-                spdlog::warn("Failed to retrieve Weibull parameter tag '{}' for read {}.\n",
-                             wtags[i], read_id);
+                DORADO_LOG(warn, "Failed to retrieve Weibull parameter tag '{}' for read {}.\n",
+                           wtags[i], read_id);
             }
             return fraction_counts;
         }
         const uint32_t taglen = bam_auxB_len(tag);
         if (p->qpos + indel >= taglen) {
-            spdlog::warn("%s tag was out of range for %s position %lu. taglen: %i\n", wtags[i],
-                         bam_get_qname(p->b), p->qpos + indel, taglen);
+            DORADO_LOG(warn, "%s tag was out of range for %s position %lu. taglen: %i\n", wtags[i],
+                       bam_get_qname(p->b), p->qpos + indel, taglen);
             return fraction_counts;
         }
         wtag_vals[i] = bam_auxB2f(tag, p->qpos + static_cast<int32_t>(indel));

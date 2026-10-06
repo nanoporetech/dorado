@@ -13,7 +13,6 @@
 #include "utils/tty_utils.h"
 
 #include <argparse/argparse.hpp>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <string>
@@ -41,7 +40,7 @@ int summary(int argc, char *argv[]) {
     } catch (const std::exception &e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -59,7 +58,7 @@ int summary(int argc, char *argv[]) {
 
     const auto all_files = cli::collect_inputs(reads, parser.get<bool>("recursive"));
     if (all_files.empty()) {
-        spdlog::info("No input files found");
+        DORADO_LOG(info, "No input files found");
         return EXIT_SUCCESS;
     }
 
@@ -75,7 +74,7 @@ int summary(int argc, char *argv[]) {
 
     auto pipeline = Pipeline::create(std::move(pipeline_desc), nullptr);
     if (pipeline == nullptr) {
-        spdlog::error("Failed to create pipeline");
+        DORADO_LOG(error, "Failed to create pipeline");
         std::exit(EXIT_FAILURE);
     }
 
@@ -86,12 +85,13 @@ int summary(int argc, char *argv[]) {
         pipeline->get_node_ref<WriterNode>(writer_node)
                 .set_dynamic_header(header_mapper->get_merged_headers_map());
     } else {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Reading from stdin: unable to check for polyA, barcode or alignment information. "
                 "Some columns will be unavailable.");
     }
 
-    spdlog::info("Processing...");
+    DORADO_LOG(info, "Processing...");
     for (const auto &input_file : all_files) {
         // The pipeline is just a sink to a WriterNode, so use all the threads to read from the input.
         const std::size_t num_reader_threads = std::thread::hardware_concurrency();
@@ -117,7 +117,7 @@ int summary(int argc, char *argv[]) {
     }
     pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::No});
 
-    spdlog::info("Finished");
+    DORADO_LOG(info, "Finished");
     return EXIT_SUCCESS;
 }
 

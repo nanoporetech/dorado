@@ -27,7 +27,7 @@ std::string generate_barcode_string(const dorado::BarcodeScoreResult& bc_res) {
     } else {
         bc = UNCLASSIFIED_BARCODE;
     }
-    dorado::utils::trace_log("BC: {}", bc);
+    DORADO_LOG(trace, "BC: {}", bc);
     return bc;
 }
 
@@ -121,7 +121,7 @@ void BarcodeClassifierNode::barcode(BamMessage& message,
     read.barcoding_result = std::make_shared<BarcodeScoreResult>(std::move(bc_res));
     read.read_attrs.barcode_id = read.barcoding_result->normalized_barcode_name;
     read.read_attrs.barcode_alias = read.barcoding_result->alias;
-    utils::trace_log("Barcode for {} is {}", bam_get_qname(irecord), bc);
+    DORADO_LOG(trace, "Barcode for {} is {}", bam_get_qname(irecord), bc);
     if (bc != UNCLASSIFIED_BARCODE) {
         bam_aux_update_str(irecord, "BC", int(bc.length() + 1), bc.c_str());
         bam_aux_update_str(irecord, "bv", int(read.barcoding_result->variant.length() + 1),
@@ -190,7 +190,7 @@ void BarcodeClassifierNode::barcode(SimplexRead& read) {
     auto bc_res = barcoder->barcode(read.read_common.seq, barcoding_info->barcode_both_ends,
                                     barcoding_info->allowed_barcodes);
     read.read_common.barcode = generate_barcode_string(bc_res);
-    utils::trace_log("Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);
+    DORADO_LOG(trace, "Barcode for {} is {}", read.read_common.read_id, read.read_common.barcode);
     {
         std::lock_guard lock(m_barcode_count_mutex);
         m_barcode_count[read.read_common.barcode]++;

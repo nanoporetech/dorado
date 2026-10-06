@@ -1,10 +1,9 @@
 #include "ProgressTracker.h"
 
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 #include "utils/tty_utils.h"
 #include "utils/types.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <sstream>
@@ -45,22 +44,22 @@ void ProgressTracker::summarize() const {
                                                                           m_initialization_time)
                             .count();
 
-    spdlog::info("> Finished in (ms): {}", double(duration));
+    DORADO_LOG(info, "> Finished in (ms): {}", double(duration));
     if (m_num_simplex_reads_written > 0) {
         auto ctx = m_mode != Mode::SIMPLEX && m_mode != Mode::DUPLEX ? "Reads written"
                                                                      : "Simplex reads basecalled";
-        spdlog::info("> {}: {}", ctx, m_num_simplex_reads_written);
+        DORADO_LOG(info, "> {}: {}", ctx, m_num_simplex_reads_written);
     }
     if (m_num_simplex_reads_filtered > 0) {
-        spdlog::info("> Simplex reads filtered: {}", m_num_simplex_reads_filtered);
+        DORADO_LOG(info, "> Simplex reads filtered: {}", m_num_simplex_reads_filtered);
     }
     if (m_mode == Mode::DUPLEX) {
-        spdlog::info("> Duplex reads basecalled: {}", m_num_duplex_reads_written);
+        DORADO_LOG(info, "> Duplex reads basecalled: {}", m_num_duplex_reads_written);
         if (m_num_duplex_reads_filtered > 0) {
-            spdlog::info("> Duplex reads filtered: {}", m_num_duplex_reads_filtered);
+            DORADO_LOG(info, "> Duplex reads filtered: {}", m_num_duplex_reads_filtered);
         }
-        spdlog::info(
-                "> Duplex rate: {}%",
+        DORADO_LOG(
+                info, "> Duplex rate: {}%",
                 ((static_cast<float>(m_num_duplex_bases_processed - m_num_duplex_bases_filtered) *
                   2) /
                  (m_num_simplex_bases_processed - m_num_simplex_bases_filtered)) *
@@ -70,72 +69,72 @@ void ProgressTracker::summarize() const {
         std::ostringstream samples_sec;
         if (m_mode == Mode::DUPLEX) {
             samples_sec << std::scientific << m_num_bases_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Bases/s: {}", samples_sec.str());
+            DORADO_LOG(info, "> Basecalled @ Bases/s: {}", samples_sec.str());
         } else {
             samples_sec << std::scientific << m_num_samples_processed / (duration / 1000.0);
-            spdlog::info("> Basecalled @ Samples/s: {}", samples_sec.str());
-            spdlog::debug("> Including Padding @ Samples/s: {:.3e} ({:.2f}%)",
-                          m_num_samples_incl_padding / (duration / 1000.0),
-                          100.f * m_num_samples_processed / m_num_samples_incl_padding);
+            DORADO_LOG(info, "> Basecalled @ Samples/s: {}", samples_sec.str());
+            DORADO_LOG(debug, "> Including Padding @ Samples/s: {:.3e} ({:.2f}%)",
+                       m_num_samples_incl_padding / (duration / 1000.0),
+                       100.f * m_num_samples_processed / m_num_samples_incl_padding);
         }
     }
 
     if (m_mode == Mode::ALIGN) {
-        spdlog::info("> total/primary/unmapped {}/{}/{}", m_total_records_written,
-                     m_primary_records_written, m_unmapped_records_written);
-        spdlog::debug("> secondary/supplementary {}/{}", m_secondary_records_written,
-                      m_supplementary_records_written);
+        DORADO_LOG(info, "> total/primary/unmapped {}/{}/{}", m_total_records_written,
+                   m_primary_records_written, m_unmapped_records_written);
+        DORADO_LOG(debug, "> secondary/supplementary {}/{}", m_secondary_records_written,
+                   m_supplementary_records_written);
     }
 
     if (m_num_barcodes_demuxed > 0) {
         std::ostringstream rate_str;
         rate_str << std::scientific << m_num_barcodes_demuxed / (duration / 1000.0);
-        spdlog::info("> {} reads demuxed @ classifications/s: {}", m_num_barcodes_demuxed,
-                     rate_str.str());
+        DORADO_LOG(info, "> {} reads demuxed @ classifications/s: {}", m_num_barcodes_demuxed,
+                   rate_str.str());
         // Report how many reads were classified into each
         // barcode.
-        if (spdlog::get_level() <= spdlog::level::debug) {
-            spdlog::debug("Barcode distribution :");
+        if (spdlog::should_log(spdlog::level::debug)) {
+            DORADO_LOG(debug, "Barcode distribution :");
             size_t unclassified = 0;
             size_t total = 0;
             for (const auto& [bc_name, bc_count] : m_barcode_count) {
-                spdlog::debug("{} : {}", bc_name, bc_count);
+                DORADO_LOG(debug, "{} : {}", bc_name, bc_count);
                 total += bc_count;
                 if (bc_name == UNCLASSIFIED) {
                     unclassified += bc_count;
                 }
             }
-            spdlog::debug("Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);
+            DORADO_LOG(debug, "Classified rate {}%", (1.f - float(unclassified) / total) * 100.f);
         }
     }
 
     if (m_num_midstrand_barcodes > 0) {
-        spdlog::debug("Midstrand barcodes detected: {}", m_num_midstrand_barcodes);
+        DORADO_LOG(debug, "Midstrand barcodes detected: {}", m_num_midstrand_barcodes);
     }
 
     if (m_num_untrimmed_short_reads > 0) {
-        spdlog::debug("> Untrimmed short reads: {}", m_num_untrimmed_short_reads);
+        DORADO_LOG(debug, "> Untrimmed short reads: {}", m_num_untrimmed_short_reads);
     }
 
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0) {
         // Visualize a distribution of the tail lengths called.
         int modal_poly_a_tail_length = 0;
         if (!m_poly_a_tail_length_count.empty()) {
-            spdlog::debug("PolyA tail length distribution :");
+            DORADO_LOG(debug, "PolyA tail length distribution :");
             auto max_val = std::max_element(
                     m_poly_a_tail_length_count.begin(), m_poly_a_tail_length_count.end(),
                     [](const auto& l, const auto& r) { return l.second < r.second; });
             int factor = std::max(1, 1 + max_val->second / 100);
             for (const auto& [len, count] : m_poly_a_tail_length_count) {
-                spdlog::debug("{:03d} : {}", len, std::string(count / factor, '*'));
+                DORADO_LOG(debug, "{:03d} : {}", len, std::string(count / factor, '*'));
             }
             modal_poly_a_tail_length = max_val->first;
         }
 
-        spdlog::info("> PolyA tails called {}, not called {}, avg tail length {}",
-                     m_num_poly_a_called, m_num_poly_a_not_called, m_avg_poly_a_tail_lengths);
+        DORADO_LOG(info, "> PolyA tails called {}, not called {}, avg tail length {}",
+                   m_num_poly_a_called, m_num_poly_a_not_called, m_avg_poly_a_tail_lengths);
         if (!m_poly_a_tail_length_count.empty()) {
-            spdlog::info("Modal tail length {}", modal_poly_a_tail_length);
+            DORADO_LOG(info, "Modal tail length {}", modal_poly_a_tail_length);
         }
     }
 }
@@ -231,9 +230,9 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     }
 
     // Collect per barcode stats.
-    if (m_num_barcodes_demuxed > 0 && (spdlog::get_level() <= spdlog::level::debug)) {
+    if (m_num_barcodes_demuxed > 0 && spdlog::should_log(spdlog::level::debug)) {
         for (const auto& [stat, val] : stats) {
-            const std::string prefix = "BarcodeClassifierNode.bc.";
+            const std::string_view prefix = "BarcodeClassifierNode.bc.";
             if (utils::starts_with(stat, prefix)) {
                 auto bc_name = stat.substr(prefix.length());
                 m_barcode_count[bc_name] = static_cast<int>(val);
@@ -242,9 +241,9 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     }
 
     if (m_num_poly_a_called + m_num_poly_a_not_called > 0 &&
-        (spdlog::get_level() <= spdlog::level::debug)) {
+        spdlog::should_log(spdlog::level::debug)) {
         for (const auto& [stat, val] : stats) {
-            const std::string prefix = "PolyACalculator.pt.";
+            const std::string_view prefix = "PolyACalculator.pt.";
             if (utils::starts_with(stat, prefix)) {
                 auto len = std::stoi(stat.substr(prefix.length()));
                 m_poly_a_tail_length_count[len] = static_cast<int>(val);

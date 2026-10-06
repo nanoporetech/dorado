@@ -9,7 +9,6 @@
 
 #include <minimap.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -106,10 +105,10 @@ PairingNode::PairingResult PairingNode::is_within_time_and_length_criteria(
     float len_ratio = static_cast<float>(min_seq_len) / static_cast<float>(max_seq_len);
     if (delta <= kEarlyAcceptTimeDeltaMs && len_ratio >= kEarlyAcceptSeqLenRatio &&
         min_seq_len >= 5000) {
-        utils::trace_log(
-                "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
-                len_ratio, delta, temp.read_common.seq.length(), comp.read_common.seq.length(),
-                temp.read_common.read_id, comp.read_common.read_id);
+        DORADO_LOG(trace,
+                   "Early acceptance: len frac {}, delta {} temp len {}, comp len {}, {} and {}",
+                   len_ratio, delta, temp.read_common.seq.length(), comp.read_common.seq.length(),
+                   temp.read_common.read_id, comp.read_common.read_id);
         m_early_accepted_pairs++;
         return {true, 0, int(temp.read_common.seq.length() - 1), 0,
                 int(comp.read_common.seq.length() - 1)};
@@ -159,13 +158,14 @@ PairingNode::PairingResult PairingNode::is_within_alignment_criteria(
         bool cond =
                 (meets_mapq && meets_length && rev && ends_anchored && meets_min_overlap_length);
 
-        utils::trace_log(
-                "mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
-                "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
-                "comp start {} comp end {}, {} and {}",
-                mapq, temp_end - temp_start, overlap_frac, delta, temp.read_common.seq.length(),
-                comp.read_common.seq.length(), rev ? "-" : "+", cond, !allow_rejection, temp_start,
-                temp_end, comp_start, comp_end, temp.read_common.read_id, comp.read_common.read_id);
+        DORADO_LOG(trace,
+                   "mapq {}, overlap length {}, overlap frac {}, delta {}, read 1 {}, "
+                   "read 2 {}, strand {}, pass {}, accepted {}, temp start {} temp end {}, "
+                   "comp start {} comp end {}, {} and {}",
+                   mapq, temp_end - temp_start, overlap_frac, delta, temp.read_common.seq.length(),
+                   comp.read_common.seq.length(), rev ? "-" : "+", cond, !allow_rejection,
+                   temp_start, temp_end, comp_start, comp_end, temp.read_common.read_id,
+                   comp.read_common.read_id);
 
         if (cond || !allow_rejection) {
             m_overlap_accepted_pairs++;
@@ -248,9 +248,9 @@ void PairingNode::pair_list_worker_thread(int tid) {
 
                     send_message_to_sink(std::move(read_pair));
                 } else {
-                    spdlog::debug("- rejected explicitly requested read pair: {} and {}",
-                                  template_read->read_common.read_id,
-                                  complement_read->read_common.read_id);
+                    DORADO_LOG(debug, "- rejected explicitly requested read pair: {} and {}",
+                               template_read->read_common.read_id,
+                               complement_read->read_common.read_id);
                 }
             }
         }
@@ -460,11 +460,11 @@ PairingNode::PairingNode(DuplexPairingParameters pairing_params,
         // If the way the cache is structured is changed the ont_basecall_client code will also
         // need to be updated otherwise there is a risk of deadlock.
         m_max_num_keys = pairing_params.cache_depth;
-        spdlog::debug("Using dorado duplex channel count of {}", m_max_num_keys);
+        DORADO_LOG(debug, "Using dorado duplex channel count of {}", m_max_num_keys);
         break;
     case ReadOrder::BY_TIME:
         m_max_num_reads = pairing_params.cache_depth;
-        spdlog::debug("Using dorado duplex read-per-channel count of {}", m_max_num_reads);
+        DORADO_LOG(debug, "Using dorado duplex read-per-channel count of {}", m_max_num_reads);
         break;
     default:
         throw std::runtime_error("Unsupported read order detected: " +

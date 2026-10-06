@@ -1,8 +1,8 @@
 #include "demux/parse_custom_kit.h"
 
 #include "demux/parse_custom_sequences.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <algorithm>
@@ -282,10 +282,11 @@ bool try_configure_custom_barcode_sequences(const std::optional<std::string>& cu
         }
         barcode_kits::add_custom_barcodes(custom_barcodes);
     } catch (const std::exception& e) {
-        spdlog::error("Unable to parse custom sequences file: '{}' - '{}'", *custom_seqs, e.what());
+        DORADO_LOG(error, "Unable to parse custom sequences file: '{}' - '{}'", *custom_seqs,
+                   e.what());
         return false;
     } catch (...) {
-        spdlog::error("Unable to parse custom sequences file '{}'", *custom_seqs);
+        DORADO_LOG(error, "Unable to parse custom sequences file '{}'", *custom_seqs);
         return false;
     }
     return true;
@@ -300,11 +301,11 @@ bool try_configure_custom_barcode_arrangement(const std::optional<std::string>& 
         auto [kit_name, kit_info] = get_custom_barcode_kit_info(*custom_kit);
         barcode_kits::add_custom_barcode_kit(kit_name, kit_info);
     } catch (const std::exception& e) {
-        spdlog::error("Unable to load custom barcode arrangement file: '{}' - '{}'", *custom_kit,
-                      e.what());
+        DORADO_LOG(error, "Unable to load custom barcode arrangement file: '{}' - '{}'",
+                   *custom_kit, e.what());
         return false;
     } catch (...) {
-        spdlog::error("Unable to load custom barcode arrangement file: '{}'", *custom_kit);
+        DORADO_LOG(error, "Unable to load custom barcode arrangement file: '{}'", *custom_kit);
         return false;
     }
     return true;

@@ -11,9 +11,9 @@
 #if DORADO_CUDA_BUILD
 #include "nn/KoiUtils.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 
 #include <c10/cuda/CUDAGuard.h>
-#include <spdlog/spdlog.h>
 #endif
 
 namespace dorado::modbase::model {
@@ -185,8 +185,8 @@ ModBaseConvLSTMV3CUDAModelImpl::ModBaseConvLSTMV3CUDAModelImpl(
             force_dtype = utils::get_dev_opt("modbase_i8", true)
                                   ? nn::TensorLayout::CUTLASS_TNC_I8
                                   : nn::TensorLayout::CUTLASS_TNC_F16;
-            spdlog::trace("Set modbase merge_conv CUTLASS dtype: {}",
-                          to_string(force_dtype.value()));
+            DORADO_LOG(trace, "Set modbase merge_conv CUTLASS dtype: {}",
+                       to_string(force_dtype.value()));
         }
 
         merge_conv->reserve_working_memory(wm, nullptr, force_dtype);

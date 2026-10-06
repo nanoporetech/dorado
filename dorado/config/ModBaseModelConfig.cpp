@@ -3,10 +3,10 @@
 #include "config/common.h"
 #include "hts_utils/bam_utils.h"
 #include "utils/dev_utils.h"
+#include "utils/log_utils.h"
 #include "utils/overloaded.h"
 #include "utils/sequence_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <algorithm>
@@ -314,8 +314,8 @@ ConvLSTMV2ModelConfig parse_lstm_v2(const std::filesystem::path& model_path,
     auto refine = parse_refinement_params(config_toml);
     const auto raw_chunk_size = parse_chunk_size(config_toml, context);
     const auto chunk_size = normalise_to_stride(raw_chunk_size, common.stride);
-    spdlog::trace("Normalised modbase chunk size for stride: {} - {} -> {}", common.stride,
-                  raw_chunk_size, chunk_size);
+    DORADO_LOG(trace, "Normalised modbase chunk size for stride: {} - {} -> {}", common.stride,
+               raw_chunk_size, chunk_size);
     return ConvLSTMV2ModelConfig{
             model_path,      std::move(common),  ChunkedModelParams{chunk_size},
             std::move(mods), std::move(context), std::move(refine)};
@@ -534,10 +534,10 @@ ContextParams::ContextParams(int64_t samples_before_,
 ContextParams ContextParams::normalised(const int stride) const {
     const int64_t sb = normalise_to_stride(samples_before, stride);
     const int64_t sa = normalise_to_stride(samples_after, stride);
-    spdlog::trace(
-            "Normalised modbase context for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
-            "[samples_before, samples_after, samples]",
-            stride, samples_before, samples_after, samples, sb, sa, sb + sa);
+    DORADO_LOG(trace,
+               "Normalised modbase context for stride: {} - [{}, {}, {}] -> [{}, {}, {}] @ "
+               "[samples_before, samples_after, samples]",
+               stride, samples_before, samples_after, samples, sb, sa, sb + sa);
     return ContextParams(sb, sa, bases_before, bases_after, reverse, base_start_justify);
 }
 

@@ -1,9 +1,8 @@
 #include "secondary/common/variant.h"
 
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <ostream>
@@ -99,21 +98,21 @@ bool operator<(const Variant& lhs, const Variant& rhs) {
 
 bool is_valid(const Variant& var) {
     if (std::empty(var.ref)) {
-        spdlog::trace("Variant with empty ref is invalid: {}", to_string(var));
+        DORADO_LOG(trace, "Variant with empty ref is invalid: {}", to_string(var));
         return false;
     }
     if (std::empty(var.alts)) {
-        spdlog::trace("Variant with no alts is invalid: {}", to_string(var));
+        DORADO_LOG(trace, "Variant with no alts is invalid: {}", to_string(var));
         return false;
     }
     if (std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                     [&var](const std::string_view val) { return val == var.ref; })) {
-        spdlog::trace("Variant with alt matching ref is invalid: {}", to_string(var));
+        DORADO_LOG(trace, "Variant with alt matching ref is invalid: {}", to_string(var));
         return false;
     }
     if (std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                     [](const std::string_view val) { return std::empty(val); })) {
-        spdlog::trace("Variant with empty alt string is invalid: {}", to_string(var));
+        DORADO_LOG(trace, "Variant with empty alt string is invalid: {}", to_string(var));
         return false;
     }
     return true;

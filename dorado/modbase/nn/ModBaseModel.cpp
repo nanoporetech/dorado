@@ -7,9 +7,8 @@
 #include "ModBaseLatentSpaceV1SequenceModel.h"
 #include "config/ModBaseModelConfig.h"
 #include "utils/dev_utils.h"
+#include "utils/log_utils.h"
 #include "utils/overloaded.h"
-
-#include <spdlog/spdlog.h>
 
 #include <optional>
 #include <stdexcept>
@@ -87,7 +86,7 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
                                                   options);
                         }
 #endif
-                        spdlog::trace("Loading ModBaseConvLSTMV3Model - Torch only");
+                        DORADO_LOG(trace, "Loading ModBaseConvLSTMV3Model - Torch only");
                         auto model = model::ModBaseConvLSTMV3Model(model_config);
                         return populate_model(std::move(model), model_config.data.model_path,
                                               options);

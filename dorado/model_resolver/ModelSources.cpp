@@ -1,6 +1,6 @@
 #include "model_resolver/ModelSources.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <ios>
@@ -13,36 +13,38 @@ bool check_model_path(const fs::path& model_path) {
     try {
         const auto& p = fs::weakly_canonical(model_path);
         if (!fs::exists(p)) {
-            spdlog::error(
-                    "Model does not exist at: '{}' - Please download the model or use a model "
-                    "complex to automatically download a model",
-                    p.string());
+            DORADO_LOG(error,
+                       "Model does not exist at: '{}' - Please download the model or use a model "
+                       "complex to automatically download a model",
+                       p.string());
 
             return false;
         }
         if (!fs::is_directory(p)) {
-            spdlog::error("Model is not a directory at: '{}' - Please check your model argument.",
-                          p.string());
+            DORADO_LOG(error,
+                       "Model is not a directory at: '{}' - Please check your model argument.",
+                       p.string());
 
             return false;
         }
         if (fs::is_empty(p)) {
-            spdlog::error("Model is an empty directory at: '{}' - Please check your model path.",
-                          p.string());
+            DORADO_LOG(error,
+                       "Model is an empty directory at: '{}' - Please check your model path.",
+                       p.string());
 
             return false;
         }
         const auto cfg = p / "config.toml";
         if (!fs::exists(cfg)) {
-            spdlog::error(
-                    "Model directory is missing a configuration file at: '{}' - Please check "
-                    "your model path or download your model again.",
-                    cfg.string());
+            DORADO_LOG(error,
+                       "Model directory is missing a configuration file at: '{}' - Please check "
+                       "your model path or download your model again.",
+                       cfg.string());
             return false;
         }
     } catch (std::exception& e) {
-        spdlog::error("Exception while checking model path at: '{}' - {}", model_path.string(),
-                      e.what());
+        DORADO_LOG(error, "Exception while checking model path at: '{}' - {}", model_path.string(),
+                   e.what());
         return false;
     }
     return true;

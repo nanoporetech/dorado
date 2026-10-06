@@ -9,7 +9,6 @@
 #include "utils/log_utils.h"
 
 #include <argparse/argparse.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdlib>
@@ -44,9 +43,9 @@ void print_models(bool yaml) {
         }
     } else {
         for (const auto& [type, models] : all_models) {
-            spdlog::info("> {}", type);
+            DORADO_LOG(info, "> {}", type);
             for (const auto& model_info : models()) {
-                spdlog::info(" - {}", model_info.name);
+                DORADO_LOG(info, " - {}", model_info.name);
             }
         }
     }
@@ -72,7 +71,7 @@ bool download_named_or_path(const models::ModelComplex& complex,
         }
 
         print_models(false);
-        spdlog::error("'{}' is not a valid model name.", complex.get_raw());
+        DORADO_LOG(error, "'{}' is not a valid model name.", complex.get_raw());
         return false;
     }
 
@@ -101,12 +100,12 @@ bool download_variant_via_resolver(const argparse::ArgumentParser& parser,
         data_loader::InputFiles input_files;
         if (data.has_value()) {
             if (!std::filesystem::exists(*data)) {
-                spdlog::error("Specified data path does not exist: '{}'.", *data);
+                DORADO_LOG(error, "Specified data path does not exist: '{}'.", *data);
                 return false;
             }
             input_files = data_loader::InputFiles::search_pod5s(*data, recursive);
             if (input_files.get().empty()) {
-                spdlog::error("No POD5 files found in '{}' recursive:'{}'.", *data, recursive);
+                DORADO_LOG(error, "No POD5 files found in '{}' recursive:'{}'.", *data, recursive);
                 return false;
             }
         }
@@ -115,8 +114,8 @@ bool download_variant_via_resolver(const argparse::ArgumentParser& parser,
                                          input_files.get()};
         const Models models(resolver.resolve());
     } catch (const std::exception& e) {
-        spdlog::error(e.what());
-        spdlog::info("Show all available models with the `--list` argument.");
+        DORADO_LOG(error, e.what());
+        DORADO_LOG(info, "Show all available models with the `--list` argument.");
         return false;
     }
 
@@ -176,7 +175,7 @@ int download(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -223,11 +222,11 @@ int download(int argc, char* argv[]) {
             }
         }
     } catch (const std::exception& e) {
-        spdlog::error(e.what());
+        DORADO_LOG(error, e.what());
         return EXIT_FAILURE;
     }
 
-    spdlog::info("Finished");
+    DORADO_LOG(info, "Finished");
     return EXIT_SUCCESS;
 }
 

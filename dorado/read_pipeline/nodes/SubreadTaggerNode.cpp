@@ -2,9 +2,8 @@
 
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
+#include "utils/log_utils.h"
 #include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 namespace dorado {
 
@@ -14,8 +13,8 @@ void SubreadTaggerNode::input_thread_fn() {
     Message message;
     while (get_input_message(message)) {
         if (!is_read_message(message)) {
-            spdlog::warn("SubreadTaggerNode received unexpected message type: {}.",
-                         message.index());
+            DORADO_LOG(warn, "SubreadTaggerNode received unexpected message type: {}.",
+                       message.index());
             continue;
         }
 

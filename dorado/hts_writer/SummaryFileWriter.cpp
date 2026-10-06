@@ -2,10 +2,10 @@
 
 #include "hts_utils/bam_utils.h"
 #include "hts_writer_utils.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <array>
 #include <fstream>
@@ -349,9 +349,9 @@ void SummaryFileWriter::handle(const HtsData& data) const {
             if (m_dynamic_header != nullptr) {
                 const auto& it = m_dynamic_header->find(data.read_attrs);
                 if (it == m_dynamic_header->cend()) {
-                    spdlog::error("Failed to find dynamic header: RG='{}', runid='{}'",
-                                  utils::get_read_group_tag(data.bam_ptr.get()),
-                                  data.read_attrs.protocol_run_id);
+                    DORADO_LOG(error, "Failed to find dynamic header: RG='{}', runid='{}'",
+                               utils::get_read_group_tag(data.bam_ptr.get()),
+                               data.read_attrs.protocol_run_id);
                     throw std::runtime_error("SummaryFileWriter - Failed to load dynamic header.");
                 }
                 header = it->second->get_merged_header();

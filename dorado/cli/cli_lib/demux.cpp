@@ -30,7 +30,6 @@
 
 #include <argparse/argparse.hpp>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <memory>
@@ -152,19 +151,20 @@ int demuxer(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
     if (parser.is_used("--no-classify") == parser.is_used("--kit-name")) {
-        spdlog::error("Please specify either --no-classify or --kit-name to use the demux tool.");
+        DORADO_LOG(error,
+                   "Please specify either --no-classify or --kit-name to use the demux tool.");
         return EXIT_FAILURE;
     }
 
     auto no_trim(parser.get<bool>("--no-trim") || parser.get<bool>("--no-classify"));
     auto sort_bam(parser.get<bool>("--sort-bam"));
     if (sort_bam && !no_trim) {
-        spdlog::error("If --sort-bam is specified then --no-trim must also be specified.");
+        DORADO_LOG(error, "If --sort-bam is specified then --no-trim must also be specified.");
         return EXIT_FAILURE;
     }
 
@@ -177,7 +177,7 @@ int demuxer(int argc, char* argv[]) {
 
     const std::string reads(parser.get<std::string>("reads"));
     if (reads.empty()) {
-        spdlog::error("'reads' argument must not be empty.");
+        DORADO_LOG(error, "'reads' argument must not be empty.");
         return EXIT_FAILURE;
     }
 
@@ -192,10 +192,10 @@ int demuxer(int argc, char* argv[]) {
 
     const auto all_files = cli::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
-        spdlog::info("No input files found");
+        DORADO_LOG(info, "No input files found");
         return EXIT_SUCCESS;
     }
-    spdlog::info("num input files: {}", all_files.size());
+    DORADO_LOG(info, "num input files: {}", all_files.size());
 
     auto read_list = utils::load_read_list(parser.get<std::string>("--read-ids"));
 
@@ -208,13 +208,13 @@ int demuxer(int argc, char* argv[]) {
         // barcoding. Empirically this shows good performance.
         std::tie(demux_threads, demux_writer_threads) =
                 cli::worker_vs_writer_thread_allocation(threads, 0.1f);
-        spdlog::debug("> barcoding threads {}, writer threads {}", demux_threads,
-                      demux_writer_threads);
+        DORADO_LOG(debug, "> barcoding threads {}, writer threads {}", demux_threads,
+                   demux_writer_threads);
     } else {
         // With no classification work, the shared HTS pool can use the full
         // thread allocation without creating a pool per output file.
         demux_writer_threads = threads;
-        spdlog::debug("> writer threads {}", demux_writer_threads);
+        DORADO_LOG(debug, "> writer threads {}", demux_writer_threads);
     }
 
     // All progress reporting is in the post-processing part.
@@ -249,7 +249,7 @@ int demuxer(int argc, char* argv[]) {
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {
-            spdlog::error("Failed to create hts file writer");
+            DORADO_LOG(error, "Failed to create hts file writer");
             std::exit(EXIT_FAILURE);
         }
 
@@ -285,10 +285,10 @@ int demuxer(int argc, char* argv[]) {
         }
 
         if (!barcode_kits::is_valid_barcode_kit(barcoding_info->kit_name)) {
-            spdlog::error(
-                    "{} is not a valid barcode kit name. Please run the help "
-                    "command to find out available barcode kits.",
-                    barcoding_info->kit_name);
+            DORADO_LOG(error,
+                       "{} is not a valid barcode kit name. Please run the help "
+                       "command to find out available barcode kits.",
+                       barcoding_info->kit_name);
             std::exit(EXIT_FAILURE);
         }
 
@@ -308,7 +308,7 @@ int demuxer(int argc, char* argv[]) {
     std::vector<dorado::stats::StatsReporter> stats_reporters;
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
-        spdlog::error("Failed to create pipeline");
+        DORADO_LOG(error, "Failed to create pipeline");
         return EXIT_FAILURE;
     }
 
@@ -364,7 +364,7 @@ int demuxer(int argc, char* argv[]) {
             kStatsPeriod, stats_reporters, stats_callables, static_cast<size_t>(0));
     // End stats counting setup.
 
-    spdlog::info("> starting barcode demuxing");
+    DORADO_LOG(info, "> starting barcode demuxing");
     for (const auto& input : all_files) {
         // multithread the reader's decompression if we're not doing classification
         const std::size_t num_reader_threads = barcoding_info ? 1 : 2;
@@ -395,7 +395,7 @@ int demuxer(int argc, char* argv[]) {
         const auto num_reads_in_file =
                 reader.read(*pipeline, max_reads, strip_alignment, &header_mapper, false);
         max_reads -= num_reads_in_file;
-        spdlog::trace("pushed to pipeline: {}", num_reads_in_file);
+        DORADO_LOG(trace, "pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
     }
 
@@ -412,7 +412,7 @@ int demuxer(int argc, char* argv[]) {
     tracker.summarize();
     progress_stats.report_final_stats();
 
-    spdlog::info("> finished barcode demuxing");
+    DORADO_LOG(info, "> finished barcode demuxing");
 
     return EXIT_SUCCESS;
 }

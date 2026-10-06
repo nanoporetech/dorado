@@ -1,6 +1,6 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <memory>
 #include <stdexcept>
@@ -18,7 +18,8 @@ void StreamHtsFileWriter::shutdown() {
     }
 
     if (m_hts_file == nullptr || m_hts_file.get() == nullptr) {
-        spdlog::debug(
+        DORADO_LOG(
+                debug,
                 "StreamHtsFileWriter::shutdown called on uninitialised hts_file - nothing to do");
         return;
     }
@@ -51,7 +52,7 @@ void StreamHtsFileWriter::set_hts_file_header(utils::HtsFile& hts_file) const {
 
 void StreamHtsFileWriter::handle(const HtsData& data) {
     if (m_has_shutdown) {
-        spdlog::debug("HtsFileWriter has shutdown and cannot process more work.");
+        DORADO_LOG(debug, "HtsFileWriter has shutdown and cannot process more work.");
         return;
     }
 

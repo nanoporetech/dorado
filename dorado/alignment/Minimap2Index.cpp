@@ -4,8 +4,7 @@
 #include "hts_utils/FastxSequentialReader.h"
 #include "hts_utils/header_sq_record.h"
 #include "hts_utils/sequence_file_format.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 //todo: mmpriv.h is a private header from mm2 for the mm_event_identity function.
 //Ask lh3 t  make some of these funcs publicly available?
@@ -81,17 +80,17 @@ std::pair<std::shared_ptr<mm_idx_t>, IndexLoadResult> Minimap2Index::load_initia
 
     if (index->k != m_options.index.index_options->get().k ||
         index->w != m_options.index.index_options->get().w) {
-        spdlog::warn(
-                "Indexing parameters mismatch prebuilt index: using parameters kmer "
-                "size={} and window size={} from prebuilt index.",
-                index->k, index->w);
+        DORADO_LOG(warn,
+                   "Indexing parameters mismatch prebuilt index: using parameters kmer "
+                   "size={} and window size={} from prebuilt index.",
+                   index->k, index->w);
     }
 
     if (mm_verbose >= 3) {
         mm_idx_stat(index.get());
     }
 
-    spdlog::debug("Loaded index with {} target seqs", index->n_seq);
+    DORADO_LOG(debug, "Loaded index with {} target seqs", index->n_seq);
 
     return {index, IndexLoadResult::success};
 }
@@ -117,7 +116,7 @@ IndexLoadResult Minimap2Index::load_next_chunk(int num_threads) {
         add_index(std::move(next_idx));
     }
 
-    spdlog::debug("Loaded next index chunk with {} target seqs", m_indexes.back()->n_seq);
+    DORADO_LOG(debug, "Loaded next index chunk with {} target seqs", m_indexes.back()->n_seq);
     return IndexLoadResult::success;
 }
 
@@ -226,8 +225,8 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
 
         if (!is_fasta) {
             // Index not supported by htslib (likely mmi or fastq) - do not add SQ M5 or UR tags.
-            spdlog::debug("Omitting SQ M5/UR tags as reference is not FASTA '{}'.",
-                          reference_path.string());
+            DORADO_LOG(debug, "Omitting SQ M5/UR tags as reference is not FASTA '{}'.",
+                       reference_path.string());
             for (uint32_t j = 0; j < index.n_seq; ++j) {
                 utils::HeaderSQRecord record{std::string(index.seq[j].name), index.seq[j].len};
                 m_header_records_cache.emplace_back(std::move(record));
@@ -245,12 +244,12 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
     try {
         fasta_reader = std::make_unique<hts_io::FastxSequentialReader>(reference_path);
     } catch (const std::exception& exc) {
-        spdlog::error("Failed to open FASTA reference '{}' for SQ M5 calculation: '{}'.",
-                      reference_path.string(), exc.what());
+        DORADO_LOG(error, "Failed to open FASTA reference '{}' for SQ M5 calculation: '{}'.",
+                   reference_path.string(), exc.what());
         throw;
     }
 
-    spdlog::debug("Computing SQ M5 hashes.");
+    DORADO_LOG(debug, "Computing SQ M5 hashes.");
     std::unordered_set<std::string> sequence_names;
     std::for_each(index.seq, std::next(index.seq, index.n_seq),
                   [&sequence_names](const mm_idx_seq_t& idx_seq) {
@@ -301,7 +300,7 @@ void Minimap2Index::cache_header_records(const mm_idx_t& index) {
         m_header_records_cache.emplace_back(std::move(record));
     }
 
-    spdlog::debug("Finished computing SQ M5 hashes.");
+    DORADO_LOG(debug, "Finished computing SQ M5 hashes.");
 }
 
 const mm_idxopt_t& Minimap2Index::index_options() const {

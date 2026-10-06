@@ -2,8 +2,7 @@
 
 #include "SpeedEntry.h"
 #include "compiled_timings.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <ranges>
@@ -69,8 +68,8 @@ int pick_best_batch_size(std::span<const SpeedEntry> speeds,
         throw std::logic_error("Error in batch size selection");
     }
 
-    spdlog::debug("Fastest capped+limited batch size is {} @ {}", first_over_threshold->batch_size,
-                  first_over_threshold->basecall_speed);
+    DORADO_LOG(debug, "Fastest capped+limited batch size is {} @ {}",
+               first_over_threshold->batch_size, first_over_threshold->basecall_speed);
     return first_over_threshold->batch_size;
 }
 

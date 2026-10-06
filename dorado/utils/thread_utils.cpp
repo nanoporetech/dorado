@@ -1,6 +1,6 @@
 #include "utils/thread_utils.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <array>
@@ -36,7 +36,7 @@ class SystemCPUUsage {
         std::ifstream proc_stat("/proc/stat");
         std::string first_line;
         if (!std::getline(proc_stat, first_line)) {
-            spdlog::error("Failed to read /proc/stat");
+            DORADO_LOG(error, "Failed to read /proc/stat");
             return std::nullopt;
         }
         std::istringstream cpu_line(first_line);
@@ -46,7 +46,7 @@ class SystemCPUUsage {
         std::size_t user = 0, nice = 0, system = 0, idle = 0;
         cpu_line >> cpu >> user >> nice >> system >> idle;
         if (cpu != "cpu" || !cpu_line) {
-            spdlog::error("Failed to parse /proc/stat cpu line");
+            DORADO_LOG(error, "Failed to parse /proc/stat cpu line");
             return std::nullopt;
         }
 
@@ -233,8 +233,8 @@ static void init_load_balancers() {
                 return;
             }
             const double target_output = std::clamp(std::atof(envvar), 0.0, 1.0);
-            spdlog::debug("Attempting to maintain a minimum CPU usage of {}%",
-                          static_cast<int>(target_output * 100));
+            DORADO_LOG(debug, "Attempting to maintain a minimum CPU usage of {}%",
+                       static_cast<int>(target_output * 100));
 
             // Spin up the monitor thread.
             m_thread = std::thread(

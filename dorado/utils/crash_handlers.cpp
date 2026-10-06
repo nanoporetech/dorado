@@ -1,6 +1,6 @@
 #include "utils/crash_handlers.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <atomic>
 #include <csignal>
@@ -47,7 +47,7 @@ struct GiveGoodTracesOnUncaughtExceptions {
     static void on_terminate() {
         if (s_enable_uncaught_exception_handler.load(std::memory_order_relaxed)) {
             // Print out where we are.
-            spdlog::error("Uncaught exception thrown from:\n{}", get_stacktrace());
+            DORADO_LOG(error, "Uncaught exception thrown from:\n{}", get_stacktrace());
 
             // Print the exception that was thrown.
             auto current_exception = std::current_exception();
@@ -55,12 +55,12 @@ struct GiveGoodTracesOnUncaughtExceptions {
                 try {
                     std::rethrow_exception(current_exception);
                 } catch (const std::exception &e) {
-                    spdlog::error("Exception thrown: {}", e.what());
+                    DORADO_LOG(error, "Exception thrown: {}", e.what());
                 } catch (...) {
-                    spdlog::error("Unknown exception thrown");
+                    DORADO_LOG(error, "Unknown exception thrown");
                 }
             } else {
-                spdlog::error("No exception thrown");
+                DORADO_LOG(error, "No exception thrown");
             }
         }
 
@@ -89,7 +89,7 @@ thread_local
 template <sig_t *previous_handler>
 void register_for_signal(int sig) {
     *previous_handler = signal(sig, [](int signum) {
-        spdlog::error("Uncaught signal from:\n{}", get_stacktrace());
+        DORADO_LOG(error, "Uncaught signal from:\n{}", get_stacktrace());
         // Reset to original handler and invoke it
         signal(signum, *previous_handler);
         raise(signum);
@@ -110,7 +110,7 @@ void install_segfault_handler() {
     // Hook into SEH.
     static PTOP_LEVEL_EXCEPTION_FILTER const s_previous_handler = [] {
         return SetUnhandledExceptionFilter([](LPEXCEPTION_POINTERS exp) -> LONG {
-            spdlog::error("Uncaught structured exception from:\n{}", get_stacktrace());
+            DORADO_LOG(error, "Uncaught structured exception from:\n{}", get_stacktrace());
             if (s_previous_handler != nullptr) {
                 return s_previous_handler(exp);
             } else {

@@ -2,11 +2,11 @@
 
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
+#include "utils/log_utils.h"
 #include "utils/tty_utils.h"
 
 #include <htslib/sam.h>
 #include <indicators/indeterminate_progress_bar.hpp>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <memory>
@@ -40,7 +40,7 @@ void ResumeLoader::copy_completed_reads() {
 
     const std::size_t num_threads = 1;
     HtsReader reader(m_resume_file, std::nullopt, num_threads);
-    spdlog::info("Resuming from file {}...", m_resume_file);
+    DORADO_LOG(info, "Resuming from file {}...", m_resume_file);
 
     auto client_info = std::make_shared<DefaultClientInfo>();
     // Iterate over all reads and write to sink.
@@ -63,7 +63,7 @@ void ResumeLoader::copy_completed_reads() {
         }
     }
     std::cerr << "\r";
-    spdlog::info("> {} original read ids found in resume file.", m_processed_read_ids.size());
+    DORADO_LOG(info, "> {} original read ids found in resume file.", m_processed_read_ids.size());
 
     hts_set_log_level(initial_hts_log_level);
 }

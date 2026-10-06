@@ -5,9 +5,8 @@
 #include "hts_writer/StreamHtsFileWriter.h"
 #include "hts_writer/Structure.h"
 #include "hts_writer/StructuredHtsFileWriter.h"
+#include "utils/log_utils.h"
 #include "utils/tty_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <optional>
@@ -41,7 +40,7 @@ HtsFileWriterBuilder::HtsFileWriterBuilder(bool emit_fastq,
           m_is_fd_tty(utils::is_fd_tty(stdout)),
           m_is_fd_pipe(utils::is_fd_pipe(stdout)) {
     if ((int(m_emit_fastq) + int(m_emit_sam) + int(m_emit_cram)) > 1) {
-        spdlog::error("Only one of --emit-{fastq, sam, cram} can be set (or none).");
+        DORADO_LOG(error, "Only one of --emit-{fastq, sam, cram} can be set (or none).");
         throw std::runtime_error("Invalid writer configuration");
     }
 };
@@ -51,7 +50,8 @@ void HtsFileWriterBuilder::update() {
 
     if (m_emit_fastq) {
         if (!std::exchange(m_warn_fastq_called, true)) {
-            spdlog::info(
+            DORADO_LOG(
+                    info,
                     " - Note: FASTQ output is not recommended as not all data can be preserved.");
         }
         m_output_mode = OutputMode::FASTQ;
@@ -120,9 +120,9 @@ BasecallHtsFileWriterBuilder::BasecallHtsFileWriterBuilder(
                                std::move(gpu_names),
                                false) {
     if (emit_fastq && reference_requested) {
-        spdlog::error(
-                "--emit-fastq cannot be used with --reference as FASTQ cannot store "
-                "alignment results.");
+        DORADO_LOG(error,
+                   "--emit-fastq cannot be used with --reference as FASTQ cannot store "
+                   "alignment results.");
         throw std::runtime_error("Invalid writer configuration");
     }
 };

@@ -6,8 +6,7 @@
 #include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <cassert>
 #include <cstddef>
@@ -15,12 +14,6 @@
 #include <stdexcept>
 #include <unordered_map>
 #include <unordered_set>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
 
 namespace dorado::secondary {
 
@@ -106,19 +99,19 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                 auto padding =
                         at::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
 
-                LOG_TRACE("[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
-                          utils::tensor_shape_as_string(chunk),
-                          utils::tensor_shape_as_string(padding));
+                DORADO_LOG(trace, "[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
+                           utils::tensor_shape_as_string(chunk),
+                           utils::tensor_shape_as_string(padding));
 
                 auto concated = at::cat({std::move(chunk), std::move(padding)}, 1);
 
-                LOG_TRACE("[pad_reads] Emplacing (1) chunk: concated.shape = {}",
-                          utils::tensor_shape_as_string(concated));
+                DORADO_LOG(trace, "[pad_reads] Emplacing (1) chunk: concated.shape = {}",
+                           utils::tensor_shape_as_string(concated));
 
                 padded_chunks.emplace_back(std::move(concated));
             } else {
-                LOG_TRACE("[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
-                          utils::tensor_shape_as_string(chunk));
+                DORADO_LOG(trace, "[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
+                           utils::tensor_shape_as_string(chunk));
 
                 padded_chunks.emplace_back(std::move(chunk));
             }
@@ -134,7 +127,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
     const auto reorder_reads = [](std::vector<at::Tensor> chunks,
                                   const std::vector<std::vector<std::string>>& read_ids_in,
                                   const std::vector<std::vector<std::string>>& read_ids_out) {
-        LOG_TRACE("[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
+        DORADO_LOG(trace, "[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
         utils::ScopedProfileRange spr2("merge_adjacent_samples_impl-reorder_reads", 8);
 
         if (std::size(chunks) < 2) {
@@ -161,7 +154,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         std::vector<std::string> prev_rids_out = read_ids_out[0];
 
         for (std::size_t n = 1; n < std::size(chunks); ++n) {
-            LOG_TRACE("[reorder_reads] Reordering chunk n = {}", n);
+            DORADO_LOG(trace, "[reorder_reads] Reordering chunk n = {}", n);
 
             auto [reordered_chunk, next_rids_out] =
                     reorder_chunk(chunks[n], prev_rids_out, read_ids_in[n], read_ids_out[n]);
@@ -170,9 +163,9 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
 
             prev_rids_out = std::move(next_rids_out);
 
-            LOG_TRACE("[reorder_reads] n = {}, updating the previous out column.", n);
+            DORADO_LOG(trace, "[reorder_reads] n = {}, updating the previous out column.", n);
 
-            LOG_TRACE("[reorder_reads] n = {}, done.", n);
+            DORADO_LOG(trace, "[reorder_reads] n = {}, done.", n);
         }
 
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
@@ -239,7 +232,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         auto& sample = samples[i];
 
         if (std::empty(sample.positions_major)) {
-            LOG_TRACE("[merge_adjacent_samples_read_matrix] Empty sample: i = {}", i);
+            DORADO_LOG(trace, "[merge_adjacent_samples_read_matrix] Empty sample: i = {}", i);
             continue;
         }
 
@@ -252,28 +245,31 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             // New or contiguous chunk.
             last_end = sample.end();
             buffer_ids.emplace_back(i);
-            LOG_TRACE("[merge_adjacent_samples_read_matrix] Emplacing to buffer_ids, i = {}", i);
+            DORADO_LOG(trace,
+                       "[merge_adjacent_samples_read_matrix] Emplacing to buffer_ids, i = {}", i);
 
         } else {
             // Discontinuity found, finalize the current chunk.
             last_end = sample.end();
             results.emplace_back(merge_samples(buffer_ids));
             buffer_ids = std::vector{i};
-            LOG_TRACE(
+            DORADO_LOG(
+                    trace,
                     "[merge_adjacent_samples_read_matrix] Merging samples in buffer, resetting the "
                     "buffer. i = {}",
                     i);
-            LOG_TRACE("[merge_adjacent_samples_read_matrix] Merged.");
+            DORADO_LOG(trace, "[merge_adjacent_samples_read_matrix] Merged.");
         }
     }
 
     if (!std::empty(buffer_ids)) {
-        LOG_TRACE(
+        DORADO_LOG(
+                trace,
                 "[merge_adjacent_samples_read_matrix] Final merging samples in buffer, resetting "
                 "the buffer. buffer_ids.size() = {}",
                 std::size(buffer_ids));
         results.emplace_back(merge_samples(buffer_ids));
-        LOG_TRACE("[merge_adjacent_samples_read_matrix] Merged.");
+        DORADO_LOG(trace, "[merge_adjacent_samples_read_matrix] Merged.");
     }
 
     return results;
@@ -336,12 +332,12 @@ kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
             fmt::format("produce_haplotags-{}-{}-{}", ref_name, ref_start, ref_end);
     utils::ScopedProfileRange spr1(spr_label.c_str(), 5);
 
-    spdlog::trace("Haplotagging region: {}:{}-{}, source = {}", ref_name, (ref_start + 1), ref_end,
-                  secondary::haplotag_source_to_string(m_hap_source));
+    DORADO_LOG(trace, "Haplotagging region: {}:{}-{}, source = {}", ref_name, (ref_start + 1),
+               ref_end, secondary::haplotag_source_to_string(m_hap_source));
 
     if (m_hap_source == secondary::HaplotagSource::BIN_FILE) {
-        LOG_TRACE("Loading haplotags from a Kadayashi bin file for region: {}:{}-{}", ref_name,
-                  (ref_start + 1), ref_end);
+        DORADO_LOG(trace, "Loading haplotags from a Kadayashi bin file for region: {}:{}-{}",
+                   ref_name, (ref_start + 1), ref_end);
 
         kadayashi::varcall_result_t ret{
                 .qname2hp = secondary::query_bin_file_get_qname2tag(
@@ -349,7 +345,8 @@ kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
 
         return ret;
     } else if (m_hap_source == secondary::HaplotagSource::COMPUTE) {
-        LOG_TRACE("Running Kadayashi on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
+        DORADO_LOG(trace, "Running Kadayashi on region: {}:{}-{}", ref_name, (ref_start + 1),
+                   ref_end);
 
         const KadayashiOptions& opt = m_kadayashi_opt;
 
@@ -361,7 +358,7 @@ kadayashi::varcall_result_t EncoderReadAlignment::produce_haplotags(
                 opt.min_strand_cov, opt.min_strand_cov_frac, opt.max_gapcompressed_seqdiv,
                 opt.ambig_ref);
 
-        LOG_TRACE("Kadayashi done on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
+        DORADO_LOG(trace, "Kadayashi done on region: {}:{}-{}", ref_name, (ref_start + 1), ref_end);
 
         return result;
     }
@@ -429,8 +426,9 @@ secondary::Sample EncoderReadAlignment::encode_region(
     if (!tensors.counts.numel()) {
         const std::string region =
                 ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
-        spdlog::debug("Pileup-feature is zero-length for {} indicating no reads in this region.",
-                      region);
+        DORADO_LOG(debug,
+                   "Pileup-feature is zero-length for {} indicating no reads in this region.",
+                   region);
         return {};
     }
 
@@ -476,7 +474,7 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch,
 
     // Process read-level features if the shape indicates a 3D tensor.
     if (std::size(feature_shape) == 3) {
-        // spdlog::info("About to merge tensors.");
+        // DORADO_LOG(info, "About to merge tensors.");
 
         int64_t max_npos = 0;
         int64_t max_nfeats = 0;
@@ -509,10 +507,10 @@ at::Tensor EncoderReadAlignment::collate(std::vector<at::Tensor> batch,
                     data);
         }
     } else {
-        spdlog::warn(
-                "Unsupported feature shape when collating samples. Shape: [{}], expected 3 "
-                "dimensions. Returning an uninitialized features tensor.",
-                utils::tensor_shape_as_string(batch.front()));
+        DORADO_LOG(warn,
+                   "Unsupported feature shape when collating samples. Shape: [{}], expected 3 "
+                   "dimensions. Returning an uninitialized features tensor.",
+                   utils::tensor_shape_as_string(batch.front()));
     }
 
     return features;

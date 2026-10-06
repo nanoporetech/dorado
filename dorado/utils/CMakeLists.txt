@@ -77,7 +77,6 @@ dorado_add_library(
         parameters.cpp
         ResourceLimiter.cpp
         SampleSheet.cpp
-        scoped_trace_log.cpp
         sequence_utils.cpp
         stats.cpp
         sys_stats.cpp
@@ -104,7 +103,6 @@ dorado_add_library(
 
 target_compile_definitions(dorado_utils
     PUBLIC
-        ENABLE_PER_READ_TRACE=$<BOOL:${DORADO_PER_READ_TRACE}>
         DORADO_CUDA_BUILD=$<NOT:$<BOOL:${APPLE}>>
         DORADO_METAL_BUILD=$<BOOL:${APPLE}>
 )

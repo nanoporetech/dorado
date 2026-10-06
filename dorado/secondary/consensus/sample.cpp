@@ -2,9 +2,9 @@
 
 #include "secondary/common/interval.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 
 #include <ATen/TensorIndexing.h>
-#include <spdlog/spdlog.h>
 
 #include <ostream>
 #include <span>
@@ -309,11 +309,12 @@ std::vector<Sample> split_samples_around_positions(
         std::vector<int64_t> last_flanking_bases;
 
 #ifdef DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
-        spdlog::debug("[split_samples_around_positions] Input sample: {}",
-                      secondary::sample_to_string(sample));
+        DORADO_LOG(debug, "[split_samples_around_positions] Input sample: {}",
+                   secondary::sample_to_string(sample));
         for (int64_t i = 0; i < std::ssize(positions); ++i) {
-            spdlog::debug("[split_samples_around_positions]     [candidate i = {}] position = {}",
-                          i, positions[i].start);
+            DORADO_LOG(debug,
+                       "[split_samples_around_positions]     [candidate i = {}] position = {}", i,
+                       positions[i].start);
         }
 #endif
 
@@ -351,7 +352,8 @@ std::vector<Sample> split_samples_around_positions(
 
                 // TODO: Handle this properly. E.g. Create an overlapping large chunk at the end.
                 if (chunk_end_idx >= std::ssize(sample.positions_major)) {
-                    spdlog::warn(
+                    DORADO_LOG(
+                            warn,
                             "Tried to create chunk but "
                             "chunk exceeds sample length. chunk_start_pos = {}, chunk_start_idx = "
                             "{}, chunk_end_idx = {}, positions_major.size() = {}, seq_id = {}. "
@@ -373,10 +375,10 @@ std::vector<Sample> split_samples_around_positions(
                 break;
             }
             if (curr_flanking_bases < MIN_FLANKING_BASES) {
-                spdlog::warn(
-                        "Could not create chunk around position = {} with more than {} bases of "
-                        "flanking context. Skipping this position.",
-                        position, MIN_FLANKING_BASES);
+                DORADO_LOG(warn,
+                           "Could not create chunk around position = {} with more than {} bases of "
+                           "flanking context. Skipping this position.",
+                           position, MIN_FLANKING_BASES);
                 continue;
             }
 
@@ -385,12 +387,12 @@ std::vector<Sample> split_samples_around_positions(
             last_flanking_bases.emplace_back(curr_flanking_bases);
 
 #ifdef DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
-            spdlog::debug(
-                    "[split_samples_around_positions] Created a chunk around position = {}. "
-                    "chunk_start_pos = {}, chunk_start_idx = {}, chunk_end_idx = {}, "
-                    "curr_flanking_bases = {}. Chunk sample: {}",
-                    position, chunk_start_pos, chunk_start_idx, chunk_end_idx, curr_flanking_bases,
-                    secondary::sample_to_string(results.back()));
+            DORADO_LOG(debug,
+                       "[split_samples_around_positions] Created a chunk around position = {}. "
+                       "chunk_start_pos = {}, chunk_start_idx = {}, chunk_end_idx = {}, "
+                       "curr_flanking_bases = {}. Chunk sample: {}",
+                       position, chunk_start_pos, chunk_start_idx, chunk_end_idx,
+                       curr_flanking_bases, secondary::sample_to_string(results.back()));
 #endif
         }
 
@@ -517,8 +519,8 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         // Get the interval tree of candidates for this sequence ID.
         const auto it_seq_id = candidate_trees.find(sample.seq_id);
         if (it_seq_id == std::cend(candidate_trees)) {
-            spdlog::debug("Cannot find seq_id = {} in candidate_trees! Sample: {}", sample.seq_id,
-                          secondary::sample_to_string(sample));
+            DORADO_LOG(debug, "Cannot find seq_id = {} in candidate_trees! Sample: {}",
+                       sample.seq_id, secondary::sample_to_string(sample));
             sample = {};
             continue;
         }

@@ -1,8 +1,7 @@
 #include "kadayashi_utils.h"
 
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cstdlib>
@@ -10,12 +9,6 @@
 #include <ctime>
 #include <fstream>
 #include <limits>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
 
 namespace kadayashi {
 
@@ -87,8 +80,8 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
             } else if (cols[0] == "R" && pass == 0) {  // collect size of storages
                 const std::string &qn = cols[2];
                 if (qn.size() > std::numeric_limits<uint8_t>::max()) {
-                    spdlog::error("[kdys::{}] read name too long (l={})\n", __func__,
-                                  (int)qn.size());
+                    DORADO_LOG(error, "[kdys::{}] read name too long (l={})\n", __func__,
+                               (int)qn.size());
                     exit(1);
                 }
                 int size = sizeof(uint8_t) /*length of qname*/ +
@@ -116,12 +109,12 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
         // if first pass is done, write the header part of the binary file now
         // and let second pass write storages.
         if (pass == 0) {
-            LOG_TRACE(
-                    "[kdys::{}] to write header: {} refs, {} chunks (sancheck: chunkinfo buf "
-                    "length "
-                    "{})\n",
-                    __func__, tot_refs, static_cast<int>(chunkID),
-                    static_cast<int>(chunkinfos.size()));
+            DORADO_LOG(trace,
+                       "[kdys::{}] to write header: {} refs, {} chunks (sancheck: chunkinfo buf "
+                       "length "
+                       "{})\n",
+                       __func__, tot_refs, static_cast<int>(chunkID),
+                       static_cast<int>(chunkinfos.size()));
             uint32_t header_offset1 =
                     static_cast<uint32_t>(sizeof(uint32_t)) +
                     static_cast<uint32_t>(refnames.size())  // tot_refs and refnames_s_concat
@@ -175,7 +168,7 @@ void write_binary_given_tsv(const std::filesystem::path &fn_tsv,
             assert(fp_bin.tellp() == (header_offset1 + header_offset2));
         }  // end of header write
     }
-    spdlog::info("[kdys::{}] wrote bin file\n", __func__);
+    DORADO_LOG(info, "[kdys::{}] wrote bin file\n", __func__);
 
     fp_tsv.close();
     fp_bin.close();
@@ -195,7 +188,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
     uint32_t n_ref;
     size_t fret = fread(&n_ref, sizeof(uint32_t), 1, fp);
     if (fret != 1) {
-        spdlog::error("[kdys::{}] fread failed", __func__);
+        DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
         exit(1);
     }
 
@@ -206,19 +199,19 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
         uint8_t tn_l;
         fret = fread(&tn_l, 1, 1, fp);
         if (fret != 1) {
-            spdlog::error("[kdys::{}] fread failed", __func__);
+            DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
             exit(1);
         }
         if (ref_i < 0) {  // haven't found the chrom yet
             refname.resize(tn_l);
             fret = fread(&refname[0], 1, tn_l, fp);
             if (fret != tn_l) {
-                spdlog::error("[kdys::{}] fread failed", __func__);
+                DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
                 exit(1);
             }
             if (refname == chrom) {  // done; don't break
                 if (debug_print) {
-                    LOG_TRACE("[kdys::{}] found ref {}\n", __func__, refname);
+                    DORADO_LOG(trace, "[kdys::{}] found ref {}\n", __func__, refname);
                 }
                 ref_i = i;
             }
@@ -235,7 +228,7 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
         fret = fread(&pos_intervals_start, sizeof(uint64_t), 1, fp);
         fret += fread(&n_intervals, sizeof(uint32_t), 1, fp);
         if (fret != 2) {
-            spdlog::error("[kdys::{}] fread failed", __func__);
+            DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
             exit(1);
         }
         fret = fseek(fp, pos_intervals_start, SEEK_SET);
@@ -255,12 +248,12 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
             fret += fread(&pos_chunk_start, sizeof(uint64_t), 1, fp);
             fret += fread(&n_reads, sizeof(uint32_t), 1, fp);
             if (fret != 4) {
-                spdlog::error("[kdys::{}] fread failed", __func__);
+                DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
                 exit(1);
             }
             if (ref_end >= start && ref_start < end) {
                 if (debug_print) {
-                    LOG_TRACE("[kdys::{}] checking {}-{}\n", __func__, start, end);
+                    DORADO_LOG(trace, "[kdys::{}] checking {}-{}\n", __func__, start, end);
                 }
                 uint32_t l = 0;
                 if (start < ref_start) {
@@ -270,10 +263,10 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
                 }
                 if (l > best_ovlp_len) {
                     if (debug_print) {
-                        LOG_TRACE(
-                                "[kdys::{}] update best hit to: {}-{} with {} reads (l: {} => "
-                                "{})\n",
-                                __func__, start, end, n_reads, (int)best_ovlp_len, (int)l);
+                        DORADO_LOG(trace,
+                                   "[kdys::{}] update best hit to: {}-{} with {} reads (l: {} => "
+                                   "{})\n",
+                                   __func__, start, end, n_reads, (int)best_ovlp_len, (int)l);
                     }
                     best_ovlp_len = l;
                     best_ovlp_chunk_start = pos_chunk_start;
@@ -282,8 +275,8 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
                     best_ovlp_end = end;
                 } else {
                     if (debug_print) {
-                        LOG_TRACE("[kdys::{}] hit (worse): {}-{} with {} reads\n", __func__, start,
-                                  end, n_reads);
+                        DORADO_LOG(trace, "[kdys::{}] hit (worse): {}-{} with {} reads\n", __func__,
+                                   start, end, n_reads);
                     }
                 }
             } else if (start > ref_end) {
@@ -292,8 +285,8 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
         }
         if (best_ovlp_chunk_start > 0) {
             fseek(fp, best_ovlp_chunk_start, SEEK_SET);
-            spdlog::info("[kdys::{}] use interval {}-{}\n", __func__, best_ovlp_start,
-                         best_ovlp_end);
+            DORADO_LOG(info, "[kdys::{}] use interval {}-{}\n", __func__, best_ovlp_start,
+                       best_ovlp_end);
 
             // read the chunk
             uint8_t qn_l, haptag;
@@ -310,30 +303,30 @@ std::unordered_map<std::string, int> query_bin_file_get_qname2hp(
 
                 fret += fread(&haptag, 1, 1, fp);
                 if (fret != 3) {
-                    spdlog::error("[kdys::{}] fread failed", __func__);
+                    DORADO_LOG(error, "[kdys::{}] fread failed", __func__);
                     exit(1);
                 }
 
                 if (qname2hp.find(qn) != qname2hp.end()) {
                     if (debug_print) {
-                        LOG_TRACE("[kdys::{}] qn {} already seen\n", __func__, qn);
+                        DORADO_LOG(trace, "[kdys::{}] qn {} already seen\n", __func__, qn);
                     }
                 } else {
                     qname2hp[qn] = haptag;
                     if (debug_print > 1) {
-                        LOG_TRACE("[kdys::{}] insert qn {} tag {}\n", __func__, qn, haptag);
+                        DORADO_LOG(trace, "[kdys::{}] insert qn {} tag {}\n", __func__, qn, haptag);
                     }
                 }
             }
             found = 1;
         }
         if (!found) {
-            spdlog::warn("[kdys::{}] ref found, but requested interval not found ({}:{}-{})\n",
-                         __func__, chrom, ref_start, ref_end);
+            DORADO_LOG(warn, "[kdys::{}] ref found, but requested interval not found ({}:{}-{})\n",
+                       __func__, chrom, ref_start, ref_end);
         }
     } else {
         if (!silent) {
-            spdlog::warn("[kdys::{}] ref {} not found in bin's header\n", __func__, chrom);
+            DORADO_LOG(warn, "[kdys::{}] ref {} not found in bin's header\n", __func__, chrom);
         }
     }
 

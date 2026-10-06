@@ -1,6 +1,6 @@
 #include "read_pipeline/base/ReadPipeline.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 #include <ranges>
@@ -50,7 +50,7 @@ std::unique_ptr<Pipeline> Pipeline::create(
     }
     const auto num_sources = std::count(is_sink.cbegin(), is_sink.cend(), false);
     if (num_sources != 1) {
-        spdlog::error("There must be exactly 1 source node.  {} were present.", num_sources);
+        DORADO_LOG(error, "There must be exactly 1 source node.  {} were present.", num_sources);
         return nullptr;
     }
     auto source_it = std::find(is_sink.cbegin(), is_sink.cend(), false);
@@ -63,7 +63,7 @@ std::unique_ptr<Pipeline> Pipeline::create(
     const bool has_cycle =
             DFS(descriptor.m_node_descriptors, source_node, dfs_state, source_to_sink_order);
     if (has_cycle) {
-        spdlog::error("Graph has cycle");
+        DORADO_LOG(error, "Graph has cycle");
         return nullptr;
     }
     std::reverse(source_to_sink_order.begin(), source_to_sink_order.end());

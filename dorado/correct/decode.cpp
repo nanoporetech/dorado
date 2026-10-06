@@ -2,15 +2,9 @@
 
 #include "correct/conversions.h"
 #include "correct/types.h"
+#include "utils/log_utils.h"
 
 #include <array>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#include <spdlog/spdlog.h>
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
 
 struct base_count_t {
     int count = 0;
@@ -67,8 +61,8 @@ std::string decode_window(const WindowFeatures& wf) {
     std::unordered_map<std::pair<int, int>, char, PairHash, PairEqual> bases_map;
 
     for (size_t i = 0; i < wf.supported.size(); i++) {
-        LOG_TRACE("supported positions {},{} for {}", wf.supported[i].first, wf.supported[i].second,
-                  wf.inferred_bases[i]);
+        DORADO_LOG(trace, "supported positions {},{} for {}", wf.supported[i].first,
+                   wf.supported[i].second, wf.inferred_bases[i]);
         bases_map.insert({wf.supported[i], wf.inferred_bases[i]});
     }
     auto& bases = wf.bases;
@@ -90,7 +84,8 @@ std::string decode_window(const WindowFeatures& wf) {
             auto new_base = found_p->second;
             if (new_base != '*') {
                 corrected_seq += new_base;
-                LOG_TRACE("{} tbase {} inferred base {} at {} {}", c, tbase, new_base, tpos, ins);
+                DORADO_LOG(trace, "{} tbase {} inferred base {} at {} {}", c, tbase, new_base, tpos,
+                           ins);
             }
         } else {
             std::array<base_count_t, 5> counter;
@@ -121,10 +116,10 @@ std::string decode_window(const WindowFeatures& wf) {
 
             new_base = base_forward[new_base];
             if (new_base != '*') {
-                LOG_TRACE("{} tbase {} new base {}", c, tbase, new_base);
+                DORADO_LOG(trace, "{} tbase {} new base {}", c, tbase, new_base);
                 corrected_seq += new_base;
             } else {
-                LOG_TRACE("{} tbase {} new base {} skipping", c, tbase, new_base);
+                DORADO_LOG(trace, "{} tbase {} new base {} skipping", c, tbase, new_base);
             }
         }
     }

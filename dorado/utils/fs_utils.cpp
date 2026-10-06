@@ -1,7 +1,7 @@
 
 #include "utils/fs_utils.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <exception>
 #include <filesystem>
@@ -38,7 +38,7 @@ bool has_write_permission(const fs::path& directory) {
         try {
             fs::create_directories(directory);
         } catch (const fs::filesystem_error& e) {
-            spdlog::error("{}", e.code().message());
+            DORADO_LOG(error, e.code().message());
             return false;
         }
     }
@@ -49,14 +49,14 @@ bool has_write_permission(const fs::path& directory) {
     tmp.close();
 
     if (!tmp) {
-        spdlog::error("Insufficient permissions or drive is full: {}", directory.string());
+        DORADO_LOG(error, "Insufficient permissions or drive is full: {}", directory.string());
         return false;
     }
 
     try {
         fs::remove(directory / fname);
     } catch (const fs::filesystem_error& e) {
-        spdlog::error("{}", e.code().message());
+        DORADO_LOG(error, e.code().message());
         return false;
     }
     return true;
@@ -96,13 +96,13 @@ fs::path get_downloads_path(const std::optional<fs::path>& override) {
 void clean_temporary_models(const std::set<std::filesystem::path>& paths) {
     for (const auto& path : paths) {
         try {
-            spdlog::debug("Deleting temporary model path: '{}'", path.string());
+            DORADO_LOG(debug, "Deleting temporary model path: '{}'", path.string());
             fs::remove_all(path);
         } catch (const fs::filesystem_error& e) {
-            spdlog::warn("Failed to clean temporary model: '{}' - {}", path.string(), e.what());
+            DORADO_LOG(warn, "Failed to clean temporary model: '{}' - {}", path.string(), e.what());
         } catch (const std::exception& e) {
-            spdlog::warn("Error while cleaning temporary model: '{}': - {}", path.string(),
-                         e.what());
+            DORADO_LOG(warn, "Error while cleaning temporary model: '{}': - {}", path.string(),
+                       e.what());
         }
     }
 }
@@ -132,14 +132,15 @@ std::vector<std::filesystem::directory_entry> fetch_directory_entries(
                 }
             }
         } catch (const std::filesystem::filesystem_error& fex) {
-            spdlog::error("File system error reading directory entries for {}. ErrCode[{}] {}",
-                          path.string(), fex.code().value(), fex.what());
+            DORADO_LOG(error, "File system error reading directory entries for {}. ErrCode[{}] {}",
+                       path.string(), fex.code().value(), fex.what());
             return {};
         } catch (const std::exception& ex) {
-            spdlog::error("Error reading directory entries for {}. {}", path.string(), ex.what());
+            DORADO_LOG(error, "Error reading directory entries for {}. {}", path.string(),
+                       ex.what());
             return {};
         } catch (...) {
-            spdlog::error("Unexpected error reading directory entries for {}", path.string());
+            DORADO_LOG(error, "Unexpected error reading directory entries for {}", path.string());
             return {};
         }
     } else {

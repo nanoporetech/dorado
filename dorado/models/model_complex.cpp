@@ -2,9 +2,8 @@
 
 #include "models/metadata.h"
 #include "models/models.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <optional>
 #include <stdexcept>
@@ -64,10 +63,10 @@ std::optional<ModelComplex> ModelComplex::parse_names(const std::string& raw) {
             mods.push_back(info);
             break;
         default:
-            spdlog::error(
-                    "Failed to parse basecaller model complex '{}' - a '{}' model is not valid "
-                    "here.",
-                    raw, to_string(info.model_type));
+            DORADO_LOG(error,
+                       "Failed to parse basecaller model complex '{}' - a '{}' model is not valid "
+                       "here.",
+                       raw, to_string(info.model_type));
             throw std::runtime_error("Invalid model argument");
         }
     }
@@ -76,16 +75,17 @@ std::optional<ModelComplex> ModelComplex::parse_names(const std::string& raw) {
     for (size_t i = 1; i < parts.size(); ++i) {
         const auto maybe_modbase_info = try_get_model_info(parts.at(i));
         if (!maybe_modbase_info.has_value()) {
-            spdlog::error(
-                    "Failed to parse model complex '{}'. '{}' is not a recognised model "
-                    "name.",
-                    raw, parts.at(i));
+            DORADO_LOG(error,
+                       "Failed to parse model complex '{}'. '{}' is not a recognised model "
+                       "name.",
+                       raw, parts.at(i));
             throw std::runtime_error("Invalid model argument");
         }
 
         const auto& info = maybe_modbase_info.value();
         if (info.model_type != ModelType::MODBASE) {
-            spdlog::error(
+            DORADO_LOG(
+                    error,
                     "Failed to parse model complex '{}' - Additional models must be modbase models "
                     "but found a '{}' model from '{}'",
                     raw, to_string(info.model_type), parts.at(i));
@@ -96,7 +96,8 @@ std::optional<ModelComplex> ModelComplex::parse_names(const std::string& raw) {
                                   info.simplex.variant == simplex.simplex.variant &&
                                   info.simplex.ver == simplex.simplex.ver;
         if (!match_parent) {
-            spdlog::error(
+            DORADO_LOG(
+                    error,
                     "Failed to parse model complex '{}' - Additional modbase model '{}' must work "
                     "with simplex model '{}'.",
                     raw, parts.at(i), simplex.name);
@@ -105,8 +106,9 @@ std::optional<ModelComplex> ModelComplex::parse_names(const std::string& raw) {
 
         for (const ModelInfo& mod : mods) {
             if (info.name == mod.name) {
-                spdlog::error("Failed to parse model complex '{}' - Duplicate modbase model '{}'",
-                              raw, parts.at(i));
+                DORADO_LOG(error,
+                           "Failed to parse model complex '{}' - Duplicate modbase model '{}'", raw,
+                           parts.at(i));
                 throw std::runtime_error("Invalid model argument");
             }
         }
@@ -133,18 +135,18 @@ std::optional<ModelComplex> ModelComplex::parse_variant(const std::string& raw) 
             if (model_variant == ModelVariant::NONE) {
                 return std::nullopt;
             } else {
-                spdlog::trace("Model complex '{}' found variant: '{}' and version: '{}'", part_str,
-                              to_string(model_variant), to_string(version));
+                DORADO_LOG(trace, "Model complex '{}' found variant: '{}' and version: '{}'",
+                           part_str, to_string(model_variant), to_string(version));
                 simplex = ModelVariantPair{model_variant, version};
             }
         } else {
             // Remaining models are modification models
             const auto mod_variant = get_mods_variant(part_str);
             if (mod_variant == ModsVariant::NONE) {
-                spdlog::error(
-                        "Model complex '{}' has unknown modification variant: '{}' "
-                        "- Choices: {}",
-                        raw, part_str, utils::join(modified_model_variants(), ", "));
+                DORADO_LOG(error,
+                           "Model complex '{}' has unknown modification variant: '{}' "
+                           "- Choices: {}",
+                           raw, part_str, utils::join(modified_model_variants(), ", "));
                 throw std::runtime_error("Failed to parse modified model arguments");
             }
             mods.push_back({mod_variant, version});

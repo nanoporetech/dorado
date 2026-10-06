@@ -4,10 +4,9 @@
 #include "model/CRFModel.h"
 #include "model/TxModel.h"
 #include "torch_utils/tensor_utils.h"
+#include "utils/log_utils.h"
 #include "utils/memory_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstddef>
@@ -208,7 +207,7 @@ size_t auto_calculate_num_runners(const BasecallModelConfig &model_config, float
     if (const char *num_runners_str = getenv("DORADO_CPU_RUNNERS"); num_runners_str != nullptr) {
         auto num_runners = utils::from_chars<size_t>(num_runners_str);
         if (num_runners) {
-            spdlog::info("Overriding CPU runners to {}", num_runners.value());
+            DORADO_LOG(info, "Overriding CPU runners to {}", num_runners.value());
             return num_runners.value();
         } else {
             throw std::runtime_error(

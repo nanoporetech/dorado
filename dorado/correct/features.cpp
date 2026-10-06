@@ -13,12 +13,6 @@
 #include <cstdint>
 #include <stdexcept>
 
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
-
 constexpr int32_t TOP_K = 30;
 constexpr int32_t MAX_INDEL_LEN = 30;
 
@@ -34,8 +28,8 @@ bool overlap_has_long_indel(const OverlapWindow& overlap,
     for (size_t i = overlap.cigar_start_idx; i < max_cigar_idx; i++) {
         if ((static_cast<int32_t>(cigar[i].len) >= max_indel_len) &&
             ((cigar[i].op == CigarOpType::I) || (cigar[i].op == CigarOpType::D))) {
-            LOG_TRACE("filter ? tstart {} qstart {} qend {} long indel: {}", overlap.tstart,
-                      overlap.qstart, overlap.qend, cigar[i].len);
+            DORADO_LOG(trace, "filter ? tstart {} qstart {} qend {} long indel: {}", overlap.tstart,
+                       overlap.qstart, overlap.qend, cigar[i].len);
             return true;
         }
     }
@@ -83,15 +77,17 @@ void calculate_accuracy(OverlapWindow& overlap, const CorrectionAlignments& alig
         default:
             if (!has_warned_bad_cigar_op) {
                 has_warned_bad_cigar_op = true;
-                LOG_TRACE("unexpected CigarOpType: {}", static_cast<uint8_t>(cigar[idx].op));
+                DORADO_LOG(trace, "unexpected CigarOpType: {}",
+                           static_cast<uint8_t>(cigar[idx].op));
             }
             break;
         }
     }
 
     overlap.accuracy = (static_cast<float>(n_match) / (n_match + n_miss + n_ins + n_del));
-    LOG_TRACE("m {} s {} i {} d {}", n_match, n_miss, n_ins, n_del);
-    LOG_TRACE("accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend, overlap.accuracy);
+    DORADO_LOG(trace, "m {} s {} i {} d {}", n_match, n_miss, n_ins, n_del);
+    DORADO_LOG(trace, "accuracy qstart {} qend {} {}", overlap.qstart, overlap.qend,
+               overlap.accuracy);
 }
 
 // Calculate the maximum number of possible inserts for each position of the
@@ -154,9 +150,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
     const int32_t win_tstart = overlaps.front().win_tstart;
 
     static auto base_encoding = gen_base_encoding();
-#ifndef NDEBUG
     static auto base_decoding = gen_base_decoding();
-#endif
     auto bases_options = at::TensorOptions().dtype(at::kInt).device(at::kCPU);
     auto quals_options = at::TensorOptions().dtype(at::kFloat).device(at::kCPU);
 
@@ -182,14 +176,14 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         target_bases_tensor[tpos] = base_encoding[tseq[i + win_tstart]];
         target_quals_tensor[tpos] = normalize_quals(float(tqual[i + win_tstart] + 33));
 
-        LOG_TRACE("tpos {} base {} qual {}", tpos, base_decoding[target_bases_tensor[tpos]],
-                  target_quals_tensor[tpos]);
+        DORADO_LOG(trace, "tpos {} base {} qual {}", tpos, base_decoding[target_bases_tensor[tpos]],
+                   target_quals_tensor[tpos]);
         tpos += 1 + max_ins[i];
     }
 
     // Write bases for each overlap in the window
     for (int w = 0; w < (int)overlaps.size(); w++) {
-        LOG_TRACE("get_features_for_ol_window for window {}", w);
+        DORADO_LOG(trace, "get_features_for_ol_window for window {}", w);
         int* query_bases_tensor = &target_bases_tensor[length * (w + 1)];
         float* query_quals_tensor = &target_quals_tensor[length * (w + 1)];
         const auto& overlap = overlaps[w];
@@ -212,8 +206,9 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             qlen = qend - qstart;
         }
 
-        LOG_TRACE("qstart {} qend {} aln qstart {} aln qend {} overlap qstart {} overlap qend {}",
-                  qstart, qend, oqstart, oqend, overlap.qstart, overlap.qend);
+        DORADO_LOG(trace,
+                   "qstart {} qend {} aln qstart {} aln qend {} overlap qstart {} overlap qend {}",
+                   qstart, qend, oqstart, oqend, overlap.qstart, overlap.qend);
         int query_iter = 0;
         if (qstart >= oqlen) {
             throw std::runtime_error{
@@ -248,8 +243,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
         tpos = offset;
         int idx = offset + std::accumulate(max_ins.begin(), max_ins.begin() + offset, 0);
 
-        LOG_TRACE("cigar_len {}, cigar_end {}, gap {}, tpos {}, idx {}, fwd {}", cigar_len,
-                  cigar_end, gap, tpos, idx, fwd ? '+' : '-');
+        DORADO_LOG(trace, "cigar_len {}, cigar_end {}, gap {}, tpos {}, idx {}, fwd {}", cigar_len,
+                   cigar_end, gap, tpos, idx, fwd ? '+' : '-');
 
         if (idx > 0) {
             std::fill(query_bases_tensor, query_bases_tensor + idx, base_encoding['.']);
@@ -268,7 +263,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                 l = overlap.cigar_end_offset;
             }
 
-            LOG_TRACE("cigar_idx {} l {}", cigar_idx, l);
+            DORADO_LOG(trace, "cigar_idx {} l {}", cigar_idx, l);
 
             switch (op) {
             case CigarOpType::EQ:
@@ -280,8 +275,8 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                     query_bases_tensor[idx] = base;
                     query_quals_tensor[idx] = normalize_quals((float)(qual + 33));
 
-                    LOG_TRACE("idx {} base {}, qual {}", idx,
-                              base_decoding[query_bases_tensor[idx]], query_quals_tensor[idx]);
+                    DORADO_LOG(trace, "idx {} base {}, qual {}", idx,
+                               base_decoding[query_bases_tensor[idx]], query_quals_tensor[idx]);
 
                     idx += 1 + max_ins[tpos + i];
                     query_iter++;
@@ -291,7 +286,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                 break;
             case CigarOpType::D:
                 for (uint32_t i = 0; i < l; i++) {
-                    LOG_TRACE("idx {}", idx);
+                    DORADO_LOG(trace, "idx {}", idx);
                     idx += 1 + max_ins[tpos + i];
                 }
                 tpos += l;
@@ -305,9 +300,9 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
                     query_bases_tensor[(idx + i)] = base;
                     query_quals_tensor[(idx + i)] = normalize_quals((float)(qual + 33));
 
-                    LOG_TRACE("idx + i {} base {}, qual {}", idx + i,
-                              base_decoding[query_bases_tensor[(idx + i)]],
-                              query_quals_tensor[(idx + i)]);
+                    DORADO_LOG(trace, "idx + i {} base {}, qual {}", idx + i,
+                               base_decoding[query_bases_tensor[(idx + i)]],
+                               query_quals_tensor[(idx + i)]);
 
                     query_iter++;
                 }
@@ -326,7 +321,7 @@ std::tuple<at::Tensor, at::Tensor> get_features_for_window(
             std::fill(query_bases_tensor + idx, query_bases_tensor + length, base_encoding['.']);
         }
 
-        LOG_TRACE("sum of bases at at overlap {} {}", w, bases.sum().item<int>());
+        DORADO_LOG(trace, "sum of bases at at overlap {} {}", w, bases.sum().item<int>());
     }
 
     return {std::move(bases), std::move(quals)};
@@ -365,22 +360,22 @@ std::vector<std::pair<int, int>> get_supported(at::Tensor& bases) {
         counter.fill(0);
         for (int r = 0; r < reads; r++) {
             auto base = bases_ptr[r * length + c];
-            LOG_TRACE("row {} base {}", r, base);
+            DORADO_LOG(trace, "row {} base {}", r, base);
             if (base == base_encoding['.']) {
                 continue;
             }
             counter[base_forward[base_decoding[base]]]++;
         }
 
-        LOG_TRACE("col {} A {} C {} T {} G {} * {}", c, counter['A'], counter['C'], counter['T'],
-                  counter['G'], counter['*']);
+        DORADO_LOG(trace, "col {} A {} C {} T {} G {} * {}", c, counter['A'], counter['C'],
+                   counter['T'], counter['G'], counter['*']);
         int count = (int)std::count_if(counter.begin(), counter.end(),
                                        [](int num) { return num >= 3; });
         if (count >= 2) {
             supported.push_back({tpos, ins});
-            LOG_TRACE("support added for {} {}", tpos, ins);
+            DORADO_LOG(trace, "support added for {} {}", tpos, ins);
         }
-        LOG_TRACE("num supported {}", supported.size());
+        DORADO_LOG(trace, "num supported {}", supported.size());
     }
     return supported;
 }
@@ -425,8 +420,8 @@ std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>&
                 filtered_overlaps.push_back(std::move(ovlp));
             }
         }
-        LOG_TRACE("window {} pre filter windows {} post filter windows {}", w,
-                  overlap_windows.size(), filtered_overlaps.size());
+        DORADO_LOG(trace, "window {} pre filter windows {} post filter windows {}", w,
+                   overlap_windows.size(), filtered_overlaps.size());
         overlap_windows = std::move(filtered_overlaps);
 
         // Sort overlaps by score
@@ -451,10 +446,11 @@ std::unordered_set<int> filter_features(std::vector<std::vector<OverlapWindow>>&
 
 #ifndef NDEBUG
         if (overlap_windows.size() == 1) {
-            LOG_TRACE("window {} 1st {}-{}", w, overlap_windows[0].qstart, overlap_windows[0].qend);
+            DORADO_LOG(trace, "window {} 1st {}-{}", w, overlap_windows[0].qstart,
+                       overlap_windows[0].qend);
         } else if (overlap_windows.size() > 1) {
-            LOG_TRACE("window {} 1st {}-{} 2nd {}-{}", w, overlap_windows[0].qstart,
-                      overlap_windows[0].qend, overlap_windows[1].qstart, overlap_windows[1].qend);
+            DORADO_LOG(trace, "window {} 1st {}-{} 2nd {}-{}", w, overlap_windows[0].qstart,
+                       overlap_windows[0].qend, overlap_windows[1].qstart, overlap_windows[1].qend);
         }
 #endif
 
@@ -472,7 +468,7 @@ std::vector<WindowFeatures> extract_features(std::vector<std::vector<OverlapWind
                                              const CorrectionAlignments& alignments) {
     std::vector<WindowFeatures> wfs;
     for (int w = 0; w < (int)windows.size(); w++) {
-        LOG_TRACE("win idx {}", w);
+        DORADO_LOG(trace, "win idx {}", w);
         auto& overlap_windows = windows[w];
 
         WindowFeatures wf;

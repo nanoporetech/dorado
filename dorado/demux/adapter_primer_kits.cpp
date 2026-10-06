@@ -2,9 +2,8 @@
 
 #include "demux/parse_custom_sequences.h"
 #include "models/kits.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <set>
 #include <sstream>
@@ -119,37 +118,39 @@ struct CustomItem {
 
     bool add_sequence(std::string nm, std::string sequence, ItemType ty, ItemPos pos) {
         if (!name.empty() && name != nm) {
-            spdlog::error("Custom adapter/primer name mismatch error: {} and {}", name, nm);
+            DORADO_LOG(error, "Custom adapter/primer name mismatch error: {} and {}", name, nm);
             return false;
         }
         if (item_type != ty && item_type != ItemType::UNKNOWN) {
-            spdlog::error("Custom adapter/primer type mismatch error. {} and {}", int(item_type),
-                          int(ty));
+            DORADO_LOG(error, "Custom adapter/primer type mismatch error. {} and {}",
+                       int(item_type), int(ty));
             return false;
         }
         if (sequence.empty()) {
-            spdlog::error("Custom adapter/primer parsing error: Empty sequence specified.");
+            DORADO_LOG(error, "Custom adapter/primer parsing error: Empty sequence specified.");
             return false;
         }
         switch (pos) {
         case ItemPos::FRONT:
             if (!front_sequence.empty()) {
-                spdlog::error(
-                        "Custom adapter/primer parsing error: Duplicate front sequence for {}", nm);
+                DORADO_LOG(error,
+                           "Custom adapter/primer parsing error: Duplicate front sequence for {}",
+                           nm);
                 return false;
             }
             front_sequence = std::move(sequence);
             break;
         case ItemPos::REAR:
             if (!rear_sequence.empty()) {
-                spdlog::error("Custom adapter/primer parsing error: Duplicate rear sequence for {}",
-                              nm);
+                DORADO_LOG(error,
+                           "Custom adapter/primer parsing error: Duplicate rear sequence for {}",
+                           nm);
                 return false;
             }
             rear_sequence = std::move(sequence);
             break;
         default:
-            spdlog::error("Custom adapter/primer parsing error: Invalid sequence position.");
+            DORADO_LOG(error, "Custom adapter/primer parsing error: Invalid sequence position.");
             return false;
         }
         name = std::move(nm);
@@ -208,7 +209,7 @@ std::pair<std::string, CustomItem::ItemPos> split_name(const std::string& record
 std::set<std::string> kit_names(const std::unordered_map<std::string, std::string>& tags) {
     auto kits_field = tags.find(SEQ_KITS_TAG);
     if (kits_field == tags.end()) {
-        spdlog::error("Custom adapter/primer parsing error: No 'kits' field found.");
+        DORADO_LOG(error, "Custom adapter/primer parsing error: No 'kits' field found.");
         throw std::runtime_error("Error parsing custom adapter/primer file.");
     }
     return parse_kit_names(kits_field->second);
@@ -248,11 +249,11 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
         auto [name, pos] = split_name(entry.name);
         std::set<std::string> kits = kit_names(entry.tags);
         if (ty == CustomItem::ItemType::UNKNOWN) {
-            spdlog::error("Invalid 'type' tag in custom adapter/primer file.");
+            DORADO_LOG(error, "Invalid 'type' tag in custom adapter/primer file.");
             throw std::runtime_error("Error parsing custom adapter/primer file.");
         }
         if (name.empty()) {
-            spdlog::error("Could not extract position from record name.");
+            DORADO_LOG(error, "Could not extract position from record name.");
             throw std::runtime_error("Error parsing custom adapter/primer file.");
         }
         auto& item = custom_items[name];
@@ -265,7 +266,7 @@ AdapterPrimerManager::AdapterPrimerManager(const std::string& custom_file) {
         } else {
             if (!kits.empty()) {
                 if (item_kits != kits) {
-                    spdlog::error("inconsistent kit specifications.");
+                    DORADO_LOG(error, "inconsistent kit specifications.");
                     throw std::runtime_error("Error parsing custom adapter/primer file.");
                 }
             }

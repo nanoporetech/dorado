@@ -5,10 +5,9 @@
 #include "decode/beam_search.h"
 #include "model/MetalCRFModel.h"
 #include "torch_utils/metal_utils.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/memory_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
@@ -41,10 +40,10 @@ MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
     ScopedAutoReleasePool autorelease_pool;
     // Our metal builds assume shared memory, so it's safe to check host.
     if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        spdlog::warn(
-                "Less than 16GB of memory available: {}GB detected. "
-                "This is below minimum spec and may cause issues",
-                total_mem);
+        DORADO_LOG(warn,
+                   "Less than 16GB of memory available: {}GB detected. "
+                   "This is below minimum spec and may cause issues",
+                   total_mem);
     }
 
     m_device = get_mtl_device();
@@ -84,8 +83,8 @@ int MetalLSTMCaller::get_max_safe_batch_size(float memory_limit_fraction,
                                              const config::BasecallModelConfig &model_config) {
     const size_t physical_memory = get_apple_physical_memory_bytes();
     const size_t usable_memory = physical_memory * memory_limit_fraction;
-    spdlog::debug("Physical/Usable memory available: {}/{} GB", physical_memory / BYTES_PER_GB,
-                  usable_memory / BYTES_PER_GB);
+    DORADO_LOG(debug, "Physical/Usable memory available: {}/{} GB", physical_memory / BYTES_PER_GB,
+               usable_memory / BYTES_PER_GB);
 
     // Constrain the maximum batch size to use about half physical memory for decode buffers,
     // with neural network GPU buffers and CPU buffers assumed to occupy a subset of the
@@ -104,13 +103,13 @@ int MetalLSTMCaller::get_max_safe_batch_size(float memory_limit_fraction,
             (static_cast<size_t>(model_config.outsize) +      // Scores
              static_cast<size_t>(states) * sizeof(int16_t) +  // Posts
              static_cast<size_t>(states) * sizeof(float));    // Back guides.
-    spdlog::trace("decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
+    DORADO_LOG(trace, "decode_buffer_size_per_elem {}", decode_buffer_size_per_elem);
     const int max_batch_size = static_cast<int>(
             std::clamp(utils::pad_to(usable_memory / (2 * decode_buffer_size_per_elem),
                                      static_cast<size_t>(MTL_CORE_BATCH_SIZE)),
                        static_cast<size_t>(MTL_CORE_BATCH_SIZE),
                        static_cast<size_t>(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count())));
-    spdlog::trace("max_batch_size {}", max_batch_size);
+    DORADO_LOG(trace, "max_batch_size {}", max_batch_size);
     return max_batch_size;
 }
 
@@ -157,10 +156,10 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
     }
     auto piece_size = complete_linear_out_size / m_out_split;
     if (piece_size > kMaxBufferSize) {
-        spdlog::debug("Did not hit linear layer target output size {} - got {}", kMaxBufferSize,
-                      piece_size);
+        DORADO_LOG(debug, "Did not hit linear layer target output size {} - got {}", kMaxBufferSize,
+                   piece_size);
     }
-    spdlog::debug("Linear layer split {}", m_out_split);
+    DORADO_LOG(debug, "Linear layer split {}", m_out_split);
     // If we exited the loop above without breaking, then m_out_split = num_batch_pieces,
     // which satisfies the divisor criterion, and should mean small enough linear layer
     // output buffers, given other reasonable parameters.
@@ -204,7 +203,7 @@ int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_conf
     // that will use 1/4 of GPU cores for LSTM execution.
     const int min_batch_size =
             std::min(MTL_CORE_BATCH_SIZE * get_mtl_device_core_count() / 4, max_batch_size);
-    spdlog::trace("min_batch_size {}", min_batch_size);
+    DORADO_LOG(trace, "min_batch_size {}", min_batch_size);
 
     std::set<int> test_batch_sizes{max_batch_size};
 
@@ -230,7 +229,7 @@ int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_conf
     int best_batch_size = -1;
     long long best_us_per_batch_element = std::numeric_limits<long long>::max();
     for (int batch_size : test_batch_sizes) {
-        spdlog::debug("Trying batch size {}", batch_size);
+        DORADO_LOG(debug, "Trying batch size {}", batch_size);
         set_chunk_batch_size(model_config, state_dict, benchmark_chunk_size, batch_size);
         auto dummy_input = torch::empty(
                 {batch_size, benchmark_chunk_size, model_config.num_features}, torch::kF16);
@@ -242,7 +241,7 @@ int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_conf
                 std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time)
                         .count();
         const auto us_per_batch_element = elapsed_us / batch_size;
-        spdlog::debug("Batch {} us Batch element {} us", elapsed_us, us_per_batch_element);
+        DORADO_LOG(debug, "Batch {} us Batch element {} us", elapsed_us, us_per_batch_element);
         if (us_per_batch_element < best_us_per_batch_element) {
             best_us_per_batch_element = us_per_batch_element;
             best_batch_size = batch_size;

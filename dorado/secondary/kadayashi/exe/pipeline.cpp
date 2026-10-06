@@ -9,6 +9,7 @@
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/sequence_utility.h"
 #include "secondary/kadayashi/types.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <cxxpool.h>
@@ -17,7 +18,6 @@
 #include <htslib/hts.h>
 #include <htslib/sam.h>
 #include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
@@ -33,12 +33,6 @@
 #include <sstream>
 #include <thread>
 #include <unordered_set>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
 
 namespace kadayashi {
 
@@ -92,27 +86,27 @@ bool parse_region_integer(std::string_view s,
                 } else if (s[i] == 'k' || s[i] == 'K') {
                     multiplier = 1'000;
                 } else {
-                    spdlog::error("[kdys::{}] malformatted: {}", __func__, s);
+                    DORADO_LOG(error, "[kdys::{}] malformatted: {}", __func__, s);
                     return false;
                 }
 
                 if (tmp.empty() && multiplier > 1) {
-                    spdlog::error(
-                            "[kdys::{}] invalid: {} (note: we do not allow interval string like "
-                            "chr1:g which should be either a chr1:1g or chr1:0)",
-                            __func__, s);
+                    DORADO_LOG(error,
+                               "[kdys::{}] invalid: {} (note: we do not allow interval string like "
+                               "chr1:g which should be either a chr1:1g or chr1:0)",
+                               __func__, s);
                     return false;
                 }
 
                 const uint64_t num = std::stoll(tmp);
                 if (num > std::numeric_limits<uint32_t>::max() / multiplier) {
-                    spdlog::error("[kdys::{}] too large #1: {}", __func__, s);
+                    DORADO_LOG(error, "[kdys::{}] too large #1: {}", __func__, s);
                     return false;
                 }
 
                 const uint32_t tmp_pos = num * multiplier;
                 if (tmp_pos > std::numeric_limits<uint32_t>::max() - pos) {
-                    spdlog::error("[kdys::{}] too large #2: {}", __func__, s);
+                    DORADO_LOG(error, "[kdys::{}] too large #2: {}", __func__, s);
                     return false;
                 }
 
@@ -134,7 +128,7 @@ void insert_bed_line(const std::string &line, std::string_view chrom, std::vecto
     const int col_e = 2;
     const std::vector<std::string> cols = dorado::utils::split(line, '\t');
     if (cols.size() != 3) {
-        spdlog::error("[kdys::{}] error parsing BED line: {}", __func__, line);
+        DORADO_LOG(error, "[kdys::{}] error parsing BED line: {}", __func__, line);
         return;
     }
     if (chrom == cols[col_chrom]) {
@@ -169,30 +163,30 @@ int insert_variant_positions_from_a_vcf_line(const std::string &line,
             return -1;
         }
         if (cols.size() < 10) {
-            spdlog::error(
-                    "[kdys::{}] vcf only has {} columns; mandatory >=8; we also need FORMAT and "
-                    "at least 1 sample. (header line check)",
-                    __func__, static_cast<int>(cols.size()));
+            DORADO_LOG(error,
+                       "[kdys::{}] vcf only has {} columns; mandatory >=8; we also need FORMAT and "
+                       "at least 1 sample. (header line check)",
+                       __func__, static_cast<int>(cols.size()));
             exit(1);
         } else if (cols.size() > 10) {
-            spdlog::error("[kdys::{}] multi-sample vcf not supported. (header line check)",
-                          __func__);
+            DORADO_LOG(error, "[kdys::{}] multi-sample vcf not supported. (header line check)",
+                       __func__);
             exit(1);
         }
         return -1;
     } else {
         if (cols.size() != 10) {
-            spdlog::warn("[kdys::{}] a vcf line does not have 10 cols, was ignored: {}", __func__,
-                         line);
+            DORADO_LOG(warn, "[kdys::{}] a vcf line does not have 10 cols, was ignored: {}",
+                       __func__, line);
             return -1;
         }
         if (chrom == cols[0]) {
             uint32_t pos = strtoul(cols[1].c_str(), NULL, 10);
             if (pos == 0) {
-                spdlog::error(
-                        "[kdys::{}] VCF line position is 0, should not happen, check input. "
-                        "Offending line: {}",
-                        __func__, line);
+                DORADO_LOG(error,
+                           "[kdys::{}] VCF line position is 0, should not happen, check input. "
+                           "Offending line: {}",
+                           __func__, line);
             } else {
                 pos -= 1;  // convert to 0-index
             }
@@ -225,7 +219,7 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
 
     std::ifstream fp(fn);
     if (!fp) {
-        spdlog::error("[kdys::{}] failed to open file: {}", __func__, fn.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open file: {}", __func__, fn.string());
         exit(1);
     }
 
@@ -249,8 +243,8 @@ std::vector<u32p_t> load_intervals_vars_from_file_one_ref(const std::filesystem:
     }
 
     if (fn_format == input_file_format::IS_VCF) {
-        spdlog::info("[kdys::{}] loaded {} variant positions from vcf", __func__,
-                     static_cast<int>(ret.size()));
+        DORADO_LOG(info, "[kdys::{}] loaded {} variant positions from vcf", __func__,
+                   static_cast<int>(ret.size()));
     }
 
     return ret;
@@ -268,7 +262,8 @@ void local_haptagging_write_tsv(std::ofstream &fp,
                                 const std::vector<u32p_t> &votes,
                                 const std::vector<uint32_t> &informative_site_positions) {
     if (!success) {
-        spdlog::warn("[kdys::{}] interval failed: {}:{}-{}", __func__, refname, ref_start, ref_end);
+        DORADO_LOG(warn, "[kdys::{}] interval failed: {}:{}-{}", __func__, refname, ref_start,
+                   ref_end);
         return;
     }
     int n = 0;
@@ -485,8 +480,8 @@ void local_haplotagging_phase_and_write(worker_2a2p_pl *pl) {
                                        st->success[i_chunk], st->haptags[i_chunk].size(),
                                        st->qnames[i_chunk], st->haptags[i_chunk],
                                        st->votes_diploid[i_chunk], st->informative_sites[i_chunk]);
-            spdlog::info("[kdys::{}] done processing interval {}:{}-{}", __func__, pl->refname,
-                         start, end);
+            DORADO_LOG(info, "[kdys::{}] done processing interval {}:{}-{}", __func__, pl->refname,
+                       start, end);
         }
     }
 }
@@ -500,7 +495,7 @@ reference_variants_t load_frozen_variants_from_vcf_2ad(const std::filesystem::pa
 
     std::ifstream file(fn_vcf);
     if (!file.is_open()) {
-        spdlog::error("[kdys::{}] failed to open input vcf: {}", __func__, fn_vcf.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open input vcf: {}", __func__, fn_vcf.string());
         exit(1);
     }
 
@@ -508,7 +503,8 @@ reference_variants_t load_frozen_variants_from_vcf_2ad(const std::filesystem::pa
     unsigned char gz_magic[2] = {0, 0};
     file.read(reinterpret_cast<char *>(gz_magic), 2);
     if (gz_magic[0] == 0x1F && gz_magic[1] == 0x8B) {
-        spdlog::error(
+        DORADO_LOG(
+                error,
                 "[kdys::{}] gz vcf input not yet supported (piping also not supported, must have a "
                 "plain text file for input).",
                 __func__);
@@ -544,7 +540,7 @@ reference_variants_t load_frozen_variants_from_vcf_2ad(const std::filesystem::pa
                 try {
                     pos = std::stoi(col);
                 } catch (const std::exception &) {
-                    spdlog::error("[kdys::{}] invalid vcf line: {}", __func__, line);
+                    DORADO_LOG(error, "[kdys::{}] invalid vcf line: {}", __func__, line);
                     break;
                 }
                 assert(pos > 0);
@@ -610,7 +606,8 @@ reference_variants_t load_frozen_variants_from_vcf_2ad(const std::filesystem::pa
                                 }
                             }
                             if (refvars[chrom].find(pos) != refvars[chrom].end()) {
-                                spdlog::warn(
+                                DORADO_LOG(
+                                        warn,
                                         "[kdys::{}] saw duplicated position: {}:{} (will use the "
                                         "last "
                                         "entry seen)",
@@ -624,10 +621,10 @@ reference_variants_t load_frozen_variants_from_vcf_2ad(const std::filesystem::pa
                 }
             } else if (i_col > 9) {
                 if (!wrote_multisample_warning) {
-                    spdlog::warn(
-                            "[kdys::{}] VCF has more than 10 columns; will only parse the first "
-                            "sample present.",
-                            __func__);
+                    DORADO_LOG(warn,
+                               "[kdys::{}] VCF has more than 10 columns; will only parse the first "
+                               "sample present.",
+                               __func__);
                     wrote_multisample_warning = 1;
                 }
                 break;
@@ -640,8 +637,8 @@ reference_variants_t load_frozen_variants_from_vcf_2ad(const std::filesystem::pa
     for (auto &[chrom, vars] : refvars) {
         tot += vars.size();
     }
-    spdlog::info("[kdys::{}] loaded {} variants from {} references", __func__, tot,
-                 (int)refvars.size());
+    DORADO_LOG(info, "[kdys::{}] loaded {} variants from {} references", __func__, tot,
+               (int)refvars.size());
 
     return refvars;
 }
@@ -656,8 +653,8 @@ void variant_graph_simple_haptag1_worker(void *data, int job_i) {
     const uint32_t seedreadID = d->seedreadID[job_i];
     d->arr_read2hp[job_i] = variant_graph_do_simple_haptag1_give_ht(d->ck, seedreadID);
     if (job_i % 500 == 1) {
-        spdlog::info("[kdys::{}] iter {}/{} done...", __func__, (int)job_i,
-                     (int)d->seedreadID.size());
+        DORADO_LOG(info, "[kdys::{}] iter {}/{} done...", __func__, (int)job_i,
+                   (int)d->seedreadID.size());
     }
 }
 
@@ -672,7 +669,7 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
 
     if constexpr (DEBUG_PRINT) {
         for (const ta_t &var : ck.varcalls) {
-            LOG_TRACE("[kdys::{}] info site pos {}", __func__, var.pos);
+            DORADO_LOG(trace, "[kdys::{}] info site pos {}", __func__, var.pos);
         }
     }
 
@@ -683,7 +680,7 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
     std::unordered_set<uint32_t> knownseeds;
     std::vector<std::pair<size_t, uint32_t>> buf_readvarcnt;
 
-    LOG_TRACE("[kdys::{}] requested {} iters", __func__, n_iter);
+    DORADO_LOG(trace, "[kdys::{}] requested {} iters", __func__, n_iter);
     for (uint32_t i_iter = 0; i_iter < n_iter; i_iter++) {
         // used the read with the most number of phasing variants within
         // the current bin
@@ -709,25 +706,28 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
             }
             seedreadIDs.push_back(i_max_var);
             if constexpr (DEBUG_PRINT) {
-                LOG_TRACE(
+                DORADO_LOG(
+                        trace,
                         "[kdys::{}] collected a seed (iter#{}), qn {}, range {}:{}-{}, max_var = "
                         "{} var_size={}",
                         __func__, (int)seedreadIDs.size() - 1, ck.qnames[i_max_var], ck.refname,
                         (int)ck.reads[i_max_var].start_pos, (int)ck.reads[i_max_var].end_pos,
                         max_var, (int)ck.reads[i_max_var].vars.size());
                 for (int tmpi = 0; tmpi < std::ssize(ck.reads[i_max_var].vars); tmpi++) {
-                    LOG_TRACE("[kdys::{}] qn {} range {}-{}, variant#{} pos={} char={}", __func__,
-                              ck.qnames[i_max_var], ck.reads[i_max_var].start_pos,
-                              ck.reads[i_max_var].end_pos, tmpi, ck.reads[i_max_var].vars[tmpi].pos,
-                              "ACGT_R"[ck.reads[i_max_var].vars[tmpi].allele[0]]);
+                    DORADO_LOG(trace, "[kdys::{}] qn {} range {}-{}, variant#{} pos={} char={}",
+                               __func__, ck.qnames[i_max_var], ck.reads[i_max_var].start_pos,
+                               ck.reads[i_max_var].end_pos, tmpi,
+                               ck.reads[i_max_var].vars[tmpi].pos,
+                               "ACGT_R"[ck.reads[i_max_var].vars[tmpi].allele[0]]);
                 }
             }
         }
     }
 
     if constexpr (DEBUG_PRINT) {
-        spdlog::info("[kdys::{}] collected {} seed reads (requested: {} ; used {:.1f} s)", __func__,
-                     (int)st.seedreadID.size(), (int)n_iter, kadayashi::get_timestamp() - T2);
+        DORADO_LOG(info, "[kdys::{}] collected {} seed reads (requested: {} ; used {:.1f} s)",
+                   __func__, (int)st.seedreadID.size(), (int)n_iter,
+                   kadayashi::get_timestamp() - T2);
     }
     T2 = kadayashi::get_timestamp();
 
@@ -745,14 +745,14 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
     }
 
     if constexpr (DEBUG_PRINT) {
-        spdlog::info("[kdys::{}] all iterations done, used {:.1f} s", __func__,
-                     kadayashi::get_timestamp() - T2);
+        DORADO_LOG(info, "[kdys::{}] all iterations done, used {:.1f} s", __func__,
+                   kadayashi::get_timestamp() - T2);
     }
     T2 = kadayashi::get_timestamp();
 
     // do concensus and log breakpoints
     if constexpr (DEBUG_PRINT) {
-        spdlog::info("[kdys::{}] normalizing...", __func__);
+        DORADO_LOG(info, "[kdys::{}] normalizing...", __func__);
     }
     std::unordered_map<uint32_t, uint8_t> breakpoint_reads;
     normalize_readtaggings_ht(st.arr_read2hp, breakpoint_reads, ck);
@@ -760,13 +760,13 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
         if (ck.reads[tmpreadID].vars.size() > 0) {
             const uint32_t pos = ck.reads[tmpreadID].vars[0].pos;
             breakpoints[pos] = 1;
-            LOG_TRACE("[kdys::{}] log phaseblock break point from read {} : {}:{}", __func__,
-                      ck.qnames[tmpreadID], ck.refname, pos);
+            DORADO_LOG(trace, "[kdys::{}] log phaseblock break point from read {} : {}:{}",
+                       __func__, ck.qnames[tmpreadID], ck.refname, pos);
         }
     }
     if constexpr (DEBUG_PRINT) {
-        spdlog::info("[kdys::{}] normalized, used {:.1f} s. Haptagging reads...", __func__,
-                     kadayashi::get_timestamp() - T2);
+        DORADO_LOG(info, "[kdys::{}] normalized, used {:.1f} s. Haptagging reads...", __func__,
+                   kadayashi::get_timestamp() - T2);
     }
     T2 = kadayashi::get_timestamp();
 
@@ -795,14 +795,14 @@ void variant_graph_do_simple_haptag_threaded(chunk_t &ck,
             }
         }
 
-        LOG_TRACE("[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__, ck.qnames[i_read],
-                  ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
+        DORADO_LOG(trace, "[kdys::{}] qn {} hp {}; cnt: {:.1f} {:.1f} {:.1f}", __func__,
+                   ck.qnames[i_read], ck.reads[i_read].hp, cnt[0], cnt[1], cnt[2]);
     }
 
-    spdlog::info("[kdys::{}] reads tagged, used {:.1f} s", __func__,
-                 kadayashi::get_timestamp() - T2);
-    spdlog::info("[kdys::{}] haptag callback all done, used  {:.1f} s", __func__,
-                 kadayashi::get_timestamp() - T);
+    DORADO_LOG(info, "[kdys::{}] reads tagged, used {:.1f} s", __func__,
+               kadayashi::get_timestamp() - T2);
+    DORADO_LOG(info, "[kdys::{}] haptag callback all done, used  {:.1f} s", __func__,
+               kadayashi::get_timestamp() - T);
 }
 
 chunk_t kadayashi_global_phasing_simple1(dorado::secondary::BamFileView &hf_view,
@@ -817,10 +817,10 @@ chunk_t kadayashi_global_phasing_simple1(dorado::secondary::BamFileView &hf_view
     double T = kadayashi::get_timestamp();
 
     // parse bam and collect variants on the reads
-    spdlog::info("[kdys::{}] pileup... (ref {}, len {})", __func__, refname, (int)ref_len);
+    DORADO_LOG(info, "[kdys::{}] pileup... (ref {}, len {})", __func__, refname, (int)ref_len);
     chunk_t ck = variant_pileup_ht(hf_view, variants, fai_view, nullptr, refname, 1, ref_len, pp);
-    spdlog::info("[kdys::{}] pileup done, has {} variants, used {:.1f} s", __func__,
-                 (int)ck.varcalls.size(), kadayashi::get_timestamp() - T);
+    DORADO_LOG(info, "[kdys::{}] pileup done, has {} variants, used {:.1f} s", __func__,
+               (int)ck.varcalls.size(), kadayashi::get_timestamp() - T);
 
     // phase
     if (ck.is_valid) {
@@ -828,8 +828,8 @@ chunk_t kadayashi_global_phasing_simple1(dorado::secondary::BamFileView &hf_view
 
         const bool variant_graph_ok = variant_graph_gen(ck);
         if (variant_graph_ok) {
-            spdlog::info("[kdys::{}] phasing requested {} iterations (ref length {} bp)", __func__,
-                         n_iter, (int)(ck.abs_end - ck.abs_start));
+            DORADO_LOG(info, "[kdys::{}] phasing requested {} iterations (ref length {} bp)",
+                       __func__, n_iter, (int)(ck.abs_end - ck.abs_start));
             variant_graph_do_simple_haptag_threaded(ck, n_iter, n_threads, breakpoints);
 
             int n_reads = 0;
@@ -840,11 +840,11 @@ chunk_t kadayashi_global_phasing_simple1(dorado::secondary::BamFileView &hf_view
                 }
                 n_reads += 1;
             }
-            spdlog::info("[kdys::{}] total of {} reads, hap0 {}, hap1 {}", __func__, n_reads,
-                         n_haps[0], n_haps[1]);
+            DORADO_LOG(info, "[kdys::{}] total of {} reads, hap0 {}, hap1 {}", __func__, n_reads,
+                       n_haps[0], n_haps[1]);
         }
     } else {
-        spdlog::warn("[kdys::{}] pileup failed", __func__);
+        DORADO_LOG(warn, "[kdys::{}] pileup failed", __func__);
     }
     return ck;
 }
@@ -916,19 +916,19 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                                                           &left_clip_len, &right_clip_len, 1);
 
         if (!parse_ok) {
-            spdlog::error(
-                    "[kdys::{}] read parse failed but we have had the read (qn={}), check code?",
-                    __func__, qn);
+            DORADO_LOG(error,
+                       "[kdys::{}] read parse failed but we have had the read (qn={}), check code?",
+                       __func__, qn);
             exit(1);
         } else {
-            LOG_TRACE("[kdys::{}] qn {} (hp {})", __func__, qn, hp_raw);
+            DORADO_LOG(trace, "[kdys::{}] qn {} (hp {})", __func__, qn, hp_raw);
             std::stable_sort(tmp_qav.begin(), tmp_qav.end());
             for (qa_t &q : tmp_qav) {
                 uint32_t qpos = q.pos;
 
                 // check position
                 if constexpr (DEBUG_PRINT) {
-                    LOG_TRACE("kdys::[{}]   pos={}", __func__, qpos);
+                    DORADO_LOG(trace, "kdys::[{}]   pos={}", __func__, qpos);
                 }
                 auto it_vars = vars.find(qpos);
                 if (it_vars == vars.cend()) {
@@ -940,8 +940,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 const variant_t &t = it_vars->second;
                 if (q.allele.back() != t.op) {
                     if constexpr (DEBUG_PRINT) {
-                        LOG_TRACE("[kdys::{}]   ^ failed cigar op check (q:{} t:{})", __func__,
-                                  q.allele.back(), t.op);
+                        DORADO_LOG(trace, "[kdys::{}]   ^ failed cigar op check (q:{} t:{})",
+                                   __func__, q.allele.back(), t.op);
                     }
                     continue;
                 }
@@ -950,8 +950,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 const std::string alt = nt4seq2seq(q.allele);  // last slot is cigar op
                 if (alt != t.alt_allele) {
                     if constexpr (DEBUG_PRINT) {
-                        LOG_TRACE("[kdys::{}]   failed alt allele check (q:{} t:{})", __func__, alt,
-                                  t.alt_allele);
+                        DORADO_LOG(trace, "[kdys::{}]   failed alt allele check (q:{} t:{})",
+                                   __func__, alt, t.alt_allele);
                     }
 
                     // this counter is neede for indels and sv when we do not have proper consensus
@@ -967,7 +967,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 }
 
                 if constexpr (DEBUG_PRINT) {
-                    LOG_TRACE("[kdys::{}]   ^ok", __func__);
+                    DORADO_LOG(trace, "[kdys::{}]   ^ok", __func__);
                 }
             }
         }
@@ -986,7 +986,8 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
                 continue;
             }
             if constexpr (DEBUG_PRINT) {
-                LOG_TRACE("[kdys::{}] read allele at pos {} (hp: {})", __func__, pos, hp_raw);
+                DORADO_LOG(trace, "[kdys::{}] read allele at pos {} (hp: {})", __func__, pos,
+                           hp_raw);
             }
             if (hp_raw == HAPTAG_UNPHASED) {
                 counter[pos2idx[pos]][2] += 1;
@@ -995,7 +996,7 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
             }
         }
         if constexpr (DEBUG_PRINT) {
-            LOG_TRACE("[kdys::{}] end of qn {}", __func__, qn);
+            DORADO_LOG(trace, "[kdys::{}] end of qn {}", __func__, qn);
         }
     }
 
@@ -1003,10 +1004,11 @@ void haptag_variants_2ad(dorado::secondary::BamFile &hf,
         const uint32_t pos = poss[i];
         uint8_t hp = HAPTAG_UNPHASED;
         if constexpr (DEBUG_PRINT) {
-            LOG_TRACE(
-                    "[kdys::{}] pos={} counter: hap0={}, hap1={}, unphased={}, "
-                    "unmatched_allele={}",
-                    __func__, (int)pos, counter[i][0], counter[i][1], counter[i][2], counter[i][3]);
+            DORADO_LOG(trace,
+                       "[kdys::{}] pos={} counter: hap0={}, hap1={}, unphased={}, "
+                       "unmatched_allele={}",
+                       __func__, (int)pos, counter[i][0], counter[i][1], counter[i][2],
+                       counter[i][3]);
         }
 
         const bool ambiguous =  // ambiguous
@@ -1037,13 +1039,15 @@ void vcfio_alter_phasings(
 
     std::ifstream fp_in(fn_vcf);
     if (!fp_in.is_open()) {
-        spdlog::error("[kdys::{}] failed to open input vcf when trying to write output", __func__);
+        DORADO_LOG(error, "[kdys::{}] failed to open input vcf when trying to write output",
+                   __func__);
         exit(1);
     }
 
     std::ofstream fp_out(fn_out_vcf);
     if (!fp_out.is_open()) {
-        spdlog::error("[kdys::{}] failed to open output file: {}", __func__, fn_out_vcf.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open output file: {}", __func__,
+                   fn_out_vcf.string());
         exit(1);
     }
 
@@ -1056,7 +1060,7 @@ void vcfio_alter_phasings(
     std::string prev_chrom = "";
     while (std::getline(fp_in, line)) {
         if (line.size() < 2) {
-            spdlog::warn("[kdys::{}] saw abnormally short vcf line: {}", __func__, line);
+            DORADO_LOG(warn, "[kdys::{}] saw abnormally short vcf line: {}", __func__, line);
             continue;
         }
         if (line[0] == '#') {
@@ -1112,7 +1116,7 @@ void vcfio_alter_phasings(
                 try {
                     pos = std::stoi(col);
                 } catch (const std::exception &) {
-                    spdlog::error("[kdys::{}] invalid vcf line: {}", __func__, line);
+                    DORADO_LOG(error, "[kdys::{}] invalid vcf line: {}", __func__, line);
                     is_unmodified = 1;
                     break;
                 }
@@ -1132,24 +1136,26 @@ void vcfio_alter_phasings(
                     if (ref2hap[pos] != HAPTAG_UNPHASED) {
                         hp = ref2hap[pos];
                         if constexpr (DEBUG_PRINT) {
-                            LOG_TRACE("[kdys::{}] pos {}, phased as hp {}", __func__, pos, hp);
+                            DORADO_LOG(trace, "[kdys::{}] pos {}, phased as hp {}", __func__, pos,
+                                       hp);
                         }
                         if (phaseblockID < 0 || prev_is_phase_gap) {
                             phaseblockID = pos + 1;  // use 1-index
                             if constexpr (DEBUG_PRINT) {
-                                LOG_TRACE("[kdys::{}] update phaseblock ID at {}:{} (0-index)",
-                                          __func__, chrom, pos);
+                                DORADO_LOG(trace,
+                                           "[kdys::{}] update phaseblock ID at {}:{} (0-index)",
+                                           __func__, chrom, pos);
                             }
                         }
                     } else {
                         if constexpr (DEBUG_PRINT) {
-                            LOG_TRACE("[kdys::{}] pos {}, in record but is unphased", __func__,
-                                      pos);
+                            DORADO_LOG(trace, "[kdys::{}] pos {}, in record but is unphased",
+                                       __func__, pos);
                         }
                     }
                 } else {
                     if constexpr (DEBUG_PRINT) {
-                        LOG_TRACE("[kdys::{}] pos {}, not found", __func__, pos);
+                        DORADO_LOG(trace, "[kdys::{}] pos {}, not found", __func__, pos);
                     }
                     hp = HAPTAG_UNPHASED;
                 }
@@ -1269,7 +1275,7 @@ void vcfio_alter_phasings(
                     }
                 }
             } else if (i_col > 9) {
-                spdlog::error("[kdys::{}] multi-sample vcf not supported", __func__);
+                DORADO_LOG(error, "[kdys::{}] multi-sample vcf not supported", __func__);
                 exit(1);
             }
 
@@ -1300,8 +1306,8 @@ void vcfio_alter_phasings(
     fp_in.close();
     fp_out.close();
 
-    spdlog::info("[kdys::{}] written output vcf, used {:.1f} s", __func__,
-                 kadayashi::get_timestamp() - T);
+    DORADO_LOG(info, "[kdys::{}] written output vcf, used {:.1f} s", __func__,
+               kadayashi::get_timestamp() - T);
 }
 
 std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1(
@@ -1314,8 +1320,8 @@ std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1
     double T = kadayashi::get_timestamp();
 
     if (!fn_in_vcf.native().empty() && fn_out_vcf.native().empty()) {
-        spdlog::error("[kdys::{}] VCF input was provided, but did not specify output VCF name",
-                      __func__);
+        DORADO_LOG(error, "[kdys::{}] VCF input was provided, but did not specify output VCF name",
+                   __func__);
         exit(1);
     }
 
@@ -1328,7 +1334,7 @@ std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1
     std::unordered_map<std::string, int> qname2hp;
     std::unordered_map<std::string, std::unordered_map<uint32_t, uint8_t>> phase_breakpoints;
     for (auto &[chrom, vars] : (*refvars)) {
-        spdlog::info("[kdys::{}] phasing {}...", __func__, chrom);
+        DORADO_LOG(info, "[kdys::{}] phasing {}...", __func__, chrom);
         const int ref_len = fp_fai.fetch_seq_len(chrom);
 
         if (ref_len < 0) {
@@ -1361,15 +1367,15 @@ std::unordered_map<std::string, int> kadayashi_global_phasing_simple_modify_vcf1
                 counter[2]++;
             }
         }
-        LOG_TRACE("[kdys::{}] {} variants: hap0={} hap1={} unphased={}", __func__, chrom,
-                  counter[0], counter[1], counter[2]);
+        DORADO_LOG(trace, "[kdys::{}] {} variants: hap0={} hap1={} unphased={}", __func__, chrom,
+                   counter[0], counter[1], counter[2]);
     }
 
     // optional: alter vcf
     if (!fn_in_vcf.native().empty()) {
         vcfio_alter_phasings(varhaps, fn_in_vcf, fn_out_vcf, phase_breakpoints);
     }
-    spdlog::info("[kdys::{}] used {:.1f} s", __func__, kadayashi::get_timestamp() - T);
+    DORADO_LOG(info, "[kdys::{}] used {:.1f} s", __func__, kadayashi::get_timestamp() - T);
     return qname2hp;
 }
 
@@ -1392,14 +1398,15 @@ query_regions_t region_strings_to_ht(const std::vector<std::string> &query_regio
         } else if (stat == region_string_format::IS_REGULAR_SANE) {
             region_string_t region = parse_region_string2(s);
             if (!region.is_parse_success) {
-                spdlog::error("[kdys::{}] failed to parse the query reigon string: {}", __func__,
-                              s);
+                DORADO_LOG(error, "[kdys::{}] failed to parse the query reigon string: {}",
+                           __func__, s);
             } else {
                 ret0[region.chrom].push_back(
                         {.chrom = region.chrom, .start = region.start, .end = region.end});
             }
         } else {
-            spdlog::error("[kdys::{}] failed to parse the query region string: {}", __func__, s);
+            DORADO_LOG(error, "[kdys::{}] failed to parse the query region string: {}", __func__,
+                       s);
         }
     }
 
@@ -1642,8 +1649,8 @@ std::vector<varcall_result_and_localphasinght_t> kadayashi_phase_and_varcall_mul
                 break;
             }
 
-            LOG_TRACE("[kdys::{}] worker got jobID starting from {}",
-                      "kadayashi_phase_and_varcall_multiregionthreaded", (int)jobID_start);
+            DORADO_LOG(trace, "[kdys::{}] worker got jobID starting from {}",
+                       "kadayashi_phase_and_varcall_multiregionthreaded", (int)jobID_start);
 
             const int jobID_end = std::min<int>(jobID_start + JOB_CHUNK_SIZE, n_jobs);
             for (int jobID = jobID_start; jobID < jobID_end; jobID++) {
@@ -1799,12 +1806,12 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
 
     std::ifstream fp_tsv(fn_tsv);
     if (!fp_tsv) {
-        spdlog::error("[kdys::{}] failed to open input: {}", __func__, fn_tsv.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open input: {}", __func__, fn_tsv.string());
         return 1;
     }
 
     dorado::secondary::BamFile hf{fn_bam, n_bam_threads};
-    spdlog::info("[kdys::{}] itvl: {}", __func__, itvl);
+    DORADO_LOG(info, "[kdys::{}] itvl: {}", __func__, itvl);
     dorado::secondary::HtsItrPtr bamitr(sam_itr_querys(hf.idx(), hf.hdr(), itvl.c_str()));
 
     // read read tags
@@ -1826,28 +1833,29 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
         }
         std::string &qname = cols[0];
         if (cols[1].empty()) {
-            spdlog::warn("[kdys::{}] read {} has no haptag", __func__, qname);
+            DORADO_LOG(warn, "[kdys::{}] read {} has no haptag", __func__, qname);
             continue;
         }
         // insert
         if (qname2hp.find(qname) != qname2hp.end()) {
-            spdlog::warn("[kdys::{}] dup read name in input? ({}) (doing nothing)", __func__,
-                         qname);
+            DORADO_LOG(warn, "[kdys::{}] dup read name in input? ({}) (doing nothing)", __func__,
+                       qname);
         } else {
             qname2hp[qname] = std::stoi(cols[1]);
         }
     }
 
     if (KDY_VERBOSE) {
-        spdlog::info("[kdys::{}] loaded {} read names", __func__,
-                     static_cast<int>(qname2hp.size()));
+        DORADO_LOG(info, "[kdys::{}] loaded {} read names", __func__,
+                   static_cast<int>(qname2hp.size()));
     }
 
     // open output file
     BGZF *fp_out = bgzf_open(fn_out.string().c_str(), "w");
     if (!fp_out) {
         if (KDY_VERBOSE) {
-            spdlog::error("[kdys::{}] failed to open output file: {}", __func__, fn_out.string());
+            DORADO_LOG(error, "[kdys::{}] failed to open output file: {}", __func__,
+                       fn_out.string());
         }
         return 1;
     }
@@ -1859,7 +1867,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     int stat = bam_hdr_write(fp_out, hf.hdr());
     if (stat != 0) {
         if (KDY_VERBOSE) {
-            spdlog::error("[kdys::{}] output bam header write failed", __func__);
+            DORADO_LOG(error, "[kdys::{}] output bam header write failed", __func__);
         }
         bgzf_close(fp_out);
         return 1;
@@ -1878,8 +1886,8 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
         bam_aux_update_int(aln.get(), "HP", haptag + 1);
         stat = bam_write1(fp_out, aln.get());
         if (stat < 0) {
-            spdlog::error("[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={})",
-                          __func__, refname, start_pos, qn, haptag);
+            DORADO_LOG(error, "[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={})",
+                       __func__, refname, start_pos, qn, haptag);
         } else {
             n_lines++;
         }
@@ -1887,8 +1895,8 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     }
     aln = {};
     if (KDY_VERBOSE) {
-        spdlog::info("[kdys::{}] wrote {} bam lines (saw {} lines)", __func__, n_lines,
-                     n_lines_seen);
+        DORADO_LOG(info, "[kdys::{}] wrote {} bam lines (saw {} lines)", __func__, n_lines,
+                   n_lines_seen);
     }
 
     // index output file
@@ -1896,7 +1904,7 @@ int util_modify_tag_given_tsv(const std::filesystem::path &fn_bam,
     const std::string fn_bai_out = fn_out.string() + ".bai";
     stat = sam_index_build3(fn_out.string().c_str(), fn_bai_out.c_str(), 0, n_threads);
     if (stat != 0) {
-        spdlog::error("[kdys::{}] failed to index output (stat={})", __func__, stat);
+        DORADO_LOG(error, "[kdys::{}] failed to index output (stat={})", __func__, stat);
         ret = 1;
     }
 
@@ -1922,7 +1930,8 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
     // open output files
     std::ofstream fp_out_tsv(fn_out_tsv);
     if (!fp_out_tsv.is_open()) {
-        spdlog::error("[kdys::{}] failed to open output file {}", __func__, fn_out_tsv.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open output file {}", __func__,
+                   fn_out_tsv.string());
         return 1;
     }
 
@@ -1961,25 +1970,26 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
         if (!dbg_region_str.empty()) {
             if (region_string_is_sane(dbg_region_str, dbg_region_str.size()) ==
                 region_string_format::IS_MALFORMAT) {
-                spdlog::error("[kdys::{}] --region was malformatted: {}", __func__, dbg_region_str);
+                DORADO_LOG(error, "[kdys::{}] --region was malformatted: {}", __func__,
+                           dbg_region_str);
                 exit(1);
             }
 
             region_string_t region = parse_region_string2(dbg_region_str);
             if (!region.is_parse_success) {
-                spdlog::error("[kdys::{}] failed to parse region string {}", __func__,
-                              dbg_region_str);
+                DORADO_LOG(error, "[kdys::{}] failed to parse region string {}", __func__,
+                           dbg_region_str);
                 exit(1);
             }
             if (region.is_whole_chrom) {
                 region.start = 1;
                 region.end = ref_l;
-                spdlog::warn(
-                        "[kdys::{}] Not slicing in the query range which seems to be a whole "
-                        "chromosome. Use BED file "
-                        "with --slice-in-bed instead if not intended. The --region is an debug "
-                        "option.",
-                        __func__);
+                DORADO_LOG(warn,
+                           "[kdys::{}] Not slicing in the query range which seems to be a whole "
+                           "chromosome. Use BED file "
+                           "with --slice-in-bed instead if not intended. The --region is an debug "
+                           "option.",
+                           __func__);
             }
             if (region.chrom != refname) {
                 pl.tot_offset += pl.range_i;
@@ -1987,8 +1997,8 @@ int local_haplotagging(const std::filesystem::path &fn_bam,
             }
             pl.ranges.push_back(u32p_t{.s = region.start, .e = region.end});
             if (KDY_VERBOSE) {
-                spdlog::info("[kdys::{}] dbg region pushed: {} {} {}", __func__, region.chrom,
-                             (int)region.start, (int)region.end);
+                DORADO_LOG(info, "[kdys::{}] dbg region pushed: {} {} {}", __func__, region.chrom,
+                           (int)region.start, (int)region.end);
             }
         } else if (!fn_bed.native().empty()) {
             const std::vector<u32p_t> loaded_ranges = load_intervals_vars_from_file_one_ref(
@@ -2033,7 +2043,7 @@ str2int_t kadayashi_global_phasing_simple_modify_vcf(const std::filesystem::path
                                                      const int n_threads) {
     reference_variants_t refvars = load_frozen_variants_from_vcf_2ad(fn_in_vcf);
     if (refvars.size() == 0) {
-        spdlog::error("[kdys::{}] input vcf is empty? ({})", __func__, fn_in_vcf.string());
+        DORADO_LOG(error, "[kdys::{}] input vcf is empty? ({})", __func__, fn_in_vcf.string());
         exit(1);
     }
 
@@ -2068,8 +2078,8 @@ intervals_t region_strings_to_intervals(dorado::secondary::BamFile &hf,
             }
         } else {  // let's make chunks
             if (hf.hdr()->target_len[i] == 0) {
-                spdlog::warn("[kdys::{}] ingoreing reference {} because length is 0", __func__,
-                             hf.hdr()->target_name[i]);
+                DORADO_LOG(warn, "[kdys::{}] ingoreing reference {} because length is 0", __func__,
+                           hf.hdr()->target_name[i]);
                 continue;
             }
             if (it_qreg->second.size() == 0) {  // use all the whole length of this reference
@@ -2184,7 +2194,7 @@ str2int_t kadayashi_phased_variant_calling_threaded(const std::filesystem::path 
         }
         std::sort(breakpoints_arr.begin(), breakpoints_arr.end());
         for (auto &pos : breakpoints_arr) {
-            spdlog::info("[kdys::{}] phasing breakpoint at {}", __func__, (int)pos);
+            DORADO_LOG(info, "[kdys::{}] phasing breakpoint at {}", __func__, (int)pos);
         }
 
         // write vcf and unsure positions
@@ -2302,7 +2312,7 @@ std::vector<std::string> bam_region_to_seqs(const std::filesystem::path &fn_ref,
     int region_size = 0;
     const region_string_t region = parse_region_string2(interval_string);
     if (!region.is_parse_success) {
-        spdlog::error("[kdys::{}] failed to parse region string {}", __func__, interval_string);
+        DORADO_LOG(error, "[kdys::{}] failed to parse region string {}", __func__, interval_string);
         return {};
     } else {
         region_size = region.end - region.start;

@@ -3,8 +3,7 @@
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <thread>
 
@@ -74,12 +73,12 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
             num_cpu_runners = basecall::auto_calculate_num_runners(params.model_config,
                                                                    params.memory_limit_fraction);
         }
-        spdlog::debug("- CPU calling: set num_cpu_runners to {}", num_cpu_runners);
+        DORADO_LOG(debug, "- CPU calling: set num_cpu_runners to {}", num_cpu_runners);
         for (size_t i = 0; i < num_cpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::ModelRunner>(params.model_config));
         }
         if (runners.back()->batch_size() != (size_t)params.model_config.basecaller.batch_size()) {
-            spdlog::debug("- CPU calling: set batch_size to {}", runners.back()->batch_size());
+            DORADO_LOG(debug, "- CPU calling: set batch_size to {}", runners.back()->batch_size());
         }
     }
 #if DORADO_METAL_BUILD
@@ -89,10 +88,10 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
             runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
         }
         if (params.model_config.basecaller.batch_size() == 0) {
-            spdlog::info(" - set batch size to {}", runners.back()->batch_size());
+            DORADO_LOG(info, " - set batch size to {}", runners.back()->batch_size());
         } else if (runners.back()->batch_size() !=
                    (size_t)params.model_config.basecaller.batch_size()) {
-            spdlog::warn("- set batch size to {}", runners.back()->batch_size());
+            DORADO_LOG(warn, "- set batch size to {}", runners.back()->batch_size());
         }
     }
 #endif  // DORADO_METAL_BUILD

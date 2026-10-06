@@ -4,8 +4,7 @@
 #include "encoder_read_alignment.h"
 #include "secondary/architectures/model_config.h"
 #include "secondary/architectures/model_config_validation.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <stdexcept>
 #include <unordered_map>
@@ -61,9 +60,9 @@ std::unique_ptr<EncoderBase> encoder_factory(
         NormaliseType normalise_type = parse_normalise_type(normalise);
 
         if (phasing_bin_fn) {
-            spdlog::warn(
-                    "Phasing bin path is provided, but this feature is not supported with the "
-                    "counts feature encoder.");
+            DORADO_LOG(warn,
+                       "Phasing bin path is provided, but this feature is not supported with the "
+                       "counts feature encoder.");
         }
 
         std::unique_ptr<EncoderCounts> ret = std::make_unique<EncoderCounts>(
@@ -89,9 +88,9 @@ std::unique_ptr<EncoderBase> encoder_factory(
         const bool right_align_insertions = get_bool_value(config, "right_align_insertions");
 
         if ((hap_source_final == HaplotagSource::BIN_FILE) && !phasing_bin_fn) {
-            spdlog::warn(
-                    "Haplotag source is the input bin file, but no input bin file is provided! "
-                    "Continuing without phasing.");
+            DORADO_LOG(warn,
+                       "Haplotag source is the input bin file, but no input bin file is provided! "
+                       "Continuing without phasing.");
             hap_source_final = HaplotagSource::UNPHASED;
         }
 

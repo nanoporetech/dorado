@@ -5,13 +5,13 @@
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "torch_utils/cuda_utils.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/thread_utils.h"
 
 #include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 #include <torch/cuda.h>
 
 #include <algorithm>
@@ -183,12 +183,12 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     // Warmup
     c10::cuda::CUDAStreamGuard stream_guard(m_stream);
     for (const auto &batch_dim : m_batch_dims) {
-        spdlog::debug("{} using chunk size {}, batch size {}", m_device, batch_dim.T_in,
-                      batch_dim.N);
-        spdlog::debug("{} Model memory {:.2f}GB", m_device,
-                      (crfmodel_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
-        spdlog::debug("{} Decode memory {:.2f}GB", m_device,
-                      (decode_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
+        DORADO_LOG(debug, "{} using chunk size {}, batch size {}", m_device, batch_dim.T_in,
+                   batch_dim.N);
+        DORADO_LOG(debug, "{} Model memory {:.2f}GB", m_device,
+                   (crfmodel_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
+        DORADO_LOG(debug, "{} Decode memory {:.2f}GB", m_device,
+                   (decode_bytes_per_ct * batch_dim.T_out * batch_dim.N) / GB);
         at::Tensor input;
         at::Tensor workspace;
         std::unique_ptr<nn::AuxiliaryData> aux;
@@ -247,7 +247,7 @@ int64_t CudaCaller::get_gpu_mem_limit(c10::Device device, float memory_limit_fra
     c10::cuda::CUDAGuard device_guard(device);
     c10::cuda::CUDACachingAllocator::emptyCache();
     const int64_t available = utils::available_memory(device);
-    spdlog::debug("{} memory available: {:.2f}GB", device.str(), available / GB);
+    DORADO_LOG(debug, "{} memory available: {:.2f}GB", device.str(), available / GB);
 
     // If running on a Jetson device with unified memory for CPU and GPU we can't use all
     // the available memory for GPU tasks. This way we leave at least half for the CPU,
@@ -412,8 +412,8 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements(
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (model_config.is_flstm_model()) {
         if (model_config.lstm_size > 1024) {
-            spdlog::warn("Unexpected model insize {}. Estimating GPU memory requirements.",
-                         model_config.lstm_size);
+            DORADO_LOG(warn, "Unexpected model insize {}. Estimating GPU memory requirements.",
+                       model_config.lstm_size);
         }
         crfmodel_bytes_per_chunk_timestep = 4096;
     } else if (model_config.out_features.has_value()) {
@@ -421,12 +421,13 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements(
         const std::map<int, int64_t> out_features_map{{128, 2312}, {256, 8712}, {4096, 34848}};
         auto it = out_features_map.upper_bound(out_features - 1);
         if (it == out_features_map.end()) {
-            spdlog::error(
-                    "Failed to set GPU memory requirements. Unexpected model out_features {}.",
-                    out_features);
+            DORADO_LOG(error,
+                       "Failed to set GPU memory requirements. Unexpected model out_features {}.",
+                       out_features);
             return {0, 0};
         } else if (it->first != out_features) {
-            spdlog::warn("Unexpected model out_features {}. Estimating GPU memory requirements.");
+            DORADO_LOG(warn,
+                       "Unexpected model out_features {}. Estimating GPU memory requirements.");
         }
         crfmodel_bytes_per_chunk_timestep = it->second;
     } else {
@@ -434,11 +435,11 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements(
                 {96, 960}, {128, 1280}, {384, 2816}, {768, 9728}, {1024, 10240}};
         auto it = insize_map.upper_bound(model_config.lstm_size - 1);
         if (it == insize_map.end()) {
-            spdlog::error("Failed to set GPU memory requirements. Unexpected model insize {}.",
-                          model_config.lstm_size);
+            DORADO_LOG(error, "Failed to set GPU memory requirements. Unexpected model insize {}.",
+                       model_config.lstm_size);
             return {0, 0};
         } else if (it->first != model_config.lstm_size) {
-            spdlog::warn("Unexpected model insize {}. Estimating GPU memory requirements.");
+            DORADO_LOG(warn, "Unexpected model insize {}. Estimating GPU memory requirements.");
         }
         crfmodel_bytes_per_chunk_timestep = it->second;
     }
@@ -513,7 +514,7 @@ CudaCaller::BatchDimsAndMaxSizes CudaCaller::calculate_batch_sizes(
     }
 
     const int64_t gpu_mem_limit = get_gpu_mem_limit(device, memory_limit_fraction);
-    spdlog::debug("{} memory limit {:.2f}GB", device.str(), gpu_mem_limit / GB);
+    DORADO_LOG(debug, "{} memory limit {:.2f}GB", device.str(), gpu_mem_limit / GB);
 
     auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = calculate_memory_requirements(model_config);
     if (crfmodel_bytes_per_ct == 0) {
@@ -529,21 +530,22 @@ CudaCaller::BatchDimsAndMaxSizes CudaCaller::calculate_batch_sizes(
         int max_batch_size = int(gpu_mem_limit / bytes_per_chunk);
         max_batch_size -= max_batch_size % batch_granularity;
         if (max_batch_size < batch_granularity) {
-            spdlog::warn(
-                    "{} maximum safe estimated batch size at chunk size {} is only {}. Required "
-                    "minimum is {}, GPU may run out of memory.",
-                    device.str(), batch_dim.T_in, max_batch_size, batch_granularity);
+            DORADO_LOG(warn,
+                       "{} maximum safe estimated batch size at chunk size {} is only {}. Required "
+                       "minimum is {}, GPU may run out of memory.",
+                       device.str(), batch_dim.T_in, max_batch_size, batch_granularity);
             max_batch_size = batch_granularity;
         } else {
-            spdlog::debug("{} maximum safe estimated batch size at chunk size {} is {}",
-                          device.str(), batch_dim.T_in, max_batch_size);
+            DORADO_LOG(debug, "{} maximum safe estimated batch size at chunk size {} is {}",
+                       device.str(), batch_dim.T_in, max_batch_size);
         }
 
         result.max_batch_sizes.push_back(max_batch_size);
 
         if (requested_batch_size != 0) {
             if (requested_batch_size > max_batch_size) {
-                spdlog::warn(
+                DORADO_LOG(
+                        warn,
                         "{}: Requested batch size {} exceeds maximum safe estimated batch size {}.",
                         device.str(), requested_batch_size, max_batch_size);
             }
@@ -582,8 +584,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
     // granularity, is a somewhat arbitrary trade-off between getting accurate measurements
     // and avoiding excessive startup time
     const int chunk_size = utils::pad_to(288 * stride, chunk_granularity);
-    spdlog::debug("Auto batchsize {}: testing up to {} in steps of {}", m_device, max_batch_size,
-                  batch_granularity);
+    DORADO_LOG(debug, "Auto batchsize {}: testing up to {} in steps of {}", m_device,
+               max_batch_size, batch_granularity);
 
     // Times and corresponding batch sizes.
     std::vector<std::pair<float, int>> times_and_batch_sizes;
@@ -596,7 +598,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
     const auto chunk_benchmarks =
             ChunkBenchmarks::instance().get_chunk_timings(prop->name, model_name);
     if (!chunk_benchmarks) {
-        spdlog::info(
+        DORADO_LOG(
+                info,
                 "Calculating optimized batch size for GPU \"{}\" and model {}. Full benchmarking "
                 "will run for this device, which may take some time. Consider using "
                 "--run-batchsize-benchmarks to save these benchmarks to disk, as they can be "
@@ -649,15 +652,15 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                 if (aux && aux->is_lstm_or_flstm_model()) {
                     aux->restore_convolution_auxiliary_data();
                 }
-                spdlog::trace("Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
-                              time_this_iteration);
+                DORADO_LOG(trace, "Auto batchsize {}: iteration:{}, ms/chunk {:8f} ms", m_device, i,
+                           time_this_iteration);
             }
             // Clear the cache each time. Without this, intermittent cuda memory allocation errors
             // are seen on windows laptop NVIDIA RTX A5500 Laptop GPU. See JIRA issue DOR-466
             c10::cuda::CUDACachingAllocator::emptyCache();
 
-            spdlog::debug("Auto batchsize {}: {}, time per chunk {:8f} ms", m_device, batch_size,
-                          time);
+            DORADO_LOG(debug, "Auto batchsize {}: {}, time per chunk {:8f} ms", m_device,
+                       batch_size, time);
         }
 
         if (time < best_time) {
@@ -673,10 +676,10 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
         ChunkBenchmarks::instance().add_chunk_timings(prop->name, model_name,
                                                       times_and_batch_sizes);
 
-        spdlog::debug(
-                "Adding chunk timings to internal cache for GPU {}, model {} ({} "
-                "entries)",
-                prop->name, model_name, times_and_batch_sizes.size());
+        DORADO_LOG(debug,
+                   "Adding chunk timings to internal cache for GPU {}, model {} ({} "
+                   "entries)",
+                   prop->name, model_name, times_and_batch_sizes.size());
     }
 
     // Find the first batch size that was under the threshold.
@@ -689,8 +692,8 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
         // Sanity check only, to avoid segfault or misleading behavior if there is a bug.
         throw std::out_of_range("Error in batch size selection algorithm.");
     }
-    spdlog::debug("Largest batch size for {}: {}, time per chunk {:8f} ms", m_device,
-                  largest_usable_batch->second, largest_usable_batch->first);
+    DORADO_LOG(debug, "Largest batch size for {}: {}, time per chunk {:8f} ms", m_device,
+               largest_usable_batch->second, largest_usable_batch->first);
 
     for (size_t i = 0; i < m_batch_dims.size(); ++i) {
         // Pick the largest batch size under the max.
@@ -702,7 +705,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                 final_size = batch_size;
             }
         }
-        spdlog::debug("Final batch size for {}[{}]: {}", m_device, i, final_size);
+        DORADO_LOG(debug, "Final batch size for {}[{}]: {}", m_device, i, final_size);
     }
 }
 
@@ -751,7 +754,8 @@ void CudaCaller::cuda_thread_fn() {
 
         const auto aggregate_idx =
                 static_cast<uint64_t>(c10::CachingAllocator::StatType::AGGREGATE);
-        spdlog::trace(
+        DORADO_LOG(
+                trace,
                 "Aggregate current: allocation {}, segment {}, active {}, inactive_split {}, "
                 "alloc_bytes {}, reserved_bytes {}, active_bytes {}, inactive_split_bytes {}, "
                 "requested_bytes {}. Total: num_alloc_retries {}, num_ooms {}, max_split_size {}",
@@ -785,7 +789,7 @@ void CudaCaller::cuda_thread_fn() {
         try {
             run_basecalling();
         } catch (c10::Error &e) {
-            spdlog::warn("Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
+            DORADO_LOG(warn, "Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
             c10::cuda::CUDACachingAllocator::emptyCache();
             run_basecalling();
         }

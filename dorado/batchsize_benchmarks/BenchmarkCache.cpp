@@ -2,9 +2,8 @@
 
 #include "compiled_timings.h"
 #include "csv_helpers.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <optional>
@@ -61,9 +60,9 @@ void BenchmarkCache::CacheProxy::add_timings(std::string gpu_name,
                                              std::vector<SpeedEntry> entries) {
     if (utils::contains(gpu_name, ",") || utils::contains(model_name, ",")) {
         // A comma will break the rudimentary CSV reader, but we still allow them to be cached.
-        spdlog::warn(
-                "GPU or model name has unexpected character. Exported benchmarks won't be "
-                "loadable");
+        DORADO_LOG(warn,
+                   "GPU or model name has unexpected character. Exported benchmarks won't be "
+                   "loadable");
     }
 
     // Entries need to be sorted for lookup to work.

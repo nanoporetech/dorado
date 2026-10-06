@@ -4,8 +4,7 @@
 #include "config/ModBaseModelConfig.h"
 #include "modbase/ModBaseCaller.h"
 #include "torch_utils/tensor_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <stdexcept>
 
@@ -60,15 +59,15 @@ void ModBaseRunner::accept_chunk(int model_id,
                 "ModBaseRunner received signal and sequence chunks with different lengths.");
     }
     if (!input_sigs.is_contiguous()) {
-        spdlog::warn(
-                "ModBaseRunner::accept_chunk received non-contiguous signal tensor which will "
-                "impact performance.");
+        DORADO_LOG(warn,
+                   "ModBaseRunner::accept_chunk received non-contiguous signal tensor which will "
+                   "impact performance.");
         input_sigs = input_sigs.contiguous();
     }
     if (!input_seqs.is_contiguous()) {
-        spdlog::warn(
-                "ModBaseRunner::accept_chunk received non-contiguous sequence tensor which will "
-                "impact performance.");
+        DORADO_LOG(warn,
+                   "ModBaseRunner::accept_chunk received non-contiguous sequence tensor which will "
+                   "impact performance.");
         input_seqs = input_seqs.contiguous();
     }
 
@@ -130,8 +129,8 @@ bool ModBaseRunner::is_chunked_model_type() const {
             const auto type_0 = to_string(config::get_model_type(model_params(0)));
             const auto type_i = to_string(config::get_model_type(model_params(i)));
 
-            spdlog::error("Modbase models have different types {}:{} {}:{}.", base_0, type_0,
-                          base_i, type_i);
+            DORADO_LOG(error, "Modbase models have different types {}:{} {}:{}.", base_0, type_0,
+                       base_i, type_i);
             throw std::runtime_error("Cannot mix the types of modified bases models");
         }
     }

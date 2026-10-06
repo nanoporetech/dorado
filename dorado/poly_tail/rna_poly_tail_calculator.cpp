@@ -70,13 +70,13 @@ std::vector<SignalAnchorInfo> RNAPolyTailCalculator::determine_signal_anchor_and
 
     auto post = utils::PostCondition([&] { edlibFreeAlignResult(align_result); });
 
-    utils::trace_log("polytail barcode mask edit dist {}", align_result.editDistance);
+    DORADO_LOG(trace, "polytail barcode mask edit dist {}", align_result.editDistance);
 
     const float adapter_score =
             1.f - static_cast<float>(align_result.editDistance) / rna_adapter.length();
 
     if (adapter_score < threshold) {
-        utils::trace_log("{} adapter score too low {}", read.read_common.read_id, adapter_score);
+        DORADO_LOG(trace, "{} adapter score too low {}", read.read_common.read_id, adapter_score);
         return {};
     }
 

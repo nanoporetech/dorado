@@ -8,13 +8,13 @@
 #include "secondary/kadayashi/sequence_utility.h"
 #include "string_utils.h"
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "variant_graph.h"
 
 #include <htslib/faidx.h>
 #include <htslib/hts.h>
 #include <htslib/kfunc.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <array>
@@ -32,14 +32,6 @@
 #include <stdexcept>
 #include <unordered_set>
 #include <utility>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#define LOG_DEBUG(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#define LOG_DEBUG(...) spdlog::debug(__VA_ARGS__)
-#endif
 
 namespace kadayashi {
 
@@ -219,18 +211,18 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
     std::vector<uint64_t> intervals;
     if (ds.empty()) {
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}] ds is empty (ds0 was {})", __func__, ds0.size());
+            DORADO_LOG(trace, "[kdys::{}] ds is empty (ds0 was {})", __func__, ds0.size());
             for (size_t i = 0; i < ds0.size(); i++) {
-                LOG_TRACE("[kdys::{}] ds0 #{} is {}", __func__, i, ds0[i]);
+                DORADO_LOG(trace, "[kdys::{}] ds0 #{} is {}", __func__, i, ds0[i]);
             }
         }
 
     } else {
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_TRACE("[kdys::{}] there are {} candidate distances (raw: {})", __func__, ds.size(),
-                      ds0.size());
+            DORADO_LOG(trace, "[kdys::{}] there are {} candidate distances (raw: {})", __func__,
+                       ds.size(), ds0.size());
             for (size_t i = 0; i < ds.size(); i++) {
-                LOG_TRACE("[kdys::{}] ds #{} is {}", __func__, i, ds[i]);
+                DORADO_LOG(trace, "[kdys::{}] ds #{} is {}", __func__, i, ds[i]);
             }
         }
 
@@ -290,8 +282,8 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                             stop = 1;
                         }
                     } else {
-                        spdlog::error("[kdys::{}] TRF kmer chain made impossible comparison.",
-                                      __func__);
+                        DORADO_LOG(error, "[kdys::{}] TRF kmer chain made impossible comparison.",
+                                   __func__);
                         failed = true;
                         break;
                     }
@@ -310,8 +302,8 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                                 intervals_buf.push_back(start << 1);
                                 intervals_buf.push_back(end << 1 | 1);
                                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                                    LOG_TRACE("[kdys::{}] d={} mer={} saw start-end: {}-{}",
-                                              __func__, d, i_mer, start, end);
+                                    DORADO_LOG(trace, "[kdys::{}] d={} mer={} saw start-end: {}-{}",
+                                               __func__, d, i_mer, start, end);
                                 }
                                 mer_is_used = 1;
                             }
@@ -336,10 +328,10 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
         if (failed /*impossible seen when parsing mers*/
             || intervals_buf.empty()) {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_TRACE(
-                        "[kdys::{}] failed parsing mers (failed={}) or intervals_buf is empty "
-                        "({})",
-                        __func__, failed ? "true" : "false", intervals_buf.size());
+                DORADO_LOG(trace,
+                           "[kdys::{}] failed parsing mers (failed={}) or intervals_buf is empty "
+                           "({})",
+                           __func__, failed ? "true" : "false", intervals_buf.size());
             }
             intervals.clear();
         } else {
@@ -361,8 +353,8 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                 const int lbreak = 0;
 
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_TRACE("[kdys::{}] current_pos={} stat={} depth={} lbreak={}", __func__,
-                              current_pos, intervals_buf[i] & 1, depth, lbreak);
+                    DORADO_LOG(trace, "[kdys::{}] current_pos={} stat={} depth={} lbreak={}",
+                               __func__, current_pos, intervals_buf[i] & 1, depth, lbreak);
                 }
 
                 if (depth >= TRF_MIN_TANDAM_DEPTH && !lbreak) {
@@ -413,10 +405,11 @@ std::vector<uint64_t> TRF_heuristic(std::string_view seq, const int ref_start) {
                 }
             }
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG("[kdys::{}] had {} intervals", __func__, intervals.size());
+                DORADO_LOG(debug, "[kdys::{}] had {} intervals", __func__, intervals.size());
                 for (size_t i = 0; i < intervals.size(); i++) {
-                    LOG_DEBUG("[kdys::{}]    itvl#{} {}-{}", __func__, i, intervals[i] >> 32,
-                              intervals[i] & std::numeric_limits<uint32_t>::max());
+                    DORADO_LOG(debug, "[kdys::{}]    itvl#{} {}-{}", __func__, i,
+                               intervals[i] >> 32,
+                               intervals[i] & std::numeric_limits<uint32_t>::max());
                 }
             }
         }
@@ -530,8 +523,9 @@ bool is_adjacent_to_perfect_repeats(const char *refseq,
         return false;
     }
     if (refseq_start > pos) {
-        spdlog::error("[kdys::{}] shouldn't happen, bad input check code (pos {} refseq_start {})",
-                      __func__, pos, refseq_start);
+        DORADO_LOG(error,
+                   "[kdys::{}] shouldn't happen, bad input check code (pos {} refseq_start {})",
+                   __func__, pos, refseq_start);
         return false;
     }
 
@@ -599,20 +593,20 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
         if (qname2hp && var.alleles.size() >= 2 && tot_cov_alt > MIN_COV_TOT &&
             suf_alt >= MIN_COV_ONE && tot_cov_alt / tot_cov_any > MIN_ALT_FRAC) {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG(
-                        "[kdys::{}] let pos {} set to unsure although flag is bad, due to its "
-                        "many alleles & sufficient coverage in alt ({}/{})",
-                        __func__, pos, tot_cov_alt, tot_cov_any);
+                DORADO_LOG(debug,
+                           "[kdys::{}] let pos {} set to unsure although flag is bad, due to its "
+                           "many alleles & sufficient coverage in alt ({}/{})",
+                           __func__, pos, tot_cov_alt, tot_cov_any);
             }
             var.is_accepted = FLAG_VARSTAT_UNSURE;
             var.type = FLAG_VAR_NA;
             return true;
         } else {
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG(
-                        "[kdys::{}] straight ignore pos {} (flag is bad; size is {}, tot cov is "
-                        "{})",
-                        __func__, pos, var.alleles.size(), tot_cov_alt);
+                DORADO_LOG(debug,
+                           "[kdys::{}] straight ignore pos {} (flag is bad; size is {}, tot cov is "
+                           "{})",
+                           __func__, pos, var.alleles.size(), tot_cov_alt);
             }
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
@@ -624,8 +618,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
 
         // should not happen
         if (var.alleles.size() < 3) {  // 3: alt *1, ref placeholders *2
-            spdlog::error("[kdys::{}] bad number of alleles (var.alleles.size={})", __func__,
-                          var.alleles.size());
+            DORADO_LOG(error, "[kdys::{}] bad number of alleles (var.alleles.size={})", __func__,
+                       var.alleles.size());
             return true;  // not really done, but return true to let caller ignore this candidate
         }
 
@@ -662,7 +656,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             var.is_accepted = FLAG_VARSTAT_REJECTED;
             var.type = FLAG_VAR_NA;
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG("[kdys::{}] ignore pos {} (first two are REF sentinels)", __func__, pos);
+                DORADO_LOG(debug, "[kdys::{}] ignore pos {} (first two are REF sentinels)",
+                           __func__, pos);
             }
             return true;
         }
@@ -684,11 +679,11 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                     var.is_accepted = FLAG_VARSTAT_UNSURE;
                     var.type = FLAG_VAR_HOM;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG(
-                                "[kdys::{}] set pos {} as unsure (due to unphased) "
-                                "tot_all_non_refs={} "
-                                "totcov={}",
-                                __func__, pos, tot_all_non_refs, tot_cov);
+                        DORADO_LOG(debug,
+                                   "[kdys::{}] set pos {} as unsure (due to unphased) "
+                                   "tot_all_non_refs={} "
+                                   "totcov={}",
+                                   __func__, pos, tot_all_non_refs, tot_cov);
                     }
                     return true;
                 }
@@ -703,7 +698,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                         &fisher_left_p_nounphased, &fisher_right_p_nounphased,
                         &fisher_twosided_p_nounphased);
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_DEBUG(
+            DORADO_LOG(
+                    debug,
                     "[kdys::{}] pos {} in prefiltering fisher: phased-only, twosided p: {:.4f} ({} "
                     "{}, {} {})",
                     __func__, pos, fisher_twosided_p_nounphased, a0.cov.cov_hap0, a0.cov.cov_hap1,
@@ -717,8 +713,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                 if (top_cov_1 / tot_cov >= 0.7f && tot_cov >= LOW_COV2) {
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2, unphased; {}/{})", __func__,
-                                  pos, top_cov_1, tot_cov);
+                        DORADO_LOG(debug, "[kdys::{}] set pos {} as hom (2, unphased; {}/{})",
+                                   __func__, pos, top_cov_1, tot_cov);
                     }
                 }
             } else {
@@ -747,8 +743,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                     hap0 / hap0_tot >= threshold && hap1 / hap1_tot >= threshold) {
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2, phased; {}/{}, {}/{})",
-                                  __func__, pos, hap0, hap0_tot, hap1, hap1_tot);
+                        DORADO_LOG(debug, "[kdys::{}] set pos {} as hom (2, phased; {}/{}, {}/{})",
+                                   __func__, pos, hap0, hap0_tot, hap1, hap1_tot);
                     }
                 } else if (
                         hap_all / tot_cov2 >= MIN_HOMALT_FRAC ||
@@ -757,17 +753,18 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
                                  LOW_COV)) {  // alternatively, as long as we have almost all bases being the one alt allele, call hom regardless of phasing quality
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG("[kdys::{}] set pos {} as hom (2b; hap_all={} tot_cov2={})",
-                                  __func__, pos, hap_all, tot_cov2);
+                        DORADO_LOG(debug,
+                                   "[kdys::{}] set pos {} as hom (2b; hap_all={} tot_cov2={})",
+                                   __func__, pos, hap_all, tot_cov2);
                     }
                 } else if (hap_all / tot_cov2 > 0.8f &&
                            (int)(tot_cov2 - tot_all_non_refs) < SMALL_COV_DIFF) {
                     is_hom = 1;
                     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                        LOG_DEBUG(
-                                "[kdys::{}] set pos {} as hom (2c; allel0all={}, tot_cov2={}, "
-                                "totallnonref={})",
-                                __func__, pos, hap_all, tot_cov2, tot_all_non_refs);
+                        DORADO_LOG(debug,
+                                   "[kdys::{}] set pos {} as hom (2c; allel0all={}, tot_cov2={}, "
+                                   "totallnonref={})",
+                                   __func__, pos, hap_all, tot_cov2, tot_all_non_refs);
                     }
                 }
             }
@@ -780,11 +777,11 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             if (is_at_repeat || fisher_twosided_p_nounphased < 0.05f) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_DEBUG(
-                            "[kdys::{}] pos {} was set to accepted hom, but flipping this to "
-                            "unsure "
-                            "due to nearby repeat; type flag is now {}",
-                            __func__, pos, var.type);
+                    DORADO_LOG(debug,
+                               "[kdys::{}] pos {} was set to accepted hom, but flipping this to "
+                               "unsure "
+                               "due to nearby repeat; type flag is now {}",
+                               __func__, pos, var.type);
                 }
             }
             return true;
@@ -794,16 +791,17 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
             if (std::min(top_cov_1, top_cov_2) >= 5 || tot_all_non_refs >= 10 || is_at_repeat) {
                 var.is_accepted = FLAG_VARSTAT_UNSURE;
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_DEBUG(
-                            "[kdys::{}] set pos {} unsure (1a: weird coverage (top1={} top2={}; "
-                            "all "
-                            "alts={}))",
-                            __func__, pos, top_cov_1, top_cov_2, tot_all_non_refs);
+                    DORADO_LOG(debug,
+                               "[kdys::{}] set pos {} unsure (1a: weird coverage (top1={} top2={}; "
+                               "all "
+                               "alts={}))",
+                               __func__, pos, top_cov_1, top_cov_2, tot_all_non_refs);
                 }
             } else {
                 var.is_accepted = FLAG_VARSTAT_REJECTED;
                 if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                    LOG_DEBUG(
+                    DORADO_LOG(
+                            debug,
                             "[kdys::{}] reject pos {} (1a: weird coverage ({} alleles) and they "
                             "are "
                             "low: {} (base_int={}) and {} (base_int={}) while top2 cov={}, tot cov "
@@ -817,7 +815,8 @@ bool classify_variant_prefilter(vc_variants1_val_t &var,
 
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
             if (qname2hp) {
-                LOG_DEBUG(
+                DORADO_LOG(
+                        debug,
                         "[kdys::{}] pos {} remained, two top covs: phased=({} and {}) unphased=({} "
                         "and "
                         "{})",
@@ -1246,7 +1245,8 @@ var_classify_t classify_variant_phased(vc_variants1_val_t &var,
     }
 
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_DEBUG(
+        DORADO_LOG(
+                debug,
                 "[kdys::{}] pos={} is_accepted={} type={} code={}; fisher_p={}; is_at_repeat={}; "
                 "a0({}{})=[{} {}] a1({}{})=[{} {}] "
                 "proper: {} {}; strand covs: {} {} {} {}",
@@ -1984,7 +1984,8 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
                     std::swap(alt_depths[0], alt_depths[1]);
                 }
             } else {
-                spdlog::debug(
+                DORADO_LOG(
+                        debug,
                         "[convert_fullinfo_var_to_dorado_style] Not sorting variant record at {} "
                         "with {}!=2 alts",
                         var.pos0, std::size(alts));
@@ -2059,8 +2060,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
             .vg = {},
     };
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        LOG_DEBUG("[kdys::{}] pileup at {}:{}-{} (1-index, close-open)", __func__, refname,
-                  ck.abs_start + 1, ck.abs_end);
+        DORADO_LOG(debug, "[kdys::{}] pileup at {}:{}-{} (1-index, close-open)", __func__, refname,
+                   ck.abs_start + 1, ck.abs_end);
     }
 
     // note: use `span_{start,end}` rather than `ck.abs_{start,end}`
@@ -2080,8 +2081,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
 
         bamitr = dorado::secondary::HtsItrPtr(sam_itr_querys(hf.idx, hf.hdr, itvl2.c_str()));
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_DEBUG("[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__, itvl2,
-                      pp.disable_region_expansion);
+            DORADO_LOG(debug, "[kdys::{}] expanded: {} (disable_interval_expansion={}", __func__,
+                       itvl2, pp.disable_region_expansion);
         }
     }
 
@@ -2098,15 +2099,16 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         const char *qn = bam_get_qname(aln.get());
 
         if (n_reads > MAX_READS) {
-            spdlog::error(
-                    "[kdys::{}] too many reads (after downsampling), giving up the whole chunk.",
-                    __func__);
+            DORADO_LOG(error,
+                       "[kdys::{}] too many reads (after downsampling), giving up the whole chunk.",
+                       __func__);
             pileup_failed = true;
             break;
         }
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
             if (n_reads % 1000 == 0) {
-                LOG_DEBUG(
+                DORADO_LOG(
+                        debug,
                         "[kdys::{}] piled {} reads (read start pos is {}) ht size {}, seen size {}",
                         __func__, n_reads, aln.get()->core.pos, ht.size(), ck.reads.size());
             }
@@ -2263,24 +2265,24 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
     }  // iterate through read alignments
 
     if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-        spdlog::debug(
-                "[kdys::{}] ht size is {}, ck size {} (downsample={}, filtered={}), n_reads={}",
-                __func__, ht.size(), ck.reads.size(), ENABLE_DOWNSAMPLE, downsample_filtered,
-                n_reads);
+        DORADO_LOG(debug,
+                   "[kdys::{}] ht size is {}, ck size {} (downsample={}, filtered={}), n_reads={}",
+                   __func__, ht.size(), ck.reads.size(), ENABLE_DOWNSAMPLE, downsample_filtered,
+                   n_reads);
     }
 
     if (pileup_failed) {
-        spdlog::error(
-                "[kdys::{}] query {}:{}-{} (1-index [) ]) pileup's initial collection failed.",
-                __func__, refname, ck.abs_start + 1, ck.abs_end);
+        DORADO_LOG(error,
+                   "[kdys::{}] query {}:{}-{} (1-index [) ]) pileup's initial collection failed.",
+                   __func__, refname, ck.abs_start + 1, ck.abs_end);
         return {};
     }
 
     if (ck.qnames.size() != ck.reads.size()) {
-        spdlog::error(
-                "[kdys::{}] ck qnames and reads buffers have different lenghts ({} and {}), "
-                "impossible, check code",
-                __func__, static_cast<int>(ck.qnames.size()), static_cast<int>(ck.reads.size()));
+        DORADO_LOG(error,
+                   "[kdys::{}] ck qnames and reads buffers have different lenghts ({} and {}), "
+                   "impossible, check code",
+                   __func__, static_cast<int>(ck.qnames.size()), static_cast<int>(ck.reads.size()));
         return {};
     }
 
@@ -2336,8 +2338,8 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
                                  {SENTINEL_REF_ALLELE_INT, VAR_OP_X}});
             candidate_poss.push_back(pos);
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG("[kdys::{}] pos {} will collect ref ({} pileup)", __func__, pos,
-                          qname2hp ? "phased" : "unphased");
+                DORADO_LOG(debug, "[kdys::{}] pos {} will collect ref ({} pileup)", __func__, pos,
+                           qname2hp ? "phased" : "unphased");
             }
         } else {
             q.is_accepted = FLAG_VARSTAT_REJECTED;
@@ -2382,9 +2384,9 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
         }
 
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            LOG_DEBUG("[kdys::{}] qn {} candidate alts bewtween: {} - {} (aln_end is {})", __func__,
-                      ck.qnames[i_read], candidate_poss[i_lower], candidate_poss[i_higher],
-                      aln_end);
+            DORADO_LOG(debug, "[kdys::{}] qn {} candidate alts bewtween: {} - {} (aln_end is {})",
+                       __func__, ck.qnames[i_read], candidate_poss[i_lower],
+                       candidate_poss[i_higher], aln_end);
         }
 
         // scan
@@ -2509,13 +2511,13 @@ chunk_t variant_pileup_ht(dorado::secondary::BamFileView &hf,
                 }
             }
             if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-                LOG_DEBUG(
-                        "[kdys::{}] unphased pileup pos {} : c0={} ({:c}) c1={} ({:c}) "
-                        "ratio={:.2f} -> "
-                        "type={} "
-                        "is_accepted={}",
-                        __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
-                        "ACGT_R"[q.alleles[1].allele[0]], ratio, q.type, q.is_accepted);
+                DORADO_LOG(debug,
+                           "[kdys::{}] unphased pileup pos {} : c0={} ({:c}) c1={} ({:c}) "
+                           "ratio={:.2f} -> "
+                           "type={} "
+                           "is_accepted={}",
+                           __func__, pos, c0, "ACGT_R"[q.alleles[0].allele[0]], c1,
+                           "ACGT_R"[q.alleles[1].allele[0]], ratio, q.type, q.is_accepted);
             }
         }
     }  // iter through variant candidate positions
@@ -3228,8 +3230,8 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
                 last_viable_i = i;
 
                 if (var_len >= MEDAKA_FEATURE_MATRIX_MAX_VAR_LEN) {
-                    spdlog::error("[kdys::{}] variant too long ({}-1) read qn {} var pos {}",
-                                  __func__, var.allele.size(), features.qn, var.pos);
+                    DORADO_LOG(error, "[kdys::{}] variant too long ({}-1) read qn {} var pos {}",
+                               __func__, var.allele.size(), features.qn, var.pos);
                     break;
                 }
 
@@ -3293,11 +3295,11 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
         for (uint32_t i = r.start_pos; i < end_pos; i++) {
             if (gck.refseq_substring[offset_on_ref] != 0 &&
                 gck.refseq_substring[offset_on_ref] != gck.read_seqi[offset_on_read]) {
-                spdlog::debug(
-                        "[wut][r {} {}] overwriting refseq substring ({}->{}) shouldn't "
-                        "happen#1 ; pos is {}\n",
-                        n_reads, qn, gck.refseq_substring[offset_on_ref],
-                        gck.read_seqi[offset_on_read], offset_on_ref + gck.itvl_start);
+                DORADO_LOG(debug,
+                           "[wut][r {} {}] overwriting refseq substring ({}->{}) shouldn't "
+                           "happen#1 ; pos is {}\n",
+                           n_reads, qn, gck.refseq_substring[offset_on_ref],
+                           gck.read_seqi[offset_on_read], offset_on_ref + gck.itvl_start);
             }
             gck.refseq_substring[offset_on_ref] = gck.read_seqi[offset_on_read];
             offset_on_ref++;
@@ -3336,16 +3338,16 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
                 offset_on_read++;
                 offset_on_read += var_len;
             } else {
-                spdlog::error("[kdys::{}] r {} saw invalid cigar {}\n", __func__, qn, cigar);
+                DORADO_LOG(error, "[kdys::{}] r {} saw invalid cigar {}\n", __func__, qn, cigar);
             }
             for (uint32_t j = offset_on_ref + gck.itvl_start; j < end_pos; j++) {
                 if (gck.refseq_substring[offset_on_ref] != 0 &&
                     gck.refseq_substring[offset_on_ref] != gck.read_seqi[offset_on_read]) {
-                    spdlog::error(
-                            "[kdys::{}] r {} overwriting refseq substring ({}->{}) "
-                            "shouldn't happen#2; pos is {}\n",
-                            __func__, qn, gck.refseq_substring[offset_on_ref],
-                            gck.read_seqi[offset_on_read], offset_on_ref + gck.itvl_start);
+                    DORADO_LOG(error,
+                               "[kdys::{}] r {} overwriting refseq substring ({}->{}) "
+                               "shouldn't happen#2; pos is {}\n",
+                               __func__, qn, gck.refseq_substring[offset_on_ref],
+                               gck.read_seqi[offset_on_read], offset_on_ref + gck.itvl_start);
                 }
                 gck.refseq_substring[offset_on_ref] = gck.read_seqi[offset_on_read];
                 offset_on_ref++;
@@ -3380,7 +3382,7 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
                     failed = !found;
                 }
                 if (failed) {
-                    spdlog::error("[kdys::{}] Datatype not found for read {}", __func__, qn);
+                    DORADO_LOG(error, "[kdys::{}] Datatype not found for read {}", __func__, qn);
                 }
             }
         }
@@ -3389,8 +3391,8 @@ static void gen_medaka_feature_matrix_store_reads_from_bam(dorado::secondary::Ba
         n_reads++;
     }  // iterate through all reads
     if (gck.n_md_tag_filtered > 0) {
-        LOG_DEBUG("[kdys::{}] skipped {} reads without valid MD tags", __func__,
-                  gck.n_md_tag_filtered);
+        DORADO_LOG(debug, "[kdys::{}] skipped {} reads without valid MD tags", __func__,
+                   gck.n_md_tag_filtered);
     }
 }
 
@@ -3451,10 +3453,11 @@ static void gen_medaka_feature_matrix_insert_to_matrix(
         // the base
         if (expanded_read[i] == 6) {
             if (minors[i] != 0) {
-                spdlog::error(
-                        "[kdys::{}] impossible: match is minor pos {} (minor={}) "
-                        "{}:{}-{} . Matrix will be incorrect .\n",
-                        __func__, majors[i], minors[i], gck.refname, gck.itvl_start, gck.itvl_end);
+                DORADO_LOG(error,
+                           "[kdys::{}] impossible: match is minor pos {} (minor={}) "
+                           "{}:{}-{} . Matrix will be incorrect .\n",
+                           __func__, majors[i], minors[i], gck.refname, gck.itvl_start,
+                           gck.itvl_end);
             }
             matrix[shift] = gck.refseq_substring[ref_pos];
             shift++;
@@ -3520,8 +3523,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
     constexpr bool WUT_VERBOSE = false;
     if (itvl_end <= itvl_start) {
-        spdlog::error("[kdys::{}] invalid query region: ref {} start {} end {}. Skipping.",
-                      __func__, refname, itvl_start, itvl_end);
+        DORADO_LOG(error, "[kdys::{}] invalid query region: ref {} start {} end {}. Skipping.",
+                   __func__, refname, itvl_start, itvl_end);
         MedakaFeatureMatrix ret(0, 0, 0, 0, 1, 0);
         return ret;
     }
@@ -3555,13 +3558,14 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
     gen_medaka_feature_matrix_store_reads_from_bam(hf, gck);
 
     if (gck.all_reads.empty()) {
-        LOG_DEBUG("[kdys::{}] requested interval {}:{}-{} inserted no reads", __func__, refname,
-                  itvl_start, itvl_end);
+        DORADO_LOG(debug, "[kdys::{}] requested interval {}:{}-{} inserted no reads", __func__,
+                   refname, itvl_start, itvl_end);
         MedakaFeatureMatrix ret(0, 0, 0, 0, 1, 0);
         return ret;
     } else {
         if constexpr (DEBUG_LOCAL_HAPLOTAGGING) {
-            spdlog::debug(
+            DORADO_LOG(
+                    debug,
                     "[kdys::{}] requested interval {}:{}-{} inserted {} reads (downsample filtered "
                     "{})",
                     __func__, refname, itvl_start, itvl_end, gck.all_reads.size(),
@@ -3657,8 +3661,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                                                                // there's no known read that
                                                                // overlaps with the right edge.
         }
-        spdlog::trace("[kdys::{}] {}:{}-{} has {} lanes (subject to capping)", __func__, refname,
-                      itvl_start, itvl_end, n_lanes);
+        DORADO_LOG(trace, "[kdys::{}] {}:{}-{} has {} lanes (subject to capping)", __func__,
+                   refname, itvl_start, itvl_end, n_lanes);
     }
 
     // Give placeholder names 1-index to empty entries in left and right qnames
@@ -3685,7 +3689,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
     std::vector<int64_t> &majors = ret.major;
     std::vector<int64_t> &minors = ret.minor;
     if constexpr (WUT_VERBOSE) {
-        spdlog::debug(
+        DORADO_LOG(
+                debug,
                 "[wut] alloc: n_pos={} (tot_exp={}) n_reads={} n_lanes(clampped)={} n_feature={}; "
                 "mat and "
                 "poss sizes: {} {} {}\n",
@@ -3773,8 +3778,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
             offset += exp.len;
         }
         if constexpr (WUT_VERBOSE) {
-            spdlog::debug("[wut][r {}] start {} , offset {}, offset-start {}\n",
-                          gck.readID2qn[i_read], read.start_pos, offset, majors[offset]);
+            DORADO_LOG(debug, "[wut][r {}] start {} , offset {}, offset-start {}\n",
+                       gck.readID2qn[i_read], read.start_pos, offset, majors[offset]);
         }
         const uint32_t offset0 = offset;
 
@@ -3799,8 +3804,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
             // the variant
             if (var.allele.back() == VAR_OP_X) {
                 if constexpr (WUT_VERBOSE) {
-                    spdlog::debug("[wut][r {}] pushing X: pos {} offset {} val {}\n",
-                                  gck.readID2qn[i_read], var.pos, offset, var.allele[0] + 1);
+                    DORADO_LOG(debug, "[wut][r {}] pushing X: pos {} offset {} val {}\n",
+                               gck.readID2qn[i_read], var.pos, offset, var.allele[0] + 1);
                 }
                 expanded_read[offset] = var.allele[0] + 1;
                 offset++;
@@ -3823,8 +3828,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                 }
             } else if (var.allele.back() == VAR_OP_D) {
                 if constexpr (WUT_VERBOSE) {
-                    spdlog::debug("[wut][r {}] pushing DEL: pos {} offset {} len {}\n",
-                                  gck.readID2qn[i_read], var.pos, offset, get_qa_t_allele_len(var));
+                    DORADO_LOG(debug, "[wut][r {}] pushing DEL: pos {} offset {} len {}\n",
+                               gck.readID2qn[i_read], var.pos, offset, get_qa_t_allele_len(var));
                 }
                 for (uint32_t i = 0; i < get_qa_t_allele_len(var); i++) {
                     if (offset >= expanded_read.size()) {
@@ -3852,9 +3857,10 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
             } else if (var.allele.back() == VAR_OP_I) {
                 // fill in the ref base first , then the right-aligned insertion w/ col exp
                 if constexpr (WUT_VERBOSE) {
-                    spdlog::debug("[wut][r {}] insertion at {} (offset {} major {}) length {}\n",
-                                  gck.readID2qn[i_read].c_str(), var.pos, offset, majors[offset],
-                                  get_qa_t_allele_len(var));
+                    DORADO_LOG(debug,
+                               "[wut][r {}] insertion at {} (offset {} major {}) length {}\n",
+                               gck.readID2qn[i_read].c_str(), var.pos, offset, majors[offset],
+                               get_qa_t_allele_len(var));
                 }
 
                 //(ref base; need to check if we have a mismatch or a del previously)
@@ -3875,7 +3881,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                 }
                 if (skip_ref_base_before_ins) {
                     if constexpr (WUT_VERBOSE) {
-                        spdlog::debug(
+                        DORADO_LOG(
+                                debug,
                                 "[wut][r {}] pushing INS(1) first: skipped ref base at offset {} "
                                 "(major pos {}; prev cigar {}; prev pos {}; prev var len {})\n",
                                 gck.readID2qn[i_read], offset, majors[offset], prev_cigar, prev_pos,
@@ -3883,10 +3890,10 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                     }
                 } else {
                     if constexpr (WUT_VERBOSE) {
-                        spdlog::debug(
-                                "[wut][r {}] pushing INS(1) first: filled ref base at offset {} "
-                                "(major pos {})\n",
-                                gck.readID2qn[i_read], offset, majors[offset]);
+                        DORADO_LOG(debug,
+                                   "[wut][r {}] pushing INS(1) first: filled ref base at offset {} "
+                                   "(major pos {})\n",
+                                   gck.readID2qn[i_read], offset, majors[offset]);
                     }
                     if (offset < majors.size()) {
                         expanded_read[offset] = 6;
@@ -3920,8 +3927,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                 }
                 i_var_incre = 1;
             } else {
-                spdlog::error("[kdys::{}] r {} has unknown cigar (op {} var pos {})", __func__,
-                              gck.readID2qn[i_read], var.allele.back(), var.pos);
+                DORADO_LOG(error, "[kdys::{}] r {} has unknown cigar (op {} var pos {})", __func__,
+                           gck.readID2qn[i_read], var.allele.back(), var.pos);
             }
 
             // the matches after it
@@ -3930,7 +3937,8 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                                                    ? read.end_pos
                                                    : read.vars[i_var + i_var_incre].pos;
                 if constexpr (WUT_VERBOSE) {
-                    spdlog::debug(
+                    DORADO_LOG(
+                            debug,
                             "[wut][r {}] pushing match: pos {} - {} (read end pos is {}, itvl_end "
                             "is {})\n",
                             gck.readID2qn[i_read], majors[offset], pos_right, read.end_pos,
@@ -3938,11 +3946,11 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                 }
                 for (uint32_t pos = majors[offset]; pos < pos_right; pos++) {
                     if constexpr (WUT_VERBOSE) {
-                        spdlog::debug(
-                                "[wut][r {}] push match (offset {} pos {}) (ref base should be "
-                                "{})\n",
-                                gck.readID2qn[i_read], offset, majors[offset],
-                                "0ACGT-"[gck.refseq_substring[pos - itvl_start]]);
+                        DORADO_LOG(debug,
+                                   "[wut][r {}] push match (offset {} pos {}) (ref base should be "
+                                   "{})\n",
+                                   gck.readID2qn[i_read], offset, majors[offset],
+                                   "0ACGT-"[gck.refseq_substring[pos - itvl_start]]);
                     }
                     expanded_read[offset] = 6;
                     offset++;

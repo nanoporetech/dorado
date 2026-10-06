@@ -1,12 +1,12 @@
 #include "demux/BarcodeClassifier.h"
 
+#include "utils/alignment_utils.h"
 #include "utils/barcode_kits.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
 
 #include <edlib.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <stdexcept>
@@ -14,10 +14,6 @@
 #include <string_view>
 #include <tuple>
 #include <vector>
-
-#if ENABLE_PER_READ_TRACE
-#include "utils/alignment_utils.h"
-#endif
 
 namespace dorado {
 
@@ -43,7 +39,7 @@ EdlibAlignConfig init_edlib_config_for_mask() {
     EdlibAlignConfig mask_config = edlibDefaultAlignConfig();
     mask_config.mode = EDLIB_MODE_NW;
     mask_config.task =
-            (spdlog::get_level() == spdlog::level::trace) ? EDLIB_TASK_PATH : EDLIB_TASK_DISTANCE;
+            spdlog::should_log(spdlog::level::trace) ? EDLIB_TASK_PATH : EDLIB_TASK_DISTANCE;
     return mask_config;
 }
 
@@ -72,7 +68,7 @@ int extract_mask_location(EdlibAlignResult aln, std::string_view query) {
             query_cursor++;
         }
     }
-    utils::trace_log("query cursor {} target cursor {}", query_cursor, target_cursor);
+    DORADO_LOG(trace, "query cursor {} target cursor {}", query_cursor, target_cursor);
     return aln.startLocations[0] + target_cursor;
 }
 
@@ -114,8 +110,8 @@ std::pair<int, int> extract_dual_mask_location(EdlibAlignResult aln, std::string
             query_cursor++;
         }
     }
-    utils::trace_log("dual: query cursor {} target cursor {} first_end {} second_end {}",
-                     query_cursor, target_cursor, first_mask_end, second_mask_end);
+    DORADO_LOG(trace, "dual: query cursor {} target cursor {} first_end {} second_end {}",
+               query_cursor, target_cursor, first_mask_end, second_mask_end);
     return {aln.startLocations[0] + first_mask_end, aln.startLocations[0] + second_mask_end};
 }
 
@@ -132,12 +128,10 @@ std::tuple<EdlibAlignResult, float, int> extract_flank_fit(
                                          int(read.length()), placement_config);
     float score = 1.f - static_cast<float>(result.editDistance) / (strand.length() - barcode_len);
     int bc_loc = extract_mask_location(result, strand);
-#if ENABLE_PER_READ_TRACE
-    utils::trace_log("{} dist {} position {} bc_loc {} score {}", debug_prefix, result.editDistance,
-                     result.startLocations[0], bc_loc, score);
+    DORADO_LOG(trace, "{} dist {} position {} bc_loc {} score {}", debug_prefix,
+               result.editDistance, result.startLocations[0], bc_loc, score);
     // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
-    utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
-#endif
+    DORADO_LOG(trace, "\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
     return {result, score, bc_loc};
 }
 
@@ -154,12 +148,10 @@ std::tuple<EdlibAlignResult, float, int, int> extract_flank_fit_dual(
                                          int(read.length()), placement_config);
     float score = 1.f - static_cast<float>(result.editDistance) / (strand.length() - barcode_len);
     auto [bc_loc, bc_loc_inner] = extract_dual_mask_location(result, strand);
-#if ENABLE_PER_READ_TRACE
-    utils::trace_log("{} dist {} position {} bc_loc {} bc_loc_inner {} score {}", debug_prefix,
-                     result.editDistance, result.startLocations[0], bc_loc, bc_loc_inner, score);
+    DORADO_LOG(trace, "{} dist {} position {} bc_loc {} bc_loc_inner {} score {}", debug_prefix,
+               result.editDistance, result.startLocations[0], bc_loc, bc_loc_inner, score);
     // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
-    utils::trace_log("\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
-#endif
+    DORADO_LOG(trace, "\n{}", utils::alignment_to_str(strand.data(), read.data(), result));
     return {result, score, bc_loc, bc_loc_inner};
 }
 
@@ -172,12 +164,10 @@ int extract_barcode_penalty(std::string_view barcode,
     auto result = edlibAlign(barcode.data(), int(barcode.length()), read.data(), int(read.length()),
                              config);
     auto penalty = result.editDistance;
-#if ENABLE_PER_READ_TRACE
-    utils::trace_log(
-            "{} {}\n{}", debug_prefix, penalty,
+    DORADO_LOG(
+            trace, "{} {}\n{}", debug_prefix, penalty,
             // NOLINTNEXTLINE(bugprone-suspicious-stringview-data-usage): sizes will match result.alignmentLength.
             utils::alignment_to_str(barcode.data(), read.data(), result));
-#endif
     edlibFreeAlignResult(result);
     return penalty;
 }
@@ -561,7 +551,7 @@ std::vector<BarcodeClassifier::BarcodeCandidateKit> BarcodeClassifier::generate_
 
         candidates_list.push_back(std::move(candidate));
     }
-    spdlog::debug("> Kits to evaluate: {}", candidates_list.size());
+    DORADO_LOG(debug, "> Kits to evaluate: {}", candidates_list.size());
     return candidates_list;
 }
 
@@ -653,8 +643,8 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
     // Find the best variant of the two.
     int total_v1_penalty = top_result_v1.editDistance + bottom_result_v1.editDistance;
     int total_v2_penalty = top_result_v2.editDistance + bottom_result_v2.editDistance;
-    utils::trace_log("total v1 edit dist {}, total v2 edit dis {}", total_v1_penalty,
-                     total_v2_penalty);
+    DORADO_LOG(trace, "total v1 edit dist {}, total v2 edit dis {}", total_v1_penalty,
+               total_v2_penalty);
 
     std::vector<BarcodeScoreResult> results;
     results.reserve(candidate.barcodes1.size());
@@ -677,7 +667,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_diffe
             continue;
         }
 
-        utils::trace_log("Checking barcode {}", barcode_name);
+        DORADO_LOG(trace, "Checking barcode {}", barcode_name);
 
         // Calculate barcode penalties for v1.
         auto top_mask_result_penalty_v1 =
@@ -873,7 +863,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score_doubl
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
             continue;
         }
-        utils::trace_log("Checking barcode {}", barcode_name);
+        DORADO_LOG(trace, "Checking barcode {}", barcode_name);
 
         auto top_mask_penalty =
                 extract_barcode_penalty(barcode, top_mask, mask_config, "top window");
@@ -992,7 +982,7 @@ BarcodeClassifier::calculate_barcode_score_double_ends_dual(
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
             continue;
         }
-        utils::trace_log("Checking barcode {}", barcode_name);
+        DORADO_LOG(trace, "Checking barcode {}", barcode_name);
 
         auto top_mask_penalty =
                 extract_barcode_penalty(barcode, top_mask, mask_config, "top window");
@@ -1034,7 +1024,7 @@ BarcodeClassifier::calculate_barcode_score_double_ends_dual(
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
             continue;
         }
-        utils::trace_log("Checking inner barcode {}", barcode_name);
+        DORADO_LOG(trace, "Checking inner barcode {}", barcode_name);
 
         auto top_mask_penalty_inner =
                 extract_barcode_penalty(barcode, top_mask_inner, mask_config, "top window inner");
@@ -1144,7 +1134,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
     auto end_idx = top_bc_loc + static_cast<int>(top_right_buffer.length());
     std::string_view top_mask = read_top.substr(start_idx, end_idx - start_idx);
 
-    utils::trace_log("BC location {}", top_bc_loc);
+    DORADO_LOG(trace, "BC location {}", top_bc_loc);
 
     std::vector<BarcodeScoreResult> results;
     for (size_t i = 0; i < candidate.barcodes1.size(); i++) {
@@ -1155,7 +1145,7 @@ std::vector<BarcodeScoreResult> BarcodeClassifier::calculate_barcode_score(
         if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
             continue;
         }
-        utils::trace_log("Checking barcode {}", barcode_name);
+        DORADO_LOG(trace, "Checking barcode {}", barcode_name);
 
         auto top_mask_penalty =
                 extract_barcode_penalty(barcode, top_mask, mask_config, "top window");
@@ -1261,7 +1251,7 @@ BarcodeClassifier::calculate_barcode_score_dual(std::string_view read_seq,
     std::string_view top_mask_inner =
             read_top.substr(top_start_idx_inner, top_end_idx_inner - top_start_idx_inner);
 
-    utils::trace_log("BC location {}", top_bc_loc);
+    DORADO_LOG(trace, "BC location {}", top_bc_loc);
 
     auto score_barcodes = [&](const std::vector<std::string>& barcodes,
                               const std::vector<std::string>& barcode_names,
@@ -1277,7 +1267,7 @@ BarcodeClassifier::calculate_barcode_score_dual(std::string_view read_seq,
             if (!barcode_is_permitted(allowed_barcodes, barcode_name)) {
                 continue;
             }
-            utils::trace_log("{} {}", trace_label, barcode_name);
+            DORADO_LOG(trace, "{} {}", trace_label, barcode_name);
 
             auto top_mask_penalty =
                     extract_barcode_penalty(barcode, mask, mask_config, penalty_label);
@@ -1402,8 +1392,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
     const auto midstrand_thres = m_scoring_params.midstrand_flank_score;
     if (midstrand_score >= midstrand_thres) {
-        utils::trace_log("Found midstrand barcode flanks with score {}, threshold {}",
-                         midstrand_score, midstrand_thres);
+        DORADO_LOG(trace, "Found midstrand barcode flanks with score {}, threshold {}",
+                   midstrand_score, midstrand_thres);
         auto midstrand_res = UNCLASSIFIED;
         midstrand_res.found_midstrand = true;
         return midstrand_res;
@@ -1439,7 +1429,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     }
 
     if (results_unsorted.empty()) {
-        spdlog::warn("Barcode unclassified because no barcodes found in kit.");
+        DORADO_LOG(warn, "Barcode unclassified because no barcodes found in kit.");
         return UNCLASSIFIED;
     }
 
@@ -1458,8 +1448,7 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
     std::sort(results_inner.begin(), results_inner.end(),
               [](const auto* l, const auto* r) { return l->penalty < r->penalty; });
 
-#if ENABLE_PER_READ_TRACE
-    {
+    DORADO_LOG(trace, "Scores: {}", [&] {
         std::string scores;
         for (const auto& s : results) {
             scores.append(s->barcode_name)
@@ -1467,9 +1456,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
                     .append(std::to_string(s->penalty))
                     .append(", ");
         }
-        utils::trace_log("Scores: {}", scores);
-    }
-#endif
+        return scores;
+    }());
 
     const auto are_penalties_acceptable = [this](const BarcodeScoreResult& proposal) {
         // If barcode penalty is 0, it's a perfect match. Consider it a pass.
@@ -1547,9 +1535,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
         // have a high score for the same barcode. If not then consider it
         // unclassified.
         if (std::max(out.top_penalty, out.bottom_penalty) > m_scoring_params.max_barcode_penalty) {
-            utils::trace_log("Max of top {} and bottom penalties {} > max barcode penalty {}",
-                             out.top_penalty, out.bottom_penalty,
-                             m_scoring_params.max_barcode_penalty);
+            DORADO_LOG(trace, "Max of top {} and bottom penalties {} > max barcode penalty {}",
+                       out.top_penalty, out.bottom_penalty, m_scoring_params.max_barcode_penalty);
             return UNCLASSIFIED;
         }
 
@@ -1557,7 +1544,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
             const BarcodeScoreResult* const best_result_inner = results_inner.front();
             if (std::max(best_result_inner->top_penalty, best_result_inner->bottom_penalty) >
                 m_scoring_params.max_barcode_penalty) {
-                utils::trace_log(
+                DORADO_LOG(
+                        trace,
                         "Max of inner top {} and inner bottom penalties {} > max barcode penalty "
                         "{}",
                         best_result_inner->top_penalty, best_result_inner->bottom_penalty,
@@ -1582,7 +1570,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
               (best_top_result->top_penalty <= m_scoring_params.max_barcode_penalty)) ||
              ((best_result.barcode_name != best_bottom_result->barcode_name) &&
               (best_bottom_result->bottom_penalty <= m_scoring_params.max_barcode_penalty)))) {
-            utils::trace_log(
+            DORADO_LOG(
+                    trace,
                     "Superior barcode found for arrangement {} : top best bc {}, bottom best bc {}",
                     best_result.barcode_name, best_top_result->barcode_name,
                     best_bottom_result->barcode_name);
@@ -1604,7 +1593,8 @@ BarcodeScoreResult BarcodeClassifier::find_best_barcode(
                  ((best_result_inner->barcode_name != best_bottom_result_inner->barcode_name) &&
                   (best_bottom_result_inner->bottom_penalty <=
                    m_scoring_params.max_barcode_penalty)))) {
-                utils::trace_log(
+                DORADO_LOG(
+                        trace,
                         "Superior inner barcode found for arrangement {} : top best bc {}, bottom "
                         "best "
                         "bc {}",

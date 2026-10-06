@@ -10,7 +10,6 @@
 
 #include <minimap.h>
 #include <spdlog/cfg/env.h>
-#include <spdlog/spdlog.h>
 #include <torch/version.h>
 
 #include <iostream>
@@ -108,7 +107,7 @@ int main(int argc, char* argv[]) {
     }
 
     // Log cmd
-    spdlog::info("Running: \"{}\"", dorado::utils::join(arguments, "\" \""));
+    DORADO_LOG(info, "Running: \"{}\"", dorado::utils::join(arguments, "\" \""));
 
     const auto& subcommand = arguments[0];
 

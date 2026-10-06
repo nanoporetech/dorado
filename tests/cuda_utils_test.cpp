@@ -1,5 +1,7 @@
 #include "torch_utils/cuda_utils.h"
 
+#include "utils/log_utils.h"
+
 #include <ATen/Context.h>
 #include <ATen/ops/allclose.h>
 #include <ATen/ops/empty.h>
@@ -7,7 +9,6 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
-#include <spdlog/spdlog.h>
 
 #define CUT_TAG "[cuda_utils]"
 #define DEFINE_TEST(name) CATCH_TEST_CASE(CUT_TAG " " name, CUT_TAG)
@@ -29,7 +30,7 @@ DEFINE_TEST("matmul_f16") {
 
     // Setup tensors
     if (!at::hasCUDA()) {
-        spdlog::warn("No Nvidia driver present - Test skipped");
+        DORADO_LOG(warn, "No Nvidia driver present - Test skipped");
         return;
     }
 

@@ -1,6 +1,6 @@
 #include "CorrectionProgressTracker.h"
 
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <algorithm>
 
@@ -19,7 +19,7 @@ void CorrectionProgressTracker::summarize() const {
     m_progress_bar.erase_progress_bar_line();
 
     if (m_num_reads_corrected > 0) {
-        spdlog::info("Number of reads submitted for correction: {}", m_num_reads_corrected);
+        DORADO_LOG(info, "Number of reads submitted for correction: {}", m_num_reads_corrected);
     }
 }
 

@@ -1,9 +1,8 @@
 #pragma once
 
 #include "MessageSink.h"
+#include "utils/log_utils.h"
 #include "utils/stats.h"
-
-#include <spdlog/spdlog.h>
 
 #include <memory>
 #include <utility>
@@ -50,7 +49,7 @@ public:
     // Returns true on success.
     bool add_node_sink(NodeHandle node_handle, NodeHandle sink_handle) {
         if (!is_handle_valid(node_handle) || !is_handle_valid(sink_handle)) {
-            spdlog::error("Invalid node handle");
+            DORADO_LOG(error, "Invalid node handle");
             return false;
         }
         m_node_descriptors[node_handle].sink_handles.push_back(sink_handle);

@@ -3,8 +3,7 @@
 #include "downloader.h"
 #include "models/models.h"
 #include "utils/fs_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <filesystem>
 #include <vector>
@@ -15,7 +14,7 @@ namespace dorado::model_downloader {
 
 bool download_models(const std::string& target_directory, std::string_view selected_model) {
     if (selected_model != "all" && !models::is_valid_model(selected_model)) {
-        spdlog::error("Selected model doesn't exist: {}", selected_model);
+        DORADO_LOG(error, "Selected model doesn't exist: {}", selected_model);
         return false;
     }
 
@@ -58,7 +57,8 @@ std::filesystem::path ModelDownloader::get(std::string_view model_name,
     }
 
     if (m_models_dir.has_value()) {
-        spdlog::trace("Model does not exist at '{}' - downloading it instead.", model_dir.string());
+        DORADO_LOG(trace, "Model does not exist at '{}' - downloading it instead.",
+                   model_dir.string());
     }
 
     if (!utils::has_write_permission(parent_dir)) {
@@ -75,9 +75,9 @@ std::filesystem::path ModelDownloader::get(std::string_view model_name,
         if (parent_dir.filename().string().find(utils::TEMP_MODELS_DIR_PREFIX) == 0) {
             m_temp_models.emplace(parent_dir);
         } else {
-            spdlog::warn(
-                    "Temporary {} model directory does not have the expected name '{}' at: '{}'",
-                    description, utils::TEMP_MODELS_DIR_PREFIX, parent_dir.string());
+            DORADO_LOG(warn,
+                       "Temporary {} model directory does not have the expected name '{}' at: '{}'",
+                       description, utils::TEMP_MODELS_DIR_PREFIX, parent_dir.string());
         }
     }
 

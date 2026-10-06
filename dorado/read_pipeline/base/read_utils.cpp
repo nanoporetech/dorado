@@ -126,15 +126,15 @@ void mux_change_trim_read(ReadCommon& read_common) {
 
     // Excessive trimming - do nothing
     if (trim_seq_idx < sequence_size * 3 / 10) {
-        trace_log("mux_change_trimming {} - size: {} trim: {} excessive trimming",
-                  read_common.read_id, sequence_size, trim_seq_idx);
+        DORADO_LOG(trace, "mux_change_trimming {} - size: {} trim: {} excessive trimming",
+                   read_common.read_id, sequence_size, trim_seq_idx);
         return;
     }
 
     const int kMinMuxChangeTrim = 5;
     // Nothing to do
     if (trim_seq_idx >= sequence_size - kMinMuxChangeTrim) {
-        trace_log("mux_change_trimming {} - no trim", read_common.read_id, trim_seq_idx);
+        DORADO_LOG(trace, "mux_change_trimming {} - no trim", read_common.read_id, trim_seq_idx);
         return;
     }
 
@@ -143,7 +143,7 @@ void mux_change_trim_read(ReadCommon& read_common) {
             utils::sequence_to_move_table_index(read_common.moves, trim_seq_idx, sequence_size);
 
     if (trim_moves_idx < 0) {
-        trace_log("mux_change_trimming {} - move table index failed", read_common.read_id);
+        DORADO_LOG(trace, "mux_change_trimming {} - move table index failed", read_common.read_id);
         return;
     }
     read_common.moves.resize(trim_moves_idx);
@@ -161,8 +161,9 @@ void mux_change_trim_read(ReadCommon& read_common) {
 
     read_common.num_minknow_events = 0;  // No way to know how the events were distributed, zero out
 
-    trace_log("mux_change_trimming {} - seq(before:{} after:{} net:-{})", read_common.read_id,
-              sequence_size, trim_seq_idx + 1, sequence_size - trim_seq_idx - 1);
+    DORADO_LOG(trace, "mux_change_trimming {} - seq(before:{} after:{} net:-{})",
+               read_common.read_id, sequence_size, trim_seq_idx + 1,
+               sequence_size - trim_seq_idx - 1);
 }
 
 }  // namespace dorado::utils

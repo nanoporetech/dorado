@@ -3,12 +3,12 @@
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "torch_utils/duplex_utils.h"
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/thread_utils.h"
 
 #include <cxxpool.h>
 #include <edlib.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cstdint>
@@ -92,8 +92,8 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
     std::vector<uint8_t> template_quality_scores;
     auto template_read_it = m_reads.find(template_read_id);
     if (template_read_it == m_reads.end()) {
-        spdlog::debug("Template Read ID={} is present in pairs file but read was not found",
-                      template_read_id);
+        DORADO_LOG(debug, "Template Read ID={} is present in pairs file but read was not found",
+                   template_read_id);
         return;
     } else {
         template_read = template_read_it->second.get();
@@ -107,8 +107,8 @@ void BaseSpaceDuplexCallerNode::basespace(const std::string& template_read_id,
 
     auto complement_read_it = m_reads.find(complement_read_id);
     if (complement_read_it == m_reads.end()) {
-        spdlog::debug("Complement ID={} paired with Template ID={} was not found",
-                      complement_read_id, template_read_id);
+        DORADO_LOG(debug, "Complement ID={} paired with Template ID={} was not found",
+                   complement_read_id, template_read_id);
         return;
     }
 

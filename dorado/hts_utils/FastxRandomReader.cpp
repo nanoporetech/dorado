@@ -1,10 +1,10 @@
 #include "hts_utils/FastxRandomReader.h"
 
 #include "hts_utils/sequence_file_format.h"
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <htslib/faidx.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <memory>
@@ -48,7 +48,7 @@ FastxRandomReader::FastxRandomReader(const std::filesystem::path& fastx_path) {
 
     // Both attempts failed.
     if (!m_faidx) {
-        spdlog::error("Could not create/load index for FASTx file {}", fastx_path.string());
+        DORADO_LOG(error, "Could not create/load index for FASTx file {}", fastx_path.string());
         throw std::runtime_error("");
     }
 }
@@ -63,10 +63,10 @@ std::string FastxRandomReader::fetch_seq(const std::string& read_id) const {
     int len = 0;
     CharPtr seq(fai_fetch(m_faidx.get(), read_id.c_str(), &len));
     if (len == -2) {
-        spdlog::error("Read {} not found", read_id);
+        DORADO_LOG(error, "Read {} not found", read_id);
         return "";
     } else if (len == -1) {
-        spdlog::error("Could not fetch sequence for {}", read_id);
+        DORADO_LOG(error, "Could not fetch sequence for {}", read_id);
         throw std::runtime_error("");
     } else {
         std::string seq_str(seq.get(), seq.get() + len);
@@ -80,7 +80,7 @@ std::string FastxRandomReader::fetch_seq(const std::string& read_id) const {
 int FastxRandomReader::fetch_seq_len(const std::string& tn) const {
     const int32_t len = faidx_seq_len(m_faidx.get(), tn.c_str());
     if (len < 0) {
-        spdlog::error("Could not fetch sequence length for {}", tn);
+        DORADO_LOG(error, "Could not fetch sequence length for {}", tn);
     }
     return len;
 }
@@ -89,10 +89,10 @@ std::vector<uint8_t> FastxRandomReader::fetch_qual(const std::string& read_id) c
     int len = 0;
     CharPtr qual(fai_fetchqual(m_faidx.get(), read_id.c_str(), &len));
     if (len == -2) {
-        spdlog::error("Read qual {} not found", read_id);
+        DORADO_LOG(error, "Read qual {} not found", read_id);
         return std::vector<uint8_t>();
     } else if (len == -1) {
-        spdlog::error("Could not fetch quality for {}", read_id);
+        DORADO_LOG(error, "Could not fetch quality for {}", read_id);
         throw std::runtime_error("");
     } else {
         std::vector<uint8_t> qscores;

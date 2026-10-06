@@ -5,13 +5,13 @@
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "utils/PostCondition.h"
 #include "utils/fs_utils.h"
+#include "utils/log_utils.h"
 #include "utils/thread_utils.h"
 #include "utils/time_utils.h"
 #include "utils/types.h"
 
 #include <ATen/ops/empty.h>
 #include <pod5_format/c_api.h>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cctype>
@@ -48,20 +48,20 @@ std::vector<std::filesystem::directory_entry> collect_pod5_dataset(
     }
 
     if (fast5_found && pod5_entries.empty()) {
-        spdlog::error(
-                "FAST5 support in Dorado was removed in version 1.0.0. "
-                "Please convert your dataset to POD5: "
-                "https://pod5-file-format.readthedocs.io/en/latest/docs/"
-                "tools.html#pod5-convert-fast5");
+        DORADO_LOG(error,
+                   "FAST5 support in Dorado was removed in version 1.0.0. "
+                   "Please convert your dataset to POD5: "
+                   "https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                   "tools.html#pod5-convert-fast5");
         throw std::runtime_error("FAST5 files are not supported.");
     }
 
     if (fast5_found && !pod5_entries.empty()) {
-        spdlog::warn(
-                "Skipping FAST5 files as support was dropped in Dorado version 1.0.0. "
-                "Please convert your FAST5 dataset to POD5: "
-                "https://pod5-file-format.readthedocs.io/en/latest/docs/"
-                "tools.html#pod5-convert-fast5");
+        DORADO_LOG(warn,
+                   "Skipping FAST5 files as support was dropped in Dorado version 1.0.0. "
+                   "Please convert your FAST5 dataset to POD5: "
+                   "https://pod5-file-format.readthedocs.io/en/latest/docs/"
+                   "tools.html#pod5-convert-fast5");
     }
 
     return pod5_entries;
@@ -75,7 +75,7 @@ models::ChemistryKey get_chemistry_key(const RunInfoDictData_t* const run_info_d
 
 void issue_pod5_error(std::string_view err, std::string_view filename) {
     // "POD5 Failed to foo the bar - '<pod5 error>' @ '<filename>'."
-    spdlog::error("POD5 {} - '{}' @ '{}'.", err, pod5_get_error_string(), filename);
+    DORADO_LOG(error, "POD5 {} - '{}' @ '{}'.", err, pod5_get_error_string(), filename);
 }
 
 void issue_pod5_error(std::string_view err,
@@ -83,13 +83,14 @@ void issue_pod5_error(std::string_view err,
                       size_t batch_index,
                       size_t row) {
     // "POD5 Failed to foo the bar - '<pod5 error>' @ '<filename>' (<batch_index>,<row>)."
-    spdlog::error("POD5 {} - '{}' @ '{}' ({},{}).", err, pod5_get_error_string(), filename,
-                  batch_index, row);
+    DORADO_LOG(error, "POD5 {} - '{}' @ '{}' ({},{}).", err, pod5_get_error_string(), filename,
+               batch_index, row);
 }
 
 void issue_pod5_error(std::string_view err, std::string_view filename, std::string_view read_id) {
     // "POD5 Failed to foo the bar - '<pod5 error>' @ '<filename>' [<read_id>]."
-    spdlog::error("POD5 {} - '{}' @ '{}' [{}].", err, pod5_get_error_string(), filename, read_id);
+    DORADO_LOG(error, "POD5 {} - '{}' @ '{}' [{}].", err, pod5_get_error_string(), filename,
+               read_id);
 }
 
 bool should_process_pod5_row(const ReadBatchRowInfo_t& read_data,
@@ -280,16 +281,16 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
     // 1. iterate through all the read metadata to collect channel information
     // across all pod5 files
     // 2. store the read list sorted by channel number
-    spdlog::info("> Reading read channel info");
+    DORADO_LOG(info, "> Reading read channel info");
     load_read_channels(files);
-    spdlog::info("> Processed read channel info");
+    DORADO_LOG(info, "> Processed read channel info");
     // 3. for each channel, iterate through all files and in each iteration
     // only load the reads that correspond to that channel.
     for (int channel = 0; channel <= m_max_channel; channel++) {
         if (m_reads_by_channel.find(channel) != m_reads_by_channel.end()) {
             // Sort the read ids within a channel by its mux
             // and start time.
-            spdlog::trace("Sort channel {}", channel);
+            DORADO_LOG(trace, "Sort channel {}", channel);
             auto& reads = m_reads_by_channel.at(channel);
             std::sort(reads.begin(), reads.end(), [](ReadSortInfo& a, ReadSortInfo& b) {
                 if (a.mux != b.mux) {
@@ -304,7 +305,7 @@ void DataLoader::load_reads_by_channel(const std::vector<std::filesystem::direct
             for (size_t i = 0; i < reads.size(); i++) {
                 m_read_id_to_index[reads[i].read_id] = i;
             }
-            spdlog::trace("Sorted channel {}", channel);
+            DORADO_LOG(trace, "Sorted channel {}", channel);
         }
         for (const auto& entry : files) {
             if (m_loaded_read_count == m_max_reads ||
@@ -334,7 +335,7 @@ void DataLoader::load_reads_unrestricted(
         if (m_loaded_read_count == m_max_reads || m_stop_loading.load(std::memory_order_relaxed)) {
             break;
         }
-        spdlog::debug("Load reads from file {}", entry.path().string());
+        DORADO_LOG(debug, "Load reads from file {}", entry.path().string());
         std::string ext = std::filesystem::path(entry).extension().string();
         std::transform(ext.begin(), ext.end(), ext.begin(),
                        [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
@@ -489,7 +490,8 @@ void DataLoader::load_pod5_reads_from_file_by_read_ids(const std::string& path,
     }
 
     if (find_success_count != read_ids.size()) {
-        spdlog::error(
+        DORADO_LOG(
+                error,
                 "POD5 failed to plan traversal of '{}' - Reads found by plan {}, reads in input {}",
                 path, find_success_count, read_ids.size());
         throw std::runtime_error("Plan traversal didn't yield correct number of reads");
@@ -614,9 +616,9 @@ void DataLoader::initialise_read(ReadCommon& read_common) const {
 void DataLoader::check_read(const SimplexReadPtr& read) {
     if (read->read_common.chemistry == models::Chemistry::UNKNOWN &&
         m_log_unknown_chemistry.exchange(false)) {
-        spdlog::warn(
-                "Could not determine sequencing Chemistry from read data - "
-                "some features might be disabled");
+        DORADO_LOG(warn,
+                   "Could not determine sequencing Chemistry from read data - "
+                   "some features might be disabled");
     }
 }
 

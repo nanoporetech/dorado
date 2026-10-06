@@ -1,8 +1,8 @@
 #include "encoder_counts.h"
 
 #include "medaka_counts.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <torch/types.h>
 
 #include <cassert>
@@ -259,28 +259,29 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             // New or contiguous chunk.
             last_end = sample.end();
             buffer_ids.emplace_back(i);
-            spdlog::trace("[merge_adjacent_samples_impl] Emplacing to buffer_ids, i = {}", i);
+            DORADO_LOG(trace, "[merge_adjacent_samples_impl] Emplacing to buffer_ids, i = {}", i);
 
         } else {
             // Discontinuity found, finalize the current chunk.
             last_end = sample.end();
             results.emplace_back(merge_samples(buffer_ids));
             buffer_ids = std::vector{i};
-            spdlog::trace(
-                    "[merge_adjacent_samples_impl] Merging samples in buffer, resetting the "
-                    "buffer. i = {}",
-                    i);
-            spdlog::trace("[merge_adjacent_samples_impl] Merged.");
+            DORADO_LOG(trace,
+                       "[merge_adjacent_samples_impl] Merging samples in buffer, resetting the "
+                       "buffer. i = {}",
+                       i);
+            DORADO_LOG(trace, "[merge_adjacent_samples_impl] Merged.");
         }
     }
 
     if (!std::empty(buffer_ids)) {
-        spdlog::trace(
+        DORADO_LOG(
+                trace,
                 "[merge_adjacent_samples_read_matrix] Final merging samples in buffer, resetting "
                 "the buffer. buffer_ids.size() = {}",
                 std::size(buffer_ids));
         results.emplace_back(merge_samples(buffer_ids));
-        spdlog::trace("[merge_adjacent_samples_read_matrix] Merged.");
+        DORADO_LOG(trace, "[merge_adjacent_samples_read_matrix] Merged.");
     }
 
     return results;
@@ -354,8 +355,9 @@ secondary::Sample EncoderCounts::encode_region(
     if (!pileup_tensors.counts.numel()) {
         const std::string region =
                 ref_name + ':' + std::to_string(ref_start + 1) + '-' + std::to_string(ref_end);
-        spdlog::debug("Pileup-feature is zero-length for {} indicating no reads in this region.",
-                      region);
+        DORADO_LOG(debug,
+                   "Pileup-feature is zero-length for {} indicating no reads in this region.",
+                   region);
         return {};
     }
 

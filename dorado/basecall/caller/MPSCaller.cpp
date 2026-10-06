@@ -5,9 +5,8 @@
 #include "decode/beam_search.h"
 #include "model/TxModel.h"
 #include "torch_utils/metal_utils.h"
+#include "utils/log_utils.h"
 #include "utils/memory_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <cassert>
 #include <cstdint>
@@ -36,11 +35,13 @@ bool is_mps_flstm_broken() {
             return true;
         }
 
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Torch's MPS backend is buggy for fLSTM before macOS {}.{}.{}. Falling back to CPU "
                 "instead.",
                 min_version.majorVersion, min_version.minorVersion, min_version.patchVersion);
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Explicitly running with `--device cpu` is recommended on this device, as it will "
                 "perform faster than allowing MPS fallback.");
         return false;
@@ -69,10 +70,10 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
 
     // Our metal builds assume shared memory, so it's safe to check host.
     if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        spdlog::warn(
-                "Less than 16GB of memory available: {}GB detected. "
-                "This is below minimum spec and may cause issues",
-                total_mem);
+        DORADO_LOG(warn,
+                   "Less than 16GB of memory available: {}GB detected. "
+                   "This is below minimum spec and may cause issues",
+                   total_mem);
     }
 
     // Create MPS objects.
@@ -98,7 +99,7 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
 
         if (model_config.is_tx_model() &&
             m_decoder_options.blank_score != model_config.tx->crf.blank_score) {
-            spdlog::warn("Transformer model config does not have the expected blank score");
+            DORADO_LOG(warn, "Transformer model config does not have the expected blank score");
         }
     }
 
@@ -186,8 +187,8 @@ int MPSCaller::get_max_safe_batch_size(float memory_limit_fraction,
         batch_size = batch_size / granularity * granularity;
 
         if (batch_size <= 0) {
-            spdlog::warn("Failed to estimate max batch size: {}GB -> bs={}. Using {}",
-                         usable_memory / BYTES_PER_GB, batch_size, granularity);
+            DORADO_LOG(warn, "Failed to estimate max batch size: {}GB -> bs={}. Using {}",
+                       usable_memory / BYTES_PER_GB, batch_size, granularity);
             batch_size = granularity;
         }
         return batch_size;

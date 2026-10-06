@@ -2,18 +2,12 @@
 
 #include "torch_utils/gpu_profiling.h"
 #include "types.h"
+#include "utils/log_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <ATen/ops/empty.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
 
 namespace dorado::correction {
 
@@ -49,8 +43,8 @@ at::Tensor collate(std::vector<at::Tensor>& tensors,
         slice.copy_(tensors[i]);
     }
 
-    LOG_TRACE("size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
-              batch.numel(), batch.sum().item<T>());
+    DORADO_LOG(trace, "size {}x{}x{} numelem {} sum {}", tensors.size(), max_length, max_reads,
+               batch.numel(), batch.sum().item<T>());
 
     return batch;
 }

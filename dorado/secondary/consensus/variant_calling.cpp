@@ -6,12 +6,11 @@
 #include "secondary/features/medaka_read_matrix.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/container_utils.h"
+#include "utils/log_utils.h"
 #include "utils/rle.h"
 #include "utils/sequence_utils.h"
 #include "utils/stl_utils.h"
 #include "utils/string_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <cassert>
@@ -204,18 +203,19 @@ std::string calculate_basecall_allele_depths(const std::vector<std::string>& all
                                              const int64_t rend,
                                              const at::Tensor& basecalls) {
     if ((!basecalls.defined()) || (basecalls.dim() != 2)) {
-        spdlog::debug(
-                "[add_basecall_allele_depths] Basecall features have incorrect shape, cannot "
-                "calculate allele depth.");
+        DORADO_LOG(debug,
+                   "[add_basecall_allele_depths] Basecall features have incorrect shape, cannot "
+                   "calculate allele depth.");
         return {};
     }
     if (basecalls.dtype() != at::kChar) {
-        spdlog::debug("[add_basecall_allele_depths] Basecall features have unexpected dtype: {}",
-                      at::toString(basecalls.dtype()));
+        DORADO_LOG(debug,
+                   "[add_basecall_allele_depths] Basecall features have unexpected dtype: {}",
+                   at::toString(basecalls.dtype()));
         return {};
     }
     if (!basecalls.is_contiguous()) {
-        spdlog::debug("[add_basecall_allele_depths] Basecall features are not contiguous");
+        DORADO_LOG(debug, "[add_basecall_allele_depths] Basecall features are not contiguous");
         return {};
     }
     const int64_t num_positions = basecalls.size(0);
@@ -584,10 +584,10 @@ std::vector<float> compute_allele_logprobs_array(const at::Tensor& probs_3D,
             if (seq_len == 0) {
                 allele = std::string_view(padding.c_str(), num_positions);
             }
-            spdlog::trace(
-                    "[compute_allele_logprobs_array] using explicit path for seq={} in region "
-                    "{}-{}",
-                    allele, rstart, rend);
+            DORADO_LOG(trace,
+                       "[compute_allele_logprobs_array] using explicit path for seq={} in region "
+                       "{}-{}",
+                       allele, rstart, rend);
             const std::vector<int32_t> seq_class_idxs =
                     make_class_indices(allele, symbol_lookup, num_classes, blank, true, true);
             for (int64_t hap_idx = 0; hap_idx < num_haplotypes; ++hap_idx) {
@@ -595,9 +595,9 @@ std::vector<float> compute_allele_logprobs_array(const at::Tensor& probs_3D,
                         compute_subseq_log_prob(probs_3D, seq_class_idxs, rstart, rend, hap_idx);
             }
         } else {
-            spdlog::trace(
-                    "[compute_allele_logprobs_array] using dp path for seq={} in region {}-{}",
-                    allele, rstart, rend);
+            DORADO_LOG(trace,
+                       "[compute_allele_logprobs_array] using dp path for seq={} in region {}-{}",
+                       allele, rstart, rend);
             const std::vector<int32_t> seq_class_idxs =
                     make_class_indices(allele, symbol_lookup, num_classes, blank, true, false);
             for (int64_t hap_idx = 0; hap_idx < num_haplotypes; ++hap_idx) {
@@ -1399,13 +1399,13 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     // Find GT and GQ records for later
     auto it_gt = ret.format.find("GT");
     if (it_gt == ret.format.end()) {
-        spdlog::warn("Failed to find GT record for variant at ({}, {})", ret.seq_id, ret.pos);
+        DORADO_LOG(warn, "Failed to find GT record for variant at ({}, {})", ret.seq_id, ret.pos);
         ret.alts.clear();
         return ret;
     }
     auto it_gq = ret.format.find("GQ");
     if (it_gq == ret.format.end()) {
-        spdlog::warn("Failed to find GQ record for variant at ({}, {})", ret.seq_id, ret.pos);
+        DORADO_LOG(warn, "Failed to find GQ record for variant at ({}, {})", ret.seq_id, ret.pos);
         ret.alts.clear();
         return ret;
     }
@@ -1432,8 +1432,8 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
             std::count_if(std::cbegin(var.alts), std::cend(var.alts),
                           [](const std::string& alt) { return alt != "<*>"; });
     if (num_called_alts > 1) {
-        spdlog::debug("Filtering variant with more than one alt in haploid region ({}, {}).",
-                      var.seq_id, var.pos);
+        DORADO_LOG(debug, "Filtering variant with more than one alt in haploid region ({}, {}).",
+                   var.seq_id, var.pos);
         ret.filters.update(Filters::IncompatZyg);
         ret.qual = 0.0f;
         it_gt->second = "0";
@@ -1445,8 +1445,8 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     if (is_homozygous || !require_hom) {
         it_gt->second = "1";
     } else {
-        spdlog::debug("Filtering heterozygous variant ({}, {}) in haploid region.", ret.seq_id,
-                      ret.pos);
+        DORADO_LOG(debug, "Filtering heterozygous variant ({}, {}) in haploid region.", ret.seq_id,
+                   ret.pos);
         ret.filters.update(Filters::IncompatZyg);
         ret.qual = 0.0f;
         it_gt->second = "0";
@@ -1467,7 +1467,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                         [&variant](const std::string_view s) { return s == variant.ref; });
 
     if (all_same_as_ref) {
-        spdlog::debug("[normalize_variant] all_same_as_ref");
+        DORADO_LOG(debug, "[normalize_variant] all_same_as_ref");
         return variant;
     }
 
@@ -1778,7 +1778,8 @@ std::vector<Variant> general_decode_variants(
                                     num_classes);
 
     if (std::size(cons_seqs_with_gaps_all) != 1) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Unexpected number of decoded samples in general_decode_variants. Output size: {}, "
                 "expected 1. Returning zero variants for this sample.",
                 std::size(cons_seqs_with_gaps_all));

@@ -25,7 +25,6 @@
 #include "utils/tty_utils.h"
 
 #include <minimap.h>
-#include <spdlog/spdlog.h>
 
 #include <chrono>
 #include <filesystem>
@@ -42,7 +41,7 @@ std::shared_ptr<dorado::alignment::IndexFileAccess> load_index(
         const std::string& filename,
         const dorado::alignment::Minimap2Options& options,
         const int num_threads) {
-    spdlog::info("> loading index {}", filename);
+    DORADO_LOG(info, "> loading index {}", filename);
 
     auto index_file_access = std::make_shared<dorado::alignment::IndexFileAccess>();
     int num_index_construction_threads{
@@ -151,7 +150,7 @@ int aligner(int argc, char* argv[]) {
     } catch (const std::exception& e) {
         std::ostringstream parser_stream;
         parser_stream << parser;
-        spdlog::error("{}\n{}", e.what(), parser_stream.str());
+        DORADO_LOG(error, "{}\n{}", e.what(), parser_stream.str());
         return EXIT_FAILURE;
     }
 
@@ -178,9 +177,9 @@ int aligner(int argc, char* argv[]) {
     const cli::EmitArgs emit = cli::get_emit_args(parser);
 
     if (parser.is_used("--no-sort") && !parser.is_used("--output-dir")) {
-        spdlog::error(
-                "--no-sort can only be used with --output-dir. Streamed output is always "
-                "unsorted.");
+        DORADO_LOG(error,
+                   "--no-sort can only be used with --output-dir. Streamed output is always "
+                   "unsorted.");
         return EXIT_FAILURE;
     }
 
@@ -194,7 +193,7 @@ int aligner(int argc, char* argv[]) {
     std::string err_msg{};
     auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
     if (!minimap_options) {
-        spdlog::error("{}\n{}", err_msg, alignment::mm2::get_help_message());
+        DORADO_LOG(error, "{}\n{}", err_msg, alignment::mm2::get_help_message());
         return EXIT_FAILURE;
     }
     align_info->minimap_options = std::move(*minimap_options);
@@ -206,37 +205,37 @@ int aligner(int argc, char* argv[]) {
     }
 
     if (reads.empty() && output_dir.has_value()) {
-        spdlog::error("--output-dir is not valid if input is stdin.");
+        DORADO_LOG(error, "--output-dir is not valid if input is stdin.");
         return EXIT_FAILURE;
     }
 
     const auto all_files = cli::collect_inputs(reads, recursive_input);
     if (all_files.empty()) {
-        spdlog::info("No input files found");
+        DORADO_LOG(info, "No input files found");
         return EXIT_SUCCESS;
     }
-    spdlog::info("num input files: {}", all_files.size());
+    DORADO_LOG(info, "num input files: {}", all_files.size());
 
     threads = threads == 0 ? std::thread::hardware_concurrency() : threads;
     // The input thread is the total number of threads to use for dorado
     // alignment. Heuristically use 10% of threads for BAM generation and
     // rest for alignment. Empirically this shows good perf.
     auto [aligner_threads, writer_threads] = cli::worker_vs_writer_thread_allocation(threads, 0.1f);
-    spdlog::debug("> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
+    DORADO_LOG(debug, "> aligner threads {}, writer threads {}", aligner_threads, writer_threads);
 
     std::shared_ptr<dorado::alignment::IndexFileAccess> index_file_access;
     try {
         index_file_access = load_index(align_info->reference_file, align_info->minimap_options,
                                        aligner_threads);
     } catch (const std::exception& e) {
-        spdlog::error("Index file loading failed: {}", e.what());
+        DORADO_LOG(error, "Index file loading failed: {}", e.what());
         return EXIT_FAILURE;
     }
     std::shared_ptr<dorado::alignment::BedFileAccess> bed_file_access;
     try {
         bed_file_access = load_bed(align_info->bed_file);
     } catch (const std::exception& e) {
-        spdlog::error("bed file loading failed: {}", e.what());
+        DORADO_LOG(error, "bed file loading failed: {}", e.what());
         return EXIT_FAILURE;
     }
 
@@ -283,7 +282,7 @@ int aligner(int argc, char* argv[]) {
 
         std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
         if (hts_file_writer == nullptr) {
-            spdlog::error("Failed to create hts file writer");
+            DORADO_LOG(error, "Failed to create hts file writer");
             std::exit(EXIT_FAILURE);
         }
 
@@ -319,7 +318,7 @@ int aligner(int argc, char* argv[]) {
     std::vector<dorado::stats::StatsReporter> stats_reporters;
     auto pipeline = Pipeline::create(std::move(pipeline_desc), &stats_reporters);
     if (pipeline == nullptr) {
-        spdlog::error("Failed to create pipeline");
+        DORADO_LOG(error, "Failed to create pipeline");
         return EXIT_FAILURE;
     }
 
@@ -363,10 +362,10 @@ int aligner(int argc, char* argv[]) {
     }
 
     tracker.set_description("Aligning");
-    spdlog::info("> starting alignment");
+    DORADO_LOG(info, "> starting alignment");
 
     for (const auto& file_info : all_files) {
-        spdlog::info("processing '{}'", file_info.string());
+        DORADO_LOG(info, "processing '{}'", file_info.string());
         const std::size_t num_reader_threads = 1;
         HtsReader reader(file_info.string(), std::nullopt, num_reader_threads);
         auto read_initialiser =
@@ -386,8 +385,8 @@ int aligner(int argc, char* argv[]) {
             });
         }
         reader.set_client_info(client_info);
-        spdlog::debug("> input:'{}' fmt:'{}' aligned:'{}'", file_info.filename().string(),
-                      reader.format_str(), reader.is_aligned());
+        DORADO_LOG(debug, "> input:'{}' fmt:'{}' aligned:'{}'", file_info.filename().string(),
+                   reader.format_str(), reader.is_aligned());
 
         if (header_mapper == nullptr) {
             SamHdrPtr hdr(sam_hdr_dup(reader.header()));
@@ -410,7 +409,7 @@ int aligner(int argc, char* argv[]) {
     progress_stats.notify_stats_collector_completed(final_stats);
     progress_stats.report_final_stats();
 
-    spdlog::info("> finished alignment");
+    DORADO_LOG(info, "> finished alignment");
     tracker.summarize();
 
     return EXIT_SUCCESS;

@@ -4,9 +4,8 @@
 #include "MetalCallerTask.h"
 #include "MetalLSTMCaller.h"
 #include "torch_utils/metal_utils.h"
+#include "utils/log_utils.h"
 #include "utils/thread_utils.h"
-
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <chrono>
@@ -178,7 +177,7 @@ void MetalCaller::metal_thread_fn() {
 
             // If we repeatedly submitted CBs without success, we give up.
             if (!cb_success) {
-                spdlog::critical("Exiting. Failed to successfully submit GPU command buffers.");
+                DORADO_LOG(critical, "Exiting. Failed to successfully submit GPU command buffers.");
                 std::exit(EXIT_FAILURE);
             }
         }

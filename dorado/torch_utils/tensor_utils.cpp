@@ -14,8 +14,7 @@
 
 #ifndef NDEBUG
 #include "utils/dev_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 #endif
 
 namespace dorado::utils {
@@ -193,7 +192,7 @@ void dump_tensor([[maybe_unused]] const at::Tensor& t,
     std::string path = oss.str();
 
     utils::serialise_tensor(t, path);
-    spdlog::warn("Writing {} to: {}", utils::print_size(t, name), path);
+    DORADO_LOG(warn, "Writing {} to: {}", utils::print_size(t, name), path);
 #endif
 }
 

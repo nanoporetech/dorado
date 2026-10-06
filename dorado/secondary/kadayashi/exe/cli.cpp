@@ -1,10 +1,10 @@
 #include "cli.h"
 
 #include "resources.h"
+#include "utils/log_utils.h"
 
 #include <argparse/argparse.hpp>
 #include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <exception>
 #include <sstream>
@@ -41,37 +41,38 @@ void throws_sancheck_cliopt_phase(cliopt_t &clio) {
     throws_sancheck_fastx_is_valid(clio.fn_ref);
 
     if (clio.n_threads < 1) {
-        spdlog::warn("[kdys::{}] clamping # threads to 1", __func__);
+        DORADO_LOG(warn, "[kdys::{}] clamping # threads to 1", __func__);
         clio.n_threads = 1;
     }
     if (clio.chunk_l < 10000) {
-        spdlog::warn("[kdys::{}] clamping chunk size to 10kb", __func__);
+        DORADO_LOG(warn, "[kdys::{}] clamping chunk size to 10kb", __func__);
         clio.chunk_l = 10000;
     }
     if (clio.chunk_stride < 100) {
-        spdlog::warn("[kdys::{}] clamping chunk stride to 100bp", __func__);
+        DORADO_LOG(warn, "[kdys::{}] clamping chunk stride to 100bp", __func__);
         clio.chunk_stride = 100;
     }
     if (clio.pp.min_base_quality < 0) {
-        spdlog::warn("[kdys::{}] min base qual was negative; clamping to 0", __func__);
+        DORADO_LOG(warn, "[kdys::{}] min base qual was negative; clamping to 0", __func__);
         clio.pp.min_base_quality = 0;
     }
     if (clio.pp.min_varcall_coverage < 1) {
-        spdlog::warn("[kdys::{}] min informative site coverage was set to <1; clamping to 1",
-                     __func__);
+        DORADO_LOG(warn, "[kdys::{}] min informative site coverage was set to <1; clamping to 1",
+                   __func__);
         clio.pp.min_varcall_coverage = 1;
     }
     if (clio.pp.min_varcall_fraction < 0) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "[kdys::{}] min informative site coverage (ratio) was set to negative; clamping to "
                 "0",
                 __func__);
         clio.pp.min_varcall_fraction = 0;
     }
     if (clio.pp.min_varcall_fraction > 1) {
-        spdlog::warn(
-                "[kdys::{}] min informative site coverage (ratio) was set to >1; clamping to 1",
-                __func__);
+        DORADO_LOG(warn,
+                   "[kdys::{}] min informative site coverage (ratio) was set to >1; clamping to 1",
+                   __func__);
         clio.pp.min_varcall_fraction = 1;
     }
     if (clio.write_dbg_bam && clio.one_region_str.empty()) {
@@ -79,7 +80,7 @@ void throws_sancheck_cliopt_phase(cliopt_t &clio) {
                 "[kdys::{}] debug option --write-dbg-bam must be used with --region", __func__));
     }
     if (clio.pp.max_clipping < 0) {
-        spdlog::warn("[kdys::{}] max clipping size was negative; clamping to 0", __func__);
+        DORADO_LOG(warn, "[kdys::{}] max clipping size was negative; clamping to 0", __func__);
         clio.pp.max_clipping = 0;
     }
 }
@@ -103,7 +104,7 @@ void parse_cli_phase_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pack)
             .flag()
             .help("Do sliding windows in bed-specified intervals.")
             .action([func = __func__](const std::string &) {
-                spdlog::info("[kdys::{}] will use window & stride in bed regions.", func);
+                DORADO_LOG(info, "[kdys::{}] will use window & stride in bed regions.", func);
             });
     p.add_argument("--region")
             .help("Phase a single region without sliding window. 0-index [). String can be "
@@ -116,7 +117,7 @@ void parse_cli_phase_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pack)
             .flag()
             .help("If set, do not allow attempts to expand the requested interval(s).")
             .action([func = __func__](const std::string &) {
-                spdlog::info("[kdys::{}] region expansion disabled.", func);
+                DORADO_LOG(info, "[kdys::{}] region expansion disabled.", func);
             });
     p.add_argument("-i").help("Specify an interval string.");
     p.add_argument("--chrom").help("Debug option: will only look within the given reference.");
@@ -180,19 +181,20 @@ void parse_cli_phase_fill(const argparse::ArgumentParser &p, clio_pack_t &clio_p
     }
     if (const auto v = p.present<std::string>("--vcf"); v) {
         clio.fn_vcf = std::filesystem::path(v.value());
-        spdlog::info(
-                "[kdys::{}] supplied vcf, will disable integrated varcall and use vcf variants "
-                "instead.",
-                __func__);
+        DORADO_LOG(info,
+                   "[kdys::{}] supplied vcf, will disable integrated varcall and use vcf variants "
+                   "instead.",
+                   __func__);
     }
     if (const auto v = p.present<std::string>("--bed"); v) {
         clio.fn_bed = std::filesystem::path(v.value());
-        spdlog::info("[kdys::{}] supplied bed, will do phasing only in these regions.", __func__);
+        DORADO_LOG(info, "[kdys::{}] supplied bed, will do phasing only in these regions.",
+                   __func__);
     }
     if (const auto v = p.present<std::string>("--readgroup"); v) {
         clio.pp.readgroup = v.value();
-        spdlog::info("[kdys::{}] will use reads only with readgroup name {} .", __func__,
-                     clio.pp.readgroup);
+        DORADO_LOG(info, "[kdys::{}] will use reads only with readgroup name {} .", __func__,
+                   clio.pp.readgroup);
     }
     if (const auto v = p.present<std::string>("--region"); v) {
         clio.one_region_str = v.value();
@@ -255,7 +257,7 @@ void parse_cli_tsv2bin_fill(const argparse::ArgumentParser &p, clio_pack_t &clio
     {
         clio.n_threads = p.get<int>("-t");
         if (clio.n_threads < 1) {
-            spdlog::warn("[kdys::{}] clamping # threads to 1", __func__);
+            DORADO_LOG(warn, "[kdys::{}] clamping # threads to 1", __func__);
             clio.n_threads = 1;
         }
     }
@@ -291,7 +293,7 @@ void parse_cli_bin2bam_fill(const argparse::ArgumentParser &p, clio_pack_t &clio
 
     clio.n_threads = p.get<int>("-t");
     if (clio.n_threads < 1) {
-        spdlog::warn("[kdys::{}] clamping # threads to 1", __func__);
+        DORADO_LOG(warn, "[kdys::{}] clamping # threads to 1", __func__);
         clio.n_threads = 1;
     }
     kadayashi::KDY_VERBOSE = p.get<bool>("--verbose");
@@ -375,16 +377,16 @@ void throws_sancheck_cliopt_varcall(cliopt_varcall_t &clio) {
     }
 
     if (clio.n_threads < 1) {
-        spdlog::warn("[kdys::{}] clamping # threads to 1", __func__);
+        DORADO_LOG(warn, "[kdys::{}] clamping # threads to 1", __func__);
         clio.n_threads = 1;
     }
     if (clio.pp.min_base_quality < 0) {
-        spdlog::warn("[kdys::{}] min base qual was negative; clamping to 0", __func__);
+        DORADO_LOG(warn, "[kdys::{}] min base qual was negative; clamping to 0", __func__);
         clio.pp.min_base_quality = 0;
     }
     if (clio.pp.min_varcall_coverage < 1) {
-        spdlog::warn("[kdys::{}] min informative site coverage was set to <1; clamping to 1",
-                     __func__);
+        DORADO_LOG(warn, "[kdys::{}] min informative site coverage was set to <1; clamping to 1",
+                   __func__);
         clio.pp.min_varcall_coverage = 1;
     }
     if (clio.pp.min_varcall_fraction < 0) {
@@ -395,22 +397,23 @@ void throws_sancheck_cliopt_varcall(cliopt_varcall_t &clio) {
         clio.pp.min_varcall_fraction = 0;
     }
     if (clio.pp.min_varcall_fraction > 1) {
-        spdlog::warn(
-                "[kdys::{}] min informative site coverage (ratio) was set to >1; clamping to 1",
-                __func__);
+        DORADO_LOG(warn,
+                   "[kdys::{}] min informative site coverage (ratio) was set to >1; clamping to 1",
+                   __func__);
         clio.pp.min_varcall_fraction = 1;
     }
     if (clio.pp.max_clipping < 0) {
-        spdlog::warn("[kdys::{}] max clipping size was negative; clamping to 0", __func__);
+        DORADO_LOG(warn, "[kdys::{}] max clipping size was negative; clamping to 0", __func__);
         clio.pp.max_clipping = 0;
     }
     if (clio.varcall_w < 10000) {
-        spdlog::warn("[kdys::{}] window size too small, setting to 10kb instead", __func__);
+        DORADO_LOG(warn, "[kdys::{}] window size too small, setting to 10kb instead", __func__);
         clio.varcall_w = 10000;
     }
     if (clio.bed_flanking <= 0) {
-        spdlog::warn("[kdys::{}] flanking size for output BED is too small, setting to 1 instead.",
-                     __func__);
+        DORADO_LOG(warn,
+                   "[kdys::{}] flanking size for output BED is too small, setting to 1 instead.",
+                   __func__);
         clio.bed_flanking = 1;
     }
 }
@@ -440,16 +443,16 @@ void parse_cli_varcall_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_pac
             .help("Set to disable region expansion i.e. phase using only the variants "
                   "within each chunk.")
             .action([func = __func__](const std::string &) {
-                spdlog::info("[kdys::{}] will not expand intervals during phasing.", func);
+                DORADO_LOG(info, "[kdys::{}] will not expand intervals during phasing.", func);
             });
     p.add_argument("--ambig-ref")
             .flag()
             .help("Set to allow the output vcf to contain")
             .action([func = __func__](const std::string &) {
-                spdlog::info(
-                        "[kdys::{}] vcf output will include entries where reference allele "
-                        "contains ambiguous bases",
-                        func);
+                DORADO_LOG(info,
+                           "[kdys::{}] vcf output will include entries where reference allele "
+                           "contains ambiguous bases",
+                           func);
             });
     p.add_argument("--max-gc-seqdiv")
             .scan<'f', float>()
@@ -520,19 +523,19 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
             .flag()
             .help("Omit dwells from the matrix.")
             .action([func = __func__](const std::string &) {
-                spdlog::info("[kdys::{}] feature matrix will not include dwells", func);
+                DORADO_LOG(info, "[kdys::{}] feature matrix will not include dwells", func);
             });
     p.add_argument("--exclude-haplotag")
             .flag()
             .help("Omit haplotags from the matrix.")
             .action([func = __func__](const std::string &) {
-                spdlog::info("[kdys::{}] feature matrix will not include haplotags", func);
+                DORADO_LOG(info, "[kdys::{}] feature matrix will not include haplotags", func);
             });
     p.add_argument("--exclude-snp-qv")
             .flag()
             .help("Omit SNP QVs from the matrix.")
             .action([func = __func__](const std::string &) {
-                spdlog::info("[kdys::{}] feature matrix will not include SNP QVs", func);
+                DORADO_LOG(info, "[kdys::{}] feature matrix will not include SNP QVs", func);
             });
     p.add_argument("--min-mapq")
             .scan<'i', int>()
@@ -544,10 +547,10 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
             .flag()
             .help("Let each read reside on its own lane.")
             .action([func = __func__](const std::string &) {
-                spdlog::info(
-                        "[kdys::{}] feature matrix will not pack reads. Read will appear on its "
-                        "own lane.",
-                        func);
+                DORADO_LOG(info,
+                           "[kdys::{}] feature matrix will not pack reads. Read will appear on its "
+                           "own lane.",
+                           func);
             });
     p.add_argument("--max-lanes")
             .scan<'i', int>()
@@ -557,16 +560,17 @@ void parse_cli_featmatgen_addarg(argparse::ArgumentParser &p, clio_pack_t &clio_
             .flag()
             .help("Left align insertions (default is right-align).")
             .action([func = __func__](const std::string &) {
-                spdlog::info(
-                        "[kdys::{}] feature matrix will left-align insertions. Default is "
-                        "right-aligned.",
-                        func);
+                DORADO_LOG(info,
+                           "[kdys::{}] feature matrix will left-align insertions. Default is "
+                           "right-aligned.",
+                           func);
             });
     p.add_argument("--use-medaka")
             .flag()
             .help("Use medaka's feature generator instead.")
             .action([func = __func__](const std::string &) {
-                spdlog::info(
+                DORADO_LOG(
+                        info,
                         "[kdys::{}] feature matrix generation will use the medaka implementation.",
                         func);
             });
@@ -686,7 +690,7 @@ clio_pack_t parse_cli_main(int argc, char *argv[]) {
     if (argc == 1) {
         std::ostringstream msg;
         msg << p;
-        spdlog::info("{}", msg.str());
+        DORADO_LOG(info, msg.str());
         clio_pack.is_good = false;
         return clio_pack;
     }
@@ -695,10 +699,8 @@ clio_pack_t parse_cli_main(int argc, char *argv[]) {
     try {
         p.parse_args(argc, argv);
     } catch (const std::exception &err) {
-        std::ostringstream msg;
-        msg << err.what();
-        spdlog::error("[kdys::{}] cli parsing failed. Use -h to print help.", __func__);
-        spdlog::error("{}", msg.str());
+        DORADO_LOG(error, "[kdys::{}] cli parsing failed. Use -h to print help.", __func__);
+        DORADO_LOG(error, err.what());
         clio_pack.is_good = false;
         return clio_pack;
     }
@@ -721,14 +723,13 @@ clio_pack_t parse_cli_main(int argc, char *argv[]) {
             parse_cli_featmatgen_fill(p_featmatgen, clio_pack);
         } else {
             // should not reach here
-            spdlog::error("[kdys::{}] unknown subcommand", __func__);
+            DORADO_LOG(error, "[kdys::{}] unknown subcommand", __func__);
             clio_pack.is_good = false;
         }
     } catch (const std::exception &err) {
-        std::ostringstream msg;
-        msg << err.what();
-        spdlog::error("[kdys::{}] cli subcommand parsing failed. Use -h to print help.", __func__);
-        spdlog::error("{}", msg.str());
+        DORADO_LOG(error, "[kdys::{}] cli subcommand parsing failed. Use -h to print help.",
+                   __func__);
+        DORADO_LOG(error, err.what());
         clio_pack.is_good = false;
     }
 

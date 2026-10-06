@@ -205,12 +205,12 @@ int64_t sequence_to_move_table_index(const std::vector<uint8_t>& move_vals,
     const bool size_invalid = sequence_size > moves_sz;
 
     if (move_vals.empty() || oob_moves || oob_seq || size_invalid) {
-        trace_log(
-                "sequence_to_move_table_index - bad input "
-                "seq_index:{} seq_size:{} move.size:{} - reason empty_moves: {} "
-                "oob_moves: {} oob_seq {} size_invalid: {}",
-                sequence_index, sequence_size, moves_sz, move_vals.empty(), oob_moves, oob_seq,
-                size_invalid);
+        DORADO_LOG(trace,
+                   "sequence_to_move_table_index - bad input "
+                   "seq_index:{} seq_size:{} move.size:{} - reason empty_moves: {} "
+                   "oob_moves: {} oob_seq {} size_invalid: {}",
+                   sequence_index, sequence_size, moves_sz, move_vals.empty(), oob_moves, oob_seq,
+                   size_invalid);
         return -1;
     }
 

@@ -1,9 +1,9 @@
 #include "basecall_output_args.h"
 
+#include "utils/log_utils.h"
 #include "utils/string_utils.h"
 
 #include <argparse/argparse.hpp>
-#include <spdlog/spdlog.h>
 
 #include <optional>
 
@@ -124,9 +124,9 @@ bool emit_cram_with_mmi_reference(const EmitArgs& emit, const std::optional<std:
         return false;
     }
 
-    spdlog::error(
-            "--emit-cram requires a FASTA reference. Prebuilt .mmi indexes are not "
-            "supported for CRAM output.");
+    DORADO_LOG(error,
+               "--emit-cram requires a FASTA reference. Prebuilt .mmi indexes are not "
+               "supported for CRAM output.");
     return true;
 }
 }  // namespace dorado::cli

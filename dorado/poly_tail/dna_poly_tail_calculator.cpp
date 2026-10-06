@@ -62,7 +62,7 @@ std::vector<SignalAnchorInfo> DNAPolyTailCalculator::determine_signal_anchor_and
     });
 
     int dist_v2 = top_v2.editDistance + bottom_v2.editDistance;
-    utils::trace_log("v1 dist {}, v2 dist {}", dist_v1, dist_v2);
+    DORADO_LOG(trace, "v1 dist {}, v2 dist {}", dist_v1, dist_v2);
 
     const bool fwd = dist_v1 < dist_v2;
     const float flank_score = 1.f - static_cast<float>(std::min(dist_v1, dist_v2)) /
@@ -70,8 +70,8 @@ std::vector<SignalAnchorInfo> DNAPolyTailCalculator::determine_signal_anchor_and
     const bool proceed = flank_score >= threshold && std::abs(dist_v1 - dist_v2) > min_separation;
 
     if (!proceed) {
-        utils::trace_log("{} primer edit distance too high {}", read.read_common.read_id,
-                         std::min(dist_v1, dist_v2));
+        DORADO_LOG(trace, "{} primer edit distance too high {}", read.read_common.read_id,
+                   std::min(dist_v1, dist_v2));
         return {};
     }
 

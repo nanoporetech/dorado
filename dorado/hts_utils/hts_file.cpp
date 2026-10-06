@@ -2,11 +2,11 @@
 
 #include "hts_utils/bam_utils.h"
 #include "utils/PostCondition.h"
+#include "utils/log_utils.h"
 
 #include <htslib/hts.h>
 #include <htslib/sam.h>
 #include <htslib/thread_pool.h>
-#include <spdlog/spdlog.h>
 
 #include <array>
 #include <cassert>
@@ -178,7 +178,7 @@ void HtsFile::initialise_threads(htsFile* file) const {
 
 HtsFile::~HtsFile() {
     if (!m_finalised) {
-        spdlog::error("finalise() not called on a HtsFile.");
+        DORADO_LOG(error, "finalise() not called on a HtsFile.");
     }
 }
 
@@ -263,7 +263,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     auto on_return = utils::PostCondition([&] { progress_callback(100); });
 
     if (std::exchange(m_finalised, true)) {
-        spdlog::error("finalise() called twice on a HtsFile. Ignoring second call.");
+        DORADO_LOG(error, "finalise() called twice on a HtsFile. Ignoring second call.");
         return;
     }
 
@@ -298,14 +298,14 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
             progress_callback(percent_start_indexing);
             int threads = (m_thread_pool ? hts_tpool_size(m_thread_pool->m_thread_pool.pool) : 0);
             if (sam_index_build3(m_filename.c_str(), nullptr, 0, threads) < 0) {
-                spdlog::error("Failed to build index for file {}", m_filename);
+                DORADO_LOG(error, "Failed to build index for file {}", m_filename);
             }
         }
     } else {
         // Otherwise merge the temp files.
         bool merge_complete = merge_temp_files_iteratively(progress_callback);
         if (!merge_complete) {
-            spdlog::error("Merging of temporary files failed.");
+            DORADO_LOG(error, "Merging of temporary files failed.");
             return;
         }
     }
@@ -424,7 +424,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
         try {
             initialise_threads(in_files[i].get());
         } catch (const std::runtime_error&) {
-            spdlog::error("Could not enable multi threading for alignment reading.");
+            DORADO_LOG(error, "Could not enable multi threading for alignment reading.");
             return false;
         }
         SamHdrPtr current_header(sam_hdr_read(in_files[i].get()));
@@ -433,8 +433,8 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
         } else {
             // Sanity check. Make sure headers match.
             if (!compare_headers(header, current_header)) {
-                spdlog::error("Header for temporary file {} does not match other headers.",
-                              temp_files[i]);
+                DORADO_LOG(error, "Header for temporary file {} does not match other headers.",
+                           temp_files[i]);
                 return false;
             }
             current_header.reset();
@@ -442,8 +442,8 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
         top_records[i].reset(bam_init1());
         auto res = sam_read1(in_files[i].get(), header.get(), top_records[i].get());
         if (res < 0) {
-            spdlog::error("Could not read first record from file {}, error code {}", temp_files[i],
-                          res);
+            DORADO_LOG(error, "Could not read first record from file {}, error code {}",
+                       temp_files[i], res);
             return false;
         }
         top_record_scores[i] = calculate_sorting_key(top_records[i].get());
@@ -454,7 +454,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     try {
         initialise_threads(out_file.get());
     } catch (const std::runtime_error&) {
-        spdlog::error("Could not enable multi threading for alignment generation.");
+        DORADO_LOG(error, "Could not enable multi threading for alignment generation.");
         return false;
     }
 
@@ -465,7 +465,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     SamHdrPtr out_header(sam_hdr_dup(header.get()));
     sam_hdr_change_HD(out_header.get(), "SO", "coordinate");
     if (sam_hdr_write(out_file.get(), out_header.get()) < 0) {
-        spdlog::error("Failed to write header for sorted bam file {}", out_file->fn);
+        DORADO_LOG(error, "Failed to write header for sorted bam file {}", out_file->fn);
         return false;
     }
 
@@ -475,7 +475,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     if (final_iteration) {
         auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
         if (res < 0) {
-            spdlog::error("Could not initialize output file for indexing, error code {}", res);
+            DORADO_LOG(error, "Could not initialize output file for indexing, error code {}", res);
             return false;
         }
     }
@@ -496,14 +496,15 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
             }
         }
         if (best_index == -1) {
-            spdlog::error("Logic error in merging algorithm.");
+            DORADO_LOG(error, "Logic error in merging algorithm.");
             return false;
         }
 
         // Write the record.
         auto res = sam_write1(out_file.get(), out_header.get(), top_records[best_index].get());
         if (res < 0) {
-            spdlog::error("Failed to write to sorted file {}, error code {}", out_file->fn, res);
+            DORADO_LOG(error, "Failed to write to sorted file {}, error code {}", out_file->fn,
+                       res);
             return false;
         }
         ++processed_records;
@@ -520,8 +521,8 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
             in_files[best_index].reset();
             ++files_done;
         } else if (res < -1) {
-            spdlog::error("Error reading record from file {}, error code {}",
-                          in_files[best_index]->fn, res);
+            DORADO_LOG(error, "Error reading record from file {}, error code {}",
+                       in_files[best_index]->fn, res);
             return false;
         }
     }
@@ -530,7 +531,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
         // Write the index file.
         auto res = sam_idx_save(out_file.get());
         if (res < 0) {
-            spdlog::error("Could not write index file, error code {}", res);
+            DORADO_LOG(error, "Could not write index file, error code {}", res);
             return false;
         }
     }

@@ -7,11 +7,11 @@
 #include <IOKit/IOKitLib.h>
 #pragma clang diagnostic pop
 
+#include "utils/log_utils.h"
 #include "utils/overloaded.h"
 
 #include <mach-o/dyld.h>
 #include <objc/objc-runtime.h>
-#include <spdlog/spdlog.h>
 #include <sys/sysctl.h>
 #include <sys/syslimits.h>
 
@@ -47,8 +47,8 @@ void report_error(const NS::Error *error, const char *function) {
         const char *c_str = str ? str->cString(NS::ASCIIStringEncoding) : nullptr;
         return c_str ? c_str : "<none>";
     };
-    spdlog::error("function={}, code={}, domain={}, description={}", function, error->code(),
-                  safe_c_str(error->domain()), safe_c_str(error->localizedDescription()));
+    DORADO_LOG(error, "function={}, code={}, domain={}, description={}", function, error->code(),
+               safe_c_str(error->domain()), safe_c_str(error->localizedDescription()));
 }
 
 #define wrap_func_with_err(func_with_err, ...)             \
@@ -71,7 +71,7 @@ auto load_kernels(MTL::Device *const device) {
     // Check the default (ie compiled into the app)
     auto kernels = NS::TransferPtr(device->newDefaultLibrary());
     if (kernels) {
-        spdlog::trace("Using default metal library");
+        DORADO_LOG(trace, "Using default metal library");
         return kernels;
     }
 
@@ -80,7 +80,7 @@ auto load_kernels(MTL::Device *const device) {
     auto lib_path = NS::String::string(fspath.c_str(), NS::ASCIIStringEncoding);
     kernels = NS::TransferPtr(wrap_func_with_err(device->newLibrary, lib_path));
     if (kernels) {
-        spdlog::trace("Using metal library at {}", fspath.string());
+        DORADO_LOG(trace, "Using metal library at {}", fspath.string());
         return kernels;
     }
 
@@ -195,7 +195,7 @@ void launch_kernel(ComputePipelineState *const pipeline,
 
     auto status = command_buffer->status();
     if (status != MTL::CommandBufferStatusCompleted) {
-        spdlog::warn("Synchronous metal command buffer failed: {}", fmt::underlying(status));
+        DORADO_LOG(warn, "Synchronous metal command buffer failed: {}", fmt::underlying(status));
     }
 }
 
@@ -244,12 +244,12 @@ bool run_command_buffer(const char *label, MTL::CommandBuffer *cb, int try_count
     auto status = cb->status();
     bool success = (status == MTL::CommandBufferStatusCompleted);
     if (success) {
-        spdlog::trace("Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
-                      1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
-                      1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
+        DORADO_LOG(trace, "Metal command buffer {}: {} GPU ms {} CPU ms succeeded (try {})", label,
+                   1000.f * float(cb->GPUEndTime() - cb->GPUStartTime()),
+                   1000.f * float(cb->kernelEndTime() - cb->kernelStartTime()), try_count);
     } else {
-        spdlog::warn("Metal command buffer {} failed: status {} (try {})", label,
-                     fmt::underlying(status), try_count);
+        DORADO_LOG(warn, "Metal command buffer {} failed: status {} (try {})", label,
+                   fmt::underlying(status), try_count);
         if (status == MTL::CommandBufferStatusError) {
             report_error(cb->error(), "run_command_buffer");
         }
@@ -300,7 +300,7 @@ int get_mtl_device_core_count() {
     if (auto core_count_opt = retrieve_ioreg_prop("AGXAccelerator", "gpu-core-count");
         core_count_opt.has_value()) {
         gpu_core_count = static_cast<int>(core_count_opt.value());
-        spdlog::debug("Retrieved GPU core count of {} from IO Registry", gpu_core_count);
+        DORADO_LOG(debug, "Retrieved GPU core count of {} from IO Registry", gpu_core_count);
         return gpu_core_count;
     }
 
@@ -308,7 +308,7 @@ int get_mtl_device_core_count() {
     // with a fallback of 8 (a complete base spec. M1) if it is not recognised.
     gpu_core_count = 8;
     const std::string name = get_mtl_device()->name()->utf8String();
-    spdlog::debug("Basing GPU core count on Metal device string {}", name);
+    DORADO_LOG(debug, "Basing GPU core count on Metal device string {}", name);
     if (name == "Apple M1 Pro") {
         gpu_core_count = 16;
     } else if (name == "Apple M1 Max") {
@@ -324,8 +324,8 @@ int get_mtl_device_core_count() {
         gpu_core_count = 10;
     }
 
-    spdlog::warn("Failed to retrieve GPU core count from IO Registry: using value of {}",
-                 gpu_core_count);
+    DORADO_LOG(warn, "Failed to retrieve GPU core count from IO Registry: using value of {}",
+               gpu_core_count);
     return gpu_core_count;
 }
 
@@ -347,11 +347,12 @@ int get_apple_cpu_perf_core_count() {
         } else if (name == "Apple M1 Ultra") {
             cpu_perf_core_count = 16;
         }
-        spdlog::warn("Failed to retrieve CPU performance core count from sysctl: using value of {}",
-                     cpu_perf_core_count);
+        DORADO_LOG(warn,
+                   "Failed to retrieve CPU performance core count from sysctl: using value of {}",
+                   cpu_perf_core_count);
     } else {
-        spdlog::debug("Retrieved CPU performance core count of {} from sysctl",
-                      cpu_perf_core_count);
+        DORADO_LOG(debug, "Retrieved CPU performance core count of {} from sysctl",
+                   cpu_perf_core_count);
     }
     return cpu_perf_core_count;
 }
@@ -391,7 +392,8 @@ size_t get_apple_physical_memory_bytes() {
     size_t size = sizeof(mem_size);
     if (sysctlbyname("hw.memsize", &mem_size, &size, nullptr, 0) == -1) {
         mem_size = size_t{8} << 30;
-        spdlog::warn("Failed to retrieve physical memory size: defaulting to {} bytes", mem_size);
+        DORADO_LOG(warn, "Failed to retrieve physical memory size: defaulting to {} bytes",
+                   mem_size);
     }
     return mem_size;
 }
@@ -403,7 +405,7 @@ static std::atomic_bool s_capturing{false};
 ScopedMetalCapture::ScopedMetalCapture(MTL::Device *device,
                                        const std::optional<std::filesystem::path> &path) {
     if (s_capturing.exchange(true, std::memory_order_relaxed) != false) {
-        spdlog::error("Already performing a GPU capture");
+        DORADO_LOG(error, "Already performing a GPU capture");
         std::abort();
     }
 
@@ -429,7 +431,7 @@ ScopedMetalCapture::ScopedMetalCapture(MTL::Device *device,
         m_device = device;
     } else if (!getenv("MTL_CAPTURE_ENABLED")) {
         // Developer probably forgot to set this, so help them out.
-        spdlog::warn("Note that MTL_CAPTURE_ENABLED=1 must be set in order to capture");
+        DORADO_LOG(warn, "Note that MTL_CAPTURE_ENABLED=1 must be set in order to capture");
     }
 }
 
@@ -450,7 +452,7 @@ void ScopedMetalCapture::inspect_buffer(MTL::Buffer *buffer, MTL::CommandBuffer 
     launch_kernel_no_wait(inspector.get(), cb, {buffer}, {}, 1, 1);
     if (!run_command_buffer("inspect_buffer", cb, 0)) {
         // Only a warning since it should still be visible in the trace
-        spdlog::warn("Buffer inspection failed");
+        DORADO_LOG(warn, "Buffer inspection failed");
     }
 }
 

@@ -1,8 +1,7 @@
 #include "model_slot_attention_consensus.h"
 
 #include "torch_utils/tensor_utils.h"
-
-#include <spdlog/spdlog.h>
+#include "utils/log_utils.h"
 
 #include <cmath>
 #include <random>
@@ -72,9 +71,10 @@ std::pair<at::Tensor, at::Tensor> SlotAttentionImpl::forward(at::Tensor x,
                                                              at::Tensor mask,
                                                              const int32_t num_slots) {
     if (std::size(x.sizes()) != 3) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Input tensor given to SlotAttention does not have exactly 3 dimensions. Shape: " +
-                utils::tensor_shape_as_string(x) + ". Returning an unitialized tensor.");
+                        utils::tensor_shape_as_string(x) + ". Returning an unitialized tensor.");
         return {};
     }
 

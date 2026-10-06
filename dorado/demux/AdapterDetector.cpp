@@ -218,7 +218,7 @@ AdapterScoreResult AdapterDetector::detect(const std::string& seq,
         const auto& name = queries[i].name;
         std::string_view query_seq_front = queries[i].front_sequence;
         std::string_view query_seq_rear = queries[i].rear_sequence;
-        utils::trace_log("Checking adapter/primer {}", name);
+        DORADO_LOG(trace, "Checking adapter/primer {}", name);
 
         if (!query_seq_front.empty()) {
             auto result = align(query_seq_front, read_front, IS_FRONT, placement_config);

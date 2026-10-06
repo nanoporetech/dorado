@@ -5,19 +5,13 @@
 #include "pipeline.h"
 #include "secondary/common/bam_file.h"
 #include "secondary/kadayashi/local_haplotagging.h"
+#include "utils/log_utils.h"
 
 #include <htslib/bgzf.h>
 #include <htslib/hts.h>
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <cassert>
-
-#ifdef NDEBUG
-#define LOG_TRACE(...)
-#else
-#define LOG_TRACE(...) spdlog::trace(__VA_ARGS__)
-#endif
 
 namespace kadayashi {
 
@@ -36,12 +30,12 @@ int write_haptagged_bam_given_hashtable_and_itvl(
 
     BGZF *fp_out = bgzf_open(fn_out.string().c_str(), "w");
     if (!fp_out) {
-        spdlog::error("[kdys::{}] failed to open output file: {}\n", __func__, fn_out.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open output file: {}\n", __func__, fn_out.string());
         return 1;
     }
     int stat = bam_hdr_write(fp_out, hf.hdr());
     if (stat != 0) {
-        spdlog::error("[kdys::{}] output bam header write failed\n", __func__);
+        DORADO_LOG(error, "[kdys::{}] output bam header write failed\n", __func__);
         bgzf_close(fp_out);
         return 1;
     }
@@ -58,8 +52,9 @@ int write_haptagged_bam_given_hashtable_and_itvl(
         bam_aux_update_int(aln.get(), "HP", haptag + 1);
         stat = bam_write1(fp_out, aln.get());
         if (stat < 0) {
-            spdlog::error("[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={})\n",
-                          __func__, refname, start_pos, qn, haptag);
+            DORADO_LOG(error,
+                       "[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={})\n",
+                       __func__, refname, start_pos, qn, haptag);
         }
     }
     aln = {};
@@ -69,7 +64,7 @@ int write_haptagged_bam_given_hashtable_and_itvl(
     const std::string fn_bai_out = fn_out.string() + ".bai";
     stat = sam_index_build3(fn_out.string().c_str(), fn_bai_out.c_str(), 0, 1);
     if (stat != 0) {
-        spdlog::error("[kdys::{}] failed to index output (stat={})\n", __func__, stat);
+        DORADO_LOG(error, "[kdys::{}] failed to index output (stat={})\n", __func__, stat);
         ret = 1;
     }
 
@@ -89,7 +84,8 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
 
     const region_string_t region = parse_region_string2(itvl);
     if (!region.is_parse_success || region.is_whole_chrom) {
-        spdlog::error(
+        DORADO_LOG(
+                error,
                 "[kdys::{}] failed to parse region string (string={} stat={}) or range not fully "
                 "specified "
                 "(is_whole_chrom={} (need to provide start&end))\n",
@@ -104,10 +100,10 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
     const std::unordered_map<std::string, int> qname2hp =
             query_bin_file_get_qname2hp(fn_bin, region.chrom, region.start, region.end);
 
-    spdlog::info("[kdys::{}] write to {}\n", __func__, fn_out.string());
+    DORADO_LOG(info, "[kdys::{}] write to {}\n", __func__, fn_out.string());
     BGZF *fp_out = bgzf_open(fn_out.string().c_str(), "w");
     if (!fp_out) {
-        spdlog::error("[kdys::{}] failed to open output file: {}\n", __func__, fn_out.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open output file: {}\n", __func__, fn_out.string());
         return 1;
     }
     if (n_threads > 1) {
@@ -115,7 +111,7 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
     }
     int stat = bam_hdr_write(fp_out, hf.hdr());
     if (stat != 0) {
-        spdlog::error("[kdys::{}] output bam header write failed\n", __func__);
+        DORADO_LOG(error, "[kdys::{}] output bam header write failed\n", __func__);
         bgzf_close(fp_out);
         return 1;
     }
@@ -132,10 +128,10 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
         if (stat < 0) {
             const char *refname = hf.hdr()->target_name[aln->core.tid];
             const int start_pos = static_cast<int>(aln->core.pos);
-            spdlog::error(
-                    "[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={} "
-                    "(0-index))\n",
-                    __func__, refname, start_pos, qn, haptag);
+            DORADO_LOG(error,
+                       "[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={} "
+                       "(0-index))\n",
+                       __func__, refname, start_pos, qn, haptag);
         }
     }
     aln = {};
@@ -145,7 +141,7 @@ int write_haptagged_bam_given_bin_and_itvl(const std::filesystem::path &fn_bam,
     const std::string fn_bai_out = fn_out.string() + ".bai";
     stat = sam_index_build3(fn_out.string().c_str(), fn_bai_out.c_str(), 0, n_threads);
     if (stat != 0) {
-        spdlog::error("[kdys::{}] failed to index output (stat={})\n", __func__, stat);
+        DORADO_LOG(error, "[kdys::{}] failed to index output (stat={})\n", __func__, stat);
         ret = 1;
     }
 
@@ -171,7 +167,7 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
     // prep output
     BGZF *fp_out = bgzf_open(fn_out.string().c_str(), "w");
     if (!fp_out) {
-        spdlog::error("[kdys::{}] failed to open output file: {}\n", __func__, fn_out.string());
+        DORADO_LOG(error, "[kdys::{}] failed to open output file: {}\n", __func__, fn_out.string());
         return 1;
     }
     if (n_threads > 1) {
@@ -181,7 +177,7 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
     // output header
     int stat = bam_hdr_write(fp_out, hf.hdr());
     if (stat != 0) {
-        spdlog::error("[kdys::{}] output bam header write failed\n", __func__);
+        DORADO_LOG(error, "[kdys::{}] output bam header write failed\n", __func__);
         bgzf_close(fp_out);
         return 1;
     }
@@ -207,7 +203,7 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
             query_itvl_s.append(std::to_string(query_itvl.first));
             query_itvl_s.append("-");
             query_itvl_s.append(std::to_string(query_itvl.second));
-            LOG_TRACE("[kdys::{}] writing bam: {}\n", __func__, query_itvl_s);
+            DORADO_LOG(trace, "[kdys::{}] writing bam: {}\n", __func__, query_itvl_s);
 
             dorado::secondary::HtsItrPtr bamitr(
                     sam_itr_querys(hf.idx(), hf.hdr(), query_itvl_s.c_str()));
@@ -227,10 +223,10 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
                 bam_aux_update_int(aln.get(), "HP", haptag + 1);
                 stat = bam_write1(fp_out, aln.get());
                 if (stat < 0) {
-                    spdlog::error(
-                            "[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={} "
-                            "(0-index))\n",
-                            __func__, refname, start_pos, qn, haptag);
+                    DORADO_LOG(error,
+                               "[kdys::{}] failed to write bam entry (ref={} pos={} qn={} newhp={} "
+                               "(0-index))\n",
+                               __func__, refname, start_pos, qn, haptag);
                 }
             }
         }
@@ -242,7 +238,7 @@ int write_haptagged_bam_given_hashtable_and_multiple_itvls(
     std::string fn_bai_out = fn_out.string() + ".bai";
     stat = sam_index_build3(fn_out.string().c_str(), fn_bai_out.c_str(), 0, 1);
     if (stat != 0) {
-        spdlog::error("[kdys::{}] failed to index output (stat={})\n", __func__, stat);
+        DORADO_LOG(error, "[kdys::{}] failed to index output (stat={})\n", __func__, stat);
         ret = 1;
     }
 

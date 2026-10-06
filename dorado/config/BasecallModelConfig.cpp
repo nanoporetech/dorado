@@ -2,8 +2,8 @@
 
 #include "models/kits.h"
 #include "models/models.h"
+#include "utils/log_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <toml.hpp>
 
 #include <cstddef>
@@ -78,7 +78,7 @@ void parse_qscore_params(BasecallModelConfig &config, const toml::value &config_
                     "model config error - qscore.mean_qscore_start_pos cannot be < 0");
         }
     } else {
-        spdlog::debug("> no qscore calibration found");
+        DORADO_LOG(debug, "> no qscore calibration found");
     }
 }
 
@@ -91,9 +91,9 @@ void parse_polya_coefficients(BasecallModelConfig &config, const toml::value &co
             if (coeffs.is_array()) {
                 const auto &coeffs_array = coeffs.as_array();
                 if (std::size(coeffs_array) > 1) {
-                    spdlog::warn(
-                            "'polya.calibration_coefficients' does not support multiple values. "
-                            "Discarding higher order coefficients.");
+                    DORADO_LOG(warn,
+                               "'polya.calibration_coefficients' does not support multiple values. "
+                               "Discarding higher order coefficients.");
                 }
                 config.polya_speed_correction =
                         1.f / static_cast<float>(coeffs_array[0].as_floating());
@@ -169,8 +169,8 @@ SignalNormalisationParams parse_signal_normalisation_params(const toml::value &c
         params.quantile.scale_multiplier = toml::find<float>(norm, "scale_multiplier");
 
         if (params.strategy != ScalingStrategy::QUANTILE) {
-            spdlog::warn(
-                    "Normalisation parameters are only used when `scaling.strategy = quantile`");
+            DORADO_LOG(warn,
+                       "Normalisation parameters are only used when `scaling.strategy = quantile`");
         }
     }
 
@@ -234,7 +234,7 @@ void warn_unrecognised_sublayers(const std::vector<toml::value> &sublayers) {
         if (sublayer_type(segment) == SublayerType::UNRECOGNISED) {
             const auto type = toml::find<std::string>(segment, "type");
             if (unique.count(type) == 0) {
-                spdlog::warn("Unrecognised sublayer type: `{}`", type);
+                DORADO_LOG(warn, "Unrecognised sublayer type: `{}`", type);
                 unique.insert(type);
             }
         }
@@ -488,7 +488,8 @@ BasecallModelConfig load_tx_model_config(const std::filesystem::path &path) {
 void TxStack::check() const {
     const auto eq = [](const int a, const int b, const std::string &msg) {
         if (a != b) {
-            spdlog::warn("Transformer model params check - expected {} but {} != {}", msg, a, b);
+            DORADO_LOG(warn, "Transformer model params check - expected {} but {} != {}", msg, a,
+                       b);
         }
     };
     eq(crf.insize, tx.layer_params.d_model,
@@ -502,19 +503,19 @@ bool BasecallModelConfig::has_normalised_basecaller_params() const {
     const auto cs = basecaller.chunk_size();
     const auto csg = chunk_size_granularity();
     if (cs % csg != 0) {
-        spdlog::error("Expected normalised chunksize - got: {} - for granularity: {}", cs, csg);
+        DORADO_LOG(error, "Expected normalised chunksize - got: {} - for granularity: {}", cs, csg);
         is_normalised = false;
     }
 
     const auto ov = basecaller.overlap();
     const auto si = stride_inner();
     if (ov % si != 0) {
-        spdlog::error("Expected normalised overlap - got: {} - for model stride: {}", ov, si);
+        DORADO_LOG(error, "Expected normalised overlap - got: {} - for model stride: {}", ov, si);
         is_normalised = false;
     }
 
     if (cs <= ov) {
-        spdlog::error("Expected chunk size > overlap - got: {} - for overlap: {}", cs, ov);
+        DORADO_LOG(error, "Expected chunk size > overlap - got: {} - for overlap: {}", cs, ov);
         is_normalised = false;
     }
     return is_normalised;

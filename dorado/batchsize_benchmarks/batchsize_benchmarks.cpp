@@ -9,11 +9,11 @@
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/BasecallerNode.h"
 #include "utils/jthread.h"
+#include "utils/log_utils.h"
 #include "utils/parameters.h"
 #include "utils/string_utils.h"
 #include "utils/sys_utils.h"
 
-#include <spdlog/spdlog.h>
 #include <torch/version.h>
 
 #include <algorithm>
@@ -115,8 +115,8 @@ SpeedEntry calculate_one(const std::string &device,
     // Wait for reads to start coming through.
     auto &sink = pipeline->get_node_ref<BenchmarkSink>(sink_handle);
     const Seconds first_read_latency = sink.wait_for_reads();
-    spdlog::debug("First read latency for batchsize={}: {}s", batch_size,
-                  first_read_latency.count());
+    DORADO_LOG(debug, "First read latency for batchsize={}: {}s", batch_size,
+               first_read_latency.count());
 
     // Make sure we let at least a few batches through before the benchmark ends.
     const int min_num_batches = 5;
@@ -132,7 +132,7 @@ SpeedEntry calculate_one(const std::string &device,
     const double samples = basecaller.sample_stats().at("samples_incl_padding");
     const double elapsed = Seconds(sink.elapsed()).count();
     const double speed = samples / elapsed;
-    spdlog::debug("[{}] {} @ {}", device, speed, batch_size);
+    DORADO_LOG(debug, "[{}] {} @ {}", device, speed, batch_size);
 
     // Teardown the pipeline. This will teardown the source thread too.
     pipeline->terminate({.fast = utils::AsyncQueueTerminateFast::Yes});
@@ -218,7 +218,7 @@ std::optional<int> get(const std::string &device,
     return BenchmarkCache::with_lock([&](BenchmarkCache::CacheProxy proxy) -> std::optional<int> {
         auto speeds = proxy.get_timings(gpu_name, model_name);
         if (speeds.empty()) {
-            spdlog::debug("No batch size timings for {}/{}", gpu_name, model_name);
+            DORADO_LOG(debug, "No batch size timings for {}/{}", gpu_name, model_name);
             return std::nullopt;
         }
         return pick_best_batch_size(speeds, memory_limit, batch_size_time_penalty);
@@ -230,7 +230,8 @@ void generate(const std::string &device,
               const data_loader::InputFiles &input_files,
               const std::function<void(float)> &progress_callback) {
     if (utils::running_in_docker()) {
-        spdlog::warn(
+        DORADO_LOG(
+                warn,
                 "Generating benchmarks inside of a container may not be representitive of the real "
                 "hardware.");
     }
@@ -252,8 +253,8 @@ void generate(const std::string &device,
             batch_size_granularity);
 
     // Do the benchmarking.
-    spdlog::debug("Benchmarking batch sizes in steps of {} for {} ({})", batch_size_granularity,
-                  device, gpu_name);
+    DORADO_LOG(debug, "Benchmarking batch sizes in steps of {} for {} ({})", batch_size_granularity,
+               device, gpu_name);
     std::vector<SpeedEntry> speeds;
     speeds.reserve(max_safe_batch_size / batch_size_granularity);
     // We count down instead of up so that torch's caching allocator doesn't fragment memory as we

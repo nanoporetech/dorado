@@ -6,6 +6,7 @@
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "utils/dev_utils.h"
+#include "utils/log_utils.h"
 #include "utils/math_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/stats.h"
@@ -15,7 +16,6 @@
 #include <ATen/TensorIndexing.h>
 #include <ATen/core/TensorBody.h>
 #include <nvtx3/nvtx3.hpp>
-#include <spdlog/spdlog.h>
 
 #include <algorithm>
 #include <atomic>
@@ -47,7 +47,7 @@ bool activate_minimal_cg_encoding(const std::vector<modbase::RunnerPtr>& model_r
 
     if (config::get_model_config_data(model_runners[0]->model_params(0)).mods.motif == "CG" &&
         utils::get_dev_opt("modbase_min_encode", 1)) {
-        spdlog::trace("Activated minimal encoding for CG context");
+        DORADO_LOG(trace, "Activated minimal encoding for CG context");
         return true;
     }
 
@@ -82,31 +82,31 @@ std::vector<modbase::RunnerPtr> validate_runners(std::vector<modbase::RunnerPtr>
         const auto& common = config::get_common_model_params(model_config);
         const auto& chunked = config::get_chunked_model_params(model_config);
         if (chunked.chunk_size < context.samples_before + context.samples_after) {
-            spdlog::error("{} chunk_size:{} is less than samples_before:{} + samples_after:{}.",
-                          name, chunked.chunk_size, context.samples_before, context.samples_after);
+            DORADO_LOG(error, "{} chunk_size:{} is less than samples_before:{} + samples_after:{}.",
+                       name, chunked.chunk_size, context.samples_before, context.samples_after);
             throw std::runtime_error(name + "chunk_size is smaller than the context window.");
         }
 
         if (chunked.chunk_size % canonical_stride != 0) {
-            spdlog::error("{} chunk_size:{} is not divisible by canonical_model_stride:{}.", name,
-                          chunked.chunk_size, canonical_stride);
+            DORADO_LOG(error, "{} chunk_size:{} is not divisible by canonical_model_stride:{}.",
+                       name, chunked.chunk_size, canonical_stride);
             throw std::runtime_error(name + "model strides are not compatible.");
         }
 
         const int modbase_stride = common.stride;
         if (modbase_stride <= 0) {
-            spdlog::error("{} invalid modbase model stride: {}.", name, modbase_stride);
+            DORADO_LOG(error, "{} invalid modbase model stride: {}.", name, modbase_stride);
             throw std::runtime_error(name + "model stride must be positive and non-zero.");
         }
         if (canonical_stride % modbase_stride != 0) {
-            spdlog::error("{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
-                          name, canonical_stride, modbase_stride);
+            DORADO_LOG(error, "{} canonical_model_stride:{} is not divisible by modbase_stride:{}.",
+                       name, canonical_stride, modbase_stride);
             throw std::runtime_error(name + "model strides are not compatible.");
         }
 
         if (chunked.chunk_size % modbase_stride != 0) {
-            spdlog::error("{} chunk_size:{} is not divisible by modbase_stride:{}.", name,
-                          chunked.chunk_size, modbase_stride);
+            DORADO_LOG(error, "{} chunk_size:{} is not divisible by modbase_stride:{}.", name,
+                       chunked.chunk_size, modbase_stride);
             throw std::runtime_error(name + "model stride and chunk size are not compatible.");
         }
 
@@ -330,8 +330,8 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
         // This is like one-hot encoding the canonical bases
         const auto base_id = utils::BaseInfo::BASE_IDS.at(static_cast<std::uint8_t>(read.seq[i]));
         if (base_id < 0) {
-            spdlog::error("Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
-                          read.seq[i], read.read_id);
+            DORADO_LOG(error, "Modbase input failed - invalid character - seq[{}]='{}' id:{}.", i,
+                       read.seq[i], read.read_id);
             throw std::runtime_error("Invalid character in sequence.");
         }
         read.base_mod_probs[i * m_num_states + m_base_prob_offsets.at(base_id)] = 1;
@@ -719,8 +719,8 @@ std::optional<ModBaseChunkCallerNode::EncodingData> ModBaseChunkCallerNode::popu
     populate_signal(mbd.signal, seq_to_sig_map, signal, int_seq, runner);
 
     if (signal_len != static_cast<size_t>(mbd.signal.size(0))) {
-        spdlog::error("Modbase signal length is incorrect for read:'{}' - {}!={}", read_id,
-                      signal_len, mbd.signal.size(0));
+        DORADO_LOG(error, "Modbase signal length is incorrect for read:'{}' - {}!={}", read_id,
+                   signal_len, mbd.signal.size(0));
         throw std::runtime_error("Modbase signal processing failed.");
     }
 
@@ -770,8 +770,8 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
     const std::size_t expected = (modbase_data.signal.size(0) / m_sequence_stride_ratio) *
                                  m_kmer_len * utils::BaseInfo::NUM_BASES;
     if (enc_kmer_size != expected) {
-        spdlog::error("Modbase kmer encoding failed for read:'{}' - {}!={}", read_id, enc_kmer_size,
-                      expected);
+        DORADO_LOG(error, "Modbase kmer encoding failed for read:'{}' - {}!={}", read_id,
+                   enc_kmer_size, expected);
         throw std::runtime_error("Modbase kmer encoding failed.");
     }
 
@@ -869,7 +869,7 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
             chunks_by_caller = get_chunks(runner, working_read, is_template_direction);
         }
     } catch (const std::exception& e) {
-        spdlog::error("ModBase Duplex Caller: {}", e.what());
+        DORADO_LOG(error, "ModBase Duplex Caller: {}", e.what());
     }
 
     if (chunks_by_caller_template.empty() && chunks_by_caller_complement.empty()) {
@@ -927,12 +927,13 @@ void ModBaseChunkCallerNode::create_and_submit_chunks(
         const int64_t len = end - start;
 
         if (start > end) {
-            spdlog::error("Modbase chunking failed - start>end {}>{} id:{}.", start, end, read_id);
+            DORADO_LOG(error, "Modbase chunking failed - start>end {}>{} id:{}.", start, end,
+                       read_id);
             throw std::runtime_error("Modbase chunking failed.");
         }
         if (int64_t(modbase_data.encoded_kmers.size()) < end) {
-            spdlog::error("Modbase chunking failed - out of bounds {}<{} id:{}.",
-                          modbase_data.encoded_kmers.size(), end, read_id);
+            DORADO_LOG(error, "Modbase chunking failed - out of bounds {}<{} id:{}.",
+                       modbase_data.encoded_kmers.size(), end, read_id);
             throw std::runtime_error("Modbase chunking failed.");
         }
 
@@ -1062,12 +1063,12 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
                                                     const int64_t context_samples_after,
                                                     const int64_t modbase_stride) {
     if (hit_sig_abs < chunk_signal_start) {
-        spdlog::error(
-                "hit_sig_abs:{} chunk_signal_start:{} scores_states:{} chunk_size:{} "
-                "context_samples_before:{} context_samples_after:{} modbase_stride:{}",
-                hit_sig_abs, chunk_signal_start, scores_states, chunk_size, context_samples_before,
-                context_samples_after, modbase_stride);
-        spdlog::error("Modbase hit before chunk start: {}<{}", hit_sig_abs, chunk_signal_start);
+        DORADO_LOG(error,
+                   "hit_sig_abs:{} chunk_signal_start:{} scores_states:{} chunk_size:{} "
+                   "context_samples_before:{} context_samples_after:{} modbase_stride:{}",
+                   hit_sig_abs, chunk_signal_start, scores_states, chunk_size,
+                   context_samples_before, context_samples_after, modbase_stride);
+        DORADO_LOG(error, "Modbase hit before chunk start: {}<{}", hit_sig_abs, chunk_signal_start);
         throw std::runtime_error("Modbase hit before chunk start.");
     }
 
@@ -1089,10 +1090,10 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
 
     // We should land on a canonical base
     if (hit_sig_rel % modbase_stride != 0) {
-        spdlog::error(
-                "Modbase unaligned chunk - hit_absolute:{} hit_relative:{} stride:{} "
-                "chunk_start:{}",
-                hit_sig_abs, hit_sig_rel, modbase_stride, chunk_signal_start);
+        DORADO_LOG(error,
+                   "Modbase unaligned chunk - hit_absolute:{} hit_relative:{} stride:{} "
+                   "chunk_start:{}",
+                   hit_sig_abs, hit_sig_rel, modbase_stride, chunk_signal_start);
         throw std::runtime_error("Modbase score did not align to canonical base.");
     }
 
@@ -1138,8 +1139,8 @@ void ModBaseChunkCallerNode::output_thread_fn() {
         const int64_t scores_seq_len = scores_size / scores_states;
 
         if (scores_seq_len > chunk_size / modbase_stride) {
-            spdlog::error("Modbase scores too long {}>{}/{}", scores_seq_len, chunk_size,
-                          modbase_stride);
+            DORADO_LOG(error, "Modbase scores too long {}>{}/{}", scores_seq_len, chunk_size,
+                       modbase_stride);
             throw std::runtime_error("Modbase scores too long.");
         }
 
@@ -1168,10 +1169,10 @@ void ModBaseChunkCallerNode::output_thread_fn() {
 
             // The canonical base should be constant for a single model
             if (seq != modbase_model_base) {
-                spdlog::error(
-                        "Modbase base '{}' from hit index '{}' does not match the model "
-                        "context '{}' on '{}' {}",
-                        seq, hit, modbase_model_base, read.read_id, is_template_direction);
+                DORADO_LOG(error,
+                           "Modbase base '{}' from hit index '{}' does not match the model "
+                           "context '{}' on '{}' {}",
+                           seq, hit, modbase_model_base, read.read_id, is_template_direction);
                 throw std::runtime_error("Modbase hit base is not correct.");
             }
 
@@ -1191,8 +1192,8 @@ void ModBaseChunkCallerNode::output_thread_fn() {
             for (int64_t mod_offset = 0; mod_offset < scores_states; ++mod_offset) {
                 const int64_t score_idx = hit_score_idx + mod_offset;
                 if (score_idx >= scores_size) {
-                    spdlog::error("Modbase score index out of bounds: {}>={} on '{}", score_idx,
-                                  scores_size, read.read_id);
+                    DORADO_LOG(error, "Modbase score index out of bounds: {}>={} on '{}", score_idx,
+                               scores_size, read.read_id);
                     throw std::runtime_error("Modbase score index out of bounds.");
                 }
 

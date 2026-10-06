@@ -91,14 +91,14 @@ std::pair<int, int> Trimmer::determine_trim_interval(AdapterScoreResult& res, in
         res.front.name = UNCLASSIFIED;
     } else {
         trim_interval.first = res.front.position.second + 1;
-        utils::trace_log("Detected front interval adapter/primer - {}", res.front.name);
+        DORADO_LOG(trace, "Detected front interval adapter/primer - {}", res.front.name);
     }
     if (res.rear.name == UNCLASSIFIED || res.rear.score < score_thres) {
         trim_interval.second = seqlen;
         res.rear.name = UNCLASSIFIED;
     } else {
         trim_interval.second = res.rear.position.first;
-        utils::trace_log("Detected rear interval adapter/primer - {}", res.rear.name);
+        DORADO_LOG(trace, "Detected rear interval adapter/primer - {}", res.rear.name);
     }
 
     if (trim_interval.second <= trim_interval.first) {

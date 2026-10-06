@@ -8,10 +8,10 @@
 #include "hts_utils/hts_types.h"
 #include "utils/SampleSheet.h"
 #include "utils/barcode_kits.h"
+#include "utils/log_utils.h"
 #include "utils/time_utils.h"
 
 #include <htslib/sam.h>
-#include <spdlog/spdlog.h>
 
 #include <filesystem>
 #include <stdexcept>
@@ -169,9 +169,9 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
         if (hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTQ ||
             hts_io::parse_sequence_format(input) == hts_io::SequenceFormatType::FASTA) {
             if (!std::exchange(m_fastq_runtime_warning_issued, true)) {
-                spdlog::warn(
-                        "Mapping headers from FASTQ files. This might take some time. Using BAM "
-                        "files as input is recommended as this avoids FASTQ header mapping.");
+                DORADO_LOG(warn,
+                           "Mapping headers from FASTQ files. This might take some time. Using BAM "
+                           "files as input is recommended as this avoids FASTQ header mapping.");
             }
             process_fastx(input);
         } else {
@@ -181,7 +181,7 @@ void HeaderMapper::process(const std::vector<std::filesystem::path>& inputs) {
 }
 
 void HeaderMapper::process_fastx(const std::filesystem::path& path) {
-    spdlog::trace("HeaderMapper::process_fastx processing '{}'", path.string());
+    DORADO_LOG(trace, "HeaderMapper::process_fastx processing '{}'", path.string());
     const auto path_string = path.string();
 
     hts_io::FastxSequentialReader reader(path);
@@ -202,7 +202,8 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
         if (!rg_data.found) {
             if (!debug_msg_issued) {
                 debug_msg_issued = true;
-                spdlog::debug("FASTQ record missing read group data in file '{}'", path.string());
+                DORADO_LOG(debug, "FASTQ record missing read group data in file '{}'",
+                           path.string());
             }
             fallback_merged_header->add_header(hdr.get(), path_string,
                                                m_fallback_read_attrs.protocol_run_id);
@@ -288,17 +289,17 @@ void HeaderMapper::process_fastx(const std::filesystem::path& path) {
 }
 
 void HeaderMapper::process_bam(const std::filesystem::path& path) {
-    spdlog::trace("HeaderMapper::process_bam processing '{}'", path.string());
+    DORADO_LOG(trace, "HeaderMapper::process_bam processing '{}'", path.string());
     const auto path_string = path.string();
 
     auto file = dorado::HtsFilePtr(hts_open(path.string().c_str(), "r"));
     if (!file) {
-        spdlog::error("Failed to open file: '{}'.", path.string());
+        DORADO_LOG(error, "Failed to open file: '{}'.", path.string());
         throw std::runtime_error("Could not open file for mapping");
     }
     dorado::SamHdrPtr header(sam_hdr_read(file.get()));
     if (!header) {
-        spdlog::error("Failed to read header from file: '{}'.", path.string());
+        DORADO_LOG(error, "Failed to read header from file: '{}'.", path.string());
         throw std::runtime_error("Could not open header for mapping");
     }
 
@@ -583,8 +584,8 @@ const MergeHeaders& HeaderMapper::get_merged_header(const HtsData::ReadAttribute
     // Lookup the merged header for these ReadAttributes
     const auto header_it = m_merged_headers_map->find(attrs);
     if (header_it == m_merged_headers_map->cend()) {
-        spdlog::error("Read group attributes were not found in mapped headers: runid='{}'.",
-                      attrs.protocol_run_id);
+        DORADO_LOG(error, "Read group attributes were not found in mapped headers: runid='{}'.",
+                   attrs.protocol_run_id);
         throw std::runtime_error("Merged header not found");
     }
 

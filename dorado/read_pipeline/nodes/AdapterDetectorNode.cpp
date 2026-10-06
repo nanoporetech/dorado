@@ -122,10 +122,10 @@ void AdapterDetectorNode::process_read(BamMessage& bam_message) {
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            utils::trace_log(
-                    "Adapter and/or primer detected for read {}, but could not be "
-                    "trimmed due to short length.",
-                    qname);
+            DORADO_LOG(trace,
+                       "Adapter and/or primer detected for read {}, but could not be "
+                       "trimmed due to short length.",
+                       qname);
             ++m_num_untrimmed_short_reads;
             return;
         }
@@ -175,10 +175,10 @@ void AdapterDetectorNode::process_read(SimplexRead& read) {
         trim_interval.first = std::max(trim_interval.first, primer_trim_interval.first);
         trim_interval.second = std::min(trim_interval.second, primer_trim_interval.second);
         if (trim_interval.first >= trim_interval.second) {
-            utils::trace_log(
-                    "Adapter and/or primer detected for read {}, but could not be "
-                    "trimmed due to short length.",
-                    read.read_common.read_id);
+            DORADO_LOG(trace,
+                       "Adapter and/or primer detected for read {}, but could not be "
+                       "trimmed due to short length.",
+                       read.read_common.read_id);
             ++m_num_untrimmed_short_reads;
             return;
         }

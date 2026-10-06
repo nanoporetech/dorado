@@ -15,10 +15,10 @@
 
 #if DORADO_ENABLE_BENCHMARK_TESTS
 #include "utils/jthread.h"
+#include "utils/log_utils.h"
 
 #include <catch2/benchmark/catch_benchmark.hpp>
 #include <spdlog/fmt/bundled/format.h>
-#include <spdlog/spdlog.h>
 
 #include <random>
 #endif
@@ -386,9 +386,9 @@ DEFINE_TEMPLATE_TEST("Benchmarking", NewThreadPool) {
         const auto rusage_after = cpu_rusage();
         const auto cpu_used = rusage_after - rusage_before;
 
-        spdlog::info("[SPEED] [{}] mode={}, workers={}, producers={}: {} ({} CPU)",
-                     TestType::name(), fmt::underlying(producer_mode), num_workers, num_producers,
-                     processed, cpu_used);
+        DORADO_LOG(info, "[SPEED] [{}] mode={}, workers={}, producers={}: {} ({} CPU)",
+                   TestType::name(), fmt::underlying(producer_mode), num_workers, num_producers,
+                   processed, cpu_used);
     }
 }
 
