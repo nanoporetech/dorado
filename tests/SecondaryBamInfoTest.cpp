@@ -26,26 +26,27 @@ struct BamRecord {
     std::string_view read_group{};
 };
 
+constexpr std::string_view header_preample =
+        "@HD\tVN:1.6\n"
+        "@SQ\tSN:chr1\tLN:100\n"
+        "@SQ\tSN:chr2\tLN:200\n"
+        "@PG\tID:aligner\tPP:samtools\tPN:dorado\n"
+        "@PG\tID:basecaller\tPN:dorado\n";
+
 // write a synthetic bam file
 std::filesystem::path write_bam(const std::filesystem::path& path,
                                 const std::string_view rg_headers,
                                 const std::vector<BamRecord>& records) {
-    const std::string header_text =
-            "@HD\tVN:1.6\n"
-            "@SQ\tSN:chr1\tLN:100\n"
-            "@SQ\tSN:chr2\tLN:200\n"
-            "@PG\tID:aligner\tPP:samtools\tPN:dorado\n"
-            "@PG\tID:basecaller\tPN:dorado\n" +
-            std::string(rg_headers);
-    SamHdrPtr header{sam_hdr_parse(std::size(header_text), header_text.c_str())};
+    SamHdrPtr header{sam_hdr_parse(header_preample.size(), header_preample.data())};
     CATCH_REQUIRE(header != nullptr);
+    CATCH_REQUIRE(sam_hdr_add_lines(header.get(), rg_headers.data(), rg_headers.size()) == 0);
     utils::HtsFile output(path.string(), utils::HtsFile::OutputMode::BAM, 1, false);
     output.set_header(header.get());
 
     for (const BamRecord& record : records) {
         BamPtr ret{bam_init1()};
-        CATCH_REQUIRE(bam_set1(ret.get(), std::ssize(record.qname), record.qname.data(), BAM_FUNMAP,
-                               -1, -1, 0, 0, nullptr, -1, -1, 0, 0, nullptr, nullptr, 0) >= 0);
+        CATCH_REQUIRE(bam_set1(ret.get(), record.qname.size(), record.qname.data(), BAM_FUNMAP, -1,
+                               -1, 0, 0, nullptr, -1, -1, 0, 0, nullptr, nullptr, 0) >= 0);
         if (!std::empty(record.dwell_tag)) {
             std::vector<uint8_t> aux_data;
             aux_data.emplace_back('c');
@@ -62,7 +63,7 @@ std::filesystem::path write_bam(const std::filesystem::path& path,
                           0);
         }
         if (!std::empty(record.read_group)) {
-            CATCH_REQUIRE(bam_aux_update_str(ret.get(), "RG", std::ssize(record.read_group),
+            CATCH_REQUIRE(bam_aux_update_str(ret.get(), "RG", record.read_group.size(),
                                              record.read_group.data()) == 0);
         }
         CATCH_REQUIRE(output.write(ret.get()) >= 0);
