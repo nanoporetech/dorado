@@ -67,8 +67,6 @@ Linux x64 or Windows systems not listed above but which have Nvidia GPUs with â‰
 
 If you encounter problems with running on your system, please [report an issue](https://github.com/nanoporetech/dorado/issues).
 
-AWS Benchmarks on Nvidia GPUs for Dorado 0.3.0 are available [here](https://aws.amazon.com/blogs/hpc/benchmarking-the-oxford-nanopore-technologies-basecallers-on-aws/). Please note: Dorado's basecalling speed is continuously improving, so these benchmarks may not reflect performance with the latest release.
-
 ## Performance tips
 
 1. Dorado will automatically detect your GPU's free memory and select an appropriate batch size.
