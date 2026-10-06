@@ -17,6 +17,8 @@
 
 namespace dorado::secondary {
 
+const std::string VCF_DEFAULT_SAMPLE{"SAMPLE"};
+
 namespace {
 
 enum class FieldType { GENOTYPE, INT_SCALAR, INT_LIST, FLOAT_SCALAR, FLOAT_LIST, STRING };

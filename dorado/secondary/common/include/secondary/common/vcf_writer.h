@@ -11,7 +11,7 @@
 
 namespace dorado::secondary {
 
-static const std::string VCF_DEFAULT_SAMPLE{"SAMPLE"};
+extern const std::string VCF_DEFAULT_SAMPLE;
 
 class VCFWriter {
 public:
