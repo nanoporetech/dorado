@@ -17,6 +17,8 @@
 
 namespace dorado::secondary {
 
+const std::string VCF_DEFAULT_SAMPLE{"SAMPLE"};
+
 namespace {
 
 enum class FieldType { GENOTYPE, INT_SCALAR, INT_LIST, FLOAT_SCALAR, FLOAT_LIST, STRING };
@@ -144,6 +146,7 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
                      const Filters::FilterType filters,
                      const std::vector<std::pair<std::string, int64_t>>& contigs,
                      const bool include_gvcf_headers,
+                     const std::string& sample_name,
                      const std::string_view command_line)
         : m_vcf_fp{hts_open(in_fn.string().c_str(), "w")},
           m_header{bcf_hdr_init("w")},
@@ -203,8 +206,8 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
         bcf_hdr_append(m_header.get(), format_entry.c_str());
     }
 
-    if (bcf_hdr_add_sample(m_header.get(), "SAMPLE") != 0) {
-        throw std::runtime_error("Failed to add sample: SAMPLE");
+    if (bcf_hdr_add_sample(m_header.get(), sample_name.c_str()) != 0) {
+        throw std::runtime_error("Failed to add sample: " + sample_name);
     }
 
     // Write the header to the file

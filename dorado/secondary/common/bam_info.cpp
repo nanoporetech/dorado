@@ -78,6 +78,10 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
                 }
             }
 
+            // Parse the sample name.
+            const auto& it_lb = tags.find("LB");
+            const std::string lb = (it_lb != std::end(tags)) ? it_lb->second : "";
+
             if (std::empty(id)) {
                 continue;
             }
@@ -90,6 +94,9 @@ BamInfo analyze_bam(const std::filesystem::path& in_aln_bam_fn, const std::strin
 
             ret.read_groups.emplace(id);
             ret.basecaller_models.emplace(basecaller_model);
+            if (!std::empty(lb)) {
+                ret.sample_names.emplace(lb);
+            }
         } else if (line.header_type == utils::HeaderLineType::SQ) {
             const auto& it_sn = tags.find("SN");
             const std::string sn = (it_sn != std::end(tags)) ? it_sn->second : "";
@@ -132,6 +139,21 @@ void check_read_groups(const BamInfo& bam_info, const std::string& cli_read_grou
                                      cli_read_group + "'"};
         }
     }
+}
+
+const std::string& unique_sample_name_or_throw(const BamInfo& bam_info) {
+    if (bam_info.sample_names.empty()) {
+        throw std::runtime_error{
+                "BAM read groups contain no sample names. Please specify a sample name with "
+                "the `--sample-name` option."};
+    }
+    if (bam_info.sample_names.size() > 1) {
+        throw std::runtime_error{
+                "BAM read groups contain multiple sample names: " +
+                utils::print_container_as_string(bam_info.sample_names, ",", true) +
+                ". Please specify a sample name with the `--sample-name` option."};
+    }
+    return *bam_info.sample_names.begin();
 }
 
 }  // namespace dorado::secondary

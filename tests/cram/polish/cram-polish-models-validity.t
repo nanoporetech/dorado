@@ -16,8 +16,9 @@ This should fail.
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > ### Create a mock config.toml with multiple types of incompatible basecaller models listed.
   > mkdir -p out/models
-  > cp -r ${MODEL_DIR} out/models/
-  > cat ${MODEL_DIR}/config.toml | sed -E 's/supported_basecallers.*//g' | sed -E 's/\[model\].*/supported_basecallers = \[ "dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0"\]\n\n\[model\]/g' > out/models/${MODEL_NAME}/config.toml
+  > POLISH_MODEL_NAME=$(basename ${POLISH_MODEL})
+  > cp -r ${POLISH_MODEL} out/models/${POLISH_MODEL_NAME}
+  > cat ${POLISH_MODEL}/config.toml | sed -E 's/supported_basecallers.*//g' | sed -E 's/\[model\].*/supported_basecallers = \[ "dna_r10.4.1_e8.2_400bps_hac@v5.0.0", "dna_r10.4.1_e8.2_400bps_hac@v4.2.0"\]\n\n\[model\]/g' > out/models/${POLISH_MODEL_NAME}/config.toml
   > model_var="--models-directory out/models"
   > ### Run the unit under test.
   > ${DORADO_BIN} polish --device cpu data/in.micro.bam ${in_dir}/draft.fasta.gz ${model_var} -t 4 --regions "contig_1:1-100" -v > out/out.fasta 2> out/out.fasta.stderr

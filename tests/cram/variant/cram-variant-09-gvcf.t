@@ -3,7 +3,7 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > in_bam=${in_dir}/in.aln.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > model_var="--model-override ${MODEL_ROOT_DIR}/${MODEL_v600}"
+  > model_var="--model-override ${SMALLVAR_MODEL_v600}"
   > touch out/empty_candidates.list
   > ${DORADO_BIN} smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --candidate-filtering true --candidates out/empty_candidates.list --regions "chr20:1-100" --ignore-read-groups --gvcf -o out 2> out/stderr
   > echo "Exit code: $?"
@@ -44,7 +44,7 @@ chr20	1959	1
   > in_ref=${in_dir_1}/in.ref.fasta.gz
   > in_candidates=${in_dir_2}/in.varcall.unsr.list
   > in_expected=${in_dir_2}/expected.gvcf.inferred.chr20_1000_2145.vcf
-  > model_var="--model-override ${MODEL_ROOT_DIR}/${MODEL_v600}"
+  > model_var="--model-override ${SMALLVAR_MODEL_v600}"
   > ${DORADO_BIN} smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --candidate-filtering true --candidates ${in_candidates} --window-len 300 --window-overlap 100 --variant-flanking-bases 100 --regions "chr20:1000-2145" --ignore-read-groups --gvcf -o out 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
@@ -85,7 +85,7 @@ Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > in_bam=${in_dir}/in.aln.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > model_var="--model-override ${MODEL_ROOT_DIR}/${MODEL_v600}"
+  > model_var="--model-override ${SMALLVAR_MODEL_v600}"
   > touch out/empty_candidates.list
   > ${DORADO_BIN} smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --candidate-filtering true --candidates out/empty_candidates.list --regions "chr20" --ignore-read-groups --gvcf -o out 2> out/stderr
   > echo "Exit code: $?"
@@ -106,7 +106,7 @@ In this region, all reads are dropped by kadayashi, so depth information is empt
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > in_bam=${in_dir}/in.aln.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
-  > model_var="--model-override ${MODEL_ROOT_DIR}/${MODEL_v600}"
+  > model_var="--model-override ${SMALLVAR_MODEL_v600}"
   > touch out/empty_candidates.list
   > ${DORADO_BIN} smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --candidate-filtering true --candidates out/empty_candidates.list --regions "chr20:9991" --ignore-read-groups --gvcf -o out 2> out/stderr
   > echo "Exit code: $?"

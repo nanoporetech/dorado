@@ -129,7 +129,7 @@ Using `--model-override`.
   > source ${TEST_DIR}/cram/variant/helpers.sh
   > prepare_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
-  > model=${POLISH_MODEL_DIR}
+  > model=${POLISH_MODEL}
   > #
   > ### Run the unit under test.
   > in_bam="out/in.bam"

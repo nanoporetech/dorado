@@ -95,6 +95,7 @@ struct Options {
     bool any_bam = false;
     bool ambig_ref = false;
     float pass_min_qual = 3.0f;
+    std::optional<std::string> sample_name{};
 
     secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::COMPUTE;
     std::optional<std::filesystem::path> phasing_bin_path;
@@ -277,6 +278,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
                 .default_value("");
+        parser.add_argument("--sample-name").help("Set sample name in VCF.");
     }
     {
         parser.add_group("Phasing options");
@@ -530,7 +532,7 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
                                    : std::nullopt;
     opt.min_mapq = parser.present<int32_t>("min-mapq");
     opt.ambig_ref = parser.get<bool>("ambig-ref");
-
+    opt.sample_name = cli::get_optional_argument<std::string>("--sample-name", parser);
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
     opt.candidate_variants_path = parser.present<std::string>("candidates");
@@ -1242,10 +1244,24 @@ void run_variant_calling(const Options& opt,
             secondary::Filters::Pass | secondary::Filters::LowQual |
             secondary::Filters::IncompatZyg | secondary::Filters::NonVariant;
 
+    // Set the sample name for VCF output
+    // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
+    // If the BAM contains multiple sample names, exit and ask for user instruction.
+    const std::string& sample_name = [&opt, &bam_info]() {
+        if (opt.sample_name.has_value()) {
+            return opt.sample_name.value();
+        }
+        if (bam_info.sample_names.empty()) {
+            return secondary::VCF_DEFAULT_SAMPLE;
+        }
+        return unique_sample_name_or_throw(bam_info);
+    }();
+    DORADO_LOG(info, "Setting sample name for VCF output: {}", sample_name);
+
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer = std::make_unique<secondary::VCFWriter>(
             out_vcf_fn, vcf_filters, draft_lens, opt.out_format == VariantCallingFormatEnum::GVCF,
-            command_line);
+            sample_name, command_line);
 
     // Optionally write Kadayashi variants.
     std::optional<secondary::VCFWriter> vcf_writer_kadayashi;
@@ -1254,12 +1270,12 @@ void run_variant_calling(const Options& opt,
         const std::string out_vcf_kadayashi_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf").string();
         vcf_writer_kadayashi.emplace(out_vcf_kadayashi_fn, vcf_filters, draft_lens, false,
-                                     command_line);
+                                     sample_name, command_line);
 
         const std::string out_vcf_inference_fn =
                 (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf").string();
         vcf_writer_inference.emplace(out_vcf_inference_fn, vcf_filters, draft_lens,
-                                     opt.out_format == VariantCallingFormatEnum::GVCF,
+                                     opt.out_format == VariantCallingFormatEnum::GVCF, sample_name,
                                      command_line);
     }
 
@@ -1523,6 +1539,10 @@ int small_variant_caller(int argc, char* argv[]) {
             }
             DORADO_LOG(debug, "bam_info.basecaller_models:");
             for (const auto& rg : bam_info.basecaller_models) {
+                DORADO_LOG(debug, "    - {}", rg);
+            }
+            DORADO_LOG(debug, "bam_info.sample_names:");
+            for (const auto& rg : bam_info.sample_names) {
                 DORADO_LOG(debug, "    - {}", rg);
             }
             if (!std::empty(opt.read_group)) {

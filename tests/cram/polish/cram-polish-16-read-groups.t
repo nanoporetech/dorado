@@ -32,8 +32,9 @@ Fails because the basecaller model cannot be determined.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.01.zero_read_groups.bam"
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
@@ -61,7 +62,7 @@ Allowed because `--model-override` allows any model to be used.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.01.zero_read_groups.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -v > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -81,7 +82,7 @@ Fails because a read group was selected, but there are no read groups in the BAM
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.01.zero_read_groups.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -97,7 +98,7 @@ The option `--ignore-read-groups` cannot help if a specific read group was reque
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.01.zero_read_groups.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --ignore-read-groups --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -112,7 +113,7 @@ Fails because only one RG is allowed.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.02.two_read_groups.one_basecaller.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -128,7 +129,7 @@ This will succeed only because both read groups have the same basecaller model.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.02.two_read_groups.one_basecaller.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --ignore-read-groups --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -149,7 +150,7 @@ This will succeed only because both read groups have the same basecaller model.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.02.two_read_groups.one_basecaller.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -170,7 +171,7 @@ Fails because the requested read group does not exist.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.02.two_read_groups.one_basecaller.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --RG "nonexistent-read-group" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -186,7 +187,7 @@ Fails because only one RG is allowed.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -218,7 +219,7 @@ Allowed because `--model-override` allows any model to be used.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --ignore-read-groups --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -239,8 +240,9 @@ Select one read group with `--RG`, which should automatically resolve the model 
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > # Run test.
-  > ${DORADO_BIN} polish --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -257,7 +259,7 @@ Select one read group with `--RG`, which should pass because the Basecaller mode
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --RG "bc8993f4557dd53bf0cbda5fd68453fea5e94485_dna_r10.4.1_e8.2_400bps_hac@v5.0.0-3AD2AF3E" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
@@ -278,7 +280,7 @@ Allowed because `--model-override` allows any model to be used.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
   > in_bam="data/in.03.two_read_groups.two_basecallers.bam"
-  > model_var="--model-override ${MODEL_DIR}"
+  > model_var="--model-override ${POLISH_MODEL}"
   > # Run test.
   > ${DORADO_BIN} polish --RG "f9f2e0901209274f132de3554913a1dc0a4439ae_dna_r10.0.0_e8.2_400bps_hac@v4.3.0-2DEAC5EC" --device cpu ${in_bam} ${in_dir}/draft.fasta.gz ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.

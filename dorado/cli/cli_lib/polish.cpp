@@ -110,6 +110,7 @@ struct Options {
     bool continue_on_error = false;
     bool legacy_feature_gen = true;
     const secondary::HaplotagSource haplotag_source = secondary::HaplotagSource::UNPHASED;
+    std::optional<std::string> sample_name{};
 };
 
 /// \brief Define the CLI options.
@@ -232,6 +233,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .help("Set quality filter for PASS variants.")
                 .default_value(3.0f)
                 .scan<'g', float>();
+        parser.add_argument("--sample-name").help("Set sample name in VCF.");
         parser.add_argument("--model-override")
                 .help("Path to a specific model folder. Overrides auto model resolution and all "
                       "compatibility checks. This may produce inferior results.")
@@ -382,6 +384,8 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
 
     opt.pass_min_qual = parser.get<float>("pass-qual-filter");
 
+    opt.sample_name = cli::get_optional_argument<std::string>("--sample-name", parser);
+
     // Write the consensus sequence only if: (1) to a folder, or (2) to stdout with no VC options specified.
     if (!std::empty(opt.output_dir) || (!vcf && !gvcf)) {
         opt.write_consensus = true;
@@ -456,6 +460,11 @@ void validate_options(const Options& opt) {
                    "Model override file path '{}' is specified, but the file does not exist.",
                    opt.model_str);
         std::exit(EXIT_FAILURE);
+    }
+
+    if (opt.sample_name.has_value() && !opt.run_variant_calling) {
+        DORADO_LOG(warn,
+                   "The --sample-name option will be ignored as not running variant calling.");
     }
 }
 
@@ -925,9 +934,23 @@ void run_polishing(const Options& opt,
                                                        secondary::Filters::LowQual |
                                                        secondary::Filters::NonVariant;
 
+        // Set the sample name for VCF output
+        // If opt.sample_name has not been set explicitly, try to set sample name from BAM.
+        // If the BAM contains multiple sample names, exit and ask for user instruction.
+        const std::string& sample_name = [&opt, &bam_info]() {
+            if (opt.sample_name.has_value()) {
+                return opt.sample_name.value();
+            }
+            if (bam_info.sample_names.empty()) {
+                return secondary::VCF_DEFAULT_SAMPLE;
+            }
+            return unique_sample_name_or_throw(bam_info);
+        }();
+        DORADO_LOG(info, "Setting sample name for VCF output: {}", sample_name);
+
         vcf_writer = std::make_unique<secondary::VCFWriter>(out_vcf_fn, filters, draft_lens,
                                                             opt.vc_type == VariantCallingEnum::GVCF,
-                                                            command_line);
+                                                            sample_name, command_line);
     }
 
     // Prepare regions for processing.
@@ -1259,6 +1282,10 @@ int polish(int argc, char* argv[]) {
             }
             DORADO_LOG(debug, "bam_info.basecaller_models:");
             for (const auto& rg : bam_info.basecaller_models) {
+                DORADO_LOG(debug, "    - {}", rg);
+            }
+            DORADO_LOG(debug, "bam_info.sample_names:");
+            for (const auto& rg : bam_info.sample_names) {
                 DORADO_LOG(debug, "    - {}", rg);
             }
             if (!std::empty(opt.read_group)) {

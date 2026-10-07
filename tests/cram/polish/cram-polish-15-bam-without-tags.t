@@ -23,7 +23,7 @@ The output should be as good as it gets with other tests.
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
@@ -49,7 +49,7 @@ Results will be worse than using QVs, but this input should successfully run non
   > samtools view -Sb out/in.sam | samtools sort > out/in.bam
   > samtools index out/in.bam
   > # Run test.
-  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --device cpu out/in.bam ${in_dir}/draft.fasta.gz --regions "contig_1:1-100" ${model_var} -vv > out/out.fasta 2> out/out.fasta.stderr
   > # Eval.
   > echo "Exit code: $?"
   > samtools faidx out/out.fasta
