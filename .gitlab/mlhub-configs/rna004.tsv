@@ -1,4 +1,4 @@
 job_name	sre_config	model	basecaller_mode	basecaller	sre_output
-SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_rna004-fast-v53	${projectDir}/configs/rna004-4khz-120bps-mixtemp-Aug24.json	rna004_130bps_fast@v5.3.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/rna004-v53-fast
-SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_rna004-hac-v53	${projectDir}/configs/rna004-4khz-120bps-mixtemp-Aug24.json	rna004_130bps_hac@v5.3.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/rna004-v53-hac
-SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_rna004-sup-v53	${projectDir}/configs/rna004-4khz-120bps-mixtemp-Aug24.json	rna004_130bps_sup@v5.3.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/rna004-v53-sup
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_rna004-fast-v60	${projectDir}/configs/rna004-4khz-120bps-mixtemp-Aug24.json	rna004_fast@v6.0.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/rna004-v60-fast
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_rna004-hac-v60	${projectDir}/configs/rna004-4khz-120bps-mixtemp-Aug24.json	rna004_hac@v6.0.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/rna004-v60-hac
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_rna004-sup-v60	${projectDir}/configs/rna004-4khz-120bps-mixtemp-Aug24.json	rna004_sup@v6.0.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/rna004-v60-sup
