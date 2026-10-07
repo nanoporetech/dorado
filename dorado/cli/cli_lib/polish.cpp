@@ -227,7 +227,7 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .scan<'i', int>();
         parser.add_argument("--min-depth")
                 .help("Sites with depth lower than this value will not be processed.")
-                .default_value(0)
+                .default_value(1)
                 .scan<'i', int>();
         parser.add_argument("--pass-qual-filter")
                 .help("Set quality filter for PASS variants.")
