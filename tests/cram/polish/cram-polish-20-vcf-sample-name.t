@@ -109,6 +109,6 @@ Sample name ignored if not running variant calling
   > model_var=${MODEL_ROOT_DIR:+--models-directory ${MODEL_ROOT_DIR}}
   > ${DORADO_BIN} polish --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --ignore-read-groups --sample-name SAMPLE > out/out.vcf 2> out/stderr
   > echo "Exit code: $?"
-  > grep "\[warning\] The --sample-name option will be ignored" out/stderr | wc -l
+  > grep "\[warning\]" out/stderr | sed -E 's/.*\]\ \[/\[/'
   Exit code: 0
-  1
+  [warning] The --sample-name option will be ignored as not running variant calling.
