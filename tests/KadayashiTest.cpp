@@ -1677,6 +1677,11 @@ CATCH_TEST_CASE("kadayashi_featmatgen uses SNP accuracy for read filtering", TES
              .nm = 1},
     };
 
+    const std::vector<int64_t> expected_majors{0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+                                               20, 21, 22, 23, 24, 25, 26, 27, 28, 29};
+    const std::vector<int64_t> expected_minors{0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
     CATCH_SECTION("filters reads below the SNP accuracy threshold") {
         const kadayashi::MedakaFeatureMatrixOptions options =
                 make_medaka_feature_matrix_options(false, 0.85, 100, false);
@@ -1684,14 +1689,16 @@ CATCH_TEST_CASE("kadayashi_featmatgen uses SNP accuracy for read filtering", TES
         const dorado::secondary::ReadAlignmentData result =
                 run_feature_matrix_test(records, "ACGTACGTAAACGTACGTAAACGTACGTAA", 0, 30, options);
 
-        CATCH_REQUIRE(result.n_pos == 30);
+        CATCH_REQUIRE(result.n_pos == 20);
         CATCH_REQUIRE(result.n_reads == 1);
         CATCH_REQUIRE(result.read_ids_left.size() == 1);
         CATCH_REQUIRE(result.read_ids_right.size() == 1);
         CATCH_CHECK(result.read_ids_left[0] == "perfect");
         CATCH_CHECK(result.read_ids_right[0] == "one_snp");
         CATCH_CHECK(get_feature_matrix_value(result, 0, 0, 0) == 1);
-        CATCH_CHECK(get_feature_matrix_value(result, 24, 0, 0) == 4);
+        CATCH_CHECK(get_feature_matrix_value(result, 14, 0, 0) == 4);
+        CATCH_CHECK(result.major == expected_majors);
+        CATCH_CHECK(result.minor == expected_minors);
     }
 
     CATCH_SECTION("keeps the low-accuracy read when filtering is disabled") {
@@ -1701,7 +1708,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen uses SNP accuracy for read filtering", TES
         const dorado::secondary::ReadAlignmentData result =
                 run_feature_matrix_test(records, "ACGTACGTAAACGTACGTAAACGTACGTAA", 0, 30, options);
 
-        CATCH_REQUIRE(result.n_pos == 30);
+        CATCH_REQUIRE(result.n_pos == 20);
         CATCH_REQUIRE(result.n_reads == 2);
         CATCH_REQUIRE(result.read_ids_left.size() == 2);
         CATCH_REQUIRE(result.read_ids_right.size() == 2);
@@ -1710,6 +1717,8 @@ CATCH_TEST_CASE("kadayashi_featmatgen uses SNP accuracy for read filtering", TES
         CATCH_CHECK(result.read_ids_right[0] == "one_snp");
         CATCH_CHECK(result.read_ids_right[1] == "__blank_1");
         CATCH_CHECK(get_feature_matrix_value(result, 1, 1, 0) == 4);
+        CATCH_CHECK(result.major == expected_majors);
+        CATCH_CHECK(result.minor == expected_minors);
     }
 }
 
@@ -1810,11 +1819,16 @@ CATCH_TEST_CASE("kadayashi_featmatgen reuses lanes at the sentinel boundary", TE
         const kadayashi::MedakaFeatureMatrixOptions options =
                 make_medaka_feature_matrix_options(false, 0.0, 100, false);
 
+        const std::vector<int64_t> expected_majors{0, 1, 2, 3, 4, 6, 7, 8, 9, 10};
+        const std::vector<int64_t> expected_minors{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
         const dorado::secondary::ReadAlignmentData result =
                 run_feature_matrix_test(records, "AAAAAACCCCC", 0, 11, options);
 
-        CATCH_REQUIRE(result.n_pos == 11);
+        CATCH_REQUIRE(result.n_pos == 10);
         CATCH_CHECK(result.n_reads == 2);
+        CATCH_CHECK(result.major == expected_majors);
+        CATCH_CHECK(result.minor == expected_minors);
     }
 
     CATCH_SECTION("exact sentinel boundary reuses the lane (two reads are 5bp apart)") {
@@ -1843,17 +1857,22 @@ CATCH_TEST_CASE("kadayashi_featmatgen reuses lanes at the sentinel boundary", TE
         const kadayashi::MedakaFeatureMatrixOptions options =
                 make_medaka_feature_matrix_options(false, 0.0, 100, false);
 
+        const std::vector<int64_t> expected_majors{0, 1, 2, 3, 4, 10, 11, 12, 13, 14};
+        const std::vector<int64_t> expected_minors{0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
         const dorado::secondary::ReadAlignmentData result =
                 run_feature_matrix_test(records, "AAAAAAAAAACCCCC", 0, 15, options);
 
-        CATCH_REQUIRE(result.n_pos == 15);
+        CATCH_REQUIRE(result.n_pos == 10);
         CATCH_CHECK(result.n_reads == 1);
         CATCH_REQUIRE(result.read_ids_left.size() == 1);
         CATCH_REQUIRE(result.read_ids_right.size() == 1);
         CATCH_CHECK(result.read_ids_left[0] == "left");
         CATCH_CHECK(result.read_ids_right[0] == "right");
         CATCH_CHECK(get_feature_matrix_value(result, 0, 0, 0) == 1);
-        CATCH_CHECK(get_feature_matrix_value(result, 10, 0, 0) == 2);
+        CATCH_CHECK(get_feature_matrix_value(result, 5, 0, 0) == 2);
+        CATCH_CHECK(result.major == expected_majors);
+        CATCH_CHECK(result.minor == expected_minors);
     }
 }
 
@@ -1890,13 +1909,18 @@ CATCH_TEST_CASE("kadayashi_featmatgen caps lanes while packing", TEST_GROUP) {
     const kadayashi::MedakaFeatureMatrixOptions options =
             make_medaka_feature_matrix_options(false, 0.0, 2, false);
 
+    const std::vector<int64_t> expected_majors{0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+    const std::vector<int64_t> expected_minors{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
     const dorado::secondary::ReadAlignmentData result =
             run_feature_matrix_test(records, "AAAAAAAAAAAA", 0, 12, options);
 
-    CATCH_REQUIRE(result.n_pos == 12);
+    CATCH_REQUIRE(result.n_pos == 11);
     CATCH_CHECK(result.n_reads == 2);
     CATCH_CHECK(result.read_ids_left.size() == 2);
     CATCH_CHECK(result.read_ids_right.size() == 2);
+    CATCH_CHECK(result.major == expected_majors);
+    CATCH_CHECK(result.minor == expected_minors);
 }
 
 CATCH_TEST_CASE("kadayashi_featmatgen preserves over-cap read suffixes", TEST_GROUP) {
@@ -1925,18 +1949,24 @@ CATCH_TEST_CASE("kadayashi_featmatgen preserves over-cap read suffixes", TEST_GR
     const kadayashi::MedakaFeatureMatrixOptions options =
             make_medaka_feature_matrix_options(false, 0.0, 1, false);
 
+    const std::vector<int64_t> expected_majors{0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+                                               15, 16, 17, 18, 19, 20, 21, 22, 23, 24};
+    const std::vector<int64_t> expected_minors{0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                                               0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
     const dorado::secondary::ReadAlignmentData result =
             run_feature_matrix_test(records, "AAAAAAAAAACCCCCCCCCCCCCCC", 0, 25, options);
 
-    CATCH_REQUIRE(result.n_pos == 25);
+    CATCH_REQUIRE(result.n_pos == 20);
     CATCH_REQUIRE(result.n_reads == 1);
     CATCH_REQUIRE(result.read_ids_left.size() == 1);
     CATCH_REQUIRE(result.read_ids_right.size() == 1);
     CATCH_CHECK(result.read_ids_left[0] == "r1");
     CATCH_CHECK(result.read_ids_right[0] == "r2");
-    CATCH_CHECK(get_feature_matrix_value(result, 14, 0, 0) == 0);
-    CATCH_CHECK(get_feature_matrix_value(result, 15, 0, 0) == 2);
-    CATCH_CHECK(get_feature_matrix_value(result, 24, 0, 0) == 2);
+    CATCH_CHECK(get_feature_matrix_value(result, 10, 0, 0) == 2);
+    CATCH_CHECK(get_feature_matrix_value(result, 19, 0, 0) == 2);
+    CATCH_CHECK(result.major == expected_majors);
+    CATCH_CHECK(result.minor == expected_minors);
 }
 
 CATCH_TEST_CASE("kadayashi_featmatgen wrapper handles empty outputs", TEST_GROUP) {

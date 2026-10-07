@@ -184,6 +184,11 @@ std::vector<T> get_unique_sorted_column(const at::Tensor& in_tensor, const int64
     return uniq_vec;
 }
 
+struct EncoderTestCase {
+    std::string test_name;
+    bool legacy_feat_encoder;
+};
+
 }  // namespace
 
 namespace dorado::secondary::tests {
@@ -306,11 +311,17 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10432, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
+                min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+                include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -335,11 +346,17 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         const std::vector<int64_t> expected_shape{10431, 11, 5};
 
         // UUT.
-        EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
+                min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+                right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+                include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -398,11 +415,17 @@ CATCH_TEST_CASE("Compute haptags", TEST_GROUP) {
     const std::vector<int8_t> expected_haptags{0};
 
     // Run UUT.
-    EncoderReadAlignment encoder(in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
+            min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
+            right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -464,20 +487,26 @@ CATCH_TEST_CASE("snp_accuracy_filter", TEST_GROUP) {
         std::vector<int64_t> expected_shape{};
     };
 
+    auto [encoder_test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
     auto [test_case] = GENERATE_REF(table<TestCase>({
             TestCase{"No filter", 0.0, {117, 11, 6}},
             TestCase{"Filter some alignments", 0.99, {113, 9, 6}},
             TestCase{"Filter ALL alignments", 1.0, {0}},
     }));
 
-    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name << ", "
+                          << encoder_test_case.test_name);
 
     // Run UUT.
     EncoderReadAlignment encoder(
             in_ref_fn, in_bam_aln_fn, dtypes, tag_name, tag_value, tag_keep_missing, read_group,
             min_mapq, max_reads, test_case.min_snp_accuracy, row_per_read, include_dwells,
             clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
-            include_snp_qv_column, kadayashi_opt, false);
+            include_snp_qv_column, kadayashi_opt, encoder_test_case.legacy_feat_encoder);
 
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -682,11 +711,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -713,11 +748,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -747,11 +788,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -780,11 +827,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -813,11 +866,18 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -838,11 +898,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         const Sample& expected = expected_total;
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -893,11 +959,17 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
         }
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -1047,11 +1119,17 @@ CATCH_TEST_CASE("synthetic_test_02", TEST_GROUP) {
     const bool row_per_read{false};
 
     // Run UUT.
-    EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+            read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+            clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
@@ -1212,11 +1290,17 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
     const bool row_per_read{true};
 
     // Run UUT.
-    EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+            read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+            clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     eval_sample(expected, result);
@@ -1358,11 +1442,17 @@ CATCH_TEST_CASE("synthetic_test_04-max_reads", TEST_GROUP) {
     const int32_t max_reads{1};
 
     // Run UUT.
-    EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                 tag_keep_missing, read_group, min_mapq, max_reads,
-                                 min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                 right_align_insertions, include_haplotype_column, hap_source,
-                                 phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+    auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+            EncoderTestCase{"kadayashi feature encoder", false},
+            EncoderTestCase{"legacy feature encoder", true},
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    EncoderReadAlignment encoder(
+            temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+            read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+            clip_to_zero, right_align_insertions, include_haplotype_column, hap_source, phasing_bin,
+            include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
     const Sample result = encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
     const std::vector<int64_t> shape(std::begin(result.features.sizes()),
@@ -1518,11 +1608,17 @@ CATCH_TEST_CASE("synthetic_test_05-haplotags", TEST_GROUP) {
         };
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
 
@@ -1691,11 +1787,17 @@ CATCH_TEST_CASE("synthetic_test_06-calculate_read_alignment_fix_for_high_coverag
         const Sample& expected = expected_total;
 
         // Run UUT.
-        EncoderReadAlignment encoder(temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value,
-                                     tag_keep_missing, read_group, min_mapq, max_reads,
-                                     min_snp_accuracy, row_per_read, include_dwells, clip_to_zero,
-                                     right_align_insertions, include_haplotype_column, hap_source,
-                                     phasing_bin, include_snp_qv_column, kadayashi_opt, false);
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
 
         const Sample result =
                 encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
@@ -1785,6 +1887,612 @@ CATCH_TEST_CASE("synthetic_test_07-populate_draft_seq_tensor", TEST_GROUP) {
                                                            reference_sequences[seq_id]);
             CATCH_CHECK(result.equal(expected_results[i]));
         }
+    }
+}
+
+CATCH_TEST_CASE("synthetic_test_08-zero_coverage_trimming_start", TEST_GROUP) {
+    /**
+     * This test mirrors synthetic_test_01 except that the reads do not span the entire reference window.
+     */
+
+    const auto temp_dir = make_temp_dir("encoder_read_aln_test");
+    const auto temp_in_ref_fn = temp_dir.m_path / "in.ref.fasta";
+    const auto temp_in_bam_fn = temp_dir.m_path / "in.aln.bam";
+
+    // Create the input test BAM/ref FASTA.
+    {
+        // clang-format off
+        // two added bases at the start of the reference
+        const std::vector<std::pair<std::string, std::string>> targets{
+                {"contig_1", "AAACTGAACTGA"},
+        };
+        const std::vector<BamRecord> records{
+            {"read_01", 0 /*tid*/,  2 /*pos*/, 0  /*flag*/, 50 /*mapq*/, "10M" /*cigar*/, "10" /*MD*/, "ACTGAACTGA" /*seq*/, "" /*qual*/, {} /*dwell*/, {} /*hp*/, 0 /*NM*/},    // Full-span.
+            {"read_01", 0 /*tid*/,  2 /*pos*/, 0  /*flag*/, 51 /*mapq*/, "10M", "10", "ACTGAACTGA", "", {}, {}, 0},                              // Duplicate.
+            {"read_01", 0 /*tid*/,  2 /*pos*/, 0  /*flag*/, 52 /*mapq*/, "10M", "10", "ACTGAACTGA", "", {}, {}, 0},                              // Duplicate.
+            {"read_02", 0 /*tid*/,  2 /*pos*/, 16 /*flag*/, 53 /*mapq*/, "5M", "0A4", "ACTGA", "", {}, 3, 1},                                    // Left-flank only. Reverse. NM = 1 and cigar = 5M make snp_qv = 6.98.
+            {"read_03", 0 /*tid*/,  2 /*pos*/, 0  /*flag*/, 54 /*mapq*/, "3M", "0A0C1", "ACT", "", {5, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 5, 2},  // This should share the row with the next one. NM = 2 and cigar = 3M make snp_qv = 1.76.
+            {"read_04", 0 /*tid*/, 10 /*pos*/, 0  /*flag*/, 55 /*mapq*/, "2M", "0G1", "GA", "", {}, {}, 1},                                      // This should share the row with the previous.
+            {"read_05", 0 /*tid*/,  3 /*pos*/, 0  /*flag*/, 56 /*mapq*/, "8M", "0C0T0G5", "CTGAACTG", "1234567890", {}, {}, 3},                  // Contained. Has quals. NM = 3 and cigar = 8M make snp_qv = 4.26.
+            {"read_06", 0 /*tid*/,  7 /*pos*/, 0  /*flag*/, 57 /*mapq*/, "5M", "0A0C0T0G0A0", "ACTGA", "", {}, {}, 5},                           // Right-flank only.
+            {"read_06", 0 /*tid*/,  7 /*pos*/, 0  /*flag*/, 58 /*mapq*/, "5M", "5", "ACTGA", "", {}, {}, 0},                                     // Duplicate.
+        };
+        // clang-format on
+
+        write_bam(temp_in_bam_fn, targets, records);
+        write_ref(temp_in_ref_fn, targets);
+    }
+
+    // Expected results.
+    // clang-format off
+    const Sample expected_total {
+        .seq_id = 123,
+        // Features tensor shape: [pos, coverage, features] -> [10, 5, 7]
+        // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+        .features = torch::tensor(
+            {
+                // (2,.,.)
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {1, 0, 0, 53, 0, 3, 7},
+                 {1, 0, 1, 54, 4, 5, 2},
+                 {0, 0, 0,  0, 0, 0, 0},
+                 {0, 0, 0,  0, 0, 0, 0}},
+
+                // (3,.,.)
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {2, 0,  0, 53, 0, 3,  7},
+                 {2, 0,  1, 54, 5, 5,  2},
+                 {2, 49, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
+
+                // (4,.,.)
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {4, 0,  0, 53, 0, 3, 7},
+                 {4, 0,  1, 54, 2, 5, 2},
+                 {4, 50, 1, 56, 0, 0, 4},
+                 {0, 0,  0,  0, 0, 0, 0}},
+
+                // (5,.,.)
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {3, 0,  0, 53, 0, 3,  7},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 51, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
+
+                // (6,.,.)
+                {{1,  0,  1, 50, 0, 0, 60},
+                 {1,  0,  0, 53, 0, 3,  7},
+                 {0,  0,  0,  0, 0, 0,  0},
+                 {1, 52,  1, 56, 0, 0,  4},
+                 {0,  0,  0,  0, 0, 0,  0}},
+
+                // (7,.,.)
+                {{1, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {1, 53, 1, 56, 0, 0,  4},
+                 {1, 0,  1, 57, 0, 0,  0}},
+
+                // (8,.,.)
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {2, 54, 1, 56, 0, 0,  4},
+                 {2, 0,  1, 57, 0, 0,  0}},
+
+                // (9,.,.)
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {4, 55, 1, 56, 0, 0,  4},
+                 {4, 0,  1, 57, 0, 0,  0}},
+
+                // (10,.,.)
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 0,  1, 55, 0, 0,  3},
+                 {3, 56, 1, 56, 0, 0,  4},
+                 {3, 0,  1, 57, 0, 0,  0}},
+
+                // (11,.,.)
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 55, 0, 0,  3},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 57, 0, 0,  0}},
+
+            }, torch::dtype(torch::kInt8)
+        ),
+        .positions_major = {
+            2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+        },
+        .positions_minor = {
+            0, 0, 0, 0, 0, 0, 0, 0,  0,  0
+        },
+        .depth = torch::tensor(
+            {3, 4, 4, 3, 3, 3, 3, 3, 4, 3},
+            torch::dtype(torch::kInt32)
+        ),
+        .read_ids_left = {
+            "read_01",
+            "read_02",
+            "read_03",
+            "__blank_1",
+            "__blank_2",
+        },
+        .read_ids_right = {
+            "read_01",
+            "__blank_1",
+            "read_04",
+            "__blank_2",
+            "read_06",
+        },
+    };
+    // clang-format on
+
+    // Parameters, fixed for this test.
+    const std::vector<std::string> dtypes{};
+    const std::string tag_name{};
+    const int32_t tag_value{0};
+    const bool tag_keep_missing{false};
+    const std::string read_group{};
+    const int32_t min_mapq{1};
+    const int32_t max_reads{100};
+    const bool row_per_read{false};
+    const double min_snp_accuracy{0.0};
+
+    const bool right_align_insertions{false};
+    const std::optional<std::filesystem::path> phasing_bin{};
+    const std::string ref_name{"contig_1"};
+    const int32_t ref_id = 123;
+    const int64_t ref_start = 0;
+    const int64_t ref_end = 12;
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
+
+    CATCH_SECTION(
+            "No dwell column, no hap column, no snp_qv column. Only the base features (base, qual, "
+            "strand, mapq)."
+            "Tests the entire output Sample: feature tensor, depth tensor, positions major/minor, "
+            "and read IDs. Include dwell col, no hap col") {
+        // Test specific parameters.
+        const bool include_dwells{false};
+        const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
+        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test: drop the dwell column from the last dimension.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index({"...", torch::indexing::Slice(0, 4)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
+
+        eval_sample(expected, result);
+    }
+}
+
+CATCH_TEST_CASE("synthetic_test_09-zero_coverage_trimming_end", TEST_GROUP) {
+    /**
+     * This test mirrors synthetic_test_01 except that the reads do not span the entire reference window.
+     */
+
+    const auto temp_dir = make_temp_dir("encoder_read_aln_test");
+    const auto temp_in_ref_fn = temp_dir.m_path / "in.ref.fasta";
+    const auto temp_in_bam_fn = temp_dir.m_path / "in.aln.bam";
+
+    // Create the input test BAM/ref FASTA.
+    {
+        // clang-format off
+        // two added bases at the end of the reference
+        const std::vector<std::pair<std::string, std::string>> targets{
+                {"contig_1", "ACTGAACTGACG"},
+        };
+        const std::vector<BamRecord> records{
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 50 /*mapq*/, "10M" /*cigar*/, "10" /*MD*/, "ACTGAACTGA" /*seq*/, "" /*qual*/, {} /*dwell*/, {} /*hp*/, 0 /*NM*/},    // Full-span.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 51 /*mapq*/, "10M", "10", "ACTGAACTGA", "", {}, {}, 0},                              // Duplicate.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 52 /*mapq*/, "10M", "10", "ACTGAACTGA", "", {}, {}, 0},                              // Duplicate.
+            {"read_02", 0 /*tid*/, 0 /*pos*/, 16 /*flag*/, 53 /*mapq*/, "5M", "0A4", "ACTGA", "", {}, 3, 1},                                    // Left-flank only. Reverse. NM = 1 and cigar = 5M make snp_qv = 6.98.
+            {"read_03", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 54 /*mapq*/, "3M", "0A0C1", "ACT", "", {5, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 5, 2},  // This should share the row with the next one. NM = 2 and cigar = 3M make snp_qv = 1.76.
+            {"read_04", 0 /*tid*/, 8 /*pos*/, 0  /*flag*/, 55 /*mapq*/, "2M", "0G1", "GA", "", {}, {}, 1},                                      // This should share the row with the previous.
+            {"read_05", 0 /*tid*/, 1 /*pos*/, 0  /*flag*/, 56 /*mapq*/, "8M", "0C0T0G5", "CTGAACTG", "1234567890", {}, {}, 3},                  // Contained. Has quals. NM = 3 and cigar = 8M make snp_qv = 4.26.
+            {"read_06", 0 /*tid*/, 5 /*pos*/, 0  /*flag*/, 57 /*mapq*/, "5M", "0A0C0T0G0A0", "ACTGA", "", {}, {}, 5},                           // Right-flank only.
+            {"read_06", 0 /*tid*/, 5 /*pos*/, 0  /*flag*/, 58 /*mapq*/, "5M", "5", "ACTGA", "", {}, {}, 0},                                     // Duplicate.
+        };
+        // clang-format on
+
+        write_bam(temp_in_bam_fn, targets, records);
+        write_ref(temp_in_ref_fn, targets);
+    }
+
+    // Expected results.
+    // clang-format off
+    const Sample expected_total {
+        .seq_id = 123,
+        // Features tensor shape: [pos, coverage, features] -> [10, 5, 7]
+        // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+        .features = torch::tensor(
+            {
+                // (0,.,.)
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {1, 0, 0, 53, 0, 3, 7},
+                 {1, 0, 1, 54, 4, 5, 2},
+                 {0, 0, 0,  0, 0, 0, 0},
+                 {0, 0, 0,  0, 0, 0, 0}},
+
+                // (1,.,.)
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {2, 0,  0, 53, 0, 3,  7},
+                 {2, 0,  1, 54, 5, 5,  2},
+                 {2, 49, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
+
+                // (2,.,.)
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {4, 0,  0, 53, 0, 3, 7},
+                 {4, 0,  1, 54, 2, 5, 2},
+                 {4, 50, 1, 56, 0, 0, 4},
+                 {0, 0,  0,  0, 0, 0, 0}},
+
+                // (3,.,.)
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {3, 0,  0, 53, 0, 3,  7},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 51, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
+
+                // (4,.,.)
+                {{1,  0,  1, 50, 0, 0, 60},
+                 {1,  0,  0, 53, 0, 3,  7},
+                 {0,  0,  0,  0, 0, 0,  0},
+                 {1, 52,  1, 56, 0, 0,  4},
+                 {0,  0,  0,  0, 0, 0,  0}},
+
+                // (5,.,.)
+                {{1, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {1, 53, 1, 56, 0, 0,  4},
+                 {1, 0,  1, 57, 0, 0,  0}},
+
+                // (6,.,.)
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {2, 54, 1, 56, 0, 0,  4},
+                 {2, 0,  1, 57, 0, 0,  0}},
+
+                // (7,.,.)
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {4, 55, 1, 56, 0, 0,  4},
+                 {4, 0,  1, 57, 0, 0,  0}},
+
+                // (8,.,.)
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 0,  1, 55, 0, 0,  3},
+                 {3, 56, 1, 56, 0, 0,  4},
+                 {3, 0,  1, 57, 0, 0,  0}},
+
+                // (9,.,.)
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 55, 0, 0,  3},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 57, 0, 0,  0}},
+
+            }, torch::dtype(torch::kInt8)
+        ),
+        .positions_major = {
+            0, 1, 2, 3, 4, 5, 6, 7, 8, 9
+        },
+        .positions_minor = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        },
+        .depth = torch::tensor(
+            {3, 4, 4, 3, 3, 3, 3, 3, 4, 3},
+            torch::dtype(torch::kInt32)
+        ),
+        .read_ids_left = {
+            "read_01",
+            "read_02",
+            "read_03",
+            "__blank_1",
+            "__blank_2",
+        },
+        .read_ids_right = {
+            "read_01",
+            "__blank_1",
+            "read_04",
+            "__blank_2",
+            "read_06",
+        },
+    };
+    // clang-format on
+
+    // Parameters, fixed for this test.
+    const std::vector<std::string> dtypes{};
+    const std::string tag_name{};
+    const int32_t tag_value{0};
+    const bool tag_keep_missing{false};
+    const std::string read_group{};
+    const int32_t min_mapq{1};
+    const int32_t max_reads{100};
+    const bool row_per_read{false};
+    const double min_snp_accuracy{0.0};
+
+    const bool right_align_insertions{false};
+    const std::optional<std::filesystem::path> phasing_bin{};
+    const std::string ref_name{"contig_1"};
+    const int32_t ref_id = 123;
+    const int64_t ref_start = 0;
+    const int64_t ref_end = 12;
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
+
+    CATCH_SECTION(
+            "No dwell column, no hap column, no snp_qv column. Only the base features (base, qual, "
+            "strand, mapq)."
+            "Tests the entire output Sample: feature tensor, depth tensor, positions major/minor, "
+            "and read IDs. Include dwell col, no hap col") {
+        // Test specific parameters.
+        const bool include_dwells{false};
+        const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
+        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test: drop the dwell column from the last dimension.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index({"...", torch::indexing::Slice(0, 4)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
+
+        eval_sample(expected, result);
+    }
+}
+
+CATCH_TEST_CASE("synthetic_test_10-zero_coverage_internal", TEST_GROUP) {
+    /**
+     * This test mirrors synthetic_test_01 except that the reads do not span the entire reference window.
+     */
+
+    const auto temp_dir = make_temp_dir("encoder_read_aln_test");
+    const auto temp_in_ref_fn = temp_dir.m_path / "in.ref.fasta";
+    const auto temp_in_bam_fn = temp_dir.m_path / "in.aln.bam";
+
+    // Create the input test BAM/ref FASTA.
+    {
+        // clang-format off
+        // two added bases in the middle of the reference
+        const std::vector<std::pair<std::string, std::string>> targets{
+                {"contig_1", "ACTGATTACTGA"},
+        };
+        const std::vector<BamRecord> records{
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 50 /*mapq*/, "5M" /*cigar*/, "5" /*MD*/, "ACTGA" /*seq*/, "" /*qual*/, {} /*dwell*/, {} /*hp*/, 0 /*NM*/},    // Full-span.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 51 /*mapq*/, "5M", "5", "ACTGA", "", {}, {}, 0},                              // Duplicate.
+            {"read_01", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 52 /*mapq*/, "5M", "5", "ACTGA", "", {}, {}, 0},                              // Duplicate.
+            {"read_02", 0 /*tid*/, 0 /*pos*/, 16 /*flag*/, 53 /*mapq*/, "5M", "0A4", "ACTGA", "", {}, 3, 1},                                    // Left-flank only. Reverse. NM = 1 and cigar = 5M make snp_qv = 6.98.
+            {"read_03", 0 /*tid*/, 0 /*pos*/, 0  /*flag*/, 54 /*mapq*/, "3M", "0A0C1", "ACT", "", {5, 1, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0}, 5, 2},  // This should share the row with the next one. NM = 2 and cigar = 3M make snp_qv = 1.76.
+            {"read_04", 0 /*tid*/, 10 /*pos*/, 0  /*flag*/, 55 /*mapq*/, "2M", "0G1", "GA", "", {}, {}, 1},                                      // This should share the row with the previous.
+            {"read_05", 0 /*tid*/, 1 /*pos*/, 0  /*flag*/, 56 /*mapq*/, "4M", "0C0T0G1", "CTGA", "1234", {}, {}, 3},                  // Contained. Has quals. NM = 3 and cigar = 8M make snp_qv = 4.26.
+            {"read_06", 0 /*tid*/, 7 /*pos*/, 0  /*flag*/, 57 /*mapq*/, "5M", "0A0C0T0G0A0", "ACTGA", "", {}, {}, 5},                           // Right-flank only.
+            {"read_06", 0 /*tid*/, 7 /*pos*/, 0  /*flag*/, 58 /*mapq*/, "5M", "5", "ACTGA", "", {}, {}, 0},                                     // Duplicate.
+        };
+        // clang-format on
+
+        write_bam(temp_in_bam_fn, targets, records);
+        write_ref(temp_in_ref_fn, targets);
+    }
+
+    // Expected results.
+    // clang-format off
+    const Sample expected_total {
+        .seq_id = 123,
+        // Features tensor shape: [pos, coverage, features] -> [10, 5, 7]
+        // Feature column: [base, qual, strand, mapq, dwell, haplotag, snp_qv, [dtype]
+        .features = torch::tensor(
+            {
+                // (0,.,.)
+                {{1, 0, 1, 50, 0, 0, 60},
+                 {1, 0, 0, 53, 0, 3, 7},
+                 {1, 0, 1, 54, 4, 5, 2},
+                 {0, 0, 0,  0, 0, 0, 0},
+                 {0, 0, 0,  0, 0, 0, 0}},
+
+                // (1,.,.)
+                {{2, 0,  1, 50, 0, 0, 60},
+                 {2, 0,  0, 53, 0, 3,  7},
+                 {2, 0,  1, 54, 5, 5,  2},
+                 {2, 49, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
+
+                // (2,.,.)
+                {{4, 0,  1, 50, 0, 0, 60},
+                 {4, 0,  0, 53, 0, 3, 7},
+                 {4, 0,  1, 54, 2, 5, 2},
+                 {4, 50, 1, 56, 0, 0, 4},
+                 {0, 0,  0,  0, 0, 0, 0}},
+
+                // (3,.,.)
+                {{3, 0,  1, 50, 0, 0, 60},
+                 {3, 0,  0, 53, 0, 3,  7},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 51, 1, 56, 0, 0,  4},
+                 {0, 0,  0,  0, 0, 0,  0}},
+
+                // (4,.,.)
+                {{1,  0,  1, 50, 0, 0, 60},
+                 {1,  0,  0, 53, 0, 3,  7},
+                 {0,  0,  0,  0, 0, 0,  0},
+                 {1, 52,  1, 56, 0, 0,  4},
+                 {0,  0,  0,  0, 0, 0,  0}},
+
+                // (7,.,.)
+                {{0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {1, 0,  1, 57, 0, 0,  0}},
+
+                // (8,.,.)
+                {{0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {2, 0,  1, 57, 0, 0,  0}},
+
+                // (9,.,.)
+                {{0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {4, 0,  1, 57, 0, 0,  0}},
+
+                // (10,.,.)
+                {{3, 0,  1, 55, 0, 0,  3},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {0, 0,  0,  0, 0, 0,  0},
+                 {3, 0,  1, 57, 0, 0,  0}},
+
+                // (11,.,.)
+                {{1, 0, 1, 55, 0, 0,  3},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {0, 0, 0,  0, 0, 0,  0},
+                 {1, 0, 1, 57, 0, 0,  0}},
+
+            }, torch::dtype(torch::kInt8)
+        ),
+        .positions_major = {
+            0, 1, 2, 3, 4, 7, 8, 9, 10, 11
+        },
+        .positions_minor = {
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+        },
+        .depth = torch::tensor(
+            {3, 4, 4, 3, 3, 1, 1, 1, 2, 2},
+            torch::dtype(torch::kInt32)
+        ),
+        .read_ids_left = {
+            "read_01",
+            "read_02",
+            "read_03",
+            "__blank_1",
+            "__blank_2",
+        },
+        .read_ids_right = {
+            "read_04",
+            "__blank_1",
+            "__blank_2",
+            "__blank_3",
+            "read_06",
+        },
+    };
+    // clang-format on
+
+    // Parameters, fixed for this test.
+    const std::vector<std::string> dtypes{};
+    const std::string tag_name{};
+    const int32_t tag_value{0};
+    const bool tag_keep_missing{false};
+    const std::string read_group{};
+    const int32_t min_mapq{1};
+    const int32_t max_reads{100};
+    const bool row_per_read{false};
+    const double min_snp_accuracy{0.0};
+
+    const bool right_align_insertions{false};
+    const std::optional<std::filesystem::path> phasing_bin{};
+    const std::string ref_name{"contig_1"};
+    const int32_t ref_id = 123;
+    const int64_t ref_start = 0;
+    const int64_t ref_end = 12;
+    const std::unordered_map<std::string, int32_t> haplotags{};
+    const secondary::KadayashiOptions kadayashi_opt;
+
+    CATCH_SECTION(
+            "No dwell column, no hap column, no snp_qv column. Only the base features (base, qual, "
+            "strand, mapq)."
+            "Tests the entire output Sample: feature tensor, depth tensor, positions major/minor, "
+            "and read IDs. Include dwell col, no hap col") {
+        // Test specific parameters.
+        const bool include_dwells{false};
+        const bool include_haplotype_column{false};
+        const bool include_snp_qv_column{false};
+        const HaplotagSource hap_source{HaplotagSource::UNPHASED};
+        const bool clip_to_zero{true};
+
+        // Expected results for this test: drop the dwell column from the last dimension.
+        const Sample expected{
+                .seq_id = expected_total.seq_id,
+                .features = expected_total.features.index({"...", torch::indexing::Slice(0, 4)}),
+                .positions_major = expected_total.positions_major,
+                .positions_minor = expected_total.positions_minor,
+                .depth = expected_total.depth,
+                .read_ids_left = expected_total.read_ids_left,
+                .read_ids_right = expected_total.read_ids_right,
+        };
+
+        // Run UUT.
+        auto [test_case] = GENERATE_REF(table<EncoderTestCase>({
+                EncoderTestCase{"kadayashi feature encoder", false},
+                EncoderTestCase{"legacy feature encoder", true},
+        }));
+
+        CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+        EncoderReadAlignment encoder(
+                temp_in_ref_fn, temp_in_bam_fn, dtypes, tag_name, tag_value, tag_keep_missing,
+                read_group, min_mapq, max_reads, min_snp_accuracy, row_per_read, include_dwells,
+                clip_to_zero, right_align_insertions, include_haplotype_column, hap_source,
+                phasing_bin, include_snp_qv_column, kadayashi_opt, test_case.legacy_feat_encoder);
+        const Sample result =
+                encoder.encode_region(ref_name, ref_start, ref_end, ref_id, haplotags);
+
+        eval_sample(expected, result);
     }
 }
 
