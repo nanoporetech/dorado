@@ -1,4 +1,5 @@
 job_name	sre_config	model	basecaller_mode	basecaller	sre_output
-SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-fast-v52	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom.json	dna_r10.4.1_e8.2_400bps_fast@v5.2.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v52-fast
-SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-hac-v52	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom.json	dna_r10.4.1_e8.2_400bps_hac@v5.2.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v52-hac
-SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-sup-v52	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom.json	dna_r10.4.1_e8.2_400bps_sup@v5.2.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v52-sup
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-fast-v52	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom_v1.json	dna_r10.4.1_e8.2_400bps_fast@v5.2.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v52-fast
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-hac-v52	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom_v1.json	dna_r10.4.1_e8.2_400bps_hac@v5.2.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v52-hac
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-sup-v52	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom_v1.json	dna_r10.4.1_e8.2_400bps_sup@v5.2.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v52-sup
+SRE-Dorado_COMMIT_SHORT_PLACEHOLDER_dna-hac-v60	${projectDir}/configs/dna_r10.4.1-e8.2-5khz-400bps-prom_v1.json	dna_r10.4.1_e8.2_400bps_hac@v6.0.0	dorado_artifact	COMMIT_SHA_PLACEHOLDER	OUTPUT_PLACEHOLDER/COMMIT_SHORT_PLACEHOLDER/dna-v60-hac

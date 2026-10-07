@@ -8,17 +8,16 @@
   extends: 
     - .linux_runner    
   before_script:
-    - pip install mlhub-api
+    - pip install mlhub-sdk
   script:
     - sed -i "s#COMMIT_SHA_PLACEHOLDER#${CI_COMMIT_SHA}#g" ${SAMPLE_SHEET}
     - sed -i "s#COMMIT_SHORT_PLACEHOLDER#${CI_COMMIT_SHORT_SHA}#g" ${SAMPLE_SHEET}
     - sed -i "s#OUTPUT_PLACEHOLDER#${SRE_OUTPUT_ROOT}#g" ${SAMPLE_SHEET}
     - |
-      mlh-sheet ${SAMPLE_SHEET} \
+      mlh submit sheet ${SAMPLE_SHEET} \
         --git_ref ${MLH_BRANCH} \
         --script_id ${SCRIPT_ID} \
-        --csrf_token ${MLH_CRSF_TOKEN} \
-        --session_id ${MLH_SESSION_ID}
+        --token ${MLH_TOKEN}
   needs:
   - job: build_archive:linux:x86:cuda12
     artifacts: false
@@ -28,27 +27,27 @@
 mlhub:sre_dna_r1041_e82:
   extends: .mlhub_job
   variables:
-    MLH_BRANCH: "dorado_regression"
+    MLH_BRANCH: "master"
     SCRIPT_ID: 378
     SAMPLE_SHEET: ".gitlab/mlhub-configs/dna-r1041-e82.tsv"
 
 mlhub:sre_rna004:
   extends: .mlhub_job
   variables:
-    MLH_BRANCH: "dorado_regression"
+    MLH_BRANCH: "master"
     SCRIPT_ID: 378
     SAMPLE_SHEET: ".gitlab/mlhub-configs/rna004.tsv"
 
 mlhub:mre_dna:
   extends: .mlhub_job
   variables:
-    MLH_BRANCH: "dorado_regression"
+    MLH_BRANCH: "master"
     SCRIPT_ID: 403
     SAMPLE_SHEET: ".gitlab/mlhub-configs/mre_dna.tsv"
 
 mlhub:mre_rna:
   extends: .mlhub_job
   variables:
-    MLH_BRANCH: "dorado_regression"
+    MLH_BRANCH: "master"
     SCRIPT_ID: 403
     SAMPLE_SHEET: ".gitlab/mlhub-configs/mre_rna.tsv"
