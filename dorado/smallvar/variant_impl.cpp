@@ -23,6 +23,7 @@
 #include <cassert>
 #include <fstream>
 #include <memory>
+#include <mutex>
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -2020,6 +2021,83 @@ void worker_variant_writer(
         const bool continue_on_exception) {
     utils::ScopedProfileRange spr1("variant_writer", 2);
 
+    // Reduction can finish out of order. Track completed chromosomes by reference-header ID
+    // and write each contiguous ready prefix as soon as it becomes available.
+    std::vector<bool> chromosome_complete(std::size(chrom_reduce_data), false);
+    int64_t next_seq_id = 0;
+    std::mutex writer_mutex;
+
+    const auto handle_exception = [&](const std::exception& e,
+                                      secondary::WorkerReturnStatus& ret_val) {
+        if (!continue_on_exception) {
+            ret_val = {.exception_thrown = true,
+                       .message = std::string("Caught exception while writing variants: '") +
+                                  e.what() + "'"};
+            signal_worker_terminate(worker_terminate);
+        } else {
+            DORADO_LOG(warn,
+                       "Caught an exception while writing variants. Skipping this "
+                       "item. Exception: {}",
+                       e.what());
+        }
+    };
+
+    const auto write_chromosome = [&](const int64_t seq_id, const int32_t tid,
+                                      secondary::WorkerReturnStatus& ret_val) {
+        try {
+            // Non-const so we can free the results for this chromosome.
+            auto& results = chrom_reduce_data[seq_id];
+
+            DORADO_LOG(debug,
+                       "[variant_writer tid = {}] Writing variants for sequence: {}, seq_id = "
+                       "{}",
+                       tid, results.seq_name, seq_id);
+
+            // Write the results and free the data.
+            {
+                std::scoped_lock<std::mutex> lock(results.mtx);
+
+                // Write the VCF file.
+                for (const secondary::Variant& variant : results.variants_merged) {
+                    vcf_writer.write_variant(variant);
+                }
+
+                // Write the processed_regions.bed.
+                if (ofs_regions.is_open()) {
+                    for (const secondary::IntervalInt64 iv : results.processed_regions) {
+                        ofs_regions << results.seq_name << '\t' << iv.start << '\t' << (iv.stop + 1)
+                                    << '\n';
+                    }
+                }
+
+                // Write Kadayashi VCF.
+                if (vcf_writer_simple) {
+                    for (const secondary::Variant& variant : results.variants_simple) {
+                        vcf_writer_simple->write_variant(variant);
+                    }
+                }
+
+                // Write the inference VCF file.
+                if (vcf_writer_inference) {
+                    for (const secondary::Variant& variant : results.variants_inference) {
+                        vcf_writer_inference->write_variant(variant);
+                    }
+                }
+
+                // Release per-chromosome output buffers once they have been handed off to the
+                // output streams so later chromosomes can reuse the memory.
+                std::vector<secondary::Variant>{}.swap(results.variants_merged);
+                std::vector<secondary::Variant>{}.swap(results.variants_simple);
+                std::vector<secondary::Variant>{}.swap(results.variants_inference);
+                std::vector<secondary::RegionInt>{}.swap(results.selected_regions);
+                std::vector<secondary::IntervalInt64>{}.swap(results.processed_regions);
+                std::vector<std::pair<uint32_t, uint32_t>>{}.swap(results.read_endpoints);
+            }
+        } catch (const std::exception& e) {
+            handle_exception(e, ret_val);
+        }
+    };
+
     const auto worker = [&](const int32_t tid, secondary::WorkerReturnStatus& ret_val) {
         utils::ScopedProfileRange spr2("variant_writer-worker", 3);
         at::InferenceMode infer_guard;
@@ -2029,85 +2107,44 @@ void worker_variant_writer(
 
             int64_t item{0};
             const auto pop_status = input_queue.try_pop(item);
-
             if (pop_status == utils::AsyncQueueStatus::Terminate) {
                 break;
             }
 
-            try {
-                const int32_t seq_id = item;
+            // Serialize completion tracking and output, but never wait for input under this lock.
+            std::scoped_lock<std::mutex> writer_lock(writer_mutex);
 
+            if (worker_terminate) {
+                break;
+            }
+
+            try {
                 // Sanity check.
-                if (seq_id >= std::ssize(chrom_reduce_data)) {
+                if ((item < 0) || (item >= std::ssize(chrom_reduce_data))) {
                     throw std::runtime_error{
-                            "Chromosome seq_id is larger than the expected number of "
-                            "input sequences when attempting to write the results. seq_id = " +
-                            std::to_string(seq_id) + ", chrom_reduce_data.size = " +
+                            "Chromosome seq_id is outside the expected range when attempting "
+                            "to write the results. seq_id = " +
+                            std::to_string(item) + ", chrom_reduce_data.size = " +
                             std::to_string(std::size(chrom_reduce_data))};
                 }
-
-                // Non-const so we can free the results for this chromosome.
-                auto& results = chrom_reduce_data[seq_id];
-
-                DORADO_LOG(debug,
-                           "[variant_writer tid = {}] Writing variants for sequence: {}, seq_id = "
-                           "{}",
-                           tid, results.seq_name, seq_id);
-
-                // Write the results and free the data.
-                {
-                    std::unique_lock<std::mutex> lock(results.mtx);
-
-                    // Write the VCF file.
-                    for (const secondary::Variant& variant : results.variants_merged) {
-                        vcf_writer.write_variant(variant);
-                    }
-
-                    // Write the processed_regions.bed.
-                    if (ofs_regions.is_open()) {
-                        for (const secondary::IntervalInt64 iv : results.processed_regions) {
-                            ofs_regions << results.seq_name << '\t' << iv.start << '\t'
-                                        << (iv.stop + 1) << '\n';
-                        }
-                    }
-
-                    // Write Kadayashi VCF.
-                    if (vcf_writer_simple) {
-                        for (const secondary::Variant& variant : results.variants_simple) {
-                            vcf_writer_simple->write_variant(variant);
-                        }
-                    }
-
-                    // Write the inference VCF file.
-                    if (vcf_writer_inference) {
-                        for (const secondary::Variant& variant : results.variants_inference) {
-                            vcf_writer_inference->write_variant(variant);
-                        }
-                    }
-
-                    // Release per-chromosome output buffers once they have been handed off to the
-                    // output streams so later chromosomes can reuse the memory.
-                    std::vector<secondary::Variant>{}.swap(results.variants_merged);
-                    std::vector<secondary::Variant>{}.swap(results.variants_simple);
-                    std::vector<secondary::Variant>{}.swap(results.variants_inference);
-                    std::vector<secondary::RegionInt>{}.swap(results.selected_regions);
-                    std::vector<secondary::IntervalInt64>{}.swap(results.processed_regions);
-                    std::vector<std::pair<uint32_t, uint32_t>>{}.swap(results.read_endpoints);
+                if (chromosome_complete[item]) {
+                    throw std::runtime_error{
+                            "Received duplicate chromosome seq_id when attempting to write "
+                            "the results. seq_id = " +
+                            std::to_string(item)};
                 }
 
+                chromosome_complete[item] = true;
+
+                while (!worker_terminate && (next_seq_id < std::ssize(chromosome_complete)) &&
+                       chromosome_complete[next_seq_id]) {
+                    const int64_t seq_id = next_seq_id;
+                    // Advance before writing so continue-on-error skips a failed chromosome.
+                    ++next_seq_id;
+                    write_chromosome(seq_id, tid, ret_val);
+                }
             } catch (const std::exception& e) {
-                if (!continue_on_exception) {
-                    ret_val = {.exception_thrown = true,
-                               .message = std::string("Caught exception while writing variants: '" +
-                                                      std::string(e.what()) + "'")};
-                    signal_worker_terminate(worker_terminate);
-                    return;
-                }
-
-                DORADO_LOG(warn,
-                           "Caught an exception while writing variants. Skipping this "
-                           "item. Exception: {}",
-                           e.what());
+                handle_exception(e, ret_val);
             }
         }
     };
@@ -2141,6 +2178,15 @@ void worker_variant_writer(
             return;
         } else {
             DORADO_LOG(warn, rv.message);
+        }
+    }
+
+    // All popped notifications have now been processed. Flush past chromosomes that never arrived.
+    while (!worker_terminate && (next_seq_id < std::ssize(chromosome_complete))) {
+        const int64_t seq_id = next_seq_id;
+        ++next_seq_id;
+        if (chromosome_complete[seq_id]) {
+            write_chromosome(seq_id, 0, ret_status);
         }
     }
 
