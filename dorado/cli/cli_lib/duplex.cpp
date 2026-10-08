@@ -465,6 +465,14 @@ int duplex(int argc, char* argv[]) {
             DuplexModels models = load_duplex_models(parser, input_pod5_files, "duplex");
             models.set_basecaller_batch_params(cli::get_batch_params(parser), device);
 
+            const auto& modbase_configs = models.get_modbase_configs();
+            if (std::any_of(
+                        std::begin(modbase_configs), std::end(modbase_configs),
+                        [](const auto& config) { return config::is_cotrained_model(config); })) {
+                throw std::runtime_error(
+                        "Selected modbase models are not compatible with duplex basecalling.");
+            }
+
             size_t device_count = 1;
 #if DORADO_CUDA_BUILD
             auto initial_device_info = utils::get_cuda_device_info(device, false);
@@ -473,12 +481,12 @@ int duplex(int argc, char* argv[]) {
 #endif
 
             const auto modbase_params =
-                    validate_modbase_params(models.get_modbase_configs(), parser, device_count);
+                    validate_modbase_params(modbase_configs, parser, device_count);
 
             // create modbase runners first so basecall runners can pick batch sizes based on available memory
-            auto mod_base_runners = api::create_modbase_runners(
-                    models.get_modbase_configs(), device, modbase_params.runners_per_caller,
-                    modbase_params.batchsize);
+            auto mod_base_runners = api::create_modbase_runners(modbase_configs, device,
+                                                                modbase_params.runners_per_caller,
+                                                                modbase_params.batchsize);
 
             if (!mod_base_runners.empty() && writer_output_mode == OutputMode::FASTQ) {
                 throw std::runtime_error("Modified base models cannot be used with FASTQ output");
