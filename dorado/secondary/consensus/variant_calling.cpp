@@ -1678,7 +1678,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         }
 
 #ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[normalize_variant] Entry variant: " << variant << '\n';
+        std::cerr << "[normalize_variant] Entry variant: " << ret << '\n';
 #endif
 
         if (std::empty(ref_with_gaps)) {
