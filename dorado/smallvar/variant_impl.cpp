@@ -293,7 +293,8 @@ BamWindowResult process_single_bam_window(
                 continue;
             }
 
-            if (var.qual < pass_min_qual) {
+            if (!((var.filters & secondary::Filters::Filter::Pass) ||
+                  (var.filters & secondary::Filters::Filter::NonVariant))) {
                 candidate_sites.emplace_back(var.pos);
             } else {
                 pass_variants.emplace_back(std::move(var));
