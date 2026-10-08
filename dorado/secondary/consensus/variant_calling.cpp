@@ -933,7 +933,7 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
 #endif
 
         if ((merge_overlapping && is_overlapping) || (merge_adjacent && is_adjacent)) {
-            furthest_rend = v2.rend;
+            furthest_rend = std::max<int64_t>(v2.rend, furthest_rend);
 #ifdef DEBUG_NORMALIZE_VARIANT
             std::cerr << "[merge_sorted_variants]   -> will merge, furthest_rend = "
                       << furthest_rend << '\n';
