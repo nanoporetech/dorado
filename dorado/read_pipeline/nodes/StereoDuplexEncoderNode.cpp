@@ -77,12 +77,19 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
     read->read_common.client_info = std::move(template_read.read_common.client_info);
     read->read_common.is_duplex = true;
     read->read_common.run_id = std::move(template_read.read_common.run_id);
+    read->read_common.flow_cell_product_code =
+            std::move(template_read.read_common.flow_cell_product_code);
+    read->read_common.sequencing_kit = std::move(template_read.read_common.sequencing_kit);
     read->read_common.flowcell_id = std::move(template_read.read_common.flowcell_id);
     read->read_common.position_id = std::move(template_read.read_common.position_id);
+    read->read_common.acquisition_id = std::move(template_read.read_common.acquisition_id);
     read->read_common.experiment_id = std::move(template_read.read_common.experiment_id);
-    read->read_common.start_time_ms = template_read.read_common.start_time_ms;
+    read->read_common.model_name = std::move(template_read.read_common.model_name);
+    read->read_common.sample_id = std::move(template_read.read_common.sample_id);
+    read->read_common.protocol_start_time_ms = template_read.read_common.protocol_start_time_ms;
     // No way to know the events corresponding to this read, set to zero
     read->read_common.num_minknow_events = 0;
+    read->read_common.start_time_ms = template_read.read_common.start_time_ms;
 
     // Set Attributes.
     read->read_common.attributes.mux = template_read.read_common.attributes.mux;
@@ -90,8 +97,12 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
             template_read.read_common.attributes.channel_number;
     read->read_common.attributes.start_time =
             std::move(template_read.read_common.attributes.start_time);
+    read->read_common.attributes.filename =
+            std::move(template_read.read_common.attributes.filename);
     read->read_common.attributes.pore_type =
             std::move(template_read.read_common.attributes.pore_type);
+    read->read_common.attributes.sample_rate = template_read.read_common.attributes.sample_rate;
+    read->read_common.attributes.model_stride = template_read.read_common.attributes.model_stride;
 
     ++m_num_encoded_pairs;
 

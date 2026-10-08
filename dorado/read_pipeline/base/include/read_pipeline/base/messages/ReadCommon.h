@@ -22,6 +22,7 @@ struct ModBaseInfo;
 
 namespace details {
 
+// Note: update StereoDuplexEncoderNode when adding to this struct.
 struct Attributes {
     uint32_t mux{std::numeric_limits<uint32_t>::max()};  // Channel mux
     int32_t read_number{-1};     // Per-channel number of each read as it was acquired by minknow
@@ -55,7 +56,8 @@ public:
     at::Tensor raw_data;  // Loaded from source file
 
     /*
-    Note: Update read_utils shallow_copy_read to ensure split reads copy all fields
+    Note: Update read_utils shallow_copy_read to ensure split reads copy all fields,
+          and StereoDuplexEncoderNode for duplex reads.
     */
     std::string read_id;                            // Unique read ID (UUID4)
     std::string seq;                                // Read basecall
@@ -72,8 +74,8 @@ public:
     std::string experiment_id;   // Experiment ID - used in aliasing
     std::string model_name;      // Read group
     std::string sample_id;       // User-supplied name for the sample being analysed.
-    int64_t protocol_start_time_ms;  // Start time of the protocol
-    uint64_t num_minknow_events{0};  // Number of minknow events or zero if unknown
+    int64_t protocol_start_time_ms{0};  // Start time of the protocol
+    uint64_t num_minknow_events{0};     // Number of minknow events or zero if unknown
 
     dorado::details::Attributes attributes;
 
