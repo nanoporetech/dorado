@@ -68,15 +68,11 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
     stereo_feature_inputs.complement_moves = std::move(complement_read.read_common.moves);
     stereo_feature_inputs.complement_signal = at::flip(complement_read.read_common.raw_data, 0);
 
+    // Combine read IDs.
     read->read_common.read_id =
             template_read.read_common.read_id + ";" + complement_read.read_common.read_id;
 
-    read->read_common.attributes.mux = template_read.read_common.attributes.mux;
-    read->read_common.attributes.channel_number =
-            template_read.read_common.attributes.channel_number;
-    read->read_common.attributes.start_time = template_read.read_common.attributes.start_time;
-    read->read_common.start_time_ms = template_read.read_common.start_time_ms;
-
+    // Set ReadCommon.
     read->read_common.read_tag = template_read.read_common.read_tag;
     read->read_common.client_info = std::move(template_read.read_common.client_info);
     read->read_common.is_duplex = true;
@@ -84,10 +80,18 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
     read->read_common.flowcell_id = std::move(template_read.read_common.flowcell_id);
     read->read_common.position_id = std::move(template_read.read_common.position_id);
     read->read_common.experiment_id = std::move(template_read.read_common.experiment_id);
-    read->read_common.attributes.pore_type =
-            std::move(template_read.read_common.attributes.pore_type);
+    read->read_common.start_time_ms = template_read.read_common.start_time_ms;
     // No way to know the events corresponding to this read, set to zero
     read->read_common.num_minknow_events = 0;
+
+    // Set Attributes.
+    read->read_common.attributes.mux = template_read.read_common.attributes.mux;
+    read->read_common.attributes.channel_number =
+            template_read.read_common.attributes.channel_number;
+    read->read_common.attributes.start_time =
+            std::move(template_read.read_common.attributes.start_time);
+    read->read_common.attributes.pore_type =
+            std::move(template_read.read_common.attributes.pore_type);
 
     ++m_num_encoded_pairs;
 
