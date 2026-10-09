@@ -12,6 +12,8 @@
 #include "utils/stl_utils.h"
 #include "utils/string_utils.h"
 
+#include <spdlog/fmt/bundled/format.h>
+
 #include <algorithm>
 #include <cassert>
 #include <cmath>
@@ -973,7 +975,7 @@ Variant construct_variant(const std::string_view draft,
         }
     }
     if (vq_val >= 0) {
-        var.format["VQ"] = std::format("{:.2f}", vq_val);
+        var.format["VQ"] = fmt::format("{:.2f}", vq_val);
         if (vq_val < pass_min_vq) {
             var.filters.update(Filters::LowVQ);
         }
