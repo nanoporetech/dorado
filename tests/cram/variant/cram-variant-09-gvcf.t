@@ -27,6 +27,7 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   ##FORMAT=<ID=VAF,Number=A,Type=Float,Description="Variant allele fraction">
   ##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Phred-scaled genotype likelihood">
   ##FORMAT=<ID=AQ,Number=R,Type=Integer,Description="Phred-scaled allele quality score">
+  ##FORMAT=<ID=VQ,Number=1,Type=Float,Description="Phred-scaled total variant quality score">
   1
   chr20 1 T <*> . END=100 GT:GQ:LEN:MIN_DP:SRC 0/0:60:100:20:R
 
@@ -49,8 +50,8 @@ chr20	1959	1
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep -v "^#" ${in_expected} | cut -f 1-5,7-10 > out/expected.gvcf.body.no_qual.vcf
-  > grep -v "^#" out/variants.vcf | cut -f 1-5,7-10 > out/gvcf.body.no_qual.vcf
+  > ### Remove QUAL and the last digits of VQ because results may vary by platform
+  > grep -v "^#" out/variants.vcf | cut -f 1-5,7-10 | sed -E 's/[0-9][0-9]$//' > out/gvcf.body.no_qual.vcf
   > awk '{ print $1, $2, $3 }' out/processed_regions.bed
   > wc -l out/gvcf.body.no_qual.vcf | awk '{ print $1 }'
   > ### Check the non-variant non-inferred gVCF reference region (GQ is 60)
@@ -73,12 +74,12 @@ chr20	1959	1
   20
   chr20 1000 . G <*> . END=1345 GT:GQ:LEN:MIN_DP:SRC 0/0:60:346:20:R
   chr20 1346 . G <*> . END=1471 GT:GQ:LEN:MIN_DP:SRC 0/0:60:126:20:I
-  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC:AD:VAF:PL:AQ 0/1:42:20:I:7,13,.:0.65,.:50,0,47,.,.,.:45,46,.
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC:AD:VAF:PL:AQ:VQ 0/1:45:20:I:7,13,.:0.65,.:50,0,47,.,.,.:45,46,.:42.
   chr20 1473 . C <*> . END=1555 GT:GQ:LEN:MIN_DP:SRC 0/0:60:83:20:I
   chr20 1556 . C <*> . END=1557 GT:GQ:LEN:MIN_DP:SRC 0/0:50:2:20:I
   chr20 1615 . C <*> . END=1615 GT:GQ:LEN:MIN_DP:SRC 0/0:54:1:20:I
-  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC:AD:VAF:PL:AQ 0/1:42:20:I:7,13,.:0.65,.:50,0,47,.,.,.:45,46,.
-  chr20 1959 . T G,<*> PASS . GT:GQ:DP:SRC:AD:VAF:PL:AQ 0/1:44:19:I:6,12,.:0.63,.:52,0,49,.,.,.:45,50,.
+  chr20 1472 . T G,<*> PASS . GT:GQ:DP:SRC:AD:VAF:PL:AQ:VQ 0/1:45:20:I:7,13,.:0.65,.:50,0,47,.,.,.:45,46,.:42.
+  chr20 1959 . T G,<*> PASS . GT:GQ:DP:SRC:AD:VAF:PL:AQ:VQ 0/1:47:19:I:6,12,.:0.63,.:52,0,49,.,.,.:45,50,.:44.
 
 Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   $ rm -rf out; mkdir -p out

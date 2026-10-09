@@ -169,7 +169,7 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             CATCH_CHECK_THAT(vcf_text,
                              Catch::Matchers::ContainsSubstring("##contig=<ID=chr2,length=250>"));
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
-                                               "##FILTER=<ID=LowQual,Description=\"Variant quality "
+                                               "##FILTER=<ID=LowQual,Description=\"Variant QUAL "
                                                "is below threshold\">"));
             CATCH_CHECK_THAT(vcf_text, Catch::Matchers::ContainsSubstring(
                                                "##FILTER=<ID=IncompatZyg,Description=\"Predicted "

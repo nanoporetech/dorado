@@ -28,10 +28,10 @@ constexpr std::array<std::pair<int64_t, float>, 2> DEFAULT_GVCF_REFERENCE_BLOCK_
         {{0, 0.5f}, {10, 5.0f}}};
 
 /**
- * \brief Get GQ string from a quality value.
+ * \brief Convert a float quality into an integer string.
  * \param qual Float QUAL value.
  */
-std::string gq_from_qual(float qual);
+std::string q_string_from_float(float qual);
 
 /**
  * \brief Extend variant span in preparation for allele depth calculation.
@@ -154,6 +154,9 @@ std::vector<Variant> general_decode_variants(
         const VariantCallingSample& vc_sample,
         const std::string_view draft,
         const float pass_min_qual,
+        const float pass_min_gq,
+        const float pass_min_aq,
+        const float pass_min_vq,
         bool ambig_ref,
         bool return_all,
         bool normalize,
