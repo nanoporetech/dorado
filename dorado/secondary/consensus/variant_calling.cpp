@@ -933,7 +933,7 @@ std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
 #endif
 
         if ((merge_overlapping && is_overlapping) || (merge_adjacent && is_adjacent)) {
-            furthest_rend = v2.rend;
+            furthest_rend = std::max<int64_t>(v2.rend, furthest_rend);
 #ifdef DEBUG_NORMALIZE_VARIANT
             std::cerr << "[merge_sorted_variants]   -> will merge, furthest_rend = "
                       << furthest_rend << '\n';
@@ -1006,7 +1006,7 @@ std::tuple<bool, int64_t, int64_t> find_previous_ref_pos(
     }
 
     const int64_t ref_pos = positions_major[rstart];
-    const int64_t prev_ref_pos = ref_pos - 1;
+    const int64_t prev_ref_pos = ref_pos - (positions_minor[rstart] > 0 ? 0 : 1);
 
     // Can't go left.
     if (ref_pos <= 0) {
@@ -1524,7 +1524,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         // Assign.
         var.ref = seqs[0];
         var.alts = std::vector<std::string>(std::cbegin(seqs) + 1, std::cend(seqs));
-        var.pos += start_pos;
+        var.pos += (rev ? 0 : start_pos);
     };
 
     const auto trim_end_and_align = [&ref_with_gaps, &cons_seqs_with_gaps, &positions_major,
@@ -1678,7 +1678,7 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
         }
 
 #ifdef DEBUG_NORMALIZE_VARIANT
-        std::cerr << "[normalize_variant] Entry variant: " << variant << '\n';
+        std::cerr << "[normalize_variant] Entry variant: " << ret << '\n';
 #endif
 
         if (std::empty(ref_with_gaps)) {
