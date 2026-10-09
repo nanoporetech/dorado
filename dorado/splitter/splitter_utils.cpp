@@ -40,11 +40,11 @@ SimplexReadPtr subread(const SimplexRead& read,
     subread->read_common.split_point =
             uint32_t(read.read_common.split_point + read.read_common.num_trimmed_samples +
                      signal_range.first);
-    subread->read_common.attributes.num_samples = signal_range.second - signal_range.first;
     subread->read_common.num_trimmed_samples = 0;
     subread->start_sample =
             read.start_sample + read.read_common.num_trimmed_samples + signal_range.first;
-    subread->end_sample = subread->start_sample + subread->read_common.attributes.num_samples;
+    const uint64_t num_samples = signal_range.second - signal_range.first;
+    subread->end_sample = subread->start_sample + num_samples;
 
     auto start_time_ms = static_cast<uint64_t>(std::round(
             subread->start_sample * 1000. / subread->read_common.attributes.sample_rate));

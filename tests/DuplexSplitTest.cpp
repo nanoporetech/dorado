@@ -37,7 +37,6 @@ auto make_read() {
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
-    read->read_common.attributes.num_samples = 256790;
     read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
@@ -86,10 +85,10 @@ CATCH_TEST_CASE("4 subread splitting test", TEST_GROUP) {
     CATCH_CHECK(split_res[2]->read_common.start_time_ms == 7479937);
     CATCH_CHECK(split_res[3]->read_common.start_time_ms == 7493435);
 
-    CATCH_CHECK(split_res[0]->read_common.attributes.num_samples == 97125);
-    CATCH_CHECK(split_res[1]->read_common.attributes.num_samples == 55055);
-    CATCH_CHECK(split_res[2]->read_common.attributes.num_samples == 53950);
-    CATCH_CHECK(split_res[3]->read_common.attributes.num_samples == 50475);
+    CATCH_CHECK(split_res[0]->read_common.get_raw_data_samples() == 97125);
+    CATCH_CHECK(split_res[1]->read_common.get_raw_data_samples() == 55055);
+    CATCH_CHECK(split_res[2]->read_common.get_raw_data_samples() == 53950);
+    CATCH_CHECK(split_res[3]->read_common.get_raw_data_samples() == 50475);
 
     CATCH_CHECK(split_res[0]->read_common.split_point == 10);
     CATCH_CHECK(split_res[1]->read_common.split_point == 97240);
@@ -171,7 +170,6 @@ CATCH_TEST_CASE("No split output read properties", TEST_GROUP) {
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
     read->read_common.attributes.start_time = "2023-02-21T12:46:01.526+00:00";
-    read->read_common.attributes.num_samples = 256790;
     read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426;
     read->end_sample = 30024216;
@@ -221,7 +219,6 @@ CATCH_TEST_CASE("Test split where only one subread is generated", TEST_GROUP) {
     read->read_common.attributes.channel_number = 105;
     read->read_common.attributes.mux = 4;
     read->read_common.attributes.start_time = "2023-04-30T02:01:37.616+00:00";
-    read->read_common.attributes.num_samples = 332541;
     read->read_common.attributes.sample_rate = 5000;
     read->start_sample = 178487546;
     read->end_sample = 178820087;

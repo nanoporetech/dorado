@@ -35,8 +35,6 @@ struct Attributes {
     std::string pore_type{"not_set"};
     // Loaded from source file.
     uint64_t sample_rate{0};
-    // Only used by tests, and only valid for POD5 data.
-    uint64_t num_samples{};
     int model_stride{-1};  // The down sampling factor of the model
 };
 
