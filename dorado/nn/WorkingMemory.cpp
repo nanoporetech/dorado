@@ -35,9 +35,9 @@ int64_t WorkingMemory::tensor_bytes(at::IntArrayRef sizes, at::ScalarType dtype)
 }
 
 at::Tensor WorkingMemory::alloc(at::IntArrayRef sizes, at::ScalarType dtype, bool make_current) {
-    auto new_bytes = tensor_bytes(sizes, dtype);
+    const int64_t new_bytes = tensor_bytes(sizes, dtype);
     at::Tensor new_tensor;
-    auto bytes_in_use = current_bytes + temp_bytes + new_bytes;
+    const int64_t bytes_in_use = current_bytes + temp_bytes + new_bytes;
     if (!backing_tensor.defined()) {
         // If no backing tensor is allocated yet we're still in the reservation phase
         reservation_bytes = std::max(reservation_bytes, bytes_in_use);
@@ -46,18 +46,18 @@ at::Tensor WorkingMemory::alloc(at::IntArrayRef sizes, at::ScalarType dtype, boo
             throw std::runtime_error("WorkingMemory: overlap detected.");
         }
 
-        bool current_is_front =
+        const bool current_is_front =
                 current.defined() && current.data_ptr() == backing_tensor.data_ptr();
         auto elems = c10::multiply_integers(sizes);
-        auto bt_dtype = backing_tensor.view(dtype);
+        const auto bt_dtype = backing_tensor.view(dtype);
 
         // if `!make_current`, add a new temp tensor after `current` and any existing temp tensors
-        auto skip_bytes = make_current ? 0ll : current_bytes + temp_bytes;
+        const int64_t skip_bytes = make_current ? 0ll : current_bytes + temp_bytes;
 
         // count from front or from back?
-        auto start_byte = (current_is_front == make_current)
-                                  ? reservation_bytes - skip_bytes - new_bytes
-                                  : skip_bytes;
+        const int64_t start_byte = (current_is_front == make_current)
+                                           ? reservation_bytes - skip_bytes - new_bytes
+                                           : skip_bytes;
 
         new_tensor = bt_dtype.narrow(0, start_byte / at::elementSize(dtype), elems).view(sizes);
     }
@@ -127,11 +127,14 @@ at::Tensor WorkingMemory::temp(at::IntArrayRef sizes, at::ScalarType dtype) {
 }
 
 void WorkingMemory::allocate_backing_tensor(c10::Device dev) {
-    // Using kF16 here because the libtorch version on TX2 doesn't support `Tensor::view()`
-    // with a dtype of a different size, and all buffers are kF16 on TX2.
-    backing_tensor =
-            at::empty({reservation_bytes / 2}, at::TensorOptions().device(dev).dtype(at::kHalf));
+    if (!backing_tensor.defined()) {
+        // Using kF16 here because the libtorch version on TX2 doesn't support `Tensor::view()`
+        // with a dtype of a different size, and all buffers are kF16 on TX2.
+        backing_tensor = at::empty({reservation_bytes / 2},
+                                   at::TensorOptions().device(dev).dtype(at::kHalf));
+    }
     current_bytes = 0;
+    temp_bytes = 0;
 }
 
 }  // namespace dorado::nn

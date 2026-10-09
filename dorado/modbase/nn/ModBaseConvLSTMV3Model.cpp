@@ -203,18 +203,14 @@ at::Tensor ModBaseConvLSTMV3CUDAModelImpl::forward(const at::Tensor& sigs_N1T,
     {
         utils::ScopedProfileRange spr2("seq_copy", 2);
         const auto [Tin_seq, Cin_seq] = get_chunked_sequence_input_TC(model_config);
-        if (!wm_seq.backing_tensor.defined()) {
-            wm_seq.allocate_backing_tensor(seqs_NTC.device());
-        }
+        wm_seq.allocate_backing_tensor(seqs_NTC.device());
         auto wm_seq_in = wm_seq.next_NTC(batch_size, Tin_seq, Cin_seq, nn::TensorLayout::NTC);
         wm_seq_in.index({torch::indexing::Slice()}) = seqs_NTC;
     }
     {
         utils::ScopedProfileRange spr2("sig_copy", 2);
         const auto [Tin_sig, Cin_sig] = get_chunked_signal_input_TC(model_config);
-        if (!wm.backing_tensor.defined()) {
-            wm.allocate_backing_tensor(sigs_N1T.device());
-        }
+        wm.allocate_backing_tensor(sigs_N1T.device());
         auto wm_in = wm.next_NTC(batch_size, Tin_sig, Cin_sig, nn::TensorLayout::NTC);
         // This transpose is free because C is 1
         wm_in.index({torch::indexing::Slice()}) = sigs_N1T.transpose(1, 2);

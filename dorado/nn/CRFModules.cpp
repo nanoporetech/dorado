@@ -36,7 +36,7 @@ at::Tensor LinearCRFImpl::forward(const at::Tensor x) {
 
 #if DORADO_CUDA_BUILD
 void LinearCRFImpl::reserve_working_memory(WorkingMemory &wm, const AuxiliaryData *const aux) {
-    int C_out = int(linear->weight.size(0));
+    const int C_out = int(linear->weight.size(0));
     bool use_torch = utils::get_dev_opt<bool>("torch_linear", false) || !koi_can_use_cutlass();
     if (use_torch || (wm.layout == TensorLayout::NTC && !activation)) {
         if (wm.layout != TensorLayout::NTC) {

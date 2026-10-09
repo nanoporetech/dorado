@@ -74,6 +74,11 @@ class WorkingMemory {
     static int64_t tensor_bytes(at::IntArrayRef sizes, at::ScalarType dtype);
     at::Tensor alloc(at::IntArrayRef sizes, at::ScalarType dtype, bool make_current);
 
+    int64_t reservation_bytes{0};
+    int64_t current_bytes{0};
+    int64_t temp_bytes{0};
+    at::Tensor backing_tensor;
+
 public:
     at::Tensor get_current_NTC_view();
     at::Tensor next_NTC(int N_, int T_, int C_, TensorLayout layout_);
@@ -82,10 +87,6 @@ public:
 
     void allocate_backing_tensor(c10::Device dev);
 
-    int64_t reservation_bytes{0};
-    int64_t current_bytes{0};
-    int64_t temp_bytes{0};
-    at::Tensor backing_tensor;
     at::Tensor current;  // The last tensor view created with `next_TC(...)`
     TensorLayout layout{TensorLayout::NTC};
     bool is_input_to_rev_lstm{true};

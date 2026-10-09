@@ -97,14 +97,12 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     KoiTypeId scores_type_id = (scores.dtype() == at::kChar) ? KOI_I8 : KOI_F16;
     if (utils::get_dev_opt("fused_decode", true)) {
-        {
-            utils::ScopedProfileRange spr{"fused_beam_search", 2};
-            int flags = utils::get_dev_opt("fused_decode_flags", (C == 1024) ? 1 : 0);
-            dorado::utils::handle_cuda_result(koi_fused_beam_search(
-                    stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
-                    m_score_range, C, scores_type_id, aux.data_ptr(), int(options.beam_width),
-                    options.beam_cut, options.blank_score, flags));
-        }
+        utils::ScopedProfileRange spr{"fused_beam_search", 2};
+        const int flags = utils::get_dev_opt("fused_decode_flags", (C == 1024) ? 1 : 0);
+        dorado::utils::handle_cuda_result(koi_fused_beam_search(
+                stream, chunks.data_ptr(), chunk_results.data_ptr(), N, scores.data_ptr(),
+                m_score_range, C, scores_type_id, aux.data_ptr(), int(options.beam_width),
+                options.beam_cut, options.blank_score, flags));
     } else {
         {
             utils::ScopedProfileRange spr{"back_guides", 2};

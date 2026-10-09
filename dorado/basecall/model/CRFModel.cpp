@@ -129,7 +129,7 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in,
     // read-modify-write operation.
 
     // Output is [N, T, C], F16 or I8, contiguous
-    assert(wm.layout == TensorLayout::NTC || wm.layout == TensorLayout::NTC_I8);
+    assert((wm.layout == TensorLayout::NTC) || (wm.layout == TensorLayout::NTC_I8));
     return wm.current;
 }
 #endif

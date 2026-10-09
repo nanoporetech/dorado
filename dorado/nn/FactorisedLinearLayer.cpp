@@ -56,14 +56,14 @@ void FactorisedLinearLayerImpl::forward_koi(WorkingMemory &wm, const AuxiliaryDa
     auto stream = at::cuda::getCurrentCUDAStream().stream();
     auto opts_f16 = wm.current.options().dtype(torch::kF16);
 
-    int N_in = wm.N;
-    int T_in = wm.T;
+    const int N_in = wm.N;
+    const int T_in = wm.T;
     auto in_bfr = wm.current.narrow(0, aux ? 3 : 2, T_in);
 
     auto dn_bfr = wm.temp({T_in, N_in, K_}, torch::kF16);
     dn_bfr.zero_();
-    int N_out = aux ? 1 : N_in;
-    int T_out = aux ? aux->NT_out() : T_in;
+    const int N_out = aux ? 1 : N_in;
+    const int T_out = aux ? aux->NT_out() : T_in;
     auto wm_out_layout = i8_output ? TensorLayout::NTC_I8 : TensorLayout::NTC;
     at::Tensor out_bfr = wm.next_NTC(N_out, T_out, C_out_, wm_out_layout);
 
@@ -92,7 +92,7 @@ void FactorisedLinearLayerImpl::forward_koi(WorkingMemory &wm, const AuxiliaryDa
     void *const out_layout = aux ? aux->device_out_layout.data_ptr() : nullptr;
 
     KoiTypeId out_koi_type = i8_output ? KOI_I8 : KOI_F16;
-    float scale = i8_output ? 127.f : SCALE;
+    const float scale = i8_output ? 127.f : SCALE;
     host_factorised_linear(stream, out_koi_type, N_in, T_in, parity, in_bfr.data_ptr(),
                            device_dn_weight_.data_ptr(), device_dn_weight_scale_.data_ptr(),
                            dn_bfr.data_ptr(), device_up_weight_.data_ptr(),
