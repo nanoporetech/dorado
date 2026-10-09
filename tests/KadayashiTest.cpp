@@ -986,6 +986,42 @@ CATCH_TEST_CASE("kadayashi_convert_fullinfo_var_to_dorado_style", TEST_GROUP) {
                                                .rend = 0},
             },
             {
+                    "multi allele trims the shared suffix in the chr1:992967 regression",
+                    kadayashi::variant_fullinfo_t{.is_valid = true,
+                                                  .is_confident = true,
+                                                  .is_multi_allele = true,
+                                                  .ref_depth = 3,
+                                                  .min_depth = 30,
+                                                  .median_depth = 30,
+                                                  .pos0 = 992966,
+                                                  .ref_allele_seq0 = "GGGAGGGTCCATGTGTCCGTCATCTGAG",
+                                                  .alt_allele_seq0 = "GG",
+                                                  .is_phased0 = true,
+                                                  .genotype0 = {'2', '|', '1'},
+                                                  .alt_depth0 = 10,
+                                                  .ref_allele_seq1 = "GGGAGGGTCCATGTGTCCGTCATCTGAG",
+                                                  .alt_allele_seq1 = "GGGAGGGTCCATGTGTCCGTCATCTGGG",
+                                                  .alt_depth1 = 17},
+                    false,
+                    dorado::secondary::Variant{.seq_id = -1,
+                                               .pos = 992966,
+                                               .ref = "GGGAGGGTCCATGTGTCCGTCATCTGA",
+                                               .alts = {"G", "GGGAGGGTCCATGTGTCCGTCATCTGG"},
+                                               .filters = {dorado::secondary::Filters::Pass},
+                                               .info = {},
+                                               .qual = 60.0f,
+                                               .format = {SOURCE_KADAYASHI,
+                                                          {"GT", "1/2"},
+                                                          {"GQ", "60"},
+                                                          {"DP", "30"},
+                                                          {"AD", "3,10,17"},
+                                                          {"VAF", "0.33,0.57"},
+                                                          {"PL", "990,990,990,990,0,990"},
+                                                          {"AQ", "0,60,60"}},
+                                               .rstart = 0,
+                                               .rend = 0},
+            },
+            {
                     // Regression test for two overlapping deletions of different lengths on the two
                     // haplotypes (ATATCTTATCT->A and ATATCT->A). The shorter-reference allele must be
                     // re-expressed against the longer reference by appending the reference suffix
@@ -1035,6 +1071,68 @@ CATCH_TEST_CASE("kadayashi_convert_fullinfo_var_to_dorado_style", TEST_GROUP) {
         const dorado::secondary::Variant result = kadayashi::convert_fullinfo_var_to_dorado_style(
                 test_case.input, test_case.keep_phasing);
         CATCH_CHECK(result == test_case.expected);
+    }
+}
+
+CATCH_TEST_CASE("kadayashi_convert_fullinfo_var_to_dorado_style trims common bases", TEST_GROUP) {
+    struct TestCase {
+        std::string name;
+        std::string ref;
+        std::vector<std::string> alts;
+        int64_t offset;
+        std::string expected_ref;
+        std::vector<std::string> expected_alts;
+    };
+
+    const std::vector<TestCase> test_cases{
+            {"prefix", "AACG", {"AAT", "AAG"}, 2, "CG", {"T", "G"}},
+            {"suffix before prefix", "ACGTT", {"ATTT", "AGTT"}, 1, "CG", {"T", "G"}},
+            {"suffix must match every allele", "ACG", {"ATG", "ACA"}, 1, "CG", {"TG", "CA"}},
+            {"prefix must match every allele", "ACG", {"ACT", "TCG"}, 0, "ACG", {"ACT", "TCG"}},
+            {"preserve reference anchor", "GG", {"GGG", "GGGG"}, 0, "G", {"GG", "GGG"}},
+            {"preserve alternate anchor", "ACG", {"A", "ATG"}, 0, "ACG", {"A", "ATG"}},
+            {"empty alternate", "AACGT", {"AATGT", ""}, 0, "AACGT", {"AATGT", ""}},
+            {"one-base reference", "A", {"AA", "AAA"}, 0, "A", {"AA", "AAA"}},
+            {"one-base alternate with shared suffix", "CA", {"A", "GCA"}, 0, "CA", {"A", "GCA"}},
+            {"suffix stops at first alternate anchor", "TAC", {"AC", "GAC"}, 0, "TA", {"A", "GA"}},
+            {"suffix stops at second alternate anchor", "TAC", {"GAC", "AC"}, 0, "TA", {"GA", "A"}},
+            {"prefix stops at first alternate anchor", "ACT", {"AC", "ACG"}, 1, "CT", {"C", "CG"}},
+            {"prefix stops at second alternate anchor", "ACT", {"ACG", "AC"}, 1, "CT", {"CG", "C"}},
+            {"prefix stops at reference anchor", "AC", {"ACT", "ACG"}, 1, "C", {"CT", "CG"}},
+            {"suffix leaves only reference anchor", "AC", {"AAC", "AAAC"}, 0, "A", {"AA", "AAA"}},
+            {"suffix leaves only alternate anchor", "AAG", {"AG", "AATG"}, 0, "AA", {"A", "AAT"}},
+            {"both ends preserve alternate anchor", "ACGT", {"ACT", "ACCT"}, 1, "CG", {"C", "CC"}},
+            {"stop at first suffix mismatch", "ATCG", {"AACG", "AGTG"}, 1, "TC", {"AC", "GT"}},
+            {"stop at first prefix mismatch", "AACT", {"AACC", "AAGT"}, 2, "CT", {"CC", "GT"}},
+            {"biallelic deletion", "AACGT", {"AAT"}, 1, "ACG", {"A"}},
+            {"biallelic SNP", "AACGT", {"AATGT"}, 2, "C", {"T"}},
+    };
+
+    for (const auto &test_case : test_cases) {
+        CATCH_CAPTURE(test_case.name);
+        const bool multi_allele = test_case.alts.size() == 2;
+        const kadayashi::variant_fullinfo_t input{
+                .is_multi_allele = multi_allele,
+                .ref_depth = 3,
+                .min_depth = 30,
+                .median_depth = 30,
+                .pos0 = 10,
+                .ref_allele_seq0 = test_case.ref,
+                .alt_allele_seq0 = test_case.alts[0],
+                .is_phased0 = true,
+                .genotype0 = {'1', '|', '0'},
+                .alt_depth0 = 10,
+                .ref_allele_seq1 = multi_allele ? test_case.ref : "",
+                .alt_allele_seq1 = multi_allele ? test_case.alts[1] : "",
+                .alt_depth1 = multi_allele ? 17 : 0};
+
+        const dorado::secondary::Variant result =
+                kadayashi::convert_fullinfo_var_to_dorado_style(input, true);
+        CATCH_CHECK(result.pos == 10 + test_case.offset);
+        CATCH_CHECK(result.ref == test_case.expected_ref);
+        CATCH_CHECK(result.alts == test_case.expected_alts);
+        CATCH_CHECK(result.format.at("GT") == (multi_allele ? "1|2" : "1|0"));
+        CATCH_CHECK(result.format.at("AD") == (multi_allele ? "3,10,17" : "3,10"));
     }
 }
 
