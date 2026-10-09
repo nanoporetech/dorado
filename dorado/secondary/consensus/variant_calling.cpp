@@ -1006,7 +1006,7 @@ std::tuple<bool, int64_t, int64_t> find_previous_ref_pos(
     }
 
     const int64_t ref_pos = positions_major[rstart];
-    const int64_t prev_ref_pos = ref_pos - 1;
+    const int64_t prev_ref_pos = ref_pos - (positions_minor[rstart] > 0 ? 0 : 1);
 
     // Can't go left.
     if (ref_pos <= 0) {
