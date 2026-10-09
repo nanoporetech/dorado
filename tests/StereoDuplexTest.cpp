@@ -61,12 +61,12 @@ CATCH_TEST_CASE(TEST_GROUP "Encoder") {
     torch::load(stereo_raw_data, DataPath("stereo_raw_data.tensor").string());
     stereo_raw_data = stereo_raw_data.to(torch::kFloat16);
 
-    dorado::StereoDuplexEncoderNode stereo_node = dorado::StereoDuplexEncoderNode(5);
+    const int input_signal_stride = 5;
 
     dorado::ReadPair read_pair;
     read_pair.template_read = template_read;
     read_pair.complement_read = complement_read;
-    auto stereo_read = stereo_node.stereo_encode(read_pair);
+    auto stereo_read = dorado::stereo_encode(read_pair, input_signal_stride);
     generate_raw_data(stereo_read);
     CATCH_REQUIRE(torch::equal(stereo_raw_data, stereo_read->read_common.raw_data));
 
@@ -79,7 +79,7 @@ CATCH_TEST_CASE(TEST_GROUP "Encoder") {
     std::swap(read_pair.template_read.read_common.start_time_ms,
               read_pair.complement_read.read_common.start_time_ms);
 
-    auto swapped_stereo_read = stereo_node.stereo_encode(read_pair);
+    auto swapped_stereo_read = dorado::stereo_encode(read_pair, input_signal_stride);
     generate_raw_data(swapped_stereo_read);
 
     // Check if the encoded signal is NOT equal to the expected stereo_raw_data

@@ -12,7 +12,7 @@
 
 namespace dorado {
 
-DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
+DuplexReadPtr stereo_encode(ReadPair read_pair, int input_signal_stride) {
     ReadPair::ReadData& template_read = read_pair.template_read;
     ReadPair::ReadData& complement_read = read_pair.complement_read;
 
@@ -47,7 +47,7 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
     // features, in DuplexRead.
     auto read = std::make_unique<DuplexRead>();
     DuplexRead::StereoFeatureInputs& stereo_feature_inputs = read->stereo_feature_inputs;
-    stereo_feature_inputs.signal_stride = m_input_signal_stride;
+    stereo_feature_inputs.signal_stride = input_signal_stride;
 
     const auto alignment_size =
             static_cast<size_t>(edlib_result.endLocations[0] - edlib_result.startLocations[0]);
@@ -104,8 +104,6 @@ DuplexReadPtr StereoDuplexEncoderNode::stereo_encode(ReadPair read_pair) {
     read->read_common.attributes.sample_rate = template_read.read_common.attributes.sample_rate;
     read->read_common.attributes.model_stride = template_read.read_common.attributes.model_stride;
 
-    ++m_num_encoded_pairs;
-
     return read;
 }
 
@@ -119,7 +117,10 @@ void StereoDuplexEncoderNode::input_thread_fn() {
             continue;
         }
 
-        auto stereo_encoded_read = stereo_encode(std::move(*message.take<ReadPairPtr>()));
+        auto stereo_encoded_read =
+                stereo_encode(std::move(*message.take<ReadPairPtr>()), m_input_signal_stride);
+
+        ++m_num_encoded_pairs;
 
         send_message_to_sink(
                 std::move(stereo_encoded_read));  // Stereo-encoded read created, send it to sink
@@ -132,7 +133,7 @@ StereoDuplexEncoderNode::StereoDuplexEncoderNode(int input_signal_stride)
 
 StereoDuplexEncoderNode::~StereoDuplexEncoderNode() {
     stop_input_processing(utils::AsyncQueueTerminateFast::Yes);
-};
+}
 
 std::string StereoDuplexEncoderNode::get_name() const { return "StereoDuplexEncoderNode"; }
 
