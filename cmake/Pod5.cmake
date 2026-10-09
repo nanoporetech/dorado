@@ -1,7 +1,7 @@
 # CMake errors out if we try to create the pod5_libs target twice, which happens in ont_core.
 include_guard(GLOBAL)
 
-set(POD5_VERSION 0.3.48)
+set(POD5_VERSION 0.3.49)
 set(POD5_DIR pod5-${POD5_VERSION}-${CMAKE_SYSTEM_NAME})
 set(POD5_REPO "https://github.com/nanoporetech/pod5-file-format")
 
@@ -19,10 +19,10 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     set(LIB_DIR "lib")
     if(CMAKE_SYSTEM_PROCESSOR MATCHES "^aarch64*|^arm*")
         set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-arm64.tar.gz")
-        set(POD5_HASH "e84ab5f95c14c763a873d8bda3056515a0b0a5a22f4f64f6343944c336212de2")
+        set(POD5_HASH "c895a963c5b58e92c805cf8183e7c4584dda6705c11ea555f8dd8635a847f25c")
     else()
         set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-linux-x64.tar.gz")
-        set(POD5_HASH "7c9f953ffabf546511323dc68389f29d88dd17e0a5ae5e64f5f6b835c101fe0c")
+        set(POD5_HASH "7d9eda9d2e37a08be1b4763f310ab5bf9dc3ab7d4c0bd49b6010602d74aab759")
     endif()
     if(POD5_STATIC)
         set(POD5_LIBRARIES
@@ -36,7 +36,7 @@ if(CMAKE_SYSTEM_NAME STREQUAL "Linux")
     endif()
 elseif(APPLE)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-osx-14.0-arm64.tar.gz")
-    set(POD5_HASH "9bea6c14fc21301177f09204317fcaa8f4d238e86d0436628c91f374f09f3b6b")
+    set(POD5_HASH "2b17ab8f0cfe5226a9c84cfbfe01ea64a52cd6e240cdf21940c20bc9eddf42c2")
     if(POD5_STATIC)
         set(POD5_LIBRARIES
             ${DORADO_3RD_PARTY_DOWNLOAD}/${POD5_DIR}/lib/libpod5_format.a
@@ -48,7 +48,7 @@ elseif(APPLE)
     endif()
 elseif(WIN32)
     set(POD5_URL "${POD5_REPO}/releases/download/${POD5_VERSION}/lib_pod5-${POD5_VERSION}-win-x64.tar.gz")
-    set(POD5_HASH "e5111febabde94c4f66f174b4a1bb3e1f46b9c6c99fc2a16760a699e2455285c")
+    set(POD5_HASH "31840a62c9d34211c98785c6055ef6efd3af22b05e281fac40d7f7372ab2e9fe")
     if(POD5_STATIC)
         add_library(pod5_format STATIC IMPORTED GLOBAL)
         set_target_properties(pod5_format
