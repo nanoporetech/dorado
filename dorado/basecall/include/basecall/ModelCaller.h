@@ -39,7 +39,7 @@ public:
                                                           int num_chunks) = 0;
     virtual size_t num_batch_dims() const = 0;
     virtual const config::BasecallModelConfig& config() const = 0;
-    virtual std::pair<int, int> batch_timeouts_ms() const = 0;
+    virtual std::pair<int, int> batch_timeouts_ms() const;
     virtual bool is_low_latency() const { return false; }
     virtual void terminate() = 0;
     virtual void restart() = 0;

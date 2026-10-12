@@ -1,5 +1,6 @@
 #include "api/runner_creation.h"
 
+#include "basecall/CPUCaller.h"
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
@@ -74,7 +75,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
         DORADO_LOG(debug, "- CPU calling: set num_cpu_runners to {}", num_cpu_runners);
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            runners.push_back(std::make_unique<basecall::ModelRunner>(params.model_config));
+            auto caller = std::make_shared<basecall::CPUCaller>(params.model_config);
+            runners.push_back(std::make_unique<basecall::ModelRunner>(std::move(caller), 0));
         }
         if (runners.back()->batch_size() != (size_t)params.model_config.basecaller.batch_size()) {
             DORADO_LOG(debug, "- CPU calling: set batch_size to {}", runners.back()->batch_size());
