@@ -97,7 +97,8 @@ private:
     bool merge_temp_files_iteratively(const ProgressCallback& progress_callback) const;
     bool merge_temp_files(ProgressUpdater& update_progress,
                           const std::vector<std::string>& temp_files,
-                          const std::string& merged_filename) const;
+                          const std::string& merged_filename,
+                          bool final_iteration) const;
     void initialise_threads(htsFile* file) const;
 };
 

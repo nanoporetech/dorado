@@ -134,7 +134,7 @@ void HtsFile::init_file() {
     }
     throw std::runtime_error("Unknown output mode selected: " +
                              std::to_string(static_cast<int>(m_mode)));
-};
+}
 
 const char* HtsFile::htslib_write_mode() const {
     switch (m_mode) {
@@ -400,7 +400,7 @@ bool HtsFile::merge_temp_files_iteratively(const ProgressCallback& progress_call
                                     m_num_records * progress_multiplier);
     for (size_t iter = 0; iter < num_batches; ++iter) {
         if (!merge_temp_files(update_progress, batcher.get_batch(iter),
-                              batcher.get_merge_filename(iter))) {
+                              batcher.get_merge_filename(iter), iter == num_batches - 1)) {
             return false;
         }
     }
@@ -409,7 +409,8 @@ bool HtsFile::merge_temp_files_iteratively(const ProgressCallback& progress_call
 
 bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
                                const std::vector<std::string>& temp_files,
-                               const std::string& merged_filename) const {
+                               const std::string& merged_filename,
+                               bool final_iteration) const {
     // This code assumes the headers for the files are all the same. This will be
     // true if the temp-files were created by this class, but it means that this
     // function is not suitable for generic merging of BAM files.
@@ -469,8 +470,8 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     }
 
     // If this is the final iteration, initialise for indexing.
-    bool final_iteration = (std::filesystem::path(merged_filename).extension().string() != ".tmp");
-    std::string idx_fname = merged_filename + index_extension();
+    const std::string idx_fname =
+            merged_filename + index_extension();  // must be kept alive until sam_idx_save()
     if (final_iteration) {
         auto res = sam_idx_init(out_file.get(), out_header.get(), 0, idx_fname.c_str());
         if (res < 0) {
