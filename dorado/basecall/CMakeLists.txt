@@ -54,6 +54,8 @@ if(APPLE)
     target_sources(dorado_basecall
         PRIVATE
             caller/MetalCaller.cpp
+            caller/MetalDecoder.cpp
+            caller/MetalDecoder.h
             caller/MetalLSTMCaller.cpp
             caller/MetalLSTMCaller.h
             caller/MPSCaller.cpp

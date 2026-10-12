@@ -84,8 +84,6 @@ protected:
     std::vector<std::thread> m_decode_threads;
     NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
 
-    decode::DecoderOptions m_decoder_options;
-
     NS::SharedPtr<MTL::Device> m_device;
 };
 

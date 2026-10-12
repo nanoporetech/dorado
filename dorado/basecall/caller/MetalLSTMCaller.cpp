@@ -1,9 +1,8 @@
 #include "MetalLSTMCaller.h"
 
 #include "MetalCallerTask.h"
+#include "MetalDecoder.h"
 #include "basecall/crf_utils.h"
-#include "decode/Decoder.h"
-#include "decode/beam_search.h"
 #include "model/MetalCRFModel.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
@@ -20,7 +19,6 @@
 #include <set>
 
 using namespace dorado::utils;
-using torch::indexing::Slice;
 
 namespace {
 constexpr int MTL_CORE_BATCH_SIZE = 48;
@@ -28,7 +26,6 @@ constexpr int MTL_CORE_BATCH_SIZE = 48;
 constexpr at::ScalarType scores_dtype = at::kChar;
 constexpr at::ScalarType posts_dtype = at::kShort;
 
-CREATE_POINT_OF_INTEREST_ID(MetalLSTMCaller);
 }  // namespace
 
 namespace dorado::basecall {
@@ -48,12 +45,6 @@ MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
     }
 
     m_device = get_mtl_device();
-
-    m_decoder_options = decode::create_decoder_options(model_config);
-
-    // TODO -- we don't honour the config n_base
-    constexpr int n_base = 4;
-    m_states = pow(n_base, model_config.state_len);
 
     auto state_dict = load_crf_model_weights(model_config);
 
@@ -164,8 +155,7 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
     // output buffers, given other reasonable parameters.
     assert(num_batch_pieces % m_out_split == 0);
     assert(m_batch_size % m_out_split == 0);
-    m_out_batch_size = m_batch_size / m_out_split;
-    assert(m_out_batch_size % MTL_CORE_BATCH_SIZE == 0);
+    assert(m_batch_size / m_out_split % MTL_CORE_BATCH_SIZE == 0);
 
     m_model = std::make_unique<model::MetalCRFModelImpl>(model_config, m_in_chunk_size,
                                                          m_batch_size, m_out_split, m_device.get());
@@ -173,24 +163,11 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
     m_model->eval();
 
     m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
-    m_bwd_scan_cps = make_cps(m_device.get(), "backward_scan", {}, std::nullopt);
-    m_fwd_scan_add_softmax_cps =
-            make_cps(m_device.get(), "forward_scan_add_softmax", {}, std::nullopt);
-
-    int T = m_out_chunk_size;
-    int C = model_config.outsize;
-    int Cs = m_states;
-
-    m_scores_TNC.clear();
-    m_posts_NTC.clear();
-    m_bwd_NTC.clear();
-    for (int i = 0; i < m_out_split; ++i) {
-        m_scores_TNC.push_back(torch::empty({T, m_out_batch_size, C}, scores_dtype));
-        // Unfortunately torch doesn't have Uint16, or we would use it.  We could offset,
-        // or rely on undefined overflow behaviour, but for now we waste the sign bit.
-        m_posts_NTC.push_back(torch::empty({m_out_batch_size, T + 1, Cs}, posts_dtype));
-        m_bwd_NTC.push_back(torch::empty({m_out_batch_size, T + 1, Cs}));
-    }
+    // The packed byte scores represent the model's [-5, 5] score range.
+    constexpr float score_scale = static_cast<float>(5.0 / 127.0);
+    m_decoder = std::make_unique<MetalDecoder>(model_config, m_device.get(), m_out_chunk_size,
+                                               m_batch_size, m_out_split, scores_dtype, posts_dtype,
+                                               score_scale, MetalDecoder::ScanMode::Quantized);
 }
 
 int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_config,
@@ -233,8 +210,8 @@ int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_conf
         auto dummy_input = torch::empty(
                 {batch_size, benchmark_chunk_size, model_config.num_features}, torch::kF16);
         const auto start_time = std::chrono::system_clock::now();
-        auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_scores_TNC);
-        run_scan_kernels(cb, 0);
+        auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_decoder->scores());
+        m_decoder->prepare_decode(cb, 0);
         const auto end_time = std::chrono::system_clock::now();
         const auto elapsed_us =
                 std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time)
@@ -251,61 +228,21 @@ int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_conf
     return best_batch_size;
 }
 
-bool MetalLSTMCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
-    POINT_OF_INTEREST_SCOPE(MetalLSTMCaller, run_scan_kernels, "try_count=%i", try_count);
-
-    // This stage is operating on the split outputs of the linear layer, so
-    // the effective batch size is m_out_batch_size.
-    std::vector<int32_t> scan_args_{m_out_chunk_size, m_out_batch_size, m_states};
-    auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
-    name_mtl_object(scan_args, "scan_kernel_args");
-
-    for (int i = 0; i < m_out_split; ++i) {
-        // TODO: optimise grid size
-        launch_kernel_no_wait(m_bwd_scan_cps.get(), cb,
-                              {scan_args.get(), mtl_for_tensor(m_scores_TNC.at(i)),
-                               mtl_for_tensor(m_bwd_NTC.at(i))},
-                              {}, m_out_batch_size, m_states);
-
-        launch_kernel_no_wait(m_fwd_scan_add_softmax_cps.get(), cb,
-                              {scan_args.get(), mtl_for_tensor(m_scores_TNC.at(i)),
-                               mtl_for_tensor(m_bwd_NTC.at(i)), mtl_for_tensor(m_posts_NTC.at(i))},
-                              {}, m_out_batch_size, m_states);
-    }
-    return run_command_buffer("linear/scan/softmax", cb, try_count);
-}
-
 bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
     std::lock_guard lock(inter_caller_mutex);
 
     // The linear layer should not execute until the previous batch has been decoded,
     // since the same buffers are used for successive batches' scores, fwd/bwd scans.
-    MTL::CommandBuffer *const cb =
-            m_model->forward_async(*task.input, m_decode_complete_event.get(),
-                                   task.decode_complete_event_id - 1, try_count, m_scores_TNC);
+    MTL::CommandBuffer *const cb = m_model->forward_async(
+            *task.input, m_decode_complete_event.get(), task.decode_complete_event_id - 1,
+            try_count, m_decoder->scores());
     if (cb == nullptr) {
         return false;
     }
 
-    return run_scan_kernels(cb, try_count);
+    return m_decoder->prepare_decode(cb, try_count);
 }
 
-DecodedData MetalLSTMCaller::decode(int chunk_idx) const {
-    POINT_OF_INTEREST_SCOPE(MetalLSTMCaller, decode, "chunk_idx=%i", chunk_idx);
-
-    // Model outputs are split across m_out_split buffers.
-    assert(m_scores_TNC.size() == static_cast<size_t>(m_out_split));
-    assert(m_bwd_NTC.size() == static_cast<size_t>(m_out_split));
-    assert(m_posts_NTC.size() == static_cast<size_t>(m_out_split));
-    const int out_buf_idx = chunk_idx / m_out_batch_size;
-    const int buf_chunk_idx = chunk_idx % m_out_batch_size;
-
-    return decode::beam_search_decode(
-            // LSTM: m_scores_TNC[:, buf_chunk_idx, :] -> scores_TC
-            m_scores_TNC.at(out_buf_idx).index({Slice(), buf_chunk_idx}),
-            m_bwd_NTC.at(out_buf_idx)[buf_chunk_idx], m_posts_NTC.at(out_buf_idx)[buf_chunk_idx],
-            m_decoder_options.beam_width, m_decoder_options.beam_cut, m_decoder_options.blank_score,
-            m_decoder_options.q_shift, m_decoder_options.q_scale, m_score_scale);
-}
+DecodedData MetalLSTMCaller::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); }
 
 }  // namespace dorado::basecall
