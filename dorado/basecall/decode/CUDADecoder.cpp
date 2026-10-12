@@ -17,17 +17,17 @@ extern "C" {
 
 namespace dorado::basecall::decode {
 
-DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
-    auto scores = data.data;
+DecoderResult CUDADecoder::prepare_decode(DecoderInput input) const {
+    auto scores = input.scores;
     if (scores.dtype() == at::kChar && utils::get_dev_opt("convert_scores_f16", false)) {
         utils::ScopedProfileRange spr{"convert_scores", 2};
         scores = scores.to(at::kHalf).mul_(m_score_range / 127.f);
     }
-    auto &options = data.options;
+    auto &options = input.options;
 
     c10::cuda::CUDAGuard device_guard(scores.device());
     utils::ScopedProfileRange loop{"gpu_decode", 1};
-    long int N = data.aux ? std::ssize(data.aux->chunk_sizes()) : (long int)(scores.sizes()[0]);
+    long int N = input.aux ? std::ssize(input.aux->chunk_sizes()) : (long int)(scores.sizes()[0]);
     long int T = (long int)(scores.sizes()[1]);
     long int C = (long int)(scores.sizes()[2]);
 
@@ -37,18 +37,18 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
 
     at::Tensor chunks;
     at::Tensor chunk_results;
-    if (data.aux) {
+    if (input.aux) {
         std::int32_t N_;
-        if (data.aux->is_lstm_or_flstm_model()) {
-            N_ = std::max<std::int32_t>(N, data.aux->N() * 4);
+        if (input.aux->is_lstm_or_flstm_model()) {
+            N_ = std::max<std::int32_t>(N, input.aux->N() * 4);
         } else {
             // N IS TOTAL_NUM_VARLEN_CHUNKS
             N_ = N;
-            data.aux->device_chunk_table.floor_divide_(data.aux->stride_out());
+            input.aux->device_chunk_table.floor_divide_(input.aux->stride_out());
         }
         chunks = at::empty({N_, 4}, tensor_options_int32);
         auto chunks_slice = chunks.slice(0, 0, N);
-        auto chunk_table_slice = data.aux->device_chunk_table.slice(0, 0, N);
+        auto chunk_table_slice = input.aux->device_chunk_table.slice(0, 0, N);
         chunks_slice.slice(1, 0, 2).copy_(chunk_table_slice);
         chunks_slice.select(1, 2).copy_(chunk_table_slice.select(1, 0));
         chunks.index({at::indexing::Slice(0, N), 3}) = 0;
@@ -67,22 +67,22 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
     at::Tensor aux;
     at::Tensor path;
     at::Tensor moves_sequence_qstring;
-    if (data.aux) {
-        if (data.aux->is_lstm_or_flstm_model()) {
+    if (input.aux) {
+        if (input.aux->is_lstm_or_flstm_model()) {
             // lstm VCS
-            const std::int32_t T_ = data.aux->NT_out_max();
-            const std::int32_t Ts_ = std::max<std::int32_t>(T_ + (data.aux->N() * 4), T + N);
+            const std::int32_t T_ = input.aux->NT_out_max();
+            const std::int32_t Ts_ = std::max<std::int32_t>(T_ + (input.aux->N() * 4), T + N);
             aux = at::empty(Ts_ * (C + 4 * options.beam_width), tensor_options_int8);
             path = at::zeros(Ts_, tensor_options_int32);
             moves_sequence_qstring = at::zeros({3, T_}, tensor_options_int8);
         } else {
             // Tx VCS
             aux = at::empty(
-                    data.aux->total_num_granularity() * (T + 1) * (C + 4 * options.beam_width),
+                    input.aux->total_num_granularity() * (T + 1) * (C + 4 * options.beam_width),
                     tensor_options_int8);
-            path = at::zeros(data.aux->total_num_granularity() * (T + 1), tensor_options_int32);
+            path = at::zeros(input.aux->total_num_granularity() * (T + 1), tensor_options_int32);
             moves_sequence_qstring =
-                    at::zeros({3, data.aux->total_num_granularity() * T}, tensor_options_int8);
+                    at::zeros({3, input.aux->total_num_granularity() * T}, tensor_options_int8);
         }
     } else {
         aux = at::empty(N * (T + 1) * (C + 4 * options.beam_width), tensor_options_int8);
@@ -132,15 +132,11 @@ DecodeData CUDADecoder::beam_search_part_1(DecodeData data) const {
                 moves.data_ptr(), sequence.data_ptr(), qstring.data_ptr(), options.q_scale,
                 options.q_shift, options.move_pad));
     }
-    if (data.aux) {
-        data.data = moves_sequence_qstring;
-    } else {
-        data.data = moves_sequence_qstring.reshape({3, N, -1});
-    }
-    return data;
+    auto data = input.aux ? moves_sequence_qstring : moves_sequence_qstring.reshape({3, N, -1});
+    return {std::move(data), input.num_chunks, input.options, input.aux};
 }
 
-std::vector<DecodedChunk> CUDADecoder::beam_search_part_2(const DecodeData &data) const {
+std::vector<DecodedChunk> CUDADecoder::decode(const DecoderResult &data) const {
     nvtx3::scoped_range loop{"cpu_decode"};
 
     const at::Tensor &moves_sequence_qstring_cpu = data.data;

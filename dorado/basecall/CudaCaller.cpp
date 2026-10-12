@@ -35,7 +35,7 @@ struct NNTask {
     int num_chunks;
     nn::AuxiliaryData *aux;
     void *caller;
-    decode::DecodeData out;
+    decode::DecoderResult out;
     std::mutex mut;
     std::condition_variable cv;
     bool done{false};
@@ -201,7 +201,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         auto scores = m_modbase_modules ? m_module->forward(input, aux.get(), &signal_embeddings)
                                         : m_module->forward(input, aux.get());
         auto decoded_data =
-                m_decoder->beam_search_part_1({scores, batch_dim.N, m_decoder_options, aux.get()});
+                m_decoder->prepare_decode({scores, batch_dim.N, m_decoder_options, aux.get()});
         if (m_modbase_modules) {
             run_modbase_models(*m_modbase_modules, decoded_data.data, signal_embeddings);
         }
@@ -322,11 +322,11 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
         at::Tensor out = output.narrow(0, 0, c10::multiply_integers(task->out.data.sizes()))
                                  .view(task->out.data.sizes());
         out.copy_(task->out.data);
-        return m_decoder->beam_search_part_2({out, num_chunks, m_decoder_options, task->aux});
+        return m_decoder->decode({out, num_chunks, m_decoder_options, task->aux});
     }
 
     output.copy_(task->out.data);
-    return m_decoder->beam_search_part_2({output, num_chunks, m_decoder_options});
+    return m_decoder->decode({output, num_chunks, m_decoder_options});
 }
 
 void CudaCaller::terminate() {
@@ -446,7 +446,7 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements(
     // Determine size of working memory for decoder divided by (batch_size * chunk_size)
     // Decoder needs roughly (beam_width * 4) + num_states + 10 extra bytes
     // where num_states = 4^(state_len+1)
-    // See `dorado::basecall::decode::CUDADecoder::beam_search_part_1()` for more details.
+    // See `dorado::basecall::decode::CUDADecoder::prepare_decode()` for more details.
     int64_t decode_bytes_per_chunk_timestep =
             10 + default_beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
 
@@ -775,7 +775,7 @@ void CudaCaller::cuda_thread_fn() {
             auto scores = m_modbase_modules
                                   ? m_module->forward(task->input, task->aux, &signal_embeddings)
                                   : m_module->forward(task->input, task->aux);
-            task->out = m_decoder->beam_search_part_1(
+            task->out = m_decoder->prepare_decode(
                     {std::move(scores), task->num_chunks, m_decoder_options, task->aux});
             if (m_modbase_modules) {
                 run_modbase_models(*m_modbase_modules, task->out.data,

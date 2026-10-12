@@ -32,8 +32,8 @@ std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {
     auto scores_TNC =
             m_module->forward(m_input_NCT.to(m_options.device())).transpose(0, 1).contiguous();
     const auto forward_ms = timer.GetElapsedMS();
-    auto decoded_chunks = m_decoder->beam_search_part_2(
-            m_decoder->beam_search_part_1({scores_TNC, num_chunks, m_decoder_options}));
+    auto decoded_chunks = m_decoder->decode(
+            m_decoder->prepare_decode({scores_TNC, num_chunks, m_decoder_options}));
     const auto forward_plus_decode_ms = timer.GetElapsedMS();
     ++m_num_batches_called;
     m_model_ms += forward_ms;

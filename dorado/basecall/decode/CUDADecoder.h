@@ -10,11 +10,10 @@ class CUDADecoder final : public Decoder {
 public:
     explicit CUDADecoder(float score_range) : m_score_range(score_range) {}
 
-    // We split beam_search into two parts, the first one running on the GPU and the second
-    // one on the CPU. While the second part is running we can submit more commands to the GPU
-    // on another thread.
-    DecodeData beam_search_part_1(DecodeData data) const override;
-    std::vector<DecodedChunk> beam_search_part_2(const DecodeData & data) const override;
+    // Decode preparation runs on the GPU and decode finalization runs on the CPU. While the
+    // latter is running we can submit more commands to the GPU on another thread.
+    DecoderResult prepare_decode(DecoderInput input) const override;
+    std::vector<DecodedChunk> decode(const DecoderResult& result) const override;
 
     at::ScalarType dtype() const override { return at::ScalarType::Half; }
 

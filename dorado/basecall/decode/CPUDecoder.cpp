@@ -94,9 +94,11 @@ at::Tensor backward_scores(const at::Tensor& scores_TNC, const float fixed_stay_
 
 namespace dorado::basecall::decode {
 
-DecodeData CPUDecoder::beam_search_part_1(DecodeData data) const { return data; }
+DecoderResult CPUDecoder::prepare_decode(DecoderInput input) const {
+    return {std::move(input.scores), input.num_chunks, input.options, input.aux};
+}
 
-std::vector<DecodedChunk> CPUDecoder::beam_search_part_2(const DecodeData& data) const {
+std::vector<DecodedChunk> CPUDecoder::decode(const DecoderResult& data) const {
     // Expects data.data(TNC)
     const auto scores_cpu = data.data.to(at::kCPU);
     const auto num_chunks = data.num_chunks;
