@@ -23,6 +23,9 @@ constexpr size_t DEFAULT_BUFFER_SIZE{
         20000000};  // Arbitrary 20 MB. Can be overridden by application code.
 constexpr size_t MAX_FILES_FOR_MERGE{512};  // Maximum number of files to merge at once.
 
+// Store temporary files as uncompressed BAMs so that they skip compression when reading/writing.
+constexpr HtsFile::OutputMode temp_file_mode = HtsFile::OutputMode::UBAM;
+
 bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& header2) {
     return (strcmp(sam_hdr_str(header1.get()), sam_hdr_str(header2.get())) == 0);
 }
@@ -212,7 +215,7 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     auto file_index = m_temp_files.size();
     auto tempfilename = m_filename + "." + std::to_string(file_index) + ".tmp";
     m_temp_files.push_back(tempfilename);
-    m_file.reset(hts_open(tempfilename.c_str(), htslib_write_mode(m_mode)));
+    m_file.reset(hts_open(tempfilename.c_str(), htslib_write_mode(temp_file_mode)));
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + tempfilename);
     }
@@ -285,8 +288,10 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         return;
     }
 
-    size_t num_temp_files = m_temp_files.size();
-    if (num_temp_files == 1) {
+    // We can just rename the temp file if there's only 1 and it matches the output format.
+    const bool single_output_file = m_temp_files.size() == 1;
+    const bool output_matches_temp = m_mode == temp_file_mode;
+    if (single_output_file && output_matches_temp) {
         // We only have 1 temporary file, so just rename it.
         std::filesystem::rename(m_temp_files.back(), m_filename);
         m_temp_files.clear();
@@ -451,7 +456,8 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     }
 
     // Open the output file, and write the header.
-    HtsFilePtr out_file(hts_open(merged_filename.c_str(), htslib_write_mode(m_mode)));
+    HtsFilePtr out_file(hts_open(merged_filename.c_str(),
+                                 htslib_write_mode(final_iteration ? m_mode : temp_file_mode)));
     try {
         initialise_threads(out_file.get());
     } catch (const std::runtime_error&) {
