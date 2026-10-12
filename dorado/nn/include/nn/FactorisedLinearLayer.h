@@ -30,6 +30,7 @@ public:
     int C_in_;
     int K_;
     int C_out_;
+    bool i8_output;
 
     torch::nn::Linear dn{nullptr};
     torch::nn::Linear up{nullptr};

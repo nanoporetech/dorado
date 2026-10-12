@@ -60,7 +60,7 @@ struct ModBaseConvLSTMV3CUDAModelImpl : torch::nn::Module {
     nn::LinearUpsample upsample{nullptr};
 
     const int batch_size;
-    nn::WorkingMemory wm{batch_size}, wm_seq{batch_size};
+    nn::WorkingMemory wm, wm_seq;
 };
 
 TORCH_MODULE(ModBaseConvLSTMV3CUDAModel);

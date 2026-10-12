@@ -77,34 +77,36 @@ void CRFModelImpl::load_state_dict(const std::vector<at::Tensor> &weights) {
 at::Tensor CRFModelImpl::run_koi(const at::Tensor &in,
                                  const nn::AuxiliaryData *const aux,
                                  at::Tensor *const signal_embeddings) {
-    // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
     c10::cuda::CUDAGuard device_guard(in.device());
+    WorkingMemory wm;
+    {
+        utils::ScopedProfileRange spr("reserve_working_memory", 2);
+        // Input is [N, C, T] -- TODO: change to [N, T, C] on the input buffer side?
 
-    // Determine working memory size
-    WorkingMemory wm(aux ? 1 : int(in.size(0)));
-    if (aux) {
-        wm.next_TC(int(aux->NT_in_max()), int(in.size(1)), TensorLayout::NTC);
-    } else {
-        wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
-    }
+        // Determine working memory size
+        if (aux) {
+            wm.next_NTC(1, int(aux->NT_in_max()), int(in.size(1)), TensorLayout::NTC);
+        } else {
+            wm.next_NTC(int(in.size(0)), int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
+        }
 
-    convs->reserve_working_memory(wm, aux, std::nullopt);
-    rnns->reserve_working_memory(wm);
-    linear1->reserve_working_memory(wm, aux);
-    if (linear2) {
-        linear2->reserve_working_memory(wm, nullptr);
-    }
+        convs->reserve_working_memory(wm, aux, std::nullopt);
+        rnns->reserve_working_memory(wm);
+        linear1->reserve_working_memory(wm, aux);
+        if (linear2) {
+            linear2->reserve_working_memory(wm, nullptr);
+        }
 
-    wm.allocate_backing_tensor(in.device());
+        wm.allocate_backing_tensor(in.device());
 
-    // Copy `in` to working memory and run the model
-    if (aux) {
-        wm.next_N(1);
-        auto wm_in = wm.next_TC(int(aux->NT_in()), int(in.size(1)), TensorLayout::NTC);
-        wm_in.index({Slice()}) = in.transpose(1, 2).narrow(1, 0, aux->NT_in());
-    } else {
-        auto wm_in = wm.next_TC(int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
-        wm_in.index({Slice()}) = in.transpose(1, 2);
+        // Copy `in` to working memory and run the model
+        if (aux) {
+            auto wm_in = wm.next_NTC(1, int(aux->NT_in()), int(in.size(1)), TensorLayout::NTC);
+            wm_in.index({Slice()}) = in.transpose(1, 2).narrow(1, 0, aux->NT_in());
+        } else {
+            auto wm_in = wm.next_NTC(-1, int(in.size(2)), int(in.size(1)), TensorLayout::NTC);
+            wm_in.index({Slice()}) = in.transpose(1, 2);
+        }
     }
 
     convs->run_koi(wm, aux);
@@ -126,8 +128,8 @@ at::Tensor CRFModelImpl::run_koi(const at::Tensor &in,
     // `CUDADecoder` on reading the scores. This eliminates the cost of a large matrix
     // read-modify-write operation.
 
-    // Output is [N, T, C], F16, contiguous
-    assert(wm.layout == TensorLayout::NTC);
+    // Output is [N, T, C], F16 or I8, contiguous
+    assert((wm.layout == TensorLayout::NTC) || (wm.layout == TensorLayout::NTC_I8));
     return wm.current;
 }
 #endif

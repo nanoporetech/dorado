@@ -102,9 +102,12 @@ void FLSTMStackImpl::reserve_working_memory(WorkingMemory &wm) {
                  (4 * ((wm.T + 1) * (int64_t)wm.N)) +           // float
                  (4 * ((int64_t)wm.N / 2U))},                   // int
                 torch::kU8);
+        wm.next_is_current();
     } else if ((wm.layout == TensorLayout::CUBLAS_TNC) ||
                (wm.layout == TensorLayout::CUTLASS_TNC_F16)) {
-        wm.temp({wm.N * ((2 * K_) + (4 * C_))}, torch::kF16);
+        wm.temp({wm.N, 2, K_}, torch::kF16);
+        wm.temp({wm.N, 4 * C_}, torch::kF16);
+        wm.next_is_current();
     } else {
         throw std::runtime_error("FLSTMStack error: unsupported TensorLayout!");
     }
@@ -125,6 +128,7 @@ void FLSTMStackImpl::run_koi(WorkingMemory &wm, const AuxiliaryData *aux) {
 }
 
 void FLSTMStackImpl::forward_koi(WorkingMemory &wm, const AuxiliaryData *aux) {
+    utils::ScopedProfileRange spr("flstm_stack", 2);
     if (aux && !first_reverse_) {
         throw std::runtime_error(
                 "FLSTM stack error: unsupported first forward layer with variable chunks.");
@@ -236,6 +240,7 @@ void FLSTMStackImpl::forward_koi(WorkingMemory &wm, const AuxiliaryData *aux) {
 
         wm.is_input_to_rev_lstm = !reverse;
     }
+    wm.next_is_current();
 }
 
 void FLSTMStackImpl::forward_cublas(WorkingMemory &wm) {
@@ -245,17 +250,12 @@ void FLSTMStackImpl::forward_cublas(WorkingMemory &wm) {
 
     auto stream = at::cuda::getCurrentCUDAStream().stream();
 
-    const int64_t dn_bfr_size = wm.N * (2 * K_);
-    const int64_t up_bfr_size = wm.N * (4 * C_);
-
-    auto temp_bfr = wm.temp({dn_bfr_size + up_bfr_size}, torch::kF16);
-
-    auto dn_bfr = temp_bfr.narrow(0, 0, dn_bfr_size).view({wm.N, 2, K_});
+    auto dn_bfr = wm.temp({wm.N, 2, K_}, torch::kF16);
     auto dn_ih_bfr = dn_bfr.select(1, 0);
     auto dn_hh_bfr = dn_bfr.select(1, 1);
     dn_bfr = dn_bfr.view({wm.N, -1});
 
-    auto up_bfr = temp_bfr.narrow(0, dn_bfr_size, up_bfr_size).view({wm.N, 4 * C_});
+    auto up_bfr = wm.temp({wm.N, 4 * C_}, torch::kF16);
 
     for (int layer = 0; layer < std::ssize(layers_); ++layer) {
         utils::ScopedProfileRange spr_lstm("flstm_layer", 3);
@@ -295,6 +295,7 @@ void FLSTMStackImpl::forward_cublas(WorkingMemory &wm) {
 
         wm.is_input_to_rev_lstm = !reverse;
     }
+    wm.next_is_current();
 }
 
 #endif

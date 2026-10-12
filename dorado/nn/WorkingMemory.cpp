@@ -13,6 +13,8 @@ std::string to_string(const TensorLayout &layout) {
     switch (layout) {
     case TensorLayout::NTC:
         return std::string("NTC");
+    case TensorLayout::NTC_I8:
+        return std::string("NTC_I8");
     case TensorLayout::TNC:
         return std::string("TNC");
     case TensorLayout::CUTLASS_TNC_F16:
@@ -32,28 +34,39 @@ int64_t WorkingMemory::tensor_bytes(at::IntArrayRef sizes, at::ScalarType dtype)
     return utils::pad_to<int64_t>(elems * at::elementSize(dtype), ALIGNMENT);
 }
 
-at::Tensor WorkingMemory::next(at::IntArrayRef sizes, at::ScalarType dtype, bool make_current) {
-    auto new_bytes = tensor_bytes(sizes, dtype);
+at::Tensor WorkingMemory::alloc(at::IntArrayRef sizes, at::ScalarType dtype, bool make_current) {
+    const int64_t new_bytes = tensor_bytes(sizes, dtype);
     at::Tensor new_tensor;
+    const int64_t bytes_in_use = current_bytes + temp_bytes + new_bytes;
     if (!backing_tensor.defined()) {
         // If no backing tensor is allocated yet we're still in the reservation phase
-        reservation_bytes = std::max(reservation_bytes, current_bytes + new_bytes);
+        reservation_bytes = std::max(reservation_bytes, bytes_in_use);
     } else {
-        if (current_bytes + new_bytes > reservation_bytes) {
+        if (bytes_in_use > reservation_bytes) {
             throw std::runtime_error("WorkingMemory: overlap detected.");
         }
 
-        bool current_is_front =
+        const bool current_is_front =
                 current.defined() && current.data_ptr() == backing_tensor.data_ptr();
         auto elems = c10::multiply_integers(sizes);
-        auto bt_dtype = backing_tensor.view(dtype);
-        auto start_pos = current_is_front ? (reservation_bytes - new_bytes) / at::elementSize(dtype)
-                                          : int64_t(0);
-        new_tensor = bt_dtype.narrow(0, start_pos, elems).view(sizes);
+        const auto bt_dtype = backing_tensor.view(dtype);
+
+        // if `!make_current`, add a new temp tensor after `current` and any existing temp tensors
+        const int64_t skip_bytes = make_current ? 0ll : current_bytes + temp_bytes;
+
+        // count from front or from back?
+        const int64_t start_byte = (current_is_front == make_current)
+                                           ? reservation_bytes - skip_bytes - new_bytes
+                                           : skip_bytes;
+
+        new_tensor = bt_dtype.narrow(0, start_byte / at::elementSize(dtype), elems).view(sizes);
     }
     if (make_current) {
         current_bytes = new_bytes;
         current = new_tensor;
+        temp_bytes = 0;
+    } else {
+        temp_bytes += new_bytes;
     }
     return new_tensor;
 }
@@ -61,6 +74,7 @@ at::Tensor WorkingMemory::next(at::IntArrayRef sizes, at::ScalarType dtype, bool
 at::Tensor WorkingMemory::get_current_NTC_view() {
     switch (layout) {
     case TensorLayout::NTC:
+    case TensorLayout::NTC_I8:
         return current;
     case TensorLayout::TNC:
         return current.transpose(0, 1);
@@ -78,39 +92,49 @@ at::Tensor WorkingMemory::get_current_NTC_view() {
     }
 }
 
-void WorkingMemory::next_N(const int N_) { N = N_; }
-
-at::Tensor WorkingMemory::next_TC(int T_, int C_, TensorLayout layout_) {
-    T = T_;
-    C = C_;
+at::Tensor WorkingMemory::next_NTC(int N_, int T_, int C_, TensorLayout layout_) {
+    N = (N_ > 0) ? N_ : N;
+    T = (T_ > 0) ? T_ : T;
+    C = (C_ > 0) ? C_ : C;
     layout = layout_;
     if (layout == TensorLayout::NTC) {
-        return next({N, T, C}, at::kHalf, true);
+        return alloc({N, T, C}, at::kHalf, true);
+    } else if (layout == TensorLayout::NTC_I8) {
+        return alloc({N, T, C}, at::kChar, true);
     } else if (layout == TensorLayout::TNC) {
-        return next({T, N, C}, at::kHalf, true);
+        return alloc({T, N, C}, at::kHalf, true);
     } else if (layout == TensorLayout::CUTLASS_TNC_F16) {
-        return next({T + 5, N, C}, at::kHalf, true);
+        return alloc({T + 5, N, C}, at::kHalf, true);
     } else if (layout == TensorLayout::CUTLASS_TNC_I8) {
-        return next({T + 5, N, C}, at::kChar, true);
+        return alloc({T + 5, N, C}, at::kChar, true);
     } else if (layout == TensorLayout::CUBLAS_TN2C) {
-        return next({T + 1, N, 2, C}, at::kHalf, true);
+        return alloc({T + 1, N, 2, C}, at::kHalf, true);
     } else if (layout == TensorLayout::CUBLAS_TNC) {
-        return next({T + 3, N, C}, at::kHalf, true);
+        return alloc({T + 3, N, C}, at::kHalf, true);
     } else {
         throw std::logic_error("Unhandled TensorLayout");
     }
 }
 
+at::Tensor WorkingMemory::next_is_current() {
+    // release temp buffers of the current pass
+    temp_bytes = 0;
+    return current;
+}
+
 at::Tensor WorkingMemory::temp(at::IntArrayRef sizes, at::ScalarType dtype) {
-    return next(sizes, dtype, false);
+    return alloc(sizes, dtype, false);
 }
 
 void WorkingMemory::allocate_backing_tensor(c10::Device dev) {
-    // Using kF16 here because the libtorch version on TX2 doesn't support `Tensor::view()`
-    // with a dtype of a different size, and all buffers are kF16 on TX2.
-    backing_tensor =
-            at::empty({reservation_bytes / 2}, at::TensorOptions().device(dev).dtype(at::kHalf));
+    if (!backing_tensor.defined()) {
+        // Using kF16 here because the libtorch version on TX2 doesn't support `Tensor::view()`
+        // with a dtype of a different size, and all buffers are kF16 on TX2.
+        backing_tensor = at::empty({reservation_bytes / 2},
+                                   at::TensorOptions().device(dev).dtype(at::kHalf));
+    }
     current_bytes = 0;
+    temp_bytes = 0;
 }
 
 }  // namespace dorado::nn
