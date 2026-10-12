@@ -13,6 +13,9 @@
 #include <filesystem>
 #include <stdexcept>
 
+namespace dorado {
+namespace utils {
+
 namespace {
 
 constexpr size_t MINIMUM_BUFFER_SIZE{100000};  // The smallest allowed buffer size is 100 KB.
@@ -36,9 +39,6 @@ void set_cram_opt(const dorado::HtsFilePtr& file, const std::string& reference) 
 }
 
 }  // namespace
-
-namespace dorado {
-namespace utils {
 
 struct HtsFile::ProgressUpdater {
     const ProgressCallback* m_progress_callback{nullptr};
