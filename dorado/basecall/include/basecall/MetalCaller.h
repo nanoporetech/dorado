@@ -18,6 +18,8 @@
 
 namespace dorado::basecall {
 
+class TensorRunnerState;
+
 using DecodedData = std::tuple<std::string, std::string, std::vector<uint8_t>>;
 
 class MetalCaller : public ModelCaller {
@@ -35,7 +37,7 @@ public:
     ~MetalCaller() override;
 
     std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override;
-    std::vector<decode::DecodedChunk> call_chunks(RunnerContext &context, int num_chunks) override;
+    std::vector<decode::DecodedChunk> call_chunks(TensorRunnerState &state, int num_chunks);
     size_t num_batch_dims() const override { return 1; }
 
     virtual at::Tensor create_input_tensor() const = 0;

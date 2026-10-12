@@ -1,7 +1,8 @@
 #include "basecall/CPUCaller.h"
 
 #include "basecall/crf_utils.h"
-#include "caller/TensorRunnerContext.h"
+#include "caller/TensorRunnerState.h"
+#include "caller/TypedRunnerContext.h"
 #include "decode/Decoder.h"
 
 #include <stdexcept>
@@ -28,20 +29,15 @@ std::unique_ptr<ModelCaller::RunnerContext> CPUCaller::create_runner_context(
     auto input = at::zeros({m_config.basecaller.batch_size(), m_config.num_features,
                             m_config.basecaller.chunk_size()},
                            m_options);
-    return std::make_unique<TensorRunnerContext>(std::move(input), TensorLayout::NCT);
+    return std::make_unique<TypedRunnerContext<CPUCaller, TensorRunnerState>>(
+            *this, std::move(input), TensorLayout::NCT);
 }
 
-std::vector<decode::DecodedChunk> CPUCaller::call_chunks(RunnerContext& generic_context,
-                                                         int num_chunks) {
-    auto* context = dynamic_cast<TensorRunnerContext*>(&generic_context);
-    if (context == nullptr) {
-        throw std::invalid_argument("CPU caller received an incompatible runner context");
-    }
-
+std::vector<decode::DecodedChunk> CPUCaller::call_chunks(TensorRunnerState& state, int num_chunks) {
     at::InferenceMode guard;
     stats::Timer timer;
     auto scores_TNC =
-            m_module->forward(context->input().to(m_options.device())).transpose(0, 1)
+            m_module->forward(state.input().to(m_options.device())).transpose(0, 1)
                               .contiguous();
     const auto forward_ms = timer.GetElapsedMS();
     auto decoded_chunks = m_decoder->decode(

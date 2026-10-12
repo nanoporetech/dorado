@@ -22,6 +22,8 @@
 
 namespace dorado::basecall {
 
+class CudaRunnerState;
+
 namespace decode {
 class Decoder;
 }  // namespace decode
@@ -32,7 +34,7 @@ public:
 
     ~CudaCaller() override;
     std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override;
-    std::vector<decode::DecodedChunk> call_chunks(RunnerContext &context, int num_chunks) override;
+    std::vector<decode::DecodedChunk> call_chunks(CudaRunnerState &context, int num_chunks);
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
                                                   at::Tensor &output,
                                                   int num_chunks,

@@ -14,7 +14,7 @@ ModelRunner::~ModelRunner() = default;
 
 std::vector<decode::DecodedChunk> ModelRunner::call_chunks(int num_chunks) {
     ++m_num_batches_called;
-    return m_caller->call_chunks(*m_runner_context, num_chunks);
+    return m_runner_context->call_chunks(num_chunks);
 }
 
 void ModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk_CT) {

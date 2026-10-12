@@ -25,6 +25,10 @@ class FakeCaller final : public dorado::basecall::ModelCaller {
             m_caller.accepted_chunk_idx = chunk_idx;
             m_caller.accepted_chunk = chunk;
         }
+        std::vector<dorado::basecall::decode::DecodedChunk> call_chunks(int num_chunks) override {
+            m_caller.called_context = this;
+            return std::vector<dorado::basecall::decode::DecodedChunk>(num_chunks);
+        }
         size_t chunk_size() const override { return 42; }
         size_t batch_size() const override { return 3; }
         bool variable_chunk_sizes() const override { return true; }
@@ -38,12 +42,6 @@ public:
 
     std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override {
         return std::make_unique<Context>(*this, batch_dims_idx);
-    }
-
-    std::vector<dorado::basecall::decode::DecodedChunk> call_chunks(RunnerContext& context,
-                                                                    int num_chunks) override {
-        called_context = &context;
-        return std::vector<dorado::basecall::decode::DecodedChunk>(num_chunks);
     }
 
     size_t num_batch_dims() const override { return 1; }

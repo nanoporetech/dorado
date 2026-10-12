@@ -3,7 +3,8 @@
 #include "MPSCaller.h"
 #include "MetalCallerTask.h"
 #include "MetalLSTMCaller.h"
-#include "TensorRunnerContext.h"
+#include "TensorRunnerState.h"
+#include "TypedRunnerContext.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
 #include "utils/thread_utils.h"
@@ -40,18 +41,14 @@ std::unique_ptr<ModelCaller::RunnerContext> MetalCaller::create_runner_context(
         throw std::out_of_range("Metal caller only has one batch dimension");
     }
     const auto layout = m_config.is_lstm_model() ? TensorLayout::NTC : TensorLayout::NCT;
-    return std::make_unique<TensorRunnerContext>(create_input_tensor(), layout);
+    return std::make_unique<TypedRunnerContext<MetalCaller, TensorRunnerState>>(
+            *this, create_input_tensor(), layout);
 }
 
-std::vector<decode::DecodedChunk> MetalCaller::call_chunks(RunnerContext &generic_context,
+std::vector<decode::DecodedChunk> MetalCaller::call_chunks(TensorRunnerState &state,
                                                            int num_chunks) {
-    auto *context = dynamic_cast<TensorRunnerContext *>(&generic_context);
-    if (context == nullptr) {
-        throw std::invalid_argument("Metal caller received an incompatible runner context");
-    }
-
     std::vector<decode::DecodedChunk> out_chunks(num_chunks);
-    call_chunks(context->input(), num_chunks, out_chunks);
+    call_chunks(state.input(), num_chunks, out_chunks);
     return out_chunks;
 }
 

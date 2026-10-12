@@ -31,12 +31,13 @@ dorado_add_library(dorado_basecall
         ModelRunner.cpp
         ModelCaller.cpp
         ModelRunnerBase.cpp
-        caller/TensorRunnerContext.cpp
-        caller/TensorRunnerContext.h
+        caller/TensorRunnerState.cpp
+        caller/TensorRunnerState.h
+        caller/TypedRunnerContext.h
     SOURCES_TEST
         DecoderTest.cpp
         ModelRunnerTest.cpp
-        TensorRunnerContextTest.cpp
+        TensorRunnerStateTest.cpp
     DEPENDS_PUBLIC
         dorado_config
         dorado_modbase

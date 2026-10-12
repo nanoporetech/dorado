@@ -14,13 +14,15 @@ class Decoder;
 
 namespace dorado::basecall {
 
+class TensorRunnerState;
+
 class CPUCaller final : public ModelCaller {
 public:
     explicit CPUCaller(const config::BasecallModelConfig& model_config);
     ~CPUCaller() override;
 
     std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override;
-    std::vector<decode::DecodedChunk> call_chunks(RunnerContext& context, int num_chunks) override;
+    std::vector<decode::DecodedChunk> call_chunks(TensorRunnerState& state, int num_chunks);
     size_t num_batch_dims() const override { return 1; }
     const config::BasecallModelConfig& config() const override { return m_config; }
     void terminate() override {}

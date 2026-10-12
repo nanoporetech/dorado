@@ -2,6 +2,7 @@
 
 #include "ChunkBenchmarks.h"
 #include "basecall/crf_utils.h"
+#include "caller/TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "torch_utils/cuda_utils.h"
@@ -27,9 +28,9 @@
 
 namespace dorado::basecall {
 
-class CudaRunnerContext final : public ModelCaller::RunnerContext {
+class CudaRunnerState final {
 public:
-    CudaRunnerContext(const CudaCaller &caller, size_t batch_dims_idx)
+    CudaRunnerState(const CudaCaller &caller, size_t batch_dims_idx)
             : m_batch_size(caller.batch_size(batch_dims_idx)),
               m_chunk_size(caller.chunk_size(batch_dims_idx)),
               m_variable_chunk_sizes(caller.variable_chunk_sizes()),
@@ -47,7 +48,7 @@ public:
         }
     }
 
-    void accept_chunk(int chunk_idx, const at::Tensor &chunk) override {
+    void accept_chunk(int chunk_idx, const at::Tensor &chunk) {
         if (!m_variable_chunk_sizes) {
             m_input.index_put_({chunk_idx}, chunk);
             return;
@@ -72,9 +73,9 @@ public:
         }
     }
 
-    size_t chunk_size() const override { return m_chunk_size; }
-    size_t batch_size() const override { return m_batch_size; }
-    bool variable_chunk_sizes() const override { return m_variable_chunk_sizes; }
+    size_t chunk_size() const { return m_chunk_size; }
+    size_t batch_size() const { return m_batch_size; }
+    bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
 
     void reset() {
         if (m_variable_chunk_sizes) {
@@ -294,26 +295,22 @@ CudaCaller::~CudaCaller() { terminate(); }
 
 std::unique_ptr<ModelCaller::RunnerContext> CudaCaller::create_runner_context(
         size_t batch_dims_idx) {
-    return std::make_unique<CudaRunnerContext>(*this, batch_dims_idx);
+    return std::make_unique<TypedRunnerContext<CudaCaller, CudaRunnerState>>(*this, *this,
+                                                                             batch_dims_idx);
 }
 
-std::vector<decode::DecodedChunk> CudaCaller::call_chunks(RunnerContext &generic_context,
+std::vector<decode::DecodedChunk> CudaCaller::call_chunks(CudaRunnerState &context,
                                                           int num_chunks) {
-    auto *context = dynamic_cast<CudaRunnerContext *>(&generic_context);
-    if (context == nullptr) {
-        throw std::invalid_argument("CUDA caller received an incompatible runner context");
-    }
-
-    c10::cuda::CUDAStreamGuard guard(context->m_stream);
+    c10::cuda::CUDAStreamGuard guard(context.m_stream);
     std::unique_ptr<nn::AuxiliaryData> aux;
-    if (context->variable_chunk_sizes()) {
+    if (context.variable_chunk_sizes()) {
         aux = std::make_unique<nn::AuxiliaryData>(
-                context->m_aux, context->batch_size(), context->chunk_size(), context->m_stride,
-                context->m_stride_inner, context->m_chunk_size_granularity, context->m_chunk_sizes,
-                context->m_max_chunk_size, context->m_is_tx_model);
+                context.m_aux, context.batch_size(), context.chunk_size(), context.m_stride,
+                context.m_stride_inner, context.m_chunk_size_granularity, context.m_chunk_sizes,
+                context.m_max_chunk_size, context.m_is_tx_model);
     }
-    auto decoded_chunks = call_chunks(context->m_input, context->m_output, num_chunks, aux.get());
-    context->reset();
+    auto decoded_chunks = call_chunks(context.m_input, context.m_output, num_chunks, aux.get());
+    context.reset();
     return decoded_chunks;
 }
 
