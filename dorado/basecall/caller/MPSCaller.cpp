@@ -195,7 +195,7 @@ bool MPSCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_
     // previous scores are processed in the decode threads
     cb->encodeWait(m_decode_complete_event.get(), task.decode_complete_event_id - 1);
 
-    m_decoder->scores().front().index_put_({at::indexing::Ellipsis}, scores_TNC);
+    m_decoder->scores().front().copy_(scores_TNC);
 
     std::lock_guard lock(inter_caller_mutex);
     return m_decoder->prepare_decode(cb, try_count);
