@@ -90,6 +90,8 @@ DuplexReadPtr stereo_encode(ReadPair read_pair, int input_signal_stride) {
     // No way to know the events corresponding to this read, set to zero
     read->read_common.num_minknow_events = 0;
     read->read_common.start_time_ms = template_read.read_common.start_time_ms;
+    read->read_common.chemistry = template_read.read_common.chemistry;
+    read->read_common.rapid_chemistry = template_read.read_common.rapid_chemistry;
 
     // Set Attributes.
     read->read_common.attributes.mux = template_read.read_common.attributes.mux;

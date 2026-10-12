@@ -170,7 +170,7 @@ DEFINE_TEST("duplex read has correct fields set") {
     CATCH_CHECK(stereo_common.attributes.read_number == -1);  // not set
     CATCH_CHECK(stereo_common.attributes.sample_rate == 500);
     CATCH_CHECK(stereo_common.attributes.start_time == "now");
-    CATCH_CHECK(stereo_common.chemistry == dorado::models::Chemistry::UNKNOWN);  // not set
+    CATCH_CHECK(stereo_common.chemistry == dorado::models::Chemistry::DNA_R10_4_1_E8_2_400BPS_5KHZ);
     CATCH_CHECK(stereo_common.client_info == client_info);
     CATCH_CHECK(stereo_common.experiment_id == "test_exp");
     CATCH_CHECK(stereo_common.flow_cell_product_code == "test_flowcell");
@@ -185,9 +185,8 @@ DEFINE_TEST("duplex read has correct fields set") {
     CATCH_CHECK(stereo_common.position_id == "sequencer_position");
     CATCH_CHECK(stereo_common.protocol_start_time_ms == 42);
     CATCH_CHECK(stereo_common.qstring.empty());  // moved to features
-    CATCH_CHECK(stereo_common.rapid_chemistry ==
-                dorado::models::RapidChemistry::UNKNOWN);  // not set
-    CATCH_CHECK(stereo_common.raw_data.numel() == 0);      // moved to features
+    CATCH_CHECK(stereo_common.rapid_chemistry == dorado::models::RapidChemistry::NONE);
+    CATCH_CHECK(stereo_common.raw_data.numel() == 0);  // moved to features
     CATCH_CHECK(stereo_common.read_id == "template_read;complement_read");
     CATCH_CHECK(stereo_common.read_tag == 314);
     CATCH_CHECK(stereo_common.run_id == "test_run");
