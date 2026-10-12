@@ -38,6 +38,7 @@ dorado_add_library(dorado_basecall
         DecoderTest.cpp
         ModelRunnerTest.cpp
         TensorRunnerStateTest.cpp
+        TypedRunnerContextTest.cpp
     DEPENDS_PUBLIC
         dorado_config
         dorado_modbase
