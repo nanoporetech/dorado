@@ -23,7 +23,8 @@ DecoderResult CUDADecoder::prepare_decode(DecoderInput input) const {
         utils::ScopedProfileRange spr{"convert_scores", 2};
         scores = scores.to(at::kHalf).mul_(m_score_range / 127.f);
     }
-    auto &options = input.options;
+
+    const auto &options = input.options;
 
     c10::cuda::CUDAGuard device_guard(scores.device());
     utils::ScopedProfileRange loop{"gpu_decode", 1};
