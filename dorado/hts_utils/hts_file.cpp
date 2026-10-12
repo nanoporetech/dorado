@@ -87,8 +87,7 @@ HtsFile::HtsFile(std::string filename,
           m_thread_pool(std::move(thread_pool)),
           m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
-          m_mode(mode),
-          m_htslib_write_mode(htslib_write_mode()) {
+          m_mode(mode) {
     init_file();
 
     if (m_finalise_is_noop && !m_file) {
@@ -118,7 +117,7 @@ void HtsFile::init_file() {
     case OutputMode::FASTA:
     case OutputMode::SAM:
     case OutputMode::UBAM:
-        m_file.reset(hts_open(m_filename.c_str(), m_htslib_write_mode.c_str()));
+        m_file.reset(hts_open(m_filename.c_str(), htslib_write_mode()));
         return;
     case OutputMode::BAM:
     case OutputMode::CRAM:
@@ -129,7 +128,7 @@ void HtsFile::init_file() {
             m_finalise_is_noop = false;
         } else {
             m_sort_bam = false;
-            m_file.reset(hts_open(m_filename.c_str(), m_htslib_write_mode.c_str()));
+            m_file.reset(hts_open(m_filename.c_str(), htslib_write_mode()));
         }
         return;
     }
@@ -137,7 +136,7 @@ void HtsFile::init_file() {
                              std::to_string(static_cast<int>(m_mode)));
 };
 
-std::string HtsFile::htslib_write_mode() const {
+const char* HtsFile::htslib_write_mode() const {
     switch (m_mode) {
     case OutputMode::UBAM:
         return "wb0";
@@ -212,7 +211,7 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     auto file_index = m_temp_files.size();
     auto tempfilename = m_filename + "." + std::to_string(file_index) + ".tmp";
     m_temp_files.push_back(tempfilename);
-    m_file.reset(hts_open(tempfilename.c_str(), m_htslib_write_mode.c_str()));
+    m_file.reset(hts_open(tempfilename.c_str(), htslib_write_mode()));
     if (!m_file) {
         throw std::runtime_error("Could not open file: " + tempfilename);
     }
@@ -450,7 +449,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
     }
 
     // Open the output file, and write the header.
-    HtsFilePtr out_file(hts_open(merged_filename.c_str(), m_htslib_write_mode.c_str()));
+    HtsFilePtr out_file(hts_open(merged_filename.c_str(), htslib_write_mode()));
     try {
         initialise_threads(out_file.get());
     } catch (const std::runtime_error&) {

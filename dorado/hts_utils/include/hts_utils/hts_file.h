@@ -62,7 +62,7 @@ public:
     static uint64_t calculate_sorting_key(const bam1_t* record);
 
     OutputMode get_output_mode() const { return m_mode; }
-    std::string htslib_write_mode() const;
+    const char* htslib_write_mode() const;
     std::string index_extension() const;
 
 private:
@@ -81,7 +81,6 @@ private:
     bool m_finalise_is_noop;
     bool m_sort_bam;
     const OutputMode m_mode;
-    const std::string m_htslib_write_mode;
     std::string m_reference;
 
     std::vector<std::byte> m_bam_buffer;
