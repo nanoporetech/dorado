@@ -9,13 +9,7 @@
 #include <vector>
 
 namespace dorado::basecall {
-
-#if DORADO_CUDA_BUILD
-class CudaCaller;
-#elif DORADO_METAL_BUILD
-class MetalCaller;
-#endif
-
+class ModelCaller;
 }  // namespace dorado::basecall
 
 namespace dorado::modbase {
@@ -29,14 +23,8 @@ struct BasecallModelConfig;
 namespace dorado::api {
 using dorado::basecall::PipelineType;
 
-#if DORADO_CUDA_BUILD
-std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
+std::shared_ptr<basecall::ModelCaller> create_basecall_caller(
         const basecall::BasecallerCreationParams& params);
-#elif DORADO_METAL_BUILD
-std::shared_ptr<basecall::MetalCaller> create_metal_caller(
-        const config::BasecallModelConfig& model_config,
-        float memory_limit_fraction);
-#endif
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
         const std::vector<config::ModBaseModelConfig>& model_configs,

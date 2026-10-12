@@ -37,8 +37,7 @@ std::vector<decode::DecodedChunk> CPUCaller::call_chunks(TensorRunnerState& stat
     at::InferenceMode guard;
     stats::Timer timer;
     auto scores_TNC =
-            m_module->forward(state.input().to(m_options.device())).transpose(0, 1)
-                              .contiguous();
+            m_module->forward(state.input().to(m_options.device())).transpose(0, 1).contiguous();
     const auto forward_ms = timer.GetElapsedMS();
     auto decoded_chunks = m_decoder->decode(
             m_decoder->prepare_decode({scores_TNC, num_chunks, m_decoder_options}));

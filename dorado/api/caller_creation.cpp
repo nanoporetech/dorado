@@ -1,6 +1,10 @@
 #include "api/caller_creation.h"
 
+#include "basecall/CPUCaller.h"
+#include "basecall/ModelCaller.h"
 #include "modbase/ModBaseCaller.h"
+
+#include <stdexcept>
 
 #if DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
@@ -10,18 +14,20 @@
 
 namespace dorado::api {
 
-#if DORADO_CUDA_BUILD
-std::shared_ptr<basecall::CudaCaller> create_cuda_caller(
+std::shared_ptr<basecall::ModelCaller> create_basecall_caller(
         const basecall::BasecallerCreationParams& params) {
+    if (params.device == "cpu") {
+        return std::make_shared<basecall::CPUCaller>(params.model_config);
+    }
+#if DORADO_CUDA_BUILD
     return std::make_shared<basecall::CudaCaller>(params);
-}
 #elif DORADO_METAL_BUILD
-std::shared_ptr<basecall::MetalCaller> create_metal_caller(
-        const config::BasecallModelConfig& model_config,
-        float memory_limit_fraction) {
-    return basecall::MetalCaller::create(model_config, memory_limit_fraction);
-}
+    if (params.device == "metal") {
+        return basecall::MetalCaller::create(params.model_config, params.memory_limit_fraction);
+    }
 #endif
+    throw std::runtime_error("Unsupported device: " + params.device);
+}
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
         const std::vector<config::ModBaseModelConfig>& model_configs,

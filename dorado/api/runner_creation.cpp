@@ -1,6 +1,6 @@
 #include "api/runner_creation.h"
 
-#include "basecall/CPUCaller.h"
+#include "basecall/ModelCaller.h"
 #include "basecall/ModelRunner.h"
 #include "basecall/crf_utils.h"
 #include "config/ModBaseModelConfig.h"
@@ -8,10 +8,7 @@
 
 #include <thread>
 
-#if DORADO_METAL_BUILD
-#include "basecall/MetalCaller.h"
-#elif DORADO_CUDA_BUILD
-#include "basecall/CudaCaller.h"
+#if DORADO_CUDA_BUILD
 #include "nn/KoiUtils.h"
 #include "torch_utils/cuda_utils.h"
 
@@ -75,7 +72,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
         DORADO_LOG(debug, "- CPU calling: set num_cpu_runners to {}", num_cpu_runners);
         for (size_t i = 0; i < num_cpu_runners; i++) {
-            auto caller = std::make_shared<basecall::CPUCaller>(params.model_config);
+            auto caller = create_basecall_caller(params);
             runners.push_back(std::make_unique<basecall::ModelRunner>(std::move(caller), 0));
         }
         if (runners.back()->batch_size() != (size_t)params.model_config.basecaller.batch_size()) {
@@ -84,7 +81,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     }
 #if DORADO_METAL_BUILD
     else if (params.device == "metal") {
-        auto caller = create_metal_caller(params.model_config, params.memory_limit_fraction);
+        auto caller = create_basecall_caller(params);
         for (size_t i = 0; i < num_gpu_runners; i++) {
             runners.push_back(std::make_unique<basecall::ModelRunner>(caller, 0));
         }
@@ -105,8 +102,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         }
 
         cxxpool::thread_pool pool{num_devices};
-        std::vector<std::shared_ptr<basecall::CudaCaller>> callers;
-        std::vector<std::future<std::shared_ptr<basecall::CudaCaller>>> futures;
+        std::vector<std::shared_ptr<basecall::ModelCaller>> callers;
+        std::vector<std::future<std::shared_ptr<basecall::ModelCaller>>> futures;
 
         futures.reserve(devices.size());
 
@@ -120,7 +117,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
                     .batch_size_time_penalty = params.batch_size_time_penalty,
                     .variable_chunk_sizes = params.variable_chunk_sizes,
             };
-            futures.push_back(pool.push(create_cuda_caller, per_device_params));
+            futures.push_back(pool.push(create_basecall_caller, per_device_params));
         }
 
         callers.reserve(futures.size());
@@ -196,22 +193,13 @@ std::vector<modbase::RunnerPtr> create_modbase_runners(
     return runners;
 }
 
-#if DORADO_CUDA_BUILD
-size_t get_num_batch_dims(const std::shared_ptr<basecall::CudaCaller>& caller) {
+size_t get_num_batch_dims(const std::shared_ptr<basecall::ModelCaller>& caller) {
     return caller->num_batch_dims();
 }
-basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller,
+basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::ModelCaller> caller,
                                            size_t batch_dims_idx) {
     return std::make_unique<basecall::ModelRunner>(std::move(caller), batch_dims_idx);
 }
-#elif DORADO_METAL_BUILD
-size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>&) {
-    return 1;  // Always 1 for Metal. Just needed for a unified interface for GPU builds.
-}
-basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller, size_t) {
-    return std::make_unique<basecall::ModelRunner>(std::move(caller), 0);
-}
-#endif
 
 modbase::RunnerPtr create_modbase_runner(std::shared_ptr<modbase::ModBaseCaller> caller) {
     return std::make_unique<::dorado::modbase::ModBaseRunner>(std::move(caller));
