@@ -9,7 +9,7 @@
 #include <thread>
 
 #if DORADO_METAL_BUILD
-#include "basecall/MetalModelRunner.h"
+#include "basecall/MetalCaller.h"
 #elif DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
 #include "nn/KoiUtils.h"
@@ -86,7 +86,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
     else if (params.device == "metal") {
         auto caller = create_metal_caller(params.model_config, params.memory_limit_fraction);
         for (size_t i = 0; i < num_gpu_runners; i++) {
-            runners.push_back(std::make_unique<basecall::MetalModelRunner>(caller));
+            runners.push_back(std::make_unique<basecall::ModelRunner>(caller, 0));
         }
         if (params.model_config.basecaller.batch_size() == 0) {
             DORADO_LOG(info, " - set batch size to {}", runners.back()->batch_size());
@@ -209,7 +209,7 @@ size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>&) {
     return 1;  // Always 1 for Metal. Just needed for a unified interface for GPU builds.
 }
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::MetalCaller> caller, size_t) {
-    return std::make_unique<basecall::MetalModelRunner>(std::move(caller));
+    return std::make_unique<basecall::ModelRunner>(std::move(caller), 0);
 }
 #endif
 

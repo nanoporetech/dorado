@@ -10,7 +10,6 @@ dorado_add_library(dorado_basecall
         DecodedChunk.h
         DecodedChunk.h
         MetalCaller.h
-        MetalModelRunner.h
         ModelCaller.h
         ModelRunner.h
         ModelRunnerBase.h
@@ -54,7 +53,6 @@ if(APPLE)
             caller/MetalLSTMCaller.h
             caller/MPSCaller.cpp
             caller/MPSCaller.h
-            MetalModelRunner.cpp
             model/MetalCRFModel.cpp
             model/MetalCRFModel.h
     )

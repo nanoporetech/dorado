@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DecodedChunk.h"
+#include "ModelCaller.h"
 #include "config/BasecallModelConfig.h"
 #include "torch_utils/metal_utils.h"
 
@@ -19,7 +20,7 @@ namespace dorado::basecall {
 
 using DecodedData = std::tuple<std::string, std::string, std::vector<uint8_t>>;
 
-class MetalCaller {
+class MetalCaller : public ModelCaller {
 protected:
     explicit MetalCaller(const config::BasecallModelConfig &model_config)
             : m_config(model_config) {}
@@ -31,17 +32,23 @@ public:
                                        const config::BasecallModelConfig &config);
     static int get_batch_size_granularity(const config::BasecallModelConfig &config);
 
-    virtual ~MetalCaller();
+    ~MetalCaller() override;
+
+    std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override;
+    std::vector<decode::DecodedChunk> call_chunks(RunnerContext &context, int num_chunks) override;
+    size_t num_batch_dims() const override { return 1; }
 
     virtual at::Tensor create_input_tensor() const = 0;
     void call_chunks(at::Tensor &input,
                      int num_chunks,
                      std::vector<decode::DecodedChunk> &out_chunks);
 
-    void terminate();
-    void restart();
+    void terminate() override;
+    void restart() override;
 
-    const config::BasecallModelConfig &config() const { return m_config; }
+    const config::BasecallModelConfig &config() const override { return m_config; }
+    std::string get_name() const override { return "MetalCaller"; }
+    stats::NamedStats sample_stats() const override { return {}; }
 
     struct NNTask;
 
