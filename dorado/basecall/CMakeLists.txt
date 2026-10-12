@@ -31,6 +31,8 @@ dorado_add_library(dorado_basecall
         ModelRunner.cpp
         ModelCaller.cpp
         ModelRunnerBase.cpp
+        caller/TensorRunnerContext.cpp
+        caller/TensorRunnerContext.h
     SOURCES_TEST
         DecoderTest.cpp
         ModelRunnerTest.cpp

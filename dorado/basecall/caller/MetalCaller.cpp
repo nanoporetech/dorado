@@ -3,11 +3,10 @@
 #include "MPSCaller.h"
 #include "MetalCallerTask.h"
 #include "MetalLSTMCaller.h"
+#include "TensorRunnerContext.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
 #include "utils/thread_utils.h"
-
-#include <ATen/TensorIndexing.h>
 
 #include <algorithm>
 #include <chrono>
@@ -20,34 +19,6 @@ using namespace dorado::utils;
 using namespace std::chrono_literals;
 
 namespace dorado::basecall {
-
-namespace {
-
-class MetalRunnerContext final : public ModelCaller::RunnerContext {
-public:
-    explicit MetalRunnerContext(const MetalCaller &caller)
-            : m_config(caller.config()), m_input(caller.create_input_tensor()) {}
-
-    void accept_chunk(int chunk_idx, const at::Tensor &chunk_CT) override {
-        assert(m_config.num_features == chunk_CT.size(0));
-        using at::indexing::Ellipsis;
-        if (m_config.is_lstm_model()) {
-            m_input.index_put_({chunk_idx, Ellipsis, Ellipsis}, chunk_CT.transpose(0, 1));
-        } else {
-            m_input.index_put_({chunk_idx, Ellipsis, Ellipsis}, chunk_CT);
-        }
-    }
-
-    size_t chunk_size() const override {
-        return m_config.is_lstm_model() ? m_input.size(1) : m_input.size(2);
-    }
-    size_t batch_size() const override { return m_input.size(0); }
-
-    const config::BasecallModelConfig &m_config;
-    at::Tensor m_input;
-};
-
-}  // namespace
 
 std::shared_ptr<MetalCaller> MetalCaller::create(const config::BasecallModelConfig &model_config,
                                                  float memory_limit_fraction) {
@@ -68,18 +39,19 @@ std::unique_ptr<ModelCaller::RunnerContext> MetalCaller::create_runner_context(
     if (batch_dims_idx != 0) {
         throw std::out_of_range("Metal caller only has one batch dimension");
     }
-    return std::make_unique<MetalRunnerContext>(*this);
+    const auto layout = m_config.is_lstm_model() ? TensorLayout::NTC : TensorLayout::NCT;
+    return std::make_unique<TensorRunnerContext>(create_input_tensor(), layout);
 }
 
 std::vector<decode::DecodedChunk> MetalCaller::call_chunks(RunnerContext &generic_context,
                                                            int num_chunks) {
-    auto *context = dynamic_cast<MetalRunnerContext *>(&generic_context);
+    auto *context = dynamic_cast<TensorRunnerContext *>(&generic_context);
     if (context == nullptr) {
         throw std::invalid_argument("Metal caller received an incompatible runner context");
     }
 
     std::vector<decode::DecodedChunk> out_chunks(num_chunks);
-    call_chunks(context->m_input, num_chunks, out_chunks);
+    call_chunks(context->input(), num_chunks, out_chunks);
     return out_chunks;
 }
 

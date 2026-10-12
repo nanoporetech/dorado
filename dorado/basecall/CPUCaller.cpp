@@ -1,35 +1,12 @@
 #include "basecall/CPUCaller.h"
 
 #include "basecall/crf_utils.h"
+#include "caller/TensorRunnerContext.h"
 #include "decode/Decoder.h"
 
 #include <stdexcept>
 
 namespace dorado::basecall {
-
-namespace {
-
-class CPURunnerContext final : public ModelCaller::RunnerContext {
-public:
-    CPURunnerContext(size_t batch_size,
-                     size_t num_features,
-                     size_t chunk_size,
-                     const at::TensorOptions& options)
-            : m_input_NCT(at::zeros(
-                      {static_cast<int64_t>(batch_size), static_cast<int64_t>(num_features),
-                       static_cast<int64_t>(chunk_size)},
-                      options)) {}
-
-    void accept_chunk(int chunk_idx, const at::Tensor& chunk_CT) override {
-        m_input_NCT.index_put_({chunk_idx, at::indexing::Ellipsis}, chunk_CT);
-    }
-    size_t chunk_size() const override { return m_input_NCT.size(2); }
-    size_t batch_size() const override { return m_input_NCT.size(0); }
-
-    at::Tensor m_input_NCT;
-};
-
-}  // namespace
 
 CPUCaller::CPUCaller(const config::BasecallModelConfig& model_config)
         : m_config(model_config),
@@ -48,22 +25,23 @@ std::unique_ptr<ModelCaller::RunnerContext> CPUCaller::create_runner_context(
     if (batch_dims_idx != 0) {
         throw std::out_of_range("CPU caller only has one batch dimension");
     }
-    return std::make_unique<CPURunnerContext>(m_config.basecaller.batch_size(),
-                                              m_config.num_features,
-                                              m_config.basecaller.chunk_size(), m_options);
+    auto input = at::zeros({m_config.basecaller.batch_size(), m_config.num_features,
+                            m_config.basecaller.chunk_size()},
+                           m_options);
+    return std::make_unique<TensorRunnerContext>(std::move(input), TensorLayout::NCT);
 }
 
 std::vector<decode::DecodedChunk> CPUCaller::call_chunks(RunnerContext& generic_context,
                                                          int num_chunks) {
-    auto* context = dynamic_cast<CPURunnerContext*>(&generic_context);
+    auto* context = dynamic_cast<TensorRunnerContext*>(&generic_context);
     if (context == nullptr) {
         throw std::invalid_argument("CPU caller received an incompatible runner context");
     }
 
     at::InferenceMode guard;
     stats::Timer timer;
-    auto scores_TNC = m_module->forward(context->m_input_NCT.to(m_options.device()))
-                              .transpose(0, 1)
+    auto scores_TNC =
+            m_module->forward(context->input().to(m_options.device())).transpose(0, 1)
                               .contiguous();
     const auto forward_ms = timer.GetElapsedMS();
     auto decoded_chunks = m_decoder->decode(
