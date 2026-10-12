@@ -11,7 +11,6 @@
 #include "basecall/MetalModelRunner.h"
 #elif DORADO_CUDA_BUILD
 #include "basecall/CudaCaller.h"
-#include "basecall/CudaModelRunner.h"
 #include "nn/KoiUtils.h"
 #include "torch_utils/cuda_utils.h"
 
@@ -131,8 +130,8 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
             size_t num_batch_dims = callers[j]->num_batch_dims();
             for (size_t i = 0; i < num_gpu_runners; i++) {
                 for (size_t batch_dims_idx = 0; batch_dims_idx < num_batch_dims; ++batch_dims_idx) {
-                    runners.push_back(std::make_unique<basecall::CudaModelRunner>(callers[j],
-                                                                                  batch_dims_idx));
+                    runners.push_back(
+                            std::make_unique<basecall::ModelRunner>(callers[j], batch_dims_idx));
                 }
             }
         }
@@ -201,7 +200,7 @@ size_t get_num_batch_dims(const std::shared_ptr<basecall::CudaCaller>& caller) {
 }
 basecall::RunnerPtr create_basecall_runner(std::shared_ptr<basecall::CudaCaller> caller,
                                            size_t batch_dims_idx) {
-    return std::make_unique<basecall::CudaModelRunner>(std::move(caller), batch_dims_idx);
+    return std::make_unique<basecall::ModelRunner>(std::move(caller), batch_dims_idx);
 }
 #elif DORADO_METAL_BUILD
 size_t get_num_batch_dims(const std::shared_ptr<basecall::MetalCaller>&) {

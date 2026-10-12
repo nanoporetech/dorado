@@ -1,6 +1,7 @@
 #pragma once
 
 #include "DecodedChunk.h"
+#include "ModelCaller.h"
 #include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
 #include "modbase/nn/ModBaseModel.h"
@@ -25,18 +26,20 @@ namespace decode {
 class Decoder;
 }  // namespace decode
 
-class CudaCaller {
+class CudaCaller final : public ModelCaller {
 public:
     CudaCaller(const BasecallerCreationParams &params);
 
-    ~CudaCaller();
+    ~CudaCaller() override;
+    std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override;
+    std::vector<decode::DecodedChunk> call_chunks(RunnerContext &context, int num_chunks) override;
     std::vector<decode::DecodedChunk> call_chunks(at::Tensor &input,
                                                   at::Tensor &output,
                                                   int num_chunks,
                                                   nn::AuxiliaryData *aux /* = nullptr */);
 
-    void terminate();
-    void restart();
+    void terminate() override;
+    void restart() override;
 
     std::tuple<at::Tensor, at::Tensor, at::Tensor> create_input_output_tensor(
             size_t batch_dims_idx) const;
@@ -47,13 +50,13 @@ public:
         return m_batch_dims[batch_dims_idx].T_in;
     }
     bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
-    size_t num_batch_dims() const { return m_batch_dims.size(); };
+    size_t num_batch_dims() const override { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
-    const config::BasecallModelConfig &config() const { return m_config; }
-    bool is_low_latency() const { return m_low_latency; }
-    std::string get_name() const { return std::string("CudaCaller_") + m_device; }
-    stats::NamedStats sample_stats() const;
-    std::pair<int, int> batch_timeouts_ms() const;
+    const config::BasecallModelConfig &config() const override { return m_config; }
+    bool is_low_latency() const override { return m_low_latency; }
+    std::string get_name() const override { return std::string("CudaCaller_") + m_device; }
+    stats::NamedStats sample_stats() const override;
+    std::pair<int, int> batch_timeouts_ms() const override;
 
     static int get_batch_size_granularity(const config::BasecallModelConfig &model_config);
     static int64_t get_gpu_mem_limit(c10::Device device, float memory_limit_fraction);

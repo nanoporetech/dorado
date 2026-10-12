@@ -6,11 +6,11 @@ dorado_add_library(dorado_basecall
     SOURCES_PUBLIC
         crf_utils.h
         CudaCaller.h
-        CudaModelRunner.h
         DecodedChunk.h
         DecodedChunk.h
         MetalCaller.h
         MetalModelRunner.h
+        ModelCaller.h
         ModelRunner.h
         ModelRunnerBase.h
     SOURCES_PRIVATE
@@ -58,7 +58,6 @@ else()
     target_sources(dorado_basecall
         PRIVATE
             CudaCaller.cpp
-            CudaModelRunner.cpp
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
     )
