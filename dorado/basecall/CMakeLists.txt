@@ -31,6 +31,7 @@ dorado_add_library(dorado_basecall
         ModelRunnerBase.cpp
     SOURCES_TEST
         DecoderTest.cpp
+        ModelRunnerTest.cpp
     DEPENDS_PUBLIC
         dorado_config
         dorado_modbase
