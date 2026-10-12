@@ -27,10 +27,9 @@ auto make_read(int delay_ms, std::string seq) {
     read->read_common.num_trimmed_samples = 10;
     read->read_common.attributes.channel_number = 664;
     read->read_common.attributes.mux = 3;
-    read->read_common.attributes.num_samples = 10000;
     read->read_common.attributes.sample_rate = 4000;
     read->start_sample = 29767426 + (delay_ms * read->read_common.attributes.sample_rate) / 1000;
-    read->end_sample = read->start_sample + read->read_common.attributes.num_samples;
+    read->end_sample = read->start_sample + 10000;
     read->run_acquisition_start_time_ms = 1676976119670;
     read->read_common.start_time_ms =
             read->run_acquisition_start_time_ms +

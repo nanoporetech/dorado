@@ -20,7 +20,6 @@ CATCH_TEST_CASE("2 subread split", TEST_GROUP) {
     read->read_common.attributes.channel_number = 2207;
     read->read_common.attributes.mux = 4;
     read->read_common.attributes.start_time = "2023-08-11T02:56:14.296+00:00";
-    read->read_common.attributes.num_samples = 10494;
     read->read_common.attributes.sample_rate = 4000;
     read->read_common.scaling_method = "test";
 
@@ -35,11 +34,11 @@ CATCH_TEST_CASE("2 subread split", TEST_GROUP) {
     const auto split_res = splitter_node.split(std::move(read));
     CATCH_REQUIRE(split_res.size() == 2);
 
-    CATCH_CHECK(split_res[0]->read_common.attributes.num_samples == 4833);
+    CATCH_CHECK(split_res[0]->read_common.get_raw_data_samples() == 4833);
     CATCH_CHECK(split_res[0]->read_common.split_point == 0);
     CATCH_CHECK(split_res[0]->read_common.scaling_method == "test");
 
-    CATCH_CHECK(split_res[1]->read_common.attributes.num_samples == 5657);
+    CATCH_CHECK(split_res[1]->read_common.get_raw_data_samples() == 5657);
     CATCH_CHECK(split_res[1]->read_common.split_point == 4837);
     CATCH_CHECK(split_res[1]->read_common.scaling_method == "test");
 }

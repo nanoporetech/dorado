@@ -7,6 +7,8 @@
 
 namespace dorado {
 
+DuplexReadPtr stereo_encode(ReadPair pair, int input_signal_stride);
+
 class StereoDuplexEncoderNode final : public MessageSink {
 public:
     explicit StereoDuplexEncoderNode(int input_signal_stride);
@@ -16,8 +18,6 @@ public:
     stats::NamedStats sample_stats() const override;
     void terminate(const TerminateOptions&) override;
     void restart() override;
-
-    DuplexReadPtr stereo_encode(ReadPair pair);
 
 private:
     StereoDuplexEncoderNode(const StereoDuplexEncoderNode&) = delete;

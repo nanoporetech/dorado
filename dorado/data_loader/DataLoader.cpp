@@ -189,7 +189,6 @@ SimplexReadPtr process_pod5_thread_fn(
     new_read->read_common.attributes.read_number = read_data.read_number;
     new_read->read_common.attributes.filename = filename;
     new_read->read_common.attributes.mux = read_data.well;
-    new_read->read_common.attributes.num_samples = read_data.num_samples;
     new_read->read_common.attributes.channel_number = read_data.channel;
     new_read->read_common.attributes.start_time = start_time;
     new_read->read_common.run_id = run_info_data->protocol_run_id;

@@ -157,7 +157,6 @@ void mux_change_trim_read(ReadCommon& read_common) {
     // Trim the signal
     const size_t trim_signal_idx = read_common.moves.size() * read_common.attributes.model_stride;
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
-    read_common.attributes.num_samples = read_common.get_raw_data_samples();
 
     read_common.num_minknow_events = 0;  // No way to know how the events were distributed, zero out
 
