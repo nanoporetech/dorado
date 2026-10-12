@@ -9,6 +9,13 @@
 
 namespace dorado::basecall::decode {
 
+DecoderOptions create_decoder_options(const config::BasecallModelConfig& config) {
+    DecoderOptions options;
+    options.q_shift = config.qbias;
+    options.q_scale = config.qscale;
+    return options;
+}
+
 std::unique_ptr<Decoder> create_decoder(c10::Device device,
                                         const config::BasecallModelConfig& config) {
 #if DORADO_CUDA_BUILD

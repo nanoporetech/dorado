@@ -2,6 +2,7 @@
 
 #include "MetalCallerTask.h"
 #include "basecall/crf_utils.h"
+#include "decode/Decoder.h"
 #include "decode/beam_search.h"
 #include "model/TxModel.h"
 #include "torch_utils/metal_utils.h"
@@ -93,9 +94,7 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
         const int n_base = model_config.is_tx_model() ? model_config.tx->crf.n_base : 4;
         m_states = std::pow(n_base, model_config.state_len);
 
-        m_decoder_options = decode::DecoderOptions();
-        m_decoder_options.q_shift = model_config.qbias;
-        m_decoder_options.q_scale = model_config.qscale;
+        m_decoder_options = decode::create_decoder_options(model_config);
 
         if (model_config.is_tx_model() &&
             m_decoder_options.blank_score != model_config.tx->crf.blank_score) {
