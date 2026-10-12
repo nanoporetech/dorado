@@ -29,6 +29,8 @@ dorado_add_library(dorado_basecall
         model/TxModel.h
         ModelRunner.cpp
         ModelRunnerBase.cpp
+    SOURCES_TEST
+        DecoderTest.cpp
     DEPENDS_PUBLIC
         dorado_config
         dorado_modbase
