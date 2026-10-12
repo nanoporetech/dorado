@@ -144,8 +144,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     assert(m_options.device().is_cuda());
     assert(params.model_config.has_normalised_basecaller_params());
 
-    m_decoder_options.q_shift = params.model_config.qbias;
-    m_decoder_options.q_scale = params.model_config.qscale;
+    m_decoder_options = decode::create_decoder_options(params.model_config);
     m_num_input_features = params.model_config.num_features;
 
     // If we allow this to be changed then calculate_memory_requirements() will

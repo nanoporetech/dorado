@@ -2,6 +2,7 @@
 
 #include "MetalCallerTask.h"
 #include "basecall/crf_utils.h"
+#include "decode/Decoder.h"
 #include "decode/beam_search.h"
 #include "model/MetalCRFModel.h"
 #include "torch_utils/metal_utils.h"
@@ -48,9 +49,7 @@ MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
 
     m_device = get_mtl_device();
 
-    m_decoder_options = decode::DecoderOptions();
-    m_decoder_options.q_shift = model_config.qbias;
-    m_decoder_options.q_scale = model_config.qscale;
+    m_decoder_options = decode::create_decoder_options(model_config);
 
     // TODO -- we don't honour the config n_base
     constexpr int n_base = 4;

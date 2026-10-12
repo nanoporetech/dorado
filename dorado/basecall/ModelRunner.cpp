@@ -13,8 +13,7 @@ ModelRunner::ModelRunner(const config::BasecallModelConfig &model_config)
           m_module(load_crf_model(model_config, m_options)) {
     assert(model_config.has_normalised_basecaller_params());
 
-    m_decoder_options.q_shift = model_config.qbias;
-    m_decoder_options.q_scale = model_config.qscale;
+    m_decoder_options = decode::create_decoder_options(model_config);
 
     // Should have set batch_size to non-zero value if device == cpu
     assert(model_config.basecaller.batch_size() > 0);

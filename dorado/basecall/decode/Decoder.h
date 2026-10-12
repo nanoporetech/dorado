@@ -40,4 +40,6 @@ protected:
 std::unique_ptr<Decoder> create_decoder(c10::Device device,
                                         const config::BasecallModelConfig &config);
 
+DecoderOptions create_decoder_options(const config::BasecallModelConfig &config);
+
 }  // namespace dorado::basecall::decode
