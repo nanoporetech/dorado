@@ -62,7 +62,6 @@ public:
     static uint64_t calculate_sorting_key(const bam1_t* record);
 
     OutputMode get_output_mode() const { return m_mode; }
-    const char* htslib_write_mode() const;
     std::string index_extension() const;
 
 private:
