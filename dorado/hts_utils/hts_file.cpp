@@ -312,7 +312,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         // Otherwise merge the temp files.
         bool merge_complete = merge_temp_files_iteratively(progress_callback);
         if (!merge_complete) {
-            DORADO_LOG(error, "Merging of temporary files failed.");
+            DORADO_LOG(error, "Merging of temporary files failed: {}", m_filename);
             return;
         }
     }
