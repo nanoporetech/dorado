@@ -23,9 +23,6 @@ constexpr size_t DEFAULT_BUFFER_SIZE{
         20000000};  // Arbitrary 20 MB. Can be overridden by application code.
 constexpr size_t MAX_FILES_FOR_MERGE{512};  // Maximum number of files to merge at once.
 
-// Store temporary files as uncompressed BAMs so that they skip compression when reading/writing.
-constexpr HtsFile::OutputMode temp_file_mode = HtsFile::OutputMode::UBAM;
-
 bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& header2) {
     return (strcmp(sam_hdr_str(header1.get()), sam_hdr_str(header2.get())) == 0);
 }

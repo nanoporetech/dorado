@@ -43,6 +43,9 @@ public:
         FASTA,
     };
 
+    // Store temporary files as uncompressed BAMs so that they skip compression when reading/writing.
+    static constexpr OutputMode temp_file_mode = OutputMode::UBAM;
+
     HtsFile(std::string filename,
             OutputMode mode,
             std::shared_ptr<HtsThreadPool> thread_pool,
