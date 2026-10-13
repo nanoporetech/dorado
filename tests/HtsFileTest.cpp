@@ -12,6 +12,7 @@
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/internal/catch_run_context.hpp>
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -62,7 +63,7 @@ struct Tester {
         header_in.reset();
         indices.resize(records.size());
         std::iota(indices.begin(), indices.end(), 0);
-        auto rng = std::default_random_engine{};
+        std::minstd_rand rng(Catch::rngSeed());
         std::shuffle(indices.begin(), indices.end(), rng);
         return static_cast<int>(records.size());
     }
