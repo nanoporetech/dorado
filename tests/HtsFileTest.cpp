@@ -105,6 +105,7 @@ struct Tester {
             ++index;
             record.reset(bam_init1());
         }
+        CATCH_REQUIRE(index == records.size());
         file_in.reset();
         header_in.reset();
     }
