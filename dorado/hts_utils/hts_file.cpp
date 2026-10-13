@@ -31,13 +31,6 @@ bool compare_headers(const dorado::SamHdrPtr& header1, const dorado::SamHdrPtr& 
 constexpr std::array fastq_aux_tags{"RG", "st", "DS", "qs", "ch", "PU",
                                     "DT", "mv", "SM", "al", "tm", "LB"};
 
-void set_cram_opt(const dorado::HtsFilePtr& file, const std::string& reference) {
-    if (hts_set_opt(file.get(), CRAM_OPT_REFERENCE, reference.c_str()) < 0) {
-        throw std::runtime_error(
-                fmt::format("Failed to set CRAM reference using '{}'.", reference));
-    }
-}
-
 const char* htslib_write_mode(HtsFile::OutputMode mode) {
     switch (mode) {
     case HtsFile::OutputMode::UBAM:
@@ -155,6 +148,17 @@ void HtsFile::init_file() {
     set_buffer_size(DEFAULT_BUFFER_SIZE);
 }
 
+void HtsFile::set_cram_opt(HtsFilePtr& file) const {
+    if (m_mode != OutputMode::CRAM || m_reference.empty()) {
+        return;
+    }
+
+    if (hts_set_opt(file.get(), CRAM_OPT_REFERENCE, m_reference.c_str()) < 0) {
+        throw std::runtime_error(
+                fmt::format("Failed to set CRAM reference using '{}'.", m_reference));
+    }
+}
+
 std::string HtsFile::index_extension() const {
     switch (m_mode) {
     case OutputMode::BAM:
@@ -220,9 +224,7 @@ void HtsFile::flush_temp_file(const bam1_t* last_record) {
     }
     initialise_threads(m_file.get());
     if (m_mode != OutputMode::FASTQ && m_mode != OutputMode::FASTA) {
-        if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
-            set_cram_opt(m_file, m_reference);
-        }
+        set_cram_opt(m_file);
         if (sam_hdr_write(m_file.get(), m_header.get()) != 0) {
             throw std::runtime_error("Could not write header to temp file.");
         }
@@ -279,7 +281,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
     // If any reads are cached for writing, write out the final temporary file.
     flush_temp_file(nullptr);
 
-    bool file_is_mapped = (sam_hdr_nref(m_header.get()) > 0) || m_mode == OutputMode::CRAM;
+    const bool file_is_mapped = (sam_hdr_nref(m_header.get()) > 0) || m_mode == OutputMode::CRAM;
     m_header.reset();
 
     if (m_temp_files.empty()) {
@@ -335,9 +337,7 @@ int HtsFile::set_header(const sam_hdr_t* const header) {
             sam_hdr_change_HD(m_header.get(), "SO", "coordinate");
         }
         if (m_file) {
-            if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
-                set_cram_opt(m_file, m_reference);
-            }
+            set_cram_opt(m_file);
             return sam_hdr_write(m_file.get(), m_header.get());
         }
     }
@@ -464,9 +464,7 @@ bool HtsFile::merge_temp_files(ProgressUpdater& update_progress,
         return false;
     }
 
-    if (m_mode == OutputMode::CRAM && !m_reference.empty()) {
-        set_cram_opt(out_file, m_reference);
-    }
+    set_cram_opt(out_file);
 
     SamHdrPtr out_header(sam_hdr_dup(header.get()));
     sam_hdr_change_HD(out_header.get(), "SO", "coordinate");

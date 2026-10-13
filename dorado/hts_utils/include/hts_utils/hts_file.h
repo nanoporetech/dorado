@@ -91,6 +91,7 @@ private:
 
     struct ProgressUpdater;
     void init_file();
+    void set_cram_opt(HtsFilePtr& file) const;
 
     void flush_temp_file(const bam1_t* last_record);
     int write_to_file(const bam1_t* record);
