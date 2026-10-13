@@ -57,7 +57,7 @@ public:
     int set_header(const sam_hdr_t* header);
     int write(bam1_t* record);
 
-    bool finalise_is_noop() const { return m_finalise_is_noop; }
+    bool finalise_is_noop() const { return !m_sort_bam; }
     void finalise(const ProgressCallback& progress_callback);
     static uint64_t calculate_sorting_key(const bam1_t* record);
 
@@ -77,8 +77,7 @@ private:
     SamHdrPtr m_header;
     size_t m_num_records{0};
     bool m_finalised{false};
-    bool m_finalise_is_noop;
-    bool m_sort_bam;
+    const bool m_sort_bam;
     const OutputMode m_mode;
     std::string m_reference;
 

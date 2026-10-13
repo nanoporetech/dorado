@@ -107,14 +107,9 @@ HtsFile::HtsFile(std::string filename,
                  bool sort_bam)
         : m_filename(std::move(filename)),
           m_thread_pool(std::move(thread_pool)),
-          m_finalise_is_noop(true),
           m_sort_bam(sort_bam),
           m_mode(mode) {
     init_file();
-
-    if (m_finalise_is_noop && !m_file) {
-        throw std::runtime_error("Could not open file: " + m_filename);
-    }
 
     if (m_mode == OutputMode::FASTA || m_mode == OutputMode::FASTQ) {
         for (const auto& tag : fastq_aux_tags) {
@@ -134,39 +129,46 @@ HtsFile::HtsFile(std::string filename, OutputMode mode, int threads, bool sort_b
                   sort_bam) {}
 
 void HtsFile::init_file() {
-    switch (m_mode) {
-    case OutputMode::FASTQ:
-    case OutputMode::FASTA:
-    case OutputMode::SAM:
-    case OutputMode::UBAM:
+    if (!m_sort_bam) {
+        // If we're not sorting then open it now.
         m_file.reset(hts_open(m_filename.c_str(), htslib_write_mode(m_mode)));
-        return;
-    case OutputMode::BAM:
-    case OutputMode::CRAM:
-        if (m_filename != "-" && m_sort_bam) {
-            set_buffer_size(DEFAULT_BUFFER_SIZE);
-            // We're doing sorted BAM/CRAM output. We need to indicate this for the
-            // finalise method.
-            m_finalise_is_noop = false;
-        } else {
-            m_sort_bam = false;
-            m_file.reset(hts_open(m_filename.c_str(), htslib_write_mode(m_mode)));
+        if (!m_file) {
+            throw std::runtime_error("Could not open file: " + m_filename);
         }
         return;
     }
-    throw std::runtime_error("Unknown output mode selected: " +
-                             std::to_string(static_cast<int>(m_mode)));
+
+    // Sanity check options if sorting is enabled.
+    if (m_filename == "-") {
+        throw std::runtime_error("Cannot sort output if outputting to stdout");
+    }
+    switch (m_mode) {
+    case OutputMode::BAM:
+    case OutputMode::UBAM:
+    case OutputMode::CRAM:
+        // Sortable.
+        break;
+    case OutputMode::SAM:
+    case OutputMode::FASTA:
+    case OutputMode::FASTQ:
+        throw std::runtime_error("Can only sort BAM/CRAM outputs");
+    }
+
+    // Setup the temporary file buffer.
+    set_buffer_size(DEFAULT_BUFFER_SIZE);
 }
 
 std::string HtsFile::index_extension() const {
-    if (m_mode == OutputMode::BAM) {
+    switch (m_mode) {
+    case OutputMode::BAM:
+    case OutputMode::UBAM:
         return ".bai";
-    }
-    if (m_mode == OutputMode::CRAM) {
+        break;
+    case OutputMode::CRAM:
         return ".crai";
+    default:
+        throw std::logic_error("Unknown htslib index extension for '" + to_string(m_mode) + "'.");
     }
-
-    throw std::logic_error("Unknown htslib index extension for '" + to_string(m_mode) + "'.");
 }
 
 void HtsFile::initialise_threads(htsFile* file) const {
@@ -270,7 +272,7 @@ void HtsFile::finalise(const ProgressCallback& progress_callback) {
         return;
     }
 
-    if (m_finalise_is_noop) {
+    if (!m_sort_bam) {
         // No cleanup is required. Just close the open objects and we're done.
         m_header.reset();
         m_file.reset();
