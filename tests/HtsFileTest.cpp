@@ -397,17 +397,15 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and CRAM mutually exclusi
 }
 
 CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) {
-    auto [output_mode, finalise_noop, ref_req, out_dir] =
-            GENERATE(table<OutputMode, bool, bool, MaybeString>({
-                    // SAM / BAM will sort if writing to file AND reference is set
-                    {OutputMode::SAM, true, false, std::nullopt},
-                    {OutputMode::SAM, true, false, "out"},
-                    {OutputMode::SAM, true, true, std::nullopt},
-                    {OutputMode::SAM, false, true, "out"},
-            }));
+    auto [output_mode, ref_req, out_dir] = GENERATE(table<OutputMode, bool, MaybeString>({
+            {OutputMode::SAM, false, std::nullopt},
+            {OutputMode::SAM, false, "out"},
+            {OutputMode::SAM, true, std::nullopt},
+            {OutputMode::SAM, true, "out"},
+    }));
 
     bool emit_sam = true;
-    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_sam, ref_req, out_dir.has_value());
+    CATCH_CAPTURE(to_string(output_mode), emit_sam, ref_req, out_dir.has_value());
 
     auto writer_builder = BasecallHtsFileWriterBuilder(false, emit_sam, false, ref_req, out_dir,
                                                        no_threads, noop_progress_callback,
@@ -415,7 +413,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
-    CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+    CATCH_CHECK(writer->finalise_is_noop() == true);  // SAM never sorts
 }
 
 class HtsFileWriterBuilderTest : public HtsFileWriterBuilder {
