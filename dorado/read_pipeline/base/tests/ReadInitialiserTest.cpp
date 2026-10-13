@@ -100,7 +100,7 @@ CATCH_TEST_CASE(TEST_GROUP " updates record trim flags without a recognised read
 CATCH_TEST_CASE(TEST_GROUP " updates barcoding fields from a parsed header", TEST_GROUP) {
     auto header = make_header();
     CATCH_REQUIRE(header != nullptr);
-    ReadInitialiser initialiser(header.get(), {}, {});
+    ReadInitialiser initialiser(header.get(), {}, TrimFlags{});
     auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_barcode12");
 
@@ -116,7 +116,7 @@ CATCH_TEST_CASE(TEST_GROUP " updates barcoding fields from a parsed header", TES
 CATCH_TEST_CASE(TEST_GROUP " undemultiplexes read groups using barcode aliases", TEST_GROUP) {
     auto header = make_header();
     CATCH_REQUIRE(header != nullptr);
-    ReadInitialiser initialiser(header.get(), {}, {});
+    ReadInitialiser initialiser(header.get(), {}, TrimFlags{});
     auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_sample-12");
     set_string_tag(data, "al", "sample-12");
@@ -132,7 +132,7 @@ CATCH_TEST_CASE(TEST_GROUP " undemultiplexes read groups using barcode aliases",
 CATCH_TEST_CASE(TEST_GROUP " undemultiplexes read groups using barcode tags", TEST_GROUP) {
     auto header = make_header();
     CATCH_REQUIRE(header != nullptr);
-    ReadInitialiser initialiser(header.get(), {}, {});
+    ReadInitialiser initialiser(header.get(), {}, TrimFlags{});
     auto data = make_data("read");
     set_string_tag(data, "RG", "read_group_barcode12");
     set_string_tag(data, "BC", "barcode12");

@@ -88,8 +88,8 @@ class TrimFlags {
     }
 
 public:
-    constexpr TrimFlags() = default;
-    constexpr TrimFlags(FlagType flags) : m_flags(flags) {
+    constexpr explicit TrimFlags() = default;
+    constexpr explicit TrimFlags(FlagType flags) : m_flags(flags) {
         assert(m_flags <= static_cast<FlagType>(Flag::ALL));
     }
 

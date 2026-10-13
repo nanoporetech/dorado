@@ -132,7 +132,7 @@ std::string filepath(const std::string& folder, const std::string& filename) {
 CATCH_TEST_CASE("HtsFileTest: Write to file", TEST_GROUP) {
     // A 200 KB buffer should make sure multiple temp files are written.
     // A 5 MB buffer should make sure only a single temp file is written.
-    enum BufferSize { Default = 0, Small = 200'000, Big = 5'000'000 };
+    enum class BufferSize : size_t { Default = 0, Small = 200'000, Big = 5'000'000 };
 
     const auto output_mode = GENERATE(HtsFile::OutputMode::UBAM, HtsFile::OutputMode::BAM,
                                       HtsFile::OutputMode::CRAM);
@@ -142,7 +142,8 @@ CATCH_TEST_CASE("HtsFileTest: Write to file", TEST_GROUP) {
 
     Tester tester;
     const int num_records = tester.read_input_records();
-    const int callback_calls = tester.write_output_records(is_sorted, buffer_size, output_mode);
+    const int callback_calls =
+            tester.write_output_records(is_sorted, static_cast<size_t>(buffer_size), output_mode);
 
     const bool matches_temp_format = output_mode == HtsFile::temp_file_mode;
     const bool single_temp_file = buffer_size != BufferSize::Small;

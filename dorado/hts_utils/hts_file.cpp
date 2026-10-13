@@ -46,8 +46,8 @@ const char* htslib_write_mode(HtsFile::OutputMode mode) {
     case HtsFile::OutputMode::FASTA:
         return "wF";
     }
-    throw std::logic_error("Unknown htslib write mode for '" + to_string(static_cast<int>(mode)) +
-                           "'.");
+    throw std::logic_error("Unknown htslib write mode for '" +
+                           std::to_string(static_cast<int>(mode)) + "'.");
 }
 
 }  // namespace
