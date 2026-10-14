@@ -2,6 +2,7 @@
 
 #include "ChunkBenchmarks.h"
 #include "basecall/crf_utils.h"
+#include "caller/TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "torch_utils/cuda_utils.h"
@@ -17,6 +18,7 @@
 #include <algorithm>
 #include <cassert>
 #include <condition_variable>
+#include <cstring>
 #include <limits>
 #include <map>
 #include <mutex>
@@ -25,6 +27,80 @@
 #include <utility>
 
 namespace dorado::basecall {
+
+class CudaRunnerState final {
+public:
+    CudaRunnerState(const CudaCaller &caller, size_t batch_dims_idx)
+            : m_batch_size(caller.batch_size(batch_dims_idx)),
+              m_chunk_size(caller.chunk_size(batch_dims_idx)),
+              m_variable_chunk_sizes(caller.variable_chunk_sizes()),
+              m_is_tx_model(caller.config().is_tx_model()),
+              m_stride(caller.config().stride),
+              m_stride_inner(caller.config().stride_inner()),
+              m_chunk_size_granularity(caller.config().chunk_size_granularity()),
+              m_max_chunk_size(caller.config().basecaller.chunk_size()),
+              m_stream(c10::cuda::getStreamFromPool(false, caller.device().index())) {
+        std::tie(m_input, m_output, m_aux) = caller.create_input_output_tensor(batch_dims_idx);
+        if (m_is_tx_model) {
+            m_first_conv_padding = caller.config().convs.front().winlen / 2;
+            m_chunk_offset = m_first_conv_padding;
+            m_input.narrow(-1, 0, m_first_conv_padding).zero_();
+        }
+    }
+
+    void accept_chunk(int chunk_idx, const at::Tensor &chunk) {
+        if (!m_variable_chunk_sizes) {
+            m_input.index_put_({chunk_idx}, chunk);
+            return;
+        }
+
+        assert(m_input.dim() == 3);
+        assert(m_input.size(0) == 1);
+        if ((m_input.size(1) == 1) && (m_input.dtype() == chunk.dtype())) {
+            assert(chunk.dim() == 2);
+            assert(chunk.size(0) == 1);
+            std::memcpy(static_cast<std::byte *>(m_input.data_ptr()) +
+                                (m_chunk_offset * chunk.element_size()),
+                        chunk.data_ptr(), chunk.size(1) * chunk.element_size());
+        } else {
+            m_input.narrow(-1, m_chunk_offset, chunk.size(1)).copy_(chunk);
+        }
+        m_chunk_sizes.emplace_back(chunk.size(1));
+        m_chunk_offset += m_chunk_sizes.back();
+        if (m_is_tx_model) {
+            m_input.narrow(-1, m_chunk_offset, m_first_conv_padding).zero_();
+            m_chunk_offset += m_first_conv_padding;
+        }
+    }
+
+    size_t chunk_size() const { return m_chunk_size; }
+    size_t batch_size() const { return m_batch_size; }
+    bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
+
+    void reset() {
+        if (m_variable_chunk_sizes) {
+            m_chunk_sizes.clear();
+            m_input.narrow(-1, 0, m_first_conv_padding).zero_();
+            m_chunk_offset = m_first_conv_padding;
+        }
+    }
+
+    at::Tensor m_input;
+    at::Tensor m_output;
+    at::Tensor m_aux;
+    const size_t m_batch_size;
+    const size_t m_chunk_size;
+    const bool m_variable_chunk_sizes;
+    const bool m_is_tx_model;
+    const int m_stride;
+    const int m_stride_inner;
+    const int m_chunk_size_granularity;
+    const int m_max_chunk_size;
+    std::vector<std::int32_t> m_chunk_sizes;
+    size_t m_chunk_offset{0};
+    int m_first_conv_padding{0};
+    c10::cuda::CUDAStream m_stream;
+};
 
 namespace {
 
@@ -216,6 +292,27 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
 }
 
 CudaCaller::~CudaCaller() { terminate(); }
+
+std::unique_ptr<ModelCaller::RunnerContext> CudaCaller::create_runner_context(
+        size_t batch_dims_idx) {
+    return std::make_unique<TypedRunnerContext<CudaCaller, CudaRunnerState>>(*this, *this,
+                                                                             batch_dims_idx);
+}
+
+std::vector<decode::DecodedChunk> CudaCaller::call_chunks(CudaRunnerState &context,
+                                                          int num_chunks) {
+    c10::cuda::CUDAStreamGuard guard(context.m_stream);
+    std::unique_ptr<nn::AuxiliaryData> aux;
+    if (context.variable_chunk_sizes()) {
+        aux = std::make_unique<nn::AuxiliaryData>(
+                context.m_aux, context.batch_size(), context.chunk_size(), context.m_stride,
+                context.m_stride_inner, context.m_chunk_size_granularity, context.m_chunk_sizes,
+                context.m_max_chunk_size, context.m_is_tx_model);
+    }
+    auto decoded_chunks = call_chunks(context.m_input, context.m_output, num_chunks, aux.get());
+    context.reset();
+    return decoded_chunks;
+}
 
 CudaCaller::GPUTaskQueue &CudaCaller::get_task_queue() {
     // Global task queues, one per GPU. This ensures that tasks from different clients are

@@ -3,6 +3,8 @@
 #include "MPSCaller.h"
 #include "MetalCallerTask.h"
 #include "MetalLSTMCaller.h"
+#include "TensorRunnerState.h"
+#include "TypedRunnerContext.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
 #include "utils/thread_utils.h"
@@ -32,6 +34,23 @@ std::shared_ptr<MetalCaller> MetalCaller::create(const config::BasecallModelConf
 }
 
 MetalCaller::~MetalCaller() { terminate(); }
+
+std::unique_ptr<ModelCaller::RunnerContext> MetalCaller::create_runner_context(
+        size_t batch_dims_idx) {
+    if (batch_dims_idx != 0) {
+        throw std::out_of_range("Metal caller only has one batch dimension");
+    }
+    const auto layout = m_config.is_lstm_model() ? TensorLayout::NTC : TensorLayout::NCT;
+    return std::make_unique<TypedRunnerContext<MetalCaller, TensorRunnerState>>(
+            *this, create_input_tensor(), layout);
+}
+
+std::vector<decode::DecodedChunk> MetalCaller::call_chunks(TensorRunnerState &state,
+                                                           int num_chunks) {
+    std::vector<decode::DecodedChunk> out_chunks(num_chunks);
+    call_chunks(state.input(), num_chunks, out_chunks);
+    return out_chunks;
+}
 
 int MetalCaller::get_max_safe_batch_size(float memory_limit_fraction,
                                          const config::BasecallModelConfig &model_config) {

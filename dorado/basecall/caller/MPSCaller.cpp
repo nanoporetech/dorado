@@ -1,9 +1,9 @@
 #include "MPSCaller.h"
 
 #include "MetalCallerTask.h"
+#include "MetalDecoder.h"
 #include "basecall/crf_utils.h"
 #include "decode/Decoder.h"
-#include "decode/beam_search.h"
 #include "model/TxModel.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
@@ -16,7 +16,6 @@
 #include <stdexcept>
 
 using namespace dorado::utils;
-using torch::indexing::Slice;
 
 namespace dorado::basecall {
 
@@ -62,8 +61,6 @@ at::TensorOptions get_crf_options(const config::BasecallModelConfig &config) {
     }
 }
 
-CREATE_POINT_OF_INTEREST_ID(MPSCaller);
-
 }  // namespace
 
 MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCaller(model_config) {
@@ -82,22 +79,14 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
         m_device = get_mtl_device();
         m_command_queue = NS::TransferPtr(m_device->newCommandQueue());
         m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
-
-        m_bwd_scan_float_cps = make_cps(m_device.get(), "backward_scan_float", {}, std::nullopt);
-        m_fwd_scan_add_softmax_float_cps =
-                make_cps(m_device.get(), "forward_scan_add_softmax_float", {}, std::nullopt);
     }
 
     // Cache common options.
     {
-        // TODO: non-Tx doesn't honour the config's n_base
-        const int n_base = model_config.is_tx_model() ? model_config.tx->crf.n_base : 4;
-        m_states = std::pow(n_base, model_config.state_len);
-
-        m_decoder_options = decode::create_decoder_options(model_config);
+        const auto decoder_options = decode::create_decoder_options(model_config);
 
         if (model_config.is_tx_model() &&
-            m_decoder_options.blank_score != model_config.tx->crf.blank_score) {
+            decoder_options.blank_score != model_config.tx->crf.blank_score) {
             DORADO_LOG(warn, "Transformer model config does not have the expected blank score");
         }
     }
@@ -129,21 +118,9 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
         }
     }
 
-    // Create tensors for scan/decode.
-    {
-        assert(m_out_chunk_size > 0);
-        assert(m_batch_size > 0);
-        assert(model_config.outsize > 0);
-
-        const int T = m_out_chunk_size;
-        const int C = model_config.outsize;
-        const int Cs = m_states;
-        const int N = m_batch_size;
-
-        m_scores_TNC = torch::empty({T, N, C}, scores_dtype);
-        m_posts_NTC = torch::empty({N, T + 1, Cs}, posts_dtype);
-        m_bwd_NTC = torch::empty({N, T + 1, Cs});
-    }
+    m_decoder = std::make_unique<MetalDecoder>(model_config, m_device.get(), m_out_chunk_size,
+                                               m_batch_size, 1, scores_dtype, posts_dtype, 1.f,
+                                               MetalDecoder::ScanMode::Float);
 
     // Load the model and get ready for calling.
     m_model = load_crf_model(model_config, get_crf_options(model_config));
@@ -207,28 +184,6 @@ int MPSCaller::get_batch_size_granularity(const config::BasecallModelConfig &mod
     }
 }
 
-bool MPSCaller::run_scan_kernels(MTL::CommandBuffer *const cb, int try_count) {
-    POINT_OF_INTEREST_SCOPE(MPSCaller, run_scan_kernels, "try_count=%i", try_count);
-
-    // ScanArgs expects scores TNC tensor sizes
-    std::vector<int32_t> scan_args_{m_out_chunk_size, m_batch_size, m_states};
-    auto scan_args = create_vec_buffer(m_device.get(), scan_args_);
-    name_mtl_object(scan_args, "scan_kernel_args");
-
-    // TODO: optimise grid size
-    launch_kernel_no_wait(
-            m_bwd_scan_float_cps.get(), cb,
-            {scan_args.get(), mtl_for_tensor(m_scores_TNC), mtl_for_tensor(m_bwd_NTC)}, {},
-            m_batch_size, m_states);
-
-    launch_kernel_no_wait(m_fwd_scan_add_softmax_float_cps.get(), cb,
-                          {scan_args.get(), mtl_for_tensor(m_scores_TNC), mtl_for_tensor(m_bwd_NTC),
-                           mtl_for_tensor(m_posts_NTC)},
-                          {}, m_batch_size, m_states);
-
-    return run_command_buffer("linear/scan/softmax", cb, try_count);
-}
-
 bool MPSCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
     auto scores_TNC = m_model->forward(task.input->to(get_crf_options(m_config)))
                               .transpose(0, 1)
@@ -240,21 +195,12 @@ bool MPSCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_
     // previous scores are processed in the decode threads
     cb->encodeWait(m_decode_complete_event.get(), task.decode_complete_event_id - 1);
 
-    m_scores_TNC.index_put_({at::indexing::Ellipsis}, scores_TNC);
+    m_decoder->scores().front().copy_(scores_TNC);
 
     std::lock_guard lock(inter_caller_mutex);
-    return run_scan_kernels(cb, try_count);
+    return m_decoder->prepare_decode(cb, try_count);
 }
 
-DecodedData MPSCaller::decode(int chunk_idx) const {
-    POINT_OF_INTEREST_SCOPE(MPSCaller, decode, "chunk_idx=%i", chunk_idx);
-
-    // Not splitting batches in Tx impl so chunk idx should be in [0, N)
-    assert(chunk_idx < m_batch_size);
-    return decode::beam_search_decode(
-            m_scores_TNC.index({Slice(), chunk_idx}), m_bwd_NTC[chunk_idx], m_posts_NTC[chunk_idx],
-            m_decoder_options.beam_width, m_decoder_options.beam_cut, m_decoder_options.blank_score,
-            m_decoder_options.q_shift, m_decoder_options.q_scale, 1.0f);
-};
+DecodedData MPSCaller::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
 
 }  // namespace dorado::basecall
