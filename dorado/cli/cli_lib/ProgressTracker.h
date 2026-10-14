@@ -88,7 +88,7 @@ private:
 
     SimpleProgressBar m_progress_bar;
 
-    float m_last_progress_written = -1.f;
+    int m_last_simplex_count_written = -1;
 
     // What % of time is going to be spent in post-processing.
     float m_post_processing_percentage;

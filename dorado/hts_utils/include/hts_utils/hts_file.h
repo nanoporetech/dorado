@@ -43,6 +43,9 @@ public:
         FASTA,
     };
 
+    // Store temporary files as uncompressed BAMs so that they skip compression when reading/writing.
+    static constexpr OutputMode temp_file_mode = OutputMode::UBAM;
+
     HtsFile(std::string filename,
             OutputMode mode,
             std::shared_ptr<HtsThreadPool> thread_pool,
@@ -57,12 +60,11 @@ public:
     int set_header(const sam_hdr_t* header);
     int write(bam1_t* record);
 
-    bool finalise_is_noop() const { return m_finalise_is_noop; }
+    bool finalise_is_noop() const { return !m_sort_bam; }
     void finalise(const ProgressCallback& progress_callback);
     static uint64_t calculate_sorting_key(const bam1_t* record);
 
     OutputMode get_output_mode() const { return m_mode; }
-    std::string htslib_write_mode() const;
     std::string index_extension() const;
 
 private:
@@ -78,10 +80,8 @@ private:
     SamHdrPtr m_header;
     size_t m_num_records{0};
     bool m_finalised{false};
-    bool m_finalise_is_noop;
-    bool m_sort_bam;
+    const bool m_sort_bam;
     const OutputMode m_mode;
-    const std::string m_htslib_write_mode;
     std::string m_reference;
 
     std::vector<std::byte> m_bam_buffer;
@@ -91,6 +91,7 @@ private:
 
     struct ProgressUpdater;
     void init_file();
+    void set_cram_opt(HtsFilePtr& file) const;
 
     void flush_temp_file(const bam1_t* last_record);
     int write_to_file(const bam1_t* record);
@@ -98,7 +99,8 @@ private:
     bool merge_temp_files_iteratively(const ProgressCallback& progress_callback) const;
     bool merge_temp_files(ProgressUpdater& update_progress,
                           const std::vector<std::string>& temp_files,
-                          const std::string& merged_filename) const;
+                          const std::string& merged_filename,
+                          bool final_iteration) const;
     void initialise_threads(htsFile* file) const;
 };
 

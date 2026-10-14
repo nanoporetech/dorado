@@ -390,7 +390,7 @@ CATCH_TEST_CASE(TEST_GROUP " maps read groups to attributes", TEST_GROUP) {
             .protocol_start_time_ms = 1651078077305,
             .subread_id = 0,
             .is_status_pass = true,
-            .trim_flags = 0,
+            .trim_flags = TrimFlags{},
     };
     const HtsData::ReadAttributes expected_two{
             .sequencing_kit = "",
@@ -405,7 +405,7 @@ CATCH_TEST_CASE(TEST_GROUP " maps read groups to attributes", TEST_GROUP) {
             .protocol_start_time_ms = 0,
             .subread_id = 0,
             .is_status_pass = true,
-            .trim_flags = 3,
+            .trim_flags = TrimFlags{3},
     };
 
     CATCH_REQUIRE(result_attrs_map.contains("rg-one"));
@@ -503,13 +503,13 @@ CATCH_TEST_CASE(TEST_GROUP " read group trim flags", TEST_GROUP) {
 
     ReadGroup rg_one{
             .sample_id = "sample-1",
-            .trim_flags = 3,
+            .trim_flags = TrimFlags{3},
     };
     read_groups.emplace("rg-one", rg_one);
 
     ReadGroup rg_two{
             .sample_id = "sample-2",
-            .trim_flags = 0,
+            .trim_flags = TrimFlags{},
     };
     read_groups.emplace("rg-two", rg_two);
 

@@ -61,9 +61,9 @@ void HtsFileWriterBuilder::update() {
         m_output_mode = OutputMode::SAM;
         m_sort = false;
     } else if (m_emit_sam) {
-        // Write SAM if chosen by user - sort only if we have a reference and are writing to a file
+        // Write SAM if chosen by user. SAM files cannot be sorted.
         m_output_mode = OutputMode::SAM;
-        m_sort = to_file && m_sort_requested;
+        m_sort = false;
     } else if (m_emit_cram) {
         // Write CRAM if chosen by user - sort only if we have a reference and are writing to a file
         m_output_mode = OutputMode::CRAM;

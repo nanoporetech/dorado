@@ -12,6 +12,7 @@
 #include <catch2/catch_message.hpp>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/internal/catch_run_context.hpp>
 #include <htslib/sam.h>
 
 #include <algorithm>
@@ -47,7 +48,7 @@ struct Tester {
               file_in_path(fs::path(get_data_dir("hts_file")) / "test_data.bam"),
               file_out_path(output_test_dir.m_path / "test_output.bam") {}
 
-    void read_input_records() {
+    int read_input_records() {
         // Read the test data into a vector of BAM records.
         file_in.reset(hts_open(file_in_path.string().c_str(), "r"));
         header_in.reset(sam_hdr_read(file_in.get()));
@@ -62,14 +63,14 @@ struct Tester {
         header_in.reset();
         indices.resize(records.size());
         std::iota(indices.begin(), indices.end(), 0);
-        auto rng = std::default_random_engine{};
+        std::minstd_rand rng(Catch::rngSeed());
         std::shuffle(indices.begin(), indices.end(), rng);
+        return static_cast<int>(records.size());
     }
 
-    int write_output_records(size_t buffer_size) {
-        bool sort_bam = (buffer_size > 0);
-        HtsFile file_out(file_out_path.string(), HtsFile::OutputMode::BAM, NUM_THREADS, sort_bam);
-        if (sort_bam) {
+    int write_output_records(bool sort_bam, size_t buffer_size, HtsFile::OutputMode mode) {
+        HtsFile file_out(file_out_path.string(), mode, NUM_THREADS, sort_bam);
+        if (buffer_size > 0) {
             file_out.set_buffer_size(buffer_size);
         }
         file_out.set_header(header_out.get());
@@ -104,6 +105,7 @@ struct Tester {
             ++index;
             record.reset(bam_init1());
         }
+        CATCH_REQUIRE(index == records.size());
         file_in.reset();
         header_in.reset();
     }
@@ -128,36 +130,39 @@ std::string filepath(const std::string& folder, const std::string& filename) {
 
 }  // namespace
 
-CATCH_TEST_CASE("HtsFileTest: Write to unsorted file", TEST_GROUP) {
-    Tester tester;
-    tester.read_input_records();
-
-    int callback_calls = tester.write_output_records(0);
-    CATCH_REQUIRE(callback_calls == 2);
-
-    tester.check_output(false);
-}
-
-CATCH_TEST_CASE("HtsFileTest: Write to single sorted file", TEST_GROUP) {
-    Tester tester;
-    tester.read_input_records();
-
-    // A 5 MB buffer should make sure only a single temp file is written.
-    int callback_calls = tester.write_output_records(5000000);
-    CATCH_REQUIRE(callback_calls == 3);
-
-    tester.check_output(true);
-}
-
-CATCH_TEST_CASE("HtsFileTest: Write to multiple sorted files, and merge", TEST_GROUP) {
-    Tester tester;
-    tester.read_input_records();
-
+CATCH_TEST_CASE("HtsFileTest: Write to file", TEST_GROUP) {
     // A 200 KB buffer should make sure multiple temp files are written.
-    int callback_calls = tester.write_output_records(200000);
-    CATCH_REQUIRE(callback_calls > 4);
+    // A 5 MB buffer should make sure only a single temp file is written.
+    enum class BufferSize : size_t { Default = 0, Small = 200'000, Big = 5'000'000 };
 
-    tester.check_output(true);
+    const auto output_mode = GENERATE(HtsFile::OutputMode::UBAM, HtsFile::OutputMode::BAM,
+                                      HtsFile::OutputMode::CRAM);
+    const auto buffer_size = GENERATE(BufferSize::Default, BufferSize::Small, BufferSize::Big);
+    const auto is_sorted = GENERATE(false, true);
+    CATCH_CAPTURE(output_mode, buffer_size, is_sorted);
+
+    Tester tester;
+    const int num_records = tester.read_input_records();
+    const int callback_calls =
+            tester.write_output_records(is_sorted, static_cast<size_t>(buffer_size), output_mode);
+
+    const bool matches_temp_format = output_mode == HtsFile::temp_file_mode;
+    const bool single_temp_file = buffer_size != BufferSize::Small;
+
+    if (!is_sorted) {
+        // 0% and 100% should be the only callbacks since there's no sorting step.
+        CATCH_REQUIRE(callback_calls == 2);
+    } else if (single_temp_file && matches_temp_format) {
+        // 0%, 5%, and 100% should be the only callbacks since the merge is just a rename
+        // of the temp file.
+        CATCH_REQUIRE(callback_calls == 3);
+    } else {
+        // If the output is a different format, or we've had to split over multiple temp
+        // files, then we'll get a callback per record in the final merge too.
+        CATCH_REQUIRE(callback_calls == 3 + num_records);
+    }
+
+    tester.check_output(is_sorted);
 }
 
 CATCH_TEST_CASE("HtsFileTest: construct with zero threads for sorted BAM does not throw",
@@ -393,17 +398,15 @@ CATCH_TEST_CASE(TEST_GROUP "HtsFileWriterBuilder FASTQ and CRAM mutually exclusi
 }
 
 CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) {
-    auto [output_mode, finalise_noop, ref_req, out_dir] =
-            GENERATE(table<OutputMode, bool, bool, MaybeString>({
-                    // SAM / BAM will sort if writing to file AND reference is set
-                    {OutputMode::SAM, true, false, std::nullopt},
-                    {OutputMode::SAM, true, false, "out"},
-                    {OutputMode::SAM, true, true, std::nullopt},
-                    {OutputMode::SAM, false, true, "out"},
-            }));
+    auto [output_mode, ref_req, out_dir] = GENERATE(table<OutputMode, bool, MaybeString>({
+            {OutputMode::SAM, false, std::nullopt},
+            {OutputMode::SAM, false, "out"},
+            {OutputMode::SAM, true, std::nullopt},
+            {OutputMode::SAM, true, "out"},
+    }));
 
     bool emit_sam = true;
-    CATCH_CAPTURE(to_string(output_mode), finalise_noop, emit_sam, ref_req, out_dir.has_value());
+    CATCH_CAPTURE(to_string(output_mode), emit_sam, ref_req, out_dir.has_value());
 
     auto writer_builder = BasecallHtsFileWriterBuilder(false, emit_sam, false, ref_req, out_dir,
                                                        no_threads, noop_progress_callback,
@@ -411,7 +414,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder SAM happy paths", TEST_GROUP) 
     auto writer = writer_builder.build();
 
     CATCH_CHECK(writer->get_mode() == output_mode);
-    CATCH_CHECK(writer->finalise_is_noop() == finalise_noop);
+    CATCH_CHECK(writer->finalise_is_noop() == true);  // SAM never sorts
 }
 
 class HtsFileWriterBuilderTest : public HtsFileWriterBuilder {

@@ -211,21 +211,25 @@ void ProgressTracker::update_progress_bar(const stats::NamedStats& stats) {
     m_num_poly_a_not_called = int(fetch_stat("PolyACalculator.reads_not_estimated"));
     m_avg_poly_a_tail_lengths = int(fetch_stat("PolyACalculator.average_tail_length"));
 
-    if (m_num_reads_expected != 0) {
-        // TODO: Add the ceiling because in duplex, reads written can exceed reads expected
-        // because of the read splitting. That needs to be handled properly.
-        float progress = std::min(100.f, 100.f *
-                                                 static_cast<float>(m_num_simplex_reads_written +
-                                                                    m_num_simplex_reads_filtered) /
-                                                 m_num_reads_expected);
-        if (progress > 0 && progress > m_last_progress_written) {
-            m_last_progress_written = progress;
-            internal_set_progress(progress, false);
-        }
-    } else {
-        if (!m_is_progress_reporting_disabled) {
-            std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
-            std::cerr << "\r";
+    if (m_num_simplex_reads_written > m_last_simplex_count_written) {
+        m_last_simplex_count_written = m_num_simplex_reads_written;
+
+        if (m_num_reads_expected != 0) {
+            // TODO: Add the ceiling because in duplex, reads written can exceed reads expected
+            // because of the read splitting. That needs to be handled properly.
+            float progress =
+                    std::min(100.f, 100.f *
+                                            static_cast<float>(m_num_simplex_reads_written +
+                                                               m_num_simplex_reads_filtered) /
+                                            m_num_reads_expected);
+            if (progress > 0) {
+                internal_set_progress(progress, false);
+            }
+        } else {
+            if (!m_is_progress_reporting_disabled) {
+                std::cerr << "\r> Output records written: " << m_num_simplex_reads_written;
+                std::cerr << "\r";
+            }
         }
     }
 
