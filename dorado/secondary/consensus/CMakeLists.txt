@@ -9,6 +9,7 @@ target_sources(dorado_secondary
         ${PUBLIC_BASE}/sample_trimming.h
         ${PUBLIC_BASE}/variant_calling_sample.h
         ${PUBLIC_BASE}/variant_calling.h
+        ${PUBLIC_BASE}/variant_normalization.h
         ${PUBLIC_BASE}/window_utils.h
     PRIVATE
         consensus_utils.cpp
@@ -17,6 +18,7 @@ target_sources(dorado_secondary
         sample_trimming.cpp
         variant_calling_sample.cpp
         variant_calling.cpp
+        variant_normalization.cpp
         window_utils.cpp
 )
 

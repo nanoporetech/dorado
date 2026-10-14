@@ -134,6 +134,11 @@ int64_t variant_end(const Variant& var) {
     return var.pos + std::max<int64_t>(1, std::ssize(var.ref));
 }
 
+int64_t variant_ref_span(const Variant& var) {
+    const int64_t end = variant_end(var);
+    return (end - var.pos);
+}
+
 bool variant_ends_before_position(const Variant& var, const int32_t seq_id, const int64_t pos) {
     return (var.seq_id == seq_id) && (variant_end(var) <= pos);
 }
