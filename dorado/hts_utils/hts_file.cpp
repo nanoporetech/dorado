@@ -405,7 +405,7 @@ bool HtsFile::merge_temp_files_iteratively(const ProgressCallback& progress_call
                                     m_num_records * progress_multiplier);
     for (size_t iter = 0; iter < num_batches; ++iter) {
         if (!merge_temp_files(update_progress, batcher.get_batch(iter),
-                              batcher.get_merge_filename(iter), iter == num_batches - 1)) {
+                              batcher.get_merge_filename(iter), iter == (num_batches - 1))) {
             return false;
         }
     }
