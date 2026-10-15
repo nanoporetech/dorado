@@ -23,7 +23,7 @@ std::pair<std::vector<basecall::RunnerPtr>, size_t> create_basecall_runners(
         size_t num_cpu_runners);
 
 std::vector<modbase::RunnerPtr> create_modbase_runners(
-        const std::vector<config::ModBaseModelConfig>& model_configs,
+        std::span<const config::ModBaseModelConfig> model_configs,
         const std::string& device,
         size_t runners_per_caller,
         size_t batch_size);

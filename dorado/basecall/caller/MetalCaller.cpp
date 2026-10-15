@@ -231,8 +231,8 @@ void MetalCaller::decode_thread_fn() {
         decode_lock.unlock();
 
         auto [sequence, qstring, moves] = decode(chunk_idx);
-        (*task->out_chunks)[chunk_idx] =
-                decode::DecodedChunk{std::move(sequence), std::move(qstring), std::move(moves)};
+        (*task->out_chunks)[chunk_idx] = decode::DecodedChunk{
+                std::move(sequence), std::move(qstring), std::move(moves), {}, {}};
 
         // Wake the waiting thread which called `call_chunks()` if we're done decoding
         std::unique_lock<std::mutex> task_lock(task->mut);

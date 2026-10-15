@@ -103,7 +103,7 @@ int64_t ModBaseCaller::ModBaseData::get_seq_len() const {
     return chunk_size;
 }
 
-ModBaseCaller::ModBaseCaller(const std::vector<config::ModBaseModelConfig>& model_configs,
+ModBaseCaller::ModBaseCaller(const std::span<const config::ModBaseModelConfig> model_configs,
                              const int batch_size,
                              const std::string& device) {
     if (model_configs.empty()) {

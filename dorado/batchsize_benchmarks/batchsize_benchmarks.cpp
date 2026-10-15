@@ -71,6 +71,7 @@ SpeedEntry calculate_one(const std::string &device,
     auto [runners, num_devices] = api::create_basecall_runners(
             {
                     .model_config = config,
+                    .modbase_configs = {},
                     .device = device,
                     .memory_limit_fraction = 1.f,
                     .pipeline_type = api::PipelineType::simplex,

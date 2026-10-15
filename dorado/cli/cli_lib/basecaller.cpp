@@ -283,8 +283,9 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
     cli::add_internal_arguments(parser);
 }
 
-ModBaseBatchParams validate_modbase_params(const std::vector<config::ModBaseModelConfig>& configs,
-                                           const BasecallerOptions& options) {
+ModBaseBatchParams validate_modbase_params(
+        const std::span<const config::ModBaseModelConfig> configs,
+        const BasecallerOptions& options) {
 #if DORADO_CUDA_BUILD
     const size_t device_count = utils::parse_cuda_device_string(options.device).size();
 #else
@@ -420,7 +421,7 @@ struct Runners {
 };
 Runners create_runners(const BasecallerOptions& options,
                        const BasecallModelConfig& model_config,
-                       const std::vector<config::ModBaseModelConfig>& modbase_configs,
+                       const std::span<const config::ModBaseModelConfig> modbase_configs,
                        size_t num_runners,
                        const ModBaseBatchParams& modbase_params) {
 #if DORADO_CUDA_BUILD
@@ -450,7 +451,9 @@ Runners create_runners(const BasecallerOptions& options,
                         {
                                 .model_config = device_config,
                                 .modbase_configs =
-                                        modbase_runners.empty() ? &modbase_configs : nullptr,
+                                        modbase_runners.empty()
+                                                ? modbase_configs
+                                                : std::span<const config::ModBaseModelConfig>{},
                                 .device = device_id,
                                 .memory_limit_fraction = memory_limit_fraction,
                                 .pipeline_type = api::PipelineType::simplex,

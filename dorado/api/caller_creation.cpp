@@ -30,7 +30,7 @@ std::shared_ptr<basecall::ModelCaller> create_basecall_caller(
 }
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
-        const std::vector<config::ModBaseModelConfig>& model_configs,
+        const std::span<const config::ModBaseModelConfig> model_configs,
         int batch_size,
         const std::string& device) {
     return std::make_shared<modbase::ModBaseCaller>(model_configs, batch_size, device);

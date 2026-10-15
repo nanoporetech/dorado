@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
 #include <thread>
 #include <vector>
@@ -55,8 +56,8 @@ public:
 #endif
     };
 
-    ModBaseCaller(const std::vector<config::ModBaseModelConfig>& model_configs,
-                  const int batch_size,
+    ModBaseCaller(std::span<const config::ModBaseModelConfig> model_configs,
+                  int batch_size,
                   const std::string& device);
     ~ModBaseCaller();
 

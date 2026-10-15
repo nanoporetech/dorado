@@ -19,7 +19,7 @@ Models::Models(ModelSources sources) : m_sources(std::move(sources)) {
 
 const config::BasecallModelConfig& Models::get_simplex_config() const { return m_simplex_config; }
 
-const std::vector<config::ModBaseModelConfig>& Models::get_modbase_configs() const {
+std::span<const config::ModBaseModelConfig> Models::get_modbase_configs() const {
     return m_modbase_configs;
 }
 

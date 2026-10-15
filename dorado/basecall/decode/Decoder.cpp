@@ -16,15 +16,15 @@ DecoderOptions create_decoder_options(const config::BasecallModelConfig& config)
     return options;
 }
 
-std::unique_ptr<Decoder> create_decoder(c10::Device device,
-                                        const config::BasecallModelConfig& config) {
+std::unique_ptr<Decoder> create_decoder(
+        c10::Device device,
+        [[maybe_unused]] const config::BasecallModelConfig& config,
+        [[maybe_unused]] const std::span<const config::ModBaseModelConfig> modbase_configs) {
 #if DORADO_CUDA_BUILD
     if (device.is_cuda()) {
         return std::make_unique<decode::CUDADecoder>(
-                config.clamp ? 5.f : ((config.scale != 1.f) ? config.scale : 0.f));
+                config.clamp ? 5.f : ((config.scale != 1.f) ? config.scale : 0.f), modbase_configs);
     }
-#else
-    (void)config;  // unused in other build types
 #endif
     if (device.is_cpu()) {
         return std::make_unique<decode::CPUDecoder>();

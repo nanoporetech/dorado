@@ -7,6 +7,7 @@
 #include <cstddef>
 #include <filesystem>
 #include <optional>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -213,10 +214,10 @@ const modbase::ModBaseModelConfigData& get_context_model_config(const ModBaseMod
 ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_path);
 
 // Determine the modbase alphabet from parameters and calculate offset positions for the results
+ModBaseInfo get_modbase_info(std::span<const ModBaseModelConfig> modbase_configs);
 ModBaseInfo get_modbase_info(
-        const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params);
+        std::span<std::reference_wrapper<const ModBaseModelConfig>> modbase_configs);
 
-void check_modbase_multi_model_compatibility(
-        const std::vector<ModBaseModelConfig>& modbase_configs);
+void check_modbase_multi_model_compatibility(std::span<const ModBaseModelConfig> modbase_configs);
 
 }  // namespace dorado::config

@@ -236,6 +236,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
     auto [runners, num_devices] = dorado::api::create_basecall_runners(
             {
                     .model_config = model_config,
+                    .modbase_configs = {},
                     .device = device,
                     .memory_limit_fraction = 1.f,
                     .pipeline_type = dorado::api::PipelineType::simplex,
