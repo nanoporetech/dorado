@@ -240,7 +240,7 @@ std::filesystem::path download_model(const std::string& model_name) {
 struct HtsFileDeleter {
     void operator()(utils::HtsFile* ptr) const {
         if (ptr) {
-            ptr->finalise([&](size_t) {});
+            ptr->finalise([&](float) {});
         }
         delete ptr;
     }

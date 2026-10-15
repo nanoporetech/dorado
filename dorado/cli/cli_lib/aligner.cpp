@@ -266,10 +266,10 @@ int aligner(int argc, char* argv[]) {
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
         auto progress_callback =
-                utils::ProgressCallback([&tracker, &progress_stats](size_t progress) {
+                utils::ProgressCallback([&tracker, &progress_stats](float progress) {
                     // Called as part of hts finalize
-                    tracker.update_post_processing_progress(static_cast<float>(progress));
-                    progress_stats.update_post_processing_progress(static_cast<float>(progress));
+                    tracker.update_post_processing_progress(progress);
+                    progress_stats.update_post_processing_progress(progress);
                 });
         auto description_callback =
                 utils::DescriptionCallback([&tracker](const std::string& description) {

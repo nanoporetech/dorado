@@ -334,8 +334,8 @@ int duplex(int argc, char* argv[]) {
         std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
         OutputMode writer_output_mode;
         {
-            auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
-                tracker.update_post_processing_progress(static_cast<float>(progress));
+            auto progress_callback = utils::ProgressCallback([&tracker](float progress) {
+                tracker.update_post_processing_progress(progress);
             });
             auto description_callback =
                     utils::DescriptionCallback([&tracker](const std::string& description) {

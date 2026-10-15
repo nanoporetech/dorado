@@ -97,7 +97,7 @@ protected:
 
         std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
         {
-            auto progress_cb = utils::ProgressCallback([](size_t) {});
+            auto progress_cb = utils::ProgressCallback([](float) {});
             auto description_cb = utils::DescriptionCallback([](const std::string &) {});
 
             bool emit_fastq = mode == hts_writer::OutputMode::FASTQ;
@@ -200,7 +200,7 @@ CATCH_TEST_CASE("HtsFileWriterTest: Read and write FASTQ with tag", TEST_GROUP) 
 
     std::vector<std::unique_ptr<hts_writer::IWriter>> writers;
     {
-        auto progress_cb = utils::ProgressCallback([](size_t) {});
+        auto progress_cb = utils::ProgressCallback([](float) {});
         auto description_cb = utils::DescriptionCallback([](const std::string &) {});
         std::optional<std::string> out_dir = tmp_dir.m_path.string();
 

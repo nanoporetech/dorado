@@ -24,7 +24,7 @@ void StreamHtsFileWriter::shutdown() {
         return;
     }
     set_description("Finalising output");
-    m_hts_file->finalise([this](size_t progress) { set_progress(progress); });
+    m_hts_file->finalise([this](float progress) { set_progress(progress); });
 }
 
 bool StreamHtsFileWriter::finalise_is_noop() const { return true; };

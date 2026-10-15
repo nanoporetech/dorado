@@ -171,7 +171,7 @@ void write_synthetic_bam(const std::filesystem::path &out_fn,
         dorado::BamPtr bam_record = make_synthetic_bam_record(record);
         hts_file.write(bam_record.get());
     }
-    hts_file.finalise([](size_t) {});
+    hts_file.finalise([](float) {});
 }
 
 kadayashi::MedakaFeatureMatrixOptions make_medaka_feature_matrix_options(

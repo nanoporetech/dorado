@@ -13,7 +13,7 @@
 namespace dorado {
 namespace utils {
 
-using ProgressCallback = std::function<void(size_t percentage)>;
+using ProgressCallback = std::function<void(float percentage)>;
 using DescriptionCallback = std::function<void(const std::string&)>;
 
 class HtsThreadPool {
@@ -89,7 +89,7 @@ private:
     std::vector<std::string> m_temp_files;
     int64_t m_current_buffer_offset{0};
 
-    struct ProgressUpdater;
+    class ProgressUpdater;
     void init_file();
     void set_cram_opt(HtsFilePtr& file) const;
 

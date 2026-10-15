@@ -48,7 +48,7 @@ public:
 
     const std::string& get_gpu_names() const { return m_gpu_names; }
 
-    void set_progress(size_t progress) const { m_progress_callback(progress); }
+    void set_progress(float progress) const { m_progress_callback(progress); }
     void set_description(const std::string& description) const {
         m_description_callback(description);
     }
