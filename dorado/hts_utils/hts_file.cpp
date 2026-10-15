@@ -52,24 +52,27 @@ const char* htslib_write_mode(HtsFile::OutputMode mode) {
 
 }  // namespace
 
-struct HtsFile::ProgressUpdater {
-    const ProgressCallback* m_progress_callback{nullptr};
-    size_t m_from{0}, m_to{0}, m_max{0}, m_last_progress{0};
-    ProgressUpdater() = default;
+class HtsFile::ProgressUpdater {
+    const ProgressCallback* const m_progress_callback{nullptr};
+    const size_t m_from, m_to, m_max;
+
+    // Processing a record is relatively fast, so don't spam the callback when there's
+    // basically no change in progress, or we burn lots of CPU updating the progress bar.
+    static constexpr int log_every = 1'000;
+    int m_counter{0};
+
+public:
     ProgressUpdater(const ProgressCallback& progress_callback, size_t from, size_t to, size_t max)
-            : m_progress_callback(&progress_callback),
-              m_from(from),
-              m_to(to),
-              m_max(max),
-              m_last_progress(0) {}
+            : m_progress_callback(&progress_callback), m_from(from), m_to(to), m_max(max) {}
 
     void operator()(size_t count) {
         if (!m_progress_callback) {
             return;
         }
-        const size_t new_progress = m_from + (m_to - m_from) * std::min(count, m_max) / m_max;
-        if (new_progress != m_last_progress) {
-            m_last_progress = new_progress;
+        if (++m_counter >= log_every) {
+            m_counter = 0;
+            const float new_progress =
+                    m_from + (m_to - m_from) * std::min(count, m_max) / static_cast<float>(m_max);
             m_progress_callback->operator()(new_progress);
         }
     }
