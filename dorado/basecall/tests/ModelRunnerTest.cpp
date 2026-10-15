@@ -46,6 +46,7 @@ public:
 
     size_t num_batch_dims() const override { return 1; }
     const dorado::config::BasecallModelConfig& config() const override { return m_config; }
+    std::shared_ptr<dorado::ModBaseInfo> modbase_info() const override { return nullptr; }
     std::pair<int, int> batch_timeouts_ms() const override { return {11, 22}; }
     bool is_low_latency() const override { return true; }
     void terminate() override { terminated = true; }

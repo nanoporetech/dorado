@@ -3,7 +3,9 @@
 #include "DecodedChunk.h"
 #include "config/ModBaseModelConfig.h"
 #include "utils/stats.h"
+#include "utils/types.h"
 
+#include <memory>
 #include <span>
 #include <string>
 #include <utility>
@@ -25,6 +27,7 @@ public:
     virtual void accept_chunk(int chunk_idx, const at::Tensor &chunk) = 0;
     virtual std::vector<decode::DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual const config::BasecallModelConfig &config() const = 0;
+    virtual std::shared_ptr<ModBaseInfo> modbase_info() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
     virtual bool variable_chunk_sizes() const { return false; }

@@ -262,6 +262,8 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.pre_trim_seq_length = read_common_data.seq.length();
             read_common_data.is_rna_model = m_is_rna_model;
 
+            read_common_data.mod_base_info = m_model_runners[0]->modbase_info();
+
             // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += read_common_data.seq.length();

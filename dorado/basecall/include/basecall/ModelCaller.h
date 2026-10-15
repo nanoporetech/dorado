@@ -2,6 +2,7 @@
 
 #include "DecodedChunk.h"
 #include "utils/stats.h"
+#include "utils/types.h"
 
 #include <cstddef>
 #include <memory>
@@ -38,6 +39,7 @@ public:
     virtual std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) = 0;
     virtual size_t num_batch_dims() const = 0;
     virtual const config::BasecallModelConfig& config() const = 0;
+    virtual std::shared_ptr<ModBaseInfo> modbase_info() const = 0;
     virtual std::pair<int, int> batch_timeouts_ms() const;
     virtual bool is_low_latency() const { return false; }
     virtual void terminate() = 0;

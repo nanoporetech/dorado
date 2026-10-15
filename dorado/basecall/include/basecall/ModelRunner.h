@@ -18,6 +18,7 @@ public:
     void accept_chunk(int chunk_idx, const at::Tensor &chunk) final;
     std::vector<decode::DecodedChunk> call_chunks(int num_chunks) final;
     const config::BasecallModelConfig &config() const final;
+    std::shared_ptr<ModBaseInfo> modbase_info() const final;
     size_t chunk_size() const final;
     size_t batch_size() const final;
     bool variable_chunk_sizes() const final;

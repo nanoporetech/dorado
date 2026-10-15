@@ -5,6 +5,7 @@
 #include "caller/TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
+#include "modbase/ModBaseContext.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
@@ -251,6 +252,21 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         // TODO: check the required dtype here
         m_modbase_modules =
                 modbase::load_modbase_latent_space_model(params.modbase_configs, m_options);
+
+        ModBaseInfo modbase_info = config::get_modbase_info(params.modbase_configs);
+
+        modbase::ModBaseContext context;
+        for (const config::ModBaseModelConfig &config : params.modbase_configs) {
+            const config::modbase::ModBaseModelConfigData &data{
+                    config::get_model_config_data(config)};
+            if (!data.mods.motif.empty()) {
+                context.set_context(data.mods.motif, data.mods.motif_offset);
+            }
+        }
+
+        m_modbase_info =
+                std::make_shared<ModBaseInfo>(std::move(modbase_info.alphabet),
+                                              std::move(modbase_info.long_names), context.encode());
     }
     m_module = load_crf_model(params.model_config, m_options);
 
