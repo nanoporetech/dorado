@@ -95,7 +95,7 @@ at::Tensor backward_scores(const at::Tensor& scores_TNC, const float fixed_stay_
 namespace dorado::basecall::decode {
 
 DecoderResult CPUDecoder::prepare_decode(DecoderInput input) const {
-    return {std::move(input.scores), input.num_chunks, input.options, input.aux};
+    return {std::move(input.scores), {}, input.num_chunks, input.options, input.aux};
 }
 
 std::vector<DecodedChunk> CPUDecoder::decode(const DecoderResult& data) const {
@@ -142,10 +142,7 @@ std::vector<DecodedChunk> CPUDecoder::decode(const DecoderResult& data) const {
                         options.beam_cut, options.blank_score, options.q_shift, options.q_scale,
                         1.0f);
                 chunk_results[t_first_chunk + chunk_idx] = DecodedChunk{
-                        .sequence = std::move(sequence),
-                        .qstring = std::move(qstring),
-                        .moves = std::move(moves),
-                };
+                        std::move(sequence), std::move(qstring), std::move(moves), {}, {}};
             }
         });
     }

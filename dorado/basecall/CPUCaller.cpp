@@ -11,7 +11,7 @@ namespace dorado::basecall {
 
 CPUCaller::CPUCaller(const config::BasecallModelConfig& model_config)
         : m_config(model_config),
-          m_decoder(decode::create_decoder(c10::DeviceType::CPU, model_config)),
+          m_decoder(decode::create_decoder(c10::DeviceType::CPU, model_config, {})),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(c10::DeviceType::CPU)),
           m_decoder_options(decode::create_decoder_options(model_config)),
           m_module(load_crf_model(model_config, m_options)) {

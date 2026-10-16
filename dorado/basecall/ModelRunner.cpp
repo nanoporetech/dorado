@@ -23,6 +23,8 @@ void ModelRunner::accept_chunk(int chunk_idx, const at::Tensor &chunk_CT) {
 
 const config::BasecallModelConfig &ModelRunner::config() const { return m_caller->config(); }
 
+std::shared_ptr<ModBaseInfo> ModelRunner::modbase_info() const { return m_caller->modbase_info(); };
+
 size_t ModelRunner::chunk_size() const { return m_runner_context->chunk_size(); }
 
 size_t ModelRunner::batch_size() const { return m_runner_context->batch_size(); }

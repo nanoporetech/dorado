@@ -25,6 +25,7 @@ public:
     std::vector<decode::DecodedChunk> call_chunks(TensorRunnerState& state, int num_chunks);
     size_t num_batch_dims() const override { return 1; }
     const config::BasecallModelConfig& config() const override { return m_config; }
+    std::shared_ptr<ModBaseInfo> modbase_info() const override { return nullptr; }
     void terminate() override {}
     void restart() override {}
     std::string get_name() const override { return "CPUCaller"; }

@@ -2,6 +2,7 @@
 
 #include "config/ModBaseModelConfigFwd.h"
 
+#include <span>
 #include <string>
 #include <vector>
 
@@ -16,7 +17,7 @@ struct ModBaseBatchParams {
     std::string to_string() const;
 };
 
-ModBaseBatchParams get_modbase_params(const std::vector<ModBaseModelConfig>& configs,
+ModBaseBatchParams get_modbase_params(std::span<const ModBaseModelConfig> configs,
                                       size_t device_count);
 
 }  // namespace dorado::config

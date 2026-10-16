@@ -5,6 +5,7 @@
 #include "model_resolver/ModelSources.h"
 
 #include <filesystem>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -19,7 +20,7 @@ public:
     const ModelSources& get_sources() const { return m_sources; }
 
     const config::BasecallModelConfig& get_simplex_config() const;
-    const std::vector<config::ModBaseModelConfig>& get_modbase_configs() const;
+    std::span<const config::ModBaseModelConfig> get_modbase_configs() const;
 
     std::string get_simplex_model_name() const;
     std::filesystem::path get_simplex_model_path() const;

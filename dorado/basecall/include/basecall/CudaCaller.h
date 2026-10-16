@@ -55,6 +55,7 @@ public:
     size_t num_batch_dims() const override { return m_batch_dims.size(); };
     c10::Device device() const { return m_options.device(); }
     const config::BasecallModelConfig &config() const override { return m_config; }
+    std::shared_ptr<ModBaseInfo> modbase_info() const override { return m_modbase_info; }
     bool is_low_latency() const override { return m_low_latency; }
     std::string get_name() const override { return std::string("CudaCaller_") + m_device; }
     stats::NamedStats sample_stats() const override;
@@ -92,6 +93,7 @@ private:
     const at::TensorOptions m_options;
     torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
     std::optional<modbase::ModBaseLatentSpaceModels> m_modbase_modules;
+    std::shared_ptr<ModBaseInfo> m_modbase_info;
     bool m_terminate{false};
     std::thread m_cuda_thread;
     int m_num_input_features;

@@ -262,6 +262,8 @@ void BasecallerNode::working_reads_manager() {
             read_common_data.pre_trim_seq_length = read_common_data.seq.length();
             read_common_data.is_rna_model = m_is_rna_model;
 
+            read_common_data.mod_base_info = m_model_runners[0]->modbase_info();
+
             // Update stats.
             ++m_called_reads_pushed;
             m_num_bases_processed += read_common_data.seq.length();
@@ -278,6 +280,19 @@ void BasecallerNode::working_reads_manager() {
             if (m_is_rna_model) {
                 std::reverse(read_common_data.seq.begin(), read_common_data.seq.end());
                 std::reverse(read_common_data.qstring.begin(), read_common_data.qstring.end());
+                if (read_common_data.mod_base_info) {
+                    std::reverse(read_common_data.base_mod_simplex_motif_hits.begin(),
+                                 read_common_data.base_mod_simplex_motif_hits.end());
+                    const int num_states = read_common_data.mod_base_info->alphabet.size();
+                    assert((read_common_data.seq.size() * num_states) ==
+                           read_common_data.base_mod_probs.size());
+                    for (int i = 0, j = read_common_data.seq.size() - 1; i < j; ++i, --j) {
+                        std::swap_ranges(
+                                read_common_data.base_mod_probs.begin() + (i * num_states),
+                                read_common_data.base_mod_probs.begin() + ((i + 1) * num_states),
+                                read_common_data.base_mod_probs.begin() + (j * num_states));
+                    }
+                }
             }
 
             // Cleanup the working read.

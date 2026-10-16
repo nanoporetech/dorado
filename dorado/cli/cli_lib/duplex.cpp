@@ -42,6 +42,7 @@
 #include <fstream>
 #include <memory>
 #include <optional>
+#include <span>
 #include <thread>
 #include <unordered_set>
 #include <utility>
@@ -63,7 +64,7 @@ using namespace dorado::config;
 
 using DirEntries = std::vector<std::filesystem::directory_entry>;
 
-ModBaseBatchParams validate_modbase_params(const std::vector<ModBaseModelConfig>& configs,
+ModBaseBatchParams validate_modbase_params(const std::span<const ModBaseModelConfig> configs,
                                            argparse::ArgumentParser& parser,
                                            size_t device_count) {
     // Convert path to params.
@@ -541,6 +542,7 @@ int duplex(int argc, char* argv[]) {
                             api::create_basecall_runners(
                                     {
                                             .model_config = models.get_simplex_config(),
+                                            .modbase_configs = {},
                                             .device = device_id,
                                             .memory_limit_fraction = 0.9f * fraction,
                                             .pipeline_type = api::PipelineType::duplex,
@@ -562,6 +564,7 @@ int duplex(int argc, char* argv[]) {
                             api::create_basecall_runners(
                                     {
                                             .model_config = models.get_stereo_config(),
+                                            .modbase_configs = {},
                                             .device = device_id,
                                             .memory_limit_fraction = 0.5f * fraction,
                                             .pipeline_type = api::PipelineType::duplex,
@@ -597,6 +600,7 @@ int duplex(int argc, char* argv[]) {
                 std::tie(runners, num_devices) = api::create_basecall_runners(
                         {
                                 .model_config = models.get_simplex_config(),
+                                .modbase_configs = {},
                                 .device = device,
                                 .memory_limit_fraction = 0.9f,
                                 .pipeline_type = api::PipelineType::duplex,
@@ -607,6 +611,7 @@ int duplex(int argc, char* argv[]) {
                 std::tie(stereo_runners, std::ignore) = api::create_basecall_runners(
                         {
                                 .model_config = models.get_stereo_config(),
+                                .modbase_configs = {},
                                 .device = device,
                                 .memory_limit_fraction = 0.5f,
                                 .pipeline_type = api::PipelineType::duplex,

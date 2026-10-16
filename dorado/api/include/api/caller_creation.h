@@ -5,6 +5,7 @@
 
 #include <filesystem>
 #include <memory>
+#include <span>
 #include <string>
 #include <vector>
 
@@ -27,7 +28,7 @@ std::shared_ptr<basecall::ModelCaller> create_basecall_caller(
         const basecall::BasecallerCreationParams& params);
 
 std::shared_ptr<modbase::ModBaseCaller> create_modbase_caller(
-        const std::vector<config::ModBaseModelConfig>& model_configs,
+        std::span<const config::ModBaseModelConfig> model_configs,
         int batch_size,
         const std::string& device);
 

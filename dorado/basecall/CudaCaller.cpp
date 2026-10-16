@@ -5,6 +5,7 @@
 #include "caller/TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
+#include "modbase/ModBaseContext.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
@@ -126,16 +127,19 @@ c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
     return c10::cuda::getStreamFromPool(false, device.index());
 }
 
-void run_modbase_models(modbase::ModBaseLatentSpaceModels &models,
-                        const at::Tensor &decoded_data,
-                        at::Tensor signal_embeddings) {
+std::vector<at::Tensor> run_modbase_models(modbase::ModBaseLatentSpaceModels &models,
+                                           const at::Tensor &decoded_data,
+                                           at::Tensor signal_embeddings) {
     auto &[sequence_model, common_model, classifier_models] = models;
-    auto encoded_sequence = sequence_model->forward(decoded_data);
-    auto common_output =
+    at::Tensor encoded_sequence = sequence_model->forward(decoded_data);
+    const at::Tensor common_output =
             common_model->forward(std::move(encoded_sequence), std::move(signal_embeddings));
+    std::vector<at::Tensor> out;
+    out.reserve(classifier_models.size());
     for (auto &classifier_model : classifier_models) {
-        classifier_model->forward(common_output);
+        out.emplace_back(classifier_model->forward(common_output));
     }
+    return out;
 }
 
 std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
@@ -210,7 +214,7 @@ struct CudaCaller::BatchDimsAndMaxSizes {
 CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         : m_config(params.model_config),
           m_device(params.device),
-          m_decoder(decode::create_decoder(params.device, m_config)),
+          m_decoder(decode::create_decoder(params.device, m_config, params.modbase_configs)),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(params.device)),
           m_low_latency(params.pipeline_type == PipelineType::simplex_low_latency),
           m_pipeline_type(params.pipeline_type),
@@ -235,7 +239,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
 
     at::InferenceMode guard;
 
-    if (params.modbase_configs && !params.modbase_configs->empty()) {
+    if (!std::empty(params.modbase_configs)) {
         if (!m_config.is_flstm_model()) {
             throw std::runtime_error(
                     "Latent-space modbase models require an FLSTM basecalling model");
@@ -247,7 +251,22 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         }
         // TODO: check the required dtype here
         m_modbase_modules =
-                modbase::load_modbase_latent_space_model(*(params.modbase_configs), m_options);
+                modbase::load_modbase_latent_space_model(params.modbase_configs, m_options);
+
+        ModBaseInfo modbase_info = config::get_modbase_info(params.modbase_configs);
+
+        modbase::ModBaseContext context;
+        for (const config::ModBaseModelConfig &config : params.modbase_configs) {
+            const config::modbase::ModBaseModelConfigData &data{
+                    config::get_model_config_data(config)};
+            if (!data.mods.motif.empty()) {
+                context.set_context(data.mods.motif, data.mods.motif_offset);
+            }
+        }
+
+        m_modbase_info =
+                std::make_shared<ModBaseInfo>(std::move(modbase_info.alphabet),
+                                              std::move(modbase_info.long_names), context.encode());
     }
     m_module = load_crf_model(params.model_config, m_options);
 
@@ -419,11 +438,16 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
         at::Tensor out = output.narrow(0, 0, c10::multiply_integers(task->out.data.sizes()))
                                  .view(task->out.data.sizes());
         out.copy_(task->out.data);
-        return m_decoder->decode({out, num_chunks, m_decoder_options, task->aux});
+        return m_decoder->decode({out, {}, num_chunks, m_decoder_options, task->aux});
     }
 
     output.copy_(task->out.data);
-    return m_decoder->decode({output, num_chunks, m_decoder_options});
+    std::vector<at::Tensor> modbase_output;
+    for (const at::Tensor &head : task->out.modbase_data) {
+        // ToDo: use pinned memory
+        modbase_output.emplace_back(head.to(at::kCPU));
+    }
+    return m_decoder->decode({output, std::move(modbase_output), num_chunks, m_decoder_options});
 }
 
 void CudaCaller::terminate() {
@@ -875,8 +899,8 @@ void CudaCaller::cuda_thread_fn() {
             task->out = m_decoder->prepare_decode(
                     {std::move(scores), task->num_chunks, m_decoder_options, task->aux});
             if (m_modbase_modules) {
-                run_modbase_models(*m_modbase_modules, task->out.data,
-                                   std::move(signal_embeddings));
+                task->out.modbase_data = run_modbase_models(*m_modbase_modules, task->out.data,
+                                                            std::move(signal_embeddings));
             }
             m_stream.synchronize();
             m_model_decode_ms += timer.GetElapsedMS();

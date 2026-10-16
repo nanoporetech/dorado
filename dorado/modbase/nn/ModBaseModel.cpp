@@ -101,7 +101,7 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
 }
 
 std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
-        const std::vector<config::ModBaseModelConfig>& configs,
+        const std::span<const config::ModBaseModelConfig> configs,
         const at::TensorOptions& options) {
     if (configs.empty()) {
         return std::nullopt;

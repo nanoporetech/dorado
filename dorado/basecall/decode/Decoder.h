@@ -1,11 +1,13 @@
 #pragma once
 
 #include "basecall/DecodedChunk.h"
+#include "config/ModBaseModelConfig.h"
 #include "nn/AuxiliaryData.h"
 
 #include <ATen/core/TensorBody.h>
 
 #include <memory>
+#include <span>
 #include <vector>
 
 namespace dorado::config {
@@ -23,6 +25,7 @@ struct DecoderInput {
 
 struct DecoderResult {
     at::Tensor data;
+    std::vector<at::Tensor> modbase_data;  // tensor per classifier head
     int num_chunks;
     DecoderOptions options;
     const nn::AuxiliaryData *aux{nullptr};
@@ -44,8 +47,10 @@ protected:
     Decoder &operator=(Decoder &&) = delete;
 };
 
-std::unique_ptr<Decoder> create_decoder(c10::Device device,
-                                        const config::BasecallModelConfig &config);
+std::unique_ptr<Decoder> create_decoder(
+        c10::Device device,
+        const config::BasecallModelConfig &config,
+        std::span<const config::ModBaseModelConfig> modbase_configs);
 
 DecoderOptions create_decoder_options(const config::BasecallModelConfig &config);
 

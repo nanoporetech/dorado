@@ -6,6 +6,7 @@
 #include <torch/nn.h>
 
 #include <optional>
+#include <span>
 #include <tuple>
 #include <vector>
 
@@ -24,7 +25,7 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
 // Returns the sequence model, common model, and classifier models in config order, or std::nullopt
 // when configs is empty.
 std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
-        const std::vector<config::ModBaseModelConfig>& configs,
+        std::span<const config::ModBaseModelConfig> configs,
         const at::TensorOptions& options);
 
 }  // namespace dorado::modbase

@@ -146,6 +146,9 @@ void mux_change_trim_read(ReadCommon& read_common) {
         DORADO_LOG(trace, "mux_change_trimming {} - move table index failed", read_common.read_id);
         return;
     }
+
+    const int num_modbase_states = read_common.base_mod_probs.size() / read_common.seq.size();
+
     read_common.moves.resize(trim_moves_idx);
 
     // Trim the sequence and qstring
@@ -157,6 +160,13 @@ void mux_change_trim_read(ReadCommon& read_common) {
     // Trim the signal
     const size_t trim_signal_idx = read_common.moves.size() * read_common.attributes.model_stride;
     read_common.raw_data = read_common.raw_data.index({Slice(0, trim_signal_idx)});
+
+    // Trim modbase calls
+    if (!read_common.base_mod_probs.empty()) {
+        assert(!read_common.base_mod_simplex_motif_hits.empty());
+        read_common.base_mod_probs.resize(trim_seq_idx * num_modbase_states);
+        read_common.base_mod_simplex_motif_hits.resize(trim_seq_idx);
+    }
 
     read_common.num_minknow_events = 0;  // No way to know how the events were distributed, zero out
 

@@ -2,6 +2,7 @@
 
 #include "torch_utils/cuda_utils.h"
 #include "torch_utils/gpu_profiling.h"
+#include "utils/sequence_utils.h"
 
 #include <ATen/TensorIndexing.h>
 #include <ATen/ops/arange.h>
@@ -16,6 +17,23 @@ extern "C" {
 }
 
 namespace dorado::basecall::decode {
+
+CUDADecoder::CUDADecoder(const float score_range,
+                         const std::span<const config::ModBaseModelConfig> modbase_configs)
+        : m_modbase_base_offsets{config::get_modbase_info(modbase_configs).base_probs_offsets()},
+          m_score_range{score_range} {
+    for (const config::ModBaseModelConfig &config : modbase_configs) {
+        const config::modbase::ModBaseModelConfigData &modbase_data{
+                config::get_model_config_data(config)};
+        const config::modbase::CommonModelParams &common_params{
+                config::get_common_model_params(config)};
+        m_modbase_decoders.emplace_back(modbase_data.mods.base_id, modbase_data.mods.count + 1,
+                                        modbase_data.context.samples_before / common_params.stride,
+                                        modbase_data.context.samples_after / common_params.stride,
+                                        modbase::MotifMatcher{config});
+        m_modbase_num_states += modbase_data.mods.count;
+    }
+}
 
 DecoderResult CUDADecoder::prepare_decode(DecoderInput input) const {
     auto scores = input.scores;
@@ -134,7 +152,7 @@ DecoderResult CUDADecoder::prepare_decode(DecoderInput input) const {
                 options.q_shift, options.move_pad));
     }
     auto data = input.aux ? moves_sequence_qstring : moves_sequence_qstring.reshape({3, N, -1});
-    return {std::move(data), input.num_chunks, input.options, input.aux};
+    return {std::move(data), {}, input.num_chunks, input.options, input.aux};
 }
 
 std::vector<DecodedChunk> CUDADecoder::decode(const DecoderResult &data) const {
@@ -167,7 +185,7 @@ std::vector<DecodedChunk> CUDADecoder::decode(const DecoderResult &data) const {
             std::string qstr(qstr_ptr + offset, qstr_ptr + offset + num_bases);
 
             called_chunks.emplace_back(
-                    DecodedChunk{std::move(seq), std::move(qstr), std::move(mov)});
+                    DecodedChunk{std::move(seq), std::move(qstr), std::move(mov), {}, {}});
 
             offset += T;
         }
@@ -190,12 +208,85 @@ std::vector<DecodedChunk> CUDADecoder::decode(const DecoderResult &data) const {
             std::string seq(seq_ptr, seq_ptr + num_bases);
             std::string qstr(qstr_ptr, qstr_ptr + num_bases);
 
-            called_chunks.emplace_back(
-                    DecodedChunk{std::move(seq), std::move(qstr), std::move(mov)});
+            std::vector<at::Tensor> modbase_data;
+            modbase_data.reserve(data.modbase_data.size());
+            for (const at::Tensor &head : data.modbase_data) {
+                modbase_data.emplace_back(head[idx]);
+            }
+
+            auto [modbase_probs, modbase_motif_hits] = decode_modbase(modbase_data, seq, mov);
+
+            called_chunks.emplace_back(std::move(seq), std::move(qstr), std::move(mov),
+                                       std::move(modbase_probs), std::move(modbase_motif_hits));
         }
     }
 
     return called_chunks;
+}
+
+std::pair<std::vector<uint8_t>, std::vector<bool>> CUDADecoder::decode_modbase(
+        const std::span<const at::Tensor> data,
+        const std::string_view sequence,
+        const std::span<const uint8_t> moves) const {
+    if (m_modbase_decoders.empty()) {
+        return {};
+    }
+
+    assert(data.size() == m_modbase_decoders.size());
+
+    std::vector<int32_t> sequence_to_signal;
+    sequence_to_signal.reserve(sequence.size());
+    for (int32_t i = 0; i < std::ssize(moves); ++i) {
+        if (moves[i] == 1) {
+            sequence_to_signal.emplace_back(i);
+        }
+    }
+    assert(sequence_to_signal.size() == sequence.size());
+
+    std::vector<uint8_t> modbase_probabilities(sequence.size() * m_modbase_num_states, 0);
+    for (int32_t i = 0; i < std::ssize(sequence); ++i) {
+        const int8_t base_id{utils::BaseInfo::BASE_IDS[sequence[i]]};
+        assert((base_id >= 0) && (base_id <= 3));
+        modbase_probabilities[(i * m_modbase_num_states) + m_modbase_base_offsets[base_id]] = 255U;
+    }
+
+    std::vector<bool> modbase_motif_hits(sequence.size(), false);
+
+    for (int32_t i = 0; i < std::ssize(data); ++i) {
+        assert(data[i].device() == at::kCPU);
+        assert(data[i].dim() == 1);
+
+        const ModBaseDecoder &decoder{m_modbase_decoders[i]};
+        assert(data[i].size(0) == (decoder.num_states * std::ssize(moves)));
+
+        const std::span<const at::Half> scores(data[i].data_ptr<at::Half>(), data[i].size(0));
+
+        const size_t base_offset = m_modbase_base_offsets[decoder.base_id];
+
+        const std::vector<size_t> sequence_hits{decoder.matcher.get_motif_hits(sequence)};
+        for (const int32_t sequence_hit : sequence_hits) {
+            const int32_t signal_hit = sequence_to_signal[sequence_hit];
+            if (signal_hit < decoder.context_num_samples_before) {
+                continue;
+            }
+            if (signal_hit > (std::ssize(moves) - decoder.context_num_samples_after)) {
+                break;
+            }
+            modbase_motif_hits[sequence_hit] = true;
+            for (int32_t mod_offset = 0; mod_offset < decoder.num_states; ++mod_offset) {
+                const uint8_t score = std::min(
+                        255.0f,
+                        std::floor(
+                                static_cast<float>(
+                                        scores[((signal_hit * decoder.num_states)) + mod_offset]) *
+                                256));
+                modbase_probabilities[(sequence_hit * m_modbase_num_states) + base_offset +
+                                      mod_offset] = score;
+            }
+        }
+    }
+
+    return {modbase_probabilities, modbase_motif_hits};
 }
 
 }  // namespace dorado::basecall::decode

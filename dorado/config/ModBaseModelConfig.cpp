@@ -808,8 +808,17 @@ ModBaseModelConfig load_modbase_model_config(const std::filesystem::path& model_
     return modbase::parse_model_config(model_path, config_toml);
 }
 
+ModBaseInfo get_modbase_info(const std::span<const ModBaseModelConfig> modbase_configs) {
+    std::vector<std::reference_wrapper<const ModBaseModelConfig>> references;
+    references.reserve(modbase_configs.size());
+    for (const ModBaseModelConfig& config : modbase_configs) {
+        references.emplace_back(config);
+    }
+    return get_modbase_info(references);
+}
+
 ModBaseInfo get_modbase_info(
-        const std::vector<std::reference_wrapper<const ModBaseModelConfig>>& base_mod_params) {
+        const std::span<std::reference_wrapper<const ModBaseModelConfig>> modbase_configs) {
     struct ModelInfo {
         std::vector<std::string> long_names;
         std::vector<std::string> alphabet;
@@ -824,8 +833,8 @@ ModBaseInfo get_modbase_info(
         model_info[b].alphabet.emplace_back(1, allowed_bases[b]);
     }
 
-    for (const auto& params_ref : base_mod_params) {
-        const auto& params = get_model_config_data(params_ref.get()).mods;
+    for (const auto& config : modbase_configs) {
+        const auto& params = get_model_config_data(config.get()).mods;
         auto base = params.motif[params.motif_offset];
         if (allowed_bases.find(base) == std::string::npos) {
             throw std::runtime_error("Invalid base in modbase model metadata.");
@@ -854,7 +863,7 @@ ModBaseInfo get_modbase_info(
 }
 
 void check_modbase_multi_model_compatibility(
-        const std::vector<ModBaseModelConfig>& modbase_configs) {
+        const std::span<const ModBaseModelConfig> modbase_configs) {
     if (modbase_configs.size() < 2) {
         return;
     }
@@ -883,10 +892,10 @@ void check_modbase_multi_model_compatibility(
     }
 
     const bool model_type_mismatch =
-            std::adjacent_find(std::begin(modbase_configs), std::end(modbase_configs),
+            std::adjacent_find(std::cbegin(modbase_configs), std::cend(modbase_configs),
                                [](const auto& lhs, const auto& rhs) {
                                    return is_cotrained_model(lhs) != is_cotrained_model(rhs);
-                               }) != std::end(modbase_configs);
+                               }) != std::cend(modbase_configs);
 
     if (model_type_mismatch) {
         if (!err_msg.empty()) {

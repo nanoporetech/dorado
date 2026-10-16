@@ -43,7 +43,7 @@ std::string ModBaseBatchParams::to_string() const {
     // clang-format on
 }
 
-ModBaseBatchParams get_modbase_params(const std::vector<ModBaseModelConfig>& configs,
+ModBaseBatchParams get_modbase_params(const std::span<const ModBaseModelConfig> configs,
                                       size_t device_count) {
     if (configs.empty()) {
         return {};

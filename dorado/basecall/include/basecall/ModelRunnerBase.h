@@ -1,9 +1,12 @@
 #pragma once
 
 #include "DecodedChunk.h"
-#include "config/ModBaseModelConfigFwd.h"
+#include "config/ModBaseModelConfig.h"
 #include "utils/stats.h"
+#include "utils/types.h"
 
+#include <memory>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -24,6 +27,7 @@ public:
     virtual void accept_chunk(int chunk_idx, const at::Tensor &chunk) = 0;
     virtual std::vector<decode::DecodedChunk> call_chunks(int num_chunks) = 0;
     virtual const config::BasecallModelConfig &config() const = 0;
+    virtual std::shared_ptr<ModBaseInfo> modbase_info() const = 0;
     virtual size_t chunk_size() const = 0;
     virtual size_t batch_size() const = 0;
     virtual bool variable_chunk_sizes() const { return false; }
@@ -50,7 +54,7 @@ enum class PipelineType { simplex_low_latency, simplex, duplex };
 
 struct BasecallerCreationParams {
     const config::BasecallModelConfig &model_config;
-    const std::vector<config::ModBaseModelConfig> *modbase_configs = nullptr;
+    const std::span<const config::ModBaseModelConfig> modbase_configs;
     const std::string &device;
     float memory_limit_fraction;
     PipelineType pipeline_type;
