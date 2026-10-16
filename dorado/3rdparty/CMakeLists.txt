@@ -38,10 +38,6 @@ add_subdirectory(argparse EXCLUDE_FROM_ALL)
 # catch2
 add_subdirectory(catch2 EXCLUDE_FROM_ALL)
 
-# CxxUrl
-option(ENABLE_INSTALL "" OFF)
-add_subdirectory(CxxUrl EXCLUDE_FROM_ALL)
-
 # cpp-httplib
 add_library(httplib INTERFACE)
 target_include_directories(httplib SYSTEM INTERFACE
@@ -55,14 +51,22 @@ target_include_directories(cxxpool SYSTEM INTERFACE
     ${DORADO_3RD_PARTY_SOURCE}/cxxpool/src
 )
 
-# Bring in spdlog
-add_subdirectory(spdlog EXCLUDE_FROM_ALL)
-# Avoid namespace clashes with static torch.
-target_compile_definitions(spdlog PUBLIC
-    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
-    "FMT_END_NAMESPACE=}}"
-)
+# CxxUrl
+option(ENABLE_INSTALL "" OFF)
+add_subdirectory(CxxUrl EXCLUDE_FROM_ALL)
 
+# date
+add_subdirectory(date EXCLUDE_FROM_ALL)
+
+# edlib
+apply_3rdparty_patch(edlib)
+set(BUILD_TESTING OFF)
+add_subdirectory(edlib EXCLUDE_FROM_ALL)
+# Disable warnings from edlib source
+disable_warnings(edlib)
+set(BUILD_TESTING ON)
+
+# elzip
 # ELZIP_DECOMPRESS_ONLY stops minizip from adding OpenSSL as a target, preventing use of three dylibs on osx.
 set(ELZIP_DECOMPRESS_ONLY ON)
 add_subdirectory(elzip EXCLUDE_FROM_ALL)
@@ -97,16 +101,13 @@ target_include_directories(nvtx SYSTEM INTERFACE
     ${DORADO_3RD_PARTY_SOURCE}/NVTX/c/include
 )
 
-# edlib
-apply_3rdparty_patch(edlib)
-set(BUILD_TESTING OFF)
-add_subdirectory(edlib EXCLUDE_FROM_ALL)
-# Disable warnings from edlib source
-disable_warnings(edlib)
-set(BUILD_TESTING ON)
-
-# date
-add_subdirectory(date EXCLUDE_FROM_ALL)
+# spdlog
+add_subdirectory(spdlog EXCLUDE_FROM_ALL)
+# Avoid namespace clashes with static torch.
+target_compile_definitions(spdlog PUBLIC
+    "FMT_BEGIN_NAMESPACE=namespace fmt { inline namespace ont {"
+    "FMT_END_NAMESPACE=}}"
+)
 
 # toml11
 apply_3rdparty_patch(toml11)
