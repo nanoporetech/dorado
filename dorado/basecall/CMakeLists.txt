@@ -26,6 +26,8 @@ dorado_add_library(dorado_basecall
         decode/Decoder.h
         model/CRFModel.cpp
         model/CRFModel.h
+        model/Model.cpp
+        model/Model.h
         model/TxModel.cpp
         model/TxModel.h
         ModelRunner.cpp

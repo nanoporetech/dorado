@@ -1,11 +1,11 @@
 #include "basecall/CudaCaller.h"
 
 #include "ChunkBenchmarks.h"
-#include "basecall/crf_utils.h"
 #include "caller/TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "modbase/ModBaseContext.h"
+#include "model/Model.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
@@ -268,7 +268,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
                 std::make_shared<ModBaseInfo>(std::move(modbase_info.alphabet),
                                               std::move(modbase_info.long_names), context.encode());
     }
-    m_module = load_crf_model(params.model_config, m_options);
+    m_model = model::load_model(params.model_config, m_options);
 
     determine_batch_dims(params, m_variable_chunk_sizes);
 
@@ -292,13 +292,12 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         } else {
             input = torch::empty({batch_dim.N, m_num_input_features, batch_dim.T_in}, m_options);
         }
-        at::Tensor signal_embeddings;
-        auto scores = m_modbase_modules ? m_module->forward(input, aux.get(), &signal_embeddings)
-                                        : m_module->forward(input, aux.get());
-        auto decoded_data =
-                m_decoder->prepare_decode({scores, batch_dim.N, m_decoder_options, aux.get()});
+        auto model_output = m_model->forward(input, aux.get(), m_modbase_modules.has_value());
+        auto decoded_data = m_decoder->prepare_decode(
+                {model_output.scores, batch_dim.N, m_decoder_options, aux.get()});
         if (m_modbase_modules) {
-            run_modbase_models(*m_modbase_modules, decoded_data.data, signal_embeddings);
+            run_modbase_models(*m_modbase_modules, decoded_data.data,
+                               std::move(model_output.signal_embeddings));
         }
     }
     m_stream.synchronize();
@@ -760,7 +759,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                 handle_cuda_result(cudaEventCreate(&start));
                 handle_cuda_result(cudaEventCreate(&stop));
                 handle_cuda_result(cudaEventRecord(start));
-                m_module->forward(input, aux.get());
+                m_model->forward(input, aux.get());
                 handle_cuda_result(cudaEventRecord(stop));
                 handle_cuda_result(cudaEventSynchronize(stop));
                 float ms = 0;
@@ -892,15 +891,14 @@ void CudaCaller::cuda_thread_fn() {
 
         auto run_basecalling = [&]() {
             stats::Timer timer;
-            at::Tensor signal_embeddings;
-            auto scores = m_modbase_modules
-                                  ? m_module->forward(task->input, task->aux, &signal_embeddings)
-                                  : m_module->forward(task->input, task->aux);
-            task->out = m_decoder->prepare_decode(
-                    {std::move(scores), task->num_chunks, m_decoder_options, task->aux});
+            auto model_output =
+                    m_model->forward(task->input, task->aux, m_modbase_modules.has_value());
+            task->out = m_decoder->prepare_decode({std::move(model_output.scores), task->num_chunks,
+                                                   m_decoder_options, task->aux});
             if (m_modbase_modules) {
-                task->out.modbase_data = run_modbase_models(*m_modbase_modules, task->out.data,
-                                                            std::move(signal_embeddings));
+                task->out.modbase_data =
+                        run_modbase_models(*m_modbase_modules, task->out.data,
+                                           std::move(model_output.signal_embeddings));
             }
             m_stream.synchronize();
             m_model_decode_ms += timer.GetElapsedMS();

@@ -2,8 +2,8 @@
 
 #include "MetalCallerTask.h"
 #include "MetalDecoder.h"
-#include "basecall/crf_utils.h"
 #include "decode/Decoder.h"
+#include "model/Model.h"
 #include "model/TxModel.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
@@ -123,7 +123,7 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
                                                MetalDecoder::ScanMode::Float);
 
     // Load the model and get ready for calling.
-    m_model = load_crf_model(model_config, get_crf_options(model_config));
+    m_model = model::load_model(model_config, get_crf_options(model_config));
     start_threads();
 }
 
@@ -186,7 +186,7 @@ int MPSCaller::get_batch_size_granularity(const config::BasecallModelConfig &mod
 
 bool MPSCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
     auto scores_TNC = m_model->forward(task.input->to(get_crf_options(m_config)))
-                              .transpose(0, 1)
+                              .scores.transpose(0, 1)
                               .contiguous()
                               .to(scores_dtype);
 

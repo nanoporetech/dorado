@@ -1,9 +1,9 @@
 #include "basecall/CPUCaller.h"
 
-#include "basecall/crf_utils.h"
 #include "caller/TensorRunnerState.h"
 #include "caller/TypedRunnerContext.h"
 #include "decode/Decoder.h"
+#include "model/Model.h"
 
 #include <stdexcept>
 
@@ -14,7 +14,7 @@ CPUCaller::CPUCaller(const config::BasecallModelConfig& model_config)
           m_decoder(decode::create_decoder(c10::DeviceType::CPU, model_config, {})),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(c10::DeviceType::CPU)),
           m_decoder_options(decode::create_decoder_options(model_config)),
-          m_module(load_crf_model(model_config, m_options)) {
+          m_model(model::load_model(model_config, m_options)) {
     assert(model_config.has_normalised_basecaller_params());
     assert(model_config.basecaller.batch_size() > 0);
 }
@@ -36,8 +36,9 @@ std::unique_ptr<ModelCaller::RunnerContext> CPUCaller::create_runner_context(
 std::vector<decode::DecodedChunk> CPUCaller::call_chunks(TensorRunnerState& state, int num_chunks) {
     at::InferenceMode guard;
     stats::Timer timer;
-    auto scores_TNC =
-            m_module->forward(state.input().to(m_options.device())).transpose(0, 1).contiguous();
+    auto scores_TNC = m_model->forward(state.input().to(m_options.device()))
+                              .scores.transpose(0, 1)
+                              .contiguous();
     const auto forward_ms = timer.GetElapsedMS();
     auto decoded_chunks = m_decoder->decode(
             m_decoder->prepare_decode({scores_TNC, num_chunks, m_decoder_options}));
