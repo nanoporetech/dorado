@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basecall/ModelRunnerBase.h"
+#include "basecall/ModelCaller.h"
 #include "config/ModBaseModelConfigFwd.h"
 
 #include <filesystem>

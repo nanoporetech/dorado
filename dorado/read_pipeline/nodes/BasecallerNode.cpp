@@ -1,6 +1,6 @@
 #include "read_pipeline/nodes/BasecallerNode.h"
 
-#include "basecall/ModelRunnerBase.h"
+#include "basecall/ModelRunner.h"
 #include "config/BasecallModelConfig.h"
 #include "read_pipeline/base/chunk.h"
 #include "read_pipeline/base/messages/ReadCommon.h"

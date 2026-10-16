@@ -1,6 +1,6 @@
 #include "api/pipeline_creation.h"
 
-#include "basecall/ModelRunnerBase.h"
+#include "basecall/ModelRunner.h"
 #include "config/BasecallModelConfig.h"
 #include "modbase/ModBaseRunner.h"
 #include "read_pipeline/nodes/BasecallerNode.h"

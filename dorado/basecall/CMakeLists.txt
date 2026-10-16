@@ -12,7 +12,6 @@ dorado_add_library(dorado_basecall
         MetalCaller.h
         ModelCaller.h
         ModelRunner.h
-        ModelRunnerBase.h
     SOURCES_PRIVATE
         CPUCaller.cpp
         ChunkBenchmarks.cpp
@@ -32,7 +31,6 @@ dorado_add_library(dorado_basecall
         model/TxModel.h
         ModelRunner.cpp
         ModelCaller.cpp
-        ModelRunnerBase.cpp
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
