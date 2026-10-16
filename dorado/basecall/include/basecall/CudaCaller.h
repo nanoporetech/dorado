@@ -2,6 +2,7 @@
 
 #include "DecodedChunk.h"
 #include "ModelCaller.h"
+#include "ModelCallerFactory.h"
 #include "config/BasecallModelConfig.h"
 #include "modbase/nn/ModBaseModel.h"
 #include "nn/AuxiliaryData.h"

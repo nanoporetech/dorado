@@ -10,6 +10,7 @@ dorado_add_library(dorado_basecall
         DecodedChunk.h
         MetalCaller.h
         ModelCaller.h
+        ModelCallerFactory.h
         ModelRunner.h
     SOURCES_PRIVATE
         caller/CPUCaller.cpp
@@ -29,6 +30,7 @@ dorado_add_library(dorado_basecall
         model/TxModel.h
         ModelRunner.cpp
         caller/ModelCaller.cpp
+        caller/ModelCallerFactory.cpp
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h

@@ -1,7 +1,6 @@
 #pragma once
 
 #include "DecodedChunk.h"
-#include "config/ModBaseModelConfigFwd.h"
 #include "utils/stats.h"
 #include "utils/types.h"
 
@@ -21,18 +20,6 @@ struct BasecallModelConfig;
 }
 
 namespace dorado::basecall {
-
-enum class PipelineType { simplex_low_latency, simplex, duplex };
-
-struct BasecallerCreationParams {
-    const config::BasecallModelConfig& model_config;
-    const std::span<const config::ModBaseModelConfig>& modbase_configs;
-    const std::string& device;
-    float memory_limit_fraction;
-    PipelineType pipeline_type;
-    float batch_size_time_penalty;
-    bool variable_chunk_sizes;
-};
 
 class ModelCaller {
 public:
