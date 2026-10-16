@@ -1,13 +1,13 @@
 #include "basecall/ModelCallerFactory.h"
 
-#include "basecall/CPUCaller.h"
+#include "CPUCaller.h"
 
 #include <stdexcept>
 
 #if DORADO_CUDA_BUILD
-#include "basecall/CudaCaller.h"
+#include "CudaCaller.h"
 #elif DORADO_METAL_BUILD
-#include "basecall/MetalCaller.h"
+#include "MetalCaller.h"
 #include "utils/memory_utils.h"
 #endif
 

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "basecall/DecodedChunk.h"
-#include "basecall/MetalCaller.h"
+#include "caller/MetalCaller.h"
 #include "torch_utils/metal_utils.h"
 
 #include <ATen/core/TensorBody.h>

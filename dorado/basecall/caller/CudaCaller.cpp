@@ -1,4 +1,4 @@
-#include "basecall/CudaCaller.h"
+#include "CudaCaller.h"
 
 #include "ChunkBenchmarks.h"
 #include "TypedRunnerContext.h"

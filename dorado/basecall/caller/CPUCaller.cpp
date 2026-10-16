@@ -1,4 +1,4 @@
-#include "basecall/CPUCaller.h"
+#include "CPUCaller.h"
 
 #include "TensorRunnerState.h"
 #include "TypedRunnerContext.h"

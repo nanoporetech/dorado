@@ -1,6 +1,6 @@
 #pragma once
 
-#include "ModelCaller.h"
+#include "basecall/ModelCaller.h"
 #include "config/BasecallModelConfig.h"
 
 #include <torch/nn.h>
