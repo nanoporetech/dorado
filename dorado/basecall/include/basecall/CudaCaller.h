@@ -2,7 +2,6 @@
 
 #include "DecodedChunk.h"
 #include "ModelCaller.h"
-#include "ModelRunnerBase.h"
 #include "config/BasecallModelConfig.h"
 #include "modbase/nn/ModBaseModel.h"
 #include "nn/AuxiliaryData.h"
@@ -27,6 +26,10 @@ class CudaRunnerState;
 namespace decode {
 class Decoder;
 }  // namespace decode
+
+namespace model {
+class Model;
+}
 
 class CudaCaller final : public ModelCaller {
 public:
@@ -91,7 +94,7 @@ private:
     std::unique_ptr<decode::Decoder> m_decoder;
     decode::DecoderOptions m_decoder_options;
     const at::TensorOptions m_options;
-    torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
+    std::unique_ptr<model::Model> m_model;
     std::optional<modbase::ModBaseLatentSpaceModels> m_modbase_modules;
     std::shared_ptr<ModBaseInfo> m_modbase_info;
     bool m_terminate{false};

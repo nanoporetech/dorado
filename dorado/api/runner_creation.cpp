@@ -2,7 +2,7 @@
 
 #include "basecall/ModelCaller.h"
 #include "basecall/ModelRunner.h"
-#include "basecall/crf_utils.h"
+#include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfig.h"
 #include "utils/log_utils.h"
 

@@ -2,12 +2,12 @@
 
 #include "basecall/MetalCaller.h"
 
-#include <torch/nn/modules/container/any.h>
-#include <torch/nn/pimpl.h>
-
 namespace dorado::basecall {
 
 class MetalDecoder;
+namespace model {
+class Model;
+}
 
 class MPSCaller final : public MetalCaller {
 public:
@@ -30,7 +30,7 @@ private:
     DecodedData decode(int chunk_idx) const override;
     bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
-    torch::nn::ModuleHolder<torch::nn::AnyModule> m_model;
+    std::unique_ptr<model::Model> m_model;
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
 
     int m_in_chunk_size, m_out_chunk_size, m_batch_size;

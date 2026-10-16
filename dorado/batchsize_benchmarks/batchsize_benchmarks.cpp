@@ -5,6 +5,7 @@
 #include "api/runner_creation.h"
 #include "batchsize_helpers.h"
 #include "config/BasecallModelConfig.h"
+#include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig
 #include "data_loader/DataLoader.h"
 #include "read_pipeline/base/ReadPipeline.h"
 #include "read_pipeline/nodes/BasecallerNode.h"

@@ -1,7 +1,7 @@
 #pragma once
 
 #include "api/caller_creation.h"
-#include "basecall/ModelRunnerBase.h"
+#include "basecall/ModelRunner.h"
 #include "config/ModBaseModelConfigFwd.h"
 #include "modbase/ModBaseRunner.h"
 

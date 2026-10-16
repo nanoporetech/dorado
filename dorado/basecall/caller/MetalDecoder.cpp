@@ -8,7 +8,6 @@
 #include <ATen/ops/empty.h>
 
 #include <cassert>
-#include <cmath>
 
 using at::indexing::Slice;
 using namespace dorado::utils;
@@ -33,11 +32,9 @@ MetalDecoder::MetalDecoder(const config::BasecallModelConfig& model_config,
           m_batch_size(batch_size),
           m_out_split(out_split),
           m_out_batch_size(batch_size / out_split),
-          m_states(static_cast<int>(
-                  std::pow(model_config.is_tx_model() ? model_config.tx->crf.n_base : 4,
-                           model_config.state_len))),
+          m_states(static_cast<int>(decode::create_decoder_config(model_config).num_states())),
           m_score_scale(score_scale),
-          m_options(decode::create_decoder_options(model_config)) {
+          m_options(decode::create_decoder_config(model_config).options) {
     assert(m_out_chunk_size > 0);
     assert(m_batch_size > 0);
     assert(m_out_split > 0);

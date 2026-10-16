@@ -5,19 +5,16 @@ dorado_add_library(dorado_basecall
         basecall
     SOURCES_PUBLIC
         CPUCaller.h
-        crf_utils.h
         CudaCaller.h
         DecodedChunk.h
         DecodedChunk.h
         MetalCaller.h
         ModelCaller.h
         ModelRunner.h
-        ModelRunnerBase.h
     SOURCES_PRIVATE
         CPUCaller.cpp
         ChunkBenchmarks.cpp
         ChunkBenchmarks.h
-        crf_utils.cpp
         decode/beam_search.cpp
         decode/beam_search.h
         decode/CPUDecoder.cpp
@@ -26,16 +23,18 @@ dorado_add_library(dorado_basecall
         decode/Decoder.h
         model/CRFModel.cpp
         model/CRFModel.h
+        model/Model.cpp
+        model/Model.h
         model/TxModel.cpp
         model/TxModel.h
         ModelRunner.cpp
         ModelCaller.cpp
-        ModelRunnerBase.cpp
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
     SOURCES_TEST
         DecoderTest.cpp
+        ModelTest.cpp
         ModelRunnerTest.cpp
         TensorRunnerStateTest.cpp
         TypedRunnerContextTest.cpp

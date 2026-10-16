@@ -12,6 +12,10 @@ namespace dorado::basecall::decode {
 class Decoder;
 }
 
+namespace dorado::basecall::model {
+class Model;
+}
+
 namespace dorado::basecall {
 
 class TensorRunnerState;
@@ -36,7 +40,7 @@ private:
     std::unique_ptr<decode::Decoder> m_decoder;
     at::TensorOptions m_options;
     decode::DecoderOptions m_decoder_options;
-    torch::nn::ModuleHolder<torch::nn::AnyModule> m_module{nullptr};
+    std::unique_ptr<model::Model> m_model;
 
     std::atomic<int64_t> m_model_ms{0};
     std::atomic<int64_t> m_decode_ms{0};

@@ -6,6 +6,7 @@
 
 #include <ATen/core/TensorBody.h>
 
+#include <cstddef>
 #include <memory>
 #include <span>
 #include <vector>
@@ -31,6 +32,16 @@ struct DecoderResult {
     const nn::AuxiliaryData *aux{nullptr};
 };
 
+struct DecoderConfig {
+    DecoderOptions options;
+    int num_bases;
+    int state_len;
+    float score_clamp;
+
+    std::size_t num_states() const;
+    std::size_t num_transitions() const;
+};
+
 class Decoder {
 public:
     virtual ~Decoder() = default;
@@ -53,5 +64,6 @@ std::unique_ptr<Decoder> create_decoder(
         std::span<const config::ModBaseModelConfig> modbase_configs);
 
 DecoderOptions create_decoder_options(const config::BasecallModelConfig &config);
+DecoderConfig create_decoder_config(const config::BasecallModelConfig &config);
 
 }  // namespace dorado::basecall::decode
