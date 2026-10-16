@@ -31,10 +31,17 @@ if(NOT TARGET htslib) # lazy include guard
             set(AUTOCONF_COMMAND autoreconf --install)
         endif()
 
-        # htslib will only try to build the .so as PIC, but ont_core needs it all as PIC.
         unset(hts_cflags)
+
+        # Show htslib where libdeflate is.
+        # Note that htslib will test that it can link to libdeflate as part of the configure,
+        # but since it's a static lib we still have to manually add it as a dependency later on.
+        set(hts_cflags "${hts_cflags} -I${DORADO_3RD_PARTY_SOURCE}/libdeflate")
+        set(hts_cflags "${hts_cflags} -L$<PATH:GET_PARENT_PATH,$<TARGET_FILE:libdeflate::libdeflate_static>>")
+
+        # htslib will only try to build the .so as PIC, but ont_core needs it all as PIC.
         if (LINUX)
-            set(hts_cflags "-fPIC")
+            set(hts_cflags "${hts_cflags} -fPIC")
         endif()
 
         # If we're building with sanitizers then we need to build htslib the same way.
@@ -74,7 +81,15 @@ if(NOT TARGET htslib) # lazy include guard
             BUILD_IN_SOURCE 1
             CONFIGURE_COMMAND ${AUTOHEADER_COMMAND}
             COMMAND ${AUTOCONF_COMMAND}
-            COMMAND ./configure --disable-bz2 --disable-lzma --disable-libcurl --disable-s3 --disable-gcs --without-libdeflate ${hts_configure_flags}
+            COMMAND
+                ./configure
+                    --disable-bz2
+                    --disable-lzma
+                    --disable-libcurl
+                    --disable-s3
+                    --disable-gcs
+                    --with-libdeflate
+                    ${hts_configure_flags}
             BUILD_COMMAND ${MAKE_COMMAND} -j${htslib_build_jobs} install prefix=${htslib_PREFIX}
             COMMAND ${INSTALL_NAME}
             INSTALL_COMMAND ""
@@ -83,6 +98,7 @@ if(NOT TARGET htslib) # lazy include guard
             LOG_BUILD 0
             LOG_TEST 0
             LOG_INSTALL 0
+            DEPENDS libdeflate::libdeflate_static # libdeflate needs building before we can configure this project.
         )
 
         add_library(htslib STATIC IMPORTED)
@@ -90,8 +106,10 @@ if(NOT TARGET htslib) # lazy include guard
         file(MAKE_DIRECTORY ${htslib_PREFIX}/include)
         set_target_properties(htslib 
             PROPERTIES 
-                "IMPORTED_LOCATION" ${htslib_PREFIX}/lib/libhts.a
-                "INTERFACE_INCLUDE_DIRECTORIES" ${htslib_PREFIX}/include)
+                IMPORTED_LOCATION ${htslib_PREFIX}/lib/libhts.a
+                INTERFACE_INCLUDE_DIRECTORIES ${htslib_PREFIX}/include
+        )
+        target_link_libraries(htslib INTERFACE libdeflate::libdeflate_static)
         message(STATUS "Done configuring htslib")
 
         # Make sure that the project is built before any targets try to use it.
