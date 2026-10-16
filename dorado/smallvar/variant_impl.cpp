@@ -5,6 +5,7 @@
 #include "secondary/common/region.h"
 #include "secondary/consensus/sample_collate_utils.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/consensus/variant_normalization.h"
 #include "secondary/features/encoder_base.h"
 #include "secondary/features/encoder_utils.h"
 #include "secondary/features/feature_columns.h"
@@ -1859,7 +1860,7 @@ void worker_variant_calling_reduce(
 
         const std::string& seq_name = draft_lens[seq_id].first;
         std::optional<std::string> draft;
-        if (!std::empty(vc_decode_data) || gvcf) {
+        if (!std::empty(vc_decode_data) || !std::empty(reduce_data.variants_simple) || gvcf) {
             draft.emplace(fastx_readers[tid]->fetch_seq(seq_name));
         }
         const std::vector<secondary::Region> empty_hemizygous_regions{};
@@ -1882,6 +1883,15 @@ void worker_variant_calling_reduce(
             hemizygous_boundaries.erase(
                     std::unique(std::begin(hemizygous_boundaries), std::end(hemizygous_boundaries)),
                     std::end(hemizygous_boundaries));
+        }
+
+        // Normalize the simple variants on the entire chromosome before they are used to trim
+        // the inference samples and merged with inference variants.
+        if (!std::empty(reduce_data.variants_simple)) {
+            std::stable_sort(std::begin(reduce_data.variants_simple),
+                             std::end(reduce_data.variants_simple));
+            reduce_data.variants_simple = secondary::normalize_variants_vs_ref(
+                    reduce_data.variants_simple, *draft, ambig_ref);
         }
 
         std::vector<secondary::Variant> variants;
