@@ -9,13 +9,7 @@
 
 namespace dorado::basecall::decode {
 
-std::size_t DecoderConfig::num_states() const {
-    std::size_t states = 1;
-    for (int i = 0; i < state_len; ++i) {
-        states *= num_bases;
-    }
-    return states;
-}
+std::size_t DecoderConfig::num_states() const { return std::pow(num_bases, state_len); }
 
 std::size_t DecoderConfig::num_transitions() const { return num_states() * num_bases; }
 
