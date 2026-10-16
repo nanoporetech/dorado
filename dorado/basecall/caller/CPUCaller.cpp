@@ -1,7 +1,7 @@
 #include "basecall/CPUCaller.h"
 
-#include "caller/TensorRunnerState.h"
-#include "caller/TypedRunnerContext.h"
+#include "TensorRunnerState.h"
+#include "TypedRunnerContext.h"
 #include "decode/Decoder.h"
 #include "model/Model.h"
 

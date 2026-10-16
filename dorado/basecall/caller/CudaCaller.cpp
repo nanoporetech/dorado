@@ -1,7 +1,7 @@
 #include "basecall/CudaCaller.h"
 
 #include "ChunkBenchmarks.h"
-#include "caller/TypedRunnerContext.h"
+#include "TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "modbase/ModBaseContext.h"

@@ -12,7 +12,7 @@ dorado_add_library(dorado_basecall
         ModelCaller.h
         ModelRunner.h
     SOURCES_PRIVATE
-        CPUCaller.cpp
+        caller/CPUCaller.cpp
         ChunkBenchmarks.cpp
         ChunkBenchmarks.h
         decode/beam_search.cpp
@@ -28,7 +28,7 @@ dorado_add_library(dorado_basecall
         model/TxModel.cpp
         model/TxModel.h
         ModelRunner.cpp
-        ModelCaller.cpp
+        caller/ModelCaller.cpp
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
@@ -65,7 +65,7 @@ if(APPLE)
 else()
     target_sources(dorado_basecall
         PRIVATE
-            CudaCaller.cpp
+            caller/CudaCaller.cpp
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
     )
