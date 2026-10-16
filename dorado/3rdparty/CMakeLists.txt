@@ -83,6 +83,12 @@ target_include_directories(intervaltree SYSTEM INTERFACE
     ${DORADO_3RD_PARTY_SOURCE}/intervaltree
 )
 
+# libdeflate - target is libdeflate::libdeflate_static
+set(LIBDEFLATE_BUILD_STATIC_LIB ON)
+set(LIBDEFLATE_BUILD_SHARED_LIB OFF)
+set(LIBDEFLATE_BUILD_GZIP OFF)
+add_subdirectory(libdeflate)
+
 # minimap
 option(ONT_MM2_EXE "Build minimap2 exe" OFF)
 add_subdirectory(ont-minimap2 EXCLUDE_FROM_ALL)

@@ -105,6 +105,14 @@ intervaltree:
     license: intervaltree/LICENSE
     files:
         - intervaltree
+libdeflate:
+    description: >
+        Heavily optimized library for DEFLATE/zlib/gzip compression and decompression
+    version: "v1.26"
+    url: https://github.com/ebiggers/libdeflate
+    license: libdeflate/COPYING
+    files:
+        - libdeflate
 minimap2:
     description: >
         Sequence alignment program
