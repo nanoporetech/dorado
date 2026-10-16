@@ -1,8 +1,8 @@
 #include "MPSCaller.h"
 
 #include "MetalCallerTask.h"
-#include "MetalDecoder.h"
 #include "decode/Decoder.h"
+#include "decode/MetalDecoder.h"
 #include "model/Model.h"
 #include "model/TxModel.h"
 #include "torch_utils/metal_utils.h"

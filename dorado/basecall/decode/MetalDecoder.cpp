@@ -1,5 +1,6 @@
 #include "MetalDecoder.h"
 
+#include "config/BasecallModelConfig.h"
 #include "decode/Decoder.h"
 #include "decode/beam_search.h"
 #include "torch_utils/metal_utils.h"

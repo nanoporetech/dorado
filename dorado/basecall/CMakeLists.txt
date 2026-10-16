@@ -53,12 +53,12 @@ if(APPLE)
     target_sources(dorado_basecall
         PRIVATE
             caller/MetalCaller.cpp
-            caller/MetalDecoder.cpp
-            caller/MetalDecoder.h
             caller/MetalLSTMCaller.cpp
             caller/MetalLSTMCaller.h
             caller/MPSCaller.cpp
             caller/MPSCaller.h
+            decode/MetalDecoder.cpp
+            decode/MetalDecoder.h
             model/MetalCRFModel.cpp
             model/MetalCRFModel.h
     )

@@ -1,11 +1,17 @@
 #pragma once
 
+#include "basecall/DecodedChunk.h"
 #include "basecall/MetalCaller.h"
+#include "torch_utils/metal_utils.h"
 
 #include <ATen/core/TensorBody.h>
 
 #include <memory>
 #include <vector>
+
+namespace dorado::config {
+struct BasecallModelConfig;
+}
 
 namespace dorado::basecall {
 
