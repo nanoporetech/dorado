@@ -32,6 +32,36 @@ CATCH_TEST_CASE(CUT_TAG " decoder options use model q-score calibration", CUT_TA
     CATCH_CHECK(options.blank_score == dorado::basecall::decode::DecoderOptions{}.blank_score);
 }
 
+CATCH_TEST_CASE(CUT_TAG " decoder config describes the model state space", CUT_TAG) {
+    CATCH_SECTION("LSTM alphabet") {
+        auto config = load_config("dna_r10.4.1_e8.2_400bps_hac@v4.2.0");
+        config.state_len = 3;
+        config.clamp = true;
+
+        const auto decoder_config = dorado::basecall::decode::create_decoder_config(config);
+
+        CATCH_CHECK(decoder_config.num_bases == 4);
+        CATCH_CHECK(decoder_config.state_len == 3);
+        CATCH_CHECK(decoder_config.num_states() == 64);
+        CATCH_CHECK(decoder_config.num_transitions() == 256);
+        CATCH_CHECK(decoder_config.score_clamp == 5.f);
+    }
+
+    CATCH_SECTION("transformer alphabet") {
+        auto config = load_config("dna_r10.4.1_e8.2_400bps_sup@v5.0.0");
+        config.tx->crf.n_base = 5;
+        config.state_len = 2;
+        config.clamp = false;
+
+        const auto decoder_config = dorado::basecall::decode::create_decoder_config(config);
+
+        CATCH_CHECK(decoder_config.num_bases == 5);
+        CATCH_CHECK(decoder_config.num_states() == 25);
+        CATCH_CHECK(decoder_config.num_transitions() == 125);
+        CATCH_CHECK(decoder_config.score_clamp == 0.f);
+    }
+}
+
 CATCH_TEST_CASE(CUT_TAG " CPU decoder preserves the typed phase boundary", CUT_TAG) {
     constexpr int num_timesteps = 4;
     constexpr int num_chunks = 1;
