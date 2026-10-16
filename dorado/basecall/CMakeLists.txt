@@ -4,15 +4,14 @@ dorado_add_library(dorado_basecall
     PUBLIC_DIR
         basecall
     SOURCES_PUBLIC
-        CPUCaller.h
-        CudaCaller.h
         DecodedChunk.h
         DecodedChunk.h
-        MetalCaller.h
         ModelCaller.h
+        ModelCallerFactory.h
         ModelRunner.h
     SOURCES_PRIVATE
-        CPUCaller.cpp
+        caller/CPUCaller.cpp
+        caller/CPUCaller.h
         ChunkBenchmarks.cpp
         ChunkBenchmarks.h
         decode/beam_search.cpp
@@ -28,12 +27,14 @@ dorado_add_library(dorado_basecall
         model/TxModel.cpp
         model/TxModel.h
         ModelRunner.cpp
-        ModelCaller.cpp
+        caller/ModelCaller.cpp
+        caller/ModelCallerFactory.cpp
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
     SOURCES_TEST
         DecoderTest.cpp
+        ModelCallerFactoryTest.cpp
         ModelTest.cpp
         ModelRunnerTest.cpp
         TensorRunnerStateTest.cpp
@@ -53,19 +54,21 @@ if(APPLE)
     target_sources(dorado_basecall
         PRIVATE
             caller/MetalCaller.cpp
-            caller/MetalDecoder.cpp
-            caller/MetalDecoder.h
+            caller/MetalCaller.h
             caller/MetalLSTMCaller.cpp
             caller/MetalLSTMCaller.h
             caller/MPSCaller.cpp
             caller/MPSCaller.h
+            decode/MetalDecoder.cpp
+            decode/MetalDecoder.h
             model/MetalCRFModel.cpp
             model/MetalCRFModel.h
     )
 else()
     target_sources(dorado_basecall
         PRIVATE
-            CudaCaller.cpp
+            caller/CudaCaller.cpp
+            caller/CudaCaller.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
     )

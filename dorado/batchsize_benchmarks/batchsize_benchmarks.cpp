@@ -3,6 +3,7 @@
 #include "BenchmarkCache.h"
 #include "BenchmarkSink.h"
 #include "api/runner_creation.h"
+#include "basecall/ModelCallerFactory.h"
 #include "batchsize_helpers.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig
@@ -25,13 +26,10 @@
 #include <thread>
 
 #if DORADO_CUDA_BUILD
-#include "basecall/CudaCaller.h"
-
 #include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
 
 #elif DORADO_METAL_BUILD
-#include "basecall/MetalCaller.h"
 #include "torch_utils/metal_utils.h"
 #endif
 
@@ -174,39 +172,6 @@ std::string get_gpu_name(const std::string &device) {
 #endif
 }
 
-int get_batch_size_granularity(const config::BasecallModelConfig &config) {
-#if DORADO_CUDA_BUILD
-    return basecall::CudaCaller::get_batch_size_granularity(config);
-#elif DORADO_METAL_BUILD
-    return basecall::MetalCaller::get_batch_size_granularity(config);
-#else
-#error "Invalid build"
-#endif
-}
-
-int get_max_safe_batch_size(const std::string &device, const config::BasecallModelConfig &config) {
-#if DORADO_CUDA_BUILD
-    return basecall::CudaCaller::get_max_safe_batch_size(device, 1, config);
-#elif DORADO_METAL_BUILD
-    (void)device;
-    return basecall::MetalCaller::get_max_safe_batch_size(1, config);
-#else
-#error "Invalid build"
-#endif
-}
-
-uint64_t get_gpu_mem_limit(const std::string &device, float memory_limit_fraction) {
-#if DORADO_CUDA_BUILD
-    return basecall::CudaCaller::get_gpu_mem_limit(device, memory_limit_fraction);
-#elif DORADO_METAL_BUILD
-    (void)device;
-    // TODO: this assumes that we're the only thing running on the machine.
-    return utils::get_apple_physical_memory_bytes() * memory_limit_fraction;
-#else
-#error "Invalid build"
-#endif
-}
-
 }  // namespace
 
 std::optional<int> get(const std::string &device,
@@ -215,7 +180,7 @@ std::optional<int> get(const std::string &device,
                        float batch_size_time_penalty) {
     const std::string gpu_name = get_gpu_name(device);
     const auto model_name = config.model_name();
-    const auto memory_limit = get_gpu_mem_limit(device, memory_limit_fraction);
+    const auto memory_limit = basecall::model_caller_memory_limit(device, memory_limit_fraction);
 
     return BenchmarkCache::with_lock([&](BenchmarkCache::CacheProxy proxy) -> std::optional<int> {
         auto speeds = proxy.get_timings(gpu_name, model_name);
@@ -248,10 +213,12 @@ void generate(const std::string &device,
     const int max_batch_size_limit = orig_config.is_tx_model() ? 1024 : 10240;
 
     const std::string gpu_name = get_gpu_name(device);
-    const auto batch_size_granularity = get_batch_size_granularity(orig_config);
+    const auto batch_size_granularity =
+            basecall::model_caller_batch_size_granularity(device, orig_config);
     const auto div_round_down = [](int size, int div) { return (size / div) * div; };
     const auto max_safe_batch_size = div_round_down(
-            std::min(max_batch_size_limit, get_max_safe_batch_size(device, orig_config)),
+            std::min(max_batch_size_limit,
+                     basecall::model_caller_max_safe_batch_size(device, 1.f, orig_config)),
             batch_size_granularity);
 
     // Do the benchmarking.

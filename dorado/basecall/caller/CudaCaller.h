@@ -1,7 +1,8 @@
 #pragma once
 
-#include "DecodedChunk.h"
-#include "ModelCaller.h"
+#include "basecall/DecodedChunk.h"
+#include "basecall/ModelCaller.h"
+#include "basecall/ModelCallerFactory.h"
 #include "config/BasecallModelConfig.h"
 #include "modbase/nn/ModBaseModel.h"
 #include "nn/AuxiliaryData.h"

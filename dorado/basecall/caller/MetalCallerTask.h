@@ -1,6 +1,6 @@
 #pragma once
 
-#include "basecall/MetalCaller.h"
+#include "MetalCaller.h"
 
 namespace dorado::basecall {
 

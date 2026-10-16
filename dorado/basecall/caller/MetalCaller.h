@@ -1,7 +1,7 @@
 #pragma once
 
-#include "DecodedChunk.h"
-#include "ModelCaller.h"
+#include "basecall/DecodedChunk.h"
+#include "basecall/ModelCaller.h"
 #include "config/BasecallModelConfig.h"
 #include "torch_utils/metal_utils.h"
 
