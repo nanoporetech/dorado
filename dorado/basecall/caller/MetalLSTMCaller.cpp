@@ -2,9 +2,9 @@
 
 #include "MetalCallerTask.h"
 #include "MetalDecoder.h"
-#include "basecall/crf_utils.h"
 #include "decode/Decoder.h"
 #include "model/MetalCRFModel.h"
+#include "model/Model.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
@@ -47,7 +47,7 @@ MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
 
     m_device = get_mtl_device();
 
-    auto state_dict = load_crf_model_weights(model_config);
+    auto state_dict = model::load_model_weights(model_config);
 
     assert(model_config.has_normalised_basecaller_params());
     const auto chunk_size = model_config.basecaller.chunk_size();

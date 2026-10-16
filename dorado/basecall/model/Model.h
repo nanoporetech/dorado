@@ -5,6 +5,7 @@
 #include <torch/nn.h>
 
 #include <memory>
+#include <vector>
 
 namespace dorado::config {
 struct BasecallModelConfig;
@@ -31,5 +32,6 @@ private:
 
 std::unique_ptr<Model> load_model(const config::BasecallModelConfig& model_config,
                                   const at::TensorOptions& options);
+std::vector<at::Tensor> load_model_weights(const config::BasecallModelConfig& model_config);
 
 }  // namespace dorado::basecall::model
