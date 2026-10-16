@@ -63,6 +63,7 @@ public:
     bool finalise_is_noop() const { return !m_sort_bam; }
     void finalise(const ProgressCallback& progress_callback);
     static uint64_t calculate_sorting_key(const bam1_t* record);
+    void set_finalise_report_rate(int report_every) { m_report_every = report_every; }
 
     OutputMode get_output_mode() const { return m_mode; }
     std::string index_extension() const;
@@ -83,6 +84,7 @@ private:
     const bool m_sort_bam;
     const OutputMode m_mode;
     std::string m_reference;
+    int m_report_every = -1;
 
     std::vector<std::byte> m_bam_buffer;
     std::multimap<uint64_t, int64_t> m_buffer_map;

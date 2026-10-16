@@ -77,6 +77,8 @@ struct Tester {
         for (size_t i = 0; i < records.size(); ++i) {
             file_out.write(records[indices[i]].get());
         }
+        // We need to see every message to determine how many files were written.
+        file_out.set_finalise_report_rate(1);
         int callback_calls = 0;
         auto callback = [&callback_calls](float) { ++callback_calls; };
         file_out.finalise(callback);
