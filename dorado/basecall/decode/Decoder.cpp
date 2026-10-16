@@ -9,11 +9,26 @@
 
 namespace dorado::basecall::decode {
 
+std::size_t DecoderConfig::num_states() const {
+    std::size_t states = 1;
+    for (int i = 0; i < state_len; ++i) {
+        states *= num_bases;
+    }
+    return states;
+}
+
+std::size_t DecoderConfig::num_transitions() const { return num_states() * num_bases; }
+
 DecoderOptions create_decoder_options(const config::BasecallModelConfig& config) {
     DecoderOptions options;
     options.q_shift = config.qbias;
     options.q_scale = config.qscale;
     return options;
+}
+
+DecoderConfig create_decoder_config(const config::BasecallModelConfig& config) {
+    return {create_decoder_options(config), config.is_tx_model() ? config.tx->crf.n_base : 4,
+            config.state_len, config.clamp ? 5.f : ((config.scale != 1.f) ? config.scale : 0.f)};
 }
 
 std::unique_ptr<Decoder> create_decoder(
@@ -22,8 +37,8 @@ std::unique_ptr<Decoder> create_decoder(
         [[maybe_unused]] const std::span<const config::ModBaseModelConfig> modbase_configs) {
 #if DORADO_CUDA_BUILD
     if (device.is_cuda()) {
-        return std::make_unique<decode::CUDADecoder>(
-                config.clamp ? 5.f : ((config.scale != 1.f) ? config.scale : 0.f), modbase_configs);
+        return std::make_unique<decode::CUDADecoder>(create_decoder_config(config).score_clamp,
+                                                     modbase_configs);
     }
 #endif
     if (device.is_cpu()) {

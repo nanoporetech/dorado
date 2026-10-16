@@ -3,6 +3,7 @@
 #include "MetalCallerTask.h"
 #include "MetalDecoder.h"
 #include "basecall/crf_utils.h"
+#include "decode/Decoder.h"
 #include "model/MetalCRFModel.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/log_utils.h"
@@ -84,9 +85,7 @@ int MetalLSTMCaller::get_max_safe_batch_size(float memory_limit_fraction,
     const auto chunk_size = model_config.basecaller.chunk_size();
     const auto out_chunk_size = chunk_size / model_config.stride;
 
-    // TODO -- we don't honour the config n_base
-    constexpr int n_base = 4;
-    const int states = pow(n_base, model_config.state_len);
+    const auto states = decode::create_decoder_config(model_config).num_states();
 
     const auto decode_buffer_size_per_elem =
             static_cast<size_t>(out_chunk_size) *

@@ -564,11 +564,11 @@ std::pair<int64_t, int64_t> CudaCaller::calculate_memory_requirements(
     }
 
     // Determine size of working memory for decoder divided by (batch_size * chunk_size)
-    // Decoder needs roughly (beam_width * 4) + num_states + 10 extra bytes
-    // where num_states = 4^(state_len+1)
+    // Decoder needs roughly (beam_width * 4) + num_transitions + 10 extra bytes.
     // See `dorado::basecall::decode::CUDADecoder::prepare_decode()` for more details.
+    const auto decoder_config = decode::create_decoder_config(model_config);
     int64_t decode_bytes_per_chunk_timestep =
-            10 + default_beam_width * 4 + (1ull << (model_config.state_len * 2 + 2));
+            10 + default_beam_width * 4 + decoder_config.num_transitions();
 
     return {crfmodel_bytes_per_chunk_timestep, decode_bytes_per_chunk_timestep};
 }

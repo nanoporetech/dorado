@@ -7,7 +7,7 @@
 namespace dorado::modbase::model {
 
 /**
- * Converts the output of decoder::beam_search_part_1 into the one-hot encoded, signal-aligned
+ * Converts the output of Decoder::prepare_decode into the one-hot encoded, signal-aligned
  * k-mers consumed by the latent-space model's sequence convolution stack.
  *
  * Input is an int8 tensor with shape [3, N, T], where the first dimension contains [moves,

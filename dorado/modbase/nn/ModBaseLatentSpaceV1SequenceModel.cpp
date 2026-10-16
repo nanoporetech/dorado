@@ -26,7 +26,7 @@ at::Tensor ModBaseLatentSpaceV1SequenceModelImpl::forward(const at::Tensor& deco
                 "ModBaseLatentSpaceV1SequenceModel input must have a non-empty time dimension");
     }
 
-    // beam_search_part_1 stores the compact sequence at the beginning of the sequence row. Use
+    // Decoder::prepare_decode stores the compact sequence at the beginning of the sequence row. Use
     // the cumulative move count to recover the sequence index active at each decoder timestep.
     const auto moves = decoded_data.select(0, 0).to(torch::kLong);
     const auto sequence = decoded_data.select(0, 1);
