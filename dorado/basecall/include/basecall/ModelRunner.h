@@ -44,4 +44,7 @@ private:
 
 using RunnerPtr = std::unique_ptr<ModelRunner>;
 
+size_t auto_calculate_num_runners(const config::BasecallModelConfig &model_config,
+                                  float memory_fraction);
+
 }  // namespace dorado::basecall

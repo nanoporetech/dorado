@@ -5,7 +5,6 @@ dorado_add_library(dorado_basecall
         basecall
     SOURCES_PUBLIC
         CPUCaller.h
-        crf_utils.h
         CudaCaller.h
         DecodedChunk.h
         DecodedChunk.h
@@ -16,7 +15,6 @@ dorado_add_library(dorado_basecall
         CPUCaller.cpp
         ChunkBenchmarks.cpp
         ChunkBenchmarks.h
-        crf_utils.cpp
         decode/beam_search.cpp
         decode/beam_search.h
         decode/CPUDecoder.cpp
