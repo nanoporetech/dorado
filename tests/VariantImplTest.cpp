@@ -943,7 +943,9 @@ CATCH_TEST_CASE("worker_sample_producer defers overlapping simple variants to in
      * \brief Verifies that overlapping Kadayashi variants are not kept as simple variants (they are
      *          deferred to inference as candidate sites), while non-overlapping ones are kept.
      *          Overlaps are detected before the unique window span filter, and include
-     *          low-quality records. Input variants are intentionally unsorted.
+     *          low-quality records. Variants extending past the unique window span are also
+     *          deferred, since they could overlap variants from the next window.
+     *          Input variants are intentionally unsorted.
      */
     const secondary::Window bam_window{
             .seq_id = 0,
@@ -1027,6 +1029,12 @@ CATCH_TEST_CASE("worker_sample_producer defers overlapping simple variants to in
         {"Overlap with a low-quality variant, the PASS variant is deferred. The pass_min_qual is set to 30.0f in the run_producer.",
             {make_variant(3, "ACG", 60.0f), make_variant(4, "A", 10.0f), make_variant(6, "A", 60.0f)},
             {make_variant(6, "A", 60.0f)}},
+        {"Variant extending past the unique span end (8) is deferred",
+            {make_variant(6, "ACG", 60.0f), make_variant(4, "A", 60.0f)},
+            {make_variant(4, "A", 60.0f)}},
+        {"Variant ending exactly at the unique span end (8) is kept",
+            {make_variant(6, "AC", 60.0f), make_variant(4, "A", 60.0f)},
+            {make_variant(4, "A", 60.0f), make_variant(6, "AC", 60.0f)}},
     };
     // clang-format on
 
