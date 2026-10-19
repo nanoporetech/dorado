@@ -43,3 +43,6 @@
 [submodule "dorado/3rdparty/CxxUrl"]
 	path = dorado/3rdparty/CxxUrl
 	url = https://github.com/chmike/CxxUrl
+[submodule "dorado/3rdparty/libdeflate"]
+	path = dorado/3rdparty/libdeflate
+	url = https://github.com/ebiggers/libdeflate.git

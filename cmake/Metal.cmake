@@ -1,3 +1,9 @@
+if (NOT APPLE)
+    return()
+endif()
+
+
+
 # Setup metal-cpp target.
 download_and_extract(
     https://developer.apple.com/metal/cpp/files/metal-cpp_26.zip

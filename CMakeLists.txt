@@ -188,18 +188,17 @@ else()
     set(DORADO_ENABLE_PCH TRUE)
 endif()
 
-# Bring in 3rdparty libs
+# Bring in system level 3rdparty libs first.
 include(cmake/Zlib.cmake)
-include(cmake/Koi.cmake)
+include(cmake/OpenSSL.cmake)
+include(cmake/Metal.cmake)
+# Then the rest of them.
+add_subdirectory(dorado/3rdparty)
+include(cmake/Htslib.cmake) # htslib depends on libdeflate (from 3rdparty)
 include(cmake/Pod5.cmake)
+include(cmake/Koi.cmake)
 include(cmake/Torch.cmake)
 include(cmake/FlashAttention.cmake)
-include(cmake/OpenSSL.cmake)
-include(cmake/Htslib.cmake)
-if (APPLE)
-    include(cmake/Metal.cmake)
-endif()
-add_subdirectory(dorado/3rdparty)
 
 enable_testing()
 
