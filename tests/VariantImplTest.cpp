@@ -937,6 +937,105 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
     CATCH_CHECK(chrom_reduce_data[0].variants_simple == expected_variants);
 }
 
+CATCH_TEST_CASE("worker_sample_producer defers overlapping simple variants to inference",
+                TEST_GROUP) {
+    /**
+     * \brief Verifies that overlapping Kadayashi variants are not kept as simple variants (they are
+     *          deferred to inference as candidate sites), while non-overlapping ones are kept.
+     *          Overlaps are detected before the unique window span filter, and include
+     *          low-quality records. Input variants are intentionally unsorted.
+     */
+    const secondary::Window bam_window{
+            .seq_id = 0,
+            .seq_length = 10,
+            .start = 0,
+            .end = 10,
+            .start_no_overlap = 2,
+            .end_no_overlap = 8,
+            .source_region_id = 0,
+    };
+
+    const auto make_variant = [](const int64_t pos, const std::string& ref, const float qual) {
+        return secondary::Variant{.seq_id = 0,
+                                  .pos = pos,
+                                  .ref = ref,
+                                  .alts = {"T"},
+                                  .filters = {secondary::Filters::Pass},
+                                  .info = {},
+                                  .qual = qual,
+                                  .format = {{"GT", "1/1"}, {"GQ", "60"}},
+                                  .rstart = 0,
+                                  .rend = 0};
+    };
+
+    // Runs the sample producer on a single window and returns the accumulated simple variants.
+    const auto run_producer = [&](const std::vector<secondary::Variant>& kadayashi_variants) {
+        VariantResources resources;
+        resources.encoders.emplace_back(std::make_unique<StubEncoder>(
+                StubEncoder::ExpectedRegion{"chr1", bam_window.start, bam_window.end,
+                                            bam_window.seq_id},
+                std::unordered_map<std::string, int32_t>{},
+                kadayashi::varcall_result_t{.qname2hp = {},
+                                            .variants = kadayashi_variants,
+                                            .phasing_breakpoints = {}}));
+        resources.models.emplace_back(secondary::ModelTorchBase::make<StubModel>(1.0, 0.0f));
+
+        std::vector<ChromosomeReduceData> chrom_reduce_data(1);
+        chrom_reduce_data[0].num_bam_regions = 1;
+        chrom_reduce_data[0].remaining_bam_regions = 1;
+
+        utils::AsyncQueue<secondary::Window> input_queue{2};
+        CATCH_REQUIRE(input_queue.try_push(secondary::Window{bam_window}) ==
+                      utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        utils::AsyncQueue<InferenceData> output_queue{2};
+        std::atomic<bool> worker_terminate{false};
+        secondary::WorkerReturnStatus ret_status;
+        secondary::Stats stats;
+        const float pass_min_qual = 30.0f;
+
+        worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
+                               worker_terminate, ret_status, {{bam_window}}, {{"chr1", 10}},
+                               std::vector<std::string>(1),
+                               secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1, 10, 0,
+                               10, false, 2, pass_min_qual, false, false, 0, 0, 0.0f, 0);
+
+        CATCH_CHECK_FALSE(ret_status.exception_thrown);
+        return chrom_reduce_data[0].variants_simple;
+    };
+
+    struct TestCase {
+        std::string name;
+        std::vector<secondary::Variant> input;
+        std::vector<secondary::Variant> expected;
+    };
+
+    // clang-format off
+    const std::vector<TestCase> test_cases{
+        {"Adjacent variants do not overlap, all are kept. Output is sorted.",
+            {make_variant(5, "A", 60.0f), make_variant(3, "AC", 60.0f)},
+            {make_variant(3, "AC", 60.0f), make_variant(5, "A", 60.0f)}},
+        {"Deletion overlapping a SNP, both are deferred",
+            {make_variant(7, "A", 60.0f), make_variant(4, "A", 60.0f), make_variant(3, "ACG", 60.0f)},
+            {make_variant(7, "A", 60.0f)}},
+        {"Chain of overlaps covered by one deletion, all are deferred",
+            {make_variant(2, "ACGT", 60.0f), make_variant(3, "A", 60.0f), make_variant(5, "A", 60.0f), make_variant(6, "A", 60.0f)},
+            {make_variant(6, "A", 60.0f)}},
+        {"Overlap with a variant outside of the unique span, the in-span variant is deferred",
+            {make_variant(1, "ACG", 60.0f), make_variant(2, "A", 60.0f), make_variant(5, "A", 60.0f)},
+            {make_variant(5, "A", 60.0f)}},
+        {"Overlap with a low-quality variant, the PASS variant is deferred. The pass_min_qual is set to 30.0f in the run_producer.",
+            {make_variant(3, "ACG", 60.0f), make_variant(4, "A", 10.0f), make_variant(6, "A", 60.0f)},
+            {make_variant(6, "A", 60.0f)}},
+    };
+    // clang-format on
+
+    for (const TestCase& test_case : test_cases) {
+        CATCH_CAPTURE(test_case.name);
+        CATCH_CHECK(run_producer(test_case.input) == test_case.expected);
+    }
+}
+
 CATCH_TEST_CASE("worker_sample_producer rejects bam windows with seq_id outside draft_lens",
                 TEST_GROUP) {
     /**
