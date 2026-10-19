@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CudaCallerPlanning.h"
 #include "basecall/DecodedChunk.h"
 #include "basecall/ModelCaller.h"
 #include "basecall/ModelCallerFactory.h"
@@ -65,26 +66,10 @@ public:
     stats::NamedStats sample_stats() const override;
     std::pair<int, int> batch_timeouts_ms() const override;
 
-    static int get_batch_size_granularity(const config::BasecallModelConfig &model_config);
-    static int64_t get_gpu_mem_limit(c10::Device device, float memory_limit_fraction);
-    static int get_max_safe_batch_size(c10::Device device,
-                                       float memory_limit_fraction,
-                                       const config::BasecallModelConfig &model_config);
-
 private:
     struct GPUTaskQueue;
     GPUTaskQueue &get_task_queue();
 
-    static std::pair<int64_t, int64_t> calculate_memory_requirements(
-            const config::BasecallModelConfig &model_config);
-    struct BatchDimsAndMaxSizes;
-    static BatchDimsAndMaxSizes calculate_batch_sizes(
-            c10::Device device,
-            float memory_limit_fraction,
-            const config::BasecallModelConfig &model_config,
-            std::optional<PipelineType> pipeline_type,
-            int requested_batch_size,
-            bool variable_chunk_sizes);
     void determine_batch_dims(const BasecallerCreationParams &params, bool variable_chunk_sizes);
 
     void start_threads();
@@ -107,12 +92,7 @@ private:
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to
     // speed up processing of reads that are shorter than the longest chunk size.
-    struct BatchDims {
-        int N;      // Batch size
-        int T_in;   // Chunk size (in)
-        int T_out;  // Chunk size (out), after stride
-    };
-    std::vector<BatchDims> m_batch_dims;
+    std::vector<cuda::BatchDims> m_batch_dims;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called{0};

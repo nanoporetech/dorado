@@ -1,8 +1,7 @@
 #include "MetalCaller.h"
 
-#include "MPSCaller.h"
 #include "MetalCallerTask.h"
-#include "MetalLSTMCaller.h"
+#include "MetalModel.h"
 #include "TensorRunnerState.h"
 #include "TypedRunnerContext.h"
 #include "torch_utils/metal_utils.h"
@@ -21,16 +20,10 @@ using namespace std::chrono_literals;
 
 namespace dorado::basecall {
 
-std::shared_ptr<MetalCaller> MetalCaller::create(const config::BasecallModelConfig &model_config,
-                                                 float memory_limit_fraction) {
-    if (model_config.is_tx_model() || model_config.is_flstm_model()) {
-        return std::make_shared<MPSCaller>(model_config);
-    } else if (model_config.is_lstm_model()) {
-        return std::make_shared<MetalLSTMCaller>(model_config, memory_limit_fraction);
-    } else {
-        throw std::runtime_error("No metal caller available for model: " +
-                                 model_config.model_name());
-    }
+MetalCaller::MetalCaller(const config::BasecallModelConfig &model_config,
+                         std::unique_ptr<MetalModel> model)
+        : m_config(model_config), m_model(std::move(model)) {
+    start_threads();
 }
 
 MetalCaller::~MetalCaller() { terminate(); }
@@ -42,7 +35,7 @@ std::unique_ptr<ModelCaller::RunnerContext> MetalCaller::create_runner_context(
     }
     const auto layout = m_config.is_lstm_model() ? TensorLayout::NTC : TensorLayout::NCT;
     return std::make_unique<TypedRunnerContext<MetalCaller, TensorRunnerState>>(
-            *this, create_input_tensor(), layout);
+            *this, m_model->create_input_tensor(), layout);
 }
 
 std::vector<decode::DecodedChunk> MetalCaller::call_chunks(TensorRunnerState &state,
@@ -50,30 +43,6 @@ std::vector<decode::DecodedChunk> MetalCaller::call_chunks(TensorRunnerState &st
     std::vector<decode::DecodedChunk> out_chunks(num_chunks);
     call_chunks(state.input(), num_chunks, out_chunks);
     return out_chunks;
-}
-
-int MetalCaller::get_max_safe_batch_size(float memory_limit_fraction,
-                                         const config::BasecallModelConfig &model_config) {
-    if (model_config.is_tx_model() || model_config.is_flstm_model()) {
-        return basecall::MPSCaller::get_max_safe_batch_size(memory_limit_fraction, model_config);
-    } else if (model_config.is_lstm_model()) {
-        return basecall::MetalLSTMCaller::get_max_safe_batch_size(memory_limit_fraction,
-                                                                  model_config);
-    } else {
-        throw std::runtime_error("No metal caller available for model: " +
-                                 model_config.model_name());
-    }
-}
-
-int MetalCaller::get_batch_size_granularity(const config::BasecallModelConfig &model_config) {
-    if (model_config.is_tx_model() || model_config.is_flstm_model()) {
-        return basecall::MPSCaller::get_batch_size_granularity(model_config);
-    } else if (model_config.is_lstm_model()) {
-        return basecall::MetalLSTMCaller::get_batch_size_granularity();
-    } else {
-        throw std::runtime_error("No metal caller available for model: " +
-                                 model_config.model_name());
-    }
 }
 
 void MetalCaller::call_chunks(at::Tensor &input,
@@ -84,7 +53,7 @@ void MetalCaller::call_chunks(at::Tensor &input,
     }
 
     // Input can be NTC or NCT for LSTM and Tx models respectively
-    auto task = std::make_shared<NNTask>(&input, num_chunks, &out_chunks);
+    auto task = std::make_shared<MetalCallerTask>(&input, num_chunks, &out_chunks);
     {
         std::lock_guard<std::mutex> lock(m_input_lock);
         m_input_queue.push_front(task);
@@ -147,7 +116,7 @@ void MetalCaller::metal_thread_fn() {
         ScopedAutoReleasePool inner_pool;
 
         // Pop the next task, or return if we're terminated.
-        std::shared_ptr<NNTask> task;
+        std::shared_ptr<MetalCallerTask> task;
         {
             std::unique_lock<std::mutex> input_lock(m_input_lock);
             while (m_input_queue.empty() && !m_terminate.load()) {
@@ -186,7 +155,7 @@ void MetalCaller::metal_thread_fn() {
             // TODO: find a more robust way of dealing with Metal kernel launch issues
             bool cb_success = false;
             for (int try_count = 0; try_count < 5; ++try_count) {
-                cb_success = call_task(*task, inter_caller_mutex, try_count);
+                cb_success = m_model->call_task(*task, inter_caller_mutex, try_count);
                 if (cb_success) {
                     break;
                 } else {
@@ -230,7 +199,7 @@ void MetalCaller::decode_thread_fn() {
         }
         decode_lock.unlock();
 
-        auto [sequence, qstring, moves] = decode(chunk_idx);
+        auto [sequence, qstring, moves] = m_model->decode(chunk_idx);
         (*task->out_chunks)[chunk_idx] = decode::DecodedChunk{
                 std::move(sequence), std::move(qstring), std::move(moves), {}, {}};
 
@@ -239,10 +208,10 @@ void MetalCaller::decode_thread_fn() {
         bool done = ++(task->decode_chunks_finished) == task->num_chunks;
         task_lock.unlock();
         if (done) {
-            if (m_decode_complete_event) {
+            if (auto *decode_complete_event = m_model->decode_complete_event()) {
                 // Now that all chunks are decoded, signal that the GPU can overwrite the scores
                 // buffer with subsequent work.
-                m_decode_complete_event->setSignaledValue(task->decode_complete_event_id);
+                decode_complete_event->setSignaledValue(task->decode_complete_event_id);
             }
             task->cv.notify_one();
         }

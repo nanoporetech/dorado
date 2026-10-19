@@ -1,7 +1,12 @@
 #include "basecall/ModelCallerFactory.h"
 
 #include "TestUtils.h"
+#include "caller/ModelCallerSelection.h"
 #include "config/BasecallModelConfig.h"
+
+#if DORADO_CUDA_BUILD
+#include "caller/CudaCallerPlanning.h"
+#endif
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -39,3 +44,46 @@ CATCH_TEST_CASE(CUT_TAG " rejects accelerator planning for CPU", CUT_TAG) {
     CATCH_CHECK_THROWS(dorado::basecall::model_caller_max_safe_batch_size("cpu", 1.f, config));
     CATCH_CHECK_THROWS(dorado::basecall::model_caller_memory_limit("cpu", 1.f));
 }
+
+CATCH_TEST_CASE(CUT_TAG " selects one Metal implementation for each model family", CUT_TAG) {
+    using dorado::basecall::MetalModelImplementation;
+    using dorado::basecall::select_metal_model_implementation;
+
+    dorado::config::BasecallModelConfig lstm_config;
+    CATCH_CHECK(select_metal_model_implementation(lstm_config) == MetalModelImplementation::lstm);
+
+    auto flstm_config = lstm_config;
+    flstm_config.lstm_inner_dim = 128;
+    CATCH_CHECK(select_metal_model_implementation(flstm_config) == MetalModelImplementation::mps);
+
+    const auto tx_config = load_config("dna_r10.4.1_e8.2_400bps_sup@v5.0.0");
+    CATCH_CHECK(select_metal_model_implementation(tx_config) == MetalModelImplementation::mps);
+}
+
+#if DORADO_CUDA_BUILD
+CATCH_TEST_CASE(CUT_TAG " estimates CUDA model memory independently of caller execution", CUT_TAG) {
+    dorado::config::BasecallModelConfig config;
+    config.state_len = 5;
+
+    config.lstm_size = 96;
+    CATCH_CHECK(
+            dorado::basecall::cuda::memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            960);
+
+    config.lstm_size = 97;
+    CATCH_CHECK(
+            dorado::basecall::cuda::memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            1280);
+
+    config.lstm_inner_dim = 64;
+    CATCH_CHECK(
+            dorado::basecall::cuda::memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            4096);
+
+    config.lstm_inner_dim.reset();
+    config.out_features = 128;
+    CATCH_CHECK(
+            dorado::basecall::cuda::memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            2312);
+}
+#endif

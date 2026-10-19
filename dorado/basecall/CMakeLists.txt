@@ -29,6 +29,8 @@ dorado_add_library(dorado_basecall
         ModelRunner.cpp
         caller/ModelCaller.cpp
         caller/ModelCallerFactory.cpp
+        caller/ModelCallerSelection.cpp
+        caller/ModelCallerSelection.h
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
@@ -55,10 +57,14 @@ if(APPLE)
         PRIVATE
             caller/MetalCaller.cpp
             caller/MetalCaller.h
-            caller/MetalLSTMCaller.cpp
-            caller/MetalLSTMCaller.h
-            caller/MPSCaller.cpp
-            caller/MPSCaller.h
+            caller/MetalCallerPlanning.cpp
+            caller/MetalCallerPlanning.h
+            caller/MetalCallerTask.h
+            caller/MetalLSTMModel.cpp
+            caller/MetalLSTMModel.h
+            caller/MetalModel.h
+            caller/MPSModel.cpp
+            caller/MPSModel.h
             decode/MetalDecoder.cpp
             decode/MetalDecoder.h
             model/MetalCRFModel.cpp
@@ -69,6 +75,8 @@ else()
         PRIVATE
             caller/CudaCaller.cpp
             caller/CudaCaller.h
+            caller/CudaCallerPlanning.cpp
+            caller/CudaCallerPlanning.h
             decode/CUDADecoder.cpp
             decode/CUDADecoder.h
     )

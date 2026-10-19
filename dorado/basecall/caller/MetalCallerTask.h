@@ -1,11 +1,20 @@
 #pragma once
 
-#include "MetalCaller.h"
+#include "basecall/DecodedChunk.h"
+
+#include <ATen/core/TensorBody.h>
+
+#include <condition_variable>
+#include <cstdint>
+#include <mutex>
+#include <vector>
 
 namespace dorado::basecall {
 
-struct MetalCaller::NNTask {
-    NNTask(at::Tensor *input_, int num_chunks_, std::vector<decode::DecodedChunk> *out_chunks_)
+struct MetalCallerTask {
+    MetalCallerTask(at::Tensor *input_,
+                    int num_chunks_,
+                    std::vector<decode::DecodedChunk> *out_chunks_)
             : input(input_), out_chunks(out_chunks_), num_chunks(num_chunks_) {}
 
     // LSTM: NTC - Tx: NCT
