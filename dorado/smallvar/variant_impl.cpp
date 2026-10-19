@@ -86,12 +86,6 @@ bool sample_has_inference_features(const secondary::Sample& sample) {
            (sample.features.numel() > 0);
 }
 
-bool variant_is_in_unique_bam_window_span(const secondary::Variant& variant,
-                                          const secondary::Window& bam_window) {
-    return (variant.pos >= bam_window.start_no_overlap) &&
-           (variant.pos < bam_window.end_no_overlap);
-}
-
 }  // namespace
 
 void signal_worker_terminate(std::atomic<bool>& worker_terminate) {
@@ -283,17 +277,40 @@ BamWindowResult process_single_bam_window(
             secondary::sanitize_empty_alts(var, ploidy);
         }
 
+        // Overlapping records cannot be merged without phasing, so defer them to inference.
+        // Marking each record which overlaps a previous one, and the previous record with the
+        // furthest end, leaves the remaining records non-overlapping.
+        std::stable_sort(std::begin(all_variants), std::end(all_variants));
+        std::vector<bool> is_overlapping(std::size(all_variants), false);
+        int64_t max_end = -1;
+        int64_t max_end_id = -1;
+        for (int64_t i = 0; i < std::ssize(all_variants); ++i) {
+            const int64_t end = secondary::variant_end(all_variants[i]);
+            if ((all_variants[i].pos < max_end) && (max_end_id >= 0)) {
+                is_overlapping[i] = true;
+                is_overlapping[max_end_id] = true;
+            }
+            if (end > max_end) {
+                max_end = end;
+                max_end_id = i;
+            }
+        }
+
         // Storage space for pass/candidate variants.
         pass_variants.reserve(std::size(all_variants));
         candidate_sites.reserve(std::size(all_variants));
 
-        // Extract the set of candidate variant sites (low-qual variants) and PASS variants.
-        for (secondary::Variant& var : all_variants) {
-            if (!variant_is_in_unique_bam_window_span(var, bam_window)) {
-                continue;
-            }
+        // Extract the candidate sites (low-qual, overlapping and boundary-crossing variants) and
+        // PASS variants.
+        for (int64_t i = 0; i < std::ssize(all_variants); ++i) {
+            secondary::Variant& var = all_variants[i];
 
-            if (!((var.filters & secondary::Filters::Filter::Pass) ||
+            // Variants reaching outside the unique span could overlap variants from the next/previous window.
+            const bool crosses_boundary = (var.pos < bam_window.start_no_overlap) ||
+                                          (secondary::variant_end(var) > bam_window.end_no_overlap);
+
+            if (is_overlapping[i] || crosses_boundary ||
+                !((var.filters & secondary::Filters::Filter::Pass) ||
                   (var.filters & secondary::Filters::Filter::NonVariant))) {
                 candidate_sites.emplace_back(var.pos);
             } else {
