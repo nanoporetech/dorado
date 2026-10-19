@@ -29,6 +29,8 @@ dorado_add_library(dorado_basecall
         ModelRunner.cpp
         caller/ModelCaller.cpp
         caller/ModelCallerFactory.cpp
+        caller/ModelCallerSelection.cpp
+        caller/ModelCallerSelection.h
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
