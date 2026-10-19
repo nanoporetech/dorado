@@ -7,6 +7,7 @@
 
 #if DORADO_CUDA_BUILD
 #include "CudaCaller.h"
+#include "CudaCallerPlanning.h"
 #elif DORADO_METAL_BUILD
 #include "MetalCaller.h"
 #include "utils/memory_utils.h"
@@ -44,12 +45,12 @@ std::shared_ptr<ModelCaller> create_cuda_caller(const BasecallerCreationParams& 
 int cuda_max_safe_batch_size(const std::string& device,
                              float memory_limit_fraction,
                              const config::BasecallModelConfig& model_config) {
-    return CudaCaller::get_max_safe_batch_size(device, memory_limit_fraction, model_config);
+    return basecall::cuda_max_safe_batch_size(device, memory_limit_fraction, model_config);
 }
 
 const CallerImplementation cuda_implementation{
         .create = create_cuda_caller,
-        .batch_size_granularity = CudaCaller::get_batch_size_granularity,
+        .batch_size_granularity = cuda_batch_size_granularity,
         .max_safe_batch_size = cuda_max_safe_batch_size,
 };
 #elif DORADO_METAL_BUILD
@@ -139,7 +140,7 @@ int model_caller_max_safe_batch_size(const std::string& device,
 uint64_t model_caller_memory_limit(const std::string& device, float memory_limit_fraction) {
 #if DORADO_CUDA_BUILD
     if (device != "cpu") {
-        return CudaCaller::get_gpu_mem_limit(device, memory_limit_fraction);
+        return cuda_memory_limit(device, memory_limit_fraction);
     }
 #elif DORADO_METAL_BUILD
     if (device == "metal") {
