@@ -64,12 +64,12 @@ std::shared_ptr<ModelCaller> create_mps_caller(const BasecallerCreationParams& p
 int mps_max_safe_batch_size_for_device(const std::string&,
                                        float memory_limit_fraction,
                                        const config::BasecallModelConfig& model_config) {
-    return mps_max_safe_batch_size(memory_limit_fraction, model_config);
+    return mps::max_safe_batch_size(memory_limit_fraction, model_config);
 }
 
 const CallerImplementation mps_implementation{
         .create = create_mps_caller,
-        .batch_size_granularity = mps_batch_size_granularity,
+        .batch_size_granularity = mps::batch_size_granularity,
         .max_safe_batch_size = mps_max_safe_batch_size_for_device,
 };
 
@@ -80,13 +80,13 @@ std::shared_ptr<ModelCaller> create_metal_lstm_caller(const BasecallerCreationPa
 }
 
 int metal_lstm_batch_size_granularity_for_config(const config::BasecallModelConfig&) {
-    return metal_lstm_batch_size_granularity();
+    return metal::lstm_batch_size_granularity();
 }
 
 int metal_lstm_max_safe_batch_size_for_device(const std::string&,
                                               float memory_limit_fraction,
                                               const config::BasecallModelConfig& model_config) {
-    return metal_lstm_max_safe_batch_size(memory_limit_fraction, model_config);
+    return metal::lstm_max_safe_batch_size(memory_limit_fraction, model_config);
 }
 
 const CallerImplementation metal_lstm_implementation{
@@ -149,7 +149,7 @@ uint64_t model_caller_memory_limit(const std::string& device, float memory_limit
     }
 #elif DORADO_METAL_BUILD
     if (device == "metal") {
-        return metal_memory_limit(memory_limit_fraction);
+        return metal::memory_limit(memory_limit_fraction);
     }
 #endif
     throw std::runtime_error("Memory limit is unavailable for device: " + device);

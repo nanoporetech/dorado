@@ -53,7 +53,7 @@ MetalLSTMModel::MetalLSTMModel(const BasecallModelConfig &model_config, float me
     auto selected_batch_size =
             (batch_size == 0)
                     ? benchmark_batch_sizes(model_config, state_dict, memory_limit_fraction)
-                    : utils::pad_to(batch_size, metal_lstm_batch_size_granularity());
+                    : utils::pad_to(batch_size, metal::lstm_batch_size_granularity());
 
     set_chunk_batch_size(model_config, state_dict, chunk_size, selected_batch_size);
 }
@@ -100,7 +100,7 @@ void MetalLSTMModel::set_chunk_batch_size(const BasecallModelConfig &model_confi
     const auto complete_linear_out_size =
             static_cast<int64_t>(m_out_chunk_size) * static_cast<int64_t>(m_batch_size) *
             static_cast<int64_t>(model_config.outsize) * sizeof(float);
-    const int core_batch_size = metal_lstm_batch_size_granularity();
+    const int core_batch_size = metal::lstm_batch_size_granularity();
     const int num_batch_pieces = m_batch_size / core_batch_size;
     for (m_out_split = 1; m_out_split < num_batch_pieces; ++m_out_split) {
         if (num_batch_pieces % m_out_split == 0 &&
@@ -137,8 +137,8 @@ void MetalLSTMModel::set_chunk_batch_size(const BasecallModelConfig &model_confi
 int MetalLSTMModel::benchmark_batch_sizes(const BasecallModelConfig &model_config,
                                           const std::vector<at::Tensor> &state_dict,
                                           float memory_limit_fraction) {
-    const int max_batch_size = metal_lstm_max_safe_batch_size(memory_limit_fraction, model_config);
-    const int core_batch_size = metal_lstm_batch_size_granularity();
+    const int max_batch_size = metal::lstm_max_safe_batch_size(memory_limit_fraction, model_config);
+    const int core_batch_size = metal::lstm_batch_size_granularity();
 
     // Subject to the above memory constraint, impose a minimum batch size
     // that will use 1/4 of GPU cores for LSTM execution.

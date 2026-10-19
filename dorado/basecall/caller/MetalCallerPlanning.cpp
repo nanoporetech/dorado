@@ -19,7 +19,7 @@ constexpr int MTL_CORE_BATCH_SIZE = 48;
 
 }  // namespace
 
-bool mps_flstm_is_broken() {
+bool mps::flstm_is_broken() {
     static bool is_working = [] {
         // I don't know exactly when it was fixed, but it's broken in 14.7 and works in 15.5.
         // Note: I'm assuming that this is an OS issue and not a hardware one (ie it's not M2 vs M4)
@@ -47,8 +47,8 @@ bool mps_flstm_is_broken() {
     return !is_working;
 }
 
-int mps_max_safe_batch_size(float memory_limit_fraction,
-                            const config::BasecallModelConfig& model_config) {
+int mps::max_safe_batch_size(float memory_limit_fraction,
+                             const config::BasecallModelConfig& model_config) {
     if (model_config.is_tx_model()) {
         // TODO: better number here
         return 32;
@@ -56,14 +56,14 @@ int mps_max_safe_batch_size(float memory_limit_fraction,
     if (!model_config.is_flstm_model()) {
         throw std::runtime_error("Unknown model config");
     }
-    if (mps_flstm_is_broken()) {
+    if (mps::flstm_is_broken()) {
         // We're falling back on CPU, so limit it.
         // This matches the value in Models::set_basecaller_batch_params().
         return 128;
     }
 
     const int64_t physical_memory = utils::get_apple_physical_memory_bytes();
-    const int64_t granularity = mps_batch_size_granularity(model_config);
+    const int64_t granularity = mps::batch_size_granularity(model_config);
     // We see performance issues from memory pressure, so only use part of what is available.
     const int64_t usable_memory = physical_memory * memory_limit_fraction / 2;
 
@@ -82,7 +82,7 @@ int mps_max_safe_batch_size(float memory_limit_fraction,
     return static_cast<int>(batch_size);
 }
 
-int mps_batch_size_granularity(const config::BasecallModelConfig& model_config) {
+int mps::batch_size_granularity(const config::BasecallModelConfig& model_config) {
     if (model_config.is_tx_model()) {
         return 8;
     }
@@ -92,8 +92,8 @@ int mps_batch_size_granularity(const config::BasecallModelConfig& model_config) 
     throw std::runtime_error("Unknown model config");
 }
 
-int metal_lstm_max_safe_batch_size(float memory_limit_fraction,
-                                   const config::BasecallModelConfig& model_config) {
+int metal::lstm_max_safe_batch_size(float memory_limit_fraction,
+                                    const config::BasecallModelConfig& model_config) {
     const size_t physical_memory = utils::get_apple_physical_memory_bytes();
     const size_t usable_memory = physical_memory * memory_limit_fraction;
     DORADO_LOG(debug, "Physical/Usable memory available: {}/{} GB",
@@ -118,9 +118,9 @@ int metal_lstm_max_safe_batch_size(float memory_limit_fraction,
     return max_batch_size;
 }
 
-int metal_lstm_batch_size_granularity() { return MTL_CORE_BATCH_SIZE; }
+int metal::lstm_batch_size_granularity() { return MTL_CORE_BATCH_SIZE; }
 
-uint64_t metal_memory_limit(float memory_limit_fraction) {
+uint64_t metal::memory_limit(float memory_limit_fraction) {
     // This assumes that Dorado is the only significant memory user on the machine.
     return utils::get_apple_physical_memory_bytes() * memory_limit_fraction;
 }

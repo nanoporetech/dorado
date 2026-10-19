@@ -26,7 +26,7 @@ namespace {
 constexpr at::ScalarType scores_dtype = at::kHalf;
 constexpr at::ScalarType posts_dtype = at::kFloat;
 at::TensorOptions get_crf_options(const config::BasecallModelConfig &config) {
-    if (config.is_flstm_model() && mps_flstm_is_broken()) {
+    if (config.is_flstm_model() && mps::flstm_is_broken()) {
         // MPS:Half and MPS:Float are broken, and CPU:Half is slower than CPU:Float.
         return at::TensorOptions().device(at::kCPU).dtype(at::kFloat);
     } else {
@@ -86,7 +86,7 @@ MPSModel::MPSModel(const config::BasecallModelConfig &model_config) : m_config(m
             } else if (model_config.is_flstm_model()) {
                 // For now pick the largest batch size we can since speed seems to scale with it.
                 // TODO: replace with implementation of autobatchsize calculation
-                m_batch_size = mps_max_safe_batch_size(1, model_config);
+                m_batch_size = mps::max_safe_batch_size(1, model_config);
             }
         }
     }
