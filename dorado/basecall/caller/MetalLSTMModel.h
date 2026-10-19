@@ -1,6 +1,7 @@
 #pragma once
 
-#include "MetalCaller.h"
+#include "MetalModel.h"
+#include "config/BasecallModelConfig.h"
 
 namespace dorado::basecall {
 
@@ -10,18 +11,18 @@ namespace model {
 struct MetalCRFModelImpl;
 }  // namespace model
 
-class MetalLSTMCaller final : public MetalCaller {
+class MetalLSTMModel final : public MetalModel {
 public:
-    MetalLSTMCaller(const config::BasecallModelConfig &model_config, float memory_limit_fraction);
-    ~MetalLSTMCaller();
+    MetalLSTMModel(const config::BasecallModelConfig &model_config, float memory_limit_fraction);
+    ~MetalLSTMModel() override;
 
     at::Tensor create_input_tensor() const override;
 
 private:
-    MetalLSTMCaller(MetalLSTMCaller &&other) = delete;
-    MetalLSTMCaller &operator=(MetalLSTMCaller &&) = delete;
-    MetalLSTMCaller(const MetalLSTMCaller &) = delete;
-    MetalLSTMCaller &operator=(const MetalLSTMCaller &) = delete;
+    MetalLSTMModel(MetalLSTMModel &&other) = delete;
+    MetalLSTMModel &operator=(MetalLSTMModel &&) = delete;
+    MetalLSTMModel(const MetalLSTMModel &) = delete;
+    MetalLSTMModel &operator=(const MetalLSTMModel &) = delete;
 
 private:
     void set_chunk_batch_size(const config::BasecallModelConfig &model_config,
@@ -32,9 +33,15 @@ private:
                               const std::vector<at::Tensor> &state_dict,
                               float memory_limit_fraction);
     DecodedData decode(int chunk_idx) const override;
-    bool call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) override;
+    bool call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, int try_count) override;
+    MTL::SharedEvent *decode_complete_event() const override {
+        return m_decode_complete_event.get();
+    }
 
+    const config::BasecallModelConfig m_config;
     std::unique_ptr<model::MetalCRFModelImpl> m_model;
+    NS::SharedPtr<MTL::Device> m_device;
+    NS::SharedPtr<MTL::SharedEvent> m_decode_complete_event;
 
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.

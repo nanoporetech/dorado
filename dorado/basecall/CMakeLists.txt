@@ -59,10 +59,12 @@ if(APPLE)
             caller/MetalCaller.h
             caller/MetalCallerPlanning.cpp
             caller/MetalCallerPlanning.h
-            caller/MetalLSTMCaller.cpp
-            caller/MetalLSTMCaller.h
-            caller/MPSCaller.cpp
-            caller/MPSCaller.h
+            caller/MetalCallerTask.h
+            caller/MetalLSTMModel.cpp
+            caller/MetalLSTMModel.h
+            caller/MetalModel.h
+            caller/MPSModel.cpp
+            caller/MPSModel.h
             decode/MetalDecoder.cpp
             decode/MetalDecoder.h
             model/MetalCRFModel.cpp

@@ -1,4 +1,4 @@
-#include "MetalLSTMCaller.h"
+#include "MetalLSTMModel.h"
 
 #include "MetalCallerPlanning.h"
 #include "MetalCallerTask.h"
@@ -32,16 +32,15 @@ namespace dorado::basecall {
 
 using namespace config;
 
-MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
-                                 float memory_limit_fraction)
-        : MetalCaller(model_config) {
+MetalLSTMModel::MetalLSTMModel(const BasecallModelConfig &model_config, float memory_limit_fraction)
+        : m_config(model_config) {
     ScopedAutoReleasePool autorelease_pool;
     // Our metal builds assume shared memory, so it's safe to check host.
     if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        DORADO_LOG(warn, 
-                "Less than 16GB of memory available: {}GB detected. "
-                "This is below minimum spec and may cause issues",
-                total_mem);
+        DORADO_LOG(warn,
+                   "Less than 16GB of memory available: {}GB detected. "
+                   "This is below minimum spec and may cause issues",
+                   total_mem);
     }
 
     m_device = get_mtl_device();
@@ -57,12 +56,11 @@ MetalLSTMCaller::MetalLSTMCaller(const BasecallModelConfig &model_config,
                     : utils::pad_to(batch_size, metal_lstm_batch_size_granularity());
 
     set_chunk_batch_size(model_config, state_dict, chunk_size, selected_batch_size);
-    start_threads();
 }
 
-MetalLSTMCaller::~MetalLSTMCaller() = default;
+MetalLSTMModel::~MetalLSTMModel() = default;
 
-at::Tensor MetalLSTMCaller::create_input_tensor() const {
+at::Tensor MetalLSTMModel::create_input_tensor() const {
     // Metal convolution kernels operate with channel ordering (N, T, C).  If m_input
     // is to be submitted directly then it must also have this arrangement.
     // Note that this is not the same as other caller implementations, which
@@ -70,10 +68,10 @@ at::Tensor MetalLSTMCaller::create_input_tensor() const {
     return at::zeros({m_batch_size, m_in_chunk_size, m_config.num_features}, at::kHalf);
 }
 
-void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_config,
-                                           const std::vector<at::Tensor> &state_dict,
-                                           int chunk_size,
-                                           int batch_size) {
+void MetalLSTMModel::set_chunk_batch_size(const BasecallModelConfig &model_config,
+                                          const std::vector<at::Tensor> &state_dict,
+                                          int chunk_size,
+                                          int batch_size) {
     // Chunk size already normalised to inner stride
     m_in_chunk_size = chunk_size;
     m_out_chunk_size = chunk_size / model_config.stride;
@@ -113,7 +111,7 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
     auto piece_size = complete_linear_out_size / m_out_split;
     if (piece_size > kMaxBufferSize) {
         DORADO_LOG(debug, "Did not hit linear layer target output size {} - got {}", kMaxBufferSize,
-                      piece_size);
+                   piece_size);
     }
     DORADO_LOG(debug, "Linear layer split {}", m_out_split);
     // If we exited the loop above without breaking, then m_out_split = num_batch_pieces,
@@ -121,7 +119,7 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
     // output buffers, given other reasonable parameters.
     assert(num_batch_pieces % m_out_split == 0);
     assert(m_batch_size % m_out_split == 0);
-    assert(m_batch_size / m_out_split % core_batch_size == 0);
+    assert((m_batch_size / m_out_split) % core_batch_size == 0);
 
     m_model = std::make_unique<model::MetalCRFModelImpl>(model_config, m_in_chunk_size,
                                                          m_batch_size, m_out_split, m_device.get());
@@ -136,9 +134,9 @@ void MetalLSTMCaller::set_chunk_batch_size(const BasecallModelConfig &model_conf
                                                score_scale, MetalDecoder::ScanMode::Quantized);
 }
 
-int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_config,
-                                           const std::vector<at::Tensor> &state_dict,
-                                           float memory_limit_fraction) {
+int MetalLSTMModel::benchmark_batch_sizes(const BasecallModelConfig &model_config,
+                                          const std::vector<at::Tensor> &state_dict,
+                                          float memory_limit_fraction) {
     const int max_batch_size = metal_lstm_max_safe_batch_size(memory_limit_fraction, model_config);
     const int core_batch_size = metal_lstm_batch_size_granularity();
 
@@ -194,7 +192,9 @@ int MetalLSTMCaller::benchmark_batch_sizes(const BasecallModelConfig &model_conf
     return best_batch_size;
 }
 
-bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
+bool MetalLSTMModel::call_task(MetalCallerTask &task,
+                               std::mutex &inter_caller_mutex,
+                               int try_count) {
     std::lock_guard lock(inter_caller_mutex);
 
     // The linear layer should not execute until the previous batch has been decoded,
@@ -209,6 +209,6 @@ bool MetalLSTMCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, in
     return m_decoder->prepare_decode(cb, try_count);
 }
 
-DecodedData MetalLSTMCaller::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); }
+DecodedData MetalLSTMModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); }
 
 }  // namespace dorado::basecall

@@ -1,4 +1,4 @@
-#include "MPSCaller.h"
+#include "MPSModel.h"
 
 #include "MetalCallerPlanning.h"
 #include "MetalCallerTask.h"
@@ -36,15 +36,15 @@ at::TensorOptions get_crf_options(const config::BasecallModelConfig &config) {
 
 }  // namespace
 
-MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCaller(model_config) {
+MPSModel::MPSModel(const config::BasecallModelConfig &model_config) : m_config(model_config) {
     ScopedAutoReleasePool autorelease_pool;
 
     // Our metal builds assume shared memory, so it's safe to check host.
     if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        DORADO_LOG(warn, 
-                "Less than 16GB of memory available: {}GB detected. "
-                "This is below minimum spec and may cause issues",
-                total_mem);
+        DORADO_LOG(warn,
+                   "Less than 16GB of memory available: {}GB detected. "
+                   "This is below minimum spec and may cause issues",
+                   total_mem);
     }
 
     // Create MPS objects.
@@ -97,17 +97,16 @@ MPSCaller::MPSCaller(const config::BasecallModelConfig &model_config) : MetalCal
 
     // Load the model and get ready for calling.
     m_model = model::load_model(model_config, get_crf_options(model_config));
-    start_threads();
 }
 
-MPSCaller::~MPSCaller() = default;
+MPSModel::~MPSModel() = default;
 
-at::Tensor MPSCaller::create_input_tensor() const {
+at::Tensor MPSModel::create_input_tensor() const {
     // NCT
     return at::zeros({m_batch_size, m_config.num_features, m_in_chunk_size}, at::kHalf);
 }
 
-bool MPSCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_count) {
+bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, int try_count) {
     auto scores_TNC = m_model->forward(task.input->to(get_crf_options(m_config)))
                               .scores.transpose(0, 1)
                               .contiguous()
@@ -124,6 +123,6 @@ bool MPSCaller::call_task(NNTask &task, std::mutex &inter_caller_mutex, int try_
     return m_decoder->prepare_decode(cb, try_count);
 }
 
-DecodedData MPSCaller::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
+DecodedData MPSModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
 
 }  // namespace dorado::basecall
