@@ -513,6 +513,66 @@ CATCH_TEST_CASE("trim_samples tests", TEST_GROUP) {
                 TrimInfo{3, 10, false},     // Trim with the first one, because the previous one was skipped.
             },
         },
+        TestCase{
+            "Heuristic trimming. Overlaps differ in minor positions, and a junction with an equal streak exists.",
+            {   // Input samples.
+                MockSample{
+                    0,                                  // seq_id
+                    {0, 1, 2, 3, 4, 5, 6, 7, 7, 8, 9},  // positions_major
+                    {0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0},  // positions_minor
+                },
+                MockSample{
+                    0,                                  // seq_id
+                    {4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, // positions_major
+                    {0, 0, 0, 0, 0, 0,  0,  0,  0,  0}, // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 5, false},      // Ends before major 5.
+                TrimInfo{1, 10, false},     // Starts at major 5.
+            },
+        },
+        TestCase{
+            "Heuristic trimming. Overlaps differ in minor positions, no junction with an equal streak exists within the overlap. Split at the overlap midpoint.",
+            {   // Input samples.
+                MockSample{
+                    0,                                                  // seq_id
+                    {0, 1, 2, 3, 4, 4, 5, 5, 6, 6, 7, 7, 8, 8, 9, 9},   // positions_major
+                    {0, 0, 0, 0, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1},   // positions_minor
+                },
+                MockSample{
+                    0,                                  // seq_id
+                    {4, 5, 6, 7, 8, 9, 10, 11, 12, 13}, // positions_major
+                    {0, 0, 0, 0, 0, 0,  0,  0,  0,  0}, // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 8, false},      // Ends before major 6.
+                TrimInfo{2, 10, false},     // Starts at major 6.
+            },
+        },
+        TestCase{
+            "Heuristic trimming. Overlaps differ in minor positions, overlap is too short for the junction search. Split at the overlap midpoint.",
+            {   // Input samples.
+                MockSample{
+                    0,                          // seq_id
+                    {0, 1, 2, 3, 4, 4, 5},      // positions_major
+                    {0, 0, 0, 0, 0, 1, 0},      // positions_minor
+                },
+                MockSample{
+                    0,                          // seq_id
+                    {4, 5, 6, 7, 8},            // positions_major
+                    {0, 0, 0, 0, 0},            // positions_minor
+                },
+            },
+            std::nullopt,   // region
+            {   // Expected results.
+                TrimInfo{0, 4, false},      // Ends before major 4.
+                TrimInfo{0, 5, false},      // Starts at major 4.
+            },
+        },
     }));
     // clang-format on
 

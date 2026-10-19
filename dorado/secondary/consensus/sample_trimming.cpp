@@ -245,8 +245,9 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
 
         constexpr int64_t UNIQ_MAJ = 3;
 
-        end_1_ind = std::ssize(s1.positions_major);
-        start_2_ind = 0;
+        // Initialize to -1 so that the junction search below can run.
+        end_1_ind = -1;
+        start_2_ind = -1;
 
         const auto count_unique = [](const std::vector<int64_t>& a, const int64_t start,
                                      const int64_t end) -> int64_t {
@@ -285,10 +286,12 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
                 count_unique(s1.positions_major, ovl_start_ind1, std::size(s1.positions_minor));
         const int64_t unique_s2 = count_unique(s2.positions_major, 0, ovl_end_ind2);
 
+        // Major coordinates of the overlap.
+        const int64_t start = s1.positions_major[ovl_start_ind1];
+        const int64_t end = s1.positions_major.back();
+        const int64_t mid = start + (end - start) / 2;
+
         if ((unique_s1 > UNIQ_MAJ) && (unique_s2 > UNIQ_MAJ)) {
-            const int64_t start = s1.positions_major[ovl_start_ind1];
-            const int64_t end = s1.positions_major.back();
-            const int64_t mid = start + (end - start) / 2;
             int64_t offset = 1;
 
             while (end_1_ind == -1) {
@@ -297,6 +300,11 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
                 }
 
                 for (const int64_t test : {+offset, -offset}) {
+                    // Junctions outside of the overlap would leave a gap between the samples.
+                    if (((mid + test) < start) || ((mid + test) > end)) {
+                        continue;
+                    }
+
                     const auto left = std::lower_bound(std::begin(s1.positions_major),
                                                        std::end(s1.positions_major), mid + test);
                     const auto right = std::lower_bound(std::begin(s2.positions_major),
@@ -319,9 +327,19 @@ std::tuple<int64_t, int64_t, bool> overlap_indices(const secondary::Sample& s1,
                 offset += 1;
             }
         }
+
+        // No viable junction was found. Split both samples at the first column of the
+        // overlap midpoint, so that the trimmed samples neither overlap nor leave a gap.
+        if (end_1_ind == -1) {
+            end_1_ind = std::distance(std::begin(s1.positions_major),
+                                      std::lower_bound(std::begin(s1.positions_major),
+                                                       std::end(s1.positions_major), mid));
+            start_2_ind = std::distance(std::begin(s2.positions_major),
+                                        std::lower_bound(std::begin(s2.positions_major),
+                                                         std::end(s2.positions_major), mid));
+        }
     }
 
-    // If return coordinates are -1, then a viable junction was not found.
     return {end_1_ind, start_2_ind, heuristic};
 }
 
