@@ -67,8 +67,7 @@ int64_t cuda_memory_limit(c10::Device device, float memory_limit_fraction) {
     return gpu_mem_limit;
 }
 
-std::pair<int64_t, int64_t> cuda_memory_requirements(
-        const config::BasecallModelConfig& model_config) {
+CudaMemoryRequirements cuda_memory_requirements(const config::BasecallModelConfig& model_config) {
     // Determine size of working memory for CRFModel divided by (batch_size * chunk_size).
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (model_config.is_flstm_model()) {

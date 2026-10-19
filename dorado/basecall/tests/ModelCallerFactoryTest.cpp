@@ -66,16 +66,24 @@ CATCH_TEST_CASE(CUT_TAG " estimates CUDA model memory independently of caller ex
     config.state_len = 5;
 
     config.lstm_size = 96;
-    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 960);
+    CATCH_CHECK(
+            dorado::basecall::cuda_memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            960);
 
     config.lstm_size = 97;
-    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 1280);
+    CATCH_CHECK(
+            dorado::basecall::cuda_memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            1280);
 
     config.lstm_inner_dim = 64;
-    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 4096);
+    CATCH_CHECK(
+            dorado::basecall::cuda_memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            4096);
 
     config.lstm_inner_dim.reset();
     config.out_features = 128;
-    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 2312);
+    CATCH_CHECK(
+            dorado::basecall::cuda_memory_requirements(config).crfmodel_bytes_per_chunk_timestep ==
+            2312);
 }
 #endif
