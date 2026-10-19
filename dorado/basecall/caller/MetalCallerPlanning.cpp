@@ -67,8 +67,10 @@ int mps_max_safe_batch_size(float memory_limit_fraction,
     // We see performance issues from memory pressure, so only use part of what is available.
     const int64_t usable_memory = physical_memory * memory_limit_fraction / 2;
 
-    // Memory usage is roughly: memory_MB = 42 * batch_size + 1000. This was determined
-    // empirically on an M3.
+    // Memory usage is roughly given by the following:
+    //   |memory_MB = 42 * batch_size + 1000|
+    // Found empirically by running the following on an M3:
+    //   |for bs in {64..512..32} ; do \time -l dorado basecaller -b ${bs} hac@v6 ... 2>&1 | grep "peak memory" ; done|
     int64_t batch_size = (usable_memory / 1024 / 1024 - 1000) / 42;
     batch_size = batch_size / granularity * granularity;
 
