@@ -57,6 +57,8 @@ if(APPLE)
         PRIVATE
             caller/MetalCaller.cpp
             caller/MetalCaller.h
+            caller/MetalCallerPlanning.cpp
+            caller/MetalCallerPlanning.h
             caller/MetalLSTMCaller.cpp
             caller/MetalLSTMCaller.h
             caller/MPSCaller.cpp

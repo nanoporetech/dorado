@@ -9,8 +9,9 @@
 #include "CudaCaller.h"
 #include "CudaCallerPlanning.h"
 #elif DORADO_METAL_BUILD
-#include "MetalCaller.h"
-#include "utils/memory_utils.h"
+#include "MPSCaller.h"
+#include "MetalCallerPlanning.h"
+#include "MetalLSTMCaller.h"
 #endif
 
 namespace dorado::basecall {
@@ -58,36 +59,36 @@ std::shared_ptr<ModelCaller> create_mps_caller(const BasecallerCreationParams& p
     return std::make_shared<MPSCaller>(params.model_config);
 }
 
-int mps_max_safe_batch_size(const std::string&,
-                            float memory_limit_fraction,
-                            const config::BasecallModelConfig& model_config) {
-    return MPSCaller::get_max_safe_batch_size(memory_limit_fraction, model_config);
+int mps_max_safe_batch_size_for_device(const std::string&,
+                                       float memory_limit_fraction,
+                                       const config::BasecallModelConfig& model_config) {
+    return mps_max_safe_batch_size(memory_limit_fraction, model_config);
 }
 
 const CallerImplementation mps_implementation{
         .create = create_mps_caller,
-        .batch_size_granularity = MPSCaller::get_batch_size_granularity,
-        .max_safe_batch_size = mps_max_safe_batch_size,
+        .batch_size_granularity = mps_batch_size_granularity,
+        .max_safe_batch_size = mps_max_safe_batch_size_for_device,
 };
 
 std::shared_ptr<ModelCaller> create_metal_lstm_caller(const BasecallerCreationParams& params) {
     return std::make_shared<MetalLSTMCaller>(params.model_config, params.memory_limit_fraction);
 }
 
-int metal_lstm_batch_size_granularity(const config::BasecallModelConfig&) {
-    return MetalLSTMCaller::get_batch_size_granularity();
+int metal_lstm_batch_size_granularity_for_config(const config::BasecallModelConfig&) {
+    return metal_lstm_batch_size_granularity();
 }
 
-int metal_lstm_max_safe_batch_size(const std::string&,
-                                   float memory_limit_fraction,
-                                   const config::BasecallModelConfig& model_config) {
-    return MetalLSTMCaller::get_max_safe_batch_size(memory_limit_fraction, model_config);
+int metal_lstm_max_safe_batch_size_for_device(const std::string&,
+                                              float memory_limit_fraction,
+                                              const config::BasecallModelConfig& model_config) {
+    return metal_lstm_max_safe_batch_size(memory_limit_fraction, model_config);
 }
 
 const CallerImplementation metal_lstm_implementation{
         .create = create_metal_lstm_caller,
-        .batch_size_granularity = metal_lstm_batch_size_granularity,
-        .max_safe_batch_size = metal_lstm_max_safe_batch_size,
+        .batch_size_granularity = metal_lstm_batch_size_granularity_for_config,
+        .max_safe_batch_size = metal_lstm_max_safe_batch_size_for_device,
 };
 #endif
 
@@ -144,8 +145,7 @@ uint64_t model_caller_memory_limit(const std::string& device, float memory_limit
     }
 #elif DORADO_METAL_BUILD
     if (device == "metal") {
-        // This assumes that Dorado is the only significant memory user on the machine.
-        return utils::get_apple_physical_memory_bytes() * memory_limit_fraction;
+        return metal_memory_limit(memory_limit_fraction);
     }
 #endif
     throw std::runtime_error("Memory limit is unavailable for device: " + device);

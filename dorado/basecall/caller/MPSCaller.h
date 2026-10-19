@@ -16,10 +16,6 @@ public:
 
     at::Tensor create_input_tensor() const override;
 
-    static int get_max_safe_batch_size(float memory_limit_fraction,
-                                       const config::BasecallModelConfig &model_config);
-    static int get_batch_size_granularity(const config::BasecallModelConfig &model_config);
-
 private:
     MPSCaller(MPSCaller &&other) = delete;
     MPSCaller &operator=(MPSCaller &&) = delete;
