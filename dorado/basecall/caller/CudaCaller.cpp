@@ -263,7 +263,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
 
     determine_batch_dims(params, m_variable_chunk_sizes);
 
-    auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = cuda_memory_requirements(m_config);
+    auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = cuda::memory_requirements(m_config);
 
     // Warmup
     c10::cuda::CUDAStreamGuard stream_guard(m_stream);
@@ -454,9 +454,9 @@ stats::NamedStats CudaCaller::sample_stats() const {
 void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
                                       bool variable_chunk_sizes) {
     const int requested_batch_size = m_config.basecaller.batch_size();
-    auto [batch_dims, max_batch_sizes] =
-            calculate_cuda_batch_sizes(m_options.device(), params.memory_limit_fraction, m_config,
-                                       m_pipeline_type, requested_batch_size, variable_chunk_sizes);
+    auto [batch_dims, max_batch_sizes] = cuda::calculate_batch_sizes(
+            m_options.device(), params.memory_limit_fraction, m_config, m_pipeline_type,
+            requested_batch_size, variable_chunk_sizes);
     m_batch_dims = std::move(batch_dims);
 
     if (requested_batch_size != 0 || max_batch_sizes.empty()) {
@@ -472,7 +472,7 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
     max_batch_size = std::min(max_batch_size, max_batch_size_limit);
 
     const int chunk_granularity = m_config.chunk_size_granularity();
-    const int batch_granularity = cuda_batch_size_granularity(m_config);
+    const int batch_granularity = cuda::batch_size_granularity(m_config);
     const int stride = m_config.stride;
 
     // `288 * stride` (much shorter than the default chunk size of 10k), adjusted for

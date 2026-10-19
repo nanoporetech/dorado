@@ -16,7 +16,7 @@
 #include <stdexcept>
 #include <string>
 
-namespace dorado::basecall {
+namespace dorado::basecall::cuda {
 
 namespace {
 
@@ -24,12 +24,12 @@ constexpr float GB = 1.0e9f;
 
 }  // namespace
 
-int cuda_batch_size_granularity(const config::BasecallModelConfig& model_config) {
+int batch_size_granularity(const config::BasecallModelConfig& model_config) {
     // TODO: we may want to use different numbers based on model type and GPU arch
     return model_config.is_tx_model() ? 32 : 64;
 }
 
-int64_t cuda_memory_limit(c10::Device device, float memory_limit_fraction) {
+int64_t memory_limit(c10::Device device, float memory_limit_fraction) {
     c10::cuda::CUDAGuard device_guard(device);
     c10::cuda::CUDACachingAllocator::emptyCache();
     const int64_t available = utils::available_memory(device);
@@ -67,7 +67,7 @@ int64_t cuda_memory_limit(c10::Device device, float memory_limit_fraction) {
     return gpu_mem_limit;
 }
 
-CudaMemoryRequirements cuda_memory_requirements(const config::BasecallModelConfig& model_config) {
+MemoryRequirements memory_requirements(const config::BasecallModelConfig& model_config) {
     // Determine size of working memory for CRFModel divided by (batch_size * chunk_size).
     int64_t crfmodel_bytes_per_chunk_timestep;
     if (model_config.is_flstm_model()) {
@@ -115,15 +115,15 @@ CudaMemoryRequirements cuda_memory_requirements(const config::BasecallModelConfi
     return {crfmodel_bytes_per_chunk_timestep, decode_bytes_per_chunk_timestep};
 }
 
-CudaBatchPlan calculate_cuda_batch_sizes(c10::Device device,
-                                         float memory_limit_fraction,
-                                         const config::BasecallModelConfig& model_config,
-                                         std::optional<PipelineType> pipeline_type,
-                                         int requested_batch_size,
-                                         bool variable_chunk_sizes) {
+BatchPlan calculate_batch_sizes(c10::Device device,
+                                float memory_limit_fraction,
+                                const config::BasecallModelConfig& model_config,
+                                std::optional<PipelineType> pipeline_type,
+                                int requested_batch_size,
+                                bool variable_chunk_sizes) {
     c10::cuda::CUDAGuard device_guard(device);
     c10::cuda::CUDACachingAllocator::emptyCache();
-    const int batch_granularity = cuda_batch_size_granularity(model_config);
+    const int batch_granularity = batch_size_granularity(model_config);
     const int chunk_granularity = model_config.chunk_size_granularity();
     const int stride = model_config.stride;
     const int min_chunk_size =
@@ -149,7 +149,7 @@ CudaBatchPlan calculate_cuda_batch_sizes(c10::Device device,
         }
     }
 
-    CudaBatchPlan result;
+    BatchPlan result;
     result.batch_dims.reserve(T_outs.size());
     for (auto iter = T_outs.rbegin(); iter != T_outs.rend(); ++iter) {
         result.batch_dims.push_back({
@@ -159,10 +159,10 @@ CudaBatchPlan calculate_cuda_batch_sizes(c10::Device device,
         });
     }
 
-    const int64_t gpu_mem_limit = cuda_memory_limit(device, memory_limit_fraction);
+    const int64_t gpu_mem_limit = memory_limit(device, memory_limit_fraction);
     DORADO_LOG(debug, "{} memory limit {:.2f}GB", device.str(), gpu_mem_limit / GB);
 
-    auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = cuda_memory_requirements(model_config);
+    auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = memory_requirements(model_config);
     if (crfmodel_bytes_per_ct == 0) {
         return result;
     }
@@ -201,11 +201,11 @@ CudaBatchPlan calculate_cuda_batch_sizes(c10::Device device,
     return result;
 }
 
-int cuda_max_safe_batch_size(c10::Device device,
-                             float memory_limit_fraction,
-                             const config::BasecallModelConfig& model_config) {
-    auto max_batch_sizes = calculate_cuda_batch_sizes(device, memory_limit_fraction, model_config,
-                                                      std::nullopt, 0, false)
+int max_safe_batch_size(c10::Device device,
+                        float memory_limit_fraction,
+                        const config::BasecallModelConfig& model_config) {
+    auto max_batch_sizes = cuda::calculate_batch_sizes(device, memory_limit_fraction, model_config,
+                                                       std::nullopt, 0, false)
                                    .max_batch_sizes;
     if (max_batch_sizes.size() != 1) {
         throw std::logic_error(fmt::format("Unexpected count of sizes for {}", device.str()));
@@ -213,4 +213,4 @@ int cuda_max_safe_batch_size(c10::Device device,
     return max_batch_sizes.front();
 }
 
-}  // namespace dorado::basecall
+}  // namespace dorado::basecall::cuda

@@ -92,7 +92,7 @@ private:
 
     // A CudaCaller may accept chunks of multiple different sizes. Smaller sizes will be used to
     // speed up processing of reads that are shorter than the longest chunk size.
-    std::vector<CudaBatchDims> m_batch_dims;
+    std::vector<cuda::BatchDims> m_batch_dims;
 
     // Performance monitoring stats.
     std::atomic<int64_t> m_num_batches_called{0};

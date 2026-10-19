@@ -9,35 +9,36 @@
 #include <utility>
 #include <vector>
 
-namespace dorado::basecall {
+namespace dorado::basecall::cuda {
 
-struct CudaBatchDims {
+struct BatchDims {
     int N;
     int T_in;
     int T_out;
 };
 
-struct CudaBatchPlan {
-    std::vector<CudaBatchDims> batch_dims;
+struct BatchPlan {
+    std::vector<BatchDims> batch_dims;
     std::vector<int> max_batch_sizes;
 };
 
-struct CudaMemoryRequirements {
+struct MemoryRequirements {
     int64_t crfmodel_bytes_per_chunk_timestep;
     int64_t decode_bytes_per_chunk_timestep;
 };
 
-int cuda_batch_size_granularity(const config::BasecallModelConfig& model_config);
-int64_t cuda_memory_limit(c10::Device device, float memory_limit_fraction);
-int cuda_max_safe_batch_size(c10::Device device,
-                             float memory_limit_fraction,
-                             const config::BasecallModelConfig& model_config);
-CudaMemoryRequirements cuda_memory_requirements(const config::BasecallModelConfig& model_config);
-CudaBatchPlan calculate_cuda_batch_sizes(c10::Device device,
-                                         float memory_limit_fraction,
-                                         const config::BasecallModelConfig& model_config,
-                                         std::optional<PipelineType> pipeline_type,
-                                         int requested_batch_size,
-                                         bool variable_chunk_sizes);
+int batch_size_granularity(const config::BasecallModelConfig& model_config);
+int64_t memory_limit(c10::Device device, float memory_limit_fraction);
+MemoryRequirements memory_requirements(const config::BasecallModelConfig& model_config);
+BatchPlan calculate_batch_sizes(c10::Device device,
+                                float memory_limit_fraction,
+                                const config::BasecallModelConfig& model_config,
+                                std::optional<PipelineType> pipeline_type,
+                                int requested_batch_size,
+                                bool variable_chunk_sizes);
 
-}  // namespace dorado::basecall
+int max_safe_batch_size(c10::Device device,
+                        float memory_limit_fraction,
+                        const config::BasecallModelConfig& model_config);
+
+}  // namespace dorado::basecall::cuda
