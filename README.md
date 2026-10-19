@@ -185,6 +185,24 @@ Note that Dorado `polish` is a **haploid** polishing tool and does _not_ impleme
 
 For more information on how to get started, head to the [Dorado `polish` documentation](https://software-docs.nanoporetech.com/dorado/latest/secondary/polish/).
 
+### Small variant calling
+
+Dorado `smallvar` is a diploid variant caller for ONT read data.
+It uses a combination of heuristic and deep-learning methods to achieve high accuracy and speed.
+
+Dorado `smallvar` takes as input aligned reads in BAM or CRAM format and the corresponding reference FASTA file against which variants will be called.
+Variant calls are output in VCF format, or optionally in gVCF format.
+To call variants, run:
+
+```bash
+dorado smallvar <aligned_reads> <reference> > variants.vcf
+```
+
+Dorado `smallvar` has been developed primarily for diploid human samples, but allows for specifying hemizygous regions via the command line or a BED file.
+Ploidy greater than two is not currently supported.
+
+Further information can be found in the [Dorado `smallvar` documentation](https://software-docs.nanoporetech.com/dorado/latest/secondary/smallvar/).
+
 ## Available basecalling models
 
 Click here for a list of [all available Dorado models](https://software-docs.nanoporetech.com/dorado/latest/models/list/).
