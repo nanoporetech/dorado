@@ -79,7 +79,11 @@ std::string make_reference_gt(const int32_t ploidy, const char allele) {
 float phred(float err, const float cap) {
     err = std::clamp(err, std::pow(10.0f, -cap / 10.0f), 1.0f);
     const float q = -10.0f * std::log10(err);
-    return std::min(q, cap);
+    float ret = std::min(q, cap);
+    if (ret <= 0.0f) {
+        ret = 0.0f;
+    }
+    return ret;
 }
 
 /**
