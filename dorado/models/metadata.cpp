@@ -11,7 +11,6 @@ namespace dorado::models {
 
 namespace model_variant {
 const std::unordered_map<std::string, ModelVariant> map = {
-        {"auto", ModelVariant::AUTO},
         {"fast", ModelVariant::FAST},
         {"hac", ModelVariant::HAC},
         {"sup", ModelVariant::SUP},

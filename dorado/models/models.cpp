@@ -30,9 +30,8 @@ bool model_info_is_similar(const ModelInfo& info,
         return false;
     }
 
-    const bool is_auto_variant_match = model.variant == ModelVariant::AUTO && info.simplex.is_auto;
     if (model.has_variant() && info.simplex.has_variant() &&
-        info.simplex.variant != model.variant && !is_auto_variant_match) {
+        info.simplex.variant != model.variant) {
         DORADO_LOG(trace, "Reject {} on model type: {}", info.name, to_string(model.variant));
         return false;
     }
@@ -226,7 +225,7 @@ const std::array models = {
                 "859d12312cbf47a0c7a8461c26b507e6764590c477e1ea0605510022bbaa8347",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v4_2_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v4_2_0},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v4.2.0",
@@ -249,7 +248,7 @@ const std::array models = {
                 "83e2292dd577b094e41e6399a7fe0d45e29eee478bf8cfbccaff7f2e19180e95",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v4.3.0",
@@ -272,7 +271,7 @@ const std::array models = {
                 "b09d5c73d403c44d0d3e3cefb5ddc5bcee1f3d8cec4efd0872c16a32eba5ff41",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.0.0",
@@ -303,7 +302,7 @@ const std::array models = {
                 "a34dd0a070acc2ad8991292e29754ceededf23f078ecc52445ded30910624b33",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v5_2_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v5_2_0},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v5.2.0",
@@ -335,7 +334,7 @@ const std::array models = {
                 "0b57da141fe97a85d2cf7028c0d0b83c24be35451fd2f8bfb6070f82a1443ea0",
                 CC::RNA004_130BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v3_0_1, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v3_0_1},
         },
         ModelInfo{
                 "rna004_130bps_sup@v3.0.1",
@@ -357,7 +356,7 @@ const std::array models = {
                 "7ca33d19824e41e1c438a60d4d844c86d449be25ea59b8df23adee385a2d9f5d",
                 CC::RNA004_130BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v5_0_0},
         },
         ModelInfo{
                 "rna004_130bps_sup@v5.0.0",
@@ -379,7 +378,7 @@ const std::array models = {
                 "36ac8bdb2baaf32e697086962078f83a001a3ffe1461e358fabef15c08b15c5e",
                 CC::RNA004_130BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v5_1_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v5_1_0},
         },
         ModelInfo{
                 "rna004_130bps_sup@v5.1.0",
@@ -401,7 +400,7 @@ const std::array models = {
                 "b189866509a1684834fe3b3cd9cade4fc80c4008d414771a960a34b84aad077e",
                 CC::RNA004_130BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v5_2_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v5_2_0},
         },
         ModelInfo{
                 "rna004_130bps_sup@v5.2.0",
@@ -423,7 +422,7 @@ const std::array models = {
                 "e24fc6ac7a9cd955af857870781b26031f8eef4c1f31c28ce07d2ddc7996d95f",
                 CC::RNA004_130BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v5_3_0},
         },
         ModelInfo{
                 "rna004_130bps_sup@v5.3.0",
@@ -446,7 +445,7 @@ const std::array models = {
                 "1d8c37d763678bcff6c69dff9af36f25647a4e3cb8eafe9ef62e2c5869ad7e5a",
                 CC::RNA004_130BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v6_0_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v6_0_0},
         },
         ModelInfo{
                 "rna004_sup@v6.0.0",
@@ -593,7 +592,7 @@ const std::array deprecated = {
                 "",
                 CC::DNA_R10_4_1_E8_2_260BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v4_1_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v4_1_0},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_260bps_sup@v4.1.0",
@@ -615,7 +614,7 @@ const std::array deprecated = {
                 "",
                 CC::DNA_R10_4_1_E8_2_400BPS_4KHZ,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v4_1_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v4_1_0},
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_sup@v4.1.0",
@@ -638,7 +637,7 @@ const std::array deprecated = {
                 "",
                 CC::RNA002_70BPS,
                 ModelType::SIMPLEX,
-                ModelVariantPair{ModelVariant::HAC, VV::v3_0_0, true},
+                ModelVariantPair{ModelVariant::HAC, VV::v3_0_0},
         },
 };
 

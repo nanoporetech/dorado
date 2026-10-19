@@ -11,7 +11,6 @@ Enumerate the options available for auto model selection.
 `UNRECOGNISED` is used to default back to a path 
 */
 enum class ModelVariant : uint16_t {
-    AUTO,
     FAST,
     HAC,
     SUP,
@@ -77,7 +76,6 @@ std::string to_string(const Chemistry& chemistry);
 struct ModelVariantPair {
     ModelVariant variant = ModelVariant::NONE;
     ModelVersion ver = ModelVersion::NONE;
-    bool is_auto = false;
     bool has_variant() const { return variant != ModelVariant::NONE; }
     bool has_ver() const { return ver != ModelVersion::NONE; }
 
