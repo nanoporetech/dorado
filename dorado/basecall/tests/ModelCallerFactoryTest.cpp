@@ -4,6 +4,10 @@
 #include "caller/ModelCallerSelection.h"
 #include "config/BasecallModelConfig.h"
 
+#if DORADO_CUDA_BUILD
+#include "caller/CudaCallerPlanning.h"
+#endif
+
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
@@ -55,3 +59,23 @@ CATCH_TEST_CASE(CUT_TAG " selects one Metal implementation for each model family
     const auto tx_config = load_config("dna_r10.4.1_e8.2_400bps_sup@v5.0.0");
     CATCH_CHECK(select_metal_model_implementation(tx_config) == MetalModelImplementation::mps);
 }
+
+#if DORADO_CUDA_BUILD
+CATCH_TEST_CASE(CUT_TAG " estimates CUDA model memory independently of caller execution", CUT_TAG) {
+    dorado::config::BasecallModelConfig config;
+    config.state_len = 5;
+
+    config.lstm_size = 96;
+    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 960);
+
+    config.lstm_size = 97;
+    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 1280);
+
+    config.lstm_inner_dim = 64;
+    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 4096);
+
+    config.lstm_inner_dim.reset();
+    config.out_features = 128;
+    CATCH_CHECK(dorado::basecall::cuda_memory_requirements(config).first == 2312);
+}
+#endif
