@@ -10,8 +10,6 @@ dorado_add_library(dorado_basecall
         ModelCallerFactory.h
         ModelRunner.h
     SOURCES_PRIVATE
-        caller/BatchedModelCaller.cpp
-        caller/BatchedModelCaller.h
         caller/BatchExecutor.cpp
         caller/BatchExecutor.h
         caller/CallerModel.cpp
@@ -41,7 +39,6 @@ dorado_add_library(dorado_basecall
         caller/ModelCallerSelection.h
         caller/TensorRunnerState.cpp
         caller/TensorRunnerState.h
-        caller/TypedRunnerContext.h
     SOURCES_TEST
         BatchExecutorTest.cpp
         DecoderTest.cpp
@@ -50,7 +47,6 @@ dorado_add_library(dorado_basecall
         ModelTest.cpp
         ModelRunnerTest.cpp
         TensorRunnerStateTest.cpp
-        TypedRunnerContextTest.cpp
     DEPENDS_PUBLIC
         dorado_config
         dorado_modbase

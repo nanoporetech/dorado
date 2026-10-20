@@ -1,6 +1,5 @@
 #include "basecall/ModelCallerFactory.h"
 
-#include "BatchedModelCaller.h"
 #include "CpuModel.h"
 #include "ModelCallerSelection.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
@@ -32,7 +31,7 @@ struct CallerImplementation {
 };
 
 std::shared_ptr<ModelCaller> create_cpu_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<BatchedModelCaller>(
+    return std::make_shared<ModelCaller>(
             std::make_unique<CpuModel>(params.model_config, params.modbase_configs));
 }
 
@@ -44,7 +43,7 @@ const CallerImplementation cpu_implementation{
 
 #if DORADO_CUDA_BUILD
 std::shared_ptr<ModelCaller> create_cuda_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<BatchedModelCaller>(std::make_unique<CudaModel>(params));
+    return std::make_shared<ModelCaller>(std::make_unique<CudaModel>(params));
 }
 
 int cuda_max_safe_batch_size(const std::string& device,
@@ -60,7 +59,7 @@ const CallerImplementation cuda_implementation{
 };
 #elif DORADO_METAL_BUILD
 std::shared_ptr<ModelCaller> create_mps_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<BatchedModelCaller>(std::make_unique<MetalCallerModel>(
+    return std::make_shared<ModelCaller>(std::make_unique<MetalCallerModel>(
             params.model_config,
             std::make_unique<MPSModel>(params.model_config, params.modbase_configs)));
 }
@@ -78,7 +77,7 @@ const CallerImplementation mps_implementation{
 };
 
 std::shared_ptr<ModelCaller> create_metal_lstm_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<BatchedModelCaller>(std::make_unique<MetalCallerModel>(
+    return std::make_shared<ModelCaller>(std::make_unique<MetalCallerModel>(
             params.model_config,
             std::make_unique<MetalLSTMModel>(params.model_config, params.memory_limit_fraction)));
 }

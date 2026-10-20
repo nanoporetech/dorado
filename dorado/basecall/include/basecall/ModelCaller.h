@@ -21,35 +21,53 @@ struct BasecallModelConfig;
 
 namespace dorado::basecall {
 
-class ModelCaller {
-public:
-    class RunnerContext {
-    public:
-        virtual ~RunnerContext() = default;
-        virtual void accept_chunk(int chunk_idx, const at::Tensor& chunk) = 0;
-        virtual std::vector<decode::DecodedChunk> call_chunks(int num_chunks) = 0;
-        virtual size_t chunk_size() const = 0;
-        virtual size_t batch_size() const = 0;
-        virtual bool variable_chunk_sizes() const { return false; }
+class BatchExecutor;
+class CallerModel;
+class RunnerState;
 
-    protected:
-        RunnerContext() = default;
+// Runs batches of chunks through a model. All backend-specific behaviour is provided by the
+// CallerModel; queueing, threading and decoding are handled by a BatchExecutor.
+class ModelCaller final {
+public:
+    // Accepts chunks for one runner, and calls them as a batch.
+    class RunnerContext final {
+    public:
+        RunnerContext(ModelCaller& caller, std::unique_ptr<RunnerState> state);
+        ~RunnerContext();
+
+        void accept_chunk(int chunk_idx, const at::Tensor& chunk);
+        std::vector<decode::DecodedChunk> call_chunks(int num_chunks);
+        size_t chunk_size() const;
+        size_t batch_size() const;
+        bool variable_chunk_sizes() const;
+
+    private:
+        ModelCaller& m_caller;
+        std::unique_ptr<RunnerState> m_state;
     };
 
-    virtual ~ModelCaller() = default;
-    virtual std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) = 0;
-    virtual size_t num_batch_dims() const = 0;
-    virtual const config::BasecallModelConfig& config() const = 0;
-    virtual std::shared_ptr<ModBaseInfo> modbase_info() const = 0;
-    virtual std::pair<int, int> batch_timeouts_ms() const;
-    virtual bool is_low_latency() const { return false; }
-    virtual void terminate() = 0;
-    virtual void restart() = 0;
-    virtual std::string get_name() const = 0;
-    virtual stats::NamedStats sample_stats() const = 0;
+    explicit ModelCaller(std::unique_ptr<CallerModel> model);
+    ~ModelCaller();
 
-protected:
-    ModelCaller() = default;
+    ModelCaller(const ModelCaller&) = delete;
+    ModelCaller& operator=(const ModelCaller&) = delete;
+
+    std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx);
+    std::vector<decode::DecodedChunk> call_chunks(RunnerState& state, int num_chunks);
+
+    size_t num_batch_dims() const;
+    const config::BasecallModelConfig& config() const;
+    std::shared_ptr<ModBaseInfo> modbase_info() const;
+    std::pair<int, int> batch_timeouts_ms() const;
+    bool is_low_latency() const;
+    void terminate();
+    void restart();
+    std::string get_name() const;
+    stats::NamedStats sample_stats() const;
+
+private:
+    std::unique_ptr<CallerModel> m_model;
+    std::unique_ptr<BatchExecutor> m_executor;
 };
 
 }  // namespace dorado::basecall

@@ -84,7 +84,7 @@ private:
     std::int32_t total_num_granularity_;          // Input length divided by chunk_size_granularity
     std::int32_t total_num_varlen_chunks_;        // Amount of varlen chunks in batch
     std::int32_t
-            max_num_granularity_;  // Given CudaCaller's batch_size and chunk_size, max amount of granularity chunks
+            max_num_granularity_;  // Given CudaModel's batch_size and chunk_size, max amount of granularity chunks
     std::int32_t max_chunk_size_;  // Acquired from model's config "[basecaller] chunksize"
 
     bool is_tx_model_;
