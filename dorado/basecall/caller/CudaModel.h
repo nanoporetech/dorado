@@ -1,5 +1,6 @@
 #pragma once
 
+#include "CallerModel.h"
 #include "CudaCallerPlanning.h"
 #include "basecall/DecodedChunk.h"
 #include "basecall/ModelCallerFactory.h"
@@ -28,31 +29,29 @@ class Model;
 
 // Owns everything backend-specific about running a basecalling model on a CUDA device: model and
 // decoder loading, batch dimension selection, warm-up, tensor layout, and the forward/decode steps.
-class CudaModel final {
+class CudaModel final : public CallerModel {
 public:
-    // A batch that has been copied to the device and is ready to be run.
-    struct Batch {
-        Batch(at::Tensor input_, int num_chunks_, nn::AuxiliaryData *aux_)
-                : input(std::move(input_)), num_chunks(num_chunks_), aux(aux_) {}
-        at::Tensor input;
-        int num_chunks;
-        nn::AuxiliaryData *aux;
-        decode::DecoderResult out;
-    };
-
     explicit CudaModel(const BasecallerCreationParams &params);
-    ~CudaModel();
+    ~CudaModel() override;
 
-    // Copies `input` to the device and creates auxiliary data if required. Runs on the calling
-    // thread, using its current stream.
-    Batch prepare_batch(const at::Tensor &input, int num_chunks, nn::AuxiliaryData *aux);
+    const config::BasecallModelConfig &config() const override { return m_config; }
+    std::shared_ptr<ModBaseInfo> modbase_info() const override { return m_modbase_info; }
+    size_t num_batch_dims() const override { return m_batch_dims.size(); }
+    std::unique_ptr<RunnerState> create_runner_state(size_t batch_dims_idx) override;
+    std::pair<int, int> batch_timeouts_ms() const override;
+    bool is_low_latency() const override { return m_low_latency; }
+    std::string name() const override { return std::string("CudaCaller_") + m_device; }
+    stats::NamedStats sample_stats() const override;
 
-    // Runs the model and the GPU part of decoding. Must be called with a stream guard for stream()
-    // active.
-    void run_batch(Batch &batch);
+    SchedulingPolicy scheduling_policy() const override;
+    std::string worker_thread_name() const override { return "cuda_caller"; }
+    std::unique_ptr<ThreadScope> worker_thread_scope() override;
 
-    // Runs the CPU part of decoding for a batch that has been run.
-    std::vector<decode::DecodedChunk> decode_batch(Batch &batch, at::Tensor &output);
+    std::unique_ptr<InFlightBatch> prepare(RunnerState &state, int num_chunks) override;
+    void submit(InFlightBatch &batch) override;
+    size_t decode_units(const InFlightBatch &) const override { return 1; }
+    void decode(InFlightBatch &batch, size_t unit, std::vector<decode::DecodedChunk> &out) override;
+    void release(InFlightBatch &batch) override;
 
     std::tuple<at::Tensor, at::Tensor, at::Tensor> create_input_output_tensor(
             size_t batch_dims_idx) const;
@@ -63,15 +62,8 @@ public:
     std::size_t chunk_size(const std::size_t batch_dims_idx) const {
         return m_batch_dims[batch_dims_idx].T_in;
     }
-    size_t num_batch_dims() const { return m_batch_dims.size(); }
     bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
-    bool is_low_latency() const { return m_low_latency; }
     c10::Device device() const { return m_options.device(); }
-    const std::string &device_name() const { return m_device; }
-    const config::BasecallModelConfig &config() const { return m_config; }
-    std::shared_ptr<ModBaseInfo> modbase_info() const { return m_modbase_info; }
-    const c10::cuda::CUDAStream &stream() const { return m_stream; }
-    stats::NamedStats sample_stats() const;
 
 private:
     void determine_batch_dims(const BasecallerCreationParams &params);
@@ -102,15 +94,15 @@ private:
 };
 
 // Per-runner buffers and chunk bookkeeping for a CudaModel.
-class CudaRunnerState final {
+class CudaRunnerState final : public RunnerState {
 public:
     CudaRunnerState(const CudaModel &model, size_t batch_dims_idx);
 
-    void accept_chunk(int chunk_idx, const at::Tensor &chunk);
+    void accept_chunk(int chunk_idx, const at::Tensor &chunk) override;
 
-    size_t chunk_size() const { return m_chunk_size; }
-    size_t batch_size() const { return m_batch_size; }
-    bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
+    size_t chunk_size() const override { return m_chunk_size; }
+    size_t batch_size() const override { return m_batch_size; }
+    bool variable_chunk_sizes() const override { return m_variable_chunk_sizes; }
 
     void reset();
 

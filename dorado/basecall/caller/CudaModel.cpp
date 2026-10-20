@@ -216,9 +216,88 @@ CudaModel::CudaModel(const BasecallerCreationParams &params)
 
 CudaModel::~CudaModel() = default;
 
-CudaModel::Batch CudaModel::prepare_batch(const at::Tensor &input,
-                                          int num_chunks,
-                                          nn::AuxiliaryData *aux) {
+std::unique_ptr<RunnerState> CudaModel::create_runner_state(size_t batch_dims_idx) {
+    return std::make_unique<CudaRunnerState>(*this, batch_dims_idx);
+}
+
+// If 5 minutes has passed since the first chunk was added to a batch, we will
+// dispatch the batch even if it is not full. This is to prevent issues with
+// MinKNOW clients disconnecting because they think the server has timed out.
+static constexpr int DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 300000;
+
+// If 30 seconds has passed since the most recent chunk was added to a batch,
+// we will dispatch the batch even if it is not full. Benchmarking indicates
+// that this gives good results when some pipelines have very low throughput
+// and others have very high throughput.
+static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
+
+// Default value for timeout of incomplete batches for low-latency pipelines. The
+// value of 350 ms has been found to give good adaptive-sampling performance on all
+// platforms. For low-latency pipelines the timeout is always from when the first
+// chunk was added to the batch.
+static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
+
+std::pair<int, int> CudaModel::batch_timeouts_ms() const {
+    // For low-latency pipelines we set both timeouts to the same value. This means that we
+    // will always timeout based on the time from the first chunk being added to the batch.
+    return m_low_latency
+                   ? std::make_pair(DEFAULT_LOW_LATENCY_TIMEOUT_MS, DEFAULT_LOW_LATENCY_TIMEOUT_MS)
+                   : std::make_pair(DEFAULT_FIRST_CHUNK_TIMEOUT_MS, DEFAULT_LAST_CHUNK_TIMEOUT_MS);
+}
+
+SchedulingPolicy CudaModel::scheduling_policy() const {
+    // Global task queues, one per GPU. This ensures that tasks from different clients are
+    // processed in the order they became ready, rather than individual callers contending
+    // for a global mutex that can wake up threads in an arbitrary order.
+    SchedulingPolicy policy;
+    policy.shared_queue_key =
+            "cuda:" + std::to_string(m_options.device().index()) + (m_low_latency ? ":ll" : "");
+    // Low-latency callers are released as soon as their batch is dispatched, so that any other
+    // low-latency callers that are ready can get going immediately. Otherwise callers using the
+    // same GPU must not start a new batch before this one has completed.
+    policy.release_point =
+            m_low_latency ? ReleasePoint::on_submit_start : ReleasePoint::on_submit_return;
+    return policy;
+}
+
+namespace {
+
+class CudaThreadScope final : public ThreadScope {
+public:
+    explicit CudaThreadScope(const c10::cuda::CUDAStream &stream) : m_stream_guard(stream) {}
+
+private:
+    c10::cuda::CUDAStreamGuard m_stream_guard;
+};
+
+struct CudaBatch final : InFlightBatch {
+    CudaBatch(CudaRunnerState &state_,
+              std::unique_ptr<nn::AuxiliaryData> aux_,
+              at::Tensor input_,
+              int num_chunks_)
+            : state(state_),
+              aux(std::move(aux_)),
+              input(std::move(input_)),
+              num_chunks(num_chunks_) {}
+    CudaRunnerState &state;
+    std::unique_ptr<nn::AuxiliaryData> aux;
+    at::Tensor input;  // On the device.
+    int num_chunks;
+    decode::DecoderResult out;
+};
+
+}  // namespace
+
+std::unique_ptr<ThreadScope> CudaModel::worker_thread_scope() {
+    return std::make_unique<CudaThreadScope>(m_stream);
+}
+
+std::unique_ptr<InFlightBatch> CudaModel::prepare(RunnerState &runner_state, int num_chunks) {
+    NVTX3_FUNC_RANGE();
+    auto &state = static_cast<CudaRunnerState &>(runner_state);
+    c10::cuda::CUDAStreamGuard guard(state.m_stream);
+
+    auto aux = state.create_auxiliary_data();
     if (!aux && m_variable_chunk_sizes) {
         throw std::logic_error("Missing auxiliary data while calling variable chunks!");
     }
@@ -226,15 +305,17 @@ CudaModel::Batch CudaModel::prepare_batch(const at::Tensor &input,
         throw std::logic_error("Found auxiliary data while calling fixed chunks!");
     }
 
-    at::Tensor device_input = input.to(m_options.device());  // async copy
+    at::Tensor device_input = state.m_input.to(m_options.device());  // async copy
 
     if (aux) {
         aux->create_auxiliary_data(m_options.device(), m_thread_pool);
     }
-    return Batch(std::move(device_input), num_chunks, aux);
+    return std::make_unique<CudaBatch>(state, std::move(aux), std::move(device_input), num_chunks);
 }
 
-void CudaModel::run_batch(Batch &batch) {
+void CudaModel::submit(InFlightBatch &in_flight) {
+    NVTX3_FUNC_RANGE();
+    auto &batch = static_cast<CudaBatch &>(in_flight);
     auto device_stats = c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
 
     const auto aggregate_idx = static_cast<uint64_t>(c10::CachingAllocator::StatType::AGGREGATE);
@@ -255,9 +336,10 @@ void CudaModel::run_batch(Batch &batch) {
 
     auto run_basecalling = [&]() {
         stats::Timer timer;
-        auto model_output = m_model->forward(batch.input, batch.aux, m_modbase_modules.has_value());
-        batch.out = m_decoder->prepare_decode(
-                {std::move(model_output.scores), batch.num_chunks, m_decoder_options, batch.aux});
+        auto model_output =
+                m_model->forward(batch.input, batch.aux.get(), m_modbase_modules.has_value());
+        batch.out = m_decoder->prepare_decode({std::move(model_output.scores), batch.num_chunks,
+                                               m_decoder_options, batch.aux.get()});
         if (m_modbase_modules) {
             batch.out.modbase_data = modbase::run_modbase_latent_space_models(
                     *m_modbase_modules, batch.out.data, std::move(model_output.signal_embeddings));
@@ -276,23 +358,36 @@ void CudaModel::run_batch(Batch &batch) {
     ++m_num_batches_called;
 }
 
-std::vector<decode::DecodedChunk> CudaModel::decode_batch(Batch &batch, at::Tensor &output) {
+void CudaModel::decode(InFlightBatch &in_flight,
+                       size_t /*unit*/,
+                       std::vector<decode::DecodedChunk> &out) {
+    auto &batch = static_cast<CudaBatch &>(in_flight);
+    auto &state = batch.state;
+    c10::cuda::CUDAStreamGuard guard(state.m_stream);
+
     if (batch.aux && m_variable_chunk_sizes) {
-        at::Tensor out = output.narrow(0, 0, c10::multiply_integers(batch.out.data.sizes()))
-                                 .view(batch.out.data.sizes());
-        out.copy_(batch.out.data);
-        return m_decoder->decode({out, {}, batch.num_chunks, m_decoder_options, batch.aux});
+        at::Tensor decoded =
+                state.m_output.narrow(0, 0, c10::multiply_integers(batch.out.data.sizes()))
+                        .view(batch.out.data.sizes());
+        decoded.copy_(batch.out.data);
+        out = m_decoder->decode(
+                {decoded, {}, batch.num_chunks, m_decoder_options, batch.aux.get()});
+        return;
     }
 
-    output.copy_(batch.out.data);
+    state.m_output.copy_(batch.out.data);
     std::vector<at::Tensor> modbase_output;
     modbase_output.reserve(batch.out.modbase_data.size());
     for (const at::Tensor &head : batch.out.modbase_data) {
         // ToDo: use pinned memory
         modbase_output.emplace_back(head.to(at::kCPU));
     }
-    return m_decoder->decode(
-            {output, std::move(modbase_output), batch.num_chunks, m_decoder_options});
+    out = m_decoder->decode(
+            {state.m_output, std::move(modbase_output), batch.num_chunks, m_decoder_options});
+}
+
+void CudaModel::release(InFlightBatch &in_flight) {
+    static_cast<CudaBatch &>(in_flight).state.reset();
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaModel::create_input_output_tensor(

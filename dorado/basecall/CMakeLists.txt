@@ -83,8 +83,6 @@ if(APPLE)
 else()
     target_sources(dorado_basecall
         PRIVATE
-            caller/CudaCaller.cpp
-            caller/CudaCaller.h
             caller/CudaModel.cpp
             caller/CudaModel.h
             caller/CudaCallerPlanning.cpp

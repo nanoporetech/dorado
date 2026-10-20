@@ -8,8 +8,8 @@
 #include <stdexcept>
 
 #if DORADO_CUDA_BUILD
-#include "CudaCaller.h"
 #include "CudaCallerPlanning.h"
+#include "CudaModel.h"
 #elif DORADO_METAL_BUILD
 #include "MPSModel.h"
 #include "MetalCaller.h"
@@ -44,7 +44,7 @@ const CallerImplementation cpu_implementation{
 
 #if DORADO_CUDA_BUILD
 std::shared_ptr<ModelCaller> create_cuda_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<CudaCaller>(params);
+    return std::make_shared<BatchedModelCaller>(std::make_unique<CudaModel>(params));
 }
 
 int cuda_max_safe_batch_size(const std::string& device,
