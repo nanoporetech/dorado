@@ -415,8 +415,8 @@ CATCH_TEST_CASE(TEST_TAG " Test modbase model resolution", TEST_TAG) {
 
     CATCH_SECTION(" test no duplicate modbase model mixed") {
         BasecallerModelResolver resolver{
-                "hac,5mC_5hmC@v2", "",    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
-                std::nullopt,      false, reads};
+                "hac@v5.2,5mC_5hmC@v2", "",    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
+                std::nullopt,           false, reads};
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::logic_error);
     }

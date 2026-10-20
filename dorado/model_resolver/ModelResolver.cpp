@@ -150,10 +150,13 @@ ModelSources ModelResolver::resolve_model_complex() const {
                                                   simplex_variant, ModsVariantPair(), true);
         const ModelSource simplex = find_or_download_model(simplex_info);
 
+        // Finding the model will resolve @latest to an actual version.
+        const auto& resolved_simplex = simplex_info.simplex;
+
         std::vector<ModelInfo> modbase_infos;
         for (const ModsVariantPair& mod_variant : model_complex.get_mod_model_variants()) {
             const ModelInfo modbase_info = find_model(modified_models(), "modbase", chemistry,
-                                                      simplex_variant, mod_variant, true);
+                                                      resolved_simplex, mod_variant, true);
             modbase_infos.push_back(modbase_info);
         }
 
