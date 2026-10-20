@@ -8,6 +8,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <iterator>
 #include <optional>
@@ -19,8 +21,6 @@
 
 using namespace dorado::models;
 using namespace dorado::model_resolution;
-
-namespace fs = std::filesystem;
 
 using MC = ModelComplex;
 using MVP = ModelVariantPair;
@@ -391,24 +391,30 @@ CATCH_TEST_CASE(TEST_TAG " Test BasecallerModelResolver", TEST_TAG) {
 }
 
 CATCH_TEST_CASE(TEST_TAG " Test modbase model resolution", TEST_TAG) {
-    const auto reads_path = fs::path(get_data_dir("pod5")) / "dna_r10.4.1_e8.2_400bps_5khz";
-    const auto reads = dorado::utils::fetch_directory_entries(reads_path, false);
+    const auto reads_path = get_data_dir("pod5");
+    const auto dna_reads = dorado::utils::fetch_directory_entries(
+            reads_path / "dna_r10.4.1_e8.2_400bps_5khz", false);
+    const auto rna_reads =
+            dorado::utils::fetch_directory_entries(reads_path / "rna004_130bps", false);
 
     CATCH_SECTION(" test no duplicate modbase models") {
-        BasecallerModelResolver resolver{"hac",
-                                         "",
-                                         {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2",
-                                          "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
-                                         std::nullopt,
-                                         false,
-                                         reads};
+        BasecallerModelResolver resolver{
+                "hac",
+                "",
+                {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2",
+                 "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
+                std::nullopt,
+                false,
+                dna_reads,
+        };
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::runtime_error);
     }
 
     CATCH_SECTION(" test no duplicate modbase model variants") {
         BasecallerModelResolver resolver{
-                "hac,5mC_5hmC,5mC_5hmC", "", {}, std::nullopt, false, reads};
+                "hac,5mC_5hmC,5mC_5hmC", "", {}, std::nullopt, false, dna_reads,
+        };
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::runtime_error);
     }
@@ -416,9 +422,28 @@ CATCH_TEST_CASE(TEST_TAG " Test modbase model resolution", TEST_TAG) {
     CATCH_SECTION(" test no duplicate modbase model mixed") {
         BasecallerModelResolver resolver{
                 "hac@v5.2,5mC_5hmC@v2", "",    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
-                std::nullopt,           false, reads};
+                std::nullopt,           false, dna_reads,
+        };
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::logic_error);
+    }
+
+    CATCH_SECTION(" model compatibility when @latest isn't supported") {
+        for (const bool with_version : {false, true}) {
+            const char *complex = with_version ? "sup@v5.1,m5C" : "sup@latest,m5C";
+            BasecallerModelResolver resolver{
+                    complex, "", {}, std::nullopt, false, rna_reads,
+            };
+
+            if (with_version) {
+                CATCH_CHECK_NOTHROW(resolver.resolve());
+            } else {
+                using namespace Catch::Matchers;
+                CATCH_CHECK_THROWS_MATCHES(
+                        resolver.resolve(), std::runtime_error,
+                        MessageMatches(StartsWith("No matches for chemistry: ")));
+            }
+        }
     }
 }
 
