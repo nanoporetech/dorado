@@ -65,8 +65,8 @@ dorado_add_library(dorado_basecall
 if(APPLE)
     target_sources(dorado_basecall
         PRIVATE
-            caller/MetalCaller.cpp
-            caller/MetalCaller.h
+            caller/MetalCallerModel.cpp
+            caller/MetalCallerModel.h
             caller/MetalCallerPlanning.cpp
             caller/MetalCallerPlanning.h
             caller/MetalCallerTask.h

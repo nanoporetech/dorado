@@ -39,7 +39,7 @@ private:
         return m_decode_complete_event.get();
     }
     std::shared_ptr<ModBaseInfo> modbase_info() const override { return m_modbase_info; }
-    void decode_modbase(MetalCallerTask &task) override;
+    void decode_modbase(MetalCallerTask &task, std::span<decode::DecodedChunk> chunks) override;
 
     const config::BasecallModelConfig m_config;
     std::unique_ptr<model::Model> m_model;

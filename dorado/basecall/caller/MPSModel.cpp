@@ -138,12 +138,11 @@ bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, 
 
 DecodedData MPSModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
 
-void MPSModel::decode_modbase(MetalCallerTask &task) {
+void MPSModel::decode_modbase(MetalCallerTask &task, std::span<decode::DecodedChunk> chunks) {
     if (!m_modbase_modules) {
         return;
     }
 
-    const auto chunks = std::span<decode::DecodedChunk>(task.out_chunks->begin(), task.num_chunks);
     {
         std::lock_guard lock(m_modbase_mutex);
         auto heads = modbase::run_modbase_latent_space_models(

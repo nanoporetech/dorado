@@ -51,7 +51,7 @@ public:
     void submit(InFlightBatch &batch) override;
     size_t decode_units(const InFlightBatch &) const override { return 1; }
     void decode(InFlightBatch &batch, size_t unit, std::vector<decode::DecodedChunk> &out) override;
-    void release(InFlightBatch &batch) override;
+    void release(InFlightBatch &batch, std::vector<decode::DecodedChunk> &out) override;
 
     std::tuple<at::Tensor, at::Tensor, at::Tensor> create_input_output_tensor(
             size_t batch_dims_idx) const;

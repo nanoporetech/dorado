@@ -69,7 +69,9 @@ public:
         m_decode_threads.insert(std::this_thread::get_id());
     }
 
-    void release(InFlightBatch&) override { ++m_counters->releases; }
+    void release(InFlightBatch&, std::vector<decode::DecodedChunk>&) override {
+        ++m_counters->releases;
+    }
 
     std::shared_ptr<Counters> m_counters;
     std::mutex m_mutex;

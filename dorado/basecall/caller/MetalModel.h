@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
+#include <span>
 #include <string>
 #include <tuple>
 #include <vector>
@@ -15,6 +16,9 @@
 namespace dorado::basecall {
 
 struct MetalCallerTask;
+namespace decode {
+struct DecodedChunk;
+}
 
 using DecodedData = std::tuple<std::string, std::string, std::vector<uint8_t>>;
 
@@ -31,7 +35,10 @@ public:
     // Models that support modbase calling override these. decode_modbase is called once all of a
     // task's chunks have been decoded.
     virtual std::shared_ptr<ModBaseInfo> modbase_info() const { return nullptr; }
-    virtual void decode_modbase(MetalCallerTask& task) { (void)task; }
+    virtual void decode_modbase(MetalCallerTask& task, std::span<decode::DecodedChunk> chunks) {
+        (void)task;
+        (void)chunks;
+    }
 
 protected:
     MetalModel() = default;

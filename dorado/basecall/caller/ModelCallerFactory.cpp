@@ -12,7 +12,7 @@
 #include "CudaModel.h"
 #elif DORADO_METAL_BUILD
 #include "MPSModel.h"
-#include "MetalCaller.h"
+#include "MetalCallerModel.h"
 #include "MetalCallerPlanning.h"
 #include "MetalLSTMModel.h"
 #endif
@@ -60,8 +60,9 @@ const CallerImplementation cuda_implementation{
 };
 #elif DORADO_METAL_BUILD
 std::shared_ptr<ModelCaller> create_mps_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<MetalCaller>(params.model_config,
-                                         std::make_unique<MPSModel>(params.model_config));
+    return std::make_shared<BatchedModelCaller>(std::make_unique<MetalCallerModel>(
+            params.model_config,
+            std::make_unique<MPSModel>(params.model_config, params.modbase_configs)));
 }
 
 int mps_max_safe_batch_size_for_device(const std::string&,
@@ -77,9 +78,9 @@ const CallerImplementation mps_implementation{
 };
 
 std::shared_ptr<ModelCaller> create_metal_lstm_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<MetalCaller>(
+    return std::make_shared<BatchedModelCaller>(std::make_unique<MetalCallerModel>(
             params.model_config,
-            std::make_unique<MetalLSTMModel>(params.model_config, params.memory_limit_fraction));
+            std::make_unique<MetalLSTMModel>(params.model_config, params.memory_limit_fraction)));
 }
 
 int metal_lstm_batch_size_granularity_for_config(const config::BasecallModelConfig&) {

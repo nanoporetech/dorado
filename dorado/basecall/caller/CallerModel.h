@@ -75,7 +75,7 @@ struct SchedulingPolicy {
 //   prepare()  - on the thread requesting the batch.
 //   submit()   - on the executor's worker thread, serialised according to the SchedulingPolicy.
 //   decode()   - once per decode unit, on the requesting thread or the decode pool.
-//   release()  - once all decode units have completed.
+//   release()  - once all decode units have completed, with the decoded chunks.
 class CallerModel {
 public:
     virtual ~CallerModel() = default;
@@ -102,7 +102,10 @@ public:
     virtual void decode(InFlightBatch& batch,
                         size_t unit,
                         std::vector<decode::DecodedChunk>& out) = 0;
-    virtual void release(InFlightBatch& batch) { (void)batch; }
+    virtual void release(InFlightBatch& batch, std::vector<decode::DecodedChunk>& out) {
+        (void)batch;
+        (void)out;
+    }
 
 protected:
     CallerModel() = default;

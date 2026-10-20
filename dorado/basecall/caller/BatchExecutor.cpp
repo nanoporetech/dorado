@@ -62,7 +62,7 @@ void BatchExecutor::decode_inline(BatchTask& task) {
     for (size_t unit = 0; unit < units; ++unit) {
         m_model.decode(*task.work, unit, task.out);
     }
-    m_model.release(*task.work);
+    m_model.release(*task.work, task.out);
 }
 
 void BatchExecutor::terminate() {
@@ -135,7 +135,7 @@ void BatchExecutor::worker_thread_fn() {
         if (m_policy.decode_threads > 0) {
             task->decode_units = m_model.decode_units(*task->work);
             if (task->decode_units == 0) {
-                m_model.release(*task->work);
+                m_model.release(*task->work, task->out);
                 {
                     std::lock_guard lock(task->mut);
                     task->done = true;
@@ -203,7 +203,7 @@ void BatchExecutor::decode_thread_fn() {
             all_decoded = ++task->decode_units_finished == task->decode_units;
         }
         if (all_decoded) {
-            m_model.release(*task->work);
+            m_model.release(*task->work, task->out);
             {
                 std::lock_guard lock(task->mut);
                 task->done = true;

@@ -386,7 +386,7 @@ void CudaModel::decode(InFlightBatch &in_flight,
             {state.m_output, std::move(modbase_output), batch.num_chunks, m_decoder_options});
 }
 
-void CudaModel::release(InFlightBatch &in_flight) {
+void CudaModel::release(InFlightBatch &in_flight, std::vector<decode::DecodedChunk> & /*out*/) {
     static_cast<CudaBatch &>(in_flight).state.reset();
 }
 
