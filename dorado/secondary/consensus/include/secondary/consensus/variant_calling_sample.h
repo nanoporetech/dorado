@@ -4,6 +4,7 @@
 
 #include <cstdint>
 #include <iosfwd>
+#include <span>
 #include <string>
 #include <utility>
 #include <vector>
@@ -77,6 +78,20 @@ std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSam
 std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples,
                                                const std::string& draft,
                                                const DecoderBase& decoder);
+
+/**
+ * \brief Splits samples at the given reference boundaries (e.g. hemizygous region edges) so that
+ *          each piece can be decoded independently. A boundary falling inside a variant (as
+ *          detected in the decoded sample) is deferred to the variant end. It is ignored if the
+ *          variant reaches the start or end of the sample.
+ * \param vc_samples Joined samples for one sequence. Consumed.
+ * \param boundaries Sorted reference coordinates at which a new chunk should start.
+ */
+std::vector<VariantCallingSample> split_vc_samples_on_boundaries(
+        std::vector<VariantCallingSample> vc_samples,
+        std::span<const int64_t> boundaries,
+        const std::string& draft,
+        const DecoderBase& decoder);
 
 std::vector<VariantCallingSample> trim_vc_samples(
         const std::vector<VariantCallingSample>& vc_input_data,

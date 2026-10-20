@@ -1458,7 +1458,8 @@ call_variants_single_chrom(const std::string& draft,
                            const float pass_min_aq,
                            const float pass_min_vq,
                            const bool ambig_ref,
-                           const bool gvcf) {
+                           const bool gvcf,
+                           const std::vector<int64_t>& hemizygous_boundaries) {
     if (std::empty(vc_input_data)) {
         return {};
     }
@@ -1529,7 +1530,14 @@ call_variants_single_chrom(const std::string& draft,
     }
 
     // Break and merge samples on non-variant positions.
-    const auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
+    auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
+
+    if (gvcf) {
+        // Split decode chunks on hemizygous boundaries so that gVCF reference blocks respect them.
+        joined_samples = secondary::split_vc_samples_on_boundaries(
+                std::move(joined_samples), hemizygous_boundaries, draft, decoder);
+    }
+
     std::vector<secondary::Variant> results;
 
     for (const auto& vc_sample : joined_samples) {
@@ -1859,6 +1867,23 @@ void worker_variant_calling_reduce(
                 std::empty(hemizygous_regions) ? empty_hemizygous_regions
                                                : hemizygous_regions[seq_id];
 
+        // Decode chunks are split on these coordinates in the gVCF mode.
+        std::vector<int64_t> hemizygous_boundaries;
+        if (gvcf) {
+            const int64_t draft_len = std::ssize(*draft);
+            for (const auto& region : reduce_hemizygous) {
+                for (const int64_t b : {region.start, region.end}) {
+                    if ((b > 0) && (b < draft_len)) {
+                        hemizygous_boundaries.emplace_back(b);
+                    }
+                }
+            }
+            std::sort(std::begin(hemizygous_boundaries), std::end(hemizygous_boundaries));
+            hemizygous_boundaries.erase(
+                    std::unique(std::begin(hemizygous_boundaries), std::end(hemizygous_boundaries)),
+                    std::end(hemizygous_boundaries));
+        }
+
         std::vector<secondary::Variant> variants;
         std::vector<secondary::IntervalInt64> merge_regions;
         reduce_data.processed_regions = make_processed_regions(vc_decode_data, false);
@@ -1871,7 +1896,7 @@ void worker_variant_calling_reduce(
             std::tie(variants, merge_regions) = call_variants_single_chrom(
                     *draft, std::move(vc_decode_data), decoder, simple_variants,
                     merge_with_simple ? flank_trim : 0, pass_min_qual, pass_min_gq, pass_min_aq,
-                    pass_min_vq, ambig_ref, gvcf);
+                    pass_min_vq, ambig_ref, gvcf, hemizygous_boundaries);
         }
 
         DORADO_LOG(debug,

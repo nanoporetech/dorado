@@ -9,6 +9,8 @@
 #include "utils/log_utils.h"
 
 #include <algorithm>
+#include <optional>
+#include <span>
 #include <sstream>
 #include <stdexcept>
 #include <tuple>
@@ -438,6 +440,42 @@ std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSam
     return ret;
 }
 
+namespace {
+
+/**
+ * \brief Decodes the sample and flags the columns where any haplotype differs from the draft.
+ * \returns Per-column variant flags, empty if the sample could not be decoded.
+ */
+std::vector<bool> find_variant_columns(const VariantCallingSample& vc_sample,
+                                       const std::string& draft,
+                                       const DecoderBase& decoder) {
+    // Unsqueeze the logits because this vector contains logits for each individual sample of the shape
+    // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
+    // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
+    // In this case, the "batch size" is 1.
+    const at::Tensor logits = vc_sample.logits.unsqueeze(0);
+    const std::vector<std::vector<ConsensusResult>> c = decoder.decode_bases(logits);
+
+    // This shouldn't be possible.
+    if ((std::size(c) != 1) || (std::empty(c.front()))) {
+        DORADO_LOG(warn,
+                   "Unexpected number of consensus sequences generated from a single sample: "
+                   "c.size = {}, c[0].size = {}. Skipping consensus of this sample.",
+                   std::size(c), (std::empty(c) ? -1 : std::size(c.front())));
+        return {};
+    }
+
+    // Sequences for comparison.
+    const std::string draft_with_gaps =
+            extract_draft_with_gaps(draft, vc_sample.positions_major, vc_sample.positions_minor);
+
+    // Use std::nullopt to be more strict about merging/breaking on variants.
+    return find_polyploid_variants(vc_sample.positions_minor, draft_with_gaps, c.front(),
+                                   std::nullopt);
+}
+
+}  // namespace
+
 /**
  * \brief This function restructures the neighboring samples for one draft sequence.
  *          Each input sample is split on the last non-variant position.
@@ -457,30 +495,10 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
 
         vc_sample.validate();
 
-        // Unsqueeze the logits because this vector contains logits for each individual sample of the shape
-        // [positions x class_probabilities], whereas the decode_bases function expects that the first dimension is
-        // the batch sample ID. That is, the tensor should be of shape: [batch_sample_id x positions x class_probabilities].
-        // In this case, the "batch size" is 1.
-        const at::Tensor logits = vc_sample.logits.unsqueeze(0);
-        const std::vector<std::vector<ConsensusResult>> c = decoder.decode_bases(logits);
-
-        // This shouldn't be possible.
-        if ((std::size(c) != 1) || (std::empty(c.front()))) {
-            DORADO_LOG(warn,
-                       "Unexpected number of consensus sequences generated from a single sample: "
-                       "c.size = {}, c[0].size = {}. Skipping consensus of this sample.",
-                       std::size(c), (std::empty(c) ? -1 : std::size(c.front())));
+        const std::vector<bool> is_variant = find_variant_columns(vc_sample, draft, decoder);
+        if (std::empty(is_variant)) {
             continue;
         }
-
-        // Sequences for comparison.
-        const std::string draft_with_gaps = extract_draft_with_gaps(
-                draft, vc_sample.positions_major, vc_sample.positions_minor);
-        const std::vector<ConsensusResult>& calls_with_gaps = c.front();
-
-        // Use std::nullopt to be more strict about merging/breaking on variants.
-        const std::vector<bool> is_variant = find_polyploid_variants(
-                vc_sample.positions_minor, draft_with_gaps, calls_with_gaps, std::nullopt);
 
         const int64_t num_positions = std::ssize(vc_sample.positions_major);
 
@@ -528,6 +546,100 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
 
         ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
                    std::make_move_iterator(std::end(new_samples)));
+    }
+
+    return ret;
+}
+
+std::vector<VariantCallingSample> split_vc_samples_on_boundaries(
+        std::vector<VariantCallingSample> vc_samples,
+        const std::span<const int64_t> boundaries,
+        const std::string& draft,
+        const DecoderBase& decoder) {
+    if (std::empty(boundaries)) {
+        return vc_samples;
+    }
+
+    std::vector<VariantCallingSample> ret;
+    ret.reserve(std::size(vc_samples));
+
+    auto it_boundary = std::begin(boundaries);
+
+    for (VariantCallingSample& vc_sample : vc_samples) {
+        vc_sample.validate();
+
+        if (std::empty(vc_sample.positions_major)) {
+            ret.emplace_back(std::move(vc_sample));
+            continue;
+        }
+
+        // Only split samples which have a boundary strictly inside.
+        const int64_t sample_end = vc_sample.end();
+        it_boundary = std::upper_bound(it_boundary, std::end(boundaries), vc_sample.start());
+        if ((it_boundary == std::end(boundaries)) || (*it_boundary >= sample_end)) {
+            ret.emplace_back(std::move(vc_sample));
+            continue;
+        }
+
+        const std::vector<bool> is_variant = find_variant_columns(vc_sample, draft, decoder);
+        if (std::empty(is_variant)) {
+            ret.emplace_back(std::move(vc_sample));
+            continue;
+        }
+
+        const std::vector<int64_t>& major = vc_sample.positions_major;
+        const std::vector<int64_t>& minor = vc_sample.positions_minor;
+        const int64_t num_positions = std::ssize(major);
+
+        std::vector<int64_t> cuts;
+        for (; (it_boundary != std::end(boundaries)) && (*it_boundary < sample_end);
+             ++it_boundary) {
+            const int64_t k = std::distance(
+                    std::cbegin(major),
+                    std::lower_bound(std::cbegin(major), std::cend(major), *it_boundary));
+            if ((k <= 0) || (k >= num_positions)) {
+                continue;
+            }
+            if (!(is_variant[k - 1] && is_variant[k])) {
+                cuts.emplace_back(k);
+                continue;
+            }
+
+            // The boundary is inside a variant. Defer the cut to the variant end, so that
+            // normalisation of the variant start has its left context.
+            int64_t start = k - 1;
+            while ((start > 0) && is_variant[start - 1]) {
+                --start;
+            }
+            // The variant touches the sample start, skip as no valid reference positions before split
+            if (start == 0) {
+                continue;
+            }
+            int64_t end = k;
+            while ((end < num_positions) && (is_variant[end] || (minor[end] != 0))) {
+                ++end;
+            }
+            // The variant touches the sample end, skip as no valid reference positions after the split
+            if (end >= num_positions) {
+                continue;
+            }
+            cuts.emplace_back(end);
+        }
+
+        std::sort(std::begin(cuts), std::end(cuts));
+        cuts.erase(std::unique(std::begin(cuts), std::end(cuts)), std::end(cuts));
+
+        if (std::empty(cuts)) {
+            ret.emplace_back(std::move(vc_sample));
+            continue;
+        }
+
+        int64_t prev = 0;
+        for (const int64_t cut : cuts) {
+            ret.emplace_back(slice_vc_sample(vc_sample, prev, cut));
+            prev = cut;
+        }
+        ret.emplace_back(slice_vc_sample(vc_sample, prev, num_positions));
     }
 
     return ret;
