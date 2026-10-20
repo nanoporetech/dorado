@@ -1,8 +1,9 @@
 #pragma once
 
-#include "basecall/ModelCaller.h"
+#include "CallerModel.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfigFwd.h"
+#include "decode/Decoder.h"
 #include "decode/ModBaseDecoder.h"
 #include "modbase/nn/ModBaseModel.h"
 
@@ -13,33 +14,28 @@
 #include <optional>
 #include <span>
 
-namespace dorado::basecall::decode {
-class Decoder;
-}
-
 namespace dorado::basecall::model {
 class Model;
 }
 
 namespace dorado::basecall {
 
-class TensorRunnerState;
-
-class CPUCaller final : public ModelCaller {
+class CpuModel final : public CallerModel {
 public:
-    CPUCaller(const config::BasecallModelConfig& model_config,
-              std::span<const config::ModBaseModelConfig> modbase_configs);
-    ~CPUCaller() override;
+    CpuModel(const config::BasecallModelConfig& model_config,
+             std::span<const config::ModBaseModelConfig> modbase_configs);
+    ~CpuModel() override;
 
-    std::unique_ptr<RunnerContext> create_runner_context(size_t batch_dims_idx) override;
-    std::vector<decode::DecodedChunk> call_chunks(TensorRunnerState& state, int num_chunks);
-    size_t num_batch_dims() const override { return 1; }
     const config::BasecallModelConfig& config() const override { return m_config; }
+    std::unique_ptr<RunnerState> create_runner_state(size_t batch_dims_idx) override;
     std::shared_ptr<ModBaseInfo> modbase_info() const override { return m_modbase_info; }
-    void terminate() override {}
-    void restart() override {}
-    std::string get_name() const override { return "CPUCaller"; }
+    std::string name() const override { return "CPUCaller"; }
     stats::NamedStats sample_stats() const override;
+
+    std::unique_ptr<InFlightBatch> prepare(RunnerState& state, int num_chunks) override;
+    void submit(InFlightBatch& batch) override;
+    size_t decode_units(const InFlightBatch&) const override { return 1; }
+    void decode(InFlightBatch& batch, size_t unit, std::vector<decode::DecodedChunk>& out) override;
 
 private:
     const config::BasecallModelConfig m_config;

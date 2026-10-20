@@ -12,7 +12,6 @@
 #include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <nvtx3/nvtx3.hpp>
-#include <torch/cuda.h>
 
 #include <algorithm>
 #include <cassert>
@@ -287,6 +286,7 @@ std::vector<decode::DecodedChunk> CudaModel::decode_batch(Batch &batch, at::Tens
 
     output.copy_(batch.out.data);
     std::vector<at::Tensor> modbase_output;
+    modbase_output.reserve(batch.out.modbase_data.size());
     for (const at::Tensor &head : batch.out.modbase_data) {
         // ToDo: use pinned memory
         modbase_output.emplace_back(head.to(at::kCPU));

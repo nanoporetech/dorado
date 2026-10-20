@@ -1,19 +1,21 @@
 #pragma once
 
+#include "CallerModel.h"
+
 #include <ATen/core/TensorBody.h>
 
 namespace dorado::basecall {
 
 enum class TensorLayout { NCT, NTC };
 
-class TensorRunnerState final {
+class TensorRunnerState final : public RunnerState {
 public:
     TensorRunnerState(at::Tensor input, TensorLayout layout);
 
-    void accept_chunk(int chunk_idx, const at::Tensor& chunk_CT);
-    size_t chunk_size() const;
-    size_t batch_size() const;
-    bool variable_chunk_sizes() const { return false; }
+    void accept_chunk(int chunk_idx, const at::Tensor& chunk_CT) override;
+    size_t chunk_size() const override;
+    size_t batch_size() const override;
+    bool variable_chunk_sizes() const override { return false; }
 
     at::Tensor& input() { return m_input; }
     const at::Tensor& input() const { return m_input; }

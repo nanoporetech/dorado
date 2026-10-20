@@ -10,8 +10,14 @@ dorado_add_library(dorado_basecall
         ModelCallerFactory.h
         ModelRunner.h
     SOURCES_PRIVATE
-        caller/CPUCaller.cpp
-        caller/CPUCaller.h
+        caller/BatchedModelCaller.cpp
+        caller/BatchedModelCaller.h
+        caller/BatchExecutor.cpp
+        caller/BatchExecutor.h
+        caller/CallerModel.cpp
+        caller/CallerModel.h
+        caller/CpuModel.cpp
+        caller/CpuModel.h
         ChunkBenchmarks.cpp
         ChunkBenchmarks.h
         decode/beam_search.cpp
@@ -37,6 +43,7 @@ dorado_add_library(dorado_basecall
         caller/TensorRunnerState.h
         caller/TypedRunnerContext.h
     SOURCES_TEST
+        BatchExecutorTest.cpp
         DecoderTest.cpp
         ModBaseDecoderTest.cpp
         ModelCallerFactoryTest.cpp
