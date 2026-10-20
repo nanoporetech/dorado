@@ -78,6 +78,8 @@ else()
         PRIVATE
             caller/CudaCaller.cpp
             caller/CudaCaller.h
+            caller/CudaModel.cpp
+            caller/CudaModel.h
             caller/CudaCallerPlanning.cpp
             caller/CudaCallerPlanning.h
             decode/CUDADecoder.cpp
