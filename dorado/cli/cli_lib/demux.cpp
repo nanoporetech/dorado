@@ -365,6 +365,7 @@ int demuxer(int argc, char* argv[]) {
     // End stats counting setup.
 
     DORADO_LOG(info, "> starting barcode demuxing");
+    const bool skip_sec_supp = emit.fastq || strip_alignment;
     for (const auto& input : all_files) {
         // multithread the reader's decompression if we're not doing classification
         const std::size_t num_reader_threads = barcoding_info ? 1 : 2;
@@ -393,7 +394,7 @@ int demuxer(int argc, char* argv[]) {
         reader.set_client_info(client_info);
 
         const auto num_reads_in_file =
-                reader.read(*pipeline, max_reads, strip_alignment, &header_mapper, false);
+                reader.read(*pipeline, max_reads, strip_alignment, &header_mapper, skip_sec_supp);
         max_reads -= num_reads_in_file;
         DORADO_LOG(trace, "pushed to pipeline: {}", num_reads_in_file);
         progress_stats.update_reads_per_file_estimate(num_reads_in_file);
