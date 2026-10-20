@@ -95,9 +95,9 @@ CATCH_TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
     }
 
     CATCH_SECTION("ModsVariant no duplicates") {
-        std::set<std::string> set;
+        std::set<ModsVariant> set;
         for (const auto& mod : mods) {
-            set.insert(mod.first);
+            set.insert(mod.second);
         }
         CATCH_CHECK(set.size() == mods.size());
     }
@@ -180,9 +180,9 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
     }
 
     CATCH_SECTION("ModelVersion no duplicates") {
-        std::set<std::string> set;
+        std::set<ModelVersion> set;
         for (const auto& ver : vers) {
-            set.insert(ver.first);
+            set.insert(ver.second);
         }
         CATCH_CHECK(set.size() == vers.size());
     }
