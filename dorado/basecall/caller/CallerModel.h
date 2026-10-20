@@ -111,4 +111,35 @@ protected:
     CallerModel() = default;
 };
 
+// Base for CallerModels whose RunnerState and InFlightBatch types are known. The downcasts from the
+// opaque base types are done here, once, so derived models work with their concrete types. This is
+// safe because a RunnerState is only ever passed back to the model which created it, and likewise
+// for batches. State and Batch must be complete types by the time a derived model is defined.
+template <typename State, typename Batch>
+class TypedCallerModel : public CallerModel {
+public:
+    std::unique_ptr<InFlightBatch> prepare(RunnerState& state, int num_chunks) final {
+        return prepare_batch(static_cast<State&>(state), num_chunks);
+    }
+    void submit(InFlightBatch& batch) final { submit_batch(static_cast<Batch&>(batch)); }
+    size_t decode_units(const InFlightBatch& batch) const final {
+        return decode_units_batch(static_cast<const Batch&>(batch));
+    }
+    void decode(InFlightBatch& batch, size_t unit, std::vector<decode::DecodedChunk>& out) final {
+        decode_batch(static_cast<Batch&>(batch), unit, out);
+    }
+    void release(InFlightBatch& batch, std::vector<decode::DecodedChunk>& out) final {
+        release_batch(static_cast<Batch&>(batch), out);
+    }
+
+protected:
+    virtual std::unique_ptr<Batch> prepare_batch(State& state, int num_chunks) = 0;
+    virtual void submit_batch(Batch& batch) = 0;
+    virtual size_t decode_units_batch(const Batch&) const { return 1; }
+    virtual void decode_batch(Batch& batch,
+                              size_t unit,
+                              std::vector<decode::DecodedChunk>& out) = 0;
+    virtual void release_batch(Batch&, std::vector<decode::DecodedChunk>&) {}
+};
+
 }  // namespace dorado::basecall

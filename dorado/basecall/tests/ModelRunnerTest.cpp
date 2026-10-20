@@ -62,7 +62,7 @@ public:
     void submit(InFlightBatch&) override { ++submits; }
     size_t decode_units(const InFlightBatch&) const override { return 1; }
     void decode(InFlightBatch& batch, size_t, std::vector<decode::DecodedChunk>& out) override {
-        out.assign(static_cast<FakeBatch&>(batch).num_chunks,
+        out.assign(dynamic_cast<FakeBatch&>(batch).num_chunks,
                    decode::DecodedChunk{"fake", {}, {}, {}, {}});
     }
 

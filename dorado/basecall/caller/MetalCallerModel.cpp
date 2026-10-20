@@ -55,14 +55,13 @@ std::unique_ptr<ThreadScope> MetalCallerModel::worker_thread_scope() {
     return std::make_unique<MetalThreadScope>();
 }
 
-std::unique_ptr<InFlightBatch> MetalCallerModel::prepare(RunnerState &state, int num_chunks) {
+std::unique_ptr<MetalCallerTask> MetalCallerModel::prepare_batch(TensorRunnerState &state,
+                                                                 int num_chunks) {
     // Input can be NTC or NCT for LSTM and Tx models respectively
-    return std::make_unique<MetalCallerTask>(&static_cast<TensorRunnerState &>(state).input(),
-                                             num_chunks);
+    return std::make_unique<MetalCallerTask>(&state.input(), num_chunks);
 }
 
-void MetalCallerModel::submit(InFlightBatch &batch) {
-    auto &task = static_cast<MetalCallerTask &>(batch);
+void MetalCallerModel::submit_batch(MetalCallerTask &task) {
     utils::ScopedAutoReleasePool inner_pool;
 
     // For unknown reasons, concurrent access to the GPU from multiple instances of this thread --
@@ -107,14 +106,14 @@ void MetalCallerModel::submit(InFlightBatch &batch) {
     }
 }
 
-size_t MetalCallerModel::decode_units(const InFlightBatch &batch) const {
+size_t MetalCallerModel::decode_units_batch(const MetalCallerTask &task) const {
     // Each chunk is decoded independently.
-    return static_cast<size_t>(static_cast<const MetalCallerTask &>(batch).num_chunks);
+    return static_cast<size_t>(task.num_chunks);
 }
 
-void MetalCallerModel::decode(InFlightBatch & /*batch*/,
-                              size_t unit,
-                              std::vector<decode::DecodedChunk> &out) {
+void MetalCallerModel::decode_batch(MetalCallerTask & /*task*/,
+                                    size_t unit,
+                                    std::vector<decode::DecodedChunk> &out) {
     auto [sequence, qstring, moves] = m_model->decode(static_cast<int>(unit));
     out[unit] =
             decode::DecodedChunk{std::move(sequence), std::move(qstring), std::move(moves), {}, {}};
@@ -124,8 +123,8 @@ std::shared_ptr<ModBaseInfo> MetalCallerModel::modbase_info() const {
     return m_model->modbase_info();
 }
 
-void MetalCallerModel::release(InFlightBatch &batch, std::vector<decode::DecodedChunk> &out) {
-    auto &task = static_cast<MetalCallerTask &>(batch);
+void MetalCallerModel::release_batch(MetalCallerTask &task,
+                                     std::vector<decode::DecodedChunk> &out) {
     if (auto *decode_complete_event = m_model->decode_complete_event()) {
         // Now that all chunks are decoded, signal that the GPU can overwrite the scores
         // buffer with subsequent work.

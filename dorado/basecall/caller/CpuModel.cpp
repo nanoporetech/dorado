@@ -8,18 +8,6 @@
 
 namespace dorado::basecall {
 
-namespace {
-
-struct CpuBatch final : InFlightBatch {
-    CpuBatch(TensorRunnerState& state_, int num_chunks_) : state(state_), num_chunks(num_chunks_) {}
-    TensorRunnerState& state;
-    int num_chunks;
-    at::Tensor scores_TNC;
-    at::Tensor signal_embeddings;
-};
-
-}  // namespace
-
 CpuModel::CpuModel(const config::BasecallModelConfig& model_config,
                    const std::span<const config::ModBaseModelConfig> modbase_configs)
         : m_config(model_config),
@@ -55,35 +43,32 @@ std::unique_ptr<RunnerState> CpuModel::create_runner_state(size_t batch_dims_idx
     return std::make_unique<TensorRunnerState>(std::move(input), TensorLayout::NCT);
 }
 
-std::unique_ptr<InFlightBatch> CpuModel::prepare(RunnerState& state, int num_chunks) {
-    return std::make_unique<CpuBatch>(static_cast<TensorRunnerState&>(state), num_chunks);
+std::unique_ptr<CpuBatch> CpuModel::prepare_batch(TensorRunnerState& state, int num_chunks) {
+    return std::make_unique<CpuBatch>(state, num_chunks);
 }
 
-void CpuModel::submit(InFlightBatch& batch) {
-    auto& cpu_batch = static_cast<CpuBatch&>(batch);
+void CpuModel::submit_batch(CpuBatch& batch) {
     stats::Timer timer;
-    auto model_output = m_model->forward(cpu_batch.state.input().to(m_options.device()), nullptr,
+    auto model_output = m_model->forward(batch.state.input().to(m_options.device()), nullptr,
                                          m_modbase_modules.has_value());
-    cpu_batch.scores_TNC = model_output.scores.transpose(0, 1).contiguous();
-    cpu_batch.signal_embeddings = std::move(model_output.signal_embeddings);
+    batch.scores_TNC = model_output.scores.transpose(0, 1).contiguous();
+    batch.signal_embeddings = std::move(model_output.signal_embeddings);
     m_model_ms += timer.GetElapsedMS();
 }
 
-void CpuModel::decode(InFlightBatch& batch,
-                      size_t /*unit*/,
-                      std::vector<decode::DecodedChunk>& out) {
+void CpuModel::decode_batch(CpuBatch& batch,
+                            size_t /*unit*/,
+                            std::vector<decode::DecodedChunk>& out) {
     at::InferenceMode guard;
-    auto& cpu_batch = static_cast<CpuBatch&>(batch);
     stats::Timer timer;
     out = m_decoder->decode(m_decoder->prepare_decode(
-            {std::move(cpu_batch.scores_TNC), cpu_batch.num_chunks, m_decoder_options}));
+            {std::move(batch.scores_TNC), batch.num_chunks, m_decoder_options}));
     if (m_modbase_modules) {
         const std::span<decode::DecodedChunk> chunks(out);
-        m_modbase_decoder.decode(
-                modbase::run_modbase_latent_space_models(
-                        *m_modbase_modules, decode::pack_decoded_chunks(chunks),
-                        cpu_batch.signal_embeddings.narrow(0, 0, cpu_batch.num_chunks)),
-                chunks);
+        m_modbase_decoder.decode(modbase::run_modbase_latent_space_models(
+                                         *m_modbase_modules, decode::pack_decoded_chunks(chunks),
+                                         batch.signal_embeddings.narrow(0, 0, batch.num_chunks)),
+                                 chunks);
     }
     m_decode_ms += timer.GetElapsedMS();
 }

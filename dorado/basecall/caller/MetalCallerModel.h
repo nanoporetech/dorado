@@ -1,6 +1,8 @@
 #pragma once
 
 #include "CallerModel.h"
+#include "MetalCallerTask.h"
+#include "TensorRunnerState.h"
 #include "config/BasecallModelConfig.h"
 
 #include <cstdint>
@@ -14,7 +16,7 @@ class MetalModel;
 
 // Adapts a MetalModel to a CallerModel. This owns the Metal-specific parts of running a batch:
 // command buffer submission with retries, the decode completion event, and autorelease pools.
-class MetalCallerModel final : public CallerModel {
+class MetalCallerModel final : public TypedCallerModel<TensorRunnerState, MetalCallerTask> {
 public:
     MetalCallerModel(const config::BasecallModelConfig &model_config,
                      std::unique_ptr<MetalModel> model);
@@ -30,13 +32,16 @@ public:
     std::string decode_thread_name() const override { return "metal_decode"; }
     std::unique_ptr<ThreadScope> worker_thread_scope() override;
 
-    std::unique_ptr<InFlightBatch> prepare(RunnerState &state, int num_chunks) override;
-    void submit(InFlightBatch &batch) override;
-    size_t decode_units(const InFlightBatch &batch) const override;
-    void decode(InFlightBatch &batch, size_t unit, std::vector<decode::DecodedChunk> &out) override;
-    void release(InFlightBatch &batch, std::vector<decode::DecodedChunk> &out) override;
-
 private:
+    std::unique_ptr<MetalCallerTask> prepare_batch(TensorRunnerState &state,
+                                                   int num_chunks) override;
+    void submit_batch(MetalCallerTask &task) override;
+    size_t decode_units_batch(const MetalCallerTask &task) const override;
+    void decode_batch(MetalCallerTask &task,
+                      size_t unit,
+                      std::vector<decode::DecodedChunk> &out) override;
+    void release_batch(MetalCallerTask &task, std::vector<decode::DecodedChunk> &out) override;
+
     const config::BasecallModelConfig m_config;
     std::unique_ptr<MetalModel> m_model;
 

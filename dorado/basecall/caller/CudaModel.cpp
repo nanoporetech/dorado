@@ -270,31 +270,14 @@ private:
     c10::cuda::CUDAStreamGuard m_stream_guard;
 };
 
-struct CudaBatch final : InFlightBatch {
-    CudaBatch(CudaRunnerState &state_,
-              std::unique_ptr<nn::AuxiliaryData> aux_,
-              at::Tensor input_,
-              int num_chunks_)
-            : state(state_),
-              aux(std::move(aux_)),
-              input(std::move(input_)),
-              num_chunks(num_chunks_) {}
-    CudaRunnerState &state;
-    std::unique_ptr<nn::AuxiliaryData> aux;
-    at::Tensor input;  // On the device.
-    int num_chunks;
-    decode::DecoderResult out;
-};
-
 }  // namespace
 
 std::unique_ptr<ThreadScope> CudaModel::worker_thread_scope() {
     return std::make_unique<CudaThreadScope>(m_stream);
 }
 
-std::unique_ptr<InFlightBatch> CudaModel::prepare(RunnerState &runner_state, int num_chunks) {
+std::unique_ptr<CudaBatch> CudaModel::prepare_batch(CudaRunnerState &state, int num_chunks) {
     NVTX3_FUNC_RANGE();
-    auto &state = static_cast<CudaRunnerState &>(runner_state);
     c10::cuda::CUDAStreamGuard guard(state.m_stream);
 
     auto aux = state.create_auxiliary_data();
@@ -313,9 +296,8 @@ std::unique_ptr<InFlightBatch> CudaModel::prepare(RunnerState &runner_state, int
     return std::make_unique<CudaBatch>(state, std::move(aux), std::move(device_input), num_chunks);
 }
 
-void CudaModel::submit(InFlightBatch &in_flight) {
+void CudaModel::submit_batch(CudaBatch &batch) {
     NVTX3_FUNC_RANGE();
-    auto &batch = static_cast<CudaBatch &>(in_flight);
     auto device_stats = c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
 
     const auto aggregate_idx = static_cast<uint64_t>(c10::CachingAllocator::StatType::AGGREGATE);
@@ -358,10 +340,9 @@ void CudaModel::submit(InFlightBatch &in_flight) {
     ++m_num_batches_called;
 }
 
-void CudaModel::decode(InFlightBatch &in_flight,
-                       size_t /*unit*/,
-                       std::vector<decode::DecodedChunk> &out) {
-    auto &batch = static_cast<CudaBatch &>(in_flight);
+void CudaModel::decode_batch(CudaBatch &batch,
+                             size_t /*unit*/,
+                             std::vector<decode::DecodedChunk> &out) {
     auto &state = batch.state;
     c10::cuda::CUDAStreamGuard guard(state.m_stream);
 
@@ -386,8 +367,8 @@ void CudaModel::decode(InFlightBatch &in_flight,
             {state.m_output, std::move(modbase_output), batch.num_chunks, m_decoder_options});
 }
 
-void CudaModel::release(InFlightBatch &in_flight, std::vector<decode::DecodedChunk> & /*out*/) {
-    static_cast<CudaBatch &>(in_flight).state.reset();
+void CudaModel::release_batch(CudaBatch &batch, std::vector<decode::DecodedChunk> & /*out*/) {
+    batch.state.reset();
 }
 
 std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaModel::create_input_output_tensor(

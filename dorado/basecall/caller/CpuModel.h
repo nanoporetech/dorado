@@ -1,6 +1,7 @@
 #pragma once
 
 #include "CallerModel.h"
+#include "TensorRunnerState.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfigFwd.h"
 #include "decode/Decoder.h"
@@ -20,7 +21,15 @@ class Model;
 
 namespace dorado::basecall {
 
-class CpuModel final : public CallerModel {
+struct CpuBatch final : InFlightBatch {
+    CpuBatch(TensorRunnerState& state_, int num_chunks_) : state(state_), num_chunks(num_chunks_) {}
+    TensorRunnerState& state;
+    int num_chunks;
+    at::Tensor scores_TNC;
+    at::Tensor signal_embeddings;
+};
+
+class CpuModel final : public TypedCallerModel<TensorRunnerState, CpuBatch> {
 public:
     CpuModel(const config::BasecallModelConfig& model_config,
              std::span<const config::ModBaseModelConfig> modbase_configs);
@@ -32,12 +41,13 @@ public:
     std::string name() const override { return "CPUCaller"; }
     stats::NamedStats sample_stats() const override;
 
-    std::unique_ptr<InFlightBatch> prepare(RunnerState& state, int num_chunks) override;
-    void submit(InFlightBatch& batch) override;
-    size_t decode_units(const InFlightBatch&) const override { return 1; }
-    void decode(InFlightBatch& batch, size_t unit, std::vector<decode::DecodedChunk>& out) override;
-
 private:
+    std::unique_ptr<CpuBatch> prepare_batch(TensorRunnerState& state, int num_chunks) override;
+    void submit_batch(CpuBatch& batch) override;
+    void decode_batch(CpuBatch& batch,
+                      size_t unit,
+                      std::vector<decode::DecodedChunk>& out) override;
+
     const config::BasecallModelConfig m_config;
     std::unique_ptr<decode::Decoder> m_decoder;
     at::TensorOptions m_options;
