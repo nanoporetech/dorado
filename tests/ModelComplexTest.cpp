@@ -8,6 +8,8 @@
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
+#include <catch2/matchers/catch_matchers_exception.hpp>
+#include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <iterator>
 #include <optional>
@@ -19,8 +21,6 @@
 
 using namespace dorado::models;
 using namespace dorado::model_resolution;
-
-namespace fs = std::filesystem;
 
 using MC = ModelComplex;
 using MVP = ModelVariantPair;
@@ -87,7 +87,7 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
                 MVP{MV::SUP, VV::v5_0_0},
                 MVP{MV::HAC, VV::v3_0_1},
                 MVP{MV::FAST, VV::v5_2_0},
-                MVP{MV::AUTO, VV::v1_0_0},
+                MVP{MV::HAC, VV::v1_0_0},
         }));
 
         const auto simplex_complex_str = to_string(mvp.variant) + "@" + to_string(mvp.ver);
@@ -136,8 +136,8 @@ CATCH_TEST_CASE(TEST_TAG "  parse", TEST_TAG) {
                         {ModVP{ModsVariant::M_5mC_5hmC, VV::NONE}},
                 },
                 {
-                        "auto@v5.1.0,6mA,2OmeG@v1",
-                        MVP{MV::AUTO, VV::v5_1_0},
+                        "hac@v5.1.0,6mA,2OmeG@v1",
+                        MVP{MV::HAC, VV::v5_1_0},
                         {
                                 ModVP{ModsVariant::M_6mA, VV::NONE},
                                 ModVP{ModsVariant::M_2OmeG, VV::v1_0_0},
@@ -229,34 +229,28 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ", TEST_TAG) {
         const Chemistry RNA = Chemistry::RNA004_130BPS;
         auto [input, expected] = GENERATE_COPY(table<In, Ex>({
                 // No version
-                std::make_tuple(In{"auto"}, Ex{{MV::AUTO}}),
                 std::make_tuple(In{"fast", DNA}, Ex{{MV::FAST}, {}}),
                 std::make_tuple(In{"hac", DNA}, Ex{{MV::HAC}, {}}),
                 std::make_tuple(In{"sup", DNA}, Ex{{MV::SUP}, {}}),
 
                 // specific version
-                std::make_tuple(In{"auto@v4.2.0", DNA}, Ex{{MV::AUTO, VV::v4_2_0}, {}}),
                 std::make_tuple(In{"fast@v5.0.0", DNA}, Ex{{MV::FAST, VV::v5_0_0}, {}}),
                 std::make_tuple(In{"hac@v4.2.0", DNA}, Ex{{MV::HAC, VV::v4_2_0}, {}}),
                 std::make_tuple(In{"sup@v5.2.0", DNA}, Ex{{MV::SUP, VV::v5_2_0}, {}}),
 
                 // latest version
-                std::make_tuple(In{"auto@latest", RNA}, Ex{{MV::AUTO}, {}}),
                 std::make_tuple(In{"fast@latest", RNA}, Ex{{MV::FAST}, {}}),
                 std::make_tuple(In{"hac@latest", RNA}, Ex{{MV::HAC}, {}}),
                 std::make_tuple(In{"sup@latest", RNA}, Ex{{MV::SUP}, {}}),
 
                 // with single mods
-                std::make_tuple(In{"auto,5mC"}, Ex{{MV::AUTO}, {{ModV::M_5mC}}}),
                 std::make_tuple(In{"hac,4mC_5mC"}, Ex{{MV::HAC}, {{ModV::M_4mC_5mC}}}),
                 std::make_tuple(In{"fast,5mC_5hmC"}, Ex{{MV::FAST}, {{ModV::M_5mC_5hmC}}}),
-                std::make_tuple(In{"auto,5mCG"}, Ex{{MV::AUTO}, {{ModV::M_5mCG}}}),
                 std::make_tuple(In{"hac,5mCG_5hmCG", DNA}, Ex{{MV::HAC}, {{ModV::M_5mCG_5hmCG}}}),
 
-                std::make_tuple(In{"auto@v5.0.0,6mA"}, Ex{{MV::AUTO, VV::v5_0_0}, {{ModV::M_6mA}}}),
-                std::make_tuple(In{"auto,m6A_DRACH", RNA}, Ex{{MV::AUTO}, {{ModV::M_m6A_DRACH}}}),
-                std::make_tuple(In{"auto,inosine_m6A", RNA},
-                                Ex{{MV::AUTO}, {{ModV::M_inosine_m6A}}}),
+                std::make_tuple(In{"hac@v5.0.0,6mA"}, Ex{{MV::HAC, VV::v5_0_0}, {{ModV::M_6mA}}}),
+                std::make_tuple(In{"hac,m6A_DRACH", RNA}, Ex{{MV::HAC}, {{ModV::M_m6A_DRACH}}}),
+                std::make_tuple(In{"hac,inosine_m6A", RNA}, Ex{{MV::HAC}, {{ModV::M_inosine_m6A}}}),
                 std::make_tuple(In{"sup,pseU_2OmeU", RNA}, Ex{{MV::SUP}, {{ModV::M_pseU_2OmeU}}}),
                 std::make_tuple(In{"sup,pseU_2OmeU,m5C_2OmeC", RNA},
                                 Ex{{MV::SUP}, {{ModV::M_pseU_2OmeU}, {ModV::M_m5C_2OmeC}}}),
@@ -267,7 +261,7 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ", TEST_TAG) {
                                 Ex{{MV::FAST}, {{ModV::M_5mC_5hmC, VV::v4_0_0}}}),
 
                 // Multi-mods
-                std::make_tuple(In{"auto,5mC,6mA"}, Ex{{MV::AUTO}, {{ModV::M_5mC}, {ModV::M_6mA}}}),
+                std::make_tuple(In{"hac,5mC,6mA"}, Ex{{MV::HAC}, {{ModV::M_5mC}, {ModV::M_6mA}}}),
                 std::make_tuple(
                         In{"fast@latest,m6A_DRACH@v1,5mC_5hmC@v4.0.0"},
                         Ex{{MV::FAST},
@@ -286,19 +280,12 @@ CATCH_TEST_CASE(TEST_TAG "  ModelComplexSearch ", TEST_TAG) {
             CATCH_CHECK(search.chemistry() == input.chemistry);
             CATCH_CHECK(search.simplex().model_type == ModelType::SIMPLEX);
 
-            if (expected.simplex.variant != MV::AUTO) {
-                CATCH_CHECK(to_string(search.simplex().simplex.variant) ==
-                            to_string(expected.simplex.variant));
-            } else {
-                CATCH_CHECK(search.simplex().simplex.is_auto);
-            }
+            CATCH_CHECK(to_string(search.simplex().simplex.variant) ==
+                        to_string(expected.simplex.variant));
 
             CATCH_CHECK(search.mods().size() == expected.mods.size());
             for (const auto &mod : search.mods()) {
-                if (expected.simplex.variant != MV::AUTO) {
-                    CATCH_CHECK(to_string(mod.simplex.variant) ==
-                                to_string(expected.simplex.variant));
-                }
+                CATCH_CHECK(to_string(mod.simplex.variant) == to_string(expected.simplex.variant));
 
                 int count_mod_matches = 0;
                 for (const auto &ex_mod : expected.mods) {
@@ -404,34 +391,59 @@ CATCH_TEST_CASE(TEST_TAG " Test BasecallerModelResolver", TEST_TAG) {
 }
 
 CATCH_TEST_CASE(TEST_TAG " Test modbase model resolution", TEST_TAG) {
-    const auto reads_path = fs::path(get_data_dir("pod5")) / "dna_r10.4.1_e8.2_400bps_5khz";
-    const auto reads = dorado::utils::fetch_directory_entries(reads_path, false);
+    const auto reads_path = get_data_dir("pod5");
+    const auto dna_reads = dorado::utils::fetch_directory_entries(
+            reads_path / "dna_r10.4.1_e8.2_400bps_5khz", false);
+    const auto rna_reads =
+            dorado::utils::fetch_directory_entries(reads_path / "rna004_130bps", false);
 
     CATCH_SECTION(" test no duplicate modbase models") {
-        BasecallerModelResolver resolver{"hac",
-                                         "",
-                                         {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2",
-                                          "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
-                                         std::nullopt,
-                                         false,
-                                         reads};
+        BasecallerModelResolver resolver{
+                "hac",
+                "",
+                {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2",
+                 "dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
+                std::nullopt,
+                false,
+                dna_reads,
+        };
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::runtime_error);
     }
 
     CATCH_SECTION(" test no duplicate modbase model variants") {
         BasecallerModelResolver resolver{
-                "hac,5mC_5hmC,5mC_5hmC", "", {}, std::nullopt, false, reads};
+                "hac,5mC_5hmC,5mC_5hmC", "", {}, std::nullopt, false, dna_reads,
+        };
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::runtime_error);
     }
 
     CATCH_SECTION(" test no duplicate modbase model mixed") {
         BasecallerModelResolver resolver{
-                "hac,5mC_5hmC@v2", "",    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
-                std::nullopt,      false, reads};
+                "hac@v5.2,5mC_5hmC@v2", "",    {"dna_r10.4.1_e8.2_400bps_hac@v5.2.0_5mC_5hmC@v2"},
+                std::nullopt,           false, dna_reads,
+        };
 
         CATCH_CHECK_THROWS_AS(resolver.resolve(), std::logic_error);
+    }
+
+    CATCH_SECTION(" model compatibility when @latest isn't supported") {
+        for (const bool with_version : {false, true}) {
+            const char *complex = with_version ? "sup@v5.1,m5C" : "sup@latest,m5C";
+            BasecallerModelResolver resolver{
+                    complex, "", {}, std::nullopt, false, rna_reads,
+            };
+
+            if (with_version) {
+                CATCH_CHECK_NOTHROW(resolver.resolve());
+            } else {
+                using namespace Catch::Matchers;
+                CATCH_CHECK_THROWS_MATCHES(
+                        resolver.resolve(), std::runtime_error,
+                        MessageMatches(StartsWith("No matches for chemistry: ")));
+            }
+        }
     }
 }
 

@@ -50,8 +50,8 @@ protected:
 
     // Overrides for testing purposes
     std::optional<models::Chemistry> m_chemistry_override;
-    std::optional<std::function<std::filesystem::path(const models::ModelInfo& model_info,
-                                                      std::string_view description)>>
+    std::function<std::filesystem::path(const models::ModelInfo& model_info,
+                                        std::string_view description)>
             m_download_override;
     bool m_check_paths_override{true};
 

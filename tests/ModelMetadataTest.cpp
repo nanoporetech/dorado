@@ -3,7 +3,6 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include <set>
-#include <stdexcept>
 
 #define TEST_TAG "[ModelMetadata]"
 
@@ -13,7 +12,6 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVariant enumeration", TEST_TAG) {
     const auto& codes = model_variants_map();
 
     CATCH_SECTION("Only expected ModelVariant exist") {
-        CATCH_CHECK(codes.at("auto") == ModelVariant::AUTO);
         CATCH_CHECK(codes.at("fast") == ModelVariant::FAST);
         CATCH_CHECK(codes.at("hac") == ModelVariant::HAC);
         CATCH_CHECK(codes.at("sup") == ModelVariant::SUP);
@@ -21,18 +19,16 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVariant enumeration", TEST_TAG) {
     }
 
     CATCH_SECTION("ModelVariant get_model_code") {
-        CATCH_CHECK(get_model_variant("auto") == ModelVariant::AUTO);
         CATCH_CHECK(get_model_variant("fast") == ModelVariant::FAST);
         CATCH_CHECK(get_model_variant("hac") == ModelVariant::HAC);
         CATCH_CHECK(get_model_variant("sup") == ModelVariant::SUP);
 
-        for (const auto& it : {"", "foo", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2"}) {
+        for (const auto& it : {"", "auto", "foo", "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_5mC@v2"}) {
             CATCH_CHECK(get_model_variant(it) == ModelVariant::NONE);
         }
     }
 
     CATCH_SECTION("ModelVariant to_string") {
-        CATCH_CHECK(to_string(ModelVariant::AUTO) == "auto");
         CATCH_CHECK(to_string(ModelVariant::FAST) == "fast");
         CATCH_CHECK(to_string(ModelVariant::HAC) == "hac");
         CATCH_CHECK(to_string(ModelVariant::SUP) == "sup");
@@ -99,9 +95,9 @@ CATCH_TEST_CASE(TEST_TAG "  ModsVariant enumeration", TEST_TAG) {
     }
 
     CATCH_SECTION("ModsVariant no duplicates") {
-        std::set<std::string> set;
+        std::set<ModsVariant> set;
         for (const auto& mod : mods) {
-            set.insert(mod.first);
+            set.insert(mod.second);
         }
         CATCH_CHECK(set.size() == mods.size());
     }
@@ -184,9 +180,9 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVersion enumeration", TEST_TAG) {
     }
 
     CATCH_SECTION("ModelVersion no duplicates") {
-        std::set<std::string> set;
+        std::set<ModelVersion> set;
         for (const auto& ver : vers) {
-            set.insert(ver.first);
+            set.insert(ver.second);
         }
         CATCH_CHECK(set.size() == vers.size());
     }
@@ -205,8 +201,8 @@ CATCH_TEST_CASE(TEST_TAG "  ModelVariantPair / ModsVariantPair", TEST_TAG) {
     CATCH_CHECK(model_cp.ver == ModelVersion::NONE);
     CATCH_CHECK_FALSE(model_cp.has_ver());
 
-    model_cp = ModelVariantPair{ModelVariant::AUTO, ModelVersion::v2_0_0};
-    CATCH_CHECK(model_cp.variant == ModelVariant::AUTO);
+    model_cp = ModelVariantPair{ModelVariant::HAC, ModelVersion::v2_0_0};
+    CATCH_CHECK(model_cp.variant == ModelVariant::HAC);
     CATCH_CHECK(model_cp.has_variant());
     CATCH_CHECK(model_cp.ver == ModelVersion::v2_0_0);
     CATCH_CHECK(model_cp.has_ver());
