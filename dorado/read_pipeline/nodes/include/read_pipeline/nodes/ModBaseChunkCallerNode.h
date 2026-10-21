@@ -91,8 +91,7 @@ private:
 
     void output_thread_fn();
 
-    void simplex_mod_call(Message message);
-    void duplex_mod_call(Message message);
+    void mod_call(Message message);
 
     // Called by chunk_caller_thread_fn, calls the model and enqueues the results
     void call_batch(modbase::ModBaseRunner& runner, size_t model_id, ModBaseChunks& batched_chunks);
@@ -169,6 +168,13 @@ private:
     void submit_or_forward(Message message,
                            std::shared_ptr<WorkingRead> working_read,
                            std::vector<ModBaseChunks>& chunks_by_model);
+
+    template <typename ReadPolicy>
+    void generate_chunks_for_read(ReadPolicy& policy,
+                                  const std::shared_ptr<WorkingRead>& working_read,
+                                  modbase::ModBaseRunner& runner,
+                                  std::vector<ModBaseChunks>& chunks_by_model,
+                                  const std::string& read_id);
 
     std::vector<uint64_t> get_seq_to_sig_map(const std::vector<uint8_t>& moves,
                                              const size_t raw_samples,
