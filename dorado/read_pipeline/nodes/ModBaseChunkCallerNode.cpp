@@ -627,7 +627,6 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
                     std::make_unique<ModBaseChunk>(working_read, int(model_id), base_id,
                                                    chunk_start, hit_idx, num_states, is_template));
         }
-        working_read->num_modbase_chunks += chunk_starts.size();
     }
     return chunks_to_enqueue_by_model;
 }
@@ -757,6 +756,9 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
 
     constexpr bool kIsTemplate = true;
     std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
+    for (const auto& chunks : chunks_by_caller) {
+        working_read->num_modbase_chunks += chunks.size();
+    }
 
     {
         stats::Timer timer;
@@ -867,6 +869,9 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
             auto& chunks_by_caller =
                     is_template_direction ? chunks_by_caller_template : chunks_by_caller_complement;
             chunks_by_caller = get_chunks(runner, working_read, is_template_direction);
+            for (const auto& chunks : chunks_by_caller) {
+                working_read->num_modbase_chunks += chunks.size();
+            }
         }
     } catch (const std::exception& e) {
         DORADO_LOG(error, "ModBase Duplex Caller: {}", e.what());
