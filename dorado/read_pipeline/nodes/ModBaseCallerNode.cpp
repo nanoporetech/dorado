@@ -153,26 +153,26 @@ void ModBaseCallerNode::init_modbase_info() {
     m_base_prob_offsets = mod_info.base_probs_offsets();
 }
 
+void ModBaseCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
+    nvtx3::scoped_range range{"base_mod_probs_init"};
+
+    // Initialise for what corresponds to 100% canonical base for each position.
+    read.base_mod_probs.resize(read.seq.size() * m_num_states, 0);
+    for (size_t i = 0; i < read.seq.size(); ++i) {
+        const auto base_id = utils::BaseInfo::BASE_IDS.at(static_cast<std::uint8_t>(read.seq[i]));
+        if (base_id < 0) {
+            throw std::runtime_error("Invalid character in sequence.");
+        }
+        read.base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
+    }
+    read.mod_base_info = m_mod_base_info;
+}
+
 void ModBaseCallerNode::duplex_mod_call(Message message) {
     auto read = message.take<DuplexReadPtr>();
     stats::Timer timer;
 
-    {
-        nvtx3::scoped_range range{"base_mod_probs_init"};
-        // initialize base_mod_probs _before_ we start handing out chunks
-        read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
-        for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
-            // Initialize for what corresponds to 100% canonical base for each position.
-            const auto base_id = utils::BaseInfo::BASE_IDS.at(
-                    static_cast<std::uint8_t>(read->read_common.seq[i]));
-            if (base_id < 0) {
-                throw std::runtime_error("Invalid character in sequence.");
-            }
-            read->read_common.base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
-        }
-    }
-
-    read->read_common.mod_base_info = m_mod_base_info;
+    initialise_base_mod_probs(read->read_common);
 
     try {
         auto working_read = std::make_shared<WorkingRead>();
@@ -316,21 +316,7 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
     auto read = message.take<SimplexReadPtr>();
     stats::Timer timer;
 
-    {
-        nvtx3::scoped_range range{"base_mod_probs_init"};
-        // initialize base_mod_probs _before_ we start handing out chunks
-        read->read_common.base_mod_probs.resize(read->read_common.seq.size() * m_num_states, 0);
-        for (size_t i = 0; i < read->read_common.seq.size(); ++i) {
-            // Initialize for what corresponds to 100% canonical base for each position.
-            const auto base_id = utils::BaseInfo::BASE_IDS.at(
-                    static_cast<std::uint8_t>(read->read_common.seq[i]));
-            if (base_id < 0) {
-                throw std::runtime_error("Invalid character in sequence.");
-            }
-            read->read_common.base_mod_probs[i * m_num_states + m_base_prob_offsets[base_id]] = 1;
-        }
-    }
-    read->read_common.mod_base_info = m_mod_base_info;
+    initialise_base_mod_probs(read->read_common);
     read->read_common.base_mod_simplex_motif_hits.resize(read->read_common.seq.size(), false);
 
     auto working_read = std::make_shared<WorkingRead>();

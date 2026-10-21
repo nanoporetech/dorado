@@ -14,6 +14,7 @@
 namespace dorado {
 
 struct ModBaseInfo;
+class ReadCommon;
 
 namespace modbase {
 class ModBaseRunner;
@@ -51,6 +52,9 @@ private:
 
     // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();
+
+    // Initialise modified base probabilities for a read.
+    void initialise_base_mod_probs(ReadCommon& read) const;
 
     // Worker threads, scales and chunks reads for runners and enqueues them
     void input_thread_fn();
