@@ -144,7 +144,7 @@ void write_bam(const std::filesystem::path& out_fn,
         dorado::BamPtr bam_record = make_bam1(r);
         hts_file.write(bam_record.get());
     }
-    hts_file.finalise([](size_t) { /* noop */ });
+    hts_file.finalise([](float) { /* noop */ });
 }
 
 // Utility to write reference sequences to a FASTA file.

@@ -40,7 +40,7 @@ CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTA input.", "Fa
         HtsWriterNode writer(hts_file, "");
         auto rec = generate_bam_entry(read_id, seq, {});
         writer.write(rec.get());
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](float) { /* noop */ });
     }
 
     hts_io::FastxRandomReader reader(temp_input_file.string());
@@ -63,7 +63,7 @@ CATCH_TEST_CASE("Check if a read can be loaded correctly from FASTQ input.", "Fa
         HtsWriterNode writer(hts_file, "");
         auto rec = generate_bam_entry(read_id, seq, qscore);
         writer.write(rec.get());
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](float) { /* noop */ });
     }
 
     hts_io::FastxRandomReader reader(temp_input_file.string());
@@ -89,7 +89,7 @@ CATCH_TEST_CASE("Check a lower-case read can be loaded as upper-case from FASTQ 
         HtsWriterNode writer(hts_file, "");
         auto rec = generate_bam_entry(read_id, seq, qscore);
         writer.write(rec.get());
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](float) { /* noop */ });
     }
 
     hts_io::FastxRandomReader reader(temp_input_file.string(), true);

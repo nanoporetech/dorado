@@ -77,8 +77,10 @@ struct Tester {
         for (size_t i = 0; i < records.size(); ++i) {
             file_out.write(records[indices[i]].get());
         }
+        // We need to see every message to determine how many files were written.
+        file_out.set_finalise_report_rate(1);
         int callback_calls = 0;
-        auto callback = [&callback_calls](size_t) { ++callback_calls; };
+        auto callback = [&callback_calls](float) { ++callback_calls; };
         file_out.finalise(callback);
         return callback_calls;
     }
@@ -169,7 +171,7 @@ CATCH_TEST_CASE("HtsFileTest: construct with zero threads for sorted BAM does no
                 TEST_GROUP) {
     Tester tester;
     std::unique_ptr<HtsFile> cut{};
-    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
+    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](float) {}); });
 
     CATCH_REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
                                                           HtsFile::OutputMode::BAM, 0, true));
@@ -179,7 +181,7 @@ CATCH_TEST_CASE("HtsFileTest: construct with zero threads for unsorted BAM does 
                 TEST_GROUP) {
     Tester tester;
     std::unique_ptr<HtsFile> cut{};
-    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](size_t) {}); });
+    auto finalize_file = utils::PostCondition([&cut] { cut->finalise([](float) {}); });
 
     CATCH_REQUIRE_NOTHROW(cut = std::make_unique<HtsFile>(tester.file_out_path.string(),
                                                           HtsFile::OutputMode::BAM, 0, false));
@@ -204,8 +206,8 @@ CATCH_TEST_CASE("HtsFileTest: multiple files can share a thread pool", TEST_GROU
 
     // Each HtsFile retains the pool for as long as its HTSlib handle may use it.
     thread_pool.reset();
-    CATCH_REQUIRE_NOTHROW(first.finalise([](size_t) {}));
-    CATCH_REQUIRE_NOTHROW(second.finalise([](size_t) {}));
+    CATCH_REQUIRE_NOTHROW(first.finalise([](float) {}));
+    CATCH_REQUIRE_NOTHROW(second.finalise([](float) {}));
     CATCH_CHECK(fs::file_size(first_path) > 0);
     CATCH_CHECK(fs::file_size(second_path) > 0);
 }
@@ -502,7 +504,7 @@ CATCH_TEST_CASE(TEST_GROUP " HtsFileWriterBuilder BAM/CRAM happy paths", TEST_GR
 
 CATCH_TEST_CASE(TEST_GROUP " HtsFileWriter getters ", TEST_GROUP) {
     int writer_threads = 10;
-    size_t progress_res = 0;
+    float progress_res = 0;
     auto progress_cb =
             utils::ProgressCallback([&progress_res](float value) { progress_res = value; });
 

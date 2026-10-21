@@ -180,7 +180,7 @@ CATCH_TEST_CASE(TEST_GROUP " Test split index loading", TEST_GROUP) {
         writer.write(rec.get());
         sequences[read_id] = seq;
     }
-    hts_file.finalise([](size_t) { /* noop */ });
+    hts_file.finalise([](float) { /* noop */ });
 
     // The -I option in minimap2 appears to be a soft limit. It will load full sequences until
     // the total number of bases exceeds this value. So setting this to 10K would result in it

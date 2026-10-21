@@ -532,9 +532,8 @@ auto create_writers(ProgressTracker& tracker,
     gpu_names = utils::get_cuda_gpu_names(options.device);
 #endif
 
-    auto progress_callback = utils::ProgressCallback([&tracker](size_t progress) {
-        tracker.update_post_processing_progress(static_cast<float>(progress));
-    });
+    auto progress_callback = utils::ProgressCallback(
+            [&tracker](float progress) { tracker.update_post_processing_progress(progress); });
     auto description_callback = utils::DescriptionCallback(
             [&tracker](const std::string& description) { tracker.set_description(description); });
     auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(

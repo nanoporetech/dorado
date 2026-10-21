@@ -68,7 +68,7 @@ std::filesystem::path write_bam(const std::filesystem::path& path,
         }
         CATCH_REQUIRE(output.write(ret.get()) >= 0);
     }
-    output.finalise([](size_t) {});
+    output.finalise([](float) {});
     CATCH_REQUIRE(sam_index_build(path.string().c_str(), 0) == 0);
     return path;
 }

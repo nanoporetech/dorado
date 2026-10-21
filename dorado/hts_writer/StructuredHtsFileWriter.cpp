@@ -44,9 +44,9 @@ void StructuredHtsFileWriter::shutdown() {
             continue;
         }
         const size_t index = i++;
-        hts_file->finalise([this, index, n_files](size_t progress) {
-            const size_t past_progress = index * size_t(100);
-            const size_t p = std::min(size_t(100), (past_progress + progress) / n_files);
+        hts_file->finalise([this, index, n_files](float progress) {
+            const float past_progress = static_cast<float>(index) * 100.f;
+            const float p = std::min(100.f, (past_progress + progress) / n_files);
             set_progress(p);
         });
     }

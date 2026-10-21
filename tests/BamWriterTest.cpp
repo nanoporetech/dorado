@@ -94,7 +94,7 @@ protected:
         auto &writer_ref = pipeline->get_node_ref<HtsWriterNode>(writer);
         stats = writer_ref.sample_stats();
 
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](float) { /* noop */ });
     }
 
     stats::NamedStats stats;
@@ -155,7 +155,7 @@ CATCH_TEST_CASE("HtsWriterTest: Read and write FASTQ with tag", TEST_GROUP) {
         CATCH_REQUIRE(st_tag != nullptr);
         CATCH_CHECK_THAT(bam_aux2Z(st_tag), Equals("2023-06-22T07:17:48.308+00:00"));
         writer.write(reader.record.get());
-        hts_file.finalise([](size_t) { /* noop */ });
+        hts_file.finalise([](float) { /* noop */ });
     }
 
     // Read temporary file to make sure tags were correctly set.
