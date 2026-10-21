@@ -15,6 +15,7 @@ dorado_add_library(
         HtsWriterNode.h
         ModBaseCallerNode.h
         ModBaseChunkCallerNode.h
+        ModBaseReadPolicies.h
         NullNode.h
         PairingNode.h
         PolyACalculatorNode.h
@@ -40,6 +41,7 @@ dorado_add_library(
         HtsWriterNode.cpp
         ModBaseCallerNode.cpp
         ModBaseChunkCallerNode.cpp
+        ModBaseReadPolicies.cpp
         NullNode.cpp
         PairingNode.cpp
         PolyACalculatorNode.cpp

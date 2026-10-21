@@ -1,4 +1,5 @@
 #include "read_pipeline/nodes/ModBaseChunkCallerNode.h"
+#include "read_pipeline/nodes/ModBaseReadPolicies.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -316,7 +317,7 @@ CATCH_TEST_CASE(TEST_GROUP ": resolve duplex sequence index", TEST_GROUP) {
                     std::make_tuple(3, 1, 7, 12, false),
             }));
 
-    const auto result = dorado::ModBaseChunkCallerNode::resolve_duplex_sequence_index(
+    const auto result = dorado::modbase::resolve_duplex_sequence_index(
             hit, target_start, sequence_size, is_template_direction);
 
     CATCH_CAPTURE(hit, target_start, sequence_size, is_template_direction);

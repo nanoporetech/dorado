@@ -48,11 +48,6 @@ public:
                                        const int64_t context_samples_after,
                                        const int64_t modbase_stride);
 
-    static int64_t resolve_duplex_sequence_index(const int64_t resolved_score_index,
-                                                 const int64_t target_start,
-                                                 const int64_t sequence_size,
-                                                 const bool is_template_direction);
-
     static std::vector<std::pair<int64_t, int64_t>> get_chunk_starts(
             const int64_t signal_len,
             const std::vector<size_t>& hits_to_sig,
