@@ -800,21 +800,21 @@ void ModBaseChunkCallerNode::mod_call(Message message) {
     auto working_read = std::make_shared<WorkingRead>();
     std::vector<ModBaseChunks> chunks_by_model(runner.num_models());
 
-    if (message.holds<SimplexReadPtr>()) {
-        modbase::SimplexReadPolicy policy(read_common);
-        generate_chunks_for_read(policy, working_read, runner, chunks_by_model,
-                                 read_common.read_id);
-        submit_or_forward(std::move(message), std::move(working_read), chunks_by_model);
-        return;
-    }
-
-    working_read->is_duplex = true;
+    // Strands are only added to the working read once fully processed, so on failure any chunks
+    // generated so far are complete and the read is still forwarded, rather than lost.
     try {
-        modbase::DuplexReadPolicy policy(*message.get<DuplexReadPtr>(), m_canonical_stride);
-        generate_chunks_for_read(policy, working_read, runner, chunks_by_model,
-                                 read_common.read_id);
+        if (message.holds<SimplexReadPtr>()) {
+            modbase::SimplexReadPolicy policy(read_common);
+            generate_chunks_for_read(policy, working_read, runner, chunks_by_model,
+                                     read_common.read_id);
+        } else {
+            working_read->is_duplex = true;
+            modbase::DuplexReadPolicy policy(*message.get<DuplexReadPtr>(), m_canonical_stride);
+            generate_chunks_for_read(policy, working_read, runner, chunks_by_model,
+                                     read_common.read_id);
+        }
     } catch (const std::exception& e) {
-        DORADO_LOG(error, "ModBase Duplex Caller: {}", e.what());
+        DORADO_LOG(error, "ModBase Chunk Caller: {}", e.what());
     }
 
     submit_or_forward(std::move(message), std::move(working_read), chunks_by_model);
