@@ -217,9 +217,11 @@ void ModBaseCallerNode::generate_chunks_for_strand(
         const auto& params = config::get_context_model_config(runner.model_params(caller_id));
         auto signal = policy.signal();
         auto seq_to_sig_map = base_seq_to_sig_map;
-        if (!ReadPolicy::is_duplex && params.context.reverse) {
-            signal = at::flip(signal, 0);
-            utils::reverse_seq_to_sig_map(seq_to_sig_map, signal_len);
+        if constexpr (!ReadPolicy::is_duplex) {
+            if (params.context.reverse) {
+                signal = at::flip(signal, 0);
+                utils::reverse_seq_to_sig_map(seq_to_sig_map, signal_len);
+            }
         }
 
         auto scaled_signal = runner.scale_signal(caller_id, signal, sequence_ints, seq_to_sig_map);
