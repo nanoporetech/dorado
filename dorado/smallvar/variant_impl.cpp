@@ -1740,7 +1740,7 @@ std::vector<secondary::Variant> filter_hemizygous_variants(
     for (const secondary::Variant& var : variants) {
         secondary::Variant new_var = var;
         const int64_t var_start = var.pos;
-        const int64_t var_end = var.pos + var.ref.length();
+        const int64_t var_end = secondary::variant_end(var);
         while ((iter_regions != hemizygous_regions.end()) && (iter_regions->end > 0) &&
                (iter_regions->end <= var_start)) {
             ++iter_regions;

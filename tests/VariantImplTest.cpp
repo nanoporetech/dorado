@@ -2563,7 +2563,7 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
             .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filters = {secondary::Filters::Pass}, .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::Pass}, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 10, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::Pass}, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }
     };
     const std::vector<secondary::Variant> expected_chr1_filtered_variants = {
@@ -2575,7 +2575,7 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
             .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filters = {secondary::Filters::IncompatZyg}, .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::IncompatZyg}, .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 10, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::IncompatZyg}, .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }
     };
     // clang-format on
