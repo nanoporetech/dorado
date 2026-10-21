@@ -168,6 +168,36 @@ void ModBaseCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
     read.mod_base_info = m_mod_base_info;
 }
 
+void ModBaseCallerNode::submit_or_forward(
+        Message message,
+        std::shared_ptr<WorkingRead> working_read,
+        std::vector<std::vector<std::unique_ptr<ModBaseChunk>>>& chunks_by_caller) {
+    if (working_read->num_modbase_chunks == 0) {
+        send_message_to_sink(std::move(message));
+        ++m_num_non_mod_base_reads_pushed;
+        return;
+    }
+
+    // Hand over our ownership to the working read.
+    working_read->read = std::move(message);
+
+    // Put the read in the working list.
+    {
+        std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
+        m_working_reads.insert(std::move(working_read));
+        ++m_working_reads_size;
+    }
+
+    // Push the chunks to the chunk queues. This needs to be done after working_read->read is set,
+    // as chunks could be processed before that value is set otherwise.
+    for (size_t caller_id = 0; caller_id < chunks_by_caller.size(); ++caller_id) {
+        auto& chunk_queue = m_chunk_queues.at(caller_id);
+        for (auto& chunk : chunks_by_caller.at(caller_id)) {
+            chunk_queue->try_push(std::move(chunk));
+        }
+    }
+}
+
 void ModBaseCallerNode::duplex_mod_call(Message message) {
     auto read = message.take<DuplexReadPtr>();
     stats::Timer timer;
@@ -280,33 +310,8 @@ void ModBaseCallerNode::duplex_mod_call(Message message) {
         }
 
         m_chunk_generation_ms += timer.GetElapsedMS();
-
-        if (working_read->num_modbase_chunks != 0) {
-            // Hand over our ownership to the working read
-            working_read->read = std::move(read);
-
-            // Put the read in the working list
-            {
-                std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-                m_working_reads.insert(std::move(working_read));
-                ++m_working_reads_size;
-            }
-
-            // push the chunks to the chunk queues
-            // needs to be done after working_read->read is set as chunks could be processed
-            // before we set that value otherwise
-            for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
-                auto& chunk_queue = m_chunk_queues.at(caller_id);
-                auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-                for (auto& chunk : chunks_to_enqueue) {
-                    chunk_queue->try_push(std::move(chunk));
-                }
-            }
-        } else {
-            // No modbases to call, pass directly to next node
-            send_message_to_sink(std::move(read));
-            ++m_num_non_mod_base_reads_pushed;
-        }
+        submit_or_forward(Message(std::move(read)), std::move(working_read),
+                          chunks_to_enqueue_by_caller);
     } catch (const std::exception& e) {
         DORADO_LOG(error, e.what());
     }
@@ -377,33 +382,8 @@ void ModBaseCallerNode::simplex_mod_call(Message message) {
         }
     }
     m_chunk_generation_ms += timer.GetElapsedMS();
-
-    if (working_read->num_modbase_chunks != 0) {
-        // Hand over our ownership to the working read
-        working_read->read = std::move(read);
-
-        // Put the read in the working list
-        {
-            std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
-            m_working_reads.insert(std::move(working_read));
-            ++m_working_reads_size;
-        }
-
-        // push the chunks to the chunk queues
-        // needs to be done after working_read->read is set as chunks could be processed
-        // before we set that value otherwise
-        for (size_t caller_id = 0; caller_id < runner->num_models(); ++caller_id) {
-            auto& chunk_queue = m_chunk_queues.at(caller_id);
-            auto& chunks_to_enqueue = chunks_to_enqueue_by_caller.at(caller_id);
-            for (auto& chunk : chunks_to_enqueue) {
-                chunk_queue->try_push(std::move(chunk));
-            }
-        }
-    } else {
-        // No modbases to call, pass directly to next node
-        send_message_to_sink(std::move(read));
-        ++m_num_non_mod_base_reads_pushed;
-    }
+    submit_or_forward(Message(std::move(read)), std::move(working_read),
+                      chunks_to_enqueue_by_caller);
 }
 
 void ModBaseCallerNode::input_thread_fn() {

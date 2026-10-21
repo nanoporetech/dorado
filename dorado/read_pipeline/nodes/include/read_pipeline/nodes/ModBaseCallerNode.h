@@ -56,6 +56,12 @@ private:
     // Initialise modified base probabilities for a read.
     void initialise_base_mod_probs(ReadCommon& read) const;
 
+    // Submit generated chunks, or forward the read if there are no chunks to call.
+    void submit_or_forward(
+            Message message,
+            std::shared_ptr<WorkingRead> working_read,
+            std::vector<std::vector<std::unique_ptr<ModBaseChunk>>>& chunks_by_caller);
+
     // Worker threads, scales and chunks reads for runners and enqueues them
     void input_thread_fn();
 
