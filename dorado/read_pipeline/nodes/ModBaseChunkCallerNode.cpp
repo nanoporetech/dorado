@@ -676,21 +676,31 @@ std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_start
     return chunks;
 }
 
-template <typename ReadType>
-void ModBaseChunkCallerNode::add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
-                                                     std::shared_ptr<WorkingRead> working_read) {
-    if (!read_ptr || !working_read) {
-        throw std::invalid_argument("Null pointer passed to add_read_to_working_set.");
+void ModBaseChunkCallerNode::submit_or_forward(Message message,
+                                               std::shared_ptr<WorkingRead> working_read,
+                                               std::vector<ModBaseChunks>& chunks_by_model) {
+    if (working_read->num_modbase_chunks == 0) {
+        send_message_to_sink(std::move(message));
+        return;
     }
 
-    // Hand over our ownership to the working read
-    working_read->read = std::move(read_ptr);
+    // Hand over our ownership to the working read.
+    working_read->read = std::move(message);
 
     // Put the working read in the working read set, where it will remain until its
     // chunks are all called.
     {
         std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
         m_working_reads.insert(std::move(working_read));
+    }
+
+    // Push the chunks to the chunk queues. This needs to be done after working_read->read is set,
+    // as chunks could be processed before that value is set otherwise.
+    for (size_t model_id = 0; model_id < chunks_by_model.size(); ++model_id) {
+        auto& chunk_queue = m_chunk_queues.at(model_id);
+        for (auto& chunk : chunks_by_model.at(model_id)) {
+            chunk_queue->try_push(std::move(chunk));
+        }
     }
 }
 
@@ -730,9 +740,7 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
 
-    // Get ownership of the read
-    auto read_ptr = message.take<SimplexReadPtr>();
-    auto& read = read_ptr->read_common;
+    auto& read = message.get<SimplexReadPtr>()->read_common;
     const std::string read_id = read.read_id;
 
     initialise_base_mod_probs(read);
@@ -743,7 +751,7 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
     const auto encoding_data = populate_modbase_data(modbase_data, runner, read.seq, read.raw_data,
                                                      read.moves, read_id);
     if (!encoding_data) {
-        send_message_to_sink(std::move(read_ptr));
+        send_message_to_sink(std::move(message));
         return;
     }
 
@@ -777,35 +785,21 @@ void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
         throw std::runtime_error("Modbase kmer encoding failed.");
     }
 
-    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
-
-    // Push the chunks to the chunk queues.
-    // Needs to be done after working_read->read is set as chunks could be processed
-    // before we set that value otherwise.
-    const size_t num_models = runner.num_models();
-    for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        auto& chunk_queue = m_chunk_queues.at(model_id);
-        auto& chunks_to_enqueue = chunks_by_caller.at(model_id);
-        for (auto& chunk : chunks_to_enqueue) {
-            chunk_queue->try_push(std::move(chunk));
-        }
-    }
+    submit_or_forward(std::move(message), std::move(working_read), chunks_by_caller);
 }
 
 void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
 
-    // Get ownership of the read
-    auto read_ptr = message.take<DuplexReadPtr>();
-    auto& read_common = read_ptr->read_common;
-    auto& read_stereo = read_ptr->stereo_feature_inputs;
+    auto& read = *message.get<DuplexReadPtr>();
+    auto& read_common = read.read_common;
+    auto& read_stereo = read.stereo_feature_inputs;
     const std::string read_id = read_common.read_id;
 
     initialise_base_mod_probs(read_common);
 
-    std::vector<ModBaseChunks> chunks_by_caller_template;
-    std::vector<ModBaseChunks> chunks_by_caller_complement;
+    std::vector<ModBaseChunks> chunks_by_caller(runner.num_models());
 
     auto working_read = std::make_shared<WorkingRead>();
     working_read->is_duplex = true;
@@ -866,41 +860,19 @@ void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
                 m_sequence_encode_ms += timer.GetElapsedMS();
             }
 
-            auto& chunks_by_caller =
-                    is_template_direction ? chunks_by_caller_template : chunks_by_caller_complement;
-            chunks_by_caller = get_chunks(runner, working_read, is_template_direction);
-            for (const auto& chunks : chunks_by_caller) {
+            auto strand_chunks = get_chunks(runner, working_read, is_template_direction);
+            for (size_t model_id = 0; model_id < strand_chunks.size(); ++model_id) {
+                auto& chunks = strand_chunks.at(model_id);
                 working_read->num_modbase_chunks += chunks.size();
+                auto& destination = chunks_by_caller.at(model_id);
+                std::move(chunks.begin(), chunks.end(), std::back_inserter(destination));
             }
         }
     } catch (const std::exception& e) {
         DORADO_LOG(error, "ModBase Duplex Caller: {}", e.what());
     }
 
-    if (chunks_by_caller_template.empty() && chunks_by_caller_complement.empty()) {
-        send_message_to_sink(std::move(read_ptr));
-        return;
-    }
-
-    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
-
-    // Push the chunks to the chunk queues.
-    // Needs to be done after working_read->read is set as chunks could be processed
-    // before we set that value otherwise.
-    const size_t num_models = runner.num_models();
-    for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        auto& chunk_queue = m_chunk_queues.at(model_id);
-        if (!chunks_by_caller_template.empty()) {
-            for (auto& template_chunk : chunks_by_caller_template.at(model_id)) {
-                chunk_queue->try_push(std::move(template_chunk));
-            }
-        }
-        if (!chunks_by_caller_complement.empty()) {
-            for (auto& complement_chunk : chunks_by_caller_complement.at(model_id)) {
-                chunk_queue->try_push(std::move(complement_chunk));
-            }
-        }
-    }
+    submit_or_forward(std::move(message), std::move(working_read), chunks_by_caller);
 }
 
 void ModBaseChunkCallerNode::create_and_submit_chunks(
