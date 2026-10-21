@@ -305,4 +305,22 @@ CATCH_TEST_CASE(TEST_GROUP ": resolve_score_index exceptions", TEST_GROUP) {
 
 }
 
+CATCH_TEST_CASE(TEST_GROUP ": resolve duplex sequence index", TEST_GROUP) {
+    auto [expected, hit, target_start, sequence_size, is_template_direction] =
+            GENERATE(table<int64_t, int64_t, int64_t, int64_t, bool>({
+                    std::make_tuple(0, 0, 0, 10, true),
+                    std::make_tuple(9, 0, 0, 10, false),
+                    std::make_tuple(5, 2, 3, 10, true),
+                    std::make_tuple(4, 2, 3, 10, false),
+                    std::make_tuple(8, 1, 7, 12, true),
+                    std::make_tuple(3, 1, 7, 12, false),
+            }));
+
+    const auto result = dorado::ModBaseChunkCallerNode::resolve_duplex_sequence_index(
+            hit, target_start, sequence_size, is_template_direction);
+
+    CATCH_CAPTURE(hit, target_start, sequence_size, is_template_direction);
+    CATCH_CHECK(result == expected);
+}
+
 }  // namespace
