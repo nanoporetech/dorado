@@ -215,7 +215,9 @@ void ModBaseCallerNode::generate_chunks_for_strand(
         nvtx3::scoped_range range{"generate_chunks"};
         auto& chunks_to_enqueue = chunks_by_caller.at(caller_id);
         const auto& params = config::get_context_model_config(runner.model_params(caller_id));
+        // NOLINTNEXTLINE(performance-unnecessary-copy-initialization): may be altered in duplex
         auto signal = policy.signal();
+        // NOLINTNEXTLINE(performance-unnecessary-copy-initialization): may be altered in duplex
         auto seq_to_sig_map = base_seq_to_sig_map;
         if constexpr (!ReadPolicy::is_duplex) {
             if (params.context.reverse) {
