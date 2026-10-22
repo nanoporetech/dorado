@@ -146,9 +146,9 @@ void add_arguments(argparse::ArgumentParser& parser, int& verbosity) {
                 .scan<'i', int>();
 
         parser.add_argument("-x", "--device")
-                .help(std::string{"Specify CPU or GPU device: 'auto', 'cpu', 'cuda:all' or "
-                                  "'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will "
-                                  "choose either 'cpu' "
+                .help(std::string{"Specify CPU or GPU device: 'auto', 'cpu', 'metal', 'cuda:all' "
+                                  "or 'cuda:<device_id>[,<device_id>...]'. Specifying 'auto' will "
+                                  "choose 'metal' on Apple silicon, otherwise either 'cpu' "
                                   "or 'cuda:all' depending on the presence of a GPU device."})
                 .default_value(std::string{"auto"});
 
@@ -318,7 +318,9 @@ Options set_options(const argparse::ArgumentParser& parser, const int verbosity)
 
     if (opt.device_str == cli::AUTO_DETECT_DEVICE) {
 #if DORADO_METAL_BUILD
-        opt.device_str = "cpu";
+        // Polishing models run on the Apple GPU through Torch MPS, giving the
+        // same consensus as the CPU several times faster.
+        opt.device_str = "mps";
 #else
         opt.device_str = utils::get_auto_detected_device();
 #endif
