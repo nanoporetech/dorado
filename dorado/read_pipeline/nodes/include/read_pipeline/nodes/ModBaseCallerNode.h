@@ -71,7 +71,7 @@ private:
             std::vector<std::vector<std::unique_ptr<ModBaseChunk>>>& chunks_by_caller);
 
     template <typename ReadPolicy>
-    void process_read(Message& message, ReadPolicy& policy, stats::Timer& timer);
+    void process_read(Message message, ReadPolicy& policy, stats::Timer& timer);
 
     // Scale and split a read into chunks for modified base calling.
     void mod_call(Message message);

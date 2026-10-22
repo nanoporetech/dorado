@@ -260,7 +260,7 @@ void ModBaseCallerNode::generate_chunks_for_strand(
 }
 
 template <typename ReadPolicy>
-void ModBaseCallerNode::process_read(Message& message, ReadPolicy& policy, stats::Timer& timer) {
+void ModBaseCallerNode::process_read(Message message, ReadPolicy& policy, stats::Timer& timer) {
     auto working_read = std::make_shared<WorkingRead>();
     working_read->num_modbase_chunks = 0;
     working_read->num_modbase_chunks_called = 0;
@@ -268,9 +268,12 @@ void ModBaseCallerNode::process_read(Message& message, ReadPolicy& policy, stats
     // All runners have the same set of callers, so only the first is needed for chunk generation.
     auto& runner = *m_runners.front();
     std::vector<std::vector<std::unique_ptr<ModBaseChunk>>> chunks_by_caller(runner.num_models());
-
-    while (policy.next_strand()) {
-        generate_chunks_for_strand(policy, working_read, runner, chunks_by_caller);
+    try {
+        while (policy.next_strand()) {
+            generate_chunks_for_strand(policy, working_read, runner, chunks_by_caller);
+        }
+    } catch (const std::exception& e) {
+        DORADO_LOG(error, "ModBase Caller: {}", e.what());
     }
 
     m_chunk_generation_ms += timer.GetElapsedMS();
@@ -282,18 +285,14 @@ void ModBaseCallerNode::mod_call(Message message) {
     auto& read_common = get_read_common_data(message);
     initialise_base_mod_probs(read_common);
 
-    try {
-        if (message.holds<SimplexReadPtr>()) {
-            modbase::SimplexReadPolicy policy(read_common);
-            process_read(message, policy, timer);
-        } else {
-            modbase::DuplexReadPolicy policy(*message.get<DuplexReadPtr>(), m_block_stride);
-            process_read(message, policy, timer);
-        }
-    } catch (const std::exception& e) {
-        // Chunks are only submitted once generation for the whole read has succeeded, so
-        // `message` is still owned here. Don't lose the read: forward it with canonical-only probs.
-        DORADO_LOG(error, "ModBase Caller: {}", e.what());
+    if (message.holds<SimplexReadPtr>()) {
+        modbase::SimplexReadPolicy policy(read_common);
+        process_read(std::move(message), policy, timer);
+    } else if (message.holds<DuplexReadPtr>()) {
+        modbase::DuplexReadPolicy policy(*message.get<DuplexReadPtr>(), m_block_stride);
+        process_read(std::move(message), policy, timer);
+    } else {
+        DORADO_LOG(error, "ModBase Caller: unexpected message type");
         send_message_to_sink(std::move(message));
         ++m_num_non_mod_base_reads_pushed;
     }
