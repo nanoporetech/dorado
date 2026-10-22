@@ -152,6 +152,7 @@ Sequencing Kit protocol information
 struct ProtocolInfo {
     bool is_barcoding{false};
     RapidChemistry rapid_chemistry{RapidChemistry::NONE};
+    bool has_rna_adapters{false};
 };
 
 using MotorSpeed = std::uint16_t;
