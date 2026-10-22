@@ -15,7 +15,9 @@
 #include <filesystem>
 #include <fstream>
 #include <memory>
+#include <numeric>
 #include <optional>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -145,6 +147,44 @@ public:
 private:
     std::vector<RegionCall> m_calls;
     int64_t m_next_call{0};
+};
+
+// Encoder which returns a fixed sample and a fixed set of Kadayashi results for any region.
+class SampleStubEncoder final : public secondary::EncoderBase {
+public:
+    SampleStubEncoder(secondary::Sample sample,
+                      kadayashi::varcall_result_t produce_haplotags_result)
+            : m_sample{std::move(sample)},
+              m_produce_haplotags_result{std::move(produce_haplotags_result)} {}
+
+    kadayashi::varcall_result_t produce_haplotags(const std::string&,
+                                                  const int64_t,
+                                                  const int64_t) override {
+        return m_produce_haplotags_result;
+    }
+
+    secondary::Sample encode_region(const std::string&,
+                                    const int64_t,
+                                    const int64_t,
+                                    const int32_t,
+                                    const std::unordered_map<std::string, int32_t>&) override {
+        return m_sample;
+    }
+
+    at::Tensor collate(std::vector<at::Tensor> batch, const bool /*pinned_memory*/) const override {
+        return std::empty(batch) ? at::empty({0}) : std::move(batch.front());
+    }
+
+    std::vector<secondary::Sample> merge_adjacent_samples(
+            std::vector<secondary::Sample> samples) const override {
+        return samples;
+    }
+
+    secondary::FeatureColumnMap get_feature_column_map() const override { return {}; }
+
+private:
+    secondary::Sample m_sample;
+    kadayashi::varcall_result_t m_produce_haplotags_result;
 };
 
 class CollatingStubEncoder final : public secondary::EncoderBase {
@@ -1041,6 +1081,99 @@ CATCH_TEST_CASE("worker_sample_producer defers overlapping simple variants to in
     for (const TestCase& test_case : test_cases) {
         CATCH_CAPTURE(test_case.name);
         CATCH_CHECK(run_producer(test_case.input) == test_case.expected);
+    }
+}
+
+CATCH_TEST_CASE("worker_sample_producer sends the full span of candidate variants to inference",
+                TEST_GROUP) {
+    /**
+     * \brief Verifies that the inference samples cover all positions of a candidate variant, not
+     *          only its start. A long low-quality deletion spans multiple inference chunks, both for
+     *          the chunking around candidate positions and for the tiled chunking.
+     */
+    constexpr int64_t SEQ_LEN = 60;
+    constexpr int64_t DEL_START = 10;
+    constexpr int64_t DEL_END = 35;
+
+    const secondary::Window bam_window{
+            .seq_id = 0,
+            .seq_length = SEQ_LEN,
+            .start = 0,
+            .end = SEQ_LEN,
+            .start_no_overlap = 0,
+            .end_no_overlap = SEQ_LEN,
+            .source_region_id = 0,
+    };
+
+    // Low-quality deletion which becomes a candidate.
+    const secondary::Variant deletion{.seq_id = 0,
+                                      .pos = DEL_START,
+                                      .ref = std::string(DEL_END - DEL_START, 'A'),
+                                      .alts = {"A"},
+                                      .filters = {secondary::Filters::Pass},
+                                      .info = {},
+                                      .qual = 10.0f,
+                                      .format = {{"GT", "1/1"}, {"GQ", "10"}},
+                                      .rstart = 0,
+                                      .rend = 0};
+
+    // Encoded sample which covers the entire window.
+    std::vector<int64_t> positions_major(SEQ_LEN);
+    std::iota(std::begin(positions_major), std::end(positions_major), 0);
+    secondary::Sample sample = make_sample(0, positions_major, 0.0f);
+    sample.depth = at::ones({SEQ_LEN}, at::kLong);
+
+    // Runs the sample producer and returns all positions covered by the emitted inference samples.
+    const auto run_producer = [&](const bool tiled_regions) {
+        VariantResources resources;
+        resources.encoders.emplace_back(std::make_unique<SampleStubEncoder>(
+                sample,
+                kadayashi::varcall_result_t{
+                        .qname2hp = {}, .variants = {deletion}, .phasing_breakpoints = {}}));
+        resources.models.emplace_back(secondary::ModelTorchBase::make<StubModel>(1.0, 0.0f));
+
+        std::vector<ChromosomeReduceData> chrom_reduce_data(1);
+        chrom_reduce_data[0].num_bam_regions = 1;
+        chrom_reduce_data[0].remaining_bam_regions = 1;
+
+        utils::AsyncQueue<secondary::Window> input_queue{2};
+        CATCH_REQUIRE(input_queue.try_push(secondary::Window{bam_window}) ==
+                      utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+        utils::AsyncQueue<InferenceData> output_queue{100};
+        std::atomic<bool> worker_terminate{false};
+        secondary::WorkerReturnStatus ret_status;
+        secondary::Stats stats;
+
+        // Inference chunks of 10 positions, with 5 positions of overlap for the tiled chunking and
+        // 3 flanking bases for the chunking around candidate positions.
+        worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
+                               worker_terminate, ret_status, {{bam_window}}, {{"chr1", SEQ_LEN}},
+                               std::vector<std::string>(1),
+                               secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1, 10, 5,
+                               3, false, 2, 30.0f, tiled_regions, false, 0, 0, 0.0f, 0);
+        output_queue.terminate(utils::AsyncQueueTerminateFast::No);
+
+        CATCH_CHECK_FALSE(ret_status.exception_thrown);
+        CATCH_CHECK(std::empty(chrom_reduce_data[0].variants_simple));
+
+        std::set<int64_t> covered;
+        InferenceData item;
+        while (output_queue.try_pop(item) == utils::AsyncQueueStatus::Success) {
+            for (const secondary::Sample& s : item.samples) {
+                covered.insert(std::begin(s.positions_major), std::end(s.positions_major));
+            }
+        }
+        return covered;
+    };
+
+    for (const bool tiled_regions : {false, true}) {
+        CATCH_CAPTURE(tiled_regions);
+        const std::set<int64_t> covered = run_producer(tiled_regions);
+        for (int64_t pos = DEL_START; pos < DEL_END; ++pos) {
+            CATCH_CAPTURE(pos);
+            CATCH_CHECK(covered.count(pos) == 1);
+        }
     }
 }
 

@@ -320,80 +320,90 @@ std::vector<Sample> split_samples_around_positions(
 
         bool stop_chunking = false;
         for (const auto itvl : positions) {
-            // Intervals are single-base width here.
-            const int64_t position = itvl.start;
-
-            // Skip candidates which are already covered by the previous chunk.
-            assert(std::size(last_flanking_bases) == std::size(results));
-            if (!std::empty(results) && !std::empty(last_flanking_bases) &&
-                (position < (results.back().end() - last_flanking_bases.back()))) {
-                continue;
-            }
-
-            int64_t curr_flanking_bases = 0;
-            int64_t chunk_start_pos = 0;
-            int64_t chunk_start_idx = 0;
-            int64_t chunk_end_idx = 0;
-            for (curr_flanking_bases = flanking_bases; curr_flanking_bases >= MIN_FLANKING_BASES;
-                 --curr_flanking_bases) {
-                chunk_start_pos = position - curr_flanking_bases;
-                chunk_start_idx = searchsorted_left(sample.positions_major, chunk_start_pos);
-                chunk_end_idx = chunk_start_idx + chunk_len;
-
-                if (chunk_start_idx >= std::ssize(sample.positions_major)) {
-                    // This shouldn't be possible, but need to check the bounds.
-                    std::ostringstream oss;
-                    oss << "Tried to create chunk from chunk_start_pos = " << chunk_start_pos
-                        << " on seq_id = " << sample.seq_id
-                        << " but the position could not be found in this sample! chunk_start_idx = "
-                        << chunk_start_idx << ", sample: " << sample;
-                    throw std::runtime_error{oss.str()};
+            // Walk through the entire candidate span (e.g. a long deletion), creating chunks until
+            // all of its positions within this sample are covered.
+            const int64_t span_end = std::min(itvl.stop, sample.end() - 1);
+            int64_t position = std::max(itvl.start, sample.start());
+            while (position <= span_end) {
+                // Skip positions which are already covered by the previous chunk.
+                assert(std::size(last_flanking_bases) == std::size(results));
+                if (!std::empty(results) && !std::empty(last_flanking_bases) &&
+                    (position < (results.back().end() - last_flanking_bases.back()))) {
+                    position = results.back().end() - last_flanking_bases.back();
+                    continue;
                 }
 
-                // TODO: Handle this properly. E.g. Create an overlapping large chunk at the end.
-                if (chunk_end_idx >= std::ssize(sample.positions_major)) {
-                    DORADO_LOG(
-                            warn,
-                            "Tried to create chunk but "
-                            "chunk exceeds sample length. chunk_start_pos = {}, chunk_start_idx = "
-                            "{}, chunk_end_idx = {}, positions_major.size() = {}, seq_id = {}. "
-                            "Stopping. Sample: {}",
-                            chunk_start_pos, chunk_start_idx, chunk_end_idx,
-                            std::ssize(sample.positions_major), sample.seq_id, chunk_end_idx,
-                            secondary::sample_to_string(sample));
-                    stop_chunking = true;
+                int64_t curr_flanking_bases = 0;
+                int64_t chunk_start_pos = 0;
+                int64_t chunk_start_idx = 0;
+                int64_t chunk_end_idx = 0;
+                for (curr_flanking_bases = flanking_bases;
+                     curr_flanking_bases >= MIN_FLANKING_BASES; --curr_flanking_bases) {
+                    chunk_start_pos = position - curr_flanking_bases;
+                    chunk_start_idx = searchsorted_left(sample.positions_major, chunk_start_pos);
+                    chunk_end_idx = chunk_start_idx + chunk_len;
+
+                    if (chunk_start_idx >= std::ssize(sample.positions_major)) {
+                        // This shouldn't be possible, but need to check the bounds.
+                        std::ostringstream oss;
+                        oss << "Tried to create chunk from chunk_start_pos = " << chunk_start_pos
+                            << " on seq_id = " << sample.seq_id
+                            << " but the position could not be found in this sample! "
+                               "chunk_start_idx = "
+                            << chunk_start_idx << ", sample: " << sample;
+                        throw std::runtime_error{oss.str()};
+                    }
+
+                    // TODO: Handle this properly. E.g. Create an overlapping large chunk at the end.
+                    if (chunk_end_idx >= std::ssize(sample.positions_major)) {
+                        DORADO_LOG(
+                                warn,
+                                "Tried to create chunk but chunk exceeds sample length. "
+                                "chunk_start_pos = {}, chunk_start_idx = {}, chunk_end_idx = {}, "
+                                "positions_major.size() = {}, seq_id = {}. Stopping. Sample: {}",
+                                chunk_start_pos, chunk_start_idx, chunk_end_idx,
+                                std::ssize(sample.positions_major), sample.seq_id, chunk_end_idx,
+                                secondary::sample_to_string(sample));
+                        stop_chunking = true;
+                        break;
+                    }
+
+                    const int64_t chunk_end_pos = sample.positions_major[chunk_end_idx];
+
+                    if (position <= (chunk_end_pos - curr_flanking_bases)) {
+                        break;
+                    }
+                }
+                if (stop_chunking) {
+                    break;
+                }
+                if (curr_flanking_bases < MIN_FLANKING_BASES) {
+                    DORADO_LOG(warn,
+                               "Could not create chunk around position = {} with more than {} "
+                               "bases of flanking context. Skipping the rest of this candidate.",
+                               position, MIN_FLANKING_BASES);
                     break;
                 }
 
-                const int64_t chunk_end_pos = sample.positions_major[chunk_end_idx];
+                // Extract the chunk around this position.
+                results.emplace_back(slice_sample(sample, chunk_start_idx, chunk_end_idx, true));
+                last_flanking_bases.emplace_back(curr_flanking_bases);
 
-                if (position <= (chunk_end_pos - curr_flanking_bases)) {
-                    break;
-                }
+#ifdef DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
+                DORADO_LOG(debug,
+                           "[split_samples_around_positions] Created a chunk around position = {}. "
+                           "chunk_start_pos = {}, chunk_start_idx = {}, chunk_end_idx = {}, "
+                           "curr_flanking_bases = {}. Chunk sample: {}",
+                           position, chunk_start_pos, chunk_start_idx, chunk_end_idx,
+                           curr_flanking_bases, secondary::sample_to_string(results.back()));
+#endif
+
+                // Continue from the first position not covered by this chunk.
+                position = std::max(position + 1, results.back().end() - curr_flanking_bases);
             }
             if (stop_chunking) {
                 break;
             }
-            if (curr_flanking_bases < MIN_FLANKING_BASES) {
-                DORADO_LOG(warn,
-                           "Could not create chunk around position = {} with more than {} bases of "
-                           "flanking context. Skipping this position.",
-                           position, MIN_FLANKING_BASES);
-                continue;
-            }
-
-            // Extract the chunk around this position.
-            results.emplace_back(slice_sample(sample, chunk_start_idx, chunk_end_idx, true));
-            last_flanking_bases.emplace_back(curr_flanking_bases);
-
-#ifdef DEBUG_POLISH_SPLIT_SAMPLES_AROUND_POSITIONS
-            DORADO_LOG(debug,
-                       "[split_samples_around_positions] Created a chunk around position = {}. "
-                       "chunk_start_pos = {}, chunk_start_idx = {}, chunk_end_idx = {}, "
-                       "curr_flanking_bases = {}. Chunk sample: {}",
-                       position, chunk_start_pos, chunk_start_idx, chunk_end_idx,
-                       curr_flanking_bases, secondary::sample_to_string(results.back()));
-#endif
         }
 
         all_results.insert(std::end(all_results), std::make_move_iterator(std::begin(results)),

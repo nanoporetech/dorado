@@ -204,14 +204,6 @@ VariantResources create_resources(const secondary::ModelConfig& model_config,
 }
 
 namespace {
-secondary::IntervalTreeInt64 build_interval_tree(const std::vector<int64_t>& in_candidate_sites) {
-    std::vector<interval_tree::Interval<int64_t, int64_t>> intervals;
-    intervals.reserve(std::size(in_candidate_sites));
-    for (const int64_t pos : in_candidate_sites) {
-        intervals.emplace_back(pos, pos + 1, 0);
-    }
-    return secondary::IntervalTreeInt64(std::move(intervals));
-}
 
 struct BamWindowResult {
     std::vector<secondary::Sample> samples;
@@ -264,7 +256,7 @@ BamWindowResult process_single_bam_window(
 
     // Optionally convert variants only if the source is COMPUTE.
     std::vector<secondary::Variant> pass_variants;
-    std::vector<int64_t> candidate_sites;
+    std::vector<interval_tree::Interval<int64_t, int64_t>> candidate_intervals;
 
     if (candidate_source == secondary::VariantCandidateSource::COMPUTE) {
         // Kadayashi now emits secondary::Variant directly.
@@ -298,7 +290,7 @@ BamWindowResult process_single_bam_window(
 
         // Storage space for pass/candidate variants.
         pass_variants.reserve(std::size(all_variants));
-        candidate_sites.reserve(std::size(all_variants));
+        candidate_intervals.reserve(std::size(all_variants));
 
         // Extract the candidate sites (low-qual, overlapping and boundary-crossing variants) and
         // PASS variants.
@@ -312,7 +304,10 @@ BamWindowResult process_single_bam_window(
             if (is_overlapping[i] || crosses_boundary ||
                 !((var.filters & secondary::Filters::Filter::Pass) ||
                   (var.filters & secondary::Filters::Filter::NonVariant))) {
-                candidate_sites.emplace_back(var.pos);
+                // Add the entire variant span, so that inference covers long events fully.
+                // IntervalTree stops are inclusive.
+                const int64_t var_end = secondary::variant_end(var);
+                candidate_intervals.emplace_back(var.pos, var_end - 1, i);
             } else {
                 pass_variants.emplace_back(std::move(var));
             }
@@ -389,7 +384,7 @@ BamWindowResult process_single_bam_window(
 
     } else if (candidate_source == secondary::VariantCandidateSource::COMPUTE) {
         candidate_trees = {
-                {bam_window.seq_id, build_interval_tree(candidate_sites)},
+                {bam_window.seq_id, secondary::IntervalTreeInt64(std::move(candidate_intervals))},
         };
     }
 
