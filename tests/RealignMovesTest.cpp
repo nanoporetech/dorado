@@ -28,16 +28,7 @@ CATCH_TEST_CASE("No alignment doesn't produce an error", TEST_GROUP) {
     // Check that the function does not throw an exception
     CATCH_REQUIRE_NOTHROW(utils::realign_moves(query_sequence, target_sequence, moves));
 
-    // Call the function and store the result
-    int move_offset = 0, target_start = 0;
-    std::vector<uint8_t> new_moves;
-
-    CATCH_CHECK_NOTHROW(std::tie(move_offset, target_start, new_moves) =
-                                utils::realign_moves(query_sequence, target_sequence, moves));
-
-    CATCH_CHECK(move_offset == -1);
-    CATCH_CHECK(target_start == -1);
-    CATCH_CHECK(new_moves.empty());
+    CATCH_CHECK(!utils::realign_moves(query_sequence, target_sequence, moves).has_value());
 }
 
 CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
@@ -55,8 +46,9 @@ CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
             input_moves.push_back(0);
         }
 
-        auto [old_moves_offset, query_start, new_moves] =
-                utils::realign_moves(query, target, input_moves);
+        auto realigned = utils::realign_moves(query, target, input_moves);
+        CATCH_REQUIRE(realigned.has_value());
+        auto [old_moves_offset, query_start, new_moves] = *realigned;
 
         CATCH_CHECK(old_moves_offset == 0);
         CATCH_CHECK(query_start == 0);
@@ -78,8 +70,10 @@ CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
             input_moves.push_back(0);
         }
 
-        auto [old_moves_offset, target_start, new_moves] =
+        auto realigned =
                 utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+        CATCH_REQUIRE(realigned.has_value());
+        auto [old_moves_offset, target_start, new_moves] = *realigned;
 
         CATCH_CHECK(old_moves_offset == 8);
         CATCH_CHECK(target_start == 0);
@@ -102,8 +96,10 @@ CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
             input_moves.push_back(0);
         }
 
-        auto [old_moves_offset, target_start, new_moves] =
+        auto realigned =
                 utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+        CATCH_REQUIRE(realigned.has_value());
+        auto [old_moves_offset, target_start, new_moves] = *realigned;
 
         CATCH_CHECK(old_moves_offset == 4 * 3);
         CATCH_CHECK(target_start == 0);
@@ -127,8 +123,10 @@ CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
             input_moves.push_back(0);
         }
 
-        auto [old_moves_offset, target_start, new_moves] =
+        auto realigned =
                 utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+        CATCH_REQUIRE(realigned.has_value());
+        auto [old_moves_offset, target_start, new_moves] = *realigned;
 
         CATCH_CHECK(old_moves_offset == 0);
         CATCH_CHECK(target_start == 5);
@@ -152,8 +150,10 @@ CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
             input_moves.push_back(0);
         }
 
-        auto [old_moves_offset, target_start, new_moves] =
+        auto realigned =
                 utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+        CATCH_REQUIRE(realigned.has_value());
+        auto [old_moves_offset, target_start, new_moves] = *realigned;
 
         CATCH_CHECK(old_moves_offset == 5 * 4);
         CATCH_CHECK(target_start == 0);
@@ -175,8 +175,10 @@ CATCH_TEST_CASE("Test realign_moves - output moves correct", TEST_GROUP) {
             input_moves.push_back(0);
         }
 
-        auto [old_moves_offset, target_start, new_moves] =
+        auto realigned =
                 utils::realign_moves(query, target, input_moves);  // simplex, duplex, moves
+        CATCH_REQUIRE(realigned.has_value());
+        auto [old_moves_offset, target_start, new_moves] = *realigned;
 
         CATCH_CHECK(old_moves_offset == 0);
         CATCH_CHECK(target_start == 5);

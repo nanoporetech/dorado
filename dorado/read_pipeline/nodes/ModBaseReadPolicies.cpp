@@ -55,11 +55,11 @@ bool DuplexReadPolicy::next_strand() {
                                              ? m_read.read_common.seq
                                              : utils::reverse_complement(m_read.read_common.seq);
 
-        auto [moves_offset, target_start, realigned_moves] =
-                utils::realign_moves(simplex_sequence, duplex_sequence, simplex_moves);
-        if (moves_offset == -1 && target_start == -1 && realigned_moves.empty()) {
+        auto realignment = utils::realign_moves(simplex_sequence, duplex_sequence, simplex_moves);
+        if (!realignment) {
             continue;
         }
+        auto& [moves_offset, target_start, realigned_moves] = *realignment;
 
         const auto signal_len = realigned_moves.size() * m_canonical_stride;
         const auto num_moves = std::accumulate(realigned_moves.begin(), realigned_moves.end(), 0);
