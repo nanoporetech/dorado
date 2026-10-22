@@ -77,6 +77,17 @@ std::vector<secondary::DeviceInfo> init_devices(const std::string& devices_str) 
         }
     }
 #endif
+#if DORADO_METAL_BUILD
+    else if ((devices_str == "metal") || (devices_str == "mps")) {
+        // The Apple GPU shares the (unified) host memory; budget a part of it.
+        constexpr double MPS_MEMORY_FRACTION = 0.5;
+        torch::Device torch_device = torch::Device(torch::kMPS);
+        devices.emplace_back(secondary::DeviceInfo{
+                .name = "mps",
+                .device = std::move(torch_device),
+                .available_memory_GB = utils::available_host_memory_GB() * MPS_MEMORY_FRACTION});
+    }
+#endif
     else {
         throw std::runtime_error("Unsupported device: " + devices_str);
     }
