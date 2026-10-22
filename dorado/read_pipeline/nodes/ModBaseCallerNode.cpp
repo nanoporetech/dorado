@@ -279,6 +279,7 @@ void ModBaseCallerNode::process_read(Message message, ReadPolicy& policy, stats:
             chunks.clear();
         }
         working_read->num_modbase_chunks = 0;
+        policy.reset_motif_hits();
     }
 
     m_chunk_generation_ms += timer.GetElapsedMS();

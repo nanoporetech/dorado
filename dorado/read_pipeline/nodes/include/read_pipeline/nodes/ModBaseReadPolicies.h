@@ -43,6 +43,9 @@ public:
     // Record that the read sequence has a motif hit at `strand_hit` of the current strand.
     void mark_motif_hit(size_t strand_hit);
 
+    // Discard all recorded motif hits.
+    void reset_motif_hits();
+
 private:
     ReadCommon& m_read;
     bool m_processed{false};
@@ -71,6 +74,7 @@ public:
 
     // Duplex reads do not record motif hits.
     void mark_motif_hit(size_t) const {}
+    void reset_motif_hits() const {}
 
 private:
     DuplexRead& m_read;

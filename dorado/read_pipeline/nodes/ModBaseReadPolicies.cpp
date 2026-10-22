@@ -5,6 +5,7 @@
 
 #include <ATen/ops/flip.h>
 
+#include <algorithm>
 #include <numeric>
 #include <utility>
 
@@ -32,6 +33,11 @@ const std::vector<uint8_t>& SimplexReadPolicy::moves() const { return m_read.mov
 
 void SimplexReadPolicy::mark_motif_hit(size_t strand_hit) {
     m_read.base_mod_simplex_motif_hits.at(strand_hit) = true;
+}
+
+void SimplexReadPolicy::reset_motif_hits() {
+    std::fill(m_read.base_mod_simplex_motif_hits.begin(), m_read.base_mod_simplex_motif_hits.end(),
+              false);
 }
 
 DuplexReadPolicy::DuplexReadPolicy(DuplexRead& read, size_t canonical_stride)
