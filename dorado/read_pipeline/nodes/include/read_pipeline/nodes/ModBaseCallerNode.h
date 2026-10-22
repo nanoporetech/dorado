@@ -14,11 +14,16 @@
 namespace dorado {
 
 struct ModBaseInfo;
+class ReadCommon;
 
 namespace modbase {
 class ModBaseRunner;
 using RunnerPtr = std::unique_ptr<ModBaseRunner>;
 }  // namespace modbase
+
+namespace stats {
+class Timer;
+}
 
 class ModBaseCallerNode final : public MessageSink {
     struct ModBaseChunk;
@@ -36,9 +41,6 @@ public:
     void terminate(const TerminateOptions&) override;
     void restart() override;
 
-    void simplex_mod_call(Message message);
-    void duplex_mod_call(Message message);
-
 private:
     ModBaseCallerNode(const ModBaseCallerNode&) = delete;
     ModBaseCallerNode& operator=(const ModBaseCallerNode&) = delete;
@@ -51,6 +53,28 @@ private:
 
     // Determine the modbase alphabet from all callers and calculate offset positions for the results
     void init_modbase_info();
+
+    // Initialise modified base probabilities for a read.
+    void initialise_base_mod_probs(ReadCommon& read) const;
+
+    // Submit generated chunks, or forward the read if there are no chunks to call.
+    void submit_or_forward(
+            Message message,
+            std::shared_ptr<WorkingRead> working_read,
+            std::vector<std::vector<std::unique_ptr<ModBaseChunk>>>& chunks_by_caller);
+
+    template <typename ReadPolicy>
+    void generate_chunks_for_strand(
+            ReadPolicy& policy,
+            const std::shared_ptr<WorkingRead>& working_read,
+            modbase::ModBaseRunner& runner,
+            std::vector<std::vector<std::unique_ptr<ModBaseChunk>>>& chunks_by_caller);
+
+    template <typename ReadPolicy>
+    void process_read(Message message, ReadPolicy& policy, stats::Timer& timer);
+
+    // Scale and split a read into chunks for modified base calling.
+    void mod_call(Message message);
 
     // Worker threads, scales and chunks reads for runners and enqueues them
     void input_thread_fn();

@@ -321,9 +321,9 @@ std::optional<OverlapResult> compute_overlap(const std::string& query_seq,
 
 // Query is the read that the moves table is associated with. A new moves table will be generated
 // Which is aligned to the target sequence.
-std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& query_sequence,
-                                                         const std::string& target_sequence,
-                                                         const std::vector<uint8_t>& moves) {
+std::optional<RealignedMoves> realign_moves(const std::string& query_sequence,
+                                            const std::string& target_sequence,
+                                            const std::vector<uint8_t>& moves) {
     assert(static_cast<int>(query_sequence.length()) ==
            std::accumulate(moves.begin(), moves.end(), 0));
 
@@ -332,11 +332,9 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
     const auto overlap_result =
             compute_overlap(query_sequence, "query", target_sequence, "target", working_buffer);
 
-    // clang-tidy warns about performance-no-automatic-move if |failed_realignment| is const. It should be treated as such though.
-    /*const*/ auto failed_realignment = std::make_tuple(-1, -1, std::vector<uint8_t>());
-    // No overlap was computed, so return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
+    // No overlap was computed, so no move table realignment was computed
     if (!overlap_result) {
-        return failed_realignment;
+        return std::nullopt;
     }
     auto query_start = overlap_result->query_start;
     auto target_start = overlap_result->target_start;
@@ -349,7 +347,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
         ++target_start;
         if (static_cast<size_t>(target_start) >= query_sequence.length() ||
             static_cast<size_t>(query_start) >= target_sequence.length()) {
-            return failed_realignment;
+            return std::nullopt;
         }
     }
 
@@ -371,8 +369,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
         // Free the memory allocated by edlibAlign
         edlibFreeAlignResult(edlib_result);
 
-        // Return the tuple (-1, -1) and an empty vector to indicate that no move table realignment was computed
-        return failed_realignment;
+        return std::nullopt;
     }
 
     // Let's keep two cursor positions - one for the new move table which we are building, and one for the old where we track where we got to
@@ -435,7 +432,7 @@ std::tuple<int, int, std::vector<uint8_t>> realign_moves(const std::string& quer
 
     edlibFreeAlignResult(edlib_result);
 
-    return std::make_tuple(old_moves_offset, query_start, std::move(new_moves));
+    return RealignedMoves{old_moves_offset, query_start, std::move(new_moves)};
 }
 
 std::vector<uint64_t> move_cum_sums(const std::vector<uint8_t>& moves) {

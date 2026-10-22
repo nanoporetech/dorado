@@ -48,11 +48,6 @@ public:
                                        const int64_t context_samples_after,
                                        const int64_t modbase_stride);
 
-    static int64_t resolve_duplex_sequence_index(const int64_t resolved_score_index,
-                                                 const int64_t target_start,
-                                                 const int64_t sequence_size,
-                                                 const bool is_template_direction);
-
     static std::vector<std::pair<int64_t, int64_t>> get_chunk_starts(
             const int64_t signal_len,
             const std::vector<size_t>& hits_to_sig,
@@ -91,8 +86,7 @@ private:
 
     void output_thread_fn();
 
-    void simplex_mod_call(Message message);
-    void duplex_mod_call(Message message);
+    void mod_call(Message message);
 
     // Called by chunk_caller_thread_fn, calls the model and enqueues the results
     void call_batch(modbase::ModBaseRunner& runner, size_t model_id, ModBaseChunks& batched_chunks);
@@ -166,9 +160,16 @@ private:
                                                  const std::vector<ModBaseChunks>& chunks_by_caller,
                                                  const EncodingData& encoding_data) const;
 
-    template <typename ReadType>
-    void add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
-                                 std::shared_ptr<WorkingRead> working_read);
+    void submit_or_forward(Message message,
+                           std::shared_ptr<WorkingRead> working_read,
+                           std::vector<ModBaseChunks>& chunks_by_model);
+
+    template <typename ReadPolicy>
+    void generate_chunks_for_read(ReadPolicy& policy,
+                                  const std::shared_ptr<WorkingRead>& working_read,
+                                  modbase::ModBaseRunner& runner,
+                                  std::vector<ModBaseChunks>& chunks_by_model,
+                                  const std::string& read_id);
 
     std::vector<uint64_t> get_seq_to_sig_map(const std::vector<uint8_t>& moves,
                                              const size_t raw_samples,

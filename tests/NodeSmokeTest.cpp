@@ -14,11 +14,13 @@
 #include "read_pipeline/base/DefaultClientInfo.h"
 #include "read_pipeline/base/HtsReader.h"
 #include "read_pipeline/base/SimpleExecutor.h"
+#include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "read_pipeline/nodes/AdapterDetectorNode.h"
 #include "read_pipeline/nodes/BarcodeClassifierNode.h"
 #include "read_pipeline/nodes/BasecallerNode.h"
 #include "read_pipeline/nodes/ModBaseCallerNode.h"
+#include "read_pipeline/nodes/ModBaseChunkCallerNode.h"
 #include "read_pipeline/nodes/PolyACalculatorNode.h"
 #include "read_pipeline/nodes/ReadToBamTypeNode.h"
 #include "read_pipeline/nodes/ScalerNode.h"
@@ -85,12 +87,16 @@ private:
     std::size_t m_num_messages = m_num_reads;
     using ReadMutator = std::function<void(dorado::SimplexReadPtr& read)>;
     ReadMutator m_read_mutator;
+    using ReadConverter =
+            std::function<dorado::Message(dorado::SimplexReadPtr read, std::size_t read_index)>;
+    ReadConverter m_read_converter;
     bool m_pipeline_restart = false;
 
 protected:
     void set_num_reads(std::size_t num_reads) { m_num_reads = num_reads; }
     void set_expected_messages(std::size_t num_messages) { m_num_messages = num_messages; }
     void set_read_mutator(ReadMutator mutator) { m_read_mutator = std::move(mutator); }
+    void set_read_converter(ReadConverter converter) { m_read_converter = std::move(converter); }
     void set_pipeline_restart(bool restart) { m_pipeline_restart = restart; }
 
     template <class NodeType, class... Args>
@@ -110,7 +116,11 @@ protected:
             if (m_read_mutator) {
                 m_read_mutator(read);
             }
-            pipeline->push_message(std::move(read));
+            if (m_read_converter) {
+                pipeline->push_message(m_read_converter(std::move(read), i));
+            } else {
+                pipeline->push_message(std::move(read));
+            }
         }
         // Wait for them to complete.
         pipeline->terminate({.fast = dorado::utils::AsyncQueueTerminateFast::No});
@@ -121,10 +131,16 @@ protected:
             CATCH_CAPTURE(message.index());
             CATCH_CHECK((message.holds<MessageTs>() || ...));
         }
+        CATCH_CHECK((std::any_of(messages.cbegin(), messages.cend(),
+                                 [](const auto& message) {
+                                     return message.template holds<MessageTs>();
+                                 }) &&
+                     ...));
     }
 };
 
 using NodeSmokeTestRead = NodeSmokeTestBase<dorado::SimplexReadPtr>;
+using NodeSmokeTestModBase = NodeSmokeTestBase<dorado::SimplexReadPtr, dorado::DuplexReadPtr>;
 using NodeSmokeTestBam = NodeSmokeTestBase<dorado::BamMessage>;
 
 #define DEFINE_TEST(base, name) CATCH_TEST_CASE_METHOD(base, "SmokeTest: " name, "[SmokeTest]")
@@ -249,7 +265,7 @@ DEFINE_TEST(NodeSmokeTestRead, "BasecallerNode") {
                                            model_name, 1000, "BasecallerNode", 0);
 }
 
-DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
+DEFINE_TEST(NodeSmokeTestModBase, "ModBaseCallerNode") {
     auto gpu = GENERATE(true, false);
     CATCH_CAPTURE(gpu);
     auto pipeline_restart = GENERATE(false, true);
@@ -311,6 +327,8 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
     // ModBase node expects half input and needs a move table
     set_read_mutator([this, model_stride](dorado::SimplexReadPtr& read) {
         read->read_common.raw_data = read->read_common.raw_data.to(at::kHalf);
+        read->read_common.seq = "ACGTTACA";
+        read->read_common.qstring = "********";
 
         read->read_common.attributes.model_stride = int(model_stride);
         // The move table size needs rounding up.
@@ -323,11 +341,86 @@ DEFINE_TEST(NodeSmokeTestRead, "ModBaseCallerNode") {
         std::shuffle(std::next(read->read_common.moves.begin()), read->read_common.moves.end(),
                      m_rng);
     });
+    set_read_converter([](dorado::SimplexReadPtr read, std::size_t read_index) {
+        if (read_index % 2 == 0) {
+            return dorado::Message(std::move(read));
+        }
+
+        auto duplex_read = std::make_unique<dorado::DuplexRead>();
+        duplex_read->read_common = std::move(read->read_common);
+        duplex_read->read_common.is_duplex = true;
+
+        auto& stereo_inputs = duplex_read->stereo_feature_inputs;
+        stereo_inputs.template_seq = duplex_read->read_common.seq;
+        stereo_inputs.complement_seq = duplex_read->read_common.seq;
+        stereo_inputs.template_moves = duplex_read->read_common.moves;
+        stereo_inputs.complement_moves = duplex_read->read_common.moves;
+        stereo_inputs.template_signal = duplex_read->read_common.raw_data;
+        stereo_inputs.complement_signal = duplex_read->read_common.raw_data;
+        return dorado::Message(std::move(duplex_read));
+    });
 
     auto modbase_runners = dorado::api::create_modbase_runners(
             modbase_configs, device, modbase_params.runners_per_caller, batch_size);
 
     run_smoke_test<dorado::ModBaseCallerNode>(std::move(modbase_runners), 2, model_stride, 1000);
+}
+
+DEFINE_TEST(NodeSmokeTestModBase, "ModBaseChunkCallerNode") {
+    constexpr std::size_t num_reads = 4;
+    constexpr int batch_size = 4;
+    set_num_reads(num_reads);
+    set_expected_messages(num_reads);
+
+    const char modbase_model_name[] = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_5mCG_5hmCG@v3";
+    const auto modbase_model_dir = download_model(modbase_model_name);
+    const auto modbase_model = modbase_model_dir.m_path / modbase_model_name;
+
+    const char model_name[] = "dna_r10.4.1_e8.2_400bps_hac@v5.0.0";
+    const auto model_dir = download_model(model_name);
+    const std::size_t model_stride = load_model_config(model_dir.m_path / model_name).stride;
+
+    std::vector<ModBaseModelConfig> modbase_configs{load_modbase_model_config(modbase_model)};
+    const auto modbase_params = get_modbase_params(modbase_configs, 1);
+
+    set_read_mutator([this, model_stride](dorado::SimplexReadPtr& read) {
+        read->read_common.raw_data = read->read_common.raw_data.to(at::kHalf);
+        read->read_common.seq = "ACGTTACA";
+        read->read_common.qstring = "********";
+        read->read_common.attributes.model_stride = int(model_stride);
+
+        const size_t move_table_size =
+                (read->read_common.get_raw_data_samples() + model_stride - 1) / model_stride;
+        read->read_common.moves.resize(move_table_size);
+        std::fill_n(read->read_common.moves.begin(), read->read_common.seq.size(),
+                    static_cast<uint8_t>(1));
+        std::shuffle(std::next(read->read_common.moves.begin()), read->read_common.moves.end(),
+                     m_rng);
+    });
+    set_read_converter([](dorado::SimplexReadPtr read, std::size_t read_index) {
+        if (read_index % 2 == 0) {
+            return dorado::Message(std::move(read));
+        }
+
+        auto duplex_read = std::make_unique<dorado::DuplexRead>();
+        duplex_read->read_common = std::move(read->read_common);
+        duplex_read->read_common.is_duplex = true;
+
+        auto& stereo_inputs = duplex_read->stereo_feature_inputs;
+        stereo_inputs.template_seq = duplex_read->read_common.seq;
+        stereo_inputs.complement_seq = duplex_read->read_common.seq;
+        stereo_inputs.template_moves = duplex_read->read_common.moves;
+        stereo_inputs.complement_moves = duplex_read->read_common.moves;
+        stereo_inputs.template_signal = duplex_read->read_common.raw_data;
+        stereo_inputs.complement_signal = duplex_read->read_common.raw_data;
+        return dorado::Message(std::move(duplex_read));
+    });
+
+    auto modbase_runners = dorado::api::create_modbase_runners(
+            modbase_configs, "cpu", modbase_params.runners_per_caller, batch_size);
+
+    run_smoke_test<dorado::ModBaseChunkCallerNode>(std::move(modbase_runners), 2, model_stride,
+                                                   1000);
 }
 
 DEFINE_TEST(NodeSmokeTestBam, "ReadToBamTypeNode") {

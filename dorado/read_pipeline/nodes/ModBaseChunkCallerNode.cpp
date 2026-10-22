@@ -5,6 +5,7 @@
 #include "modbase/encode_kmer.h"
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
+#include "read_pipeline/nodes/ModBaseReadPolicies.h"
 #include "utils/dev_utils.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
@@ -246,10 +247,8 @@ void ModBaseChunkCallerNode::input_thread_fn() {
         // If this message isn't a read, just forward it to the sink.
         if (!is_read_message(message)) {
             send_message_to_sink(std::move(message));
-        } else if (message.holds<SimplexReadPtr>()) {
-            simplex_mod_call(std::move(message));
-        } else if (message.holds<DuplexReadPtr>()) {
-            duplex_mod_call(std::move(message));
+        } else {
+            mod_call(std::move(message));
         }
     }
 }
@@ -337,7 +336,6 @@ void ModBaseChunkCallerNode::initialise_base_mod_probs(ReadCommon& read) const {
         read.base_mod_probs[i * m_num_states + m_base_prob_offsets.at(base_id)] = 1;
     }
     read.mod_base_info = m_mod_base_info;
-    read.base_mod_simplex_motif_hits.resize(read.seq.size(), false);
 }
 
 // Get the index of the next context hit in `hit_sig_idxs` with a signal index
@@ -627,7 +625,6 @@ std::vector<ModBaseChunkCallerNode::ModBaseChunks> ModBaseChunkCallerNode::get_c
                     std::make_unique<ModBaseChunk>(working_read, int(model_id), base_id,
                                                    chunk_start, hit_idx, num_states, is_template));
         }
-        working_read->num_modbase_chunks += chunk_starts.size();
     }
     return chunks_to_enqueue_by_model;
 }
@@ -677,21 +674,31 @@ std::vector<std::pair<int64_t, int64_t>> ModBaseChunkCallerNode::get_chunk_start
     return chunks;
 }
 
-template <typename ReadType>
-void ModBaseChunkCallerNode::add_read_to_working_set(std::unique_ptr<ReadType> read_ptr,
-                                                     std::shared_ptr<WorkingRead> working_read) {
-    if (!read_ptr || !working_read) {
-        throw std::invalid_argument("Null pointer passed to add_read_to_working_set.");
+void ModBaseChunkCallerNode::submit_or_forward(Message message,
+                                               std::shared_ptr<WorkingRead> working_read,
+                                               std::vector<ModBaseChunks>& chunks_by_model) {
+    if (working_read->num_modbase_chunks == 0) {
+        send_message_to_sink(std::move(message));
+        return;
     }
 
-    // Hand over our ownership to the working read
-    working_read->read = std::move(read_ptr);
+    // Hand over our ownership to the working read.
+    working_read->read = std::move(message);
 
     // Put the working read in the working read set, where it will remain until its
     // chunks are all called.
     {
         std::lock_guard<std::mutex> working_reads_lock(m_working_reads_mutex);
         m_working_reads.insert(std::move(working_read));
+    }
+
+    // Push the chunks to the chunk queues. This needs to be done after working_read->read is set,
+    // as chunks could be processed before that value is set otherwise.
+    for (size_t model_id = 0; model_id < chunks_by_model.size(); ++model_id) {
+        auto& chunk_queue = m_chunk_queues.at(model_id);
+        for (auto& chunk : chunks_by_model.at(model_id)) {
+            chunk_queue->try_push(std::move(chunk));
+        }
     }
 }
 
@@ -727,175 +734,90 @@ std::optional<ModBaseChunkCallerNode::EncodingData> ModBaseChunkCallerNode::popu
     return EncodingData{std::move(seq_to_sig_map), std::move(int_seq)};
 }
 
-void ModBaseChunkCallerNode::simplex_mod_call(Message message) {
-    // The callers of each runner are all the same, so just take the first one.
-    modbase::ModBaseRunner& runner = *m_runners.front();
+template <typename ReadPolicy>
+void ModBaseChunkCallerNode::generate_chunks_for_read(
+        ReadPolicy& policy,
+        const std::shared_ptr<WorkingRead>& working_read,
+        modbase::ModBaseRunner& runner,
+        std::vector<ModBaseChunks>& chunks_by_model,
+        const std::string& read_id) {
+    while (policy.next_strand()) {
+        const bool is_template_direction = policy.is_template_direction();
+        auto& modbase_data =
+                is_template_direction ? working_read->template_data : working_read->complement_data;
+        modbase_data.target_start = policy.target_start();
 
-    // Get ownership of the read
-    auto read_ptr = message.take<SimplexReadPtr>();
-    auto& read = read_ptr->read_common;
-    const std::string read_id = read.read_id;
-
-    initialise_base_mod_probs(read);
-
-    auto working_read = std::make_shared<WorkingRead>();
-    auto& modbase_data = working_read->template_data;
-
-    const auto encoding_data = populate_modbase_data(modbase_data, runner, read.seq, read.raw_data,
-                                                     read.moves, read_id);
-    if (!encoding_data) {
-        send_message_to_sink(std::move(read_ptr));
-        return;
-    }
-
-    // Build the sequence hit mask from the data.
-    for (const auto& per_base_hits : modbase_data.per_base_hits_seq) {
-        for (std::size_t hit : per_base_hits) {
-            read.base_mod_simplex_motif_hits.at(hit) = true;
+        const auto encoding_data = populate_modbase_data(modbase_data, runner, policy.sequence(),
+                                                         policy.signal(), policy.moves(), read_id);
+        if (!encoding_data) {
+            continue;
         }
-    }
 
-    constexpr bool kIsTemplate = true;
-    std::vector<ModBaseChunks> chunks_by_caller = get_chunks(runner, working_read, kIsTemplate);
+        for (const auto& per_base_hits : modbase_data.per_base_hits_seq) {
+            for (const std::size_t hit : per_base_hits) {
+                policy.mark_motif_hit(hit);
+            }
+        }
+        auto strand_chunks = get_chunks(runner, working_read, is_template_direction);
 
-    {
-        stats::Timer timer;
-        const auto base_skips =
-                get_minimal_encoding_skips(runner, chunks_by_caller, *encoding_data);
-        populate_encoded_kmer(modbase_data.encoded_kmers, modbase_data.signal.size(0),
-                              encoding_data->int_seq, encoding_data->seq_to_sig_map, base_skips);
-        m_sequence_encode_ms += timer.GetElapsedMS();
-    }
-    const std::size_t enc_kmer_size = modbase_data.encoded_kmers.size();
-    const std::size_t expected = (modbase_data.signal.size(0) / m_sequence_stride_ratio) *
-                                 m_kmer_len * utils::BaseInfo::NUM_BASES;
-    if (enc_kmer_size != expected) {
-        DORADO_LOG(error, "Modbase kmer encoding failed for read:'{}' - {}!={}", read_id,
-                   enc_kmer_size, expected);
-        throw std::runtime_error("Modbase kmer encoding failed.");
-    }
+        {
+            stats::Timer timer;
+            const auto base_skips =
+                    !ReadPolicy::is_duplex
+                            ? get_minimal_encoding_skips(runner, strand_chunks, *encoding_data)
+                            : std::vector<bool>{};
+            populate_encoded_kmer(modbase_data.encoded_kmers, modbase_data.signal.size(0),
+                                  encoding_data->int_seq, encoding_data->seq_to_sig_map,
+                                  base_skips);
+            m_sequence_encode_ms += timer.GetElapsedMS();
+        }
 
-    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
+        const std::size_t enc_kmer_size = modbase_data.encoded_kmers.size();
+        const std::size_t expected = (modbase_data.signal.size(0) / m_sequence_stride_ratio) *
+                                     m_kmer_len * utils::BaseInfo::NUM_BASES;
+        if (enc_kmer_size != expected) {
+            DORADO_LOG(error, "Modbase kmer encoding failed for read:'{}' - {}!={}", read_id,
+                       enc_kmer_size, expected);
+            throw std::runtime_error("Modbase kmer encoding failed.");
+        }
 
-    // Push the chunks to the chunk queues.
-    // Needs to be done after working_read->read is set as chunks could be processed
-    // before we set that value otherwise.
-    const size_t num_models = runner.num_models();
-    for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        auto& chunk_queue = m_chunk_queues.at(model_id);
-        auto& chunks_to_enqueue = chunks_by_caller.at(model_id);
-        for (auto& chunk : chunks_to_enqueue) {
-            chunk_queue->try_push(std::move(chunk));
+        for (size_t model_id = 0; model_id < strand_chunks.size(); ++model_id) {
+            auto& chunks = strand_chunks.at(model_id);
+            working_read->num_modbase_chunks += chunks.size();
+            auto& destination = chunks_by_model.at(model_id);
+            std::move(chunks.begin(), chunks.end(), std::back_inserter(destination));
         }
     }
 }
 
-void ModBaseChunkCallerNode::duplex_mod_call(Message message) {
+void ModBaseChunkCallerNode::mod_call(Message message) {
     // The callers of each runner are all the same, so just take the first one.
     modbase::ModBaseRunner& runner = *m_runners.front();
-
-    // Get ownership of the read
-    auto read_ptr = message.take<DuplexReadPtr>();
-    auto& read_common = read_ptr->read_common;
-    auto& read_stereo = read_ptr->stereo_feature_inputs;
-    const std::string read_id = read_common.read_id;
+    auto& read_common = get_read_common_data(message);
 
     initialise_base_mod_probs(read_common);
 
-    std::vector<ModBaseChunks> chunks_by_caller_template;
-    std::vector<ModBaseChunks> chunks_by_caller_complement;
-
     auto working_read = std::make_shared<WorkingRead>();
-    working_read->is_duplex = true;
+    std::vector<ModBaseChunks> chunks_by_model(runner.num_models());
 
+    // Strands are only added to the working read once fully processed, so on failure any chunks
+    // generated so far are complete and the read is still forwarded, rather than lost.
     try {
-        for (const bool is_template_direction : {true, false}) {
-            auto& modbase_data = is_template_direction ? working_read->template_data
-                                                       : working_read->complement_data;
-
-            // ??? Why are we flipping the signal but not the moves?
-            auto simplex_signal = is_template_direction
-                                          ? read_stereo.template_signal
-                                          : at::flip(read_stereo.complement_signal, 0);
-
-            // const-ref extends lifetime of temporary
-            const auto& simplex_moves = is_template_direction ? read_stereo.template_moves
-                                                              : read_stereo.complement_moves;
-
-            // const-ref extends lifetime of temporary
-            const auto& simplex_seq =
-                    is_template_direction ? read_stereo.template_seq
-                                          : utils::reverse_complement(read_stereo.complement_seq);
-
-            // const-ref extends lifetime of temporary
-            const auto& duplex_seq = is_template_direction
-                                             ? read_common.seq
-                                             : utils::reverse_complement(read_common.seq);
-
-            auto [moves_offset, target_start, new_move_table] =
-                    utils::realign_moves(simplex_seq, duplex_seq, simplex_moves);
-
-            // If the alignment has failed, the rest of this duplex mod call cannot be
-            // completed in this direction
-            if (moves_offset == -1 && target_start == -1 && new_move_table.empty()) {
-                continue;
-            }
-
-            // Store the realigned target start to correctly resolve the sequence offset
-            // in the output predictions back onto the original sequence.
-            modbase_data.target_start = target_start;
-
-            auto new_signal_len = new_move_table.size() * m_canonical_stride;
-            auto new_num_moves = std::accumulate(new_move_table.begin(), new_move_table.end(), 0);
-            auto new_seq = duplex_seq.substr(target_start, new_num_moves);
-            auto signal = simplex_signal.slice(0, moves_offset * m_canonical_stride,
-                                               moves_offset * m_canonical_stride + new_signal_len);
-
-            const auto encoding_data = populate_modbase_data(modbase_data, runner, new_seq, signal,
-                                                             new_move_table, read_id);
-            if (!encoding_data) {
-                continue;
-            }
-
-            {
-                stats::Timer timer;
-                populate_encoded_kmer(modbase_data.encoded_kmers, modbase_data.signal.size(0),
-                                      encoding_data->int_seq, encoding_data->seq_to_sig_map, {});
-                m_sequence_encode_ms += timer.GetElapsedMS();
-            }
-
-            auto& chunks_by_caller =
-                    is_template_direction ? chunks_by_caller_template : chunks_by_caller_complement;
-            chunks_by_caller = get_chunks(runner, working_read, is_template_direction);
+        if (message.holds<SimplexReadPtr>()) {
+            modbase::SimplexReadPolicy policy(read_common);
+            generate_chunks_for_read(policy, working_read, runner, chunks_by_model,
+                                     read_common.read_id);
+        } else {
+            working_read->is_duplex = true;
+            modbase::DuplexReadPolicy policy(*message.get<DuplexReadPtr>(), m_canonical_stride);
+            generate_chunks_for_read(policy, working_read, runner, chunks_by_model,
+                                     read_common.read_id);
         }
     } catch (const std::exception& e) {
-        DORADO_LOG(error, "ModBase Duplex Caller: {}", e.what());
+        DORADO_LOG(error, "ModBase Chunk Caller: {}", e.what());
     }
 
-    if (chunks_by_caller_template.empty() && chunks_by_caller_complement.empty()) {
-        send_message_to_sink(std::move(read_ptr));
-        return;
-    }
-
-    add_read_to_working_set(std::move(read_ptr), std::move(working_read));
-
-    // Push the chunks to the chunk queues.
-    // Needs to be done after working_read->read is set as chunks could be processed
-    // before we set that value otherwise.
-    const size_t num_models = runner.num_models();
-    for (size_t model_id = 0; model_id < num_models; ++model_id) {
-        auto& chunk_queue = m_chunk_queues.at(model_id);
-        if (!chunks_by_caller_template.empty()) {
-            for (auto& template_chunk : chunks_by_caller_template.at(model_id)) {
-                chunk_queue->try_push(std::move(template_chunk));
-            }
-        }
-        if (!chunks_by_caller_complement.empty()) {
-            for (auto& complement_chunk : chunks_by_caller_complement.at(model_id)) {
-                chunk_queue->try_push(std::move(complement_chunk));
-            }
-        }
-    }
+    submit_or_forward(std::move(message), std::move(working_read), chunks_by_model);
 }
 
 void ModBaseChunkCallerNode::create_and_submit_chunks(
@@ -1102,16 +1024,6 @@ int64_t ModBaseChunkCallerNode::resolve_score_index(const int64_t hit_sig_abs,
     return hit_sig_rel / modbase_stride * scores_states;
 }
 
-int64_t ModBaseChunkCallerNode::resolve_duplex_sequence_index(const int64_t hit,
-                                                              const int64_t target_start,
-                                                              const int64_t sequence_size,
-                                                              const bool is_template_direction) {
-    if (is_template_direction) {
-        return hit + target_start;
-    }
-    return sequence_size - (hit + target_start + 1);
-}
-
 void ModBaseChunkCallerNode::output_thread_fn() {
     at::InferenceMode inference_mode_guard;
     utils::set_thread_name("mbc_output");
@@ -1159,7 +1071,7 @@ void ModBaseChunkCallerNode::output_thread_fn() {
             // Context hit sequence index in the chunk sequence
             const size_t hit_seq = !working_read->is_duplex
                                            ? hits_seq.at(hit)
-                                           : resolve_duplex_sequence_index(
+                                           : modbase::resolve_duplex_sequence_index(
                                                      hits_seq.at(hit), modbase_data.target_start,
                                                      read.seq.size(), is_template_direction);
 
