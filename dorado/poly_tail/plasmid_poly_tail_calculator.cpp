@@ -18,7 +18,8 @@ struct Result {
 }  // namespace
 
 std::vector<SignalAnchorInfo> PlasmidPolyTailCalculator::determine_signal_anchor_and_strand(
-        const SimplexRead& read) const {
+        const SimplexRead& read,
+        bool) const {
     const std::string_view front_flank = m_config.plasmid_front_flank;
     const std::string_view rear_flank = m_config.plasmid_rear_flank;
     const std::string_view front_flank_rc = m_config.rc_plasmid_front_flank;

@@ -24,9 +24,8 @@ EdlibAlignConfig init_edlib_config_for_adapter() {
 namespace dorado::poly_tail {
 
 RNAPolyTailCalculator::RNAPolyTailCalculator(PolyTailConfig config,
-                                             bool is_rna_adapter,
                                              const PolyTailCalibrationCoeffs& calibration)
-        : PolyTailCalculator(std::move(config), calibration), m_rna_adapter(is_rna_adapter) {}
+        : PolyTailCalculator(std::move(config), calibration) {}
 
 float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& sizes) const {
     const auto log_sum =
@@ -48,8 +47,9 @@ float RNAPolyTailCalculator::average_samples_per_base(const std::vector<float>& 
 }
 
 std::vector<SignalAnchorInfo> RNAPolyTailCalculator::determine_signal_anchor_and_strand(
-        const SimplexRead& read) const {
-    if (!m_rna_adapter) {
+        const SimplexRead& read,
+        bool has_rna_adapters) const {
+    if (!has_rna_adapters) {
         return {SignalAnchorInfo{SearchDirection::FORWARD,
                                  read.read_common.rna_adapter_end_signal_pos, 0}};
     }
@@ -105,14 +105,14 @@ int RNAPolyTailCalculator::signal_length_adjustment([[maybe_unused]] const Simpl
 }
 
 std::pair<int, int> RNAPolyTailCalculator::buffer_range(const std::pair<int, int>& interval,
-                                                        float samples_per_base) const {
-    if (m_rna_adapter) {
-        // Extend the buffer towards the front of the read as there may be something between the adapter and the polytail
-        return {interval.second - interval.first +
-                        static_cast<int>(std::round(m_config.rna_offset * samples_per_base)),
-                interval.second - interval.first};
+                                                        bool has_rna_adapters,
+                                                        float num_samples_per_base) const {
+    std::pair<int, int> range =
+            PolyTailCalculator::buffer_range(interval, has_rna_adapters, num_samples_per_base);
+    if (has_rna_adapters) {
+        range.first += static_cast<int>(std::round(m_config.rna_offset * num_samples_per_base));
     }
-    return {interval.second - interval.first, interval.second - interval.first};
+    return range;
 }
 
 std::pair<int, int> RNAPolyTailCalculator::signal_range(int signal_anchor,

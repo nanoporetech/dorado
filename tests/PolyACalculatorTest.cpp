@@ -58,7 +58,7 @@ CATCH_TEST_CASE("PolyACalculator: Test polyT tail estimation", TEST_GROUP) {
     read->read_common.client_info->contexts()
             .register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
                     std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>(
-                            "", is_rna, false, dorado::poly_tail::PolyTailCalibrationCoeffs{}));
+                            "", is_rna, dorado::poly_tail::PolyTailCalibrationCoeffs{}));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));
@@ -97,7 +97,7 @@ CATCH_TEST_CASE("PolyACalculator: Test polyT tail estimation with custom config"
     read->read_common.client_info->contexts()
             .register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
                     std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>(
-                            config, false, false, dorado::poly_tail::PolyTailCalibrationCoeffs{}));
+                            config, false, dorado::poly_tail::PolyTailCalibrationCoeffs{}));
 
     // Push a Read type.
     pipeline->push_message(std::move(read));

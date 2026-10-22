@@ -636,10 +636,6 @@ NewPipeline create_pipeline(
                                                                 is_rna_model(model_config));
     }
 
-    const bool is_rna_adapter =
-            is_rna_model(model_config) &&
-            (adapter_info->rna_adapters || (barcoding_info && !barcoding_info->kit_name.empty()));
-
     auto client_info = std::make_shared<DefaultClientInfo>();
     client_info->contexts().register_context<const demux::AdapterInfo>(adapter_info);
 
@@ -649,8 +645,7 @@ NewPipeline create_pipeline(
                 .offset = model_config.polya_offset_correction};
         auto poly_tail_calc_selector =
                 std::make_shared<const poly_tail::PolyTailCalculatorSelector>(
-                        options.polya_config, is_rna_model(model_config), is_rna_adapter,
-                        calibration);
+                        options.polya_config, is_rna_model(model_config), calibration);
         if (poly_tail_calc_selector->has_enabled_calculator()) {
             client_info->contexts().register_context<const poly_tail::PolyTailCalculatorSelector>(
                     poly_tail_calc_selector);

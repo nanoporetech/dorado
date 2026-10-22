@@ -27,6 +27,17 @@ struct Interval {
 
 }  // namespace
 
+// The buffer is currently the length of the interval
+// itself. This heuristic generally works because a longer interval
+// detected is likely to be the correct one so we relax the
+// how close it needs to be to the anchor to account for errors
+// in anchor determination.
+std::pair<int, int> PolyTailCalculator::buffer_range(const std::pair<int, int>& interval,
+                                                     bool,
+                                                     float) const {
+    return {interval.second - interval.first, interval.second - interval.first};
+}
+
 std::pair<int, int> PolyTailCalculator::signal_range(int signal_anchor,
                                                      int signal_len,
                                                      float samples_per_base,
@@ -79,7 +90,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
                                                                 SearchDirection direction,
                                                                 const dorado::SimplexRead& read,
                                                                 float num_samples_per_base,
-                                                                float std_samples_per_base) const {
+                                                                float std_samples_per_base,
+                                                                bool has_rna_adapters) const {
     const c10::Half* signal = static_cast<c10::Half*>(read.read_common.raw_data.data_ptr());
     int signal_len = int(read.read_common.get_raw_data_samples());
 
@@ -217,7 +229,9 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
     std::vector<Interval> filtered_intervals;
     std::copy_if(intervals.begin(), intervals.end(), std::back_inserter(filtered_intervals),
                  [&](const auto& i) {
-                     auto buffer = buffer_range({i.start, i.end}, num_samples_per_base);
+                     auto buffer =
+                             buffer_range({i.start, i.end}, has_rna_adapters, num_samples_per_base);
+
                      // Only keep intervals that are close-ish to the signal anchor.
                      // i.e. the anchor needs to be within the buffer region of
                      // the interval
@@ -270,7 +284,8 @@ std::pair<int, int> PolyTailCalculator::determine_signal_bounds(int signal_ancho
 
 PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
         const SimplexRead& read,
-        const std::vector<SignalAnchorInfo>& signal_info) const {
+        const std::vector<SignalAnchorInfo>& signal_info,
+        const bool has_rna_adapters) const {
     if (std::empty(signal_info)) {
         return {};
     }
@@ -284,7 +299,7 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
     // the current algorithm returns a lot of false intervals.
     auto [signal_start, signal_end] =
             determine_signal_bounds(signal_info[0].signal_anchor, signal_info[0].search_dir, read,
-                                    num_samples_per_base, stddev);
+                                    num_samples_per_base, stddev, has_rna_adapters);
 
     if (std::tie(signal_start, signal_end) == std::make_tuple(-1, -1)) {
         return {};
@@ -296,7 +311,7 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
     if (std::size(signal_info) > 1) {
         split_signal_range =
                 determine_signal_bounds(signal_info[1].signal_anchor, signal_info[1].search_dir,
-                                        read, num_samples_per_base, stddev);
+                                        read, num_samples_per_base, stddev, has_rna_adapters);
         auto [sec_signal_start, sec_signal_end] = split_signal_range;
         if (signal_start <= sec_signal_start && sec_signal_start <= signal_end) {
             // regions overlap
@@ -345,10 +360,9 @@ PolyTailLengthInfo PolyTailCalculator::calculate_num_bases(
 std::shared_ptr<const PolyTailCalculator> PolyTailCalculatorFactory::create(
         const PolyTailConfig& config,
         bool is_rna,
-        bool is_rna_adapter,
         const PolyTailCalibrationCoeffs& calibration) {
     if (is_rna) {
-        return std::make_unique<RNAPolyTailCalculator>(config, is_rna_adapter, calibration);
+        return std::make_unique<RNAPolyTailCalculator>(config, calibration);
     }
     if (config.is_plasmid) {
         return std::make_unique<PlasmidPolyTailCalculator>(config, calibration);

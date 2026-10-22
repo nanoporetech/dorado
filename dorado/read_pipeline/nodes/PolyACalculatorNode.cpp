@@ -63,12 +63,13 @@ void PolyACalculatorNode::process_read(SimplexRead &read) {
             std::make_pair(ReadCommon::POLY_TAIL_NOT_FOUND, ReadCommon::POLY_TAIL_NOT_FOUND),
             std::make_pair(ReadCommon::POLY_TAIL_NOT_FOUND, ReadCommon::POLY_TAIL_NOT_FOUND)};
 
-    auto signal_info = calculator->determine_signal_anchor_and_strand(read);
+    const bool has_rna_adapters = read.read_common.has_rna_adapters();
+    auto signal_info = calculator->determine_signal_anchor_and_strand(read, has_rna_adapters);
     if (!std::empty(signal_info)) {
         read.read_common.poly_tail_signal_anchor =
                 signal_info[0].signal_anchor + read.read_common.num_trimmed_samples;
 
-        auto polya_tail_info = calculator->calculate_num_bases(read, signal_info);
+        auto polya_tail_info = calculator->calculate_num_bases(read, signal_info, has_rna_adapters);
 
         read.read_common.poly_tail_signal_boundaries[0] = polya_tail_info.signal_range;
         read.read_common.poly_tail_signal_boundaries[1] = polya_tail_info.split_signal_range;
