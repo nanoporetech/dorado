@@ -274,6 +274,11 @@ void ModBaseCallerNode::process_read(Message message, ReadPolicy& policy, stats:
         }
     } catch (const std::exception& e) {
         DORADO_LOG(error, "ModBase Caller: {}", e.what());
+        // Partial results would be inconsistent, so forward the read without modbase calls.
+        for (auto& chunks : chunks_by_caller) {
+            chunks.clear();
+        }
+        working_read->num_modbase_chunks = 0;
     }
 
     m_chunk_generation_ms += timer.GetElapsedMS();
