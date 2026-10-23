@@ -18,11 +18,9 @@ class PolyTailCalculatorSelector {
 public:
     PolyTailCalculatorSelector(const std::filesystem::path& config,
                                bool is_rna,
-                               bool is_rna_adapter,
                                const PolyTailCalibrationCoeffs& calibration);
     PolyTailCalculatorSelector(std::istream& config_stream,
                                bool is_rna,
-                               bool is_rna_adapter,
                                const PolyTailCalibrationCoeffs& calibration);
 
     std::shared_ptr<const PolyTailCalculator> get_calculator(const std::string& name) const;
@@ -32,7 +30,6 @@ public:
 private:
     void init(std::istream& config_stream,
               bool is_rna,
-              bool is_rna_adapter,
               const PolyTailCalibrationCoeffs& calibration);
 
     mutable std::mutex m_lut_mutex;

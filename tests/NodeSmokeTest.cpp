@@ -550,6 +550,7 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     if (is_rna) {
         is_rna_adapter = GENERATE(false, true);
     }
+
     CATCH_CAPTURE(pipeline_restart);
     CATCH_CAPTURE(is_rna);
     CATCH_CAPTURE(is_rna_adapter);
@@ -559,13 +560,16 @@ DEFINE_TEST(NodeSmokeTestRead, "PolyACalculatorNode") {
     set_pipeline_restart(pipeline_restart);
 
     client_info->contexts().register_context<const dorado::poly_tail::PolyTailCalculatorSelector>(
-            std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>(
-                    "", is_rna, is_rna_adapter, calibration));
+            std::make_shared<dorado::poly_tail::PolyTailCalculatorSelector>("", is_rna,
+                                                                            calibration));
 
-    set_read_mutator([](dorado::SimplexReadPtr& read) {
+    set_read_mutator([is_rna_adapter](dorado::SimplexReadPtr& read) {
         read->read_common.attributes.model_stride = 2;
         read->read_common.moves = {1, 0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 1, 0,
                                    0, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1, 0, 1, 1};
+        if (is_rna_adapter) {
+            read->read_common.sequencing_kit = "SQK-DRB004-24";
+        }
     });
 
     dorado::SimpleExecutor<dorado::PolyACalculatorNode> thread_pool(8);

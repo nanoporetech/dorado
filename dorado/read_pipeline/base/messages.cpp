@@ -1,12 +1,18 @@
 #include "read_pipeline/base/messages.h"
 
+#include "demux/KitInfoProvider.h"
+#include "demux/adapter_info.h"
+#include "demux/barcoding_info.h"
 #include "hts_utils/bam_utils.h"
 #include "modbase/ModBaseContext.h"
+#include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages/CorrectionAlignments.h"
 #include "read_pipeline/base/messages/DuplexRead.h"
 #include "read_pipeline/base/messages/ReadPair.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "stereo_features.h"
+#include "utils/barcode_kits.h"
+#include "utils/context_container.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 #include "utils/types.h"
@@ -486,6 +492,35 @@ std::vector<BamPtr> ReadCommon::extract_sam_lines(bool emit_moves,
     alns.push_back(BamPtr(aln));
 
     return alns;
+}
+
+bool ReadCommon::has_rna_adapters() const {
+    std::shared_ptr<const demux::AdapterInfo> adapter_info =
+            client_info ? client_info->contexts().get_ptr<const demux::AdapterInfo>() : nullptr;
+
+    if (adapter_info && adapter_info->rna_adapters) {
+        return true;
+    }
+
+    auto kc = models::kit_code(sequencing_kit);
+    const auto &kit_info = models::kit_info(kc);
+    if (kit_info.protocol.has_rna_adapters) {
+        return true;
+    }
+
+    if (client_info) {
+        auto barcoding_info = client_info->contexts().get_ptr<const dorado::demux::BarcodingInfo>();
+        if (barcoding_info && !barcoding_info->kit_name.empty()) {
+            demux::KitInfoProvider provider(barcoding_info->kit_name);
+            const barcode_kits::KitInfo &barcode_kit_info =
+                    provider.get_kit_info(barcoding_info->kit_name);
+            if (barcode_kit_info.rna_barcodes) {
+                return true;
+            }
+        }
+    }
+
+    return false;
 }
 
 ReadCommon &get_read_common_data(Message &message) {

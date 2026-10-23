@@ -1,13 +1,10 @@
 #include "read_pipeline/nodes/ScalerNode.h"
 
 #include "config/BasecallModelConfig.h"
-#include "demux/adapter_info.h"
 #include "models/kits.h"
-#include "read_pipeline/base/ClientInfo.h"
 #include "read_pipeline/base/messages/SimplexRead.h"
 #include "torch_utils/tensor_utils.h"
 #include "torch_utils/trim.h"
-#include "utils/context_container.h"
 #include "utils/log_utils.h"
 
 #include <ATen/TensorIndexing.h>
@@ -136,13 +133,7 @@ void ScalerNode::input_thread_fn() {
         // Trim adapter for RNA first before scaling.
         int trim_start = 0;
         if (is_rna_model) {
-            std::shared_ptr<const demux::AdapterInfo> adapter_info =
-                    read->read_common.client_info ? read->read_common.client_info->contexts()
-                                                            .get_ptr<const demux::AdapterInfo>()
-                                                  : nullptr;
-
-            const bool has_rna_based_adapters = adapter_info && adapter_info->rna_adapters;
-            if (!has_rna_based_adapters) {
+            if (!read->read_common.has_rna_adapters()) {
                 trim_start = determine_rna_adapter_pos(*read);
                 if (size_t(trim_start) < read->read_common.get_raw_data_samples()) {
                     read->read_common.raw_data = read->read_common.raw_data.index(

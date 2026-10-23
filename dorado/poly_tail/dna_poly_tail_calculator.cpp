@@ -16,7 +16,8 @@
 namespace dorado::poly_tail {
 
 std::vector<SignalAnchorInfo> DNAPolyTailCalculator::determine_signal_anchor_and_strand(
-        const SimplexRead& read) const {
+        const SimplexRead& read,
+        bool) const {
     int trailing_Ts =
             static_cast<int>(dorado::utils::count_trailing_chars(m_config.rear_primer, 'T'));
     const std::string_view front_primer = m_config.front_primer;

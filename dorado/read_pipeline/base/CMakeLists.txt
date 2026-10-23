@@ -36,6 +36,7 @@ dorado_add_library(
         dorado_utils
         htslib
     DEPENDS_PRIVATE
+        dorado_demux
         dorado_modbase
         spdlog::spdlog
 )

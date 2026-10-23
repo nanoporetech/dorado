@@ -91,6 +91,7 @@ class TestDorado(unittest.TestCase):
                 "SQK-DRB004-24",
                 "hac",
                 barcode_kit="SQK-DRB004-24",
+                estimate_poly_a=True,
             ),
             Run(
                 "Kit14_cDNA_PolyA_hac",

@@ -124,6 +124,9 @@ public:
     // `True` if the basecall model is an RNA model
     bool is_rna_model{false};
 
+    // `True` if the basecall model is an RNA model
+    bool has_rna_adapters() const;
+
     // The chemistry type if any
     models::Chemistry chemistry{models::Chemistry::UNKNOWN};
     // The rapid chemistry adapter type if any - sourced from the read info data

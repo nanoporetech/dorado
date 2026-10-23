@@ -50,11 +50,13 @@ public:
 
     // returns information about the polyA/T tail. signal_anchor = -1 on failure
     virtual std::vector<SignalAnchorInfo> determine_signal_anchor_and_strand(
-            const SimplexRead& read) const = 0;
+            const SimplexRead& read,
+            bool has_rna_adapters) const = 0;
 
     // returns a struct with: number of bases in the polyA/T tail (), start and end of poly(A) in raw signal (all -1 on failure)
     PolyTailLengthInfo calculate_num_bases(const SimplexRead& read,
-                                           const std::vector<SignalAnchorInfo>& signal_info) const;
+                                           const std::vector<SignalAnchorInfo>& signal_info,
+                                           bool has_rna_adapters) const;
 
     static int max_tail_length() { return 750; };
 
@@ -78,7 +80,8 @@ protected:
 
     // Returns the acceptable distance between the supplied interval and the anchor
     virtual std::pair<int, int> buffer_range(const std::pair<int, int>& interval,
-                                             float samples_per_base) const = 0;
+                                             bool has_rna_adapters,
+                                             float num_samples_per_base) const;
 
     // Determine the outer boundary of the signal space to consider based on the anchor.
     virtual std::pair<int, int> signal_range(int signal_anchor,
@@ -93,7 +96,8 @@ protected:
                                                 SearchDirection direction,
                                                 const SimplexRead& read,
                                                 float num_samples_per_base,
-                                                float std_samples_per_base) const;
+                                                float std_samples_per_base,
+                                                bool has_rna_adapters) const;
 
     const PolyTailConfig m_config;
     const PolyTailCalibrationCoeffs m_calibration;
@@ -101,11 +105,8 @@ protected:
 
 class PolyTailCalculatorFactory {
 public:
-    static std::shared_ptr<const PolyTailCalculator> create(
-            const PolyTailConfig& config,
-            bool is_rna,
-            bool is_rna_adapter,
-            const PolyTailCalibrationCoeffs& calibration);
+    static std::shared_ptr<const PolyTailCalculator>
+    create(const PolyTailConfig& config, bool is_rna, const PolyTailCalibrationCoeffs& calibration);
 };
 
 }  // namespace dorado::poly_tail

@@ -9,7 +9,8 @@ public:
     PlasmidPolyTailCalculator(PolyTailConfig config, const PolyTailCalibrationCoeffs& calibration)
             : DNAPolyTailCalculator(std::move(config), calibration) {}
     std::vector<SignalAnchorInfo> determine_signal_anchor_and_strand(
-            const SimplexRead& read) const override;
+            const SimplexRead& read,
+            bool has_rna_adapters) const override;
 };
 
 }  // namespace dorado::poly_tail
