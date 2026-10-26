@@ -20,6 +20,8 @@ dorado_add_library(dorado_basecall
         decode/CPUDecoder.h
         decode/Decoder.cpp
         decode/Decoder.h
+        decode/ModBaseDecoder.cpp
+        decode/ModBaseDecoder.h
         model/CRFModel.cpp
         model/CRFModel.h
         model/Model.cpp
@@ -36,6 +38,7 @@ dorado_add_library(dorado_basecall
         caller/TypedRunnerContext.h
     SOURCES_TEST
         DecoderTest.cpp
+        ModBaseDecoderTest.cpp
         ModelCallerFactoryTest.cpp
         ModelTest.cpp
         ModelRunnerTest.cpp
