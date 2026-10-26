@@ -58,8 +58,9 @@ const CallerImplementation cuda_implementation{
 };
 #elif DORADO_METAL_BUILD
 std::shared_ptr<ModelCaller> create_mps_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<MetalCaller>(params.model_config,
-                                         std::make_unique<MPSModel>(params.model_config));
+    return std::make_shared<MetalCaller>(
+            params.model_config,
+            std::make_unique<MPSModel>(params.model_config, params.modbase_configs));
 }
 
 int mps_max_safe_batch_size_for_device(const std::string&,

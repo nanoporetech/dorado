@@ -36,7 +36,9 @@ at::TensorOptions get_crf_options(const config::BasecallModelConfig &config) {
 
 }  // namespace
 
-MPSModel::MPSModel(const config::BasecallModelConfig &model_config) : m_config(model_config) {
+MPSModel::MPSModel(const config::BasecallModelConfig &model_config,
+                   const std::span<const config::ModBaseModelConfig> modbase_configs)
+        : m_config(model_config), m_modbase_decoder(modbase_configs) {
     ScopedAutoReleasePool autorelease_pool;
 
     // Our metal builds assume shared memory, so it's safe to check host.
@@ -97,6 +99,16 @@ MPSModel::MPSModel(const config::BasecallModelConfig &model_config) : m_config(m
 
     // Load the model and get ready for calling.
     m_model = model::load_model(model_config, get_crf_options(model_config));
+
+    if (!modbase_configs.empty()) {
+        if (!model_config.is_flstm_model()) {
+            throw std::runtime_error(
+                    "Latent-space modbase models require an FLSTM basecalling model");
+        }
+        m_modbase_modules = modbase::load_modbase_latent_space_model(modbase_configs,
+                                                                     get_crf_options(model_config));
+        m_modbase_info = modbase::create_modbase_info(modbase_configs);
+    }
 }
 
 MPSModel::~MPSModel() = default;
@@ -107,10 +119,10 @@ at::Tensor MPSModel::create_input_tensor() const {
 }
 
 bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, int try_count) {
-    auto scores_TNC = m_model->forward(task.input->to(get_crf_options(m_config)))
-                              .scores.transpose(0, 1)
-                              .contiguous()
-                              .to(scores_dtype);
+    auto model_output = m_model->forward(task.input->to(get_crf_options(m_config)), nullptr,
+                                         m_modbase_modules.has_value());
+    auto scores_TNC = model_output.scores.transpose(0, 1).contiguous().to(scores_dtype);
+    task.signal_embeddings = std::move(model_output.signal_embeddings);
 
     MTL::CommandBuffer *const cb = next_command_buffer(m_command_queue.get(), try_count);
     // wait for the previous decode task to complete - this acts as a mutex
@@ -124,5 +136,25 @@ bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, 
 }
 
 DecodedData MPSModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
+
+void MPSModel::decode_modbase(MetalCallerTask &task) {
+    if (!m_modbase_modules) {
+        return;
+    }
+    const std::span<decode::DecodedChunk> chunks =
+            std::span(*task.out_chunks).first(task.num_chunks);
+    {
+        std::lock_guard lock(m_modbase_mutex);
+        auto heads = modbase::run_modbase_latent_space_models(
+                *m_modbase_modules,
+                decode::pack_decoded_chunks(chunks).to(task.signal_embeddings.device()),
+                task.signal_embeddings.narrow(0, 0, task.num_chunks));
+        for (at::Tensor &head : heads) {
+            head = head.to(at::kCPU);
+        }
+        m_modbase_decoder.decode(heads, chunks);
+    }
+    task.signal_embeddings = at::Tensor{};
+}
 
 }  // namespace dorado::basecall

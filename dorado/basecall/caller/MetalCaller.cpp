@@ -28,6 +28,8 @@ MetalCaller::MetalCaller(const config::BasecallModelConfig &model_config,
 
 MetalCaller::~MetalCaller() { terminate(); }
 
+std::shared_ptr<ModBaseInfo> MetalCaller::modbase_info() const { return m_model->modbase_info(); }
+
 std::unique_ptr<ModelCaller::RunnerContext> MetalCaller::create_runner_context(
         size_t batch_dims_idx) {
     if (batch_dims_idx != 0) {
@@ -61,7 +63,7 @@ void MetalCaller::call_chunks(at::Tensor &input,
     m_input_cv.notify_one();
 
     std::unique_lock lock(task->mut);
-    while (task->decode_chunks_finished != num_chunks) {
+    while (!task->done) {
         task->cv.wait(lock);
     }
 }
@@ -205,13 +207,19 @@ void MetalCaller::decode_thread_fn() {
 
         // Wake the waiting thread which called `call_chunks()` if we're done decoding
         std::unique_lock<std::mutex> task_lock(task->mut);
-        bool done = ++(task->decode_chunks_finished) == task->num_chunks;
+        bool all_decoded = ++(task->decode_chunks_finished) == task->num_chunks;
         task_lock.unlock();
-        if (done) {
+        if (all_decoded) {
             if (auto *decode_complete_event = m_model->decode_complete_event()) {
                 // Now that all chunks are decoded, signal that the GPU can overwrite the scores
                 // buffer with subsequent work.
                 decode_complete_event->setSignaledValue(task->decode_complete_event_id);
+            }
+            // The sequences are now known, so the modbase models can run.
+            m_model->decode_modbase(*task);
+            {
+                std::lock_guard<std::mutex> done_lock(task->mut);
+                task->done = true;
             }
             task->cv.notify_one();
         }
