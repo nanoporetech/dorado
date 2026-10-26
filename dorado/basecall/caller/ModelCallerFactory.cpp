@@ -2,6 +2,7 @@
 
 #include "CPUCaller.h"
 #include "ModelCallerSelection.h"
+#include "config/ModBaseModelConfig.h"
 
 #include <stdexcept>
 
@@ -30,7 +31,7 @@ struct CallerImplementation {
 };
 
 std::shared_ptr<ModelCaller> create_cpu_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<CPUCaller>(params.model_config);
+    return std::make_shared<CPUCaller>(params.model_config, params.modbase_configs);
 }
 
 const CallerImplementation cpu_implementation{
