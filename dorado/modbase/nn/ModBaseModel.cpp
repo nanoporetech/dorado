@@ -6,10 +6,12 @@
 #include "ModBaseLatentSpaceV1Model.h"
 #include "ModBaseLatentSpaceV1SequenceModel.h"
 #include "config/ModBaseModelConfig.h"
+#include "modbase/ModBaseContext.h"
 #include "utils/dev_utils.h"
 #include "utils/log_utils.h"
 #include "utils/overloaded.h"
 
+#include <memory>
 #include <optional>
 #include <stdexcept>
 #include <utility>
@@ -165,6 +167,37 @@ std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
             torch::nn::AnyModule(std::move(common).value()));
     return ModBaseLatentSpaceModels{std::move(sequence_holder), std::move(common_holder),
                                     std::move(classifiers)};
+}
+
+std::shared_ptr<ModBaseInfo> create_modbase_info(
+        const std::span<const config::ModBaseModelConfig> configs) {
+    ModBaseInfo modbase_info = config::get_modbase_info(configs);
+
+    ModBaseContext context;
+    for (const config::ModBaseModelConfig& config : configs) {
+        const config::modbase::ModBaseModelConfigData& data{config::get_model_config_data(config)};
+        if (!data.mods.motif.empty()) {
+            context.set_context(data.mods.motif, data.mods.motif_offset);
+        }
+    }
+
+    return std::make_shared<ModBaseInfo>(std::move(modbase_info.alphabet),
+                                         std::move(modbase_info.long_names), context.encode());
+}
+
+std::vector<at::Tensor> run_modbase_latent_space_models(ModBaseLatentSpaceModels& models,
+                                                        const at::Tensor& decoded_data,
+                                                        at::Tensor signal_embeddings) {
+    auto& [sequence_model, common_model, classifier_models] = models;
+    at::Tensor encoded_sequence = sequence_model->forward(decoded_data);
+    const at::Tensor common_output =
+            common_model->forward(std::move(encoded_sequence), std::move(signal_embeddings));
+    std::vector<at::Tensor> out;
+    out.reserve(classifier_models.size());
+    for (auto& classifier_model : classifier_models) {
+        out.emplace_back(classifier_model->forward(common_output));
+    }
+    return out;
 }
 
 }  // namespace dorado::modbase
