@@ -8,6 +8,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstring>
+#include <tuple>
 
 namespace dorado::basecall::decode {
 
@@ -88,6 +90,35 @@ std::pair<std::vector<uint8_t>, std::vector<bool>> ModBaseDecoder::decode(
     }
 
     return {modbase_probabilities, modbase_motif_hits};
+}
+
+void ModBaseDecoder::decode(const std::span<const at::Tensor> heads,
+                            const std::span<DecodedChunk> chunks) const {
+    if (m_heads.empty()) {
+        return;
+    }
+    std::vector<at::Tensor> chunk_heads(heads.size());
+    for (int64_t idx = 0; idx < std::ssize(chunks); ++idx) {
+        for (std::size_t i = 0; i < heads.size(); ++i) {
+            chunk_heads[i] = heads[i][idx];
+        }
+        DecodedChunk &chunk = chunks[idx];
+        std::tie(chunk.base_mod_probs, chunk.base_mod_simplex_motif_hits) =
+                decode(chunk_heads, chunk.sequence, chunk.moves);
+    }
+}
+
+at::Tensor pack_decoded_chunks(const std::span<const DecodedChunk> chunks) {
+    const int64_t N = std::ssize(chunks);
+    const int64_t T = std::ssize(chunks.front().moves);
+    at::Tensor packed = at::zeros({3, N, T}, at::kChar);
+    auto *const data = packed.data_ptr<int8_t>();
+    for (int64_t idx = 0; idx < N; ++idx) {
+        const DecodedChunk &chunk = chunks[idx];
+        std::memcpy(data + idx * T, chunk.moves.data(), chunk.moves.size());
+        std::memcpy(data + (N + idx) * T, chunk.sequence.data(), chunk.sequence.size());
+    }
+    return packed;
 }
 
 }  // namespace dorado::basecall::decode

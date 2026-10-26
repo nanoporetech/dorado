@@ -1,5 +1,6 @@
 #pragma once
 
+#include "basecall/DecodedChunk.h"
 #include "config/ModBaseModelConfigFwd.h"
 #include "modbase/MotifMatcher.h"
 
@@ -27,6 +28,9 @@ public:
                                                               std::string_view sequence,
                                                               std::span<const uint8_t> moves) const;
 
+    // Fills the modbase fields of each chunk from per-head [N, T * num_states] CPU scores.
+    void decode(std::span<const at::Tensor> heads, std::span<DecodedChunk> chunks) const;
+
 private:
     struct Head {
         int32_t base_id;
@@ -40,5 +44,9 @@ private:
     std::array<size_t, 4> m_base_offsets;
     std::vector<Head> m_heads;
 };
+
+// Packs chunks into the [3, N, T] int8 (moves, sequence, qstring) layout produced by
+// CUDADecoder::prepare_decode, as consumed by the modbase sequence model.
+at::Tensor pack_decoded_chunks(std::span<const DecodedChunk> chunks);
 
 }  // namespace dorado::basecall::decode
