@@ -3,12 +3,13 @@
 #include "config/ModBaseModelConfig.h"
 #include "utils/sequence_utils.h"
 
-#include <ATen/ATen.h>
+#include <ATen/core/TensorBody.h>
+#include <ATen/ops/zeros.h>
+#include <c10/core/ScalarType.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cmath>
-#include <cstring>
 #include <tuple>
 
 namespace dorado::basecall::decode {
@@ -122,8 +123,8 @@ at::Tensor pack_decoded_chunks(const std::span<const DecodedChunk> chunks) {
     auto *const data = packed.data_ptr<int8_t>();
     for (int64_t idx = 0; idx < N; ++idx) {
         const DecodedChunk &chunk = chunks[idx];
-        std::memcpy(data + idx * T, chunk.moves.data(), chunk.moves.size());
-        std::memcpy(data + (N + idx) * T, chunk.sequence.data(), chunk.sequence.size());
+        std::ranges::copy(chunk.moves, data + idx * T);
+        std::ranges::copy(chunk.sequence, data + (N + idx) * T);
     }
     return packed;
 }

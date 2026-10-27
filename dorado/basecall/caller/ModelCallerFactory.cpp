@@ -2,7 +2,7 @@
 
 #include "CPUCaller.h"
 #include "ModelCallerSelection.h"
-#include "config/ModBaseModelConfig.h"
+#include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 
 #include <stdexcept>
 

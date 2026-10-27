@@ -4,7 +4,6 @@
 #include "config/ModBaseModelConfig.h"
 
 #include <ATen/ops/arange.h>
-#include <ATen/ops/zeros.h>
 #include <catch2/catch_test_macros.hpp>
 
 #include <string>
@@ -111,7 +110,7 @@ CATCH_TEST_CASE(CUT_TAG " pack_decoded_chunks uses the decoder tensor layout", C
     CATCH_REQUIRE(packed.scalar_type() == at::kChar);
     for (int64_t n = 0; n < 2; ++n) {
         for (int64_t t = 0; t < T; ++t) {
-            CATCH_CHECK(packed[0][n][t].item<int8_t>() == chunks[n].moves[t]);
+            CATCH_CHECK(packed[0][n][t].item<int8_t>() == static_cast<int8_t>(chunks[n].moves[t]));
         }
         for (size_t i = 0; i < chunks[n].sequence.size(); ++i) {
             CATCH_CHECK(packed[1][n][i].item<int8_t>() == chunks[n].sequence[i]);
