@@ -225,8 +225,9 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
                     "models.");
         }
         // TODO: check the required dtype here
-        m_modbase_modules =
-                modbase::load_modbase_latent_space_model(params.modbase_configs, m_options);
+        m_modbase_modules = modbase::load_modbase_latent_space_model(
+                params.modbase_configs, m_options,
+                static_cast<int>(m_config.basecaller.chunk_size() / m_config.stride_inner()));
 
         m_modbase_info = modbase::create_modbase_info(params.modbase_configs);
     }

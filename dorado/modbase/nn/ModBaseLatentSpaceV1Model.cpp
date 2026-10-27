@@ -124,7 +124,8 @@ namespace dorado::modbase::model {
 
 ModBaseLatentSpaceV1CommonModelImpl::ModBaseLatentSpaceV1CommonModelImpl(
         const config::modbase::LatentSpaceV1ModelConfig& config,
-        const at::TensorOptions& options)
+        const at::TensorOptions& options,
+        const int max_seq_len)
         : model_config(config) {
     sequence_encoder =
             register_module("sequence_encoder", nn::ConvStack(model_config.modules.sequence_convs));
@@ -135,10 +136,8 @@ ModBaseLatentSpaceV1CommonModelImpl::ModBaseLatentSpaceV1CommonModelImpl(
 
     common_encoder = register_module("common_encoder", torch::nn::Sequential());
     for (auto params : model_config.modules.transformer_encoder) {
-        if (params.max_seq_len == 0) {
-            params.max_seq_len =
-                    static_cast<int>(model_config.chunked.chunk_size / model_config.general.stride);
-        }
+        // The input is taken from the basecall model so its chunk size determines the length.
+        params.max_seq_len = max_seq_len;
         common_encoder->push_back(nn::TxEncoder(params, options, false));
     }
 }

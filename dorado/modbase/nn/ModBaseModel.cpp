@@ -104,7 +104,8 @@ torch::nn::ModuleHolder<torch::nn::AnyModule> load_modbase_model(
 
 std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
         const std::span<const config::ModBaseModelConfig> configs,
-        const at::TensorOptions& options) {
+        const at::TensorOptions& options,
+        const int max_seq_len) {
     if (configs.empty()) {
         return std::nullopt;
     }
@@ -128,8 +129,8 @@ std::optional<ModBaseLatentSpaceModels> load_modbase_latent_space_model(
         std::visit(
                 utils::overloaded{
                         [&](const config::modbase::LatentSpaceV1ModelConfig& model_config) {
-                            auto candidate_common =
-                                    model::ModBaseLatentSpaceV1CommonModel(model_config, options);
+                            auto candidate_common = model::ModBaseLatentSpaceV1CommonModel(
+                                    model_config, options, max_seq_len);
                             load_model_weights(candidate_common, model_config.data.model_path);
 
                             if (common.has_value()) {

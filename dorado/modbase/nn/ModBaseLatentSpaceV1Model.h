@@ -20,7 +20,8 @@ namespace dorado::modbase::model {
  */
 struct ModBaseLatentSpaceV1CommonModelImpl : torch::nn::Module {
     ModBaseLatentSpaceV1CommonModelImpl(const config::modbase::LatentSpaceV1ModelConfig& config,
-                                        const at::TensorOptions& options);
+                                        const at::TensorOptions& options,
+                                        int max_seq_len);
 
     at::Tensor forward(at::Tensor sequences, at::Tensor embedded_features);
     void load_state_dict(const std::vector<at::Tensor>& weights);

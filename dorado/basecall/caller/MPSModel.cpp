@@ -105,8 +105,10 @@ MPSModel::MPSModel(const config::BasecallModelConfig &model_config,
             throw std::runtime_error(
                     "Latent-space modbase models require an FLSTM basecalling model");
         }
-        m_modbase_modules = modbase::load_modbase_latent_space_model(modbase_configs,
-                                                                     get_crf_options(model_config));
+        m_modbase_modules = modbase::load_modbase_latent_space_model(
+                modbase_configs, get_crf_options(model_config),
+                static_cast<int>(model_config.basecaller.chunk_size() /
+                                 model_config.stride_inner()));
         m_modbase_info = modbase::create_modbase_info(modbase_configs);
     }
 }
