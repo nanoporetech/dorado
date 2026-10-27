@@ -29,7 +29,7 @@ struct CpuBatch final : InFlightBatch {
     at::Tensor signal_embeddings;
 };
 
-class CpuModel final : public TypedCallerModel<TensorRunnerState, CpuBatch> {
+class CpuModel final : public TypedCallerModel<CpuModel, TensorRunnerState, CpuBatch> {
 public:
     CpuModel(const config::BasecallModelConfig& model_config,
              std::span<const config::ModBaseModelConfig> modbase_configs);
@@ -42,11 +42,10 @@ public:
     stats::NamedStats sample_stats() const override;
 
 private:
-    std::unique_ptr<CpuBatch> prepare_batch(TensorRunnerState& state, int num_chunks) override;
-    void submit_batch(CpuBatch& batch) override;
-    void decode_batch(CpuBatch& batch,
-                      size_t unit,
-                      std::vector<decode::DecodedChunk>& out) override;
+    friend class TypedCallerModel<CpuModel, TensorRunnerState, CpuBatch>;
+    std::unique_ptr<CpuBatch> prepare_batch(TensorRunnerState& state, int num_chunks);
+    void submit_batch(CpuBatch& batch);
+    void decode_batch(CpuBatch& batch, size_t unit, std::vector<decode::DecodedChunk>& out);
 
     const config::BasecallModelConfig m_config;
     std::unique_ptr<decode::Decoder> m_decoder;

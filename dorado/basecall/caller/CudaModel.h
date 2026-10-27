@@ -82,7 +82,7 @@ struct CudaBatch final : InFlightBatch {
 
 // Owns everything backend-specific about running a basecalling model on a CUDA device: model and
 // decoder loading, batch dimension selection, warm-up, tensor layout, and the forward/decode steps.
-class CudaModel final : public TypedCallerModel<CudaRunnerState, CudaBatch> {
+class CudaModel final : public TypedCallerModel<CudaModel, CudaRunnerState, CudaBatch> {
 public:
     explicit CudaModel(const BasecallerCreationParams &params);
     ~CudaModel() override;
@@ -113,12 +113,11 @@ public:
     c10::Device device() const { return m_options.device(); }
 
 private:
-    std::unique_ptr<CudaBatch> prepare_batch(CudaRunnerState &state, int num_chunks) override;
-    void submit_batch(CudaBatch &batch) override;
-    void decode_batch(CudaBatch &batch,
-                      size_t unit,
-                      std::vector<decode::DecodedChunk> &out) override;
-    void release_batch(CudaBatch &batch, std::vector<decode::DecodedChunk> &out) override;
+    friend class TypedCallerModel<CudaModel, CudaRunnerState, CudaBatch>;
+    std::unique_ptr<CudaBatch> prepare_batch(CudaRunnerState &state, int num_chunks);
+    void submit_batch(CudaBatch &batch);
+    void decode_batch(CudaBatch &batch, size_t unit, std::vector<decode::DecodedChunk> &out);
+    void release_batch(CudaBatch &batch, std::vector<decode::DecodedChunk> &out);
 
     void determine_batch_dims(const BasecallerCreationParams &params);
 
