@@ -1,6 +1,9 @@
 #include <metal_stdlib>
 using namespace metal;
 
+#include "nn.h"
+using namespace dorado::nn::metal;
+
 static constexpr constant int TILE_SIZE = 8;
 
 // Values set via the FunctionConstantValues object passed in at MTL::Function
@@ -58,12 +61,6 @@ typedef float ftype_out;
             [[maybe_unused]] uint simdgroups [[simdgroups_per_threadgroup]], \
             [[maybe_unused]] uint threadgroups [[threadgroups_per_grid]],    \
             [[maybe_unused]] uint threads [[threads_per_threadgroup]]
-
-struct ScanArgs {
-    int T;
-    int N;
-    int C;
-};
 
 // Scores must be rescaled from byte range to [-5.0, 5.0] before use in
 // forward / backward scans.
@@ -374,20 +371,6 @@ kernel void forward_scan_add_softmax_float(const device ScanArgs* const args,
         posts[ts_idx + tid] = static_cast<ftype_out>(exp_val / sum);
     }
 }
-
-struct ConvArgs {
-    int in_size;
-    int win_size;
-    int out_size;
-    int stride;
-    int pad;
-    int chunk_size_in;  // NOTE: multiple of stride!
-    int num_chunks;     // Actually batch size
-    // These are in strided (output) time steps.
-    // Ignored except by conv3.
-    int conv3_time_step_begin;  // Inclusive.
-    int conv3_time_step_end;    // Exclusive
-};
 
 /*
 // Generic convolution implementation that assumes that `weights` are provided as contiguous tensor of shape
@@ -1042,13 +1025,6 @@ kernel void conv3_simd(const device ConvArgs* const args,
 }
 #undef SIMD_GROUPS
 
-struct LstmArgs {
-    int batch_tiles;
-    int chunk_size;
-    int time_step_begin;  // Inclusive
-    int time_step_end;    // Exclusive
-};
-
 template <typename InLayout, typename OutLayout>
 kernel void reorder(const device LstmArgs* const args,
                     const device typename InLayout::ftype* const in,
@@ -1207,13 +1183,6 @@ kernel void lstm(const device LstmArgs* const args,
         }
     }
 }
-
-struct LinearArgs {
-    int in_batch_tiles;
-    int in_batch_tile_offset;
-    int out_batch_tiles;
-    int chunk_size;
-};
 
 template <typename InputMatLayout>
 kernel void linear(const device LinearArgs* const args,
