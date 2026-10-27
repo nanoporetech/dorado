@@ -29,20 +29,20 @@ class RunnerState;
 // CallerModel; queueing, threading and decoding are handled by a BatchExecutor.
 class ModelCaller final {
 public:
-    // Accepts chunks for one runner, and calls them as a batch.
+    // Accepts chunks for one runner. It does not own or refer to the ModelCaller which created it,
+    // so must be passed that caller to call its chunks as a batch.
     class RunnerContext final {
     public:
-        RunnerContext(ModelCaller& caller, std::unique_ptr<RunnerState> state);
+        explicit RunnerContext(std::unique_ptr<RunnerState> state);
         ~RunnerContext();
 
         void accept_chunk(int chunk_idx, const at::Tensor& chunk);
-        std::vector<decode::DecodedChunk> call_chunks(int num_chunks);
+        std::vector<decode::DecodedChunk> call_chunks(ModelCaller& caller, int num_chunks);
         size_t chunk_size() const;
         size_t batch_size() const;
         bool variable_chunk_sizes() const;
 
     private:
-        ModelCaller& m_caller;
         std::unique_ptr<RunnerState> m_state;
     };
 

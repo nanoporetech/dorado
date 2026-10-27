@@ -5,8 +5,8 @@
 
 namespace dorado::basecall {
 
-ModelCaller::RunnerContext::RunnerContext(ModelCaller& caller, std::unique_ptr<RunnerState> state)
-        : m_caller(caller), m_state(std::move(state)) {}
+ModelCaller::RunnerContext::RunnerContext(std::unique_ptr<RunnerState> state)
+        : m_state(std::move(state)) {}
 
 ModelCaller::RunnerContext::~RunnerContext() = default;
 
@@ -14,8 +14,9 @@ void ModelCaller::RunnerContext::accept_chunk(int chunk_idx, const at::Tensor& c
     m_state->accept_chunk(chunk_idx, chunk);
 }
 
-std::vector<decode::DecodedChunk> ModelCaller::RunnerContext::call_chunks(int num_chunks) {
-    return m_caller.call_chunks(*m_state, num_chunks);
+std::vector<decode::DecodedChunk> ModelCaller::RunnerContext::call_chunks(ModelCaller& caller,
+                                                                          int num_chunks) {
+    return caller.call_chunks(*m_state, num_chunks);
 }
 
 size_t ModelCaller::RunnerContext::chunk_size() const { return m_state->chunk_size(); }
@@ -33,7 +34,7 @@ ModelCaller::~ModelCaller() { m_executor->terminate(); }
 
 std::unique_ptr<ModelCaller::RunnerContext> ModelCaller::create_runner_context(
         size_t batch_dims_idx) {
-    return std::make_unique<RunnerContext>(*this, m_model->create_runner_state(batch_dims_idx));
+    return std::make_unique<RunnerContext>(m_model->create_runner_state(batch_dims_idx));
 }
 
 std::vector<decode::DecodedChunk> ModelCaller::call_chunks(RunnerState& state, int num_chunks) {
