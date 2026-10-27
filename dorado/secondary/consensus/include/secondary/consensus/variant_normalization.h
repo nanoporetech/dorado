@@ -1,10 +1,16 @@
 #pragma once
 
 #include "secondary/common/variant.h"
+#include "secondary/consensus/consensus_result.h"
 
+#include <ATen/ATen.h>
+
+#include <array>
+#include <cstdint>
 #include <span>
 #include <string_view>
 #include <tuple>
+#include <unordered_set>
 #include <vector>
 
 namespace dorado::secondary {
@@ -98,5 +104,44 @@ std::pair<std::vector<Variant>, NormalizationStatus> normalize_variants_vs_ref_c
 std::vector<Variant> normalize_variants_vs_ref(std::span<const Variant> variants,
                                                std::string_view ref_seq,
                                                bool allow_ambig_ref);
+
+/**
+ * \brief Normalizes the variants of a single inference sample (window) against the reference, and merges
+ *          the adjacent or overlapping ones into larger variants constructed from the haplotypes.
+ *          Steps: (1) each variant is normalized without overlapping its neighbours, (2) groups of
+ *          adjacent/overlapping variants are replaced by a single variant constructed with
+ *          construct_variant over the union of their spans, (3) all variants are normalized again
+ *          until convergence. Normalization never extends beyond the window.
+ * \param draft The entire input draft/reference sequence.
+ * \param ref_with_gaps Reference sequence with gaps at minor positions, one character per column.
+ * \param cons_seqs_with_gaps Consensus sequence with gaps for each haplotype, one character per column.
+ * \param positions_major Major (reference) coordinate for each column.
+ * \param positions_minor Minor coordinate for each column (0 for reference positions).
+ * \param symbol_set Set of valid symbols in the label scheme.
+ * \param variants Input variants of this window, sorted by position.
+ * \param allow_ambig_ref Allow ambiguous reference bases.
+ * \param probs_3D Probabilities of shape [num_columns x num_haplotypes x num_classes].
+ * \param symbol_lookup Class index for each symbol, or -1.
+ * \param basecalls Optional basecalls tensor used to compute the AD tag. Can be undefined.
+ * \returns Normalized, non-overlapping variants with updated rstart/rend columns.
+ */
+std::vector<Variant> normalize_variants_vs_haplotypes(
+        std::string_view draft,
+        std::string_view ref_with_gaps,
+        const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+        const std::vector<int64_t>& positions_major,
+        const std::vector<int64_t>& positions_minor,
+        const std::unordered_set<char>& symbol_set,
+        std::span<const Variant> variants,
+        bool allow_ambig_ref,
+        const at::Tensor& probs_3D,
+        const std::array<int32_t, 256>& symbol_lookup,
+        bool merge_overlapping,
+        bool merge_adjacent,
+        const at::Tensor& basecalls,
+        float pass_min_qual,
+        float pass_min_gq,
+        float pass_min_aq,
+        float pass_min_vq);
 
 }  // namespace dorado::secondary

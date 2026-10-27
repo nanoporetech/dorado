@@ -1313,6 +1313,37 @@ CATCH_TEST_CASE("join_samples joins a long insertion split between multiple samp
     CATCH_CHECK(result.front().alts == std::vector<std::string>{"GACGTTGCAAC"});
 }
 
+CATCH_TEST_CASE("decode_variants with a sample starting on an insertion column", TEST_GROUP) {
+    /**
+     * \brief The sample starts on an insertion column after the reference position 2, so position 2
+     *          has no reference column in the sample. The insertion is anchored on the draft base
+     *          of position 2, which must also be the reference base used by normalization.
+     */
+    const DecoderBase decoder(LabelSchemeType::HAPLOID);
+    const std::string symbols = decoder.get_label_scheme_symbols();
+    const std::string_view draft{"ACGTACGTAC"};
+
+    const VariantCallingSample sample{
+            0,
+            {2, 3, 4, 5, 6},
+            {1, 0, 0, 0, 0},
+            make_haploid_probs(symbols, "ATACG", 0.99f),
+            at::full({5}, 10, at::kInt),
+            {},
+            {},
+            at::Tensor{},
+    };
+
+    const std::vector<Variant> result =
+            general_decode_variants(decoder, sample, draft, 0.0f, 0.0f, 0.0f, 0.0f, false, false,
+                                    false, false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result.front().pos == 2);
+    CATCH_CHECK(result.front().ref == "G");
+    CATCH_CHECK(result.front().alts == std::vector<std::string>{"GA"});
+}
+
 CATCH_TEST_CASE("compute VAF from AD", TEST_GROUP) {
     struct TestCase {
         std::string test_name;

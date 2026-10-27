@@ -51,16 +51,6 @@ float round_float(float val, const int32_t decimal_places) {
     return val;
 }
 
-bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map,
-                          const std::string_view query) {
-    for (const char c : query) {
-        if (symbol_map.count(c) == 0) {
-            return false;
-        }
-    }
-    return true;
-}
-
 std::string make_reference_gt(const int32_t ploidy, const char allele) {
     std::ostringstream oss_gt;
     for (int32_t i = 0; i < ploidy; ++i) {
@@ -814,6 +804,18 @@ float calculate_VQ(const std::vector<float>& allele_logprobs, const std::vector<
     return phred(-std::expm1(v_logprob), VCF_MAX_GQ_CAP);
 }
 
+}  // namespace
+
+bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map,
+                          const std::string_view query) {
+    for (const char c : query) {
+        if (symbol_map.count(c) == 0) {
+            return false;
+        }
+    }
+    return true;
+}
+
 Variant construct_variant(const std::string_view draft,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
@@ -988,6 +990,8 @@ Variant construct_variant(const std::string_view draft,
 
     return var;
 }
+
+namespace {
 
 std::vector<Variant> merge_sorted_variants(const std::vector<Variant>& variants,
                                            const bool merge_overlapping,

@@ -141,6 +141,53 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
                           const std::unordered_set<char>& symbol_set,
                           const Variant& variant,
                           bool ambig_variant);
+/**
+ * \brief Utility function which checks if every character of query is in the allowed
+ *          symbol map.
+ */
+bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map, const std::string_view query);
+
+/**
+ * \brief Constructs a variant from the haplotype sequences over a span of sample columns, and computes
+ *          its genotype and quality scores from the per-haplotype probabilities.
+ * \param draft The entire input draft/reference sequence.
+ * \param positions_major Major (reference) coordinate for each sample column.
+ * \param positions_minor Minor coordinate for each sample column (0 for reference positions).
+ * \param ref_seq_with_gaps Reference sequence with gaps at minor positions, one character per column.
+ * \param cons_seqs_with_gaps Consensus sequence with gaps for each haplotype, one character per column.
+ * \param seq_id Reference sequence ID of the variant.
+ * \param rstart Start column of the variant span. Zero-based.
+ * \param rend End column of the variant span. Non-inclusive.
+ * \param is_var If true, an empty variant is returned when no haplotype differs from the reference.
+ * \param ambig_ref Allow ambiguous reference bases in the variant.
+ * \param normalize Normalize the variant with normalize_variant.
+ * \param variant_source Value for the SRC FORMAT tag.
+ * \param probs_3D Probabilities of shape [num_columns x num_haplotypes x num_classes].
+ * \param symbol_set Set of valid symbols in the label scheme.
+ * \param symbol_lookup Class index for each symbol, or -1.
+ * \param basecalls Optional basecalls tensor used to compute the AD tag. Can be undefined.
+ * \returns The constructed variant, or an empty (invalid) variant if no variant can be constructed.
+ */
+Variant construct_variant(std::string_view draft,
+                          const std::vector<int64_t>& positions_major,
+                          const std::vector<int64_t>& positions_minor,
+                          std::string_view ref_seq_with_gaps,
+                          const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+                          int32_t seq_id,
+                          int64_t rstart,
+                          int64_t rend,
+                          bool is_var,
+                          bool ambig_ref,
+                          bool normalize,
+                          const std::string& variant_source,
+                          const at::Tensor& probs_3D,
+                          const std::unordered_set<char>& symbol_set,
+                          const std::array<int32_t, 256>& symbol_lookup,
+                          const at::Tensor& basecalls,
+                          float pass_min_qual,
+                          float pass_min_gq,
+                          float pass_min_aq,
+                          float pass_min_vq);
 
 /**
  * \brief Decodes polyploid variants from a given tensor of probabilities for a single inference sample (not a batch).
