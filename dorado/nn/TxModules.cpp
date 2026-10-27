@@ -652,7 +652,6 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
     const int E = params.dim_feedforward * 2;
     // TODO: I should have alpha be an argument to RMSNorm kernels...
     // const float alpha = params.deepnorm_alpha;
-    const int use_uswiglu = utils::get_dev_opt("unconventional_swiglu", 0);
 
     // auto f32_opts = x_tiled_nvfp4.options().dtype(torch::kFloat);
     auto f16_opts = x_tiled_nvfp4.options().dtype(torch::kF16);
@@ -1061,8 +1060,6 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] Aux
 #if DORADO_CUDA_BUILD
     if (use_koi_nvfp4_tiled && !DORADO_ORIN) {
 #if !DORADO_ORIN
-        bool test_nvfp4_tx_perf = utils::get_dev_opt<bool>("koi_test_nvfp4_tx_perf", true);
-
         if (aux) {
             throw std::runtime_error(
                     "NVFP4 Blackwell inference does not support "
@@ -1076,33 +1073,18 @@ at::Tensor TxEncoderStackImpl::forward(const at::Tensor &x, [[maybe_unused]] Aux
         at::Tensor x_tiled_nvfp4;
         {
             utils::ScopedProfileRange spr("Tile Input to NVFP4", 2);
-            if (test_nvfp4_tx_perf) {
-                x_tiled_nvfp4 = torch::randn({(N * T) / 256, C / 128, 16, 288},
-                                             x.options().dtype(torch::kFloat))
-                                        .view(torch::kInt);
-            } else {
-                x_tiled_nvfp4 = convert_to_nvfp4_tiled(x.reshape({(N * T), C}), {256, 128}, false,
-                                                       x.options().dtype(torch::kInt));
-            }
+            x_tiled_nvfp4 = convert_to_nvfp4_tiled(x.reshape({(N * T), C}), {256, 128}, false,
+                                                   x.options().dtype(torch::kInt));
         }
 
         for (auto &layer : layer_vec) {
             layer->koi_nvfp4_forward(x_tiled_nvfp4, N, T);
         }
 
-        at::Tensor untiled_f16;
-        {
-            utils::ScopedProfileRange spr("Untile NVFP4 Output and Convert to F16", 2);
-            if (test_nvfp4_tx_perf) {
-                untiled_f16 = x_tiled_nvfp4;
-                untiled_f16 = torch::randn({N, T, C}, x.options().dtype(torch::kHalf));
-            } else {
-                untiled_f16 = untile_nvfp4(x_tiled_nvfp4, {256, 128},
-                                           x_tiled_nvfp4.options().dtype(torch::kHalf));
-                untiled_f16 = untiled_f16.view({N, T, C});
-            }
-        }
-        return untiled_f16;
+        utils::ScopedProfileRange spr("Untile NVFP4 Output and Convert to F16", 2);
+        at::Tensor untiled_f16 = untile_nvfp4(x_tiled_nvfp4, {256, 128},
+                                              x_tiled_nvfp4.options().dtype(torch::kHalf));
+        return untiled_f16.view({N, T, C});
 #endif  // !DORADO_ORIN
     } else if (use_koi_tiled) {
         int N, T, C;
