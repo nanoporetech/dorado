@@ -14,15 +14,17 @@
 
 namespace dorado::basecall {
 
+class BatchExecutor;
+
 // A batch waiting for, or going through, the executor pipeline.
 struct BatchTask {
-    BatchTask(const void* owner_, std::unique_ptr<InFlightBatch> work_, int num_chunks_)
+    BatchTask(const BatchExecutor* owner_, std::unique_ptr<InFlightBatch> work_, int num_chunks_)
             : owner(owner_),
               work(std::move(work_)),
               num_chunks(num_chunks_),
               out(static_cast<size_t>(num_chunks_)) {}
 
-    const void* owner;
+    const BatchExecutor* owner;
     std::unique_ptr<InFlightBatch> work;
     const int num_chunks;
     std::vector<decode::DecodedChunk> out;
