@@ -3,6 +3,7 @@
 #include "config/BasecallModelConfig.h"
 #include "decode/Decoder.h"
 #include "decode/beam_search.h"
+#include "nn/metal/nn.h"
 #include "torch_utils/metal_utils.h"
 
 #include <ATen/TensorIndexing.h>
@@ -62,8 +63,12 @@ MetalDecoder::MetalDecoder(const config::BasecallModelConfig& model_config,
 bool MetalDecoder::prepare_decode(MTL::CommandBuffer* const command_buffer, int try_count) {
     POINT_OF_INTEREST_SCOPE(MetalDecoder, prepare_decode, "try_count=%i", try_count);
 
-    std::vector<int32_t> scan_args_data{m_out_chunk_size, m_out_batch_size, m_states};
-    auto scan_args = create_vec_buffer(m_device, scan_args_data);
+    const nn::metal::ScanArgs scan_args_data{
+            .T = m_out_chunk_size,
+            .N = m_out_batch_size,
+            .C = m_states,
+    };
+    auto scan_args = create_buffer_from_data(m_device, scan_args_data);
     name_mtl_object(scan_args, "scan_kernel_args");
 
     for (int i = 0; i < m_out_split; ++i) {

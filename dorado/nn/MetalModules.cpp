@@ -1,6 +1,6 @@
 #include "nn/MetalModules.h"
 
-#include "metal/nn.h"
+#include "nn/metal/nn.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
 

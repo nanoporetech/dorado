@@ -1,3 +1,4 @@
+#include "nn/metal/nn.h"
 #include "torch_utils/metal_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -70,13 +71,14 @@ CATCH_TEST_CASE(TEST_GROUP "Linear") {
                      {{"kLstmLayerSize", layer_size}}, std::nullopt);
     CATCH_REQUIRE(reorder_input_cps);
 
-    // Order in LstmArgs struct (which is also used by reorder_input):
-    // batch_tiles
-    // chunk_size
-    // time_step_begin
-    // time_step_end
-    const std::vector<int32_t> args_reorder_{in_batch_size / tile_size, lstm_chunk_size, 0, 0};
-    const NS::SharedPtr<MTL::Buffer> args_reorder = create_vec_buffer(device.get(), args_reorder_);
+    const dorado::nn::metal::LstmArgs lstm_reorder_args{
+            .batch_tiles = in_batch_size / tile_size,
+            .chunk_size = lstm_chunk_size,
+            .time_step_begin = 0,
+            .time_step_end = 0,
+    };
+    const NS::SharedPtr<MTL::Buffer> args_reorder =
+            create_buffer_from_data(device.get(), lstm_reorder_args);
     CATCH_REQUIRE(args_reorder);
 
     // Ensure we get the same random values for each run.
@@ -153,11 +155,14 @@ CATCH_TEST_CASE(TEST_GROUP "Linear") {
                         const int in_batch_tiles = in_batch_size / tile_size;
                         for (int in_batch_tile_offset = 0; in_batch_tile_offset < in_batch_tiles;
                              in_batch_tile_offset += out_batch_tiles) {
-                            const std::vector<int32_t> args_linear_{
-                                    in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
-                                    lstm_chunk_size};
+                            const dorado::nn::metal::LstmArgs linear_args{
+                                    .batch_tiles = in_batch_tiles,
+                                    .chunk_size = in_batch_tile_offset,
+                                    .time_step_begin = out_batch_tiles,
+                                    .time_step_end = lstm_chunk_size,
+                            };
                             const NS::SharedPtr<MTL::Buffer> args_linear =
-                                    create_vec_buffer(device.get(), args_linear_);
+                                    create_buffer_from_data(device.get(), linear_args);
                             CATCH_REQUIRE(args_linear);
 
                             auto out_dtype = output_as_byte ? torch::kI8 : torch::kF16;

@@ -1,7 +1,7 @@
 #include <metal_stdlib>
 using namespace metal;
 
-#include "nn.h"
+#include "../include/nn/metal/nn.h"
 using namespace dorado::nn::metal;
 
 static constexpr constant int TILE_SIZE = 8;
