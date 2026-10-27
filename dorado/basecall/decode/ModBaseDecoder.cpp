@@ -22,16 +22,12 @@ ModBaseDecoder::ModBaseDecoder(const std::span<const config::ModBaseModelConfig>
         const config::modbase::CommonModelParams &common_params{
                 config::get_common_model_params(config)};
 
-        Head head{
-                .base_id = static_cast<int32_t>(modbase_data.mods.base_id),
-                .num_states = static_cast<int32_t>(modbase_data.mods.count + 1),
-                .context_num_samples_before = static_cast<int32_t>(
-                        modbase_data.context.samples_before / common_params.stride),
-                .context_num_samples_after = static_cast<int32_t>(
-                        modbase_data.context.samples_after / common_params.stride),
-                .matcher = modbase::MotifMatcher{config},
-        };
-        m_heads.emplace_back(std::move(head));
+        m_heads.emplace_back(
+                static_cast<int32_t>(modbase_data.mods.base_id),
+                static_cast<int32_t>(modbase_data.mods.count + 1),
+                static_cast<int32_t>(modbase_data.context.samples_before / common_params.stride),
+                static_cast<int32_t>(modbase_data.context.samples_after / common_params.stride),
+                modbase::MotifMatcher{config});
         m_num_states += modbase_data.mods.count;
     }
 }
