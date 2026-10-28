@@ -126,7 +126,6 @@ void MetalLSTMModel::set_chunk_batch_size(const BasecallModelConfig &model_confi
     m_model->load_state_dict(state_dict);
     m_model->eval();
 
-    m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
     // The packed byte scores represent the model's [-5, 5] score range.
     constexpr float score_scale = static_cast<float>(5.0 / 127.0);
     m_decoder = std::make_unique<MetalDecoder>(model_config, m_device.get(), m_out_chunk_size,
@@ -199,16 +198,14 @@ bool MetalLSTMModel::call_task(MetalCallerTask &task,
 
     // The linear layer should not execute until the previous batch has been decoded,
     // since the same buffers are used for successive batches' scores, fwd/bwd scans.
-    MTL::CommandBuffer *const cb = m_model->forward_async(
-            *task.input, m_decode_complete_event.get(), task.decode_complete_event_id - 1,
-            try_count, m_decoder->scores());
+    MTL::CommandBuffer *const cb = m_model->forward_async(*task.input, decode_complete_event(),
+                                                          task.decode_complete_event_id - 1,
+                                                          try_count, m_decoder->scores());
     if (cb == nullptr) {
         return false;
     }
 
     return m_decoder->prepare_decode(cb, try_count);
 }
-
-DecodedData MetalLSTMModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); }
 
 }  // namespace dorado::basecall

@@ -123,11 +123,10 @@ std::shared_ptr<ModBaseInfo> MetalCallerModel::modbase_info() const {
 
 void MetalCallerModel::release_batch(MetalCallerTask &task,
                                      std::vector<decode::DecodedChunk> &out) {
-    if (auto *decode_complete_event = m_model->decode_complete_event()) {
-        // Now that all chunks are decoded, signal that the GPU can overwrite the scores
-        // buffer with subsequent work.
-        decode_complete_event->setSignaledValue(task.decode_complete_event_id);
-    }
+    // Now that all chunks are decoded, signal that the GPU can overwrite the scores
+    // buffer with subsequent work.
+    m_model->decode_complete_event()->setSignaledValue(task.decode_complete_event_id);
+
     // The sequences are now known, so the modbase models can run.
     m_model->decode_modbase(task, std::span<decode::DecodedChunk>(out.data(), task.num_chunks));
 }

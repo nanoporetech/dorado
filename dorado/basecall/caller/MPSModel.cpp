@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <mutex>
 #include <stdexcept>
 
 using namespace dorado::utils;
@@ -52,7 +53,6 @@ MPSModel::MPSModel(const config::BasecallModelConfig &model_config,
     {
         m_device = get_mtl_device();
         m_command_queue = NS::TransferPtr(m_device->newCommandQueue());
-        m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
     }
 
     // Cache common options.
@@ -128,15 +128,13 @@ bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, 
     MTL::CommandBuffer *const cb = next_command_buffer(m_command_queue.get(), try_count);
     // wait for the previous decode task to complete - this acts as a mutex
     // previous scores are processed in the decode threads
-    cb->encodeWait(m_decode_complete_event.get(), task.decode_complete_event_id - 1);
+    cb->encodeWait(decode_complete_event(), task.decode_complete_event_id - 1);
 
     m_decoder->scores().front().copy_(scores_TNC);
 
     std::lock_guard lock(inter_caller_mutex);
     return m_decoder->prepare_decode(cb, try_count);
 }
-
-DecodedData MPSModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
 
 void MPSModel::decode_modbase(MetalCallerTask &task, std::span<decode::DecodedChunk> chunks) {
     if (!m_modbase_modules) {

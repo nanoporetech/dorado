@@ -68,6 +68,7 @@ if(APPLE)
             caller/MetalCallerTask.h
             caller/MetalLSTMModel.cpp
             caller/MetalLSTMModel.h
+            caller/MetalModel.cpp
             caller/MetalModel.h
             caller/MPSModel.cpp
             caller/MPSModel.h
