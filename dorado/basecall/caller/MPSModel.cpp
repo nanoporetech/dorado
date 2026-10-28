@@ -144,7 +144,7 @@ void MPSModel::decode_modbase(MetalCallerTask &task) {
         return;
     }
 
-    const std::span<decode::DecodedChunk> chunks = std::span(*task.out_chunks, task.num_chunks);
+    const auto chunks = std::span<decode::DecodedChunk>(task.out_chunks->begin(), task.num_chunks);
     {
         std::lock_guard lock(m_modbase_mutex);
         auto heads = modbase::run_modbase_latent_space_models(
