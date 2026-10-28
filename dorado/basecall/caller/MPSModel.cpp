@@ -13,7 +13,6 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
-#include <mutex>
 #include <stdexcept>
 
 using namespace dorado::utils;
