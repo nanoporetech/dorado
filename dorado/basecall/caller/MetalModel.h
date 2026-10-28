@@ -40,8 +40,17 @@ public:
         (void)chunks;
     }
 
+    // Only to be called from the worker thread.
+    uint64_t next_decode_complete_event_id() { return m_next_decode_complete_event_id++; }
+
 protected:
     MetalModel() = default;
+
+private:
+    // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
+    // run i before the CPU has finished decoding all run i's chunks. Start at 1, since at event
+    // creation ID 0 is deemed to have been signalled.
+    uint64_t m_next_decode_complete_event_id{1};
 };
 
 }  // namespace dorado::basecall

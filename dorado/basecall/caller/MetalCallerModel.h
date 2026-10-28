@@ -43,11 +43,6 @@ private:
 
     const config::BasecallModelConfig m_config;
     std::unique_ptr<MetalModel> m_model;
-
-    // Incrementing ID used to prevent the linear layer of run i+1 overwriting the scores of
-    // run i before the CPU has finished decoding all run i's chunks. Start at 1, since at event
-    // creation ID 0 is deemed to have been signalled. Only accessed from the worker thread.
-    uint64_t m_next_decode_complete_event_id{1};
 };
 
 }  // namespace dorado::basecall

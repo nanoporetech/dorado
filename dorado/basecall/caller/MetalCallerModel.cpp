@@ -50,8 +50,6 @@ SchedulingPolicy MetalCallerModel::scheduling_policy() const {
 }
 
 std::unique_ptr<ThreadScope> MetalCallerModel::worker_thread_scope() {
-    // Event IDs restart from 1 whenever the worker thread does.
-    m_next_decode_complete_event_id = 1;
     return std::make_unique<MetalThreadScope>();
 }
 
@@ -72,7 +70,7 @@ void MetalCallerModel::submit_batch(MetalCallerTask &task) {
     // Assign this task a unique decode completion event ID.
     // This ID will be signalled by the CPU once it has finished relevant decoding work,
     // allowing the GPU to proceed.
-    task.decode_complete_event_id = m_next_decode_complete_event_id++;
+    task.decode_complete_event_id = m_model->next_decode_complete_event_id();
 
     // Basecall the chunk and run the scan kernels on GPU
     auto retry_delay = 100ms;
