@@ -207,7 +207,8 @@ void MetalCaller::decode_thread_fn() {
 
         // Wake the waiting thread which called `call_chunks()` if we're done decoding
         std::unique_lock<std::mutex> task_lock(task->mut);
-        bool all_decoded = ++(task->decode_chunks_finished) == task->num_chunks;
+        const int num_decoded_chunks = ++(task->decode_chunks_finished);
+        const bool all_decoded = (num_decoded_chunks == task->num_chunks);
         task_lock.unlock();
         if (all_decoded) {
             if (auto *decode_complete_event = m_model->decode_complete_event()) {
