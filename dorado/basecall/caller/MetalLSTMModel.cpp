@@ -33,17 +33,8 @@ namespace dorado::basecall {
 using namespace config;
 
 MetalLSTMModel::MetalLSTMModel(const BasecallModelConfig &model_config, float memory_limit_fraction)
-        : m_config(model_config) {
+        : MetalModel(model_config) {
     ScopedAutoReleasePool autorelease_pool;
-    // Our metal builds assume shared memory, so it's safe to check host.
-    if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        DORADO_LOG(warn,
-                   "Less than 16GB of memory available: {}GB detected. "
-                   "This is below minimum spec and may cause issues",
-                   total_mem);
-    }
-
-    m_device = get_mtl_device();
 
     auto state_dict = model::load_model_weights(model_config);
 

@@ -36,12 +36,8 @@ private:
     std::shared_ptr<ModBaseInfo> modbase_info() const override { return m_modbase_info; }
     void decode_modbase(MetalCallerTask &task, std::span<decode::DecodedChunk> chunks) override;
 
-    const config::BasecallModelConfig m_config;
     std::unique_ptr<model::Model> m_model;
-    NS::SharedPtr<MTL::Device> m_device;
     NS::SharedPtr<MTL::CommandQueue> m_command_queue;
-
-    int m_in_chunk_size, m_out_chunk_size, m_batch_size;
 
     decode::ModBaseDecoder m_modbase_decoder;
     std::optional<modbase::ModBaseLatentSpaceModels> m_modbase_modules;

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "config/BasecallModelConfig.h"
 #include "torch_utils/metal_utils.h"
 #include "utils/types.h"
 
@@ -45,9 +46,13 @@ public:
     uint64_t next_decode_complete_event_id() { return m_next_decode_complete_event_id++; }
 
 protected:
-    MetalModel();
+    explicit MetalModel(const config::BasecallModelConfig& model_config);
 
-    // Created by the derived class once the decoder's dimensions are known.
+    const config::BasecallModelConfig m_config;
+    NS::SharedPtr<MTL::Device> m_device;
+
+    // Set by the derived class.
+    int m_in_chunk_size{0}, m_out_chunk_size{0}, m_batch_size{0};
     std::unique_ptr<MetalDecoder> m_decoder;
 
 private:

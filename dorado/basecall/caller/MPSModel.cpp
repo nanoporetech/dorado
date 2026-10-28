@@ -38,24 +38,14 @@ at::TensorOptions get_crf_options(const config::BasecallModelConfig &config) {
 
 MPSModel::MPSModel(const config::BasecallModelConfig &model_config,
                    const std::span<const config::ModBaseModelConfig> modbase_configs)
-        : m_config(model_config), m_modbase_decoder(modbase_configs) {
+        : MetalModel(model_config), m_modbase_decoder(modbase_configs) {
     ScopedAutoReleasePool autorelease_pool;
-
-    // Our metal builds assume shared memory, so it's safe to check host.
-    if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        DORADO_LOG(warn,
-                   "Less than 16GB of memory available: {}GB detected. "
-                   "This is below minimum spec and may cause issues",
-                   total_mem);
-    }
 
     // Create MPS objects.
     {
-        m_device = get_mtl_device();
         m_command_queue = NS::TransferPtr(m_device->newCommandQueue());
     }
 
-    // Cache common options.
     {
         const auto decoder_options = decode::create_decoder_options(model_config);
 

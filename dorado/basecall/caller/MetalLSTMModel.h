@@ -32,14 +32,11 @@ private:
                               float memory_limit_fraction);
     bool call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, int try_count) override;
 
-    const config::BasecallModelConfig m_config;
     std::unique_ptr<model::MetalCRFModelImpl> m_model;
-    NS::SharedPtr<MTL::Device> m_device;
 
     // Number of pieces the linear output is split into, for reasons of
     // buffer size constraints.
     int m_out_split;
-    int m_in_chunk_size, m_out_chunk_size, m_batch_size;
 };
 
 }  // namespace dorado::basecall
