@@ -1580,8 +1580,7 @@ call_variants_single_chrom(const std::string& draft,
     for (const auto& vc_sample : flank_trimmed_samples) {
         std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                 decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq, pass_min_vq,
-                ambig_ref, gvcf, true, true, false,
-                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                ambig_ref, gvcf, true, false, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
 
         results.insert(std::end(results), std::make_move_iterator(std::begin(variants)),
                        std::make_move_iterator(std::end(variants)));

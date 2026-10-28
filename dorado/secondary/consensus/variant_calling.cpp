@@ -1218,7 +1218,6 @@ std::vector<Variant> general_decode_variants(
         const float pass_min_vq,
         const bool ambig_ref,
         const bool return_all,
-        const bool normalize,
         const bool merge_overlapping,
         const bool merge_adjacent,
         const std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins) {
@@ -1366,15 +1365,13 @@ std::vector<Variant> general_decode_variants(
     std::cerr << '\n';
 #endif
 
-    if (normalize) {
-        // Normalizes the variants of this window and merges the adjacent or overlapping ones.
-        std::sort(std::begin(variants), std::end(variants));
-        variants = normalize_variants_vs_haplotypes(
-                draft, ref_seq_with_gaps, cons_seqs_with_gaps, positions_major, positions_minor,
-                symbol_set, variants, ambig_ref, probs_3D, symbol_lookup, merge_overlapping,
-                merge_adjacent, vc_sample.basecalls, pass_min_qual, pass_min_gq, pass_min_aq,
-                pass_min_vq);
-    }
+    // Normalize all variants of this window, and optionally merge the adjacent or overlapping ones.
+    std::sort(std::begin(variants), std::end(variants));
+    variants = normalize_variants_vs_haplotypes(
+            draft, ref_seq_with_gaps, cons_seqs_with_gaps, positions_major, positions_minor,
+            symbol_set, variants, ambig_ref, probs_3D, symbol_lookup, merge_overlapping,
+            merge_adjacent, vc_sample.basecalls, pass_min_qual, pass_min_gq, pass_min_aq,
+            pass_min_vq);
 
     // Variants which still have empty alleles (could not be padded during normalization) are
     // reported as non-variant records.

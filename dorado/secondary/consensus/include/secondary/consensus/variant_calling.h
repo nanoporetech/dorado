@@ -174,12 +174,10 @@ Variant construct_variant(std::string_view draft,
  * \param draft The entire input draft/reference sequence.
  * \param ambig_ref Allow ambiguous reference bases (`N`) for variant calling.
  * \param return_all Returns gVCF records for all reference positions, including the non-variant ones.
- * \param normalize Normalizes the variants of this sample with normalize_variants_vs_haplotypes, which
- *                  also merges the adjacent and overlapping variants.
- * \param merge_overlapping Overlapping variants will be merged and deduplicated. Used only if normalize is false.
+ * \param merge_overlapping Overlapping variants will be merged and deduplicated.
  * \param merge_adjacent Variants which are immediately adjacent will be merged into a single larger variant.
- *                       Used only if normalize is false.
- * \returns Normalized variants for the input sample.
+ * \returns Normalized variants for the input sample. All variants of the sample are normalized together
+ *          with normalize_variants_vs_haplotypes, after they are constructed from the haplotypes.
  */
 std::vector<Variant> general_decode_variants(
         const DecoderBase& decoder,
@@ -191,7 +189,6 @@ std::vector<Variant> general_decode_variants(
         const float pass_min_vq,
         bool ambig_ref,
         bool return_all,
-        bool normalize,
         bool merge_overlapping,
         bool merge_adjacent,
         std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins);
