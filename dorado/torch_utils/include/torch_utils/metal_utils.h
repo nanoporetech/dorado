@@ -75,13 +75,6 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
         const std::optional<int> max_total_threads_per_tg);
 
-void launch_kernel(MTL::ComputePipelineState *cps,
-                   MTL::CommandQueue *cq,
-                   const std::vector<MTL::Buffer *> &buffers,
-                   const std::vector<int> &tg_buffer_lens,
-                   long threadgroups,
-                   long threads_per_threadroup);
-
 MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count);
 
 // Create a command buffer that won't start until a (potentially long running) task completes.

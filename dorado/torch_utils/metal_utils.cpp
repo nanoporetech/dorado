@@ -180,25 +180,6 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
     return cps;
 }
 
-void launch_kernel(ComputePipelineState *const pipeline,
-                   CommandQueue *const command_queue,
-                   const std::vector<Buffer *> &buffers,
-                   const std::vector<int> &tg_buffer_lens,
-                   long threadgroups,
-                   long threads_per_threadgroup) {
-    auto command_buffer = command_queue->commandBuffer();
-    launch_kernel_no_wait(pipeline, command_buffer, buffers, tg_buffer_lens, threadgroups,
-                          threads_per_threadgroup);
-
-    command_buffer->commit();
-    command_buffer->waitUntilCompleted();
-
-    auto status = command_buffer->status();
-    if (status != MTL::CommandBufferStatusCompleted) {
-        DORADO_LOG(warn, "Synchronous metal command buffer failed: {}", fmt::underlying(status));
-    }
-}
-
 MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count) {
     if (try_count == 0) {
         return queue->commandBuffer();

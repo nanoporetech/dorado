@@ -24,6 +24,9 @@ float MeanAbsDiff(const at::Tensor &a, const at::Tensor &b) {
 // 32 threads/SIMD group on Apple GPUs.  The kernels have this hardwired.
 constexpr int kSimdGroupSize = 32;
 
+// Any non-0 try count will produce extra logging on error.
+constexpr int try_count = 1;
+
 }  // namespace
 
 CATCH_TEST_CASE(TEST_GROUP "Linear") {
@@ -106,9 +109,15 @@ CATCH_TEST_CASE(TEST_GROUP "Linear") {
     // 3) Converts from float32 to float16.
     at::Tensor in_f16_reordered =
             torch::zeros({lstm_chunk_size + 3, in_batch_size, layer_size}, torch::kFloat16);
-    launch_kernel(reorder_input_cps.get(), command_queue.get(),
-                  {args_reorder.get(), mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)},
-                  {}, kernel_thread_groups, threads_per_thread_group);
+    {
+        MTL::CommandBuffer *command_buffer = next_command_buffer(command_queue.get(), try_count);
+        CATCH_REQUIRE(command_buffer != nullptr);
+        launch_kernel_no_wait(
+                reorder_input_cps.get(), command_buffer,
+                {args_reorder.get(), mtl_for_tensor(in_f32), mtl_for_tensor(in_f16_reordered)}, {},
+                kernel_thread_groups, threads_per_thread_group);
+        CATCH_REQUIRE(run_command_buffer("reorder_inputs", command_buffer, try_count));
+    }
 
     // CPU comparison calculation.
     const at::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
@@ -169,13 +178,22 @@ CATCH_TEST_CASE(TEST_GROUP "Linear") {
                             auto out_gpu_partial = torch::zeros(
                                     {lstm_chunk_size, out_batch_size, out_size}, out_dtype);
 
-                            launch_kernel(
-                                    linear_cps.get(), command_queue.get(),
-                                    {args_linear.get(),
-                                     mtl_for_tensor(input_from_lstm ? in_f16_reordered : in_f16),
-                                     mtl_for_tensor(weights_biases_f16),
-                                     mtl_for_tensor(out_gpu_partial)},
-                                    tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
+                            {
+                                MTL::CommandBuffer *command_buffer =
+                                        next_command_buffer(command_queue.get(), try_count);
+                                CATCH_REQUIRE(command_buffer != nullptr);
+                                launch_kernel_no_wait(
+                                        linear_cps.get(), command_buffer,
+                                        {args_linear.get(),
+                                         mtl_for_tensor(input_from_lstm ? in_f16_reordered
+                                                                        : in_f16),
+                                         mtl_for_tensor(weights_biases_f16),
+                                         mtl_for_tensor(out_gpu_partial)},
+                                        tg_buffer_lens, kernel_thread_groups,
+                                        threads_per_thread_group);
+                                CATCH_REQUIRE(
+                                        run_command_buffer("linear", command_buffer, try_count));
+                            }
 
                             int in_batch_offset = in_batch_tile_offset * tile_size;
                             out_gpu_f32.slice(1, in_batch_offset,

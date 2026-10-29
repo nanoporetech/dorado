@@ -176,17 +176,6 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
     conv_cps = make_cps(device, kernel_name + "_simd", metal_constants, kernel_threads);
 }
 
-void MetalConv1dImpl::run(MTL::CommandQueue *command_queue,
-                          MTL::Buffer *mat_in,
-                          MTL::Buffer *mat_out) {
-    for (const auto &args : m_args) {
-        std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
-                                           mat_out};
-        launch_kernel(conv_cps.get(), command_queue, buffers, {}, kernel_thread_groups,
-                      kernel_simd_groups * kSIMDGroupWidth);
-    }
-}
-
 void MetalConv1dImpl::run(MTL::CommandBuffer *command_buffer,
                           MTL::Buffer *mat_in,
                           MTL::Buffer *mat_out) {
