@@ -558,9 +558,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     // can be overwritten by subsequent batches as soon as they have been consumed by
     // the linear layer.  The output of the linear layer must be protected until
     // it has been decoded.
-    if (linear_hold_off_event) {
-        command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
-    }
+    command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
 
     // For now the same SIMD group count, and therefore threadgroup memory buffer size, is
     // used for all linear layer kernel invocations.
