@@ -11,7 +11,6 @@
 #include "utils/memory_utils.h"
 
 #include <cassert>
-#include <cstdint>
 #include <cstdlib>
 #include <mutex>
 #include <stdexcept>
