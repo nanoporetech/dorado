@@ -15,7 +15,6 @@ public:
     void accept_chunk(int chunk_idx, const at::Tensor& chunk_CT) override;
     size_t chunk_size() const override;
     size_t batch_size() const override;
-    bool variable_chunk_sizes() const override { return false; }
 
     at::Tensor& input() { return m_input; }
     const at::Tensor& input() const { return m_input; }
