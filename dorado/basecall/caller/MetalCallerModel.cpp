@@ -31,6 +31,8 @@ MetalCallerModel::MetalCallerModel(std::unique_ptr<MetalModel> model) : m_model(
 
 MetalCallerModel::~MetalCallerModel() = default;
 
+const config::BasecallModelConfig &MetalCallerModel::config() const { return m_model->config(); }
+
 std::unique_ptr<RunnerState> MetalCallerModel::create_runner_state(size_t batch_dims_idx) {
     if (batch_dims_idx != 0) {
         throw std::out_of_range("Metal caller only has one batch dimension");

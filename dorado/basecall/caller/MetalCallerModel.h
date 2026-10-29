@@ -22,7 +22,7 @@ public:
     explicit MetalCallerModel(std::unique_ptr<MetalModel> model);
     ~MetalCallerModel() override;
 
-    const config::BasecallModelConfig &config() const override { return m_model->config(); }
+    const config::BasecallModelConfig &config() const override;
     std::unique_ptr<RunnerState> create_runner_state(size_t batch_dims_idx) override;
     std::shared_ptr<ModBaseInfo> modbase_info() const override;
     std::string name() const override { return "MetalCaller"; }
