@@ -1,10 +1,12 @@
 #pragma once
 
 #include "torch_utils/metal_utils.h"
+#include "utils/types.h"
 
 #include <ATen/core/TensorBody.h>
 
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <string>
 #include <tuple>
@@ -26,6 +28,10 @@ public:
                            int try_count) = 0;
     virtual DecodedData decode(int chunk_idx) const = 0;
     virtual MTL::SharedEvent* decode_complete_event() const = 0;
+    // Models that support modbase calling override these. decode_modbase is called once all of a
+    // task's chunks have been decoded.
+    virtual std::shared_ptr<ModBaseInfo> modbase_info() const { return nullptr; }
+    virtual void decode_modbase(MetalCallerTask& task) { (void)task; }
 
 protected:
     MetalModel() = default;

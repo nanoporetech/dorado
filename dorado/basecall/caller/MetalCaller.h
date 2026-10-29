@@ -37,7 +37,7 @@ public:
     void restart() override;
 
     const config::BasecallModelConfig &config() const override { return m_config; }
-    std::shared_ptr<ModBaseInfo> modbase_info() const override { return nullptr; }
+    std::shared_ptr<ModBaseInfo> modbase_info() const override;
     std::string get_name() const override { return "MetalCaller"; }
     stats::NamedStats sample_stats() const override { return {}; }
 

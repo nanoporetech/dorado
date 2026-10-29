@@ -4,7 +4,6 @@
 #include "TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
-#include "modbase/ModBaseContext.h"
 #include "model/Model.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/log_utils.h"
@@ -125,21 +124,6 @@ c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
     return c10::cuda::getStreamFromPool(false, device.index());
 }
 
-std::vector<at::Tensor> run_modbase_models(modbase::ModBaseLatentSpaceModels &models,
-                                           const at::Tensor &decoded_data,
-                                           at::Tensor signal_embeddings) {
-    auto &[sequence_model, common_model, classifier_models] = models;
-    at::Tensor encoded_sequence = sequence_model->forward(decoded_data);
-    const at::Tensor common_output =
-            common_model->forward(std::move(encoded_sequence), std::move(signal_embeddings));
-    std::vector<at::Tensor> out;
-    out.reserve(classifier_models.size());
-    for (auto &classifier_model : classifier_models) {
-        out.emplace_back(classifier_model->forward(common_output));
-    }
-    return out;
-}
-
 std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
                                                       const at::TensorOptions &in_options,
                                                       at::Tensor &workspace,
@@ -241,23 +225,11 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
                     "models.");
         }
         // TODO: check the required dtype here
-        m_modbase_modules =
-                modbase::load_modbase_latent_space_model(params.modbase_configs, m_options);
+        m_modbase_modules = modbase::load_modbase_latent_space_model(
+                params.modbase_configs, m_options,
+                static_cast<int>(m_config.basecaller.chunk_size() / m_config.stride_inner()));
 
-        ModBaseInfo modbase_info = config::get_modbase_info(params.modbase_configs);
-
-        modbase::ModBaseContext context;
-        for (const config::ModBaseModelConfig &config : params.modbase_configs) {
-            const config::modbase::ModBaseModelConfigData &data{
-                    config::get_model_config_data(config)};
-            if (!data.mods.motif.empty()) {
-                context.set_context(data.mods.motif, data.mods.motif_offset);
-            }
-        }
-
-        m_modbase_info =
-                std::make_shared<ModBaseInfo>(std::move(modbase_info.alphabet),
-                                              std::move(modbase_info.long_names), context.encode());
+        m_modbase_info = modbase::create_modbase_info(params.modbase_configs);
     }
     m_model = model::load_model(params.model_config, m_options);
 
@@ -287,8 +259,8 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
         auto decoded_data = m_decoder->prepare_decode(
                 {model_output.scores, batch_dim.N, m_decoder_options, aux.get()});
         if (m_modbase_modules) {
-            run_modbase_models(*m_modbase_modules, decoded_data.data,
-                               std::move(model_output.signal_embeddings));
+            modbase::run_modbase_latent_space_models(*m_modbase_modules, decoded_data.data,
+                                                     std::move(model_output.signal_embeddings));
         }
     }
     m_stream.synchronize();
@@ -672,9 +644,9 @@ void CudaCaller::cuda_thread_fn() {
             task->out = m_decoder->prepare_decode({std::move(model_output.scores), task->num_chunks,
                                                    m_decoder_options, task->aux});
             if (m_modbase_modules) {
-                task->out.modbase_data =
-                        run_modbase_models(*m_modbase_modules, task->out.data,
-                                           std::move(model_output.signal_embeddings));
+                task->out.modbase_data = modbase::run_modbase_latent_space_models(
+                        *m_modbase_modules, task->out.data,
+                        std::move(model_output.signal_embeddings));
             }
             m_stream.synchronize();
             m_model_decode_ms += timer.GetElapsedMS();
