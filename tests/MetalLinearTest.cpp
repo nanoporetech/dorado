@@ -2,6 +2,7 @@
 #include "torch_utils/metal_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <torch/types.h>
 
 #include <cstdint>
@@ -122,99 +123,81 @@ CATCH_TEST_CASE(TEST_GROUP "Linear") {
     // CPU comparison calculation.
     const at::Tensor out_cpu_f32 = torch::addmm(biases_f32, in_f32, weights_f32);
 
-    for (bool output_clamp : {false, true}) {
-        const auto out_cpu_clamp_f32 = output_clamp ? out_cpu_f32.clamp(-5.f, 5.f) : out_cpu_f32;
-        for (bool output_tanh : {false, true}) {
-            const auto out_cpu_tanh_f32 =
-                    output_tanh ? out_cpu_clamp_f32.tanh() : out_cpu_clamp_f32;
-            for (bool output_as_byte : {false, true}) {
-                // Byte output is only supported if at least one of [tanh, clamp] is enabled
-                if (output_as_byte && !(output_tanh || output_clamp)) {
-                    continue;
-                }
-                float output_scale =
-                        (output_as_byte ? ((output_clamp && !output_tanh) ? (127.f / 5.f) : 127.f)
-                                        : 1.f);
-                const auto out_cpu =
-                        output_as_byte
-                                ? (output_scale * out_cpu_tanh_f32).to(torch::kI8).to(torch::kF32)
-                                : out_cpu_tanh_f32;
+    const bool output_clamp = GENERATE(false, true);
+    const bool output_tanh = GENERATE(false, true);
+    const bool output_as_byte = GENERATE(false, true);
+    const bool input_from_lstm = GENERATE(false, true);
+    CATCH_CAPTURE(output_clamp, output_tanh, output_as_byte, input_from_lstm);
 
-                for (bool input_from_lstm : {false, true}) {
-                    CATCH_DYNAMIC_SECTION("Metal linear layer " << output_clamp << output_tanh
-                                                                << output_as_byte
-                                                                << input_from_lstm) {
-                        const NS::SharedPtr<MTL::ComputePipelineState> linear_cps = make_cps(
-                                device.get(), input_from_lstm ? "linear_from_rev_lstm" : "linear",
-                                {{"kLinearInSize", layer_size},
-                                 {"kLinearOutSize", out_size},
-                                 {"kLinearOutputScale", output_scale},
-                                 {"kLinearOutputClamp", output_clamp},
-                                 {"kLinearOutputTanh", output_tanh},
-                                 {"kLinearOutputAsByte", output_as_byte}},
-                                threads_per_thread_group);
-                        CATCH_REQUIRE(linear_cps);
+    const auto out_cpu_clamp_f32 = output_clamp ? out_cpu_f32.clamp(-5.f, 5.f) : out_cpu_f32;
+    const auto out_cpu_tanh_f32 = output_tanh ? out_cpu_clamp_f32.tanh() : out_cpu_clamp_f32;
 
-                        auto out_gpu_f32 = torch::zeros({lstm_chunk_size, in_batch_size, out_size},
-                                                        torch::kF32);
-
-                        const int out_batch_size = in_batch_size / batch_split;
-                        const int32_t out_batch_tiles = out_batch_size / tile_size;
-
-                        const int in_batch_tiles = in_batch_size / tile_size;
-                        for (int in_batch_tile_offset = 0; in_batch_tile_offset < in_batch_tiles;
-                             in_batch_tile_offset += out_batch_tiles) {
-                            const dorado::nn::metal::LstmArgs linear_args{
-                                    .batch_tiles = in_batch_tiles,
-                                    .chunk_size = in_batch_tile_offset,
-                                    .time_step_begin = out_batch_tiles,
-                                    .time_step_end = lstm_chunk_size,
-                            };
-                            const NS::SharedPtr<MTL::Buffer> args_linear =
-                                    create_buffer_from_data(device.get(), linear_args);
-                            CATCH_REQUIRE(args_linear);
-
-                            auto out_dtype = output_as_byte ? torch::kI8 : torch::kF16;
-                            auto out_gpu_partial = torch::zeros(
-                                    {lstm_chunk_size, out_batch_size, out_size}, out_dtype);
-
-                            {
-                                MTL::CommandBuffer *command_buffer =
-                                        next_command_buffer(command_queue.get(), try_count);
-                                CATCH_REQUIRE(command_buffer != nullptr);
-                                launch_kernel_no_wait(
-                                        linear_cps.get(), command_buffer,
-                                        {args_linear.get(),
-                                         mtl_for_tensor(input_from_lstm ? in_f16_reordered
-                                                                        : in_f16),
-                                         mtl_for_tensor(weights_biases_f16),
-                                         mtl_for_tensor(out_gpu_partial)},
-                                        tg_buffer_lens, kernel_thread_groups,
-                                        threads_per_thread_group);
-                                CATCH_REQUIRE(
-                                        run_command_buffer("linear", command_buffer, try_count));
-                            }
-
-                            int in_batch_offset = in_batch_tile_offset * tile_size;
-                            out_gpu_f32.slice(1, in_batch_offset,
-                                              in_batch_offset + out_batch_size) = out_gpu_partial;
-                        }
-
-                        // These tolerances are somewhat arbitary, but we must account for GPU calculations in float16
-                        // versus CPU calculations in float32.
-                        // (The CPU calculation can be done in float16, but is too slow.)
-                        const float kRelTolerance = 0.1f;
-                        const float kAbsTolerance =
-                                output_as_byte ? (output_tanh ? 7.f : 2.f) : 0.08;
-                        const float kMeanAbsDiffTolerance = output_as_byte ? 0.15f : 0.008f;
-
-                        auto out_gpu_2d = out_gpu_f32.view({-1, out_size});
-                        CATCH_CHECK(
-                                torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
-                        CATCH_CHECK(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
-                    }
-                }
-            }
-        }
+    // Byte output is only supported if at least one of [tanh, clamp] is enabled
+    if (output_as_byte && !(output_tanh || output_clamp)) {
+        return;
     }
+    const float output_scale =
+            (output_as_byte ? ((output_clamp && !output_tanh) ? (127.f / 5.f) : 127.f) : 1.f);
+    const auto out_cpu = output_as_byte
+                                 ? (output_scale * out_cpu_tanh_f32).to(torch::kI8).to(torch::kF32)
+                                 : out_cpu_tanh_f32;
+
+    const NS::SharedPtr<MTL::ComputePipelineState> linear_cps =
+            make_cps(device.get(), input_from_lstm ? "linear_from_rev_lstm" : "linear",
+                     {{"kLinearInSize", layer_size},
+                      {"kLinearOutSize", out_size},
+                      {"kLinearOutputScale", output_scale},
+                      {"kLinearOutputClamp", output_clamp},
+                      {"kLinearOutputTanh", output_tanh},
+                      {"kLinearOutputAsByte", output_as_byte}},
+                     threads_per_thread_group);
+    CATCH_REQUIRE(linear_cps);
+
+    auto out_gpu_f32 = torch::zeros({lstm_chunk_size, in_batch_size, out_size}, torch::kF32);
+
+    const int out_batch_size = in_batch_size / batch_split;
+    const int32_t out_batch_tiles = out_batch_size / tile_size;
+
+    const int in_batch_tiles = in_batch_size / tile_size;
+    for (int in_batch_tile_offset = 0; in_batch_tile_offset < in_batch_tiles;
+         in_batch_tile_offset += out_batch_tiles) {
+        const dorado::nn::metal::LstmArgs linear_args{
+                .batch_tiles = in_batch_tiles,
+                .chunk_size = in_batch_tile_offset,
+                .time_step_begin = out_batch_tiles,
+                .time_step_end = lstm_chunk_size,
+        };
+        const NS::SharedPtr<MTL::Buffer> args_linear =
+                create_buffer_from_data(device.get(), linear_args);
+        CATCH_REQUIRE(args_linear);
+
+        auto out_dtype = output_as_byte ? torch::kI8 : torch::kF16;
+        auto out_gpu_partial = torch::zeros({lstm_chunk_size, out_batch_size, out_size}, out_dtype);
+
+        {
+            MTL::CommandBuffer *command_buffer =
+                    next_command_buffer(command_queue.get(), try_count);
+            CATCH_REQUIRE(command_buffer != nullptr);
+            launch_kernel_no_wait(
+                    linear_cps.get(), command_buffer,
+                    {args_linear.get(), mtl_for_tensor(input_from_lstm ? in_f16_reordered : in_f16),
+                     mtl_for_tensor(weights_biases_f16), mtl_for_tensor(out_gpu_partial)},
+                    tg_buffer_lens, kernel_thread_groups, threads_per_thread_group);
+            CATCH_REQUIRE(run_command_buffer("linear", command_buffer, try_count));
+        }
+
+        int in_batch_offset = in_batch_tile_offset * tile_size;
+        out_gpu_f32.slice(1, in_batch_offset, in_batch_offset + out_batch_size) = out_gpu_partial;
+    }
+
+    // These tolerances are somewhat arbitary, but we must account for GPU calculations in float16
+    // versus CPU calculations in float32.
+    // (The CPU calculation can be done in float16, but is too slow.)
+    const float kRelTolerance = 0.1f;
+    const float kAbsTolerance = output_as_byte ? (output_tanh ? 7.f : 2.f) : 0.08;
+    const float kMeanAbsDiffTolerance = output_as_byte ? 0.15f : 0.008f;
+
+    auto out_gpu_2d = out_gpu_f32.view({-1, out_size});
+    CATCH_CHECK(torch::allclose(out_cpu, out_gpu_2d, kRelTolerance, kAbsTolerance));
+    CATCH_CHECK(MeanAbsDiff(out_cpu, out_gpu_2d) < kMeanAbsDiffTolerance);
 }
