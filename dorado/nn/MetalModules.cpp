@@ -419,10 +419,8 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         linear_cps[0] =
                 make_cps(m_device, "linear_from_rev_lstm", linear_constants, linear_threads);
         // Single matmul that may or may not have a bias.
-        if (!config.out_features.has_value()) {
-            linear1 = register_module("linear1",
-                                      MetalLinear(config.lstm_size, config.outsize, config.bias));
-        }
+        linear1 = register_module("linear1",
+                                  MetalLinear(config.lstm_size, config.outsize, config.bias));
     }
 
     // This buffer is used for several layers of the model.
