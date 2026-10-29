@@ -17,6 +17,8 @@ class VCFWriter {
 public:
     /**
      * \brief Opens a VCF file for writing.
+     * \param filename Output path. A ".gz" extension writes BGZF-compressed output, otherwise writes uncompressed.
+                       "-" writes to stdout.
      * \param filters A bitset representation of the allowed filters, which will be read from KNOWN_FILTERS.
      * \param contigs A vector of header/length pairs for every contig which may appear in this VCF.
      * \param include_gvcf_headers Whether gVCF-specific header lines should be added.
@@ -32,7 +34,15 @@ public:
 
     void write_variant(const Variant& variant);
 
+    /**
+     * \brief Flushes and closes the file. If the filename ends in ".gz" the output is BGZF compressed
+     *        and a tabix index (<filename>.tbi) is built here. Throws if closing or indexing fails.
+     */
+    void close();
+
 private:
+    std::filesystem::path m_filename;
+    bool m_compressed = false;
     HtsFilePtr m_vcf_fp;
     BcfHdrPtr m_header;
     bool m_include_gvcf_headers = false;

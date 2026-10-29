@@ -63,16 +63,16 @@ gVCF run: reference-block (R) and inference (I) sources.
   > ### Order-independent SRC lookup (see the first block).
   > src_of='src=""; nf=split($9,f,":"); split($10,s,":"); for(i=1;i<=nf;i++) if(f[i]=="SRC") src=s[i];'
   > ### All variant source values present (I from inference, R from the outside-inference reference block).
-  > grep -v "#" out/variants.vcf | awk "{ ${src_of} print src }" | sort -u | paste -sd' ' -
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | awk "{ ${src_of} print src }" | sort -u | paste -sd' ' -
   > ### Reference blocks (INFO carries END) are I inside inference regions and R outside; never K or U.
-  > grep -v "#" out/variants.vcf | awk "\$8 ~ /^END=/ { ${src_of} if (src != \"R\" && src != \"I\") print \"BAD:\"\$0 } END { print \"reference_blocks_only_R_or_I\" }"
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | awk "\$8 ~ /^END=/ { ${src_of} if (src != \"R\" && src != \"I\") print \"BAD:\"\$0 } END { print \"reference_blocks_only_R_or_I\" }"
   > ### The leading reference block starts at the region start (pos 1000), which is outside the
   > ### inference region (chr20:1345-...), so it is sourced R.
-  > grep -v "#" out/variants.vcf | awk "\$2 == 1000 { ${src_of} print \$2, src }"
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | awk "\$2 == 1000 { ${src_of} print \$2, src }"
   > ### The first reference block inside the inference region is sourced I.
-  > grep -v "#" out/variants.vcf | awk "\$8 ~ /^END=/ { ${src_of} if (src == \"I\") { print \$2, src; exit } }"
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | awk "\$8 ~ /^END=/ { ${src_of} if (src == \"I\") { print \$2, src; exit } }"
   > ### The non-reference (variant) records are inference-sourced.
-  > grep -v "#" out/variants.vcf | awk "\$8 == \".\" { ${src_of} print \$2, src }"
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | awk "\$8 == \".\" { ${src_of} print \$2, src }"
   Exit code: 0
   I R
   reference_blocks_only_R_or_I

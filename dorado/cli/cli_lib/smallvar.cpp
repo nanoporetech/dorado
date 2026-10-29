@@ -1248,7 +1248,7 @@ void run_variant_calling(const Options& opt,
 
     // Open the output stream to a file/stdout for the variant calls.
     const std::filesystem::path out_vcf_fn =
-            (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
+            (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf.gz");
 
     std::ofstream ofs_regions;
     if (!std::empty(opt.output_dir)) {
@@ -1287,12 +1287,12 @@ void run_variant_calling(const Options& opt,
     std::optional<secondary::VCFWriter> vcf_writer_inference;
     if (candidate_filtering && opt.dump_variants) {
         const std::string out_vcf_kadayashi_fn =
-                (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf").string();
+                (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "kadayashi.vcf.gz").string();
         vcf_writer_kadayashi.emplace(out_vcf_kadayashi_fn, vcf_filters, draft_lens, false,
                                      sample_name, command_line);
 
         const std::string out_vcf_inference_fn =
-                (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf").string();
+                (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "inference.vcf.gz").string();
         vcf_writer_inference.emplace(out_vcf_inference_fn, vcf_filters, draft_lens,
                                      opt.out_format == VariantCallingFormatEnum::GVCF, sample_name,
                                      command_line);
@@ -1500,6 +1500,15 @@ void run_variant_calling(const Options& opt,
         if (wrs.exception_thrown) {
             throw std::runtime_error{wrs.message};
         }
+    }
+
+    // Finalise (close + index) the VCFs only after a fully successful run.
+    vcf_writer->close();
+    if (vcf_writer_kadayashi) {
+        vcf_writer_kadayashi->close();
+    }
+    if (vcf_writer_inference) {
+        vcf_writer_inference->close();
     }
 }
 

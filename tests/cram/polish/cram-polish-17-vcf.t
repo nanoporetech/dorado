@@ -58,12 +58,13 @@ VCF output to a directory (variants only).
   > echo "Exit code: $?"
   > ls -1 out
   > grep -v "#" ${expected} > out/expected.no_header.vcf
-  > grep -v "#" out/variants.vcf > out/result.no_header.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/result.no_header.vcf
   > diff out/expected.no_header.vcf out/result.no_header.vcf
   Exit code: 0
   consensus.fasta
   stderr
-  variants.vcf
+  variants.vcf.gz
+  variants.vcf.gz.tbi
 
 gVCF output to a directory (variants + non-variant positions).
 IMPORTANT: not comparing exact reference block boundaries because they depend on qualities which may vary with Torch versions and architectures.
@@ -78,18 +79,19 @@ IMPORTANT: not comparing exact reference block boundaries because they depend on
   > ls -1 out
   > ### Check the command line in the header
   > expected_cmdline="##cmdline=polish --gvcf --device cpu ${in_bam} ${in_draft} -t 4 ${model_var} -o out"
-  > grep -Fxq "${expected_cmdline}" out/variants.vcf || exit 1
+  > gunzip -c out/variants.vcf.gz | grep -Fxq "${expected_cmdline}" || exit 1
   > ### Check other lines.
-  > grep -E "^##INFO=<ID=END|^##ALT=<ID=\*|^##FORMAT=<ID=LEN" out/variants.vcf
+  > gunzip -c out/variants.vcf.gz | grep -E "^##INFO=<ID=END|^##ALT=<ID=\*|^##FORMAT=<ID=LEN"
   > grep -v "#" ${expected} | awk 'BEGIN { FS=OFS="\t" } $5 != "." && $5 !~ /(^|,)<\*>($|,)/ { $5 = $5 ",<*>" } { print }' | cut -f 1-5,7-8 > out/expected.variants.no_qual.vcf
-  > grep -v "#" out/variants.vcf | awk '$5 != "." && $5 != "<*>"' | cut -f 1-5,7-8 > out/result.variants.no_qual.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | awk '$5 != "." && $5 != "<*>"' | cut -f 1-5,7-8 > out/result.variants.no_qual.vcf
   > diff out/expected.variants.no_qual.vcf out/result.variants.no_qual.vcf
-  > awk '$5 == "<*>" && $8 ~ /^END=[0-9]+$/ { found=1 } END { print found ? "has_reference_blocks" : "missing_reference_blocks" }' out/variants.vcf
-  > awk 'BEGIN { compact="compact_reference_blocks" } !/^#/ { ++num_records } END { if (num_records >= 2000) compact="too_many_reference_records"; print compact }' out/variants.vcf
+  > gunzip -c out/variants.vcf.gz | awk '$5 == "<*>" && $8 ~ /^END=[0-9]+$/ { found=1 } END { print found ? "has_reference_blocks" : "missing_reference_blocks" }'
+  > gunzip -c out/variants.vcf.gz | awk 'BEGIN { compact="compact_reference_blocks" } !/^#/ { ++num_records } END { if (num_records >= 2000) compact="too_many_reference_records"; print compact }'
   Exit code: 0
   consensus.fasta
   stderr
-  variants.vcf
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the reference block">
   ##FORMAT=<ID=LEN,Number=1,Type=Integer,Description="Length of <*> reference block">
   has_reference_blocks

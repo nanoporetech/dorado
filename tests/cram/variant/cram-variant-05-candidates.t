@@ -14,7 +14,7 @@ Provide candidate variant sites to seed inference windows (the --candidates feat
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
-  > cat out/variants.vcf | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   > diff ${in_expected_proc_regions} out/processed_regions.bed
   Exit code: 0
@@ -36,7 +36,7 @@ Additionally provide a regions BED file to limit where the candidate sites are c
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
-  > cat out/variants.vcf | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   > diff ${in_expected_proc_regions} out/processed_regions.bed
   Exit code: 0
@@ -57,7 +57,7 @@ Tiled region selection is the default windowing approach for candidate-filtered 
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
-  > cat out/variants.vcf | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   > diff ${in_expected_proc_regions} out/processed_regions.bed
   Exit code: 0
@@ -73,7 +73,7 @@ Candidate filtering with an empty candidates file should succeed and produce no 
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep -v "^#" out/variants.vcf > out/result.no_header.vcf || true
+  > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/result.no_header.vcf || true
   > test ! -s out/result.no_header.vcf
   > test ! -s out/processed_regions.bed
   Exit code: 0

@@ -9,8 +9,8 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep -E "^##INFO|^##ALT\*|^##FORMAT" out/variants.vcf
-  > grep -v "^#" out/variants.vcf > out/gvcf.body.vcf
+  > gunzip -c out/variants.vcf.gz | grep -E "^##INFO|^##ALT\*|^##FORMAT"
+  > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
   > awk 'NR == 1 { print $1, $2, $4, $5, $7, $8, $9, $10 }' out/gvcf.body.vcf
   Exit code: 0
@@ -51,7 +51,7 @@ chr20	1959	1
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > ### Remove QUAL and the last digits of VQ because results may vary by platform
-  > grep -v "^#" out/variants.vcf | cut -f 1-5,7-10 | sed -E 's/[0-9][0-9]$//' > out/gvcf.body.no_qual.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "^#" | cut -f 1-5,7-10 | sed -E 's/[0-9][0-9]$//' > out/gvcf.body.no_qual.vcf
   > awk '{ print $1, $2, $3 }' out/processed_regions.bed
   > wc -l out/gvcf.body.no_qual.vcf | awk '{ print $1 }'
   > ### Check the non-variant non-inferred gVCF reference region (GQ is 60)
@@ -92,7 +92,7 @@ Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep -v "^#" out/variants.vcf > out/gvcf.body.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
   > awk 'NR == 1 { print $1, $2, $4, $5, $7, $8, $9, $10 }' out/gvcf.body.vcf
   Exit code: 0
@@ -113,7 +113,7 @@ In this region, all reads are dropped by kadayashi, so depth information is empt
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep -v "^#" out/variants.vcf > out/gvcf.body.vcf
+  > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
   > awk 'NR == 1 { print $1, $2, $4, $5, $7, $8, $9, $10 }' out/gvcf.body.vcf
   Exit code: 0

@@ -6,6 +6,7 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <htslib/hts.h>
+#include <htslib/tbx.h>
 #include <htslib/vcf.h>
 
 #include <cstdint>
@@ -423,6 +424,64 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
             CATCH_CHECK(bcf_read(vcf_file.get(), header.get(), third_record.get()) < 0);
         }
+    }
+
+    CATCH_SECTION("compressed output is BGZF and tabix indexed after close") {
+        const std::filesystem::path gz_path = temp_dir.m_path / "variants.vcf.gz";
+        {
+            VCFWriter writer(gz_path, data.filters, data.contigs, false,
+                             secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
+            writer.write_variant(data.first_variant);
+            writer.write_variant(data.second_variant);
+            writer.write_variant(data.third_variant);
+            CATCH_REQUIRE_NOTHROW(writer.close());
+            CATCH_CHECK_NOTHROW(writer.close());  // Idempotent.
+        }
+        CATCH_REQUIRE(std::filesystem::exists(gz_path));
+        CATCH_REQUIRE(std::filesystem::exists(gz_path.string() + ".tbi"));
+
+        // The file is BGZF compressed.
+        HtsFilePtr vcf_file{hts_open(gz_path.string().c_str(), "r")};
+        CATCH_REQUIRE(vcf_file);
+        CATCH_CHECK(vcf_file->format.compression == bgzf);
+
+        // The index supports region queries.
+        using TbxPtr = std::unique_ptr<tbx_t, decltype(&tbx_destroy)>;
+        TbxPtr tbx{tbx_index_load(gz_path.string().c_str()), &tbx_destroy};
+        CATCH_REQUIRE(tbx);
+        const auto count_records = [&](const char* region) {
+            using IterPtr = std::unique_ptr<hts_itr_t, decltype(&hts_itr_destroy)>;
+            IterPtr itr{tbx_itr_querys(tbx.get(), region), &hts_itr_destroy};
+            CATCH_REQUIRE(itr);
+            kstring_t str{};
+            int n = 0;
+            while (tbx_itr_next(vcf_file.get(), tbx.get(), itr.get(), &str) >= 0) {
+                ++n;
+            }
+            hts_free(str.s);
+            return n;
+        };
+        CATCH_CHECK(count_records("chr1") == 1);
+        CATCH_CHECK(count_records("chr2") == 2);
+        CATCH_CHECK(count_records("chr2:50-60") == 1);
+    }
+
+    CATCH_SECTION("compressed output with no records is still indexed") {
+        const std::filesystem::path gz_path = temp_dir.m_path / "empty.vcf.gz";
+        VCFWriter writer(gz_path, data.filters, data.contigs, false, secondary::VCF_DEFAULT_SAMPLE,
+                         std::string_view{});
+        CATCH_REQUIRE_NOTHROW(writer.close());
+        CATCH_CHECK(std::filesystem::exists(gz_path.string() + ".tbi"));
+    }
+
+    CATCH_SECTION("uncompressed output is not indexed") {
+        {
+            VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
+                             secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
+            writer.write_variant(data.first_variant);
+            writer.close();
+        }
+        CATCH_CHECK(!std::filesystem::exists(data.vcf_path.string() + ".tbi"));
     }
 }
 
