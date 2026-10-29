@@ -13,7 +13,9 @@
 #include <os/signpost.h>
 
 #include <filesystem>
+#include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -85,8 +87,8 @@ MTL::CommandBuffer *next_command_buffer_after_event(MTL::CommandQueue *queue,
 
 void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            MTL::CommandBuffer *cb,
-                           const std::vector<MTL::Buffer *> &buffers,
-                           const std::vector<int> &tg_buffer_lens,
+                           std::initializer_list<const MTL::Buffer *> buffers,
+                           std::span<const int> tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup);
 

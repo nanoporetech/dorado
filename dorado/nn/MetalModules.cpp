@@ -180,10 +180,9 @@ void MetalConv1dImpl::run(MTL::CommandBuffer *command_buffer,
                           MTL::Buffer *mat_in,
                           MTL::Buffer *mat_out) {
     for (const auto &args : m_args) {
-        std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
-                                           mat_out};
-        launch_kernel_no_wait(conv_cps.get(), command_buffer, buffers, {}, kernel_thread_groups,
-                              kernel_simd_groups * kSIMDGroupWidth);
+        launch_kernel_no_wait(conv_cps.get(), command_buffer,
+                              {args.get(), mat_in, mtl_for_tensor(t_weights_bias), mat_out}, {},
+                              kernel_thread_groups, kernel_simd_groups * kSIMDGroupWidth);
     }
 }
 
@@ -514,15 +513,14 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                 static_cast<int>(dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize);
         const int kOutBufSize =
                 static_cast<int>(dtype_bytes * kernel_simd_groups * kTileSize * kTileSize);
-        const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
+        const std::array tg_buffer_lens{kResBufSize, kOutBufSize};
         for (const auto &args_lstm : m_args_lstm) {
-            const std::vector<MTL::Buffer *> buffers{args_lstm.get(), mat_working_mem.get(),
-                                                     mtl_for_tensor(rnn->t_weights_bias),
-                                                     mat_state.get()};
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
             auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 #endif
-            launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
+            launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer,
+                                  {args_lstm.get(), mat_working_mem.get(),
+                                   mtl_for_tensor(rnn->t_weights_bias), mat_state.get()},
                                   tg_buffer_lens, kernel_thread_groups,
                                   kernel_simd_groups * kSIMDGroupWidth);
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
@@ -550,7 +548,7 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
     // used for all linear layer kernel invocations.
     const int kLinearTGOutBufSize =
             static_cast<int>(dtype_bytes * kernel_simd_groups * kTileSize * kTileSize);
-    const std::vector<int> linear_tg_buffer_lens{kLinearTGOutBufSize};
+    const std::array linear_tg_buffer_lens{kLinearTGOutBufSize};
 
     // The output of the linear layer is split into multiple buffers, each generated
     // by a separate kernel launch.

@@ -67,7 +67,7 @@ CATCH_TEST_CASE(TEST_GROUP "Linear") {
     typedef uint16_t ftype;
     const int kOutBufSize = sizeof(ftype) * kernel_simd_groups * kTileSize * kTileSize;
     const int kOutBufF32Size = sizeof(float) * kernel_simd_groups * kTileSize * kTileSize;
-    const std::vector<int> tg_buffer_lens{kOutBufSize, kOutBufF32Size};
+    const std::array tg_buffer_lens{kOutBufSize, kOutBufF32Size};
 
     // Create a ComputePipelineState for the input reordering kernel.
     const NS::SharedPtr<MTL::ComputePipelineState> reorder_input_cps =

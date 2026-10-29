@@ -211,21 +211,21 @@ MTL::CommandBuffer *next_command_buffer_after_event(MTL::CommandQueue *queue,
 
 void launch_kernel_no_wait(ComputePipelineState *const pipeline,
                            CommandBuffer *const command_buffer,
-                           const std::vector<Buffer *> &buffers,
-                           const std::vector<int> &tg_buffer_lens,
+                           std::initializer_list<const Buffer *> buffers,
+                           std::span<const int> tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup) {
     auto compute_encoder = command_buffer->computeCommandEncoder();
     compute_encoder->setComputePipelineState(pipeline);
 
     // Set up device memory buffers.
-    for (auto i = 0; i < (int)buffers.size(); i++) {
-        compute_encoder->setBuffer(buffers[i], 0, i);
+    for (size_t i = 0; i < buffers.size(); ++i) {
+        compute_encoder->setBuffer(buffers.begin()[i], 0, i);
     }
 
     // Set lengths of threadgroup memory buffers.
-    for (int i = 0; i < (int)tg_buffer_lens.size(); ++i) {
-        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
+    for (size_t i = 0; i < tg_buffer_lens.size(); ++i) {
+        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens[i], i);
     }
 
     compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1),
