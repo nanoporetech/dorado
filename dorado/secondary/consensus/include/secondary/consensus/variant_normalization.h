@@ -144,4 +144,20 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
         float pass_min_aq,
         float pass_min_vq);
 
+/**
+ * \brief Normalization fallback for non-valid variants (e.g. with empty ALTs) which could not be
+ *          normalized within their inference window. Each such variant is re-normalized against the
+ *          reference within the bases between its neighboring variants. Variants which still have
+ *          empty ALTs are converted to reference records (see sanitize_empty_alts).
+ *        Non-valid variants are not removed here (see remove_non_valid_variants).
+ * \param variants Variants sorted by position on a single chromosome. Modified in place.
+ * \param ref_seq The entire reference chromosome sequence.
+ * \param allow_ambig_ref If true, allow normalization over ambiguous reference bases.
+ * \param ploidy Ploidy used for the GT of variants converted to reference records.
+ */
+void renormalize_non_valid_variants(std::vector<Variant>& variants,
+                                    std::string_view ref_seq,
+                                    bool allow_ambig_ref,
+                                    int32_t ploidy);
+
 }  // namespace dorado::secondary

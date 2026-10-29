@@ -457,10 +457,11 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Normalization. Single reference base which is deleted in the alt. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
+            "Normalization. Single reference base which is deleted in the alt.",
             "A", {"*"}, {0}, {0}, 3.0f, false, false, false, false,
             {
-                Variant{0, 0, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 1},
+                // Variant{0, 0, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 1},
+                Variant{0, 0, "A", {""}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 0, 1},
             },
             false,
         },

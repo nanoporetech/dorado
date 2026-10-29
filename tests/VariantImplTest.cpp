@@ -841,8 +841,7 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
     worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
                            worker_terminate, ret_status, bam_regions, draft_lens, draft_seqs,
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
-                           bam_window.seq_length, 0, 10, false, 2, 30.0f, false, false, 0, 0, 0.0f,
-                           0);
+                           bam_window.seq_length, 0, 10, false, 30.0f, false, false, 0, 0, 0.0f, 0);
 
     ////////////////////////////////////////
     /// Eval.                            ///
@@ -966,7 +965,7 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
                            /*window_len=*/100, /*window_overlap=*/40,
                            /*variant_flanking_bases=*/10, /*continue_on_exception=*/false,
-                           /*ploidy=*/2, /*pass_min_qual=*/30.0f,
+                           /*pass_min_qual=*/30.0f,
                            /*tiled_regions=*/false, /*tiled_ext_flanks=*/false,
                            /*tiled_ext_major=*/0, /*tiled_ext_min_cov=*/0,
                            /*tiled_ext_cov_fract=*/0.0f, /*min_depth=*/0);
@@ -1043,7 +1042,7 @@ CATCH_TEST_CASE("worker_sample_producer defers overlapping simple variants to in
                                worker_terminate, ret_status, {{bam_window}}, {{"chr1", 10}},
                                std::vector<std::string>(1),
                                secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1, 10, 0,
-                               10, false, 2, pass_min_qual, false, false, 0, 0, 0.0f, 0);
+                               10, false, pass_min_qual, false, false, 0, 0, 0.0f, 0);
 
         CATCH_CHECK_FALSE(ret_status.exception_thrown);
         return chrom_reduce_data[0].variants_simple;
@@ -1154,7 +1153,7 @@ CATCH_TEST_CASE("worker_sample_producer sends the full span of candidate variant
                                worker_terminate, ret_status, {{bam_window}}, {{"chr1", SEQ_LEN}},
                                std::vector<std::string>(1),
                                secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1, 10, 5,
-                               3, false, 2, 30.0f, tiled_regions, false, 0, 0, 0.0f, 0);
+                               3, false, 30.0f, tiled_regions, false, 0, 0, 0.0f, 0);
         output_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
         CATCH_CHECK_FALSE(ret_status.exception_thrown);
@@ -1244,8 +1243,7 @@ CATCH_TEST_CASE("worker_sample_producer rejects bam windows with seq_id outside 
     worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
                            worker_terminate, ret_status, bam_regions, draft_lens, draft_seqs,
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
-                           bam_window.seq_length, 0, 10, false, 2, 30.0f, false, false, 0, 0, 0.0f,
-                           0);
+                           bam_window.seq_length, 0, 10, false, 30.0f, false, false, 0, 0, 0.0f, 0);
 
     ////////////////////////////////////////
     /// Eval.                            ///
@@ -1331,8 +1329,7 @@ CATCH_TEST_CASE("worker_sample_producer rejects negative remaining_bam_regions",
     worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
                            worker_terminate, ret_status, bam_regions, draft_lens, draft_seqs,
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
-                           bam_window.seq_length, 0, 10, false, 2, 30.0f, false, false, 0, 0, 0.0f,
-                           0);
+                           bam_window.seq_length, 0, 10, false, 30.0f, false, false, 0, 0, 0.0f, 0);
 
     ////////////////////////////////////////
     /// Eval.                            ///
@@ -1417,7 +1414,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt,
                            /*num_threads=*/2, /*window_len=*/1000, /*window_overlap=*/0,
                            /*variant_flanking_bases=*/50, /*continue_on_exception=*/false,
-                           /*ploidy=*/2, /*pass_min_qual=*/3.0f, /*tiled_regions=*/false,
+                           /*pass_min_qual=*/3.0f, /*tiled_regions=*/false,
                            /*tiled_ext_flanks=*/false, /*tiled_ext_major=*/0,
                            /*tiled_ext_min_cov=*/0, /*tiled_ext_cov_fract=*/0.0f,
                            /*min_depth=*/0);

@@ -519,4 +519,52 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
     return ret;
 }
 
+void renormalize_non_valid_variants(std::vector<Variant>& variants,
+                                    const std::string_view ref_seq,
+                                    const bool allow_ambig_ref,
+                                    const int32_t ploidy) {
+    // Handle an edge case where some variants can still have empty alts. Try to prepend a reference base to them before failing.
+    // One possible scenario where this could happen: a sample has a 1bp major position sandwiched between long insertions which
+    // are not fully captured. In a concrete case: front insertion gets removed because it begins on a minor position, and
+    // back insertion results in a reference match (no variants). The only variant is the 1bp major position and it is a deletion.
+    // Example:
+    //   - MAJOR: 5555555555...
+    //   - MINOR: 0123456789...
+    //   - REF:   G*********...
+    //   - HAP 0: **********...
+    //   - HAP 1: G*********...
+    //   - VAR:   1111111111...
+    // Variant: chr19 5 G {[]} PASS 19.202 0 368 gt:AQ=16,16,PL=19,0,26,GQ=18,VQ=12.84,AD=15,11,SRC=I,GT=0/1 info:
+    // Solution: re-normalize only variants with empty alts. If they still turn out empty, reset them to a reference match.
+    // The variants are sorted, so each variant with an empty allele is normalized only within the bases between its
+    // neighboring variants.
+
+    // Furthest end of all previous variants.
+    int64_t prev_end = 0;
+
+    for (int64_t i = 0; i < std::ssize(variants); ++i) {
+        Variant& var = variants[i];
+
+        const bool needs_normalization =
+                !is_reference_record(var) && (has_empty_alts(var) || !is_valid(var));
+
+        if (needs_normalization) {
+            const int64_t next_start =
+                    ((i + 1) == std::ssize(variants)) ? std::ssize(ref_seq) : variants[i + 1].pos;
+
+            // A variant which overlaps a neighbor is not normalized.
+            if ((var.pos >= prev_end) && (variant_end(var) <= next_start)) {
+                const std::string_view ref_subseq = ref_seq.substr(prev_end, next_start - prev_end);
+                var = normalize_variant_vs_ref_core(var, ref_subseq, prev_end, allow_ambig_ref)
+                              .first;
+            }
+
+            // If all else fails, convert the variant to a reference match.
+            sanitize_empty_alts(var, ploidy);
+        }
+
+        prev_end = std::max(prev_end, variant_end(var));
+    }
+}
+
 }  // namespace dorado::secondary

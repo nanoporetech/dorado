@@ -124,6 +124,11 @@ bool is_reference_record(const Variant& var) {
             ((var.alts.front() == ".") || (var.alts.front() == "<*>")));
 }
 
+void remove_non_valid_variants(std::vector<Variant>& variants) {
+    std::erase_if(variants,
+                  [](const Variant& var) { return !is_reference_record(var) && !is_valid(var); });
+}
+
 int64_t variant_end(const Variant& var) {
     if (const auto it = var.info.find("END"); it != std::cend(var.info)) {
         return static_cast<int64_t>(std::stoll(it->second));

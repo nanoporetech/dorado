@@ -218,7 +218,6 @@ BamWindowResult process_single_bam_window(
         [[maybe_unused]] const std::vector<std::string>& draft_seqs,
         const secondary::VariantCandidateSource candidate_source,
         const std::optional<secondary::IntervalTreesInt64Map>& candidate_trees_from_file,
-        const int32_t ploidy,
         const float pass_min_qual,
         const int32_t window_len,
         const int32_t window_overlap,
@@ -266,7 +265,6 @@ BamWindowResult process_single_bam_window(
             if ((!(var.filters & secondary::Filters::NonVariant)) && (var.qual < pass_min_qual)) {
                 var.filters.update(secondary::Filters::LowQual);
             }
-            secondary::sanitize_empty_alts(var, ploidy);
         }
 
         // Overlapping records cannot be merged without phasing, so defer them to inference.
@@ -301,7 +299,7 @@ BamWindowResult process_single_bam_window(
             const bool crosses_boundary = (var.pos < bam_window.start_no_overlap) ||
                                           (secondary::variant_end(var) > bam_window.end_no_overlap);
 
-            if (is_overlapping[i] || crosses_boundary ||
+            if (is_overlapping[i] || crosses_boundary || secondary::has_empty_alts(var) ||
                 !((var.filters & secondary::Filters::Filter::Pass) ||
                   (var.filters & secondary::Filters::Filter::NonVariant))) {
                 // Add the entire variant span, so that inference covers long events fully.
@@ -438,7 +436,6 @@ void worker_sample_producer(
         const int32_t window_overlap,
         const int32_t variant_flanking_bases,
         const bool continue_on_exception,
-        const int32_t ploidy,
         const float pass_min_qual,
         const bool tiled_regions,
         const bool tiled_ext_flanks,
@@ -479,10 +476,10 @@ void worker_sample_producer(
             try {
                 BamWindowResult bam_window_result = process_single_bam_window(
                         bam_window, *resources.encoders[tid], draft_lens, draft_seqs,
-                        candidate_source, candidate_trees_from_file, ploidy, pass_min_qual,
-                        window_len, window_overlap, variant_flanking_bases, tiled_regions,
-                        tiled_ext_flanks, tiled_ext_major, tiled_ext_min_cov, tiled_ext_cov_fract,
-                        min_depth, resources.models[0]->requires_ref(), tid);
+                        candidate_source, candidate_trees_from_file, pass_min_qual, window_len,
+                        window_overlap, variant_flanking_bases, tiled_regions, tiled_ext_flanks,
+                        tiled_ext_major, tiled_ext_min_cov, tiled_ext_cov_fract, min_depth,
+                        resources.models[0]->requires_ref(), tid);
                 stats.add("processed",
                           static_cast<double>(std::max<int64_t>(
                                   0, bam_window.end_no_overlap - bam_window.start_no_overlap)));
@@ -1964,6 +1961,20 @@ void worker_variant_calling_reduce(
         } else {
             reduce_data.variants_merged = reduce_data.variants_inference;
         }
+
+        // Normalization fallback. Re-normalize the non-valid variants (e.g. with empty alts) against the
+        // entire chromosome, and convert those which still have empty alts into reference records.
+        // The merged (inference and simple) variants are sorted, so each variant is normalized only
+        // within the bases between its neighboring variants of either source.
+        // The draft is not loaded if there are no variants.
+        if (draft) {
+            secondary::renormalize_non_valid_variants(reduce_data.variants_merged, *draft,
+                                                      ambig_ref, ploidy);
+        }
+
+        // Filter non-valid variants as a sanity check.
+        secondary::remove_non_valid_variants(reduce_data.variants_merged);
+
         if (gvcf) {
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));

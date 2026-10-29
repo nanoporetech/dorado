@@ -1373,12 +1373,6 @@ std::vector<Variant> general_decode_variants(
             merge_adjacent, vc_sample.basecalls, pass_min_qual, pass_min_gq, pass_min_aq,
             pass_min_vq);
 
-    // Variants which still have empty alleles (could not be padded during normalization) are
-    // reported as non-variant records.
-    for (Variant& var : variants) {
-        sanitize_empty_alts(var, static_cast<int32_t>(num_haplotypes));
-    }
-
 #ifdef DEBUG_NORMALIZE_VARIANT
     std::cerr << "Merged variants (" << std::size(variants) << "):\n";
     for (size_t i = 0; i < std::size(variants); ++i) {
@@ -1484,10 +1478,9 @@ std::vector<Variant> general_decode_variants(
         Variant new_var = var;
         add_depth(new_var, vc_sample.depth);
         add_VAF(new_var);
-        // Sanity check.
-        if (is_valid(new_var)) {
-            normalized_variants.emplace_back(std::move(new_var));
-        }
+
+        // Keep all variants and filter non-valid ones later.
+        normalized_variants.emplace_back(std::move(new_var));
     }
 
     return normalized_variants;

@@ -1394,7 +1394,7 @@ void run_variant_calling(const Options& opt,
                     bam_region_queue, sample_queue, chrom_reduce_data, resources, stats,
                     worker_terminate, wrs_sample_producer, bam_regions, draft_lens, draft_seqs,
                     variant_candidate_source, candidate_trees_from_file, opt.threads, window_len,
-                    window_overlap, variant_flanking_bases, opt.continue_on_error, ploidy,
+                    window_overlap, variant_flanking_bases, opt.continue_on_error,
                     opt.pass_min_qual, opt.tiled_regions, opt.tiled_ext_flanks, opt.tiled_ext_major,
                     opt.tiled_ext_min_cov, opt.tiled_ext_cov_fract, opt.min_depth);
         });
