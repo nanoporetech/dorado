@@ -53,13 +53,14 @@ void name_mtl_object(const MetalObject &obj, const char *name) {
     obj->setLabel(NS::String::string(name, NS::ASCIIStringEncoding));
 }
 
-// Returns an uninitialised MTL::Buffer of length bytes.
+// Returns an uninitialised GPU-only MTL::Buffer of length bytes.
 NS::SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length);
 
 // Returns a MTL::Buffer holding a copy of the supplied data.
 template <typename T>
     requires(std::is_trivial_v<T>)
 NS::SharedPtr<MTL::Buffer> create_buffer_from_data(MTL::Device *const device, const T &data) {
+    // Note: can't be Private without jumping through extra hoops.
     return NS::TransferPtr(device->newBuffer(&data, sizeof(T), MTL::ResourceStorageModeShared));
 }
 

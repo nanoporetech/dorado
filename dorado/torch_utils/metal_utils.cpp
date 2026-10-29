@@ -131,7 +131,7 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
 namespace dorado::utils {
 
 NS::SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length) {
-    return NS::TransferPtr(device->newBuffer(length, MTL::ResourceStorageModeShared));
+    return NS::TransferPtr(device->newBuffer(length, MTL::ResourceStorageModePrivate));
 }
 
 NS::SharedPtr<MTL::ComputePipelineState> make_cps(
