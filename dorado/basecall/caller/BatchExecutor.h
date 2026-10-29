@@ -31,10 +31,9 @@ struct BatchTask {
 
     std::mutex mut;
     std::condition_variable cv;
-    // submit() has returned.
-    bool submitted{false};
-    // All decode units have been decoded and the batch released. Only used with a decode pool.
-    bool done{false};
+    // The thread waiting in execute() can proceed: submit() has returned if the requesting thread
+    // decodes, otherwise all decode units have been decoded and the batch released.
+    bool ready{false};
     size_t decode_units{0};
     size_t decode_units_finished{0};
     // Guarded by the decode queue lock.
@@ -74,6 +73,7 @@ private:
     void worker_thread_fn();
     void decode_thread_fn();
     void decode_inline(BatchTask& task);
+    static void mark_ready(BatchTask& task);
 
     CallerModel& m_model;
     const SchedulingPolicy m_policy;

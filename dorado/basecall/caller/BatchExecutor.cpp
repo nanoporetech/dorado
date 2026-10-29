@@ -45,13 +45,12 @@ std::vector<decode::DecodedChunk> BatchExecutor::execute(std::unique_ptr<InFligh
     }
     m_input_queue->cv.notify_all();
 
-    const bool decoded_by_pool = m_policy.decode_threads > 0;
     {
         std::unique_lock lock(task->mut);
-        task->cv.wait(lock, [&] { return decoded_by_pool ? task->done : task->submitted; });
+        task->cv.wait(lock, [&] { return task->ready; });
     }
 
-    if (!decoded_by_pool) {
+    if (m_policy.decode_threads == 0) {
         decode_inline(*task);
     }
     return std::move(task->out);
@@ -63,6 +62,14 @@ void BatchExecutor::decode_inline(BatchTask& task) {
         m_model.decode(*task.work, unit, task.out);
     }
     m_model.release(*task.work, task.out);
+}
+
+void BatchExecutor::mark_ready(BatchTask& task) {
+    {
+        std::lock_guard lock(task.mut);
+        task.ready = true;
+    }
+    task.cv.notify_one();
 }
 
 void BatchExecutor::terminate() {
@@ -136,11 +143,7 @@ void BatchExecutor::worker_thread_fn() {
             task->decode_units = m_model.decode_units(*task->work);
             if (task->decode_units == 0) {
                 m_model.release(*task->work, task->out);
-                {
-                    std::lock_guard lock(task->mut);
-                    task->done = true;
-                }
-                task->cv.notify_one();
+                mark_ready(*task);
             } else {
                 {
                     std::lock_guard lock(m_decode_lock);
@@ -149,11 +152,7 @@ void BatchExecutor::worker_thread_fn() {
                 m_decode_cv.notify_all();
             }
         } else {
-            {
-                std::lock_guard lock(task->mut);
-                task->submitted = true;
-            }
-            task->cv.notify_one();
+            mark_ready(*task);
         }
 
         if (m_policy.release_point == ReleasePoint::on_submit_return) {
@@ -204,11 +203,7 @@ void BatchExecutor::decode_thread_fn() {
         }
         if (all_decoded) {
             m_model.release(*task->work, task->out);
-            {
-                std::lock_guard lock(task->mut);
-                task->done = true;
-            }
-            task->cv.notify_one();
+            mark_ready(*task);
         }
     }
 }
