@@ -27,9 +27,7 @@ private:
 
 }  // namespace
 
-MetalCallerModel::MetalCallerModel(const config::BasecallModelConfig &model_config,
-                                   std::unique_ptr<MetalModel> model)
-        : m_config(model_config), m_model(std::move(model)) {}
+MetalCallerModel::MetalCallerModel(std::unique_ptr<MetalModel> model) : m_model(std::move(model)) {}
 
 MetalCallerModel::~MetalCallerModel() = default;
 
@@ -37,7 +35,7 @@ std::unique_ptr<RunnerState> MetalCallerModel::create_runner_state(size_t batch_
     if (batch_dims_idx != 0) {
         throw std::out_of_range("Metal caller only has one batch dimension");
     }
-    const auto layout = m_config.is_lstm_model() ? TensorLayout::NTC : TensorLayout::NCT;
+    const auto layout = config().is_lstm_model() ? TensorLayout::NTC : TensorLayout::NCT;
     return std::make_unique<TensorRunnerState>(m_model->create_input_tensor(), layout);
 }
 

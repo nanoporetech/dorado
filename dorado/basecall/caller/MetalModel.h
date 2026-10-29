@@ -28,6 +28,7 @@ class MetalModel {
 public:
     virtual ~MetalModel();
 
+    const config::BasecallModelConfig& config() const { return m_config; }
     virtual at::Tensor create_input_tensor() const = 0;
     virtual bool call_task(MetalCallerTask& task,
                            std::mutex& inter_caller_mutex,

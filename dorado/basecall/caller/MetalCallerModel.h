@@ -19,11 +19,10 @@ class MetalModel;
 class MetalCallerModel final
         : public TypedCallerModel<MetalCallerModel, TensorRunnerState, MetalCallerTask> {
 public:
-    MetalCallerModel(const config::BasecallModelConfig &model_config,
-                     std::unique_ptr<MetalModel> model);
+    explicit MetalCallerModel(std::unique_ptr<MetalModel> model);
     ~MetalCallerModel() override;
 
-    const config::BasecallModelConfig &config() const override { return m_config; }
+    const config::BasecallModelConfig &config() const override { return m_model->config(); }
     std::unique_ptr<RunnerState> create_runner_state(size_t batch_dims_idx) override;
     std::shared_ptr<ModBaseInfo> modbase_info() const override;
     std::string name() const override { return "MetalCaller"; }
@@ -41,7 +40,6 @@ private:
     void decode_batch(MetalCallerTask &task, size_t unit, std::vector<decode::DecodedChunk> &out);
     void release_batch(MetalCallerTask &task, std::vector<decode::DecodedChunk> &out);
 
-    const config::BasecallModelConfig m_config;
     std::unique_ptr<MetalModel> m_model;
 };
 
