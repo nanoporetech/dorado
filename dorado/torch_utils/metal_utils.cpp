@@ -209,6 +209,25 @@ MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count)
     return queue->commandBuffer(descriptor.get());
 }
 
+MTL::CommandBuffer *next_command_buffer_after_event(MTL::CommandQueue *queue,
+                                                    int try_count,
+                                                    MTL::SharedEvent *event,
+                                                    uint64_t value) {
+    MTL::CommandBuffer *command_buffer = next_command_buffer(queue, try_count);
+    command_buffer->encodeWait(event, value);
+
+    // Explicitly wait for the signal too since on slower machines/debug builds it can
+    // take a while. This then causes the command buffer to timeout since metal only
+    // allows kernels to run for ~5s, CPU time included.
+    const uint64_t timeout_ms = 5'000;
+    if (!event->waitUntilSignaledValue(value, timeout_ms)) {
+        // Even if this fails, we'll still have a wait encoded in the command buffer.
+        DORADO_LOG(warn, "Timed out waiting for signal. Is CPU overloaded?");
+    }
+
+    return command_buffer;
+}
+
 void launch_kernel_no_wait(ComputePipelineState *const pipeline,
                            CommandBuffer *const command_buffer,
                            const std::vector<Buffer *> &buffers,
