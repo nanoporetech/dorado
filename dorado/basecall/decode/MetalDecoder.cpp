@@ -48,6 +48,14 @@ MetalDecoder::MetalDecoder(const config::BasecallModelConfig& model_config,
     m_bwd_scan_cps = make_cps(m_device, bwd_kernel, {}, std::nullopt);
     m_fwd_scan_add_softmax_cps = make_cps(m_device, fwd_kernel, {}, std::nullopt);
 
+    const nn::metal::ScanArgs scan_args_data{
+            .T = m_out_chunk_size,
+            .N = m_out_batch_size,
+            .C = m_states,
+    };
+    m_scan_args = create_buffer_from_data(m_device, scan_args_data);
+    name_mtl_object(m_scan_args, "scan_kernel_args");
+
     m_scores_TNC.reserve(m_out_split);
     m_posts_NTC.reserve(m_out_split);
     m_bwd_NTC.reserve(m_out_split);
@@ -63,21 +71,13 @@ MetalDecoder::MetalDecoder(const config::BasecallModelConfig& model_config,
 bool MetalDecoder::prepare_decode(MTL::CommandBuffer* const command_buffer, int try_count) {
     POINT_OF_INTEREST_SCOPE(MetalDecoder, prepare_decode, "try_count=%i", try_count);
 
-    const nn::metal::ScanArgs scan_args_data{
-            .T = m_out_chunk_size,
-            .N = m_out_batch_size,
-            .C = m_states,
-    };
-    auto scan_args = create_buffer_from_data(m_device, scan_args_data);
-    name_mtl_object(scan_args, "scan_kernel_args");
-
     for (int i = 0; i < m_out_split; ++i) {
         launch_kernel_no_wait(m_bwd_scan_cps.get(), command_buffer,
-                              {scan_args.get(), mtl_for_tensor(m_scores_TNC.at(i)),
+                              {m_scan_args.get(), mtl_for_tensor(m_scores_TNC.at(i)),
                                mtl_for_tensor(m_bwd_NTC.at(i))},
                               {}, m_out_batch_size, m_states);
         launch_kernel_no_wait(m_fwd_scan_add_softmax_cps.get(), command_buffer,
-                              {scan_args.get(), mtl_for_tensor(m_scores_TNC.at(i)),
+                              {m_scan_args.get(), mtl_for_tensor(m_scores_TNC.at(i)),
                                mtl_for_tensor(m_bwd_NTC.at(i)), mtl_for_tensor(m_posts_NTC.at(i))},
                               {}, m_out_batch_size, m_states);
     }
