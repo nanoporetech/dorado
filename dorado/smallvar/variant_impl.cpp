@@ -41,7 +41,6 @@
 
 // #define DEBUG_INFERENCE_DATA
 // #define DEBUG_DUMP_INFERENCE_TENSORS_TO_DISK
-constexpr bool DEBUG_VC_SAMPLES = false;
 
 namespace dorado::smallvar {
 
@@ -1461,6 +1460,30 @@ call_variants_single_chrom(const std::string& draft,
                            const bool ambig_ref,
                            const bool gvcf,
                            const std::vector<int64_t>& hemizygous_boundaries) {
+    const auto debug_print_samples =
+            [](const std::span<const secondary::VariantCallingSample> samples_to_print,
+               const std::string_view label, const int32_t seq_id) {
+                if constexpr (secondary::DEBUG_VC_SAMPLES) {
+                    DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] {}: size = {}",
+                               seq_id, label, std::size(samples_to_print));
+                    constexpr bool PRINT_ALL = ((secondary::DEBUG_VC_SAMPLES_START < 0) ||
+                                                (secondary::DEBUG_VC_SAMPLES_END < 0));
+                    for (int64_t i = 0; i < std::ssize(samples_to_print); ++i) {
+                        const auto& vc = samples_to_print[i];
+                        const bool print_this =
+                                PRINT_ALL || (((secondary::DEBUG_VC_SAMPLES_START >= 0) &&
+                                               (secondary::DEBUG_VC_SAMPLES_END > 0)) &&
+                                              (vc.start() < secondary::DEBUG_VC_SAMPLES_END) &&
+                                              (secondary::DEBUG_VC_SAMPLES_START < vc.end()));
+                        if (print_this) {
+                            DORADO_LOG(trace,
+                                       "[call_variants_single_chrom seq_id = {}]    [i = {}] {}",
+                                       seq_id, i, secondary::to_string(vc, false));
+                        }
+                    }
+                }
+            };
+
     if (std::empty(vc_input_data)) {
         return {};
     }
@@ -1487,31 +1510,15 @@ call_variants_single_chrom(const std::string& draft,
         return {};
     }
 
-    [[maybe_unused]] const int32_t seq_id = vc_input_data[ordered_ids.front()].seq_id;
+    const int32_t seq_id = vc_input_data[ordered_ids.front()].seq_id;
 
-    // Debug print.
-    if constexpr (DEBUG_VC_SAMPLES == true) {
-        DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] vc_input_data: size = {}",
-                   seq_id, std::size(vc_input_data));
-        for (int64_t i = 0; i < std::ssize(vc_input_data); ++i) {
-            DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
-                       secondary::to_string(vc_input_data[i], false));
-        }
-    }
+    debug_print_samples(vc_input_data, "1. vc_input_data", seq_id);
 
     // Trim the overlapping portions between samples.
     auto trimmed_vc_samples = secondary::trim_vc_samples(vc_input_data, ordered_ids);
     std::vector<secondary::VariantCallingSample>{}.swap(vc_input_data);
 
-    // Debug print.
-    if constexpr (DEBUG_VC_SAMPLES == true) {
-        DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] trimmed_vc_samples: size = {}",
-                   seq_id, std::size(trimmed_vc_samples));
-        for (int64_t i = 0; i < std::ssize(trimmed_vc_samples); ++i) {
-            DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
-                       secondary::to_string(trimmed_vc_samples[i], false));
-        }
-    }
+    debug_print_samples(trimmed_vc_samples, "2. trimmed_vc_samples", seq_id);
 
     std::vector<secondary::IntervalInt64> merge_regions =
             construct_trimmed_merge_regions(trimmed_vc_samples, simple_variants, flank_trim);
@@ -1520,15 +1527,7 @@ call_variants_single_chrom(const std::string& draft,
     auto callable_vc_samples =
             trim_samples_to_merge_regions(std::move(trimmed_vc_samples), merge_regions);
 
-    // Debug print.
-    if constexpr (DEBUG_VC_SAMPLES == true) {
-        DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}] callable_vc_samples: size = {}",
-                   seq_id, std::size(callable_vc_samples));
-        for (int64_t i = 0; i < std::ssize(callable_vc_samples); ++i) {
-            DORADO_LOG(trace, "[call_variants_single_chrom seq_id = {}]    [i = {}] {}", seq_id, i,
-                       secondary::to_string(callable_vc_samples[i], false));
-        }
-    }
+    debug_print_samples(callable_vc_samples, "3. callable_vc_samples", seq_id);
 
     // Break and merge samples on non-variant positions.
     auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
@@ -1550,6 +1549,8 @@ call_variants_single_chrom(const std::string& draft,
         results.insert(std::end(results), std::make_move_iterator(std::begin(variants)),
                        std::make_move_iterator(std::end(variants)));
     }
+
+    debug_print_samples(joined_samples, "4. joined_samples", seq_id);
 
     // Sort the variants.
     std::stable_sort(std::begin(results), std::end(results));

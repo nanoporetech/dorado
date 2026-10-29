@@ -21,6 +21,11 @@
 
 namespace dorado::secondary {
 
+constexpr bool DEBUG_VC_SAMPLES = false;
+constexpr int64_t DEBUG_VC_SAMPLES_POINT = -1;
+constexpr int64_t DEBUG_VC_SAMPLES_START = DEBUG_VC_SAMPLES_POINT - 1000;
+constexpr int64_t DEBUG_VC_SAMPLES_END = DEBUG_VC_SAMPLES_POINT + 1000;
+
 constexpr float VCF_MAX_GQ_CAP = 60.0f;
 constexpr float VCF_MAX_PL_CAP = 990.0f;
 constexpr int32_t VAF_DP = 2;

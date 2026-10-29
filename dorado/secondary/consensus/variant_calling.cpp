@@ -26,7 +26,6 @@
 #include <unordered_map>
 #include <unordered_set>
 
-// #define DEBUG_VC_DATA_DUMP
 // #define DEBUG_VARIANT_REGIONS
 // #define DEBUG_NORMALIZE_VARIANT
 
@@ -1919,19 +1918,26 @@ std::vector<Variant> general_decode_variants(
     }
 #endif
 
-#ifdef DEBUG_VC_DATA_DUMP
-    {
-        std::vector<std::string_view> cons_view2;
-        cons_view2.reserve(std::size(cons_seqs_with_gaps));
-        for (const ConsensusResult& val : cons_seqs_with_gaps) {
-            cons_view2.emplace_back(val.seq);
+    if constexpr (DEBUG_VC_SAMPLES == true) {
+        constexpr bool PRINT_ALL = ((DEBUG_VC_SAMPLES_START < 0) || (DEBUG_VC_SAMPLES_END < 0));
+        const bool print_this =
+                PRINT_ALL || (((DEBUG_VC_SAMPLES_START >= 0) && (DEBUG_VC_SAMPLES_END > 0)) &&
+                              (vc_sample.start() < DEBUG_VC_SAMPLES_END) &&
+                              (DEBUG_VC_SAMPLES_START < vc_sample.end()));
+        if (print_this) {
+            std::vector<std::string_view> cons_view2;
+            cons_view2.reserve(std::size(cons_seqs_with_gaps));
+            for (const ConsensusResult& val : cons_seqs_with_gaps) {
+                cons_view2.emplace_back(val.seq);
+            }
+            std::cerr << "[general_decode_variants] seq_id = " << seq_id
+                      << ", columns = " << std::size(positions_major) << '\n';
+            print_slice(std::cerr,
+                        "Slice printed in general_decode_variants before constructing variants:",
+                        ref_seq_with_gaps, cons_view2, positions_major, positions_minor, is_variant,
+                        0, -1, 0, -1);
         }
-        std::cerr << "[general_decode_variants] seq_id = " << seq_id
-                  << ", columns = " << std::size(positions_major) << '\n';
-        print_slice(std::cerr, ref_seq_with_gaps, cons_view2, positions_major, positions_minor,
-                    is_variant, 0, -1, 0, -1);
     }
-#endif
 
     // Extract variants.
     std::vector<Variant> variants;
@@ -1960,8 +1966,10 @@ std::vector<Variant> general_decode_variants(
             std::cerr << "[general_decode_variants slice] var = " << var << '\n';
             const int64_t s = std::max<int64_t>(0, var.rstart - 5);
             const int64_t e = std::min(std::ssize(positions_major), var.rend + 5);
-            print_slice(std::cerr, ref_seq_with_gaps, cons_view, positions_major, positions_minor,
-                        is_variant, s, e, var.rstart, var.rend);
+            print_slice(std::cerr,
+                        "Slice printed in general_decode_variants after construct_variant:",
+                        ref_seq_with_gaps, cons_view, positions_major, positions_minor, is_variant,
+                        s, e, var.rstart, var.rend);
             std::cerr << '\n';
         }
 #endif
