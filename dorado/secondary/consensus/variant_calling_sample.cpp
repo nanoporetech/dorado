@@ -176,6 +176,22 @@ template <typename T>
 inline T get_back_val(const std::vector<T>& data, const T default_val) {
     return std::empty(data) ? default_val : data.back();
 }
+
+/**
+ * \brief Returns true if the rhs sample directly continues the lhs sample: either the major coordinates
+ *          are adjacent and rhs starts at minor zero, or the major coordinates are equal and the minor
+ *          coordinates are adjacent.
+ */
+bool are_samples_adjacent(const VariantCallingSample& lhs, const VariantCallingSample& rhs) {
+    if (std::empty(lhs.positions_major) || std::empty(rhs.positions_major)) {
+        return false;
+    }
+    return (lhs.seq_id == rhs.seq_id) &&
+           (((rhs.positions_major.front() == (lhs.positions_major.back() + 1)) &&
+             (rhs.positions_minor.front() == 0)) ||
+            ((rhs.positions_major.front() == lhs.positions_major.back()) &&
+             (rhs.positions_minor.front() == (lhs.positions_minor.back() + 1))));
+}
 }  // namespace
 
 bool variant_calling_sample_less(const VariantCallingSample& lhs, const VariantCallingSample& rhs) {
@@ -423,13 +439,7 @@ std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSam
             continue;
         }
 
-        // Merge if major coordinates are adjacent and the next sample starts at minor zero,
-        // or if major coordinates are equal but minor coordinates are adjacent.
-        if ((curr.seq_id == last.seq_id) &&
-            (((curr.positions_major[0] == (last.positions_major.back() + 1)) &&
-              (curr.positions_minor[0] == 0)) ||
-             ((curr.positions_major[0] == last.positions_major.back()) &&
-              (curr.positions_minor[0] == (last.positions_minor.back() + 1))))) {
+        if (are_samples_adjacent(last, curr)) {
             merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
             curr = {};
         } else {
@@ -488,7 +498,28 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
                                                const DecoderBase& decoder) {
     std::vector<VariantCallingSample> ret;
 
+    // Holds the samples which continue each other, until they are merged and moved to ret.
     std::vector<VariantCallingSample> queue;
+
+    // Merges the queued samples and moves them to the output.
+    const auto flush_queue = [&ret, &queue]() {
+        if (std::empty(queue)) {
+            return;
+        }
+        auto new_samples = merge_vc_samples(std::move(queue));
+        ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
+                   std::make_move_iterator(std::end(new_samples)));
+        queue.clear();
+    };
+
+    // Adds a sample to the queue. If it cannot be merged with the queued samples, the queue is
+    // flushed first.
+    const auto enqueue = [&queue, &flush_queue](VariantCallingSample sample) {
+        if (!std::empty(queue) && !are_samples_adjacent(queue.back(), sample)) {
+            flush_queue();
+        }
+        queue.emplace_back(std::move(sample));
+    };
 
     for (std::size_t i = 0; i < std::size(vc_samples); ++i) {
         VariantCallingSample& vc_sample = vc_samples[i];
@@ -513,7 +544,7 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
 
         // All positions differ. Merge the entire sample with the next one.
         if (last_non_var_start <= 0) {
-            queue.emplace_back(std::move(vc_sample));
+            enqueue(std::move(vc_sample));
             continue;
         }
 
@@ -523,30 +554,19 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
                 slice_vc_sample(vc_sample, last_non_var_start, num_positions);
         vc_sample = {};
 
-        // Enqueue the queue if possible.
-        if (last_non_var_start > 0) {
-            queue.emplace_back(std::move(left_slice));
+        // If the left part continues the queue (the right part of the previous sample), merge them
+        // and output. Otherwise, the queue is flushed and the left part stays in the queue, where it
+        // is merged again with its own right part.
+        const bool left_continues_queue =
+                !std::empty(queue) && are_samples_adjacent(queue.back(), left_slice);
+        enqueue(std::move(left_slice));
+        if (left_continues_queue) {
+            flush_queue();
         }
-
-        // Merge and insert.
-        if (!std::empty(queue)) {
-            auto new_samples = merge_vc_samples(std::move(queue));
-
-            ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
-                       std::make_move_iterator(std::end(new_samples)));
-        }
-
-        // Reset the queue.
-        queue = {std::move(right_slice)};
+        enqueue(std::move(right_slice));
     }
 
-    // Merge and insert.
-    if (!std::empty(queue)) {
-        auto new_samples = merge_vc_samples(std::move(queue));
-
-        ret.insert(std::end(ret), std::make_move_iterator(std::begin(new_samples)),
-                   std::make_move_iterator(std::end(new_samples)));
-    }
+    flush_queue();
 
     return ret;
 }

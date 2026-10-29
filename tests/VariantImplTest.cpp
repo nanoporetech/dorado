@@ -2838,9 +2838,7 @@ CATCH_TEST_CASE(
                     {
                         secondary::Variant{0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "4"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "4"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 4},
                         secondary::Variant{0, 4, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "7"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0"}}, 0, 3},
-                        secondary::Variant{0, 7, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "2"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 2},
-                        // Last major position in each sample always gets split in case it needs to be joined to the next sample
-                        secondary::Variant{0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 1},
+                        secondary::Variant{0, 7, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 3},
                     },
                     // clang-format on
             },
@@ -2851,8 +2849,7 @@ CATCH_TEST_CASE(
                     // clang-format off
                     {
                         {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "6"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "6"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 6},
-                        {0, 6, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0"}}, 0, 3},
-                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0"}}, 0, 1},
+                        {0, 6, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "4"}, {"GQ", "27"}, {"GT", "0"}}, 0, 4},
                     },
                     // clang-format on
             },
@@ -2862,8 +2859,7 @@ CATCH_TEST_CASE(
                     {{"chr1", 0, 10}},
                     // clang-format off
                     {
-                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "9"}, {"GQ", "27"}, {"GT", "0"}}, 0, 9},
-                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0"}}, 0, 1},
+                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "10"}, {"GQ", "27"}, {"GT", "0"}}, 0, 10},
                     },
                     // clang-format on
             },
@@ -2873,8 +2869,7 @@ CATCH_TEST_CASE(
                     {},
                     // clang-format off
                     {
-                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "9"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 9},
-                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 1},
+                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "10"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 10},
                     },
                     // clang-format on
             },
@@ -2888,8 +2883,7 @@ CATCH_TEST_CASE(
                         {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "3"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 3},
                         {0, 3, "AA", {"CC"}, {secondary::Filters::Pass}, {}, 60.0f, {{"SRC", "I"}, {"DP", "4"}, {"VQ", "23.99"}, {"AQ", "0,54"}, {"PL", "144,69,0"}, {"GQ", "60"}, {"GT", "1/1"}}, 3, 5},
                         {0, 5, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "7"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "2"}, {"GQ", "27"}, {"GT", "0"}}, 0, 2},
-                        {0, 7, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "2"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 2},
-                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 1},
+                        {0, 7, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 3},
                     },
                     // clang-format on
             },
