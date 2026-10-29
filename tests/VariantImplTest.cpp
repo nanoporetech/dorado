@@ -6,6 +6,7 @@
 #include "variant/variant_impl.h"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/generators/catch_generators.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
 
 #include <algorithm>
@@ -2563,7 +2564,7 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
             .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filters = {secondary::Filters::Pass}, .info = {}, .qual = 60.0f, .format = {{"GT", "1/2"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::Pass}, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 10, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::Pass}, .info = {}, .qual = 60.0f, .format = {{"GT", "0/1"}, {"GQ", "60"}}, .rstart = 0, .rend = 0,
         }
     };
     const std::vector<secondary::Variant> expected_chr1_filtered_variants = {
@@ -2575,7 +2576,7 @@ CATCH_TEST_CASE("filter_hemizygous_variants", TEST_GROUP) {
             .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T", "C"}, .filters = {secondary::Filters::IncompatZyg}, .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }, {
             // filtered because het
-            .seq_id = 0, .pos = 5, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::IncompatZyg}, .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
+            .seq_id = 0, .pos = 10, .ref = "A", .alts = {"T"}, .filters = {secondary::Filters::IncompatZyg}, .info = {}, .qual = 0.0f, .format = {{"GT", "0"}, {"GQ", "0"}}, .rstart = 0, .rend = 0,
         }
     };
     // clang-format on
@@ -2754,6 +2755,149 @@ CATCH_TEST_CASE("worker_variant_calling_reduce emits diploid gVCF records around
     CATCH_CHECK(stats.get_stats().at("processed") == 5.0);
     CATCH_CHECK(std::size(output_queue) == 1);
     // clang-format on
+}
+
+CATCH_TEST_CASE(
+        "worker_variant_calling_reduce splits inference gVCF reference blocks on hemizygous "
+        "boundaries",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("variant_reduce_gvcf_hemizygous_split");
+    const auto reference_fasta = temp_dir.m_path / "reference.fa";
+    const int64_t seq_len = 10;
+    {
+        std::ofstream ref_out(reference_fasta);
+        ref_out << ">chr1\nAAAAAAAAAA\n";
+    }
+
+    const secondary::DecoderBase decoder(secondary::LabelSchemeType::DIPLOID);
+
+    // Runs the reduce worker on a single inference sample covering the whole contig, with the
+    // given homozygous consensus. Returns reference records as "pos-end:GT" strings, and the
+    // positions of the non-reference records.
+    const auto run = [&](const std::string_view consensus,
+                         const std::vector<secondary::Region>& hemizygous) {
+        secondary::VariantCallingSample vc_sample{
+                .seq_id = 0,
+                .positions_major = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+                .positions_minor = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+                .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(),
+                                               {consensus, consensus}, {0.999f, 0.999f}),
+                .depth = at::full({seq_len}, 4, at::kInt),
+        };
+
+        std::vector<ChromosomeReduceData> chrom_reduce_data(1);
+        {
+            ChromosomeReduceData& data = chrom_reduce_data[0];
+            data.seq_id = 0;
+            data.seq_name = "chr1";
+            data.seq_len = seq_len;
+            data.progress_target = seq_len;
+            data.ready = true;
+            data.num_samples = 1;
+            data.selected_regions = {secondary::RegionInt{0, 0, seq_len}};
+        }
+
+        std::vector<std::unique_ptr<hts_io::FastxRandomReader>> fastx_readers;
+        fastx_readers.emplace_back(std::make_unique<hts_io::FastxRandomReader>(reference_fasta));
+        const std::vector<std::pair<std::string, int64_t>> draft_lens{{"chr1", seq_len}};
+
+        utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
+        utils::AsyncQueue<int64_t> output_queue{2};
+        const auto push_result = input_queue.try_push(std::move(vc_sample));
+        CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
+        input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+
+        std::atomic<bool> worker_terminate{false};
+        secondary::WorkerReturnStatus ret_status;
+        secondary::Stats stats;
+        stats.set("processed", 0.0);
+
+        const std::vector<std::vector<secondary::Region>> hemizygous_regions = {hemizygous};
+        worker_variant_calling_reduce(
+                input_queue, output_queue, chrom_reduce_data, worker_terminate, ret_status, stats,
+                fastx_readers, false, 1, draft_lens, decoder, hemizygous_regions, 30.0f, 0.0f, 0.0f,
+                0.0f, false, true, 2, 1, secondary::VariantCandidateSource::NONE);
+        CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+
+        return std::move(chrom_reduce_data[0].variants_merged);
+    };
+
+    struct TestCase {
+        std::string_view test_name;
+        std::string_view consensus;
+        std::vector<secondary::Region> hemizygous_regions;
+        std::vector<secondary::Variant> expected_variants;
+    };
+
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+            TestCase{
+                    "Reference block spanning a hemizygous region is split on both edges",
+                    "AAAAAAAAAA",
+                    {{"chr1", 4, 7}},
+                    // clang-format off
+                    {
+                        secondary::Variant{0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "4"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "4"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 4},
+                        secondary::Variant{0, 4, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "7"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0"}}, 0, 3},
+                        secondary::Variant{0, 7, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "2"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 2},
+                        // Last major position in each sample always gets split in case it needs to be joined to the next sample
+                        secondary::Variant{0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 1},
+                    },
+                    // clang-format on
+            },
+            TestCase{
+                    "Open-ended hemizygous region splits only on its start",
+                    "AAAAAAAAAA",
+                    {{"chr1", 6, -1}},
+                    // clang-format off
+                    {
+                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "6"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "6"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 6},
+                        {0, 6, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0"}}, 0, 3},
+                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0"}}, 0, 1},
+                    },
+                    // clang-format on
+            },
+            TestCase{
+                    "Region at the contig edges does not create empty blocks",
+                    "AAAAAAAAAA",
+                    {{"chr1", 0, 10}},
+                    // clang-format off
+                    {
+                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "9"}, {"GQ", "27"}, {"GT", "0"}}, 0, 9},
+                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0"}}, 0, 1},
+                    },
+                    // clang-format on
+            },
+            TestCase{
+                    "No hemizygous regions leaves a single diploid block",
+                    "AAAAAAAAAA",
+                    {},
+                    // clang-format off
+                    {
+                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "9"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 9},
+                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 1},
+                    },
+                    // clang-format on
+            },
+            TestCase{
+                    "Boundary inside a variant: reference blocks end and resume at its edges",
+                    // Homozygous SNVs at 3 and 4, and the hemizygous region starts at 4.
+                    "AAACCAAAAA",
+                    {{"chr1", 4, 7}},
+                    // clang-format off
+                    {
+                        {0, 0, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "3"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "3"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 3},
+                        {0, 3, "AA", {"CC"}, {secondary::Filters::Pass}, {}, 60.0f, {{"SRC", "I"}, {"DP", "4"}, {"VQ", "23.99"}, {"AQ", "0,54"}, {"PL", "144,69,0"}, {"GQ", "60"}, {"GT", "1/1"}}, 3, 5},
+                        {0, 5, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "7"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "2"}, {"GQ", "27"}, {"GT", "0"}}, 0, 2},
+                        {0, 7, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "9"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "2"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 2},
+                        {0, 9, "A", {"<*>"}, {secondary::Filters::NonVariant}, {{"END", "10"}}, 26.992f, {{"SRC", "I"}, {"MIN_DP", "4"}, {"LEN", "1"}, {"GQ", "27"}, {"GT", "0/0"}}, 0, 1},
+                    },
+                    // clang-format on
+            },
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+    const auto variants = run(test_case.consensus, test_case.hemizygous_regions);
+    CATCH_CHECK(variants == test_case.expected_variants);
 }
 
 }  // namespace dorado::smallvar::tests

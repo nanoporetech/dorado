@@ -1,10 +1,13 @@
 #include "secondary/consensus/sample.h"
 #include "secondary/consensus/variant_calling_sample.h"
+#include "secondary/features/decoder_base.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <cstdint>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace dorado::secondary::consensus::tests {
@@ -692,6 +695,75 @@ CATCH_TEST_CASE("trim_vc_samples reuses tensors for an unchanged sample", TEST_G
     CATCH_REQUIRE(result.size() == 1);
     CATCH_CHECK(result.front().logits.data_ptr() == sample.logits.data_ptr());
     CATCH_CHECK(result.front().depth.data_ptr() == sample.depth.data_ptr());
+}
+
+CATCH_TEST_CASE("split_vc_samples_on_boundaries", TEST_GROUP) {
+    const DecoderBase decoder(LabelSchemeType::HAPLOID);
+    const std::string symbols = decoder.get_label_scheme_symbols();
+    const std::string draft = "ACGTACGTAC";
+
+    // One-hot logits for the given consensus. Sample covers the whole draft.
+    const auto make_sample = [&](const std::string_view cons) {
+        const int64_t n = std::ssize(cons);
+        at::Tensor logits = at::zeros({n, static_cast<int64_t>(std::size(symbols))}, at::kFloat);
+        std::vector<int64_t> major(n);
+        for (int64_t i = 0; i < n; ++i) {
+            major[i] = i;
+            logits.index_put_({i, static_cast<int64_t>(symbols.find(cons[i]))}, 1.0f);
+        }
+        return VariantCallingSample{.seq_id = 0,
+                                    .positions_major = major,
+                                    .positions_minor = std::vector<int64_t>(n, 0),
+                                    .logits = logits,
+                                    .depth = at::ones({n}, at::kInt)};
+    };
+
+    using Extents = std::vector<std::pair<int64_t, int64_t>>;
+
+    const auto split = [&](const std::string_view cons, const std::vector<int64_t>& boundaries) {
+        std::vector<VariantCallingSample> samples;
+        samples.emplace_back(make_sample(cons));
+        const auto ret =
+                split_vc_samples_on_boundaries(std::move(samples), boundaries, draft, decoder);
+        Extents extents;
+        extents.reserve(std::size(ret));
+        for (const auto& vc : ret) {
+            extents.emplace_back(vc.start(), vc.end());
+        }
+        return extents;
+    };
+
+    CATCH_SECTION("No boundaries") { CATCH_CHECK(split(draft, {}) == Extents{{0, 10}}); }
+    CATCH_SECTION("Boundaries at or outside the sample edges are ignored") {
+        CATCH_CHECK(split(draft, {0, 10, 20}) == Extents{{0, 10}});
+    }
+    CATCH_SECTION("Boundary on a non-variant column, one split") {
+        CATCH_CHECK(split(draft, {5}) == Extents{{0, 5}, {5, 10}});
+    }
+    CATCH_SECTION("Boundary on a non-variant column, two splits") {
+        CATCH_CHECK(split(draft, {3, 7}) == Extents{{0, 3}, {3, 7}, {7, 10}});
+    }
+    CATCH_SECTION("Boundary inside a variant is deferred to the variant end") {
+        // Draft[4:6] = "AC", consensus "CA".
+        CATCH_CHECK(split("ACGTCAGTAC", {5}) == Extents{{0, 6}, {6, 10}});
+    }
+    CATCH_SECTION("Multiple boundaries inside a variant coincide") {
+        CATCH_CHECK(split("ACGTCAGTAC", {5, 6}) == Extents{{0, 6}, {6, 10}});
+    }
+    CATCH_SECTION("Boundary adjacent to variant start") {
+        CATCH_CHECK(split("ACGTCAGTAC", {4}) == Extents{{0, 4}, {4, 10}});
+    }
+    CATCH_SECTION("Boundary adjacent to variant end") {
+        CATCH_CHECK(split("ACGTCAGTAC", {6}) == Extents{{0, 6}, {6, 10}});
+    }
+    CATCH_SECTION("Variant reaching the sample start is ignored") {
+        // Draft[0:3] = "ACG", consensus "CAT".
+        CATCH_CHECK(split("CATTACGTAC", {2}) == Extents{{0, 10}});
+    }
+    CATCH_SECTION("Variant reaching the sample end is ignored") {
+        // Draft[8:10] = "AC", consensus "CA".
+        CATCH_CHECK(split("ACGTACGTCA", {9}) == Extents{{0, 10}});
+    }
 }
 
 }  // namespace dorado::secondary::consensus::tests

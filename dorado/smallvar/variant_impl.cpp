@@ -1458,7 +1458,8 @@ call_variants_single_chrom(const std::string& draft,
                            const float pass_min_aq,
                            const float pass_min_vq,
                            const bool ambig_ref,
-                           const bool gvcf) {
+                           const bool gvcf,
+                           const std::vector<int64_t>& hemizygous_boundaries) {
     if (std::empty(vc_input_data)) {
         return {};
     }
@@ -1529,7 +1530,14 @@ call_variants_single_chrom(const std::string& draft,
     }
 
     // Break and merge samples on non-variant positions.
-    const auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
+    auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
+
+    if (gvcf) {
+        // Split decode chunks on hemizygous boundaries so that gVCF reference blocks respect them.
+        joined_samples = secondary::split_vc_samples_on_boundaries(
+                std::move(joined_samples), hemizygous_boundaries, draft, decoder);
+    }
+
     std::vector<secondary::Variant> results;
 
     for (const auto& vc_sample : joined_samples) {
@@ -1586,7 +1594,8 @@ void add_gvcf_reference_records_for_unprocessed_regions(
         const std::string& draft,
         const std::vector<secondary::RegionInt>& selected_regions,
         const int32_t ploidy,
-        const std::vector<std::pair<uint32_t, uint32_t>>& read_endpoints) {
+        const std::vector<std::pair<uint32_t, uint32_t>>& read_endpoints,
+        const std::vector<secondary::Region>& hemizygous_regions) {
     const int64_t seq_len = std::ssize(draft);
     const std::vector<secondary::Interval64> selected = merge_intervals(selected_regions, seq_len);
     const std::size_t num_existing_variants = std::size(variants);
@@ -1621,9 +1630,22 @@ void add_gvcf_reference_records_for_unprocessed_regions(
         return std::make_tuple(start_idx_, end_idx_, depth_);
     };
 
+    auto iter_regions = hemizygous_regions.cbegin();
+
     for (const secondary::Interval64& selected_interval : selected) {
         int64_t pos = selected_interval.start;
+
+        while ((iter_regions != hemizygous_regions.cend()) && (iter_regions->end > 0) &&
+               (iter_regions->end <= selected_interval.start)) {
+            ++iter_regions;
+        }
+
         while (pos < selected_interval.end) {
+            while ((iter_regions != hemizygous_regions.cend()) && (iter_regions->end > 0) &&
+                   (iter_regions->end <= pos)) {
+                ++iter_regions;
+            }
+
             while ((variant_idx < num_existing_variants) &&
                    (!secondary::is_valid(variants[variant_idx]) ||
                     (variants[variant_idx].seq_id < seq_id) ||
@@ -1652,6 +1674,16 @@ void add_gvcf_reference_records_for_unprocessed_regions(
                     is_callable_block) {
                     pos = candidate_pos;
                     break;
+                }
+            }
+
+            if (iter_regions != hemizygous_regions.cend()) {
+                if ((iter_regions->start > block_start) && (iter_regions->start > 0) &&
+                    (iter_regions->start < pos)) {
+                    pos = iter_regions->start;
+                } else if ((iter_regions->end > block_start) && (iter_regions->end > 0) &&
+                           (iter_regions->end < pos)) {
+                    pos = iter_regions->end;
                 }
             }
 
@@ -1740,7 +1772,7 @@ std::vector<secondary::Variant> filter_hemizygous_variants(
     for (const secondary::Variant& var : variants) {
         secondary::Variant new_var = var;
         const int64_t var_start = var.pos;
-        const int64_t var_end = var.pos + var.ref.length();
+        const int64_t var_end = secondary::variant_end(var);
         while ((iter_regions != hemizygous_regions.end()) && (iter_regions->end > 0) &&
                (iter_regions->end <= var_start)) {
             ++iter_regions;
@@ -1830,6 +1862,27 @@ void worker_variant_calling_reduce(
         if (!std::empty(vc_decode_data) || gvcf) {
             draft.emplace(fastx_readers[tid]->fetch_seq(seq_name));
         }
+        const std::vector<secondary::Region> empty_hemizygous_regions{};
+        const std::vector<secondary::Region>& reduce_hemizygous =
+                std::empty(hemizygous_regions) ? empty_hemizygous_regions
+                                               : hemizygous_regions[seq_id];
+
+        // Decode chunks are split on these coordinates in the gVCF mode.
+        std::vector<int64_t> hemizygous_boundaries;
+        if (gvcf) {
+            const int64_t draft_len = std::ssize(*draft);
+            for (const auto& region : reduce_hemizygous) {
+                for (const int64_t b : {region.start, region.end}) {
+                    if ((b > 0) && (b < draft_len)) {
+                        hemizygous_boundaries.emplace_back(b);
+                    }
+                }
+            }
+            std::sort(std::begin(hemizygous_boundaries), std::end(hemizygous_boundaries));
+            hemizygous_boundaries.erase(
+                    std::unique(std::begin(hemizygous_boundaries), std::end(hemizygous_boundaries)),
+                    std::end(hemizygous_boundaries));
+        }
 
         std::vector<secondary::Variant> variants;
         std::vector<secondary::IntervalInt64> merge_regions;
@@ -1843,7 +1896,7 @@ void worker_variant_calling_reduce(
             std::tie(variants, merge_regions) = call_variants_single_chrom(
                     *draft, std::move(vc_decode_data), decoder, simple_variants,
                     merge_with_simple ? flank_trim : 0, pass_min_qual, pass_min_gq, pass_min_aq,
-                    pass_min_vq, ambig_ref, gvcf);
+                    pass_min_vq, ambig_ref, gvcf, hemizygous_boundaries);
         }
 
         DORADO_LOG(debug,
@@ -1867,19 +1920,16 @@ void worker_variant_calling_reduce(
                              std::end(reduce_data.variants_merged));
             std::stable_sort(std::begin(reduce_data.read_endpoints),
                              std::end(reduce_data.read_endpoints));
-            add_gvcf_reference_records_for_unprocessed_regions(reduce_data.variants_merged, seq_id,
-                                                               *draft, reduce_data.selected_regions,
-                                                               ploidy, reduce_data.read_endpoints);
+            add_gvcf_reference_records_for_unprocessed_regions(
+                    reduce_data.variants_merged, seq_id, *draft, reduce_data.selected_regions,
+                    ploidy, reduce_data.read_endpoints, reduce_hemizygous);
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));
         }
 
-        if (!std::empty(hemizygous_regions)) {
-            const std::vector<secondary::Region>& reduce_hemizygous = hemizygous_regions[seq_id];
-            if (!std::empty(reduce_hemizygous)) {
-                reduce_data.variants_merged =
-                        filter_hemizygous_variants(reduce_data.variants_merged, reduce_hemizygous);
-            }
+        if (!std::empty(reduce_hemizygous)) {
+            reduce_data.variants_merged =
+                    filter_hemizygous_variants(reduce_data.variants_merged, reduce_hemizygous);
         }
 
         chrom_reduced[seq_id] = true;
