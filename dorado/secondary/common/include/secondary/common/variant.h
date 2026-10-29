@@ -99,6 +99,8 @@ bool variant_ends_before_position(const Variant& var, int32_t seq_id, int64_t po
 
 bool variant_covers_position(const Variant& var, int32_t seq_id, int64_t pos);
 
+bool has_empty_alts(const Variant& var);
+
 void set_gvcf_reference_block_end(Variant& var, int64_t end);
 
 float get_gvcf_reference_record_gq_margin(float gq,

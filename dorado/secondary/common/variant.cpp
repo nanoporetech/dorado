@@ -148,6 +148,12 @@ bool variant_covers_position(const Variant& var, const int32_t seq_id, const int
            !variant_ends_before_position(var, seq_id, pos);
 }
 
+bool has_empty_alts(const Variant& var) {
+    return std::empty(var.alts) ||
+           std::any_of(std::cbegin(var.alts), std::cend(var.alts),
+                       [](const std::string_view s) { return std::empty(s); });
+}
+
 void set_gvcf_reference_block_end(Variant& var, const int64_t end) {
     var.alts = {"<*>"};
     var.info["END"] = std::to_string(end);
