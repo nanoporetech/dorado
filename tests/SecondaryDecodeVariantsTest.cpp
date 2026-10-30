@@ -486,7 +486,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Prepending with a reference base because the entire variant is in an insertion.",
+            "Variant entirely in an insertion is constructed without an anchor, and normalization prepends the reference base.",
             "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, 3.0f, false, false, true, false, false,
             {
                 Variant{0, 2, "T", {"TAAA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "300,0"}, {"AQ", "0,60"}}, 2, 6},
@@ -495,7 +495,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Edge case. SNPs follow a long stretch of minor positions, making a large variant region. The rstart moved left 1bp because a base was prepended.",
+            "Edge case. SNPs follow a long stretch of minor positions, making a large variant region. The variant is constructed from the first column of the region (no base is prepended).",
              "CCTAG***********TATTATT",
             {"CCTAG*********TT*CTTATT"
             },
@@ -503,13 +503,13 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, false, false,
             {
-                Variant{0, 6, "A", {"TC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "195,0"}, {"AQ", "0,60"}}, 4, 18},
+                Variant{0, 6, "A", {"TC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "195,0"}, {"AQ", "0,60"}}, 5, 18},
             },
             false,
         },
 
         TestCase{
-            "Edge case, diploid. Normalize, merge overlapping and merge adjacent. SNPs follow a long stretch of minor positions, making a large variant region. The rstart moved left 1bp because a base was prepended.",
+            "Edge case, diploid. Normalize, merge overlapping and merge adjacent. SNPs follow a long stretch of minor positions, making a large variant region. The variant is constructed from the first column of the region (no base is prepended).",
              "CCTAG************TTATTATT",
             {"CCTAG*********TT**T*TTATT",
              "CCTAG*********T*AT*ATTATT",
@@ -518,7 +518,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0},
             3.0f, false, false, true, true, true,
             {
-                Variant{0, 6, "TA", {"ATA", "TT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,100,200,100,0,197"}, {"AQ", "0,60,60"}}, 4, 20},
+                Variant{0, 6, "TA", {"ATA", "TT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,100,200,100,0,197"}, {"AQ", "0,60,60"}}, 5, 20},
             },
             false,
         },
