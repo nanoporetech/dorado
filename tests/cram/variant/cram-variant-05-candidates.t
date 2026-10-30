@@ -12,12 +12,17 @@ Provide candidate variant sites to seed inference windows (the --candidates feat
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
   > gunzip -c out/variants.vcf.gz | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   > diff ${in_expected_proc_regions} out/processed_regions.bed
   Exit code: 0
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
 
 Additionally provide a regions BED file to limit where the candidate sites are considered for inference.
   $ rm -rf out; mkdir -p out
@@ -34,12 +39,17 @@ Additionally provide a regions BED file to limit where the candidate sites are c
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
   > gunzip -c out/variants.vcf.gz | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   > diff ${in_expected_proc_regions} out/processed_regions.bed
   Exit code: 0
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
 
 Tiled region selection is the default windowing approach for candidate-filtered inference.
   $ rm -rf out; mkdir -p out
@@ -55,12 +65,17 @@ Tiled region selection is the default windowing approach for candidate-filtered 
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > ### Remove the qual field because Torch results can vary slightly cross-platform.
   > cat ${in_expected} | grep -v "#" | cut -f 1-5,7-8 > out/expected.no_header.no_qual.vcf
   > gunzip -c out/variants.vcf.gz | grep -v "#" | cut -f 1-5,7-8 > out/result.no_header.no_qual.vcf
   > diff out/expected.no_header.no_qual.vcf out/result.no_header.no_qual.vcf
   > diff ${in_expected_proc_regions} out/processed_regions.bed
   Exit code: 0
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
 
 Candidate filtering with an empty candidates file should succeed and produce no calls.
   $ rm -rf out; mkdir -p out
@@ -73,7 +88,13 @@ Candidate filtering with an empty candidates file should succeed and produce no 
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/result.no_header.vcf || true
   > test ! -s out/result.no_header.vcf
   > test ! -s out/processed_regions.bed
   Exit code: 0
+  empty_candidates.list
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi

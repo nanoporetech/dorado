@@ -1244,11 +1244,6 @@ void run_polishing(const Options& opt,
             }
         }
     }
-
-    // Finalise (close + index) the VCF.
-    if (vcf_writer) {
-        vcf_writer->close();
-    }
 }
 
 }  // namespace

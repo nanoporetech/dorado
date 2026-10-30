@@ -434,8 +434,6 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             writer.write_variant(data.first_variant);
             writer.write_variant(data.second_variant);
             writer.write_variant(data.third_variant);
-            CATCH_REQUIRE_NOTHROW(writer.close());
-            CATCH_CHECK_NOTHROW(writer.close());  // Idempotent.
         }
         CATCH_REQUIRE(std::filesystem::exists(gz_path));
         CATCH_REQUIRE(std::filesystem::exists(gz_path.string() + ".tbi"));
@@ -468,9 +466,10 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
 
     CATCH_SECTION("compressed output with no records is still indexed") {
         const std::filesystem::path gz_path = temp_dir.m_path / "empty.vcf.gz";
-        VCFWriter writer(gz_path, data.filters, data.contigs, false, secondary::VCF_DEFAULT_SAMPLE,
-                         std::string_view{});
-        CATCH_REQUIRE_NOTHROW(writer.close());
+        {
+            VCFWriter writer(gz_path, data.filters, data.contigs, false,
+                             secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
+        }
         CATCH_CHECK(std::filesystem::exists(gz_path.string() + ".tbi"));
     }
 
@@ -479,7 +478,6 @@ CATCH_TEST_CASE("VCFWriter writes valid VCF output and rejects invalid inputs", 
             VCFWriter writer(data.vcf_path, data.filters, data.contigs, false,
                              secondary::VCF_DEFAULT_SAMPLE, std::string_view{});
             writer.write_variant(data.first_variant);
-            writer.close();
         }
         CATCH_CHECK(!std::filesystem::exists(data.vcf_path.string() + ".tbi"));
     }

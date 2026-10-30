@@ -9,6 +9,7 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > gunzip -c out/variants.vcf.gz | grep -E "^##INFO|^##ALT\*|^##FORMAT"
   > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
@@ -16,6 +17,11 @@ Candidate-filtered gVCF emits non-variant records for regions with no candidates
   Exit code: 0
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
+  empty_candidates.list
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   ##INFO=<ID=END,Number=1,Type=Integer,Description="End position of the reference block">
   ##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
   ##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality score">
@@ -50,6 +56,7 @@ chr20	1959	1
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > ### Remove QUAL and the last digits of VQ because results may vary by platform
   > gunzip -c out/variants.vcf.gz | grep -v "^#" | cut -f 1-5,7-10 | sed -E 's/[0-9][0-9]$//' > out/gvcf.body.no_qual.vcf
   > awk '{ print $1, $2, $3 }' out/processed_regions.bed
@@ -67,6 +74,10 @@ chr20	1959	1
   Exit code: 0
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   chr20 1345 1626
   chr20 1534 1812
   chr20 1714 2001
@@ -92,12 +103,18 @@ Candidate-filtered gVCF handles a whole-contig region with omitted bounds.
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
   > awk 'NR == 1 { print $1, $2, $4, $5, $7, $8, $9, $10 }' out/gvcf.body.vcf
   Exit code: 0
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
+  empty_candidates.list
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   1
   chr20 1 T <*> . END=10000 GT:GQ:LEN:MIN_DP:SRC 0/0:60:10000:15:R
 
@@ -113,11 +130,17 @@ In this region, all reads are dropped by kadayashi, so depth information is empt
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > gunzip -c out/variants.vcf.gz | grep -v "^#" > out/gvcf.body.vcf
   > wc -l out/gvcf.body.vcf | awk '{ print $1 }'
   > awk 'NR == 1 { print $1, $2, $4, $5, $7, $8, $9, $10 }' out/gvcf.body.vcf
   Exit code: 0
   [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Variant calling model is not compatible with the input BAM. This may produce inferior results.
+  empty_candidates.list
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   1
   chr20 9991 A <*> . END=10000 GT:GQ:LEN:MIN_DP:SRC 0/0:60:10:.:R

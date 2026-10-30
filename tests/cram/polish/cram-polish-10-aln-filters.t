@@ -102,9 +102,14 @@ Filter `--min-depth` set to 1. No bases are under this limit, everything should 
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "Copying contig verbatim from input" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > samtools fqidx out/consensus.fasta
   > awk '{ print $1,$2 }' out/consensus.fasta.fai
   Exit code: 0
+  consensus.fasta
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   contig_1 9998
 
 Filter `--min-depth` set to 11. Many bases should be filtered out.
@@ -118,10 +123,15 @@ Filter `--min-depth` set to 11. Many bases should be filtered out.
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "Copying contig verbatim from input" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > samtools fqidx out/consensus.fasta
   > awk '{ print $1,$2 }' out/consensus.fasta.fai
   Exit code: 0
   [debug] Sequence 'contig_1' of length 10000 has zero inferred samples. Copying contig verbatim from input.
+  consensus.fasta
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   contig_1 10000
 
 Filter `--min-depth` set to 11 with `--no-fill-gaps`. This should just output nothing.
@@ -136,6 +146,11 @@ Filter `--min-depth` set to 11 with `--no-fill-gaps`. This should just output no
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "Copying contig verbatim from input" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > wc -l out/consensus.fasta | awk '{ print $1 }'
   Exit code: 0
+  consensus.fasta
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   0

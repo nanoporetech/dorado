@@ -224,15 +224,15 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
     }
 }
 
-void VCFWriter::close() {
+VCFWriter::~VCFWriter() {
     if (!m_vcf_fp) {
         return;
     }
     if (hts_close(m_vcf_fp.release()) < 0) {
-        throw std::runtime_error("Failed to close VCF file: " + m_filename.string());
-    }
-    if (m_compressed && (tbx_index_build(m_filename.string().c_str(), 0, &TBX_CONF_VCF) != 0)) {
-        throw std::runtime_error("Failed to index VCF file: " + m_filename.string());
+        DORADO_LOG(error, "Failed to close VCF file: {}", m_filename.string());
+    } else if (m_compressed &&
+               (tbx_index_build(m_filename.string().c_str(), 0, &TBX_CONF_VCF) != 0)) {
+        DORADO_LOG(error, "Failed to index VCF file: {}", m_filename.string());
     }
 }
 

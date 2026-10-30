@@ -32,13 +32,13 @@ public:
               const std::string& sample_name,
               std::string_view command_line);
 
-    void write_variant(const Variant& variant);
-
     /**
-     * \brief Flushes and closes the file. If the filename ends in ".gz" the output is BGZF compressed
-     *        and a tabix index (<filename>.tbi) is built here. Throws if closing or indexing fails.
+     * \brief Destructor handles flushing and closing the file. If the filename ends in ".gz" the output is BGZF compressed
+     *        and a tabix index (<filename>.tbi) is built here.
      */
-    void close();
+    ~VCFWriter();
+
+    void write_variant(const Variant& variant);
 
 private:
     std::filesystem::path m_filename;

@@ -60,6 +60,7 @@ gVCF run: reference-block (R) and inference (I) sources.
   > ${DORADO_BIN} smallvar --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --candidate-filtering true --candidates ${in_candidates} --window-len 300 --window-overlap 100 --variant-flanking-bases 100 --regions "chr20:1000-2145" --ignore-read-groups --gvcf -o out 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
+  > ls -1 out
   > ### Order-independent SRC lookup (see the first block).
   > src_of='src=""; nf=split($9,f,":"); split($10,s,":"); for(i=1;i<=nf;i++) if(f[i]=="SRC") src=s[i];'
   > ### All variant source values present (I from inference, R from the outside-inference reference block).
@@ -74,6 +75,10 @@ gVCF run: reference-block (R) and inference (I) sources.
   > ### The non-reference (variant) records are inference-sourced.
   > gunzip -c out/variants.vcf.gz | grep -v "#" | awk "\$8 == \".\" { ${src_of} print \$2, src }"
   Exit code: 0
+  processed_regions.bed
+  stderr
+  variants.vcf.gz
+  variants.vcf.gz.tbi
   I R
   reference_blocks_only_R_or_I
   1000 R

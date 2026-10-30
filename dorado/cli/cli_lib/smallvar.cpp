@@ -1501,15 +1501,6 @@ void run_variant_calling(const Options& opt,
             throw std::runtime_error{wrs.message};
         }
     }
-
-    // Finalise (close + index) the VCFs only after a fully successful run.
-    vcf_writer->close();
-    if (vcf_writer_kadayashi) {
-        vcf_writer_kadayashi->close();
-    }
-    if (vcf_writer_inference) {
-        vcf_writer_inference->close();
-    }
 }
 
 }  // namespace
