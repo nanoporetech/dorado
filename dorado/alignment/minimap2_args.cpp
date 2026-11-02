@@ -124,6 +124,8 @@ void add_arguments(argparse::ArgumentParser& parser) {
             .default_value("none");
     parser.add_argument("--rmq").help("use the minigraph chaining algorithm").flag();
 
+    parser.add_argument("-u").help("").choices("b", "f", "r", "n");
+
     parser.add_argument("--secondary-seq")
             .hidden()
             .help("minimap2 output seq/qual for secondary and supplementary alignments")
@@ -237,6 +239,9 @@ std::optional<Minimap2Options> process_arguments(const argparse::ArgumentParser&
     }
 
     apply_cs_option(res, parser.get("cs"));
+    if (auto u_option = parser.present<std::string>("u"); u_option.has_value()) {
+        apply_u_option(res, *u_option);
+    }
 
     return res;
 }
@@ -262,6 +267,20 @@ Minimap2Options parse_options(const std::string& minimap2_option_string) {
 
 namespace {
 
+// Split attached -u values (e.g. "-uf") into a separate "-u" entry followed by the value.
+// This type of parameter passing is not supported by argparse, but mm2 allows it.
+// This is done specifically for this parameter to allow users to copypasta their mm2 commandline options
+// Invalid values are left for the parser to reject.
+void split_attached_u_values(std::vector<std::string>& mm2_args) {
+    for (size_t i = 0; i < mm2_args.size(); ++i) {
+        if (mm2_args[i].size() > 2 && mm2_args[i].starts_with("-u")) {
+            std::string value = mm2_args[i].substr(2);
+            mm2_args[i].resize(2);
+            mm2_args.insert(mm2_args.begin() + i + 1, std::move(value));
+        }
+    }
+}
+
 std::optional<Minimap2Options> try_parse_options_impl(argparse::ArgumentParser& parser,
                                                       const std::string& minimap2_option_string,
                                                       std::string& error_message) {
@@ -271,6 +290,7 @@ std::optional<Minimap2Options> try_parse_options_impl(argparse::ArgumentParser& 
         }
         return utils::split("minimap2_options " + minimap2_option_string, ' ');
     }();
+    split_attached_u_values(mm2_args);
     add_arguments(parser);
     try {
         parser.parse_args(mm2_args);
@@ -312,6 +332,24 @@ void apply_cs_option(Minimap2Options& options, std::string_view cs_opt) {
         flag &= ~MM_F_OUT_CS;
     } else {
         DORADO_LOG(warn, "Unrecognized options for --cs={}", cs_opt);
+    }
+}
+
+void apply_u_option(Minimap2Options& options, std::string_view u_opt) {
+    auto& flag = options.mapping.mapping_options->get().flag;
+
+    if (u_opt == "b") {
+        flag |= MM_F_SPLICE_FOR | MM_F_SPLICE_REV;  // both strands
+    } else if (u_opt == "f") {
+        flag |= MM_F_SPLICE_FOR;
+        flag &= ~MM_F_SPLICE_REV;  // match GT-AG
+    } else if (u_opt == "r") {
+        flag |= MM_F_SPLICE_REV;
+        flag &= ~MM_F_SPLICE_FOR;  // match CT-AC (reverse complement of GT-AG)
+    } else if (u_opt == "n") {
+        flag &= ~(MM_F_SPLICE_FOR | MM_F_SPLICE_REV);  // don't try to match the GT-AG signal
+    } else {
+        DORADO_LOG(error, "Unrecognized option for -u={}", u_opt);
     }
 }
 

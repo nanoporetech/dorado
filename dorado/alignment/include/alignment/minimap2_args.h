@@ -43,6 +43,7 @@ std::string get_help_message();
 // Helper functions for CorrectionMapperNode which uses options we don't yet support in the command line
 void apply_cs_option(Minimap2Options& options, std::string_view cs_opt);
 void apply_dual_option(Minimap2Options& options, std::string_view dual_yes_or_no);
+void apply_u_option(Minimap2Options& options, std::string_view u_opt);
 
 // Returns true in the minimap global flag 'MM_DBG_PRINT_ALN_SEQ' is set
 bool print_aln_seq();
