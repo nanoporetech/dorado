@@ -1,7 +1,7 @@
+#include "SuppressLogging.h"
 #include "TestUtils.h"
 #include "file_info/file_info.h"
 #include "utils/fs_utils.h"
-#include "utils/stream_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -102,7 +102,7 @@ CATCH_TEST_CASE(TEST_GROUP "  get_unique_sequencing_chemistry", TEST_GROUP) {
 
     CATCH_SECTION("get_chemistry throws with inhomogeneous") {
         auto data = fs::path(get_data_dir("pod5")) / "mixed";
-        utils::SuppressStdout suppress_error_message{};
+        SuppressLogging suppress_error_message{};
         CATCH_CHECK_THROWS(get_unique_sequencing_chemistry(dir_entries(data.string(), true)),
                            Catch::Matchers::Contains(
                                    "Could not uniquely resolve chemistry from inhomogeneous data"));

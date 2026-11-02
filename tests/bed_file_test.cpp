@@ -1,7 +1,7 @@
 #include "alignment/bed_file.h"
 
+#include "SuppressLogging.h"
 #include "TestUtils.h"
-#include "utils/stream_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -115,7 +115,7 @@ CATCH_TEST_CASE(CUT_TAG " load with header line after bed data line returns fals
     dorado::alignment::BedFile cut{};
     std::istringstream input_stream{LAMBDA_1.bed_line + "\nbrowser blah"};
 
-    utils::SuppressStdout suppress_load_error_message{};
+    SuppressLogging suppress_load_error_message{};
     CATCH_REQUIRE_FALSE(cut.load(input_stream));
 }
 
@@ -159,7 +159,7 @@ CATCH_TEST_CASE(CUT_TAG " load from stream with inconsistent number of columns r
     std::istringstream input_stream{three_column_line + six_column_line};
     dorado::alignment::BedFile cut{};
 
-    utils::SuppressStdout suppress_load_error_message{};
+    SuppressLogging suppress_load_error_message{};
     CATCH_REQUIRE_FALSE(cut.load(input_stream));
 }
 
@@ -172,7 +172,7 @@ CATCH_TEST_CASE(CUT_TAG
     std::istringstream input_stream{three_column_line + three_column_line_empty_last_col};
     dorado::alignment::BedFile cut{};
 
-    utils::SuppressStdout suppress_load_error_message{};
+    SuppressLogging suppress_load_error_message{};
     CATCH_REQUIRE_FALSE(cut.load(input_stream));
 }
 
@@ -185,7 +185,7 @@ CATCH_TEST_CASE(CUT_TAG
     std::istringstream input_stream{four_column_line + four_column_line_empty_last_col};
     dorado::alignment::BedFile cut{};
 
-    utils::SuppressStdout suppress_load_error_message{};
+    SuppressLogging suppress_load_error_message{};
     CATCH_REQUIRE(cut.load(input_stream));
 }
 
@@ -272,7 +272,7 @@ CATCH_TEST_CASE(CUT_TAG " load from stream. Parameterised testing.", CUT_TAG) {
     if (!valid) {
         bool load_result;
         {
-            utils::SuppressStdout suppress_load_error_message{};
+            SuppressLogging suppress_load_error_message{};
             load_result = cut.load(input_stream);
         }
         CATCH_REQUIRE_FALSE(load_result);

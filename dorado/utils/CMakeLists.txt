@@ -46,7 +46,6 @@ dorado_add_library(
         sequence_utils.h
         stats.h
         stl_utils.h
-        stream_utils.h
         sys_stats.h
         sys_utils.h
         thread_utils.h

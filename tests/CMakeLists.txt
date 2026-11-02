@@ -93,6 +93,7 @@ add_executable(dorado_tests
     StlUtilsTest.cpp
     StringUtilsTest.cpp
     SummaryFileWriterTest.cpp
+    SuppressLogging.h
     synchronisation_test.cpp
     TimeUtilsTest.cpp
     TrimTest.cpp
