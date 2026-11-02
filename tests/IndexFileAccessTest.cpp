@@ -3,15 +3,12 @@
 #include "TestUtils.h"
 #include "alignment/Minimap2Index.h"      // IWYU pragma: keep for Minimap2Index
 #include "alignment/minimap2_wrappers.h"  // IWYU pragma: keep for Minimap2MapOptHolder
-#include "utils/stream_utils.h"
 
 #include <catch2/catch_test_macros.hpp>
 
 #include <filesystem>
 
 #define TEST_GROUP "[alignment::IndexFileAccess]"
-
-using namespace dorado::utils;
 
 namespace {
 
@@ -53,11 +50,25 @@ const dorado::alignment::Minimap2Options& invalid_options() {
     return result;
 }
 
+// RAII helper to silence minimap2's messages to stderr for the current scope.
+class [[nodiscard]] SuppressMinimap2Output final {
+    const int m_verbose{mm_verbose};
+
+public:
+    SuppressMinimap2Output() { mm_verbose = 0; }
+    ~SuppressMinimap2Output() { mm_verbose = m_verbose; }
+
+    SuppressMinimap2Output(const SuppressMinimap2Output&) = delete;
+    SuppressMinimap2Output& operator=(const SuppressMinimap2Output&) = delete;
+    SuppressMinimap2Output(SuppressMinimap2Output&&) = delete;
+    SuppressMinimap2Output& operator=(SuppressMinimap2Output&&) = delete;
+};
+
 dorado::alignment::IndexLoadResult load_index_no_stderr(
         dorado::alignment::IndexFileAccess& cut,
         const std::string& file,
         const dorado::alignment::Minimap2Options& options) {
-    SuppressStderr no_stderr{};
+    SuppressMinimap2Output no_stderr{};
     return cut.load_index(file, options, 1);
 }
 
@@ -204,7 +215,10 @@ CATCH_SCENARIO(TEST_GROUP " Load and retrieve index files", TEST_GROUP) {
 
 CATCH_TEST_CASE(TEST_GROUP " validate_options with invalid options returns false", TEST_GROUP) {
     bool result{};
-    SuppressStderr::invoke([&result] { result = validate_options(invalid_options()); });
+    {
+        SuppressMinimap2Output no_stderr{};
+        result = validate_options(invalid_options());
+    }
 
     CATCH_REQUIRE_FALSE(result);
 }
