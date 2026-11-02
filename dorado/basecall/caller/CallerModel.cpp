@@ -9,4 +9,6 @@ std::pair<int, int> CallerModel::batch_timeouts_ms() const {
                                              : std::make_pair(100, 100);
 }
 
+void CallerModel::release(InFlightBatch &, std::vector<decode::DecodedChunk> &) {}
+
 }  // namespace dorado::basecall

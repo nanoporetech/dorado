@@ -102,10 +102,7 @@ public:
     virtual void decode(InFlightBatch& batch,
                         size_t unit,
                         std::vector<decode::DecodedChunk>& out) = 0;
-    virtual void release(InFlightBatch& batch, std::vector<decode::DecodedChunk>& out) {
-        (void)batch;
-        (void)out;
-    }
+    virtual void release(InFlightBatch& batch, std::vector<decode::DecodedChunk>& out);
 
 protected:
     CallerModel() = default;
