@@ -941,7 +941,7 @@ void run_polishing(const Options& opt,
 
     // Open the output stream to a file/stdout for the variant calls.
     const std::filesystem::path out_vcf_fn =
-            (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf");
+            (std::empty(opt.output_dir)) ? "-" : (opt.output_dir / "variants.vcf.gz");
 
     // VCF writer, nullptr unless variant calling is run.
     std::unique_ptr<secondary::VCFWriter> vcf_writer;

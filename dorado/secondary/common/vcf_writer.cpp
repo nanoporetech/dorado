@@ -5,6 +5,7 @@
 #include "utils/log_utils.h"
 
 #include <htslib/hts.h>
+#include <htslib/tbx.h>
 #include <htslib/vcf.h>
 
 #include <algorithm>
@@ -93,6 +94,10 @@ float missing_bcf_float() {
     return value;
 }
 
+// Same values as htslib's tbx_conf_vcf (tbx.c), without referencing the exported data symbol
+// that is not available in all Windows builds.
+constexpr tbx_conf_t TBX_CONF_VCF{TBX_VCF, 1, 2, 0, '#', 0};
+
 int32_t parse_vcf_int(const std::string_view value) {
     if (value == ".") {
         return bcf_int32_missing;
@@ -149,7 +154,9 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
                      const bool include_gvcf_headers,
                      const std::string& sample_name,
                      const std::string_view command_line)
-        : m_vcf_fp{hts_open(in_fn.string().c_str(), "w")},
+        : m_filename{in_fn},
+          m_compressed{in_fn.extension() == ".gz"},
+          m_vcf_fp{hts_open(in_fn.string().c_str(), m_compressed ? "wz" : "w")},
           m_header{bcf_hdr_init("w")},
           m_include_gvcf_headers{include_gvcf_headers} {
     if (!m_vcf_fp) {
@@ -214,6 +221,18 @@ VCFWriter::VCFWriter(const std::filesystem::path& in_fn,
     // Write the header to the file
     if (bcf_hdr_write(m_vcf_fp.get(), m_header.get()) < 0) {
         throw std::runtime_error("Failed to write VCF header.");
+    }
+}
+
+VCFWriter::~VCFWriter() {
+    if (!m_vcf_fp) {
+        return;
+    }
+    if (hts_close(m_vcf_fp.release()) < 0) {
+        DORADO_LOG(error, "Failed to close VCF file: {}", m_filename.string());
+    } else if (m_compressed &&
+               (tbx_index_build(m_filename.string().c_str(), 0, &TBX_CONF_VCF) != 0)) {
+        DORADO_LOG(error, "Failed to index VCF file: {}", m_filename.string());
     }
 }
 
