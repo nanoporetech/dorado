@@ -1,17 +1,17 @@
 #include "basecall/ModelCallerFactory.h"
 
-#include "CPUCaller.h"
+#include "CpuModel.h"
 #include "ModelCallerSelection.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 
 #include <stdexcept>
 
 #if DORADO_CUDA_BUILD
-#include "CudaCaller.h"
 #include "CudaCallerPlanning.h"
+#include "CudaModel.h"
 #elif DORADO_METAL_BUILD
 #include "MPSModel.h"
-#include "MetalCaller.h"
+#include "MetalCallerModel.h"
 #include "MetalCallerPlanning.h"
 #include "MetalLSTMModel.h"
 #endif
@@ -31,7 +31,8 @@ struct CallerImplementation {
 };
 
 std::shared_ptr<ModelCaller> create_cpu_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<CPUCaller>(params.model_config, params.modbase_configs);
+    return std::make_shared<ModelCaller>(
+            std::make_unique<CpuModel>(params.model_config, params.modbase_configs));
 }
 
 const CallerImplementation cpu_implementation{
@@ -42,7 +43,7 @@ const CallerImplementation cpu_implementation{
 
 #if DORADO_CUDA_BUILD
 std::shared_ptr<ModelCaller> create_cuda_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<CudaCaller>(params);
+    return std::make_shared<ModelCaller>(std::make_unique<CudaModel>(params));
 }
 
 int cuda_max_safe_batch_size(const std::string& device,
@@ -58,9 +59,8 @@ const CallerImplementation cuda_implementation{
 };
 #elif DORADO_METAL_BUILD
 std::shared_ptr<ModelCaller> create_mps_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<MetalCaller>(
-            params.model_config,
-            std::make_unique<MPSModel>(params.model_config, params.modbase_configs));
+    return std::make_shared<ModelCaller>(std::make_unique<MetalCallerModel>(
+            std::make_unique<MPSModel>(params.model_config, params.modbase_configs)));
 }
 
 int mps_max_safe_batch_size_for_device(const std::string&,
@@ -76,9 +76,8 @@ const CallerImplementation mps_implementation{
 };
 
 std::shared_ptr<ModelCaller> create_metal_lstm_caller(const BasecallerCreationParams& params) {
-    return std::make_shared<MetalCaller>(
-            params.model_config,
-            std::make_unique<MetalLSTMModel>(params.model_config, params.memory_limit_fraction));
+    return std::make_shared<ModelCaller>(std::make_unique<MetalCallerModel>(
+            std::make_unique<MetalLSTMModel>(params.model_config, params.memory_limit_fraction)));
 }
 
 int metal_lstm_batch_size_granularity_for_config(const config::BasecallModelConfig&) {

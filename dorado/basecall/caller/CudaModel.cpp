@@ -1,123 +1,33 @@
-#include "CudaCaller.h"
+#include "CudaModel.h"
 
 #include "ChunkBenchmarks.h"
-#include "TypedRunnerContext.h"
 #include "config/ModBaseModelConfig.h"  // IWYU pragma: keep for ModBaseModelConfig types
 #include "decode/Decoder.h"
 #include "model/Model.h"
 #include "torch_utils/cuda_utils.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
-#include "utils/thread_utils.h"
+#include "utils/stats.h"
 
 #include <ATen/cuda/CUDAContextLight.h>
 #include <c10/cuda/CUDAGuard.h>
 #include <nvtx3/nvtx3.hpp>
-#include <torch/cuda.h>
 
 #include <algorithm>
 #include <cassert>
-#include <condition_variable>
 #include <cstring>
 #include <limits>
-#include <mutex>
-#include <queue>
 #include <utility>
 
 namespace dorado::basecall {
 
-class CudaRunnerState final {
-public:
-    CudaRunnerState(const CudaCaller &caller, size_t batch_dims_idx)
-            : m_batch_size(caller.batch_size(batch_dims_idx)),
-              m_chunk_size(caller.chunk_size(batch_dims_idx)),
-              m_variable_chunk_sizes(caller.variable_chunk_sizes()),
-              m_is_tx_model(caller.config().is_tx_model()),
-              m_stride(caller.config().stride),
-              m_stride_inner(caller.config().stride_inner()),
-              m_chunk_size_granularity(caller.config().chunk_size_granularity()),
-              m_max_chunk_size(caller.config().basecaller.chunk_size()),
-              m_stream(c10::cuda::getStreamFromPool(false, caller.device().index())) {
-        std::tie(m_input, m_output, m_aux) = caller.create_input_output_tensor(batch_dims_idx);
-        if (m_is_tx_model) {
-            m_first_conv_padding = caller.config().convs.front().winlen / 2;
-            m_chunk_offset = m_first_conv_padding;
-            m_input.narrow(-1, 0, m_first_conv_padding).zero_();
-        }
-    }
-
-    void accept_chunk(int chunk_idx, const at::Tensor &chunk) {
-        if (!m_variable_chunk_sizes) {
-            m_input.index_put_({chunk_idx}, chunk);
-            return;
-        }
-
-        assert(m_input.dim() == 3);
-        assert(m_input.size(0) == 1);
-        if ((m_input.size(1) == 1) && (m_input.dtype() == chunk.dtype())) {
-            assert(chunk.dim() == 2);
-            assert(chunk.size(0) == 1);
-            std::memcpy(static_cast<std::byte *>(m_input.data_ptr()) +
-                                (m_chunk_offset * chunk.element_size()),
-                        chunk.data_ptr(), chunk.size(1) * chunk.element_size());
-        } else {
-            m_input.narrow(-1, m_chunk_offset, chunk.size(1)).copy_(chunk);
-        }
-        m_chunk_sizes.emplace_back(chunk.size(1));
-        m_chunk_offset += m_chunk_sizes.back();
-        if (m_is_tx_model) {
-            m_input.narrow(-1, m_chunk_offset, m_first_conv_padding).zero_();
-            m_chunk_offset += m_first_conv_padding;
-        }
-    }
-
-    size_t chunk_size() const { return m_chunk_size; }
-    size_t batch_size() const { return m_batch_size; }
-    bool variable_chunk_sizes() const { return m_variable_chunk_sizes; }
-
-    void reset() {
-        if (m_variable_chunk_sizes) {
-            m_chunk_sizes.clear();
-            m_input.narrow(-1, 0, m_first_conv_padding).zero_();
-            m_chunk_offset = m_first_conv_padding;
-        }
-    }
-
-    at::Tensor m_input;
-    at::Tensor m_output;
-    at::Tensor m_aux;
-    const size_t m_batch_size;
-    const size_t m_chunk_size;
-    const bool m_variable_chunk_sizes;
-    const bool m_is_tx_model;
-    const int m_stride;
-    const int m_stride_inner;
-    const int m_chunk_size_granularity;
-    const int m_max_chunk_size;
-    std::vector<std::int32_t> m_chunk_sizes;
-    size_t m_chunk_offset{0};
-    int m_first_conv_padding{0};
-    c10::cuda::CUDAStream m_stream;
-};
-
 namespace {
-
-struct NNTask {
-    NNTask(at::Tensor input_, int num_chunks_, nn::AuxiliaryData *aux_, void *caller_)
-            : input(std::move(input_)), num_chunks(num_chunks_), aux(aux_), caller(caller_) {}
-    at::Tensor input;
-    int num_chunks;
-    nn::AuxiliaryData *aux;
-    void *caller;
-    decode::DecoderResult out;
-    std::mutex mut;
-    std::condition_variable cv;
-    bool done{false};
-};
 
 constexpr float GB = 1.0e9f;
 
 constexpr auto default_beam_width = decode::DecoderOptions{}.beam_width;
+
+constexpr int NUM_KOI_THREADS = 6;
 
 c10::cuda::CUDAStream get_stream_for_device(c10::Device device) {
     c10::cuda::CUDAGuard device_guard(device);
@@ -160,33 +70,67 @@ std::unique_ptr<nn::AuxiliaryData> create_empty_input(at::Tensor &in,
 
 }  // namespace
 
-// If 5 minutes has passed since the first chunk was added to a batch, we will
-// dispatch the batch even if it is not full. This is to prevent issues with
-// MinKNOW clients disconnecting because they think the server has timed out.
-static constexpr int DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 300000;
+CudaRunnerState::CudaRunnerState(const CudaModel &model, size_t batch_dims_idx)
+        : m_batch_size(model.batch_size(batch_dims_idx)),
+          m_chunk_size(model.chunk_size(batch_dims_idx)),
+          m_variable_chunk_sizes(model.variable_chunk_sizes()),
+          m_is_tx_model(model.config().is_tx_model()),
+          m_stride(model.config().stride),
+          m_stride_inner(model.config().stride_inner()),
+          m_chunk_size_granularity(model.config().chunk_size_granularity()),
+          m_max_chunk_size(model.config().basecaller.chunk_size()),
+          m_stream(c10::cuda::getStreamFromPool(false, model.device().index())) {
+    std::tie(m_input, m_output, m_aux) = model.create_input_output_tensor(batch_dims_idx);
+    if (m_is_tx_model) {
+        m_first_conv_padding = model.config().convs.front().winlen / 2;
+        m_chunk_offset = m_first_conv_padding;
+        m_input.narrow(-1, 0, m_first_conv_padding).zero_();
+    }
+}
 
-// If 30 seconds has passed since the most recent chunk was added to a batch,
-// we will dispatch the batch even if it is not full. Benchmarking indicates
-// that this gives good results when some pipelines have very low throughput
-// and others have very high throughput.
-static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
+void CudaRunnerState::accept_chunk(int chunk_idx, const at::Tensor &chunk) {
+    if (!m_variable_chunk_sizes) {
+        m_input.index_put_({chunk_idx}, chunk);
+        return;
+    }
 
-// Default value for timeout of incomplete batches for low-latency pipelines. The
-// value of 350 ms has been found to give good adaptive-sampling performance on all
-// platforms. For low-latency pipelines the timeout is always from when the first
-// chunk was added to the batch.
-static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
+    assert(m_input.dim() == 3);
+    assert(m_input.size(0) == 1);
+    if ((m_input.size(1) == 1) && (m_input.dtype() == chunk.dtype())) {
+        assert(chunk.dim() == 2);
+        assert(chunk.size(0) == 1);
+        std::memcpy(static_cast<std::byte *>(m_input.data_ptr()) +
+                            (m_chunk_offset * chunk.element_size()),
+                    chunk.data_ptr(), chunk.size(1) * chunk.element_size());
+    } else {
+        m_input.narrow(-1, m_chunk_offset, chunk.size(1)).copy_(chunk);
+    }
+    m_chunk_sizes.emplace_back(chunk.size(1));
+    m_chunk_offset += m_chunk_sizes.back();
+    if (m_is_tx_model) {
+        m_input.narrow(-1, m_chunk_offset, m_first_conv_padding).zero_();
+        m_chunk_offset += m_first_conv_padding;
+    }
+}
 
-static constexpr int NUM_KOI_THREADS = 6;
+void CudaRunnerState::reset() {
+    if (m_variable_chunk_sizes) {
+        m_chunk_sizes.clear();
+        m_input.narrow(-1, 0, m_first_conv_padding).zero_();
+        m_chunk_offset = m_first_conv_padding;
+    }
+}
 
-struct CudaCaller::GPUTaskQueue {
-public:
-    std::queue<std::shared_ptr<NNTask>> m_input_queue;
-    std::mutex m_input_lock;
-    std::condition_variable m_input_cv;
-};
+std::unique_ptr<nn::AuxiliaryData> CudaRunnerState::create_auxiliary_data() const {
+    if (!m_variable_chunk_sizes) {
+        return nullptr;
+    }
+    return std::make_unique<nn::AuxiliaryData>(m_aux, m_batch_size, m_chunk_size, m_stride,
+                                               m_stride_inner, m_chunk_size_granularity,
+                                               m_chunk_sizes, m_max_chunk_size, m_is_tx_model);
+}
 
-CudaCaller::CudaCaller(const BasecallerCreationParams &params)
+CudaModel::CudaModel(const BasecallerCreationParams &params)
         : m_config(params.model_config),
           m_device(params.device),
           m_decoder(decode::create_decoder(params.device, m_config, params.modbase_configs)),
@@ -233,7 +177,7 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     }
     m_model = model::load_model(params.model_config, m_options);
 
-    determine_batch_dims(params, m_variable_chunk_sizes);
+    determine_batch_dims(params);
 
     auto [crfmodel_bytes_per_ct, decode_bytes_per_ct] = cuda::memory_requirements(m_config);
 
@@ -265,49 +209,35 @@ CudaCaller::CudaCaller(const BasecallerCreationParams &params)
     }
     m_stream.synchronize();
 
-    start_threads();
-
-    // This isn't the thread that we run on, so clean up any unreferenced allocations
+    // Callers run on a different thread, so clean up any unreferenced allocations from this one
     // otherwise they'll stick around forever.
     c10::cuda::CUDACachingAllocator::emptyCache();
 }
 
-CudaCaller::~CudaCaller() { terminate(); }
+CudaModel::~CudaModel() = default;
 
-std::unique_ptr<ModelCaller::RunnerContext> CudaCaller::create_runner_context(
-        size_t batch_dims_idx) {
-    return std::make_unique<TypedRunnerContext<CudaCaller, CudaRunnerState>>(*this, *this,
-                                                                             batch_dims_idx);
+std::unique_ptr<RunnerState> CudaModel::create_runner_state(size_t batch_dims_idx) {
+    return std::make_unique<CudaRunnerState>(*this, batch_dims_idx);
 }
 
-std::vector<decode::DecodedChunk> CudaCaller::call_chunks(CudaRunnerState &context,
-                                                          int num_chunks) {
-    c10::cuda::CUDAStreamGuard guard(context.m_stream);
-    std::unique_ptr<nn::AuxiliaryData> aux;
-    if (context.variable_chunk_sizes()) {
-        aux = std::make_unique<nn::AuxiliaryData>(
-                context.m_aux, context.batch_size(), context.chunk_size(), context.m_stride,
-                context.m_stride_inner, context.m_chunk_size_granularity, context.m_chunk_sizes,
-                context.m_max_chunk_size, context.m_is_tx_model);
-    }
-    auto decoded_chunks = call_chunks(context.m_input, context.m_output, num_chunks, aux.get());
-    context.reset();
-    return decoded_chunks;
-}
+// If 5 minutes has passed since the first chunk was added to a batch, we will
+// dispatch the batch even if it is not full. This is to prevent issues with
+// MinKNOW clients disconnecting because they think the server has timed out.
+static constexpr int DEFAULT_FIRST_CHUNK_TIMEOUT_MS = 300000;
 
-CudaCaller::GPUTaskQueue &CudaCaller::get_task_queue() {
-    // Global task queues, one per GPU. This ensures that tasks from different clients are
-    // processed in the order they became ready, rather than individual callers contending
-    // for a global mutex that can wake up threads in an arbitrary order
+// If 30 seconds has passed since the most recent chunk was added to a batch,
+// we will dispatch the batch even if it is not full. Benchmarking indicates
+// that this gives good results when some pipelines have very low throughput
+// and others have very high throughput.
+static constexpr int DEFAULT_LAST_CHUNK_TIMEOUT_MS = 30000;
 
-    static std::vector<GPUTaskQueue> gpu_task_queues(torch::cuda::device_count());
-    static std::vector<GPUTaskQueue> low_latency_gpu_task_queues(torch::cuda::device_count());
+// Default value for timeout of incomplete batches for low-latency pipelines. The
+// value of 350 ms has been found to give good adaptive-sampling performance on all
+// platforms. For low-latency pipelines the timeout is always from when the first
+// chunk was added to the batch.
+static constexpr int DEFAULT_LOW_LATENCY_TIMEOUT_MS = 350;
 
-    auto &task_queues = m_low_latency ? low_latency_gpu_task_queues : gpu_task_queues;
-    return task_queues.at(m_options.device().index());
-}
-
-std::pair<int, int> CudaCaller::batch_timeouts_ms() const {
+std::pair<int, int> CudaModel::batch_timeouts_ms() const {
     // For low-latency pipelines we set both timeouts to the same value. This means that we
     // will always timeout based on the time from the first chunk being added to the batch.
     return m_low_latency
@@ -315,15 +245,42 @@ std::pair<int, int> CudaCaller::batch_timeouts_ms() const {
                    : std::make_pair(DEFAULT_FIRST_CHUNK_TIMEOUT_MS, DEFAULT_LAST_CHUNK_TIMEOUT_MS);
 }
 
-std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
-                                                          at::Tensor &output,
-                                                          int num_chunks,
-                                                          nn::AuxiliaryData *const aux) {
-    NVTX3_FUNC_RANGE();
-    if (num_chunks == 0) {
-        return std::vector<decode::DecodedChunk>();
-    }
+SchedulingPolicy CudaModel::scheduling_policy() const {
+    // Global task queues, one per GPU. This ensures that tasks from different clients are
+    // processed in the order they became ready, rather than individual callers contending
+    // for a global mutex that can wake up threads in an arbitrary order.
+    SchedulingPolicy policy;
+    policy.shared_queue_key =
+            "cuda:" + std::to_string(m_options.device().index()) + (m_low_latency ? ":ll" : "");
+    // Low-latency callers are released as soon as their batch is dispatched, so that any other
+    // low-latency callers that are ready can get going immediately. Otherwise callers using the
+    // same GPU must not start a new batch before this one has completed.
+    policy.release_point =
+            m_low_latency ? ReleasePoint::on_submit_start : ReleasePoint::on_submit_return;
+    return policy;
+}
 
+namespace {
+
+class CudaThreadScope final : public ThreadScope {
+public:
+    explicit CudaThreadScope(const c10::cuda::CUDAStream &stream) : m_stream_guard(stream) {}
+
+private:
+    c10::cuda::CUDAStreamGuard m_stream_guard;
+};
+
+}  // namespace
+
+std::unique_ptr<ThreadScope> CudaModel::worker_thread_scope() {
+    return std::make_unique<CudaThreadScope>(m_stream);
+}
+
+std::unique_ptr<CudaBatch> CudaModel::prepare_batch(CudaRunnerState &state, int num_chunks) {
+    NVTX3_FUNC_RANGE();
+    c10::cuda::CUDAStreamGuard guard(state.m_stream);
+
+    auto aux = state.create_auxiliary_data();
     if (!aux && m_variable_chunk_sizes) {
         throw std::logic_error("Missing auxiliary data while calling variable chunks!");
     }
@@ -331,63 +288,90 @@ std::vector<decode::DecodedChunk> CudaCaller::call_chunks(at::Tensor &input,
         throw std::logic_error("Found auxiliary data while calling fixed chunks!");
     }
 
-    at::Tensor device_input = input.to(m_options.device());  // async copy
+    at::Tensor device_input = state.m_input.to(m_options.device());  // async copy
 
     if (aux) {
         aux->create_auxiliary_data(m_options.device(), m_thread_pool);
     }
+    return std::make_unique<CudaBatch>(state, std::move(aux), std::move(device_input), num_chunks);
+}
 
-    auto &task_queue = get_task_queue();
-    auto task = std::make_shared<NNTask>(device_input, num_chunks, aux, this);
-    {
-        std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
-        task_queue.m_input_queue.push(task);
+void CudaModel::submit_batch(CudaBatch &batch) {
+    NVTX3_FUNC_RANGE();
+    auto device_stats = c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
+
+    const auto aggregate_idx = static_cast<uint64_t>(c10::CachingAllocator::StatType::AGGREGATE);
+    DORADO_LOG(trace,
+               "Aggregate current: allocation {}, segment {}, active {}, inactive_split {}, "
+               "alloc_bytes {}, reserved_bytes {}, active_bytes {}, inactive_split_bytes {}, "
+               "requested_bytes {}. Total: num_alloc_retries {}, num_ooms {}, max_split_size {}",
+               device_stats.allocation[aggregate_idx].current,
+               device_stats.segment[aggregate_idx].current,
+               device_stats.active[aggregate_idx].current,
+               device_stats.inactive_split[aggregate_idx].current,
+               device_stats.allocated_bytes[aggregate_idx].current,
+               device_stats.reserved_bytes[aggregate_idx].current,
+               device_stats.active_bytes[aggregate_idx].current,
+               device_stats.inactive_split_bytes[aggregate_idx].current,
+               device_stats.requested_bytes[aggregate_idx].current, device_stats.num_alloc_retries,
+               device_stats.num_alloc_retries, device_stats.num_ooms, device_stats.max_split_size);
+
+    auto run_basecalling = [&]() {
+        stats::Timer timer;
+        auto model_output =
+                m_model->forward(batch.input, batch.aux.get(), m_modbase_modules.has_value());
+        batch.out = m_decoder->prepare_decode({std::move(model_output.scores), batch.num_chunks,
+                                               m_decoder_options, batch.aux.get()});
+        if (m_modbase_modules) {
+            batch.out.modbase_data = modbase::run_modbase_latent_space_models(
+                    *m_modbase_modules, batch.out.data, std::move(model_output.signal_embeddings));
+        }
+        m_stream.synchronize();
+        m_model_decode_ms += timer.GetElapsedMS();
+    };
+
+    try {
+        run_basecalling();
+    } catch (c10::Error &e) {
+        DORADO_LOG(warn, "Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
+        c10::cuda::CUDACachingAllocator::emptyCache();
+        run_basecalling();
     }
-    task_queue.m_input_cv.notify_all();
+    ++m_num_batches_called;
+}
 
-    std::unique_lock lock(task->mut);
-    while (!task->done) {
-        task->cv.wait(lock);
+void CudaModel::decode_batch(CudaBatch &batch,
+                             size_t /*unit*/,
+                             std::vector<decode::DecodedChunk> &out) {
+    auto &state = batch.state;
+    c10::cuda::CUDAStreamGuard guard(state.m_stream);
+
+    if (batch.aux && m_variable_chunk_sizes) {
+        at::Tensor decoded =
+                state.m_output.narrow(0, 0, c10::multiply_integers(batch.out.data.sizes()))
+                        .view(batch.out.data.sizes());
+        decoded.copy_(batch.out.data);
+        out = m_decoder->decode(
+                {decoded, {}, batch.num_chunks, m_decoder_options, batch.aux.get()});
+        return;
     }
 
-    if (aux && m_variable_chunk_sizes) {
-        at::Tensor out = output.narrow(0, 0, c10::multiply_integers(task->out.data.sizes()))
-                                 .view(task->out.data.sizes());
-        out.copy_(task->out.data);
-        return m_decoder->decode({out, {}, num_chunks, m_decoder_options, task->aux});
-    }
-
-    output.copy_(task->out.data);
+    state.m_output.copy_(batch.out.data);
     std::vector<at::Tensor> modbase_output;
-    for (const at::Tensor &head : task->out.modbase_data) {
+    modbase_output.reserve(batch.out.modbase_data.size());
+    for (const at::Tensor &head : batch.out.modbase_data) {
         // ToDo: use pinned memory
         modbase_output.emplace_back(head.to(at::kCPU));
     }
-    return m_decoder->decode({output, std::move(modbase_output), num_chunks, m_decoder_options});
+    out = m_decoder->decode(
+            {state.m_output, std::move(modbase_output), batch.num_chunks, m_decoder_options});
 }
 
-void CudaCaller::terminate() {
-    auto &task_queue = get_task_queue();
-    {
-        std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
-        m_terminate = true;
-    }
-    task_queue.m_input_cv.notify_all();
-    if (m_cuda_thread.joinable()) {
-        m_cuda_thread.join();
-    }
+void CudaModel::release_batch(CudaBatch &batch, std::vector<decode::DecodedChunk> & /*out*/) {
+    batch.state.reset();
 }
 
-void CudaCaller::restart() {
-    // This can be called more than once, via multiple runners.
-    auto &task_queue = get_task_queue();
-    std::lock_guard<std::mutex> lock(task_queue.m_input_lock);
-    if (std::exchange(m_terminate, false)) {
-        start_threads();
-    }
-}
-
-std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaCaller::create_input_output_tensor(
+std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaModel::create_input_output_tensor(
         size_t batch_dims_idx) const {
     auto opts = at::TensorOptions().device(torch::kCPU).pinned_memory(true);
     int64_t N = m_batch_dims[batch_dims_idx].N;
@@ -416,19 +400,18 @@ std::tuple<at::Tensor, at::Tensor, at::Tensor> CudaCaller::create_input_output_t
     return {input, output, at::Tensor{}};
 }
 
-stats::NamedStats CudaCaller::sample_stats() const {
+stats::NamedStats CudaModel::sample_stats() const {
     stats::NamedStats stats;
     stats["batches_called"] = static_cast<double>(m_num_batches_called);
     stats["model_decode_ms"] = static_cast<double>(m_model_decode_ms);
     return stats;
 }
 
-void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
-                                      bool variable_chunk_sizes) {
+void CudaModel::determine_batch_dims(const BasecallerCreationParams &params) {
     const int requested_batch_size = m_config.basecaller.batch_size();
     auto [batch_dims, max_batch_sizes] = cuda::calculate_batch_sizes(
             m_options.device(), params.memory_limit_fraction, m_config, m_pipeline_type,
-            requested_batch_size, variable_chunk_sizes);
+            requested_batch_size, m_variable_chunk_sizes);
     m_batch_dims = std::move(batch_dims);
 
     if (requested_batch_size != 0 || max_batch_sizes.empty()) {
@@ -573,106 +556,6 @@ void CudaCaller::determine_batch_dims(const BasecallerCreationParams &params,
             }
         }
         DORADO_LOG(debug, "Final batch size for {}[{}]: {}", m_device, i, final_size);
-    }
-}
-
-void CudaCaller::start_threads() {
-    m_cuda_thread = std::thread([this] { cuda_thread_fn(); });
-}
-
-void CudaCaller::cuda_thread_fn() {
-    utils::set_thread_name("cuda_caller");
-    at::InferenceMode guard;
-    const std::string loop_scope_str =
-            "cuda_thread_fn_device_" + std::to_string(m_options.device().index());
-    const std::string input_q_cv_scope_str =
-            "input_queue_cv_device_" + std::to_string(m_options.device().index());
-
-    c10::cuda::CUDAStreamGuard stream_guard(m_stream);
-    auto &task_queue = get_task_queue();
-    while (true) {
-        nvtx3::scoped_range loop{loop_scope_str};
-        std::unique_lock<std::mutex> input_lock(task_queue.m_input_lock);
-        nvtxRangePushA(input_q_cv_scope_str.c_str());
-        task_queue.m_input_cv.wait(input_lock, [&] {
-            return (!task_queue.m_input_queue.empty() &&
-                    task_queue.m_input_queue.front()->caller == this) ||
-                   (task_queue.m_input_queue.empty() && m_terminate);
-        });
-        nvtxRangePop();
-
-        if (task_queue.m_input_queue.empty() && m_terminate) {
-            return;
-        }
-
-        auto task = task_queue.m_input_queue.front();
-
-        // pop and notify if this is a low latency queue so any other
-        // low latency callers that are ready can get going immediately
-        if (m_low_latency) {
-            task_queue.m_input_queue.pop();
-            input_lock.unlock();
-            task_queue.m_input_cv.notify_all();
-        }
-
-        std::unique_lock<std::mutex> task_lock(task->mut);
-        auto device_stats =
-                c10::cuda::CUDACachingAllocator::getDeviceStats(m_options.device().index());
-
-        const auto aggregate_idx =
-                static_cast<uint64_t>(c10::CachingAllocator::StatType::AGGREGATE);
-        DORADO_LOG(
-                trace,
-                "Aggregate current: allocation {}, segment {}, active {}, inactive_split {}, "
-                "alloc_bytes {}, reserved_bytes {}, active_bytes {}, inactive_split_bytes {}, "
-                "requested_bytes {}. Total: num_alloc_retries {}, num_ooms {}, max_split_size {}",
-                device_stats.allocation[aggregate_idx].current,
-                device_stats.segment[aggregate_idx].current,
-                device_stats.active[aggregate_idx].current,
-                device_stats.inactive_split[aggregate_idx].current,
-                device_stats.allocated_bytes[aggregate_idx].current,
-                device_stats.reserved_bytes[aggregate_idx].current,
-                device_stats.active_bytes[aggregate_idx].current,
-                device_stats.inactive_split_bytes[aggregate_idx].current,
-                device_stats.requested_bytes[aggregate_idx].current, device_stats.num_alloc_retries,
-                device_stats.num_alloc_retries, device_stats.num_ooms, device_stats.max_split_size);
-
-        auto run_basecalling = [&]() {
-            stats::Timer timer;
-            auto model_output =
-                    m_model->forward(task->input, task->aux, m_modbase_modules.has_value());
-            task->out = m_decoder->prepare_decode({std::move(model_output.scores), task->num_chunks,
-                                                   m_decoder_options, task->aux});
-            if (m_modbase_modules) {
-                task->out.modbase_data = modbase::run_modbase_latent_space_models(
-                        *m_modbase_modules, task->out.data,
-                        std::move(model_output.signal_embeddings));
-            }
-            m_stream.synchronize();
-            m_model_decode_ms += timer.GetElapsedMS();
-        };
-
-        try {
-            run_basecalling();
-        } catch (c10::Error &e) {
-            DORADO_LOG(warn, "Caught Torch error '{}', clearing CUDA cache and retrying.", e.msg());
-            c10::cuda::CUDACachingAllocator::emptyCache();
-            run_basecalling();
-        }
-        ++m_num_batches_called;
-        task->done = true;
-        task_lock.unlock();
-        task->cv.notify_one();
-
-        if (!m_low_latency) {
-            // not low latency, so pop task and notify callers that we're ready to process a new one.
-            // this prevents other callers that use the same GPU from attempting to call a new task
-            // before this one has completed, without requiring an unsignalled mutex on the GPU
-            // which was shown to have issues waking up threads in an even-handed manner
-            task_queue.m_input_queue.pop();
-            input_lock.unlock();
-            task_queue.m_input_cv.notify_all();
-        }
     }
 }
 

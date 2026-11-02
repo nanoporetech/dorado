@@ -13,6 +13,7 @@
 #include <cassert>
 #include <cstdint>
 #include <cstdlib>
+#include <mutex>
 #include <stdexcept>
 
 using namespace dorado::utils;
@@ -37,25 +38,14 @@ at::TensorOptions get_crf_options(const config::BasecallModelConfig &config) {
 
 MPSModel::MPSModel(const config::BasecallModelConfig &model_config,
                    const std::span<const config::ModBaseModelConfig> modbase_configs)
-        : m_config(model_config), m_modbase_decoder(modbase_configs) {
+        : MetalModel(model_config), m_modbase_decoder(modbase_configs) {
     ScopedAutoReleasePool autorelease_pool;
-
-    // Our metal builds assume shared memory, so it's safe to check host.
-    if (auto total_mem = utils::total_host_memory_GB(); total_mem < 16) {
-        DORADO_LOG(warn,
-                   "Less than 16GB of memory available: {}GB detected. "
-                   "This is below minimum spec and may cause issues",
-                   total_mem);
-    }
 
     // Create MPS objects.
     {
-        m_device = get_mtl_device();
         m_command_queue = NS::TransferPtr(m_device->newCommandQueue());
-        m_decode_complete_event = NS::TransferPtr(m_device->newSharedEvent());
     }
 
-    // Cache common options.
     {
         const auto decoder_options = decode::create_decoder_options(model_config);
 
@@ -128,7 +118,7 @@ bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, 
     MTL::CommandBuffer *const cb = next_command_buffer(m_command_queue.get(), try_count);
     // wait for the previous decode task to complete - this acts as a mutex
     // previous scores are processed in the decode threads
-    cb->encodeWait(m_decode_complete_event.get(), task.decode_complete_event_id - 1);
+    cb->encodeWait(decode_complete_event(), task.decode_complete_event_id - 1);
 
     m_decoder->scores().front().copy_(scores_TNC);
 
@@ -136,14 +126,11 @@ bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, 
     return m_decoder->prepare_decode(cb, try_count);
 }
 
-DecodedData MPSModel::decode(int chunk_idx) const { return m_decoder->decode(chunk_idx); };
-
-void MPSModel::decode_modbase(MetalCallerTask &task) {
+void MPSModel::decode_modbase(MetalCallerTask &task, std::span<decode::DecodedChunk> chunks) {
     if (!m_modbase_modules) {
         return;
     }
 
-    const auto chunks = std::span<decode::DecodedChunk>(task.out_chunks->begin(), task.num_chunks);
     {
         std::lock_guard lock(m_modbase_mutex);
         auto heads = modbase::run_modbase_latent_space_models(

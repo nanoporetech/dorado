@@ -208,8 +208,8 @@ void generate(const std::string &device,
         }
     };
 
-    // This clamping is copied from CudaCaller since it can wildly overpredict the maximum batch size.
-    // TODO: fixup CudaCaller memory usage estimation
+    // This clamping is copied from CudaModel since it can wildly overpredict the maximum batch size.
+    // TODO: fixup CudaModel memory usage estimation
     const int max_batch_size_limit = orig_config.is_tx_model() ? 1024 : 10240;
 
     const std::string gpu_name = get_gpu_name(device);

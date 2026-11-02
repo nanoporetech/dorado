@@ -1,16 +1,15 @@
-#include "CPUCaller.h"
+#include "CpuModel.h"
 
 #include "TensorRunnerState.h"
-#include "TypedRunnerContext.h"
-#include "decode/Decoder.h"
 #include "model/Model.h"
+#include "utils/stats.h"
 
 #include <stdexcept>
 
 namespace dorado::basecall {
 
-CPUCaller::CPUCaller(const config::BasecallModelConfig& model_config,
-                     const std::span<const config::ModBaseModelConfig> modbase_configs)
+CpuModel::CpuModel(const config::BasecallModelConfig& model_config,
+                   const std::span<const config::ModBaseModelConfig> modbase_configs)
         : m_config(model_config),
           m_decoder(decode::create_decoder(c10::DeviceType::CPU, model_config, {})),
           m_options(at::TensorOptions().dtype(m_decoder->dtype()).device(c10::DeviceType::CPU)),
@@ -32,43 +31,49 @@ CPUCaller::CPUCaller(const config::BasecallModelConfig& model_config,
     }
 }
 
-CPUCaller::~CPUCaller() = default;
+CpuModel::~CpuModel() = default;
 
-std::unique_ptr<ModelCaller::RunnerContext> CPUCaller::create_runner_context(
-        size_t batch_dims_idx) {
+std::unique_ptr<RunnerState> CpuModel::create_runner_state(size_t batch_dims_idx) {
     if (batch_dims_idx != 0) {
         throw std::out_of_range("CPU caller only has one batch dimension");
     }
     auto input = at::zeros({m_config.basecaller.batch_size(), m_config.num_features,
                             m_config.basecaller.chunk_size()},
                            m_options);
-    return std::make_unique<TypedRunnerContext<CPUCaller, TensorRunnerState>>(
-            *this, std::move(input), TensorLayout::NCT);
+    return std::make_unique<TensorRunnerState>(std::move(input), TensorLayout::NCT);
 }
 
-std::vector<decode::DecodedChunk> CPUCaller::call_chunks(TensorRunnerState& state, int num_chunks) {
+std::unique_ptr<CpuBatch> CpuModel::prepare_batch(TensorRunnerState& state, int num_chunks) {
+    return std::make_unique<CpuBatch>(state, num_chunks);
+}
+
+void CpuModel::submit_batch(CpuBatch& batch) {
+    stats::Timer timer;
+    auto model_output = m_model->forward(batch.state.input().to(m_options.device()), nullptr,
+                                         m_modbase_modules.has_value());
+    batch.scores_TNC = model_output.scores.transpose(0, 1).contiguous();
+    batch.signal_embeddings = std::move(model_output.signal_embeddings);
+    m_model_ms += timer.GetElapsedMS();
+}
+
+void CpuModel::decode_batch(CpuBatch& batch,
+                            size_t /*unit*/,
+                            std::vector<decode::DecodedChunk>& out) {
     at::InferenceMode guard;
     stats::Timer timer;
-    auto model_output = m_model->forward(state.input().to(m_options.device()), nullptr,
-                                         m_modbase_modules.has_value());
-    auto scores_TNC = model_output.scores.transpose(0, 1).contiguous();
-    const auto forward_ms = timer.GetElapsedMS();
-    auto decoded_chunks = m_decoder->decode(
-            m_decoder->prepare_decode({scores_TNC, num_chunks, m_decoder_options}));
+    out = m_decoder->decode(m_decoder->prepare_decode(
+            {std::move(batch.scores_TNC), batch.num_chunks, m_decoder_options}));
     if (m_modbase_modules) {
-        const std::span<decode::DecodedChunk> chunks(decoded_chunks);
+        const std::span<decode::DecodedChunk> chunks(out);
         m_modbase_decoder.decode(modbase::run_modbase_latent_space_models(
                                          *m_modbase_modules, decode::pack_decoded_chunks(chunks),
-                                         model_output.signal_embeddings.narrow(0, 0, num_chunks)),
+                                         batch.signal_embeddings.narrow(0, 0, batch.num_chunks)),
                                  chunks);
     }
-    const auto forward_plus_decode_ms = timer.GetElapsedMS();
-    m_model_ms += forward_ms;
-    m_decode_ms += forward_plus_decode_ms - forward_ms;
-    return decoded_chunks;
+    m_decode_ms += timer.GetElapsedMS();
 }
 
-stats::NamedStats CPUCaller::sample_stats() const {
+stats::NamedStats CpuModel::sample_stats() const {
     return {{"model_ms", double(m_model_ms)}, {"decode_ms", double(m_decode_ms)}};
 }
 

@@ -420,7 +420,7 @@ at::Tensor ConvStackImpl::ConvLayer::run_koi_vcs_tx(at::Tensor &conv_input,
     if (stride > 1) {
         // Input has padding, we can divide by stride for output, but must make sure we
         // we make M_out big enough to accommodate "worse-case" max amount of padding
-        // given CudaCaller's N * T. This "max amount of padding" scenario is when
+        // given CudaModel's N * T. This "max amount of padding" scenario is when
         // all of N * T is filled with chunk_size_granularity chunks.
         // You can do the math, and even then, it is 0.5% of M_input, while stride would
         // reduce it at least 50%, so worth doing
