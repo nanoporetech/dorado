@@ -249,9 +249,7 @@ std::optional<Minimap2Options> process_arguments(const argparse::ArgumentParser&
     }
 
     apply_cs_option(res, parser.get("cs"));
-    if (auto u_option = parser.present<std::string>("u"); u_option.has_value()) {
-        apply_u_option(res, *u_option);
-    }
+    apply_u_option(res, parser.get("u"));
 
     return res;
 }
