@@ -164,7 +164,8 @@ int MetalLSTMModel::benchmark_batch_sizes(const BasecallModelConfig &model_confi
         auto dummy_input = torch::empty(
                 {batch_size, benchmark_chunk_size, model_config.num_features}, torch::kF16);
         const auto start_time = std::chrono::system_clock::now();
-        auto *cb = m_model->forward_async(dummy_input, nullptr, 0, 0, m_decoder->scores());
+        auto *cb = m_model->forward_async(dummy_input, decode_complete_event(), 0, 0,
+                                          m_decoder->scores());
         m_decoder->prepare_decode(cb, 0);
         const auto end_time = std::chrono::system_clock::now();
         const auto elapsed_us =

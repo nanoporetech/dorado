@@ -50,6 +50,7 @@ private:
     std::vector<at::Tensor> m_bwd_NTC;
     NS::SharedPtr<MTL::ComputePipelineState> m_bwd_scan_cps;
     NS::SharedPtr<MTL::ComputePipelineState> m_fwd_scan_add_softmax_cps;
+    NS::SharedPtr<MTL::Buffer> m_scan_args;
 };
 
 }  // namespace dorado::basecall

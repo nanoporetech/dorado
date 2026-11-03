@@ -26,7 +26,6 @@ struct MetalConv1dImpl : torch::nn::Module {
                     int batch_size_,
                     MTL::Device *const device);
 
-    void run(MTL::CommandQueue *command_queue, MTL::Buffer *mat_in, MTL::Buffer *mat_out);
     void run(MTL::CommandBuffer *command_buffer, MTL::Buffer *mat_in, MTL::Buffer *mat_out);
 
     void load_weights();

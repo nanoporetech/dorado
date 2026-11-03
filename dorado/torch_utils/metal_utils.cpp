@@ -131,7 +131,7 @@ std::optional<int64_t> retrieve_ioreg_prop(const std::string &service_class,
 namespace dorado::utils {
 
 NS::SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length) {
-    return NS::TransferPtr(device->newBuffer(length, MTL::ResourceStorageModeShared));
+    return NS::TransferPtr(device->newBuffer(length, MTL::ResourceStorageModePrivate));
 }
 
 NS::SharedPtr<MTL::ComputePipelineState> make_cps(
@@ -180,25 +180,6 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
     return cps;
 }
 
-void launch_kernel(ComputePipelineState *const pipeline,
-                   CommandQueue *const command_queue,
-                   const std::vector<Buffer *> &buffers,
-                   const std::vector<int> &tg_buffer_lens,
-                   long threadgroups,
-                   long threads_per_threadgroup) {
-    auto command_buffer = command_queue->commandBuffer();
-    launch_kernel_no_wait(pipeline, command_buffer, buffers, tg_buffer_lens, threadgroups,
-                          threads_per_threadgroup);
-
-    command_buffer->commit();
-    command_buffer->waitUntilCompleted();
-
-    auto status = command_buffer->status();
-    if (status != MTL::CommandBufferStatusCompleted) {
-        DORADO_LOG(warn, "Synchronous metal command buffer failed: {}", fmt::underlying(status));
-    }
-}
-
 MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count) {
     if (try_count == 0) {
         return queue->commandBuffer();
@@ -209,23 +190,42 @@ MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count)
     return queue->commandBuffer(descriptor.get());
 }
 
+MTL::CommandBuffer *next_command_buffer_after_event(MTL::CommandQueue *queue,
+                                                    int try_count,
+                                                    MTL::SharedEvent *event,
+                                                    uint64_t value) {
+    MTL::CommandBuffer *command_buffer = next_command_buffer(queue, try_count);
+    command_buffer->encodeWait(event, value);
+
+    // Explicitly wait for the signal too since on slower machines/debug builds it can
+    // take a while. This then causes the command buffer to timeout since metal only
+    // allows kernels to run for ~5s, CPU time included.
+    const uint64_t timeout_ms = 5'000;
+    if (!event->waitUntilSignaledValue(value, timeout_ms)) {
+        // Even if this fails, we'll still have a wait encoded in the command buffer.
+        DORADO_LOG(warn, "Timed out waiting for signal. Is CPU overloaded?");
+    }
+
+    return command_buffer;
+}
+
 void launch_kernel_no_wait(ComputePipelineState *const pipeline,
                            CommandBuffer *const command_buffer,
-                           const std::vector<Buffer *> &buffers,
-                           const std::vector<int> &tg_buffer_lens,
+                           std::initializer_list<const Buffer *> buffers,
+                           std::span<const int> tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup) {
     auto compute_encoder = command_buffer->computeCommandEncoder();
     compute_encoder->setComputePipelineState(pipeline);
 
     // Set up device memory buffers.
-    for (auto i = 0; i < (int)buffers.size(); i++) {
-        compute_encoder->setBuffer(buffers[i], 0, i);
+    for (size_t i = 0; i < buffers.size(); ++i) {
+        compute_encoder->setBuffer(buffers.begin()[i], 0, i);
     }
 
     // Set lengths of threadgroup memory buffers.
-    for (int i = 0; i < (int)tg_buffer_lens.size(); ++i) {
-        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens.at(i), i);
+    for (size_t i = 0; i < tg_buffer_lens.size(); ++i) {
+        compute_encoder->setThreadgroupMemoryLength(tg_buffer_lens[i], i);
     }
 
     compute_encoder->dispatchThreadgroups(MTL::Size(threadgroups, 1, 1),

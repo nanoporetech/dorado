@@ -11,7 +11,6 @@
 #include "utils/memory_utils.h"
 
 #include <cassert>
-#include <cstdint>
 #include <cstdlib>
 #include <mutex>
 #include <stdexcept>
@@ -115,12 +114,13 @@ bool MPSModel::call_task(MetalCallerTask &task, std::mutex &inter_caller_mutex, 
     auto scores_TNC = model_output.scores.transpose(0, 1).contiguous().to(scores_dtype);
     task.signal_embeddings = std::move(model_output.signal_embeddings);
 
-    MTL::CommandBuffer *const cb = next_command_buffer(m_command_queue.get(), try_count);
+    m_decoder->scores().front().copy_(scores_TNC);
+
     // wait for the previous decode task to complete - this acts as a mutex
     // previous scores are processed in the decode threads
-    cb->encodeWait(decode_complete_event(), task.decode_complete_event_id - 1);
-
-    m_decoder->scores().front().copy_(scores_TNC);
+    MTL::CommandBuffer *const cb = next_command_buffer_after_event(
+            m_command_queue.get(), try_count, decode_complete_event(),
+            task.decode_complete_event_id - 1);
 
     std::lock_guard lock(inter_caller_mutex);
     return m_decoder->prepare_decode(cb, try_count);

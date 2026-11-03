@@ -13,9 +13,12 @@
 #include <os/signpost.h>
 
 #include <filesystem>
+#include <initializer_list>
 #include <optional>
+#include <span>
 #include <string>
 #include <tuple>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -52,14 +55,15 @@ void name_mtl_object(const MetalObject &obj, const char *name) {
     obj->setLabel(NS::String::string(name, NS::ASCIIStringEncoding));
 }
 
-// Returns an uninitialised MTL::Buffer of length bytes.
+// Returns an uninitialised GPU-only MTL::Buffer of length bytes.
 NS::SharedPtr<MTL::Buffer> create_buffer(MTL::Device *device, size_t length);
 
-// Returns a MTL::Buffer holding the content of the supplied std::vector.
+// Returns a MTL::Buffer holding a copy of the supplied data.
 template <typename T>
-NS::SharedPtr<MTL::Buffer> create_vec_buffer(MTL::Device *const device, const std::vector<T> &vec) {
-    return NS::TransferPtr(
-            device->newBuffer(vec.data(), vec.size() * sizeof(T), MTL::ResourceStorageModeShared));
+    requires(std::is_trivial_v<T>)
+NS::SharedPtr<MTL::Buffer> create_buffer_from_data(MTL::Device *const device, const T &data) {
+    // Note: can't be Private without jumping through extra hoops.
+    return NS::TransferPtr(device->newBuffer(&data, sizeof(T), MTL::ResourceStorageModeShared));
 }
 
 using MetalConstant = std::variant<int, bool, float>;
@@ -73,19 +77,18 @@ NS::SharedPtr<MTL::ComputePipelineState> make_cps(
         const std::vector<std::tuple<std::string, MetalConstant>> &named_constants,
         const std::optional<int> max_total_threads_per_tg);
 
-void launch_kernel(MTL::ComputePipelineState *cps,
-                   MTL::CommandQueue *cq,
-                   const std::vector<MTL::Buffer *> &buffers,
-                   const std::vector<int> &tg_buffer_lens,
-                   long threadgroups,
-                   long threads_per_threadroup);
-
 MTL::CommandBuffer *next_command_buffer(MTL::CommandQueue *queue, int try_count);
+
+// Create a command buffer that won't start until a (potentially long running) task completes.
+MTL::CommandBuffer *next_command_buffer_after_event(MTL::CommandQueue *queue,
+                                                    int try_count,
+                                                    MTL::SharedEvent *event,
+                                                    uint64_t value);
 
 void launch_kernel_no_wait(MTL::ComputePipelineState *cps,
                            MTL::CommandBuffer *cb,
-                           const std::vector<MTL::Buffer *> &buffers,
-                           const std::vector<int> &tg_buffer_lens,
+                           std::initializer_list<const MTL::Buffer *> buffers,
+                           std::span<const int> tg_buffer_lens,
                            long threadgroups,
                            long threads_per_threadgroup);
 

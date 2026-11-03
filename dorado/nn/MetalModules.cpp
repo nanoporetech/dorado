@@ -1,5 +1,6 @@
 #include "nn/MetalModules.h"
 
+#include "nn/metal/nn.h"
 #include "utils/log_utils.h"
 #include "utils/math_utils.h"
 
@@ -88,9 +89,18 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
     if (layer != 3) {
         // Layers 1 and 2 are executed with a single kernel launch.
         // The last 2 arguments are unused.
-        const std::vector<int32_t> args{in_size,    win_size,   out_size, stride, win_size / 2,
-                                        chunk_size, batch_size, 0,        0};
-        auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
+        const ConvArgs conv_args{
+                .in_size = in_size,
+                .win_size = win_size,
+                .out_size = out_size,
+                .stride = stride,
+                .pad = win_size / 2,
+                .chunk_size_in = chunk_size,
+                .num_chunks = batch_size,
+                .conv3_time_step_begin = 0,
+                .conv3_time_step_end = 0,
+        };
+        auto &buffer = m_args.emplace_back(create_buffer_from_data(device, conv_args));
         name_mtl_object(buffer, "conv_args");
     } else {
         // We cut up the time span for individual kernel launches for conv3 since it is by far
@@ -104,10 +114,18 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
         for (int i = 0; i < num_pieces; ++i) {
             const int time_step_begin = i * kMaxTimeSteps;
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, output_time_step_count);
-            const std::vector<int32_t> args{in_size,    win_size,        out_size,
-                                            stride,     win_size / 2,    chunk_size,
-                                            batch_size, time_step_begin, time_step_end};
-            auto &buffer = m_args.emplace_back(create_vec_buffer(device, args));
+            const ConvArgs conv_args{
+                    .in_size = in_size,
+                    .win_size = win_size,
+                    .out_size = out_size,
+                    .stride = stride,
+                    .pad = win_size / 2,
+                    .chunk_size_in = chunk_size,
+                    .num_chunks = batch_size,
+                    .conv3_time_step_begin = time_step_begin,
+                    .conv3_time_step_end = time_step_end,
+            };
+            auto &buffer = m_args.emplace_back(create_buffer_from_data(device, conv_args));
             name_mtl_object(buffer, fmt::format("conv_args_{}", i).c_str());
         }
         DORADO_LOG(debug, "conv3 output_time_step_count {} => {} kernel launches",
@@ -158,25 +176,13 @@ MetalConv1dImpl::MetalConv1dImpl(int layer,
     conv_cps = make_cps(device, kernel_name + "_simd", metal_constants, kernel_threads);
 }
 
-void MetalConv1dImpl::run(MTL::CommandQueue *command_queue,
-                          MTL::Buffer *mat_in,
-                          MTL::Buffer *mat_out) {
-    for (const auto &args : m_args) {
-        std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
-                                           mat_out};
-        launch_kernel(conv_cps.get(), command_queue, buffers, {}, kernel_thread_groups,
-                      kernel_simd_groups * kSIMDGroupWidth);
-    }
-}
-
 void MetalConv1dImpl::run(MTL::CommandBuffer *command_buffer,
                           MTL::Buffer *mat_in,
                           MTL::Buffer *mat_out) {
     for (const auto &args : m_args) {
-        std::vector<MTL::Buffer *> buffers{args.get(), mat_in, mtl_for_tensor(t_weights_bias),
-                                           mat_out};
-        launch_kernel_no_wait(conv_cps.get(), command_buffer, buffers, {}, kernel_thread_groups,
-                              kernel_simd_groups * kSIMDGroupWidth);
+        launch_kernel_no_wait(conv_cps.get(), command_buffer,
+                              {args.get(), mat_in, mtl_for_tensor(t_weights_bias), mat_out}, {},
+                              kernel_thread_groups, kernel_simd_groups * kSIMDGroupWidth);
     }
 }
 
@@ -233,9 +239,13 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         for (int i = 0; i < num_pieces; ++i) {
             const int time_step_begin = i * kMaxTimeSteps;
             const int time_step_end = std::min((i + 1) * kMaxTimeSteps, lstm_chunk_size);
-            std::vector<int32_t> args{batch_size / kTileSize, lstm_chunk_size, time_step_begin,
-                                      time_step_end};
-            auto &buffer = m_args_lstm.emplace_back(create_vec_buffer(m_device, args));
+            const LstmArgs lstm_args{
+                    .batch_tiles = batch_size / kTileSize,
+                    .chunk_size = lstm_chunk_size,
+                    .time_step_begin = time_step_begin,
+                    .time_step_end = time_step_end,
+            };
+            auto &buffer = m_args_lstm.emplace_back(create_buffer_from_data(m_device, lstm_args));
             name_mtl_object(buffer, fmt::format("lstm_args_{}", i).c_str());
         }
         DORADO_LOG(debug, "lstm_chunk_size {} => {} LSTM kernel launches", lstm_chunk_size,
@@ -249,15 +259,26 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
     const int32_t out_batch_tiles = (batch_size / out_split_) / kTileSize;
     for (int i = 0; i < out_split_; ++i) {
         const int32_t in_batch_tile_offset = out_batch_tiles * i;
-        std::vector<int32_t> args_linear_ = {in_batch_tiles, in_batch_tile_offset, out_batch_tiles,
-                                             lstm_chunk_size};
+        const LinearArgs linear_args{
+                .in_batch_tiles = in_batch_tiles,
+                .in_batch_tile_offset = in_batch_tile_offset,
+                .out_batch_tiles = out_batch_tiles,
+                .chunk_size = lstm_chunk_size,
+        };
         auto &buffer = args_linear.at(i);
-        buffer = create_vec_buffer(m_device, args_linear_);
+        buffer = create_buffer_from_data(m_device, linear_args);
         name_mtl_object(buffer, fmt::format("linear_args_{}", i).c_str());
     }
-    args_linear2 = create_vec_buffer<int32_t>(
-            device, {out_batch_tiles, 0, out_batch_tiles, lstm_chunk_size});
-    name_mtl_object(args_linear2, "linear2_args");
+    {
+        const LinearArgs linear2_args{
+                .in_batch_tiles = out_batch_tiles,
+                .in_batch_tile_offset = 0,
+                .out_batch_tiles = out_batch_tiles,
+                .chunk_size = lstm_chunk_size,
+        };
+        args_linear2 = create_buffer_from_data(device, linear2_args);
+        name_mtl_object(args_linear2, "linear2_args");
+    }
 
     switch (config.lstm_size) {
     case 128:
@@ -386,10 +407,8 @@ MetalBlockImpl::MetalBlockImpl(int chunk_size_,
         linear_cps[0] =
                 make_cps(m_device, "linear_from_rev_lstm", linear_constants, linear_threads);
         // Single matmul that may or may not have a bias.
-        if (!config.out_features.has_value()) {
-            linear1 = register_module("linear1",
-                                      MetalLinear(config.lstm_size, config.outsize, config.bias));
-        }
+        linear1 = register_module("linear1",
+                                  MetalLinear(config.lstm_size, config.outsize, config.bias));
     }
 
     // This buffer is used for several layers of the model.
@@ -494,15 +513,14 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
                 static_cast<int>(dtype_bytes * kernel_simd_groups * 2 * kTileSize * kTileSize);
         const int kOutBufSize =
                 static_cast<int>(dtype_bytes * kernel_simd_groups * kTileSize * kTileSize);
-        const std::vector<int> tg_buffer_lens{kResBufSize, kOutBufSize};
+        const std::array tg_buffer_lens{kResBufSize, kOutBufSize};
         for (const auto &args_lstm : m_args_lstm) {
-            const std::vector<MTL::Buffer *> buffers{args_lstm.get(), mat_working_mem.get(),
-                                                     mtl_for_tensor(rnn->t_weights_bias),
-                                                     mat_state.get()};
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
             auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
 #endif
-            launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer, buffers,
+            launch_kernel_no_wait(lstm_cps[rnn->reverse].get(), command_buffer,
+                                  {args_lstm.get(), mat_working_mem.get(),
+                                   mtl_for_tensor(rnn->t_weights_bias), mat_state.get()},
                                   tg_buffer_lens, kernel_thread_groups,
                                   kernel_simd_groups * kSIMDGroupWidth);
 #if USE_SPLIT_LSTM_COMMAND_BUFFERS
@@ -519,21 +537,18 @@ MTL::CommandBuffer *MetalBlockImpl::forward_async(at::Tensor &in,
 #endif
     }
 
-    auto *command_buffer = next_command_buffer(m_command_queue.get(), try_count);
-
     // The output buffers of conv/LSTM layers are not used by the decoding, so
     // can be overwritten by subsequent batches as soon as they have been consumed by
     // the linear layer.  The output of the linear layer must be protected until
     // it has been decoded.
-    if (linear_hold_off_event) {
-        command_buffer->encodeWait(linear_hold_off_event, linear_hold_off_id);
-    }
+    auto *command_buffer = next_command_buffer_after_event(
+            m_command_queue.get(), try_count, linear_hold_off_event, linear_hold_off_id);
 
     // For now the same SIMD group count, and therefore threadgroup memory buffer size, is
     // used for all linear layer kernel invocations.
     const int kLinearTGOutBufSize =
             static_cast<int>(dtype_bytes * kernel_simd_groups * kTileSize * kTileSize);
-    const std::vector<int> linear_tg_buffer_lens{kLinearTGOutBufSize};
+    const std::array linear_tg_buffer_lens{kLinearTGOutBufSize};
 
     // The output of the linear layer is split into multiple buffers, each generated
     // by a separate kernel launch.

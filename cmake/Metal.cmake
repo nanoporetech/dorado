@@ -25,7 +25,7 @@ set(AIR_FILES)
 set(METAL_SOURCES dorado/nn/metal/nn.metal)
 
 set(XCRUN_SDK macosx)
-set(METAL_STD_VERSION "macos-metal2.3") # macOS 11.0
+set(METAL_STD_VERSION "metal3.1") # macOS 14
 string(TOUPPER ${XCRUN_SDK} XCRUN_SDK_UPPER)
 
 foreach(source ${METAL_SOURCES})
