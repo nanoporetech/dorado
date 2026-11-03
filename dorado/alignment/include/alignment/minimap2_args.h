@@ -45,6 +45,10 @@ void apply_cs_option(Minimap2Options& options, std::string_view cs_opt);
 void apply_dual_option(Minimap2Options& options, std::string_view dual_yes_or_no);
 void apply_u_option(Minimap2Options& options, std::string_view u_opt);
 
+// Splits attached -u values (e.g. "-uf") into a separate "-u" entry followed by the value.
+// Only public for unit tests.
+void split_attached_u_values(std::vector<std::string>& mm2_args);
+
 // Returns true in the minimap global flag 'MM_DBG_PRINT_ALN_SEQ' is set
 bool print_aln_seq();
 

@@ -265,8 +265,6 @@ Minimap2Options parse_options(const std::string& minimap2_option_string) {
     return *minimap2_options;
 }
 
-namespace {
-
 // Split attached -u values (e.g. "-uf") into a separate "-u" entry followed by the value.
 // This type of parameter passing is not supported by argparse, but mm2 allows it.
 // This is done specifically for this parameter to allow users to copypasta their mm2 commandline options
@@ -280,6 +278,8 @@ void split_attached_u_values(std::vector<std::string>& mm2_args) {
         }
     }
 }
+
+namespace {
 
 std::optional<Minimap2Options> try_parse_options_impl(argparse::ArgumentParser& parser,
                                                       const std::string& minimap2_option_string,

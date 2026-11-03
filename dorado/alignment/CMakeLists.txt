@@ -24,6 +24,8 @@ dorado_add_library(
         Minimap2MemoryLimiter.cpp
         Minimap2Options.cpp
         sam_utils.cpp
+    SOURCES_TEST
+        minimap2_args_test.cpp
     DEPENDS_PUBLIC
         htslib
         minimap2
