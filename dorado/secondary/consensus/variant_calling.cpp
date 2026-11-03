@@ -1489,6 +1489,7 @@ void sanitize_empty_alts(Variant& var, const int32_t ploidy) {
                            std::any_of(std::cbegin(var.alts), std::cend(var.alts),
                                        [](const std::string_view s) { return std::empty(s); });
     if (any_empty) {
+        DORADO_LOG(debug, "[sanitize_empty_alts] resetting variant: {}", to_string(var));
         var.alts = {"."};
         var.format["GT"] = make_reference_gt(ploidy, '0');
         var.format.erase("AD");
