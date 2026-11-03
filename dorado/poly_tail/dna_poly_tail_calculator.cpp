@@ -35,25 +35,30 @@ std::vector<SignalAnchorInfo> DNAPolyTailCalculator::determine_signal_anchor_and
     auto bottom_start = std::max(0, (int)seq_view.length() - primer_window);
     std::string_view read_bottom = seq_view.substr(bottom_start, primer_window);
 
-    EdlibAlignConfig align_config = edlibDefaultAlignConfig();
-    align_config.task = EDLIB_TASK_LOC;
-    align_config.mode = EDLIB_MODE_HW;
+    EdlibAlignConfig align_loc_config = edlibDefaultAlignConfig();
+    align_loc_config.task = EDLIB_TASK_LOC;
+    align_loc_config.mode = EDLIB_MODE_HW;
+
+    EdlibAlignConfig align_dist_config = edlibDefaultAlignConfig();
+    align_dist_config.task = EDLIB_TASK_DISTANCE;
+    align_dist_config.mode = EDLIB_MODE_HW;
 
     // Check for forward strand.
-    EdlibAlignResult top_v1 = edlibAlign(front_primer.data(), int(front_primer.length()),
-                                         read_top.data(), int(read_top.length()), align_config);
+    EdlibAlignResult top_v1 =
+            edlibAlign(front_primer.data(), int(front_primer.length()), read_top.data(),
+                       int(read_top.length()), align_dist_config);
     EdlibAlignResult bottom_v1 =
             edlibAlign(rear_primer_rc.data(), int(rear_primer_rc.length()), read_bottom.data(),
-                       int(read_bottom.length()), align_config);
+                       int(read_bottom.length()), align_loc_config);
 
     int dist_v1 = top_v1.editDistance + bottom_v1.editDistance;
 
     // Check for reverse strand.
     EdlibAlignResult top_v2 = edlibAlign(rear_primer.data(), int(rear_primer.length()),
-                                         read_top.data(), int(read_top.length()), align_config);
+                                         read_top.data(), int(read_top.length()), align_loc_config);
     EdlibAlignResult bottom_v2 =
             edlibAlign(front_primer_rc.data(), int(front_primer_rc.length()), read_bottom.data(),
-                       int(read_bottom.length()), align_config);
+                       int(read_bottom.length()), align_dist_config);
 
     auto post = utils::PostCondition([&] {
         edlibFreeAlignResult(top_v1);
