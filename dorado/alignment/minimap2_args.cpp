@@ -114,17 +114,27 @@ void add_arguments(argparse::ArgumentParser& parser) {
     // Setting options to lr:hq which is appropriate for high quality nanopore reads.
     parser.add_argument("-x")
             .help("minimap2 preset for indexing and mapping.")
-            .default_value(std::string{DEFAULT_MM_PRESET});
+            .default_value(std::string{DEFAULT_MM_PRESET})
+            .nargs(1);
 
     parser.add_argument("--eqx").help("write =/X CIGAR operators").flag();
     parser.add_argument("--MD").help("output the MD tag (no-op since we do by default)").flag();
     parser.add_argument("--cs")
             .help("output the cs tag")
             .choices("none", "short", "long")
-            .default_value("none");
+            .default_value("none")
+            .nargs(1);
     parser.add_argument("--rmq").help("use the minigraph chaining algorithm").flag();
 
-    parser.add_argument("-u").help("").choices("b", "f", "r", "n");
+    parser.add_argument("-u")
+            .help("how to find GT-AG. "
+                  "f:transcript strand, "
+                  "r:reverse strand (match CT-AC), "
+                  "b:both strands, "
+                  "n:don't match GT-AG")
+            .choices("f", "r", "b", "n")
+            .default_value("n")
+            .nargs(1);
 
     parser.add_argument("--secondary-seq")
             .hidden()
