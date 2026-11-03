@@ -45,3 +45,9 @@ CATCH_TEST_CASE(CUT_TAG " invalid attached value is left for the parser", CUT_TA
     split_attached_u_values(args);
     CATCH_CHECK(args == std::vector<std::string>{"prog", "-u", "xyz"});
 }
+
+CATCH_TEST_CASE(CUT_TAG " invalid missing value is left for the parser", CUT_TAG) {
+    std::vector<std::string> args{"prog", "-u"};
+    split_attached_u_values(args);
+    CATCH_CHECK(args == std::vector<std::string>{"prog", "-u"});
+}
