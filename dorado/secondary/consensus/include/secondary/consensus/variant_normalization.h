@@ -10,6 +10,20 @@
 namespace dorado::secondary {
 
 /**
+ * \brief Result of a normalization. CHANGED and UNCHANGED indicate success; ERROR_* values indicate
+ *          invalid input, in which case the input is returned unchanged.
+ */
+enum class NormalizationStatus {
+    CHANGED,
+    UNCHANGED,
+    ERROR_REF,
+    ERROR_DUPLICATE_ALLELE,
+    ERROR_NOT_SORTED,
+    ERROR_NEGATIVE_OFFSET,
+    ERROR_OUT_OF_RANGE,
+};
+
+/**
  * \brief Finds the longest common prefix and suffix for a given reference sequence and a set of alleles.
  * \param ref_allele Sequence of the reference allele for this variant.
  * \param alt_alleles A vector of sequences for all alternate alleles.
@@ -32,18 +46,19 @@ std::pair<int64_t, int64_t> find_common_prefix_suffix_len(
  *          chromosome position win_start_offset.
  * \param win_start_offset Chromosome position of the first base of ref_seq. Must not be negative.
  * \param allow_ambig_ref If true, allow normalization over ambiguous reference bases.
- * \returns {normalized variant, true if the variant was modified}.
- * \throws std::out_of_range If the input REF span lies outside of ref_seq.
- * \throws std::invalid_argument If win_start_offset is negative, if REF mismatches ref_seq, or if an ALT
- *          equals REF.
+ * \returns {variant, status}. The status is CHANGED or UNCHANGED on success. On invalid input, the input
+ *          variant is returned with ERROR_REF if REF mismatches ref_seq (including an empty REF), or with
+ *          ERROR_DUPLICATE_ALLELE if an ALT equals REF, with ERROR_OUT_OF_RANGE if the REF span lies
+ *          outside of ref_seq, or with ERROR_NEGATIVE_OFFSET if win_start_offset is negative.
+ *          Reference records are returned as UNCHANGED without validation.
  * \details Variant coordinates are absolute (chromosome) coordinates. Empty alleles are padded on the
  *          left when possible, otherwise on the right. Non-reference records must have ALTs distinct
  *          from REF, including after case folding.
  */
-std::pair<Variant, bool> normalize_variant_vs_ref_core(const Variant& variant,
-                                                       std::string_view ref_seq,
-                                                       int64_t win_start_offset,
-                                                       bool allow_ambig_ref);
+std::pair<Variant, NormalizationStatus> normalize_variant_vs_ref_core(const Variant& variant,
+                                                                      std::string_view ref_seq,
+                                                                      int64_t win_start_offset,
+                                                                      bool allow_ambig_ref);
 
 /**
  * \brief Same as normalize_variants_vs_ref, but ref_seq covers only a window of the chromosome which
@@ -57,11 +72,13 @@ std::pair<Variant, bool> normalize_variant_vs_ref_core(const Variant& variant,
  * \param ref_seq Reference sequence of the window. ref_seq[0] is at chromosome position win_start_offset.
  * \param win_start_offset Chromosome position of the first base of ref_seq. Must not be negative.
  * \param allow_ambig_ref If true, allow normalization over ambiguous reference bases.
- * \returns {normalized variants, true if any of the variants was modified}.
- * \throws std::invalid_argument If records are unsorted or on different chromosomes. Input
- *                              validation errors of normalize_variant_vs_ref_core also propagate.
+ * \returns {variants, status}. The status is CHANGED if any variant was modified, UNCHANGED otherwise.
+ *          On invalid input, all input variants are returned unchanged with ERROR_NOT_SORTED if records
+ *          are unsorted, on different chromosomes, or start before win_start_offset, or with the error
+ *          status of normalize_variant_vs_ref_core if any variant could not be normalized (e.g.
+ *          ERROR_OUT_OF_RANGE if a variant lies outside of the window).
  **/
-std::pair<std::vector<Variant>, bool> normalize_variants_vs_ref_core(
+std::pair<std::vector<Variant>, NormalizationStatus> normalize_variants_vs_ref_core(
         std::span<const Variant> variants,
         std::string_view ref_seq,
         int64_t win_start_offset,
@@ -75,9 +92,8 @@ std::pair<std::vector<Variant>, bool> normalize_variants_vs_ref_core(
  *                 overlap any other input record are preserved unchanged.
  * \param ref_seq The entire reference chromosome sequence, covering all possible positions of the input variants.
  * \param allow_ambig_ref If true, allow normalization over ambiguous reference bases.
- * \returns A vector of normalized variants.
- * \throws std::invalid_argument If records are unsorted or on different chromosomes. Input
- *                              validation errors also propagate.
+ * \returns A vector of normalized variants. On invalid input (see normalize_variants_vs_ref_core), the
+ *          input variants are returned unchanged and the error status is not reported.
  **/
 std::vector<Variant> normalize_variants_vs_ref(std::span<const Variant> variants,
                                                std::string_view ref_seq,

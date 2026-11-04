@@ -5,7 +5,6 @@
 #include <catch2/generators/catch_generators.hpp>
 
 #include <cstdint>
-#include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
@@ -468,10 +467,13 @@ CATCH_TEST_CASE("normalize_variant_vs_ref_core within the bounds of the neighbor
     CATCH_INFO("Test name: " << test_case.name);
     const std::string_view window = std::string_view{test_case.ref_seq}.substr(
             test_case.prev_variant_end, test_case.next_variant_start - test_case.prev_variant_end);
-    const auto [result_var, result_changed] = normalize_variant_vs_ref_core(
+    const auto [result_var, result_status] = normalize_variant_vs_ref_core(
             test_case.variant, window, test_case.prev_variant_end, test_case.allow_ambig_ref);
     CATCH_CHECK(result_var == test_case.expected_variant);
-    CATCH_CHECK(result_changed == test_case.expected_changed);
+    const NormalizationStatus expected_status = test_case.expected_changed
+                                                        ? NormalizationStatus::CHANGED
+                                                        : NormalizationStatus::UNCHANGED;
+    CATCH_CHECK(result_status == expected_status);
     CATCH_REQUIRE(test_case.ref_seq.substr(result_var.pos, result_var.ref.size()) ==
                   result_var.ref);
     CATCH_CHECK(result_var.pos >= test_case.prev_variant_end);
@@ -736,67 +738,63 @@ CATCH_TEST_CASE("Normalization passes reference records through unchanged", TEST
     CATCH_CHECK(normalize_variants_vs_ref(records, "", false) == records);
 }
 
-CATCH_TEST_CASE("normalize_variant_vs_ref_core rejects invalid inputs", TEST_GROUP) {
+CATCH_TEST_CASE("normalize_variant_vs_ref_core returns an error for invalid inputs", TEST_GROUP) {
     struct TestCase {
         std::string name;
         std::string ref_seq;
         int64_t prev_variant_end;
         int64_t next_variant_start;
         Variant variant;
-        bool out_of_range = false;
+        NormalizationStatus expected_status;
     };
 
     // clang-format off
     auto [test_case] = GENERATE(table<TestCase>({
         TestCase{"Negative position", "ACGT", 0, 4,
-                 Variant{0, -1, "A", {"C"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, -1, "A", {"C"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Position beyond chromosome", "ACGT", 0, 4,
-                 Variant{0, 5, "A", {"C"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 5, "A", {"C"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Nonempty REF at chromosome end", "ACGT", 0, 4,
-                 Variant{0, 4, "T", {"C"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 4, "T", {"C"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"REF extends beyond chromosome", "AAAA", 0, 4,
-                 Variant{0, 3, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 3, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Empty chromosome with nonempty REF", "", 0, 0,
-                 Variant{0, 0, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 0, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Unpadded insertion beyond chromosome end", "ACGT", 0, 4,
-                 Variant{0, 5, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 5, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Unpadded insertion at chromosome end", "ACGT", 0, 4,
-                 Variant{0, 4, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 4, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Empty REF inside the chromosome", "AAAAAA", 0, 6,
-                 Variant{0, 3, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 3, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"Empty REF at chromosome start", "ACGT", 0, 4,
-                 Variant{0, 0, "", {"TT"}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 0, "", {"TT"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"REF mismatches the chromosome", "ACGT", 0, 4,
-                 Variant{0, 1, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 1, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"Variant starts before the window", "AAAA", 3, 4,
-                 Variant{0, 2, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 2, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"ALT equals REF", "ACGT", 0, 4,
-                 Variant{0, 2, "G", {"G"}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 2, "G", {"G"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_DUPLICATE_ALLELE},
         TestCase{"REF matching is case-sensitive", "ACGT", 0, 4,
-                 Variant{0, 2, "g", {"T"}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 2, "g", {"T"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"One of several ALTs equals REF", "AAAA", 0, 4,
-                 Variant{0, 2, "AA", {"A", "AA"}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 2, "AA", {"A", "AA"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_DUPLICATE_ALLELE},
         TestCase{"All alleles are empty", "ACGT", 0, 4,
-                 Variant{0, 2, "", {""}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 2, "", {""}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"Empty REF and one empty ALT", "ACGT", 0, 4,
-                 Variant{0, 2, "", {"A", ""}, {}, {}, 0.0f, {}, 0, 0}},
+                 Variant{0, 2, "", {"A", ""}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"Insertion on an empty chromosome", "", 0, 0,
-                 Variant{0, 0, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, true},
+                 Variant{0, 0, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
     }));
     // clang-format on
 
     CATCH_INFO("Test name: " << test_case.name);
     const std::string_view window = std::string_view{test_case.ref_seq}.substr(
             test_case.prev_variant_end, test_case.next_variant_start - test_case.prev_variant_end);
-    if (test_case.out_of_range) {
-        CATCH_CHECK_THROWS_AS(normalize_variant_vs_ref_core(test_case.variant, window,
-                                                            test_case.prev_variant_end, false),
-                              std::out_of_range);
-    } else {
-        CATCH_CHECK_THROWS_AS(normalize_variant_vs_ref_core(test_case.variant, window,
-                                                            test_case.prev_variant_end, false),
-                              std::invalid_argument);
-    }
+    // Invalid input is returned unchanged with an error status.
+    const auto [result_var, result_status] = normalize_variant_vs_ref_core(
+            test_case.variant, window, test_case.prev_variant_end, false);
+    CATCH_CHECK(result_status == test_case.expected_status);
+    CATCH_CHECK(result_var == test_case.variant);
 }
 
 CATCH_TEST_CASE("normalize_variants_vs_ref keeps overlapping records unchanged", TEST_GROUP) {
@@ -855,12 +853,13 @@ CATCH_TEST_CASE("normalize_variants_vs_ref keeps overlapping records unchanged",
                 test_case.expected);
 }
 
-CATCH_TEST_CASE("normalize_variant_vs_ref_core rejects a negative window start offset",
+CATCH_TEST_CASE("normalize_variant_vs_ref_core returns an error for a negative window start offset",
                 TEST_GROUP) {
-    // Inputs outside of the window are covered by "normalize_variant_vs_ref_core rejects invalid inputs".
+    // Inputs outside of the window are covered by "normalize_variant_vs_ref_core returns an error for invalid inputs".
     const Variant snp{0, 1, "C", {"T"}, {}, {}, 0.0f, {}, 0, 0};
-    CATCH_CHECK_THROWS_AS(normalize_variant_vs_ref_core(snp, "ACGT", -1, false),
-                          std::invalid_argument);
+    const auto [result_var, result_status] = normalize_variant_vs_ref_core(snp, "ACGT", -1, false);
+    CATCH_CHECK(result_status == NormalizationStatus::ERROR_NEGATIVE_OFFSET);
+    CATCH_CHECK(result_var == snp);
 }
 
 CATCH_TEST_CASE("normalize_variants_vs_ref_core with a window start offset", TEST_GROUP) {
@@ -903,26 +902,31 @@ CATCH_TEST_CASE("normalize_variants_vs_ref_core with a window start offset", TES
     CATCH_INFO("Test name: " << test_case.name);
     const std::string_view window =
             std::string_view{test_case.chrom}.substr(test_case.win_start_offset);
-    const auto [result, modified] = normalize_variants_vs_ref_core(
+    const auto [result, result_status] = normalize_variants_vs_ref_core(
             test_case.variants, window, test_case.win_start_offset, false);
     CATCH_CHECK(result == test_case.expected);
-    CATCH_CHECK(modified == !(result == test_case.variants));
+    const NormalizationStatus expected_status = (result == test_case.variants)
+                                                        ? NormalizationStatus::UNCHANGED
+                                                        : NormalizationStatus::CHANGED;
+    CATCH_CHECK(result_status == expected_status);
 }
 
-CATCH_TEST_CASE("normalize_variants_vs_ref_core rejects variants before the window start",
-                TEST_GROUP) {
+CATCH_TEST_CASE(
+        "normalize_variants_vs_ref_core returns an error for variants before the window start",
+        TEST_GROUP) {
     const std::string_view window{"TACG"};  // Chromosome positions [4, 8).
     const std::vector<Variant> variants{Variant{0, 3, "G", {"C"}, {}, {}, 0.0f, {}, 0, 0}};
-    CATCH_CHECK_THROWS_AS(normalize_variants_vs_ref_core(variants, window, 4, false),
-                          std::invalid_argument);
+    const auto [result, result_status] = normalize_variants_vs_ref_core(variants, window, 4, false);
+    CATCH_CHECK(result_status == NormalizationStatus::ERROR_NOT_SORTED);
+    CATCH_CHECK(result == variants);
 }
 
-CATCH_TEST_CASE("normalize_variants_vs_ref rejects invalid inputs", TEST_GROUP) {
+CATCH_TEST_CASE("normalize_variants_vs_ref_core returns an error for invalid inputs", TEST_GROUP) {
     struct TestCase {
         std::string name;
         std::string ref_seq;
         std::vector<Variant> variants;
-        bool out_of_range = false;
+        NormalizationStatus expected_status;
     };
 
     // clang-format off
@@ -930,32 +934,30 @@ CATCH_TEST_CASE("normalize_variants_vs_ref rejects invalid inputs", TEST_GROUP) 
         TestCase{
             "Invalid position after a valid variant", "AAAA",
             {Variant{0, 0, "A", {"C"}, {}, {}, 0.0f, {}, 0, 0},
-             Variant{0, 6, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}}, true,
+             Variant{0, 6, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}}, NormalizationStatus::ERROR_OUT_OF_RANGE,
         },
         TestCase{
             "Unsorted inputs even when normalization would restore order", "AAAAAA",
             {Variant{0, 4, "A", {"AA"}, {}, {}, 0.0f, {}, 0, 0},
-             Variant{0, 2, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}},
+             Variant{0, 2, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}}, NormalizationStatus::ERROR_NOT_SORTED,
         },
         TestCase{
             "Records on different chromosomes", "AAAA",
             {Variant{0, 0, "A", {"C"}, {}, {}, 0.0f, {}, 0, 0},
-             Variant{1, 2, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}},
+             Variant{1, 2, "AA", {"A"}, {}, {}, 0.0f, {}, 0, 0}}, NormalizationStatus::ERROR_NOT_SORTED,
         },
-        TestCase{"Negative first position is rejected before normalization", "ACGT", {Variant{}}},
+        TestCase{"Negative first position is rejected before normalization", "ACGT", {Variant{}}, NormalizationStatus::ERROR_NOT_SORTED},
     }));
     // clang-format on
 
     CATCH_INFO("Test name: " << test_case.name);
-    if (test_case.out_of_range) {
-        CATCH_CHECK_THROWS_AS(
-                normalize_variants_vs_ref(test_case.variants, test_case.ref_seq, false),
-                std::out_of_range);
-    } else {
-        CATCH_CHECK_THROWS_AS(
-                normalize_variants_vs_ref(test_case.variants, test_case.ref_seq, false),
-                std::invalid_argument);
-    }
+    // Invalid input is returned unchanged with an error status.
+    const auto [result, result_status] =
+            normalize_variants_vs_ref_core(test_case.variants, test_case.ref_seq, 0, false);
+    CATCH_CHECK(result_status == test_case.expected_status);
+    CATCH_CHECK(result == test_case.variants);
+    CATCH_CHECK(normalize_variants_vs_ref(test_case.variants, test_case.ref_seq, false) ==
+                test_case.variants);
 }
 
 }  // namespace dorado::secondary::tests

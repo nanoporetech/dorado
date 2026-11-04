@@ -1,11 +1,9 @@
 #include "secondary/consensus/variant_normalization.h"
 
+#include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
 
-#include <spdlog/fmt/bundled/format.h>
-
 #include <algorithm>
-#include <stdexcept>
 
 namespace dorado::secondary {
 
@@ -58,11 +56,11 @@ std::pair<int64_t, int64_t> find_common_prefix_suffix_len(
     return std::make_pair(prefix_trim, suffix_trim);
 }
 
-std::pair<Variant, bool> normalize_variant_vs_ref_core(const Variant& variant,
-                                                       const std::string_view ref_seq,
-                                                       const int64_t win_start_offset,
-                                                       const bool allow_ambig_ref) {
-
+std::pair<Variant, NormalizationStatus> normalize_variant_vs_ref_core(
+        const Variant& variant,
+        const std::string_view ref_seq,
+        const int64_t win_start_offset,
+        const bool allow_ambig_ref) {
     // The ref_seq starts at win_start_offset, while the variant coordinates are absolute.
     const int64_t win_end = win_start_offset + std::ssize(ref_seq);
 
@@ -145,40 +143,47 @@ std::pair<Variant, bool> normalize_variant_vs_ref_core(const Variant& variant,
     };
 
     if (is_reference_record(variant)) {
-        return {variant, false};
+        return {variant, NormalizationStatus::UNCHANGED};
     }
 
     if (win_start_offset < 0) {
-        throw std::invalid_argument(
-                fmt::format("Window start offset must not be negative. win_start_offset = {}",
-                            win_start_offset));
+        DORADO_LOG(warn, "Window start offset must not be negative. win_start_offset = {}",
+                   win_start_offset);
+        return {variant, NormalizationStatus::ERROR_NEGATIVE_OFFSET};
     }
     if ((variant.pos < win_start_offset) || (variant.pos >= win_end) ||
         (variant_end(variant) > win_end)) {
-        throw std::out_of_range(fmt::format(
-                "Variant is outside the reference sequence. variant.pos = {}, variant_end = {}, "
-                "win_start_offset = {}, ref_seq.size() = {}",
-                variant.pos, variant_end(variant), win_start_offset, std::ssize(ref_seq)));
+        DORADO_LOG(warn,
+                   "Variant is outside the reference sequence. variant.pos = {}, "
+                   "variant_end = {}, win_start_offset = {}, ref_seq.size() = {}",
+                   variant.pos, variant_end(variant), win_start_offset, std::ssize(ref_seq));
+        return {variant, NormalizationStatus::ERROR_OUT_OF_RANGE};
     }
 
     Variant ret = variant;
+    NormalizationStatus ret_status;
 
     // Validate the REF sequence.
     const std::string_view actual_ref_subseq =
             ref_seq.substr(ret.pos - win_start_offset, variant_ref_span(ret));
     if (ret.ref != actual_ref_subseq) {
-        throw std::invalid_argument(
-                fmt::format("Variant REF does not match the reference sequence. ret.ref = \"{}\", "
-                            "actual_ref_subseq = \"{}\"",
-                            ret.ref, actual_ref_subseq));
+        DORADO_LOG(warn,
+                   "Variant REF does not match the reference sequence. ret.ref = \"{}\", "
+                   "actual_ref_subseq = \"{}\"",
+                   ret.ref, actual_ref_subseq);
+        ret_status = NormalizationStatus::ERROR_REF;
+        return {ret, ret_status};
     }
 
     // Validate that none of the ALTs match the reference.
     for (const std::string& alt : ret.alts) {
         if (alt == ret.ref) {
-            throw std::invalid_argument(fmt::format(
-                    "Alternate alleles must differ from REF. ret.ref = \"{}\", alt = \"{}\"",
-                    ret.ref, alt));
+            DORADO_LOG(warn,
+                       "Alternate alleles must differ from REF. ret.ref = "
+                       "\"{}\", alt = \"{}\"",
+                       ret.ref, alt);
+            ret_status = NormalizationStatus::ERROR_DUPLICATE_ALLELE;
+            return {ret, ret_status};
         }
     }
 
@@ -228,10 +233,12 @@ std::pair<Variant, bool> normalize_variant_vs_ref_core(const Variant& variant,
 
     modified = is_trimmed || modified;
 
-    return {std::move(ret), modified};
+    ret_status = modified ? NormalizationStatus::CHANGED : NormalizationStatus::UNCHANGED;
+
+    return {std::move(ret), ret_status};
 }
 
-std::pair<std::vector<Variant>, bool> normalize_variants_vs_ref_core(
+std::pair<std::vector<Variant>, NormalizationStatus> normalize_variants_vs_ref_core(
         const std::span<const Variant> variants,
         const std::string_view ref_seq,
         const int64_t win_start_offset,
@@ -263,6 +270,11 @@ std::pair<std::vector<Variant>, bool> normalize_variants_vs_ref_core(
         return ret_ovl;
     }();
 
+    const auto copy_input = [&variants](const NormalizationStatus var_status) {
+        std::vector<Variant> input_vec{std::begin(variants), std::end(variants)};
+        return std::pair{std::move(input_vec), var_status};
+    };
+
     // Furthest end of all previous output (normalized) variants. Each variant can be shifted left
     // until it reaches the previous variants after they were normalized.
     int64_t prev_end = win_start_offset;
@@ -276,8 +288,9 @@ std::pair<std::vector<Variant>, bool> normalize_variants_vs_ref_core(
 
         // Check that the variants are sorted.
         if ((v.seq_id != seq_id) || (v.pos < prev_start)) {
-            throw std::invalid_argument{
-                    "Variants must be sorted on a single reference sequence for normalization."};
+            DORADO_LOG(warn,
+                       "Variants must be sorted on a single reference sequence for normalization.");
+            return copy_input(NormalizationStatus::ERROR_NOT_SORTED);
         }
 
         if (is_overlapping[i]) {
@@ -291,16 +304,29 @@ std::pair<std::vector<Variant>, bool> normalize_variants_vs_ref_core(
             // input variant, so it lies entirely within this window.
             const std::string_view local_ref =
                     ref_seq.substr(prev_end - win_start_offset, next_start - prev_end);
-            auto [var, var_modified] =
+
+            auto [var, var_status] =
                     normalize_variant_vs_ref_core(v, local_ref, prev_end, allow_ambig_ref);
+
+            // If there was an error normalizing any of the variants, copy everything and
+            // return unnormalized.
+            if ((var_status != NormalizationStatus::CHANGED) &&
+                (var_status != NormalizationStatus::UNCHANGED)) {
+                return copy_input(var_status);
+            }
+
             ret.emplace_back(std::move(var));
-            modified = modified || var_modified;
+
+            modified = modified || (var_status == NormalizationStatus::CHANGED);
         }
 
         prev_end = std::max(prev_end, variant_end(ret.back()));
     }
 
-    return {std::move(ret), modified};
+    const NormalizationStatus ret_status =
+            modified ? NormalizationStatus::CHANGED : NormalizationStatus::UNCHANGED;
+
+    return std::pair{std::move(ret), ret_status};
 }
 
 std::vector<Variant> normalize_variants_vs_ref(const std::span<const Variant> variants,
