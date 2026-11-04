@@ -1859,58 +1859,6 @@ bool read_downsampling_query_or_update_counter(read_downsampling_rw rw,
     return read_may_be_accepted;
 }
 
-std::tuple<int64_t, std::string_view, std::vector<std::string>> trim_common_prefix_suffix(
-        const std::string_view in_ref,
-        const std::vector<std::string> &in_alts) {
-    const int64_t min_len = [&]() {
-        int64_t ret = std::ssize(in_ref);
-        for (const auto &alt : in_alts) {
-            ret = std::min<int64_t>(ret, std::ssize(alt));
-        }
-        return ret;
-    }();
-
-    // Find the maximum common suffix.
-    int64_t suffix_trim = 0;
-    {
-        while (((suffix_trim + 1) < min_len) &&
-               std::all_of(std::begin(in_alts), std::end(in_alts), [&](const std::string &alt) {
-                   return (alt[std::ssize(alt) - 1 - suffix_trim] ==
-                           in_ref[std::ssize(in_ref) - 1 - suffix_trim]);
-               })) {
-            ++suffix_trim;
-        }
-    }
-
-    // Find the maximum common prefix after trimming the common suffix.
-    int64_t prefix_trim = 0;
-    {
-        // Min len is shorter by the length of the common suffix.
-        const int64_t new_min_len = min_len - suffix_trim;
-
-        while (((prefix_trim + 1) < new_min_len) &&
-               std::all_of(std::begin(in_alts), std::end(in_alts), [&](const std::string &alt) {
-                   return (alt[prefix_trim] == in_ref[prefix_trim]);
-               })) {
-            ++prefix_trim;
-        }
-    }
-
-    // Trim the reference.
-    const std::string_view trimmed_ref =
-            in_ref.substr(prefix_trim, std::ssize(in_ref) - prefix_trim - suffix_trim);
-
-    // Trim the alts.
-    std::vector<std::string> trimmed_alts;
-    trimmed_alts.reserve(std::ssize(in_alts));
-    for (const auto &alt : in_alts) {
-        trimmed_alts.push_back(
-                alt.substr(prefix_trim, std::ssize(alt) - prefix_trim - suffix_trim));
-    }
-
-    return std::make_tuple(prefix_trim, trimmed_ref, std::move(trimmed_alts));
-}
-
 }  // namespace
 
 dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fullinfo_t &var,
@@ -2027,9 +1975,6 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
         alt_depths = {var.alt_depth0};
     }
 
-    int64_t prefix_trim = 0;
-    std::tie(prefix_trim, ref, alts) = trim_common_prefix_suffix(ref, alts);
-
     if (!(var.is_phased0 && keep_phasing)) {
         if (genotype.first > genotype.second) {
             std::swap(genotype.first, genotype.second);
@@ -2054,7 +1999,7 @@ dorado::secondary::Variant convert_fullinfo_var_to_dorado_style(const variant_fu
     const float qual = var.is_confident ? dorado::secondary::VCF_MAX_GQ_CAP : 0.0f;
     dorado::secondary::Variant ret{
             .seq_id = -1,  // placeholder
-            .pos = var.pos0 + prefix_trim,
+            .pos = var.pos0,
             .ref = std::string(ref),
             .alts = alts,
             .filters = {var.is_confident ? dorado::secondary::Filters::Pass

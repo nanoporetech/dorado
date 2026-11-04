@@ -675,6 +675,20 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             false,
         },
+        TestCase{
+            "Ambiguous reference NOT allowed, but N bases flank the deletion on both sides. The N base is used as the anchor as a last resort, "
+            "because an empty ALT cannot be represented in the VCF.",
+             "ANGCCATTNA",
+            {"AA******AA",
+             "AA******AA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, true, false, false,
+            {
+                Variant{0, 1, "NGCCATT", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,597,0"}, {"AQ", "0,60"}}, 1, 8},
+            },
+            false,
+        },
 
         TestCase{
             "Ambiguous reference IS allowed. (Prepending case.) N bases flank a large deletion, but are also themselves deleted. Prepends the ref base at position 0.",

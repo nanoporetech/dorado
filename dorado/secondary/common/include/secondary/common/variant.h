@@ -93,6 +93,8 @@ bool is_reference_record(const Variant& var);
 
 int64_t variant_end(const Variant& var);
 
+int64_t variant_ref_span(const Variant& var);
+
 bool variant_ends_before_position(const Variant& var, int32_t seq_id, int64_t pos);
 
 bool variant_covers_position(const Variant& var, int32_t seq_id, int64_t pos);
