@@ -5,6 +5,7 @@
 
 #include <cstdint>
 #include <ostream>
+#include <set>
 #include <utility>
 #include <vector>
 
@@ -503,6 +504,62 @@ CATCH_TEST_CASE("split_samples_around_positions: candidate-driven chunking and e
                               std::runtime_error);
         CATCH_CHECK_THROWS_AS(split_samples_around_positions({sample}, candidate_trees, -1, 0),
                               std::runtime_error);
+    }
+}
+
+CATCH_TEST_CASE("split_samples_tiled_with_candidates: windows cover an entire long insertion",
+                TEST_GROUP) {
+    /**
+     * \brief Mimics a real case (chr20:26589669) where an insertion longer than several windows was
+     *          only partially selected for inference. The insertion after major 5 is not a candidate
+     *          itself; the candidates are only on its flanks (majors 4 and 9).
+     *
+     *          Columns (chunk_len = 6, chunk_overlap = 2, so windows start every 4 columns):
+     *            - IDX  :  0 1 2 3 4 5 | 6 .. 17      | 18 19 20 21 22 23
+     *            - MAJOR:  0 1 2 3 4 5 | 5 .. 5       |  6  7  8  9 10 11
+     *            - MINOR:  0 0 0 0 0 0 | 1 .. 12      |  0  0  0  0  0  0
+     *          Windows: [0,6) [4,10) [8,14) [12,18) [16,22) [18,24).
+     *          The windows [0,6) and [4,10) contain the candidate at major 4, and [16,22) and [18,24)
+     *          contain the candidate at major 9. The windows [8,14) and [12,18) contain only the
+     *          insertion (major 5) and have no candidate, so they are not selected and the middle of
+     *          the insertion (minors 5 to 10) is missing from inference.
+     *          Selected windows which end or begin inside an insertion should be extended to the
+     *          neighboring windows until the entire insertion is covered.
+     */
+    std::vector<int64_t> positions_major{0, 1, 2, 3, 4, 5};
+    std::vector<int64_t> positions_minor{0, 0, 0, 0, 0, 0};
+    for (int64_t minor = 1; minor <= 12; ++minor) {
+        positions_major.emplace_back(5);
+        positions_minor.emplace_back(minor);
+    }
+    for (int64_t major = 6; major <= 11; ++major) {
+        positions_major.emplace_back(major);
+        positions_minor.emplace_back(0);
+    }
+    const int64_t num_columns = std::ssize(positions_major);
+
+    // No deletions in the pileup, so the deletion-based flank extension does not apply.
+    const Sample sample = make_pileup_sample(46, positions_major, positions_minor,
+                                             torch::full({num_columns}, 3, torch::kInt64));
+    const IntervalTreesInt64Map candidate_trees = make_candidate_trees({{46, {4, 9}}});
+
+    const std::vector<Sample> result =
+            split_samples_tiled_with_candidates({sample}, candidate_trees, 6, 2, true, 2, 2, 0.5);
+
+    CATCH_CHECK(std::size(result) == 6);
+
+    // Collect all columns covered by the selected windows.
+    std::set<std::pair<int64_t, int64_t>> covered;
+    for (const Sample& window : result) {
+        for (int64_t i = 0; i < std::ssize(window.positions_major); ++i) {
+            covered.emplace(window.positions_major[i], window.positions_minor[i]);
+        }
+    }
+
+    // Every insertion column is covered by at least one window.
+    for (int64_t minor = 1; minor <= 12; ++minor) {
+        CATCH_CAPTURE(minor);
+        CATCH_CHECK(covered.count({5, minor}) == 1);
     }
 }
 
