@@ -433,6 +433,15 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                 ", chunk_overlap = " + std::to_string(chunk_overlap));
     }
 
+    enum class WindowUsedStatus {
+        UNUSED,
+        SELECTED_BY_CANDIDATES,
+        LEFT_EXT_INSERTIONS,
+        LEFT_EXT_DELETIONS,
+        RIGHT_EXT_INSERTIONS,
+        RIGHT_EXT_DELETIONS,
+    };
+
     const auto has_candidates = [](const secondary::IntervalTreeInt64& tree,
                                    const secondary::Sample& sample, const int64_t start_idx,
                                    const int64_t end_idx) {
@@ -459,7 +468,7 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         const int64_t cov = sample.find_max_depth(start_idx, end_idx);
         const int64_t min_count = std::max(min_abs_cov, static_cast<int64_t>(cov * cov_fraction));
 
-        if (!reverse) {
+        if (reverse) {
             for (int64_t pos = start_idx, num_major = 0; pos < end_idx; ++pos) {
                 if (sample.positions_minor[pos] > 0) {
                     continue;
@@ -497,26 +506,118 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         return false;
     };
 
-    const auto check_flanking_minor = [](const secondary::Sample& sample, const int64_t start_idx,
-                                         const int64_t end_idx, const bool reverse) {
-        /// @brief Returns true if the first/last position is a minor one.
-        if (std::empty(sample.positions_minor)) {
-            return false;
+    const auto extend_left = [&check_excess_deletions, &ext_major_bases, &ext_cov_frac,
+                              &ext_min_cov](const secondary::Sample& sample,
+                                            const std::vector<std::pair<int64_t, int64_t>>& windows,
+                                            const int32_t start_window,
+                                            std::span<WindowUsedStatus> window_used) {
+        // If the current window is unused or an extension, do not extend.
+        if (window_used[start_window] != WindowUsedStatus::SELECTED_BY_CANDIDATES) {
+            return;
         }
-        if (start_idx >= end_idx) {
-            return false;
+
+        if (start_window == 0) {
+            return;
         }
-        if ((start_idx < 0) || (end_idx <= 0) ||
-            (start_idx >= std::ssize(sample.positions_minor)) ||
-            (end_idx > std::ssize(sample.positions_minor))) {
-            return false;
+
+        // Get the last major coordinate of the starting window.
+        const auto [initial_start_idx, initial_end_idx] = windows[start_window];
+        const int64_t initial_first_major = sample.positions_major[initial_start_idx];
+
+        int64_t j = start_window - 1;
+
+        // Extend left due to insertion columns on the left edge until the major coord changes.
+        int64_t next_idx = initial_start_idx - 1;
+        for (; (j >= 0 && (next_idx >= 0)); --j) {
+            if (window_used[j] != WindowUsedStatus::UNUSED) {
+                break;
+            }
+            const auto [start_idx, end_idx] = windows[j];
+            const int64_t next_major = sample.positions_major[next_idx];
+            if (next_major < initial_first_major) {
+                break;
+            }
+            next_idx = start_idx - 1;
+            window_used[j] = WindowUsedStatus::LEFT_EXT_INSERTIONS;
         }
-        if (!reverse) {
-            return sample.positions_minor[start_idx] != 0;
-        } else {
-            return sample.positions_minor[end_idx - 1] != 0;
+
+        // Extend further if there are flanking deletions.
+        for (; j >= 0; --j) {
+            if (window_used[j] != WindowUsedStatus::UNUSED) {
+                break;
+            }
+            const auto [start_idx, end_idx] = windows[j + 1];
+            const bool is_deletion = check_excess_deletions(
+                    sample, start_idx, end_idx, true, ext_major_bases, ext_cov_frac, ext_min_cov);
+            if (!is_deletion) {
+                break;
+            }
+            window_used[j] = WindowUsedStatus::LEFT_EXT_DELETIONS;
         }
-        return false;
+    };
+
+    const auto extend_right = [&check_excess_deletions, &ext_major_bases, &ext_cov_frac,
+                               &ext_min_cov](
+                                      const secondary::Sample& sample,
+                                      const std::vector<std::pair<int64_t, int64_t>>& windows,
+                                      const int32_t start_window,
+                                      std::span<WindowUsedStatus> window_used) {
+        // If the current window is unused or an extension, do not extend.
+        if (window_used[start_window] != WindowUsedStatus::SELECTED_BY_CANDIDATES) {
+            return;
+        }
+
+        if (start_window == (std::ssize(window_used) - 1)) {
+            return;
+        }
+
+        // Get the last major coordinate of the starting window.
+        const auto [initial_start_idx, initial_end_idx] = windows[start_window];
+        const int64_t initial_last_major = sample.positions_major[initial_end_idx - 1];
+
+        const int64_t num_pos = std::ssize(sample.positions_major);
+
+        int64_t j = start_window + 1;
+
+        // Extend insertions right until we reach a window with MAJOR position > initial_last_major.
+        // Reason - this handles 2 cases:
+        //      1. Last position of the `start_window` is a minor position, in which case
+        //          we need to extend the window right. If the window to the right begins
+        //          with the same major coordinate (also a minor position), take it.
+        //          If the next window begins on a larger major, that means we saw all
+        //          insertion columns for the initial_last_major coordinate.
+        //      2. Last position of the `start_window` is a major position, but it is followed
+        //          by minor coordinates in the next window. Due to pure chance, we ended up here
+        //          by cutting on the major column. In this case, the same heuristic applies - the
+        //          next window should have the first major position > initial_last_major to ensure all
+        //          insertions are covered.
+        int64_t next_idx = initial_end_idx;
+        for (; (j < std::ssize(window_used)) && (next_idx < num_pos); ++j) {
+            if (window_used[j] != WindowUsedStatus::UNUSED) {
+                break;
+            }
+            const auto [start_idx, end_idx] = windows[j];
+            const int64_t next_major = sample.positions_major[next_idx];
+            if (next_major > initial_last_major) {
+                break;
+            }
+            next_idx = end_idx;
+            window_used[j] = WindowUsedStatus::RIGHT_EXT_INSERTIONS;
+        }
+
+        // Extend further if there are flanking deletions.
+        for (; j < std::ssize(window_used); ++j) {
+            if (window_used[j] != WindowUsedStatus::UNUSED) {
+                break;
+            }
+            const auto [start_idx, end_idx] = windows[j - 1];
+            const bool is_deletion = check_excess_deletions(
+                    sample, start_idx, end_idx, false, ext_major_bases, ext_cov_frac, ext_min_cov);
+            if (!is_deletion) {
+                break;
+            }
+            window_used[j] = WindowUsedStatus::RIGHT_EXT_DELETIONS;
+        }
     };
 
     std::vector<secondary::Sample> results;
@@ -564,11 +665,11 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         }
 
         // Find windows with candidates.
-        std::vector<bool> window_used(std::size(windows), false);
+        std::vector<WindowUsedStatus> window_used(std::size(windows), WindowUsedStatus::UNUSED);
         for (int64_t i = 0; i < std::ssize(windows); ++i) {
             const auto [start, end] = windows[i];
             if (has_candidates(tree, sample, start, end)) {
-                window_used[i] = true;
+                window_used[i] = WindowUsedStatus::SELECTED_BY_CANDIDATES;
             }
         }
 
@@ -576,47 +677,14 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
         // deletions at the flanks.
         if (ext_flanks) {
             for (int64_t i = 0; i < std::ssize(windows); ++i) {
-                if (!window_used[i]) {
-                    continue;
-                }
-
-                // Extend to the left if needed.
-                for (int64_t j = i; j > 0; --j) {
-                    // Predecessor window is already used, no need to extend to the left any further.
-                    if (!window_used[j] || window_used[j - 1]) {
-                        break;
-                    }
-                    const auto [start, end] = windows[j];
-                    const bool is_deletion = check_excess_deletions(
-                            sample, start, end, false, ext_major_bases, ext_cov_frac, ext_min_cov);
-                    const bool is_insertion = check_flanking_minor(sample, start, end, false);
-                    if (!is_deletion && !is_insertion) {
-                        break;
-                    }
-                    window_used[j - 1] = true;
-                }
-
-                // Extend to the right if needed.
-                for (int64_t j = i; j < (std::ssize(windows) - 1); ++j) {
-                    // Next window is already used, no need to extend to the right any further.
-                    if (!window_used[j] || window_used[j + 1]) {
-                        break;
-                    }
-                    const auto [start, end] = windows[j];
-                    const bool is_deletion = check_excess_deletions(
-                            sample, start, end, true, ext_major_bases, ext_cov_frac, ext_min_cov);
-                    const bool is_insertion = check_flanking_minor(sample, start, end, true);
-                    if (!is_deletion && !is_insertion) {
-                        break;
-                    }
-                    window_used[j + 1] = true;
-                }
+                extend_right(sample, windows, i, window_used);
+                extend_left(sample, windows, i, window_used);
             }
         }
 
         // Slice out selected windows to return.
         for (int64_t i = 0; i < std::ssize(windows); ++i) {
-            if (window_used[i]) {
+            if (window_used[i] != WindowUsedStatus::UNUSED) {
                 const auto [start, end] = windows[i];
                 results.emplace_back(slice_sample(sample, start, end, true));
             }
