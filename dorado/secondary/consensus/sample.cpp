@@ -587,9 +587,10 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                         break;
                     }
                     const auto [start, end] = windows[j];
-                    if (!check_excess_deletions(sample, start, end, false, ext_major_bases,
-                                                ext_cov_frac, ext_min_cov) ||
-                        !check_flanking_minor(sample, start, end, false)) {
+                    const bool is_deletion = check_excess_deletions(
+                            sample, start, end, false, ext_major_bases, ext_cov_frac, ext_min_cov);
+                    const bool is_insertion = check_flanking_minor(sample, start, end, false);
+                    if (!is_deletion && !is_insertion) {
                         break;
                     }
                     window_used[j - 1] = true;
@@ -602,9 +603,10 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                         break;
                     }
                     const auto [start, end] = windows[j];
-                    if (!check_excess_deletions(sample, start, end, true, ext_major_bases,
-                                                ext_cov_frac, ext_min_cov) ||
-                        !check_flanking_minor(sample, start, end, true)) {
+                    const bool is_deletion = check_excess_deletions(
+                            sample, start, end, true, ext_major_bases, ext_cov_frac, ext_min_cov);
+                    const bool is_insertion = check_flanking_minor(sample, start, end, true);
+                    if (!is_deletion && !is_insertion) {
                         break;
                     }
                     window_used[j + 1] = true;
