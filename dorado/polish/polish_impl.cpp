@@ -1815,8 +1815,8 @@ std::vector<secondary::Variant> call_variants(
             const std::string ref_seq_with_gaps = dorado::secondary::extract_draft_with_gaps(
                     draft, vc_sample.positions_major, vc_sample.positions_minor);
             dorado::secondary::print_slice(
-                    std::cout, ref_seq_with_gaps, cons_view, vc_sample.positions_major,
-                    vc_sample.positions_minor,
+                    std::cout, "Slice printed in call_variants:", ref_seq_with_gaps, cons_view,
+                    vc_sample.positions_major, vc_sample.positions_minor,
                     std::vector<bool>(std::size(vc_sample.positions_major), false), 0, -1, 0, -1);
             std::cout << "vc_sample.logits tensor =\n" << vc_sample.logits << "\n";
         }

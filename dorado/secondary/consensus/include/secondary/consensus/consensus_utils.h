@@ -33,6 +33,7 @@ std::vector<bool> find_polyploid_variants(
         const std::optional<std::unordered_set<char>>& allowed_symbol_set);
 
 void print_slice(std::ostream& os,
+                 std::string_view label,
                  const std::string_view ref_seq_with_gaps,
                  const std::vector<std::string_view>& cons_seqs,
                  const std::vector<int64_t>& pos_major,

@@ -137,6 +137,7 @@ std::vector<bool> find_polyploid_variants(
 }
 
 void print_slice(std::ostream& os,
+                 const std::string_view label,
                  const std::string_view ref_seq_with_gaps,
                  const std::vector<std::string_view>& cons_seqs,
                  const std::vector<int64_t>& pos_major,
@@ -172,6 +173,10 @@ void print_slice(std::ostream& os,
 
     slice_end = (slice_end <= 0) ? std::ssize(pos_major) : slice_end;
     rend = (rend <= 0) ? std::ssize(pos_major) : rend;
+
+    if (!std::empty(label)) {
+        os << label << '\n';
+    }
 
     // IDX
     os << "    - IDX  : ";
