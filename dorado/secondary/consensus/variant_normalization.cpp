@@ -353,6 +353,7 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
         const bool merge_overlapping,
         const bool merge_adjacent,
         const at::Tensor& basecalls,
+        const at::Tensor& depth,
         const float pass_min_qual,
         const float pass_min_gq,
         const float pass_min_aq,
@@ -411,8 +412,8 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
         return construct_variant(draft, positions_major, positions_minor, ref_with_gaps,
                                  cons_seqs_with_gaps, first.seq_id, rstart, rend, true,
                                  allow_ambig_ref, variant_source, probs_3D, symbol_set,
-                                 symbol_lookup, basecalls, pass_min_qual, pass_min_gq, pass_min_aq,
-                                 pass_min_vq);
+                                 symbol_lookup, basecalls, depth, pass_min_qual, pass_min_gq,
+                                 pass_min_aq, pass_min_vq);
     };
 
     const auto has_disallowed_ambig_ref = [&](const int64_t start, const int64_t end) {

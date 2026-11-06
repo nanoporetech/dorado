@@ -123,6 +123,8 @@ std::vector<Variant> normalize_variants_vs_ref(std::span<const Variant> variants
  * \param probs_3D Probabilities of shape [num_columns x num_haplotypes x num_classes].
  * \param symbol_lookup Class index for each symbol, or -1.
  * \param basecalls Optional basecalls tensor used to compute the AD tag. Can be undefined.
+ * \param depth Optional per-column depth tensor used to compute the DP and MIN_DP tags of merged
+ *              variants. Can be undefined.
  * \returns Normalized, non-overlapping variants with updated rstart/rend columns.
  */
 std::vector<Variant> normalize_variants_vs_haplotypes(
@@ -139,6 +141,7 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
         bool merge_overlapping,
         bool merge_adjacent,
         const at::Tensor& basecalls,
+        const at::Tensor& depth,
         float pass_min_qual,
         float pass_min_gq,
         float pass_min_aq,

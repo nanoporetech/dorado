@@ -145,6 +145,8 @@ bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map, const std:
  * \param symbol_set Set of valid symbols in the label scheme.
  * \param symbol_lookup Class index for each symbol, or -1.
  * \param basecalls Optional basecalls tensor used to compute the AD tag. Can be undefined.
+ * \param depth Optional per-column depth tensor used to compute the DP and MIN_DP tags on the
+ *              columns [rstart, rend). Can be undefined.
  * \returns The constructed variant, or an empty (invalid) variant if no variant can be constructed.
  */
 Variant construct_variant(std::string_view draft,
@@ -162,6 +164,7 @@ Variant construct_variant(std::string_view draft,
                           const std::unordered_set<char>& symbol_set,
                           const std::array<int32_t, 256>& symbol_lookup,
                           const at::Tensor& basecalls,
+                          const at::Tensor& depth,
                           float pass_min_qual,
                           float pass_min_gq,
                           float pass_min_aq,

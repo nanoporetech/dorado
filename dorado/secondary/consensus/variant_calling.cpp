@@ -804,6 +804,31 @@ float calculate_VQ(const std::vector<float>& allele_logprobs, const std::vector<
     return phred(-std::expm1(v_logprob), VCF_MAX_GQ_CAP);
 }
 
+void add_depth(Variant& var, const at::Tensor& depth) {
+    // missing depth information
+    if ((!depth.defined()) || (depth.size(0) == 0)) {
+        return;
+    }
+
+    const auto depth_span = depth.index({at::indexing::Slice(var.rstart, var.rend)});
+    // reference block, output MIN_DP
+    if (is_reference_record(var)) {
+        const int64_t dp = at::min(depth_span).item<int64_t>();
+        var.format["MIN_DP"] = std::to_string(dp);
+        return;
+    }
+
+    // default case, output DP and MIN_DP if multi-site and different
+    const int64_t med_dp = at::median(depth_span).item<int64_t>();
+    var.format["DP"] = std::to_string(med_dp);
+    if ((var.rend - var.rstart) > 1) {
+        const int64_t min_dp = at::min(depth_span).item<int64_t>();
+        if (min_dp != med_dp) {
+            var.format["MIN_DP"] = std::to_string(min_dp);
+        }
+    }
+}
+
 }  // namespace
 
 bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map,
@@ -831,6 +856,7 @@ Variant construct_variant(const std::string_view draft,
                           const std::unordered_set<char>& symbol_set,
                           const std::array<int32_t, 256>& symbol_lookup,
                           const at::Tensor& basecalls,
+                          const at::Tensor& depth,
                           const float pass_min_qual,
                           const float pass_min_gq,
                           const float pass_min_aq,
@@ -912,6 +938,11 @@ Variant construct_variant(const std::string_view draft,
             .rend = rend,
     };
 
+    // DP is computed on the same columns as the other tags, before the normalization can move the span.
+    if (depth.defined()) {
+        add_depth(var, depth);
+    }
+
     if (basecalls.defined()) {
         int64_t temp_rstart = var.rstart;
         int64_t temp_rend = var.rend;
@@ -952,37 +983,10 @@ Variant construct_variant(const std::string_view draft,
         }
     }
 
+    add_VAF(var);
+
     return var;
 }
-
-namespace {
-
-void add_depth(Variant& var, const at::Tensor& depth) {
-    // missing depth information
-    if ((!depth.defined()) || (depth.size(0) == 0)) {
-        return;
-    }
-
-    const auto depth_span = depth.index({at::indexing::Slice(var.rstart, var.rend)});
-    // reference block, output MIN_DP
-    if (is_reference_record(var)) {
-        const int64_t dp = at::min(depth_span).item<int64_t>();
-        var.format["MIN_DP"] = std::to_string(dp);
-        return;
-    }
-
-    // default case, output DP and MIN_DP if multi-site and different
-    const int64_t med_dp = at::median(depth_span).item<int64_t>();
-    var.format["DP"] = std::to_string(med_dp);
-    if ((var.rend - var.rstart) > 1) {
-        const int64_t min_dp = at::min(depth_span).item<int64_t>();
-        if (min_dp != med_dp) {
-            var.format["MIN_DP"] = std::to_string(min_dp);
-        }
-    }
-}
-
-}  // namespace
 
 /**
  * \brief Lookup genotypes list with bounds checking.
@@ -1325,8 +1329,8 @@ std::vector<Variant> general_decode_variants(
         Variant var = construct_variant(draft, positions_major, positions_minor, ref_seq_with_gaps,
                                         cons_seqs_with_gaps, seq_id, rstart, rend, is_var,
                                         ambig_ref, VARIANT_SOURCE_INFERENCE, probs_3D, symbol_set,
-                                        symbol_lookup, vc_sample.basecalls, pass_min_qual,
-                                        pass_min_gq, pass_min_aq, pass_min_vq);
+                                        symbol_lookup, vc_sample.basecalls, vc_sample.depth,
+                                        pass_min_qual, pass_min_gq, pass_min_aq, pass_min_vq);
 
 #ifdef DEBUG_VARIANT_REGIONS
         {
@@ -1370,8 +1374,8 @@ std::vector<Variant> general_decode_variants(
     variants = normalize_variants_vs_haplotypes(
             draft, ref_seq_with_gaps, cons_seqs_with_gaps, positions_major, positions_minor,
             symbol_set, variants, ambig_ref, probs_3D, symbol_lookup, merge_overlapping,
-            merge_adjacent, vc_sample.basecalls, pass_min_qual, pass_min_gq, pass_min_aq,
-            pass_min_vq);
+            merge_adjacent, vc_sample.basecalls, vc_sample.depth, pass_min_qual, pass_min_gq,
+            pass_min_aq, pass_min_vq);
 
 #ifdef DEBUG_NORMALIZE_VARIANT
     std::cerr << "Merged variants (" << std::size(variants) << "):\n";
@@ -1465,25 +1469,16 @@ std::vector<Variant> general_decode_variants(
                     seq_id, block_start_pos, draft[block_start_pos], min_gq, num_haplotypes,
                     /*min_depth*/ -1, block_end_pos, block_start_idx, block_end_idx,
                     VARIANT_SOURCE_INFERENCE);
+
+            add_depth(var, vc_sample.depth);
+
             variants.emplace_back(std::move(var));
         }
     }
 
     std::sort(std::begin(variants), std::end(variants));
 
-    // Normalize variants.
-    std::vector<Variant> normalized_variants;
-    normalized_variants.reserve(std::size(variants));
-    for (const Variant& var : variants) {
-        Variant new_var = var;
-        add_depth(new_var, vc_sample.depth);
-        add_VAF(new_var);
-
-        // Keep all variants and filter non-valid ones later.
-        normalized_variants.emplace_back(std::move(new_var));
-    }
-
-    return normalized_variants;
+    return variants;
 }
 
 std::pair<std::vector<std::string_view>, bool> split_GT_string(const std::string_view gt) {

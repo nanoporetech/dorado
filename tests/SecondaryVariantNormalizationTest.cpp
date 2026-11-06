@@ -1,5 +1,6 @@
 #include "secondary/common/variant.h"
 #include "secondary/consensus/consensus_result.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/consensus/variant_normalization.h"
 
 #include <catch2/catch_test_macros.hpp>
@@ -1150,7 +1151,7 @@ CATCH_TEST_CASE("normalize_variants_vs_haplotypes", TEST_GROUP) {
                 test_case.draft, ref_with_gaps, cons_seqs, test_case.positions_major,
                 test_case.positions_minor, symbol_set, test_case.variants, false, probs,
                 symbol_lookup, test_case.merge_overlapping, test_case.merge_adjacent, at::Tensor{},
-                0.0f, 0.0f, 0.0f, 0.0f);
+                at::Tensor{}, 0.0f, 0.0f, 0.0f, 0.0f);
 
         CATCH_REQUIRE(std::size(result) == std::size(test_case.expected));
         for (int64_t i = 0; i < std::ssize(result); ++i) {
@@ -1162,6 +1163,80 @@ CATCH_TEST_CASE("normalize_variants_vs_haplotypes", TEST_GROUP) {
             CATCH_CHECK(result[i].rstart == test_case.expected[i].rstart);
             CATCH_CHECK(result[i].rend == test_case.expected[i].rend);
         }
+    }
+}
+
+CATCH_TEST_CASE("normalize_variants_vs_haplotypes computes DP on the original columns",
+                TEST_GROUP) {
+    constexpr std::string_view SYMBOLS{"*ACGT"};
+    const std::unordered_set<char> symbol_set(std::begin(SYMBOLS), std::end(SYMBOLS));
+    std::array<int32_t, 256> symbol_lookup{};
+    symbol_lookup.fill(-1);
+    for (int32_t i = 0; i < std::ssize(SYMBOLS); ++i) {
+        symbol_lookup[static_cast<uint8_t>(SYMBOLS[i])] = i;
+    }
+
+    struct TestCase {
+        std::string name;
+        std::string draft;
+        std::string hap;  // One character per column, '*' is a gap. Both haplotypes are identical.
+        std::vector<std::pair<int64_t, int64_t>> runs;  // Variant columns [rstart, rend).
+        std::vector<int64_t> depth;
+        std::string expected_dp;
+        std::string expected_min_dp;
+    };
+
+    // clang-format off
+    const std::vector<TestCase> test_cases{
+        // The deletion of the columns [5, 8) is left-aligned to the position 2, but the evidence
+        // stays on the columns [5, 8). The normalized span [2, 8) would give DP = 9.
+        {"Left-aligned deletion keeps the depth of the original columns",
+            "ACGTTTTTACG", "ACGTT***ACG", {{5, 8}},
+            {10, 10, 10, 10, 10, 9, 5, 7, 10, 10, 10}, "7", "5"},
+        // The 3 adjacent SNPs are merged. The merged variant covers the columns [2, 5).
+        {"Merged variant gets the depth of the merged columns",
+            "ACGTACGTAC", "ACTACCGTAC", {{2, 3}, {3, 4}, {4, 5}},
+            {10, 10, 3, 9, 6, 10, 10, 10, 10, 10}, "6", "3"},
+    };
+    // clang-format on
+
+    for (const TestCase& test_case : test_cases) {
+        CATCH_CAPTURE(test_case.name);
+        const int64_t num_columns = std::ssize(test_case.hap);
+        std::vector<int64_t> positions_major(num_columns);
+        std::iota(std::begin(positions_major), std::end(positions_major), 0);
+        const std::vector<int64_t> positions_minor(num_columns, 0);
+
+        constexpr int64_t NUM_HAPS = 2;
+        std::vector<ConsensusResult> cons_seqs;
+        at::Tensor probs = at::full({num_columns, NUM_HAPS, std::ssize(SYMBOLS)}, 0.01f);
+        for (int64_t hap = 0; hap < NUM_HAPS; ++hap) {
+            cons_seqs.emplace_back(ConsensusResult{"", test_case.hap, ""});
+            for (int64_t i = 0; i < num_columns; ++i) {
+                const int32_t cls = symbol_lookup[static_cast<uint8_t>(test_case.hap[i])];
+                probs.index_put_({i, hap, cls}, 0.96f);
+            }
+        }
+        const at::Tensor depth = at::tensor(test_case.depth, at::kLong);
+
+        // Construct the variants the same way as the decoding does.
+        std::vector<Variant> variants;
+        variants.reserve(std::size(test_case.runs));
+        for (const auto& [rstart, rend] : test_case.runs) {
+            variants.emplace_back(construct_variant(
+                    test_case.draft, positions_major, positions_minor, test_case.draft, cons_seqs,
+                    0, rstart, rend, true, false, VARIANT_SOURCE_INFERENCE, probs, symbol_set,
+                    symbol_lookup, at::Tensor{}, depth, 0.0f, 0.0f, 0.0f, 0.0f));
+        }
+
+        const std::vector<Variant> result = normalize_variants_vs_haplotypes(
+                test_case.draft, test_case.draft, cons_seqs, positions_major, positions_minor,
+                symbol_set, variants, false, probs, symbol_lookup, true, true, at::Tensor{}, depth,
+                0.0f, 0.0f, 0.0f, 0.0f);
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(result.front().format.at("DP") == test_case.expected_dp);
+        CATCH_CHECK(result.front().format.at("MIN_DP") == test_case.expected_min_dp);
     }
 }
 
