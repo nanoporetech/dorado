@@ -321,6 +321,15 @@ const std::array models = {
                 ModelVariantPair{ModelVariant::HAC, VV::v6_0_0},
         },
 
+        // v6.1.0
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0",
+                "2a4baa4b6f9e38583c12a040b44e2395f3517ce3fb36a76e1e16e2173fa1f951",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::SIMPLEX,
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
+        },
+
         // RNA004 v3.0.1
         ModelInfo{
                 "rna004_130bps_fast@v3.0.1",
@@ -680,6 +689,13 @@ const std::array models = {
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::STEREO,
                 ModelVariantPair{ModelVariant::NONE, VV::v6_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_5khz_stereo@v1.6",
+                "b28a4d67cf67eb5ffe807cd692c016575091897f431f1688ed6a970a67dc91e3",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::STEREO,
+                ModelVariantPair{ModelVariant::NONE, VV::v6_1_0},
         },
 };
 
@@ -1150,6 +1166,40 @@ const std::array models = {
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::MODBASE,
                 ModelVariantPair{ModelVariant::HAC, VV::v6_0_0},
+                ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
+        },
+
+        // DNA v6.1.0 - hac-only
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_4mC_5mC@v1",
+                "7f5c19674bb95a7244ff0fdd3e9582b834759595b602eca9c2e6bb7430d944dd",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
+                ModsVariantPair{ModsVariant::M_4mC_5mC, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_5mC_5hmC@v1",
+                "568aabfc100380922626f4add4a5b6cde7f6bde32b20e77bf96cc869a223023b",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
+                ModsVariantPair{ModsVariant::M_5mC_5hmC, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_5mCG_5hmCG@v1",
+                "4f2e8a21b4b0b8167c349dc80594918442bec3a40bec4d1a69f320124f1024da",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
+                ModsVariantPair{ModsVariant::M_5mCG_5hmCG, VV::v1_0_0},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_6mA@v1",
+                "ea8b4bb4e6d85c197512a03bafcca5cb305cdd76238bbab0b6155b903a748547",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
                 ModsVariantPair{ModsVariant::M_6mA, VV::v1_0_0},
         },
 
@@ -1894,6 +1944,14 @@ const std::array models = {
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::VARIANT,
                 ModelVariantPair{ModelVariant::HAC, VV::v6_0_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_smallvar@v1.0",
+                "aea94a84b6b8a9a48ceb56b3385bc643c76871687b338b8e9226158312fd2001",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::VARIANT,
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
                 ModsVariantPair{},
         },
 };
