@@ -210,7 +210,8 @@ bool variant_calling_sample_less(const VariantCallingSample& lhs, const VariantC
 
 VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                      const int64_t idx_start,
-                                     const int64_t idx_end) {
+                                     const int64_t idx_end,
+                                     const bool clone) {
     // Check that all members of the sample are of the same length.
     vc_sample.validate();
 
@@ -229,6 +230,27 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
             placeholder_read_ids(std::ssize(vc_sample.read_ids_left));
 
     // Slice.
+    if (clone) {
+        return VariantCallingSample{
+                .seq_id = vc_sample.seq_id,
+                .positions_major =
+                        std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
+                                             std::begin(vc_sample.positions_major) + idx_end),
+                .positions_minor =
+                        std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
+                                             std::begin(vc_sample.positions_minor) + idx_end),
+                .logits = vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
+                .depth = vc_sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
+                .read_ids_left = (idx_start == 0) ? vc_sample.read_ids_left : placeholder_rids,
+                .read_ids_right =
+                        (idx_end == num_columns) ? vc_sample.read_ids_right : placeholder_rids,
+                .basecalls = vc_sample.basecalls.defined()
+                                     ? vc_sample.basecalls
+                                               .index({at::indexing::Slice(idx_start, idx_end)})
+                                               .clone()
+                                     : at::Tensor{}};
+    }
+
     return VariantCallingSample{
             .seq_id = vc_sample.seq_id,
             .positions_major =
@@ -237,15 +259,14 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
             .positions_minor =
                     std::vector<int64_t>(std::begin(vc_sample.positions_minor) + idx_start,
                                          std::begin(vc_sample.positions_minor) + idx_end),
-            .logits = vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
-            .depth = vc_sample.depth.index({at::indexing::Slice(idx_start, idx_end)}).clone(),
+            .logits = vc_sample.logits.index({at::indexing::Slice(idx_start, idx_end)}),
+            .depth = vc_sample.depth.index({at::indexing::Slice(idx_start, idx_end)}),
             .read_ids_left = (idx_start == 0) ? vc_sample.read_ids_left : placeholder_rids,
             .read_ids_right =
                     (idx_end == num_columns) ? vc_sample.read_ids_right : placeholder_rids,
             .basecalls =
                     vc_sample.basecalls.defined()
                             ? vc_sample.basecalls.index({at::indexing::Slice(idx_start, idx_end)})
-                                      .clone()
                             : at::Tensor{}};
 }
 
@@ -283,7 +304,7 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
     const int64_t start_idx = std::distance(std::begin(vc_sample.positions_major), start_iter);
     const int64_t end_idx = std::distance(std::begin(vc_sample.positions_major), end_iter);
 
-    return slice_vc_sample(vc_sample, start_idx, end_idx);
+    return slice_vc_sample(vc_sample, start_idx, end_idx, true);
 }
 
 std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples) {
@@ -606,10 +627,10 @@ std::vector<VariantCallingSample> split_vc_samples_on_boundaries(
 
         int64_t prev = 0;
         for (const int64_t cut : cuts) {
-            ret.emplace_back(slice_vc_sample(vc_sample, prev, cut));
+            ret.emplace_back(slice_vc_sample(vc_sample, prev, cut, true));
             prev = cut;
         }
-        ret.emplace_back(slice_vc_sample(vc_sample, prev, num_positions));
+        ret.emplace_back(slice_vc_sample(vc_sample, prev, num_positions, true));
     }
 
     return ret;
@@ -667,7 +688,7 @@ std::vector<VariantCallingSample> trim_vc_samples(
         if ((t.start == 0) && (t.end == std::ssize(s.positions_major))) {
             trimmed_samples.emplace_back(s);
         } else {
-            trimmed_samples.emplace_back(slice_vc_sample(s, t.start, t.end));
+            trimmed_samples.emplace_back(slice_vc_sample(s, t.start, t.end, true));
         }
     }
 
