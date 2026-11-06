@@ -94,8 +94,8 @@ def compare_platforms(platform_compare: PlatformCompare):
             if platform_compare.exclude_columns:
                 for column in platform_compare.exclude_columns:
                     if column in frame1.columns:
-                        frame1.drop(columns=[column], inplace=True)
-                        frame2.drop(columns=[column], inplace=True)
+                        frame1 = frame1.drop(columns=[column])
+                        frame2 = frame2.drop(columns=[column])
 
             diffs = pretty_print_diffs(frame1, frame2, tolerance)
             if diffs:

@@ -18,9 +18,9 @@ def load_sorted_data_frame(path: pathlib.Path):
     # Fall back to indexing on the first column
     if df is None:
         df = read_csv(path, sep="\t")
-        df.set_index(df.columns[0], inplace=True)
+        df = df.set_index(df.columns[0])
 
-    df.sort_index(inplace=True)
+    df = df.sort_index()
     for col in df.select_dtypes(bool):
         df[col] = df[col].astype(int)
 
@@ -41,7 +41,7 @@ def merge_csv_files(
             else:
                 merged_df = concat([merged_df, file_df])
 
-    merged_df.sort_index(inplace=True)
+    merged_df = merged_df.sort_index()
     # We output the merged file in case we need to rebase/compare
     merged_df.to_csv(output_file, sep=sep)
 
