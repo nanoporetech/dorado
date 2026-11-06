@@ -12,13 +12,13 @@ fi
 
 test_dir=$(dirname $0)
 dorado_bin=$(cd "$(dirname $1)"; pwd -P)/$(basename $1)
-model_name_5k=${2:-dna_r10.4.1_e8.2_400bps_hac@v6.0.0}
+model_name_5k=${2:-dna_r10.4.1_e8.2_400bps_hac@v6.1.0}
 batch=${3:-384}
 model_name_5k_v43=${4:-dna_r10.4.1_e8.2_400bps_hac@v4.3.0}
 model_name_rna004=${5:-rna004_hac@v6.0.0}
 
 model_speed=${6:-"hac"}
-version=${7:-"v6.0.0"}
+version=${7:-"v6.1.0"}
 model_complex="${model_speed}@${version}"
 
 data_dir=${test_dir}/data
