@@ -2894,4 +2894,296 @@ CATCH_TEST_CASE(
     CATCH_CHECK(variants == test_case.expected_variants);
 }
 
+namespace {
+
+using Column = std::pair<int64_t, int64_t>;  // (major, minor).
+
+std::vector<Column> major_columns(const int64_t start, const int64_t end) {
+    std::vector<Column> columns;
+    for (int64_t pos = start; pos < end; ++pos) {
+        columns.emplace_back(pos, 0);
+    }
+    return columns;
+}
+
+std::vector<Column> concat_columns(std::vector<Column> lhs, const std::vector<Column>& rhs) {
+    lhs.insert(std::end(lhs), std::begin(rhs), std::end(rhs));
+    return lhs;
+}
+
+/// Logits of every column are filled with the column index, so that slicing can be verified.
+secondary::VariantCallingSample make_trim_test_sample(const int32_t seq_id,
+                                                      const std::vector<Column>& columns) {
+    const int64_t num_columns = std::ssize(columns);
+    secondary::VariantCallingSample sample;
+    sample.seq_id = seq_id;
+    for (const auto& [major, minor] : columns) {
+        sample.positions_major.emplace_back(major);
+        sample.positions_minor.emplace_back(minor);
+    }
+    sample.logits = at::arange(num_columns, at::kFloat).unsqueeze(1).repeat({1, 5});
+    sample.depth = at::ones({num_columns}, at::kLong);
+    return sample;
+}
+
+std::vector<Column> to_pairs(const std::vector<secondary::Interval64>& intervals) {
+    std::vector<Column> ret;
+    ret.reserve(std::size(intervals));
+    for (const secondary::Interval64& iv : intervals) {
+        ret.emplace_back(iv.start, iv.end);
+    }
+    return ret;
+}
+
+std::vector<Column> get_columns(const secondary::VariantCallingSample& sample) {
+    std::vector<Column> columns;
+    columns.reserve(std::size(sample.positions_major));
+    for (size_t i = 0; i < std::size(sample.positions_major); ++i) {
+        columns.emplace_back(sample.positions_major[i], sample.positions_minor[i]);
+    }
+    return columns;
+}
+
+secondary::Variant make_trim_test_variant(const int32_t seq_id,
+                                          const int64_t pos,
+                                          const std::string& ref) {
+    return secondary::Variant{.seq_id = seq_id,
+                              .pos = pos,
+                              .ref = ref,
+                              .alts = {"A"},
+                              .filters = {secondary::Filters::Pass},
+                              .info = {},
+                              .qual = 60.0f,
+                              .format = {},
+                              .rstart = 0,
+                              .rend = 0};
+}
+
+}  // namespace
+
+CATCH_TEST_CASE("trim_flanks computes the column interval which remains after trimming",
+                TEST_GROUP) {
+    struct TestCase {
+        std::string_view test_name;
+        std::vector<Column> columns;
+        std::vector<secondary::Variant> simple_variants;
+        int32_t flank_trim;
+        secondary::Interval64 expected;
+    };
+
+    // clang-format off
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+        TestCase{
+            "Zero trim returns the full interval",
+            major_columns(0, 20), {}, 0, {0, 20},
+        },
+        TestCase{
+            "Negative trim returns the full interval",
+            major_columns(0, 20), {}, -3, {0, 20},
+        },
+        TestCase{
+            "Plain trim on both sides",
+            major_columns(0, 20), {}, 3, {3, 17},
+        },
+        TestCase{
+            "Sample shorter than twice the trim is empty",
+            major_columns(0, 6), {}, 3, {0, 0},
+        },
+        TestCase{
+            "Sample with exactly one column left after trimming",
+            major_columns(0, 7), {}, 3, {3, 4},
+        },
+        TestCase{
+            "Left edge begins mid-insertion, partial block is removed",
+            // (10,5) (10,6) (11,0) ... (20,0)
+            concat_columns({{10, 5}, {10, 6}}, major_columns(11, 21)), {}, 2, {3, 10},
+        },
+        TestCase{
+            "Insertion block of the last kept major position is kept in full",
+            // Majors 0..11, with insertions (8,1) (8,2) on major 8, which is the last kept position.
+            concat_columns(concat_columns(major_columns(0, 8), {{8, 0}, {8, 1}, {8, 2}}),
+                           major_columns(9, 12)),
+            {}, 3, {3, 11},
+        },
+        TestCase{
+            "Right edge ends mid-insertion, partial block is removed",
+            // Majors 0..9, then (10,0) ... (10,4).
+            concat_columns(major_columns(0, 10), {{10, 0}, {10, 1}, {10, 2}, {10, 3}, {10, 4}}),
+            {}, 2, {2, 9},
+        },
+        TestCase{
+            "Simple variant overlapping the left flank moves the start",
+            major_columns(0, 20), {make_trim_test_variant(0, 2, "ACGT")}, 3, {6, 17},
+        },
+        TestCase{
+            "Simple variant overlapping the right flank moves the end",
+            major_columns(0, 20), {make_trim_test_variant(0, 15, "AC")}, 3, {3, 15},
+        },
+        TestCase{
+            "Simple variant on a different sequence is ignored",
+            major_columns(0, 20), {make_trim_test_variant(1, 2, "ACGT")}, 3, {3, 17},
+        },
+        TestCase{
+            "Simple variant covering the whole sample leaves nothing",
+            major_columns(0, 20), {make_trim_test_variant(0, 0, "ACGTACGTACGTACGTACGT")}, 3, {0, 0},
+        },
+    }));
+    // clang-format on
+
+    CATCH_INFO(test_case.test_name);
+
+    const std::vector<secondary::VariantCallingSample> samples = {
+            make_trim_test_sample(0, test_case.columns)};
+    const std::vector<secondary::Interval64> result =
+            trim_flanks(samples, test_case.simple_variants, test_case.flank_trim);
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result.front().start == test_case.expected.start);
+    CATCH_CHECK(result.front().end == test_case.expected.end);
+}
+
+CATCH_TEST_CASE("trim_flanks returns one interval per sample, in order", TEST_GROUP) {
+    // The middle sample is too short to survive the trim. The intervals of the samples after it
+    // must still be aligned with their samples.
+    const std::vector<secondary::VariantCallingSample> samples = {
+            make_trim_test_sample(0, major_columns(0, 6)),
+            make_trim_test_sample(0, major_columns(100, 120)),
+            make_trim_test_sample(0, major_columns(200, 204)),
+            make_trim_test_sample(0, major_columns(300, 310)),
+    };
+    const std::vector<secondary::Interval64> expected = {{0, 0}, {3, 17}, {0, 0}, {3, 7}};
+
+    const std::vector<secondary::Interval64> result = trim_flanks(samples, {}, 3);
+
+    CATCH_CHECK(to_pairs(result) == to_pairs(expected));
+}
+
+CATCH_TEST_CASE("apply_trim slices samples and removes empty ones", TEST_GROUP) {
+    std::vector<secondary::VariantCallingSample> samples = {
+            make_trim_test_sample(0, major_columns(0, 10)),
+            make_trim_test_sample(0, major_columns(20, 30)),
+            make_trim_test_sample(0, major_columns(40, 50)),
+            make_trim_test_sample(0, major_columns(60, 70)),
+    };
+    const at::Tensor logits_of_second = samples[1].logits;
+    const std::vector<secondary::Interval64> trim_indices = {{0, 0}, {2, 8}, {0, 10}, {4, 4}};
+
+    const std::vector<secondary::VariantCallingSample> result =
+            apply_trim(std::move(samples), trim_indices);
+
+    CATCH_REQUIRE(std::size(result) == 2);
+
+    // Trimmed sample.
+    CATCH_CHECK(get_columns(result[0]) == major_columns(22, 28));
+    CATCH_CHECK(result[0].logits.size(0) == 6);
+    CATCH_CHECK(result[0].depth.size(0) == 6);
+    CATCH_CHECK(result[0].logits.index({0, 0}).item<float>() == 2.0f);
+    CATCH_CHECK(result[0].logits.index({5, 0}).item<float>() == 7.0f);
+    // The tensors are views, not copies.
+    CATCH_CHECK(result[0].logits.is_alias_of(logits_of_second));
+
+    // Untouched sample.
+    CATCH_CHECK(get_columns(result[1]) == major_columns(40, 50));
+    CATCH_CHECK(result[1].logits.size(0) == 10);
+}
+
+CATCH_TEST_CASE("apply_trim throws if the number of intervals differs from the samples",
+                TEST_GROUP) {
+    std::vector<secondary::VariantCallingSample> samples = {
+            make_trim_test_sample(0, major_columns(0, 10)),
+            make_trim_test_sample(0, major_columns(20, 30)),
+    };
+    CATCH_CHECK_THROWS_AS(apply_trim(std::move(samples), {{0, 10}}), std::runtime_error);
+}
+
+CATCH_TEST_CASE("apply_trim of no samples returns no samples", TEST_GROUP) {
+    CATCH_CHECK(std::empty(apply_trim({}, {})));
+}
+
+CATCH_TEST_CASE("trim_partial_insertion_edges computes the interval of complete insertion blocks",
+                TEST_GROUP) {
+    struct TestCase {
+        std::string_view test_name;
+        std::vector<Column> columns;
+        secondary::Interval64 expected;
+    };
+
+    // clang-format off
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+        TestCase{
+            "Empty input produces an empty interval",
+            {},
+            {0, 0},
+        },
+        TestCase{
+            "Complete sample is not changed",
+            major_columns(0, 5), {0, 5},
+        },
+        TestCase{
+            "Complete sample with inner insertions is not changed",
+            {{0, 0}, {1, 0}, {1, 1}, {1, 2}, {2, 0}},
+            {0, 5},
+        },
+        TestCase{
+            "Leading minor columns are removed",
+            {{3, 2}, {3, 3}, {4, 0}, {5, 0}},
+            {2, 4},
+        },
+        TestCase{
+            "Trailing partial block is removed together with its anchor",
+            {{0, 0}, {1, 0}, {2, 0}, {2, 1}, {2, 2}},
+            {0, 2},
+        },
+        TestCase{
+            "Both edges are trimmed",
+            {{3, 2}, {4, 0}, {5, 0}, {5, 1}},
+            {1, 2},
+        },
+        TestCase{
+            "Only minor columns leave nothing",
+            {{3, 1}, {3, 2}},
+            {0, 0},
+        },
+        TestCase{
+            "A single block with its anchor and insertions leaves nothing",
+            {{0, 0}, {0, 1}},
+            {0, 0},
+        },
+        TestCase{
+            "A trailing major column without insertions is treated as complete",
+            {{0, 0}, {1, 0}},
+            {0, 2},
+        },
+    }));
+    // clang-format on
+
+    CATCH_INFO(test_case.test_name);
+
+    const std::vector<secondary::VariantCallingSample> samples = {
+            make_trim_test_sample(0, test_case.columns)};
+    const std::vector<secondary::Interval64> result = trim_partial_insertion_edges(samples);
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result.front().start == test_case.expected.start);
+    CATCH_CHECK(result.front().end == test_case.expected.end);
+}
+
+CATCH_TEST_CASE("trim_partial_insertion_edges returns one interval per sample, in order",
+                TEST_GROUP) {
+    const std::vector<secondary::VariantCallingSample> samples = {
+            make_trim_test_sample(0, {{3, 1}, {3, 2}}),
+            make_trim_test_sample(0, {{5, 4}, {6, 0}, {7, 0}}),
+            make_trim_test_sample(0, major_columns(10, 12)),
+    };
+    const std::vector<secondary::Interval64> expected = {{0, 0}, {1, 3}, {0, 2}};
+
+    const std::vector<secondary::Interval64> result = trim_partial_insertion_edges(samples);
+
+    CATCH_CHECK(to_pairs(result) == to_pairs(expected));
+}
+
+CATCH_TEST_CASE("trim_partial_insertion_edges of no samples returns no intervals", TEST_GROUP) {
+    CATCH_CHECK(std::empty(trim_partial_insertion_edges({})));
+}
+
 }  // namespace dorado::smallvar::tests
