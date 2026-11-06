@@ -75,9 +75,7 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
 std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples);
 
 // Consumes vc_samples so intermediate tensor storage can be released as samples are joined.
-std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples,
-                                               const std::string& draft,
-                                               const DecoderBase& decoder);
+std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples);
 
 /**
  * \brief Splits samples at the given reference boundaries (e.g. hemizygous region edges) so that
