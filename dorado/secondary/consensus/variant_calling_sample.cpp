@@ -487,15 +487,9 @@ std::vector<bool> find_variant_columns(const VariantCallingSample& vc_sample,
 }  // namespace
 
 /**
- * \brief This function restructures the neighboring samples for one draft sequence.
- *          Each input sample is split on the last non-variant position.
- *          The left part is merged with anything previously added to a queue (i.e.
- *          previous sample's right portion). The right part is then added to a cleared queue.
- *          The goal of this function is to prevent calling variants on sample boundaries.
+ * \brief This function merges all neighboring VC sample windows, without splitting on variants.
  */
-std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples,
-                                               const std::string& draft,
-                                               const DecoderBase& decoder) {
+std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample> vc_samples) {
     std::vector<VariantCallingSample> ret;
 
     // Holds the samples which continue each other, until they are merged and moved to ret.
@@ -512,58 +506,14 @@ std::vector<VariantCallingSample> join_samples(std::vector<VariantCallingSample>
         queue.clear();
     };
 
-    // Adds a sample to the queue. If it cannot be merged with the queued samples, the queue is
-    // flushed first.
-    const auto enqueue = [&queue, &flush_queue](VariantCallingSample sample) {
+    for (VariantCallingSample& sample : vc_samples) {
+        sample.validate();
+
+        // Enqueue the sample.
         if (!std::empty(queue) && !are_samples_adjacent(queue.back(), sample)) {
             flush_queue();
         }
         queue.emplace_back(std::move(sample));
-    };
-
-    for (std::size_t i = 0; i < std::size(vc_samples); ++i) {
-        VariantCallingSample& vc_sample = vc_samples[i];
-
-        vc_sample.validate();
-
-        const std::vector<bool> is_variant = find_variant_columns(vc_sample, draft, decoder);
-        if (std::empty(is_variant)) {
-            continue;
-        }
-
-        const int64_t num_positions = std::ssize(vc_sample.positions_major);
-
-        // Find a location where to split the sample.
-        int64_t last_non_var_start = 0;
-        for (int64_t j = (num_positions - 1); j >= 0; --j) {
-            if ((vc_sample.positions_minor[j] == 0) && !is_variant[j]) {
-                last_non_var_start = j;
-                break;
-            }
-        }
-
-        // All positions differ. Merge the entire sample with the next one.
-        if (last_non_var_start <= 0) {
-            enqueue(std::move(vc_sample));
-            continue;
-        }
-
-        // Split the sample.
-        VariantCallingSample left_slice = slice_vc_sample(vc_sample, 0, last_non_var_start);
-        VariantCallingSample right_slice =
-                slice_vc_sample(vc_sample, last_non_var_start, num_positions);
-        vc_sample = {};
-
-        // If the left part continues the queue (the right part of the previous sample), merge them
-        // and output. Otherwise, the queue is flushed and the left part stays in the queue, where it
-        // is merged again with its own right part.
-        const bool left_continues_queue =
-                !std::empty(queue) && are_samples_adjacent(queue.back(), left_slice);
-        enqueue(std::move(left_slice));
-        if (left_continues_queue) {
-            flush_queue();
-        }
-        enqueue(std::move(right_slice));
     }
 
     flush_queue();

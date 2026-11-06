@@ -1257,76 +1257,6 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
     }
 }
 
-CATCH_TEST_CASE("join_samples does not split off a sample start which cannot be merged",
-                TEST_GROUP) {
-    /**
-     * \brief Mimics a real case where a 1-column sample was produced by join_samples:
-     *          - S0 has no variants and is split into [0, 1] and [2].
-     *          - S1 starts with a deletion at position 5 (positions 3-4 are not in any sample, e.g.
-     *              removed by merge-region trimming), and its last non-variant major is at position 6,
-     *              so it would be split into [5] and [6, ...]. The left part [5] cannot be merged with
-     *              the previous right part [2], so it was emitted as a lone 1-column sample, in which
-     *              the deletion cannot be padded and becomes an empty ALT.
-     *          - S2 contains only insertion columns.
-     *          - S3 continues the insertion and ends with non-variant positions.
-     *          The left part of S1 should instead stay with its right part, so that the deletion at 5
-     *          can be padded with the following reference base.
-     */
-    const DecoderBase decoder(LabelSchemeType::DIPLOID);
-    const std::string symbols = decoder.get_label_scheme_symbols();
-    const std::string draft{"ACGTCACGTA"};
-
-    const auto make_sample = [&](std::vector<int64_t> positions_major,
-                                 std::vector<int64_t> positions_minor, const std::string_view hap0,
-                                 const std::string_view hap1) {
-        const int64_t num_columns = std::ssize(positions_major);
-        return VariantCallingSample{
-                0,
-                std::move(positions_major),
-                std::move(positions_minor),
-                make_polyploid_probs(symbols, {hap0, hap1}, {0.99f, 0.99f}),
-                at::full({num_columns}, 10, at::kInt),
-                {},
-                {},
-                at::Tensor{},
-        };
-    };
-
-    std::vector<VariantCallingSample> samples;
-    samples.emplace_back(make_sample({0, 1, 2}, {0, 0, 0}, "ACG", "ACG"));
-    samples.emplace_back(make_sample({5, 6, 7, 7, 7}, {0, 0, 0, 1, 2}, "*CTTT", "ACTTT"));
-    samples.emplace_back(make_sample({7, 7}, {3, 4}, "TT", "TT"));
-    samples.emplace_back(make_sample({7, 8, 9}, {5, 0, 0}, "TTA", "TTA"));
-
-    const std::vector<VariantCallingSample> joined =
-            join_samples(std::move(samples), draft, decoder);
-
-    // S0 stays whole, and S1 is joined with S2 and the left part of S3.
-    std::vector<std::vector<int64_t>> joined_positions_major;
-    joined_positions_major.reserve(std::size(joined));
-    for (const VariantCallingSample& sample : joined) {
-        joined_positions_major.emplace_back(sample.positions_major);
-    }
-    const std::vector<std::vector<int64_t>> expected_positions_major{
-            {0, 1, 2}, {5, 6, 7, 7, 7, 7, 7, 7, 8}, {9}};
-    CATCH_CHECK(joined_positions_major == expected_positions_major);
-
-    // The deletion at position 5 is padded with the following reference base.
-    std::vector<Variant> result;
-    for (const VariantCallingSample& sample : joined) {
-        std::vector<Variant> variants = general_decode_variants(
-                decoder, sample, draft, 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
-        result.insert(std::end(result), std::begin(variants), std::end(variants));
-    }
-    CATCH_CHECK(std::none_of(std::begin(result), std::end(result),
-                             [](const Variant& var) { return is_reference_record(var); }));
-    CATCH_REQUIRE_FALSE(std::empty(result));
-    CATCH_CHECK(result.front().pos == 5);
-    CATCH_CHECK(result.front().ref == "AC");
-    CATCH_CHECK(result.front().alts == std::vector<std::string>{"C"});
-}
-
 CATCH_TEST_CASE("join_samples joins a long insertion split between multiple samples", TEST_GROUP) {
     /**
      * \brief An insertion of 10 bases after position 2 is longer than a sample, so it is split between
@@ -1358,8 +1288,7 @@ CATCH_TEST_CASE("join_samples joins a long insertion split between multiple samp
     samples.emplace_back(make_sample({2, 2, 2}, {6, 7, 8}, "GCA"));
     samples.emplace_back(make_sample({2, 2, 3, 4}, {9, 10, 0, 0}, "ACTA"));
 
-    const std::vector<VariantCallingSample> joined =
-            join_samples(std::move(samples), draft, decoder);
+    const std::vector<VariantCallingSample> joined = join_samples(std::move(samples));
 
     // All insertion columns are in the same sample.
     std::vector<std::vector<int64_t>> joined_positions_minor;
@@ -1368,7 +1297,7 @@ CATCH_TEST_CASE("join_samples joins a long insertion split between multiple samp
         joined_positions_minor.emplace_back(sample.positions_minor);
     }
     const std::vector<std::vector<int64_t>> expected_positions_minor{
-            {0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0}, {0}};
+            {0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 0, 0}};
     CATCH_CHECK(joined_positions_minor == expected_positions_minor);
 
     std::vector<Variant> result;

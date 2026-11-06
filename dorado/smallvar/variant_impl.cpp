@@ -1530,7 +1530,7 @@ call_variants_single_chrom(const std::string& draft,
     debug_print_samples(callable_vc_samples, "3. callable_vc_samples", seq_id);
 
     // Break and merge samples on non-variant positions.
-    auto joined_samples = join_samples(std::move(callable_vc_samples), draft, decoder);
+    auto joined_samples = join_samples(std::move(callable_vc_samples));
 
     if (gvcf) {
         // Split decode chunks on hemizygous boundaries so that gVCF reference blocks respect them.
