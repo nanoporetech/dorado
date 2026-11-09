@@ -1521,6 +1521,14 @@ const std::array models = {
                 ModelVariantPair{ModelVariant::SUP, VV::v6_0_0},
                 ModsVariantPair{ModsVariant::M_m5C_2OmeC, VV::v1_0_0},
         },
+        ModelInfo{
+                "rna004_sup@v6.0.0_m5C_2OmeC@v2",
+                "f72356a1e827c71367d6cc589e9dc4061432472b3174ee037f1c606a55fc61cb",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v6_0_0},
+                ModsVariantPair{ModsVariant::M_m5C_2OmeC, VV::v2_0_0},
+        },
         // inosine_m6A & inosine_m6A_2OmeA - all context
         ModelInfo{
                 "rna004_hac@v6.0.0_inosine_m6A@v1",
@@ -1537,6 +1545,14 @@ const std::array models = {
                 ModelType::MODBASE,
                 ModelVariantPair{ModelVariant::SUP, VV::v6_0_0},
                 ModsVariantPair{ModsVariant::M_inosine_m6A_2OmeA, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_sup@v6.0.0_inosine_m6A_2OmeA@v2",
+                "080962a08b424ec532f6032ab26c2d24bcfa7da0f9cd2a103babb14b92916af6",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v6_0_0},
+                ModsVariantPair{ModsVariant::M_inosine_m6A_2OmeA, VV::v2_0_0},
         },
         // m6A - DRACH
         ModelInfo{
@@ -1571,6 +1587,14 @@ const std::array models = {
                 ModelType::MODBASE,
                 ModelVariantPair{ModelVariant::SUP, VV::v6_0_0},
                 ModsVariantPair{ModsVariant::M_pseU_2OmeU, VV::v1_0_0},
+        },
+        ModelInfo{
+                "rna004_sup@v6.0.0_pseU_2OmeU@v2",
+                "a7430ec613fcb9f8919c5935f24510feae7eae8a3bb5f207ce3ee5ebd1d48761",
+                CC::RNA004_130BPS,
+                ModelType::MODBASE,
+                ModelVariantPair{ModelVariant::SUP, VV::v6_0_0},
+                ModsVariantPair{ModsVariant::M_pseU_2OmeU, VV::v2_0_0},
         },
 };
 
