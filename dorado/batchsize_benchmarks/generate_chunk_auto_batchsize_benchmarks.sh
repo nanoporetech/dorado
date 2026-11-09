@@ -18,6 +18,7 @@ for model_name in \
         dna_r10.4.1_e8.2_400bps_fast@v5.2.0 \
         dna_r10.4.1_e8.2_400bps_hac@v5.2.0 \
         dna_r10.4.1_e8.2_400bps_hac@v6.0.0 \
+        dna_r10.4.1_e8.2_400bps_hac@v6.1.0 \
         dna_r10.4.1_e8.2_400bps_sup@v5.2.0 \
         rna004_fast@v6.0.0 \
         rna004_hac@v6.0.0 \
