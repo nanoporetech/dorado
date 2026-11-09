@@ -1947,12 +1947,38 @@ const std::array models_read_level{
                 ModelVariantPair{ModelVariant::HAC, VV::v6_0_0},
                 ModsVariantPair{},
         },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_polish_rl@v1.0",
+                "54d89ec9b3808c7b72118e630cf7e3b0222cc8b93e052936db3adf811a2cd917",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{ModelVariant::HAC,
+                                 VV::v6_0_0},  // TODO: Change to v6_1_0 when available!
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_polish_rl_mv@v1.0",
+                "3e13f050cb649568c65a61a565633ff2d7bdee96939015fccfb5cde41fc036bd",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{ModelVariant::HAC,
+                                 VV::v6_0_0},  // TODO: Change to v6_1_0 when available!
+                ModsVariantPair{},
+        },
 };
 
 const std::array models_bacterial{
         ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0",
-                "56e3763638677adb32de783e648dd721aa1ec04504d0328db70be208822aef6e",
+                "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v1.0",
+                "50e4f7deace0923a8f7d48a42a5eec541b73e578bacbaa665663bb511b797c8a",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0",
+                "54c6d4f8cba69f7d54d2848208946ef3341c92b2c2993557bf15f7c04c73dc48",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::POLISH,
                 ModelVariantPair{},
