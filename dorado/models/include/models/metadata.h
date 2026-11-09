@@ -55,6 +55,7 @@ enum class ModelVersion : uint8_t {
     v5_2_0,
     v5_3_0,
     v6_0_0,
+    v6_1_0,
     NONE  // NONE must be last
 };
 

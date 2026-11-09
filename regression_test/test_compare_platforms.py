@@ -39,6 +39,9 @@ class TestCompareData(unittest.TestCase):
         # we can only really compare linux_cuda and windows.
         exclude_modbase = SpecialCase(pattern="modified_basecalling", tolerance=None)
 
+        # A100 gives a significantly _better_ qscore on A100 compared to V100 on modbase data
+        loosen_modbase = SpecialCase(pattern="modified_basecalling", tolerance=0.065)
+
         platforms_to_compare = [
             PlatformCompare(
                 reference_path=REF_DIR,
@@ -63,7 +66,9 @@ class TestCompareData(unittest.TestCase):
                 platform_1="linux",
                 platform_2="linux_a100",
                 platform_tolerance=DEFAULT_TOLERANCE,
-                special_cases=[],
+                special_cases=[
+                    loosen_modbase,
+                ],
                 exclude_columns=["passes_filtering"],
             ),
             PlatformCompare(
