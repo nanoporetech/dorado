@@ -52,6 +52,9 @@ std::span<const ModelInfo> modified_models();
 std::span<const ModelInfo> modified_deprecated_models();
 std::span<const ModelInfo> correction_models();
 std::span<const ModelInfo> polish_models();
+std::span<const ModelInfo> polish_models_legacy();
+std::span<const ModelInfo> polish_models_bacterial();
+std::span<const ModelInfo> polish_models_read_level();
 std::span<const ModelInfo> variant_models();
 
 std::vector<std::string> simplex_model_names();

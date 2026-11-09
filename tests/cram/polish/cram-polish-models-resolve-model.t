@@ -154,20 +154,21 @@ Resolve the bacterial model from a Basecaller model name `dna_r10.4.1_e8.2_400bp
 ##############################################
 ### Compatibility checks.                  ###
 ##############################################
-Negative test: no bacterial model is compatible with the model listed in the input BAM file.
+All basecaller models resolve to the latest bacterial model.
+Passing test: bacterial model resolves for any basecaller.
   $ rm -rf out; mkdir -p out
   > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > model_var="--models-directory ${MODEL_ROOT_DIR}"
   > ### Create the mocked data for a non-supported basecaller version (1.0.0).
   > samtools view -h data/in.micro.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
   > samtools index out/in.bam
   > ### Run the unit under test.
-  > ${DORADO_BIN} polish --bacteria --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
+  > ${DORADO_BIN} polish --bacteria ${model_var} --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  Exit code: 1
-  [error] There are no bacterial models for the basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
+  Exit code: 0
 
 Passing test with warnings: data has dwells, but the model does not support them.
 The `--model-override` option allows this, but emits a warning.
@@ -221,21 +222,6 @@ The `--model-override` option allows this, but emits a warning.
   Exit code: 0
   [warning] Skipping basecaller compatibility checks for user-specified model
   [warning] Polishing model is not compatible with the input BAM. This may produce inferior results.
-
-Passing test: bacterial model is not compatible with the model listed in the input BAM file.
-  $ rm -rf out; mkdir -p out
-  > in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
-  > ### Create the mocked data for a non-supported basecaller version (1.0.0).
-  > samtools view -h data/in.micro.bam | sed -E 's/dna_r10.4.1_e8.2_400bps_hac@v5.0.0/dna_r10.4.1_e8.2_400bps_hac@v1.0.0/g' | samtools view -Sb > out/in.bam
-  > samtools index out/in.bam
-  > ### Run the unit under test.
-  > ${DORADO_BIN} polish --bacteria --device cpu out/in.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 -vv > out/out.fasta 2> out/out.fasta.stderr
-  > ### Eval.
-  > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  Exit code: 1
-  [error] There are no bacterial models for the basecaller model: 'dna_r10.4.1_e8.2_400bps_hac@v1.0.0'.
 
 Negative test: Cannot resolve the model, it does not match a Polishing model nor a path.
   $ rm -rf out; mkdir -p out

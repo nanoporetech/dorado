@@ -9,6 +9,7 @@
 #include "secondary/architectures/model_config.h"
 #include "secondary/common/bam_info.h"
 #include "secondary/common/region.h"
+#include "secondary/common/resolve_model.h"
 #include "secondary/common/stats.h"
 #include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
@@ -700,14 +701,6 @@ int32_t count_model_hits(std::span<const dorado::models::ModelInfo> model_list,
             [&model_name](const models::ModelInfo& info) { return info.name == model_name; }));
 }
 
-void print_basecaller_models(std::ostream& os,
-                             const std::unordered_set<std::string>& basecaller_models,
-                             const std::string& delimiter) {
-    std::vector<std::string> lines(std::begin(basecaller_models), std::end(basecaller_models));
-    std::sort(std::begin(lines), std::end(lines));
-    os << utils::join(lines, delimiter);
-}
-
 std::string determine_model_name(const std::string& basecaller_model, const bool use_dwells) {
     auto find_model = [](const std::string& model_prefix) {
         std::string ret;
@@ -735,35 +728,19 @@ std::string determine_model_name(const std::string& basecaller_model, const bool
     return ret;
 }
 
-const std::filesystem::path resolve_model(
-        const secondary::BamInfo& bam_info,
-        const std::optional<std::filesystem::path>& models_directory) {
+std::filesystem::path resolve_model(const secondary::BamInfo& bam_info,
+                                    const std::optional<std::filesystem::path>& models_directory) {
     DORADO_LOG(info, "Auto resolving the model.");
 
-    // Check that there is exactly one basecaller listed in the BAM. Otherwise, no auto resolving.
-    if (std::size(bam_info.basecaller_models) != 1) {
-        if (std::empty(bam_info.basecaller_models)) {
-            throw std::runtime_error{
-                    "Input BAM file has no basecaller models listed in the header."};
-        }
-        if (std::size(bam_info.basecaller_models) > 1) {
-            std::ostringstream oss;
-            oss << "Input BAM file has a mix of different basecaller models. Only one basecaller "
-                   "model can be processed. List of all basecaller models found in the BAM file: ";
-            print_basecaller_models(oss, bam_info.basecaller_models, ", ");
-            throw std::runtime_error{oss.str()};
-        }
+    if (bam_info.has_dwells) {
+        DORADO_LOG(info, "Input data contains move tables.");
+    } else {
+        DORADO_LOG(info, "Input data does not contain move tables.");
     }
 
-    // Check if any of the input models is a stereo, to report a clear error that this is not supported.
-    for (const std::string& model : bam_info.basecaller_models) {
-        if (model.find("stereo") != std::string::npos) {
-            std::ostringstream oss;
-            oss << "Inputs from duplex basecalling are not supported. Detected model: '" << model
-                << "' in the input BAM.";
-            throw std::runtime_error{oss.str()};
-        }
-    }
+    throw_unless_single_model_present(bam_info);
+
+    check_stereo_models(bam_info, true);
 
     // Example: dna_r10.4.1_e8.2_400bps_hac@v5.2.0
     const std::string& basecaller_model = *std::begin(bam_info.basecaller_models);
@@ -789,40 +766,20 @@ std::filesystem::path resolve_model_advanced(
         const std::optional<std::filesystem::path>& models_directory,
         const std::string& model_str,
         const bool any_model) {
+    DORADO_LOG(info, "User-specificed model.");
+
     if (bam_info.has_dwells) {
         DORADO_LOG(info, "Input data contains move tables.");
     } else {
         DORADO_LOG(info, "Input data does not contain move tables.");
     }
 
-    // Check if any of the input models is a stereo, to report a clear error that this is not supported.
-    for (const std::string& model : bam_info.basecaller_models) {
-        if (model.find("stereo") != std::string::npos) {
-            std::ostringstream oss;
-            oss << "Inputs from duplex basecalling are not supported. Detected model: '" << model
-                << "' in the input BAM.";
-            if (!any_model) {
-                throw std::runtime_error{oss.str()};
-            } else {
-                DORADO_LOG(warn, "{} This may produce inferior results.", oss.str());
-            }
-        }
+    // Fail only if not explicitly permitting any model.
+    if (!any_model) {
+        throw_unless_single_model_present(bam_info);
     }
 
-    // Fail only if not explicitly permitting any model.
-    if (!any_model && (std::size(bam_info.basecaller_models) != 1)) {
-        if (std::empty(bam_info.basecaller_models)) {
-            throw std::runtime_error{
-                    "Input BAM file has no basecaller models listed in the header."};
-        }
-        if (std::size(bam_info.basecaller_models) > 1) {
-            std::ostringstream oss;
-            oss << "Input BAM file has a mix of different basecaller models. Only one basecaller "
-                   "model can be processed. List of all basecaller models found in the BAM file:\n";
-            print_basecaller_models(oss, bam_info.basecaller_models, ", ");
-            throw std::runtime_error{oss.str()};
-        }
-    }
+    check_stereo_models(bam_info, !any_model);
 
     std::filesystem::path model_dir;
 
