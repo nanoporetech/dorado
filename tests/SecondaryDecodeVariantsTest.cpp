@@ -730,6 +730,54 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             false,
         },
 
+        // Merging adjacent variants fails because the merged ref contains an ambiguous base and ambig_ref is false.
+        // The original variants must be kept instead of being dropped.
+        TestCase{
+            "Two adjacent deletions separated by an ambiguous ref base. No merging.",
+             "AGTNCGNAAA",
+            {"A**A**AAAA",
+             "A**A**AAAA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, false, false,
+            {
+                Variant{0, 0, "AGT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 0, 3},
+                Variant{0, 3, "NCG", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 3, 6},
+            },
+            false,
+        },
+        TestCase{
+            "Two adjacent deletions separated by an ambiguous ref base. Merging fails (ambig_ref = false), so the original variants are kept.",
+             "AGTNCGNAAA",
+            {"A**A**AAAA",
+             "A**A**AAAA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, true, true,
+            {
+                Variant{0, 0, "AGT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 0, 3},
+                Variant{0, 3, "NCG", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 3, 6},
+            },
+            false,
+        },
+
+        // The first two adjacent variants have no ambiguous bases and should be merged. The third one is
+        // anchored on an ambiguous base, so it must not be merged into the group, but it must be kept.
+        TestCase{
+            "Three adjacent deletions, the third one anchored on an ambiguous ref base. The first two are merged, the third is kept.",
+             "AGTCCGNTTNAA",
+            {"A**C**A**AAA",
+             "A**C**A**AAA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, true, true,
+            {
+                Variant{0, 1, "GTCCG", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "800,397,0"}, {"AQ", "0,60"}}, 0, 6},
+                Variant{0, 6, "NTT", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 6, 9},
+            },
+            false,
+        },
+
         ///// Diploid test 2. /////
         // Explanation for test 3 (merge_overlapping and merge_adjacent test):
         //   1. Normalized individual variants are located in positions (check the previous test case: Diploid 1, test 2):
