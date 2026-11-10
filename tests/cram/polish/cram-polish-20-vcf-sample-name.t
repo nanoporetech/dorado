@@ -55,13 +55,13 @@ Test fallback when no other source of sample name.
   > ${DORADO_BIN} polish --vcf --device cpu ${in_bam} ${in_ref} -t 4 ${model_var} --any-bam > out/out.vcf 2> out/stderr
   > echo "Exit code: $?"
   > grep "\[error\]" out/stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/stderr | sed -E 's/.*\[/\[/g'
   > grep "\[E::" out/stderr || true
   > ### Check the column names
   > expected_header="#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	SAMPLE"
   > grep -Fxq "${expected_header}" out/out.vcf || exit 1
   Exit code: 0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Multiple RGs with single sample name passes
   $ rm -rf out; mkdir -p out

@@ -86,6 +86,17 @@ Reuse the pre-downloaded model (freshly downloaded one test above). There should
   1
   0
 
+Manually specify a model from the models directory.
+  $ in_dir=${TEST_DATA_DIR}/polish/test-01-supertiny
+  > ${DORADO_BIN} polish --models-directory ${MODEL_ROOT_DIR} --model-override "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv" --device cpu data/in.micro.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" -v > out/out.fasta 2> out/out.fasta.stderr
+  > echo "Exit code: $?"
+  > grep -- " - downloading dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv with " out/out.fasta.stderr | wc -l | awk '{ print $1 }'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
+  Exit code: 0
+  0
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
+
 ###################################################
 ### Test resolving from the Basecaller model    ###
 ### name, Polishing model name or a path.       ###
@@ -99,10 +110,11 @@ This is not supported and should fail.
   > ${DORADO_BIN} polish -v --device cpu data/in.micro.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 --model-override "${model}" > out/out.fasta 2> out/out.fasta.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/path .* is/path <> is/g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/from string: .*/from string: <>/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Model override file path <> is specified, but the file does not exist.
+  [error] Could not resolve model from string: <>
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Resolve the model from a local Polishing model path.
   $ rm -rf out; mkdir -p out
@@ -115,11 +127,11 @@ Resolve the model from a local Polishing model path.
   > grep "Resolved model from user-specified path: " out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep -- " - downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Resolve the model from a local path.
   $ rm -rf out; mkdir -p out
@@ -132,11 +144,11 @@ Resolve the model from a local path.
   > grep "Resolved model from user-specified path: " out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep -- " - downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   1
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Resolve the bacterial model from a Basecaller model name `dna_r10.4.1_e8.2_400bps_hac@v5.0.0`.
   $ rm -rf out; mkdir -p out
@@ -146,10 +158,11 @@ Resolve the bacterial model from a Basecaller model name `dna_r10.4.1_e8.2_400bp
   > ${DORADO_BIN} polish --bacteria -v --device cpu data/in.micro.bam ${in_dir}/draft.fasta.gz -t 4 --regions "contig_1:1-100" --infer-threads 1 --model-override "${model}" > out/out.fasta 2> out/out.fasta.stderr
   > ### Eval.
   > echo "Exit code: $?"
-  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/path .* is/path <> is/g'
+  > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/from string: .*/from string: <>/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
-  [error] Model override file path <> is specified, but the file does not exist.
+  [error] Could not resolve model from string: <>
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 ##############################################
 ### Compatibility checks.                  ###
@@ -180,9 +193,9 @@ The `--model-override` option allows this, but emits a warning.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Input data has move tables, but a model without move table support has been chosen. This may produce inferior results.
 
 Passing test with warnings: no dwells in data, but the model uses them for polishing.
@@ -200,9 +213,9 @@ The `--model-override` option allows this, but emits a warning.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Input data does not contain move tables, but a model which requires move tables has been chosen. This may produce inferior results.
 
 Passing test with warnings: Basecaller model specified in the BAM does not match the Basecaller model specified in the Polishing model.
@@ -218,9 +231,9 @@ The `--model-override` option allows this, but emits a warning.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Polishing model is not compatible with the input BAM. This may produce inferior results.
 
 Negative test: Cannot resolve the model, it does not match a Polishing model nor a path.
@@ -234,7 +247,8 @@ Negative test: Cannot resolve the model, it does not match a Polishing model nor
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
   Exit code: 1
-  [error] Model override file path 'unknown' is specified, but the file does not exist.
+  [error] Could not resolve model from string: 'unknown'.
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 A Variant Calling model is provided instead of a Polishing model.
 Incompatible label scheme should fail even with `--model-override`.
@@ -247,10 +261,10 @@ Using `--model-override`.
   > ### Eval.
   > echo "Exit code: $?"
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 1
   [error] Incompatible model label scheme! Expected HaploidLabelScheme but got DiploidLabelScheme.
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 #############################################
 ## Resolve move tables                    ###
@@ -276,11 +290,11 @@ Results will be worse than using QVs, but this input should successfully run non
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 10001
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Input data has move tables, but a model without move table support has been chosen. This may produce inferior results.
 
 The input BAM is stripped of all tags (no move tables) but the specified model was trained using the move tables.
@@ -303,11 +317,11 @@ Results are worse than using the correct model, as expected.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 10000
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Input data does not contain move tables, but a model which requires move tables has been chosen. This may produce inferior results.
 
 The input BAM _has_ move tables, but the specified model was trained without the move tables.
@@ -325,9 +339,9 @@ Results are worse than using the correct model, as expected.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9995
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Input data has move tables, but a model without move table support has been chosen. This may produce inferior results.

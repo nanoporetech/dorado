@@ -71,11 +71,11 @@ Allowed because `--model-override` allows any model to be used.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9996
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Zero read groups in the input and `--RG` option provided.
 Fails because a read group was selected, but there are no read groups in the BAM file.
@@ -138,11 +138,11 @@ This will succeed only because both read groups have the same basecaller model.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9996
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Two read groups are present in the input BAM, but both belong to the same basecaller model.
 Select one read group with the `--RG` tag.
@@ -159,11 +159,11 @@ This will succeed only because both read groups have the same basecaller model.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9996
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Two read groups are present in the input BAM, but only one basecaller model.
 Select one read group with the `--RG` tag, but this read group does not exist.
@@ -228,11 +228,11 @@ Allowed because `--model-override` allows any model to be used.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9996
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Polishing model is not compatible with the input BAM. This may produce inferior results.
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
@@ -268,11 +268,11 @@ Select one read group with `--RG`, which should pass because the Basecaller mode
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9996
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
 
 Two read groups are present in the input BAM, and two basecaller models (one for each read group).
 Select the second read group with `--RG`.
@@ -289,9 +289,9 @@ Allowed because `--model-override` allows any model to be used.
   > awk '{ print $1,$2 }' out/out.fasta.fai
   > grep "Copying contig verbatim from input" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
-  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g' | sed -E 's/model: .*/model/g'
+  > grep "\[warning\]" out/out.fasta.stderr | sed -E 's/.*\[/\[/g'
   Exit code: 0
   contig_1 9996
   0
-  [warning] Skipping basecaller compatibility checks for user-specified model
+  [warning] Skipping basecaller compatibility checks for user-specified model override. The accuracy of the results is not guaranteed.
   [warning] Polishing model is not compatible with the input BAM. This may produce inferior results.

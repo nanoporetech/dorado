@@ -474,13 +474,6 @@ void validate_options(const Options& opt) {
         std::exit(EXIT_FAILURE);
     }
 
-    if (!std::empty(opt.model_str) && !std::filesystem::exists(opt.model_str)) {
-        DORADO_LOG(error,
-                   "Model override file path '{}' is specified, but the file does not exist.",
-                   opt.model_str);
-        std::exit(EXIT_FAILURE);
-    }
-
     if (opt.sample_name.has_value() && !opt.run_variant_calling) {
         DORADO_LOG(warn,
                    "The --sample-name option will be ignored as not running variant calling.");
@@ -642,10 +635,11 @@ std::filesystem::path resolve_model(const secondary::BamInfo& bam_info,
     return model_dir;
 }
 
-std::filesystem::path resolve_model_advanced(
+std::filesystem::path resolve_model_manually(
         const secondary::BamInfo& bam_info,
         const std::optional<std::filesystem::path>& models_directory,
         const std::string& model_str,
+        const bool bacteria,
         const bool any_model) {
     if (bam_info.has_dwells) {
         DORADO_LOG(info, "Input data contains move tables.");
@@ -663,11 +657,14 @@ std::filesystem::path resolve_model_advanced(
 
     std::filesystem::path model_dir;
 
+    if (!std::empty(model_str)) {
+        DORADO_LOG(
+                warn,
+                "Skipping basecaller compatibility checks for user-specified model override. The "
+                "accuracy of the results is not guaranteed.");
+    }
+
     if (!std::empty(model_str) && std::filesystem::exists(model_str)) {
-        DORADO_LOG(warn,
-                   "Skipping basecaller compatibility checks for user-specified model: '{}'. The "
-                   "accuracy of the results is not guaranteed.",
-                   model_str);
         DORADO_LOG(debug, "Resolved model from user-specified path: {}", model_str);
         model_dir = model_str;
 
@@ -677,6 +674,19 @@ std::filesystem::path resolve_model_advanced(
                    model_name);
         model_downloader::ModelDownloader downloader(models_directory, false);
         model_dir = downloader.get(model_name, "polish");
+
+    } else if (contains_model(models::simplex_models(), model_str, false)) {
+        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.0.0
+        const std::string& basecaller_model = model_str;
+
+        // Example: dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0
+        const std::string model_name =
+                determine_model_name(basecaller_model, bacteria, bam_info.has_dwells);
+
+        DORADO_LOG(debug, "Resolved model from user-specified basecaller model name: '{}'",
+                   model_name);
+        model_downloader::ModelDownloader downloader(models_directory, false);
+        model_dir = downloader.get(model_name, "smallvar");
 
     } else {
         throw std::runtime_error{"Could not resolve model from string: '" + model_str + "'."};
@@ -1252,8 +1262,8 @@ int polish(int argc, char* argv[]) {
         } else {
             constexpr bool ANY_MODEL = true;
             // Advanced model resolve from a specific path or model name.
-            const std::filesystem::path model_dir = resolve_model_advanced(
-                    bam_info, opt.models_directory, opt.model_str, ANY_MODEL);
+            const std::filesystem::path model_dir = resolve_model_manually(
+                    bam_info, opt.models_directory, opt.model_str, opt.bacteria, ANY_MODEL);
             model_config = polisher::load_model(model_dir, opt.load_scripted_model);
             validate_bam_model(bam_info, model_config, opt.bacteria, ANY_MODEL,
                                secondary::LabelSchemeType::HAPLOID);

@@ -761,7 +761,7 @@ std::filesystem::path resolve_model(const secondary::BamInfo& bam_info,
     return model_dir;
 }
 
-std::filesystem::path resolve_model_advanced(
+std::filesystem::path resolve_model_manually(
         const secondary::BamInfo& bam_info,
         const std::optional<std::filesystem::path>& models_directory,
         const std::string& model_str,
@@ -1553,7 +1553,7 @@ int small_variant_caller(int argc, char* argv[]) {
         } else {
             constexpr bool ANY_MODEL = true;
             // Advanced model resolve from a specific path or model name.
-            const std::filesystem::path model_dir = resolve_model_advanced(
+            const std::filesystem::path model_dir = resolve_model_manually(
                     bam_info, opt.models_directory, opt.model_str, ANY_MODEL);
             model_config = load_model(model_dir, opt.load_scripted_model);
             validate_bam_model(bam_info, model_config, ANY_MODEL,
