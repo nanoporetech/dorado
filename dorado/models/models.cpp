@@ -1985,7 +1985,7 @@ const std::array models = {
         },
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v6.1.0_smallvar@v1.0",
-                "aea94a84b6b8a9a48ceb56b3385bc643c76871687b338b8e9226158312fd2001",
+                "23d846c2e3d78aa974926c538d86105053e11bdb2587a36f8e388a5e62a74ed2",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::VARIANT,
                 ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
