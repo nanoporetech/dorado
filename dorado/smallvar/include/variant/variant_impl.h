@@ -299,6 +299,46 @@ void worker_variant_writer(
         const bool continue_on_exception);
 
 /**
+ * \brief Computes, for each sample, the column interval [start, end) which remains after trimming
+ *          `flank_trim` reference bases from both ends. The interval always starts and ends on a
+ *          major column, so no partial insertion blocks remain. Edges are moved further inwards to
+ *          avoid overlapping `simple_variants`.
+ *          Samples are treated independently, they are not checked for neighbours.
+ *          Must be run on joined samples, otherwise valid window boundaries would be trimmed too.
+ * \param vc_samples Input VC samples, ideally already joined.
+ * \param simple_variants Variants used to avoid overlaps when trimming the flanks.
+ * \param flank_trim Number of reference bases to trim from each end. If <= 0, nothing is trimmed.
+ * \return One interval per input sample, in the same order. An empty interval (start >= end) means
+ *          that nothing is left of the sample.
+ */
+std::vector<secondary::Interval64> trim_flanks(
+        const std::vector<secondary::VariantCallingSample>& vc_samples,
+        const std::vector<secondary::Variant>& simple_variants,
+        const int32_t flank_trim);
+
+/**
+ * \brief Computes, for each sample, the column interval [start, end) which starts and ends on
+ *          complete insertion blocks. Leading minor columns are dropped. A trailing minor block
+ *          is dropped including its anchor major column to ensure that partial insertions aren't
+ *          present in the sample.
+ *          Must be run on joined samples, otherwise valid window boundaries would be trimmed too.
+ * \param vc_samples Input VC samples, ideally already joined.
+ * \return One interval per input sample, in the same order. An empty interval (start >= end) means
+ *          that nothing is left of the sample.
+ */
+std::vector<secondary::Interval64> trim_partial_insertion_edges(
+        const std::vector<secondary::VariantCallingSample>& vc_samples);
+
+/**
+ * \brief Applies the column intervals computed by trim_flanks. Tensors are sliced as views.
+ *          Samples with an empty interval are removed.
+ * \throws std::runtime_error if the number of intervals differs from the number of samples.
+ */
+std::vector<secondary::VariantCallingSample> apply_trim(
+        std::vector<secondary::VariantCallingSample> vc_samples,
+        const std::vector<secondary::Interval64>& trim_indices);
+
+/**
  * \brief Selects variants according to overlaps with hemizygous_regions and passes them to
           secondary::collapse_to_haploid.
  * \param variants Input variants for a single contig.

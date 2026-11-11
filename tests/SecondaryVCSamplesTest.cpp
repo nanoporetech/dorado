@@ -612,15 +612,15 @@ CATCH_TEST_CASE("slice_vc_sample preserves boundary IDs and basecalls", TEST_GRO
     const std::vector<std::string> placeholder_ids = placeholder_read_ids(2);
 
     CATCH_SECTION("internal slice") {
-        const VariantCallingSample result = slice_vc_sample(sample, 1, 3);
+        const VariantCallingSample result = slice_vc_sample(sample, 1, 3, true);
 
         CATCH_CHECK(result.read_ids_left == placeholder_ids);
         CATCH_CHECK(result.read_ids_right == placeholder_ids);
-        CATCH_CHECK(result.basecalls.equal(sample.basecalls.slice(0, 1, 3)));
+        CATCH_CHECK(result.basecalls.equal(sample.basecalls.slice(0, 1, 3, true)));
     }
 
     CATCH_SECTION("left boundary slice") {
-        const VariantCallingSample result = slice_vc_sample(sample, 0, 2);
+        const VariantCallingSample result = slice_vc_sample(sample, 0, 2, true);
 
         CATCH_CHECK(result.read_ids_left == sample.read_ids_left);
         CATCH_CHECK(result.read_ids_right == placeholder_ids);
@@ -628,7 +628,7 @@ CATCH_TEST_CASE("slice_vc_sample preserves boundary IDs and basecalls", TEST_GRO
     }
 
     CATCH_SECTION("right boundary slice") {
-        const VariantCallingSample result = slice_vc_sample(sample, 2, 4);
+        const VariantCallingSample result = slice_vc_sample(sample, 2, 4, true);
 
         CATCH_CHECK(result.read_ids_left == placeholder_ids);
         CATCH_CHECK(result.read_ids_right == sample.read_ids_right);

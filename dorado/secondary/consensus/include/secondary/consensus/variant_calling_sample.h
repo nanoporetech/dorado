@@ -50,7 +50,8 @@ bool variant_calling_sample_less(const VariantCallingSample& lhs, const VariantC
 
 VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                      int64_t idx_start,
-                                     int64_t idx_end);
+                                     int64_t idx_end,
+                                     bool clone);
 
 /**
  * \brief Slices the variant calling sample between specified reference coordinates.

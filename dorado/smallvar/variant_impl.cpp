@@ -1264,8 +1264,7 @@ secondary::IntervalTreesInt64Map make_variant_trees(
 }
 
 std::vector<secondary::IntervalInt64> make_processed_regions(
-        const std::vector<secondary::VariantCallingSample>& vc_samples,
-        const bool merge_intervals) {
+        const std::vector<secondary::VariantCallingSample>& vc_samples) {
     std::vector<secondary::IntervalInt64> intervals;
     for (const auto& vc_sample : vc_samples) {
         const int64_t start = vc_sample.start();  // Zero-based.
@@ -1281,43 +1280,32 @@ std::vector<secondary::IntervalInt64> make_processed_regions(
                   return std::tie(a.value, a.start, a.stop) < std::tie(b.value, b.start, b.stop);
               });
 
-    if (merge_intervals && !std::empty(intervals)) {
-        std::vector<secondary::IntervalInt64> merged_intervals;
-        merged_intervals.reserve(std::ssize(intervals));
-        merged_intervals.emplace_back(intervals.front());
-        for (const auto& iv : intervals) {
-            // The +1 is because .stop is inclusive, and we want to merge neighboring regions.
-            if (iv.start > (merged_intervals.back().stop + 1)) {
-                merged_intervals.emplace_back(iv);
-            }
-            merged_intervals.back().stop = std::max(merged_intervals.back().stop, iv.stop);
-        }
-        std::swap(intervals, merged_intervals);
-    } else {
-        const auto new_end = std::unique(
-                std::begin(intervals), std::end(intervals),
-                [](const secondary::IntervalInt64& a, const secondary::IntervalInt64& b) {
-                    return std::tie(a.value, a.start, a.stop) == std::tie(b.value, b.start, b.stop);
-                });
-        intervals.erase(new_end, intervals.end());
-    }
+    const auto new_end = std::unique(
+            std::begin(intervals), std::end(intervals),
+            [](const secondary::IntervalInt64& a, const secondary::IntervalInt64& b) {
+                return std::tie(a.value, a.start, a.stop) == std::tie(b.value, b.start, b.stop);
+            });
+
+    intervals.erase(new_end, intervals.end());
 
     return intervals;
 }
 
-std::vector<secondary::IntervalInt64> construct_trimmed_merge_regions(
+}  // namespace
+
+std::vector<secondary::Interval64> trim_flanks(
         const std::vector<secondary::VariantCallingSample>& vc_samples,
         const std::vector<secondary::Variant>& simple_variants,
         const int32_t flank_trim) {
-    // Merge the processed regions. Only edges of these regions will be trimmed.
-    // Non-const to avoid Clang-tidy error: constness of 'merged_processed_regions' prevents automatic move.
-    std::vector<secondary::IntervalInt64> merged_processed_regions =
-            make_processed_regions(vc_samples, true);
-
-    // Nothing to do here.
     const int64_t trim = std::max<int32_t>(0, flank_trim);
+
+    // Nothing to trim. Return full-length intervals;
     if (trim == 0) {
-        return merged_processed_regions;
+        std::vector<secondary::Interval64> ret(std::size(vc_samples));
+        for (int64_t i = 0; i < std::ssize(vc_samples); ++i) {
+            ret[i] = secondary::Interval64{0, std::ssize(vc_samples[i].positions_major)};
+        }
+        return ret;
     }
 
     // Create variant trees to find any left-flank overlaps.
@@ -1326,16 +1314,12 @@ std::vector<secondary::IntervalInt64> construct_trimmed_merge_regions(
 
     const int32_t seq_id = vc_samples.front().seq_id;
 
-    std::vector<secondary::IntervalInt64> merge_regions;
+    std::vector<secondary::Interval64> ret;
 
-    for (const auto& iv : merged_processed_regions) {
+    for (const auto& sample : vc_samples) {
         // Bluntly trim the coords left/right.
-        int64_t new_start = iv.start + trim;
-        int64_t new_end = iv.stop - trim;
-
-        if (new_start > new_end) {
-            continue;
-        }
+        int64_t new_start = sample.start() + trim;
+        int64_t new_end = sample.end() - 1 - trim;
 
         // Find any simple variants on the left side which may overlap the trimmed sample coords.
         // Move the decode_start to the first position which doesn't overlap a simple variant.
@@ -1377,75 +1361,119 @@ std::vector<secondary::IntervalInt64> construct_trimmed_merge_regions(
                 }
                 new_end = next_new_end;
             }
-
-            if (new_start > new_end) {
-                continue;
-            }
         }
 
-        merge_regions.emplace_back(secondary::IntervalInt64(new_start, new_end, iv.value));
-    }
+        // Trimming produced a region which is not valid, return zeros.
+        if (new_start > new_end) {
+            ret.emplace_back(secondary::Interval64{0, 0});
 
-    return merge_regions;
-}
-
-std::vector<secondary::VariantCallingSample> trim_samples_to_merge_regions(
-        std::vector<secondary::VariantCallingSample> vc_samples,
-        const std::vector<secondary::IntervalInt64>& merge_regions) {
-    if (std::empty(vc_samples) || std::empty(merge_regions)) {
-        return {};
-    }
-
-    // Create trees from the intervals.
-    std::vector<secondary::IntervalInt64> intervals = merge_regions;
-    const secondary::IntervalTreeInt64 tree(std::move(intervals));
-
-    std::vector<secondary::VariantCallingSample> ret;
-
-    for (auto& sample : vc_samples) {
-        if (sample.start() >= sample.end()) {
-            sample = {};
-            continue;
-        }
-
-        // Find overlapping merge regions.
-        const std::vector<secondary::IntervalInt64> hits =
-                tree.findOverlapping(sample.start(), sample.end() - 1);
-
-        // This sample is not in any merge region, skip it.
-        if (std::empty(hits)) {
-            sample = {};
-            continue;
-        }
-
-        // Find the maximum start and minimum end coordinate of all overlapping merge regions.
-        const auto max_it_start =
-                std::max_element(std::begin(hits), std::end(hits),
-                                 [](const auto& a, const auto& b) { return a.start < b.start; });
-        const auto min_it_end =
-                std::min_element(std::begin(hits), std::end(hits),
-                                 [](const auto& a, const auto& b) { return a.stop < b.stop; });
-
-        // Find the reference clip coordinates.
-        const int64_t decode_start = std::max(max_it_start->start, sample.start());
-        const int64_t decode_end = std::min(min_it_end->stop + 1, sample.end());
-
-        if (decode_start >= decode_end) {
-            sample = {};
-            continue;
-        }
-
-        // Clip.
-        if ((decode_start == sample.start()) && (decode_end == sample.end())) {
-            ret.emplace_back(std::move(sample));
         } else {
-            ret.emplace_back(slice_vc_sample_in_ref_coords(sample, decode_start, decode_end));
-            sample = {};
+            // Index of the first non-trimmed column.
+            int64_t first = 0;
+            for (first = 0; first < std::ssize(sample.positions_major); ++first) {
+                if ((sample.positions_major[first] >= new_start) &&
+                    (sample.positions_minor[first] == 0)) {
+                    break;
+                }
+            }
+
+            // Index of the last non-trimmed column (+1 because it's exclusive).
+            int64_t last = std::ssize(sample.positions_major) - 1;
+            for (; last >= 0; --last) {
+                if ((sample.positions_major[last] <= (new_end + 1)) &&
+                    (sample.positions_minor[last] == 0)) {
+                    break;
+                }
+            }
+
+            // Something went wrong.
+            if (first >= last) {
+                DORADO_LOG(trace,
+                           "Sample flank trimming produced an empty interval: "
+                           "first = {}, last = {}, flank_trim = {}, sample = {}",
+                           first, last, flank_trim, secondary::to_string(sample, false));
+                first = 0;
+                last = 0;
+            }
+
+            // Add the interval.
+            ret.emplace_back(secondary::Interval64{first, last});
         }
     }
 
     return ret;
 }
+
+std::vector<secondary::Interval64> trim_partial_insertion_edges(
+        const std::vector<secondary::VariantCallingSample>& vc_samples) {
+    std::vector<secondary::Interval64> ret;
+    ret.reserve(std::size(vc_samples));
+
+    for (const secondary::VariantCallingSample& sample : vc_samples) {
+        const int64_t num_columns = std::ssize(sample.positions_minor);
+
+        int64_t idx_start = 0;
+        while ((idx_start < num_columns) && (sample.positions_minor[idx_start] > 0)) {
+            ++idx_start;
+        }
+
+        // Everything up to idx_start is minor, so the loop below stops at a major column.
+        int64_t idx_end = num_columns;
+        if ((idx_start < idx_end) && (sample.positions_minor[idx_end - 1] > 0)) {
+            while (sample.positions_minor[idx_end - 1] > 0) {
+                --idx_end;
+            }
+            --idx_end;  // Also drop the anchor major column of the partial block.
+        }
+
+        if (idx_start >= idx_end) {
+            DORADO_LOG(trace,
+                       "Sample has no complete insertion blocks, returning an empty interval: "
+                       "idx_start = {}, "
+                       "idx_end = {}, num_columns = {}, sample = {}",
+                       idx_start, idx_end, num_columns, secondary::to_string(sample, false));
+            idx_start = 0;
+            idx_end = 0;
+        }
+
+        ret.emplace_back(secondary::Interval64{idx_start, idx_end});
+    }
+
+    return ret;
+}
+
+std::vector<secondary::VariantCallingSample> apply_trim(
+        std::vector<secondary::VariantCallingSample> vc_samples,
+        const std::vector<secondary::Interval64>& trim_indices) {
+    if (std::size(vc_samples) != std::size(trim_indices)) {
+        throw std::runtime_error{fmt::format(
+                "The number of samples and trim intervals differ in apply_trim: samples = {}, "
+                "trim_indices = {}",
+                std::size(vc_samples), std::size(trim_indices))};
+    }
+
+    std::vector<secondary::VariantCallingSample> ret;
+    ret.reserve(std::size(vc_samples));
+
+    for (int64_t i = 0; i < std::ssize(vc_samples); ++i) {
+        secondary::VariantCallingSample& sample = vc_samples[i];
+        const auto [idx_start, idx_end] = trim_indices[i];
+        const int64_t num_columns = std::ssize(sample.positions_major);
+        if ((idx_start == 0) && (idx_end == num_columns)) {
+            // The sample has nothing to trim.
+            ret.emplace_back(std::move(sample));
+        } else if (idx_start >= idx_end) {
+            // Nothing is left after trimming.
+            continue;
+        } else {
+            ret.emplace_back(secondary::slice_vc_sample(sample, idx_start, idx_end, false));
+        }
+    }
+
+    return ret;
+}
+
+namespace {
 
 std::pair<std::vector<secondary::Variant>, std::vector<secondary::IntervalInt64>>
 call_variants_single_chrom(const std::string& draft,
@@ -1520,27 +1548,36 @@ call_variants_single_chrom(const std::string& draft,
 
     debug_print_samples(trimmed_vc_samples, "2. trimmed_vc_samples", seq_id);
 
-    std::vector<secondary::IntervalInt64> merge_regions =
-            construct_trimmed_merge_regions(trimmed_vc_samples, simple_variants, flank_trim);
-
-    // Trim overlaps with simple variants.
-    auto callable_vc_samples =
-            trim_samples_to_merge_regions(std::move(trimmed_vc_samples), merge_regions);
-
-    debug_print_samples(callable_vc_samples, "3. callable_vc_samples", seq_id);
-
     // Break and merge samples on non-variant positions.
-    auto joined_samples = join_samples(std::move(callable_vc_samples));
+    auto joined_samples = join_samples(std::move(trimmed_vc_samples));
+
+    debug_print_samples(joined_samples, "3. joined_samples", seq_id);
+
+    // Trim the flanks after merging.
+    auto flank_trimmed_samples = std::move(joined_samples);
+    if (flank_trim <= 0) {
+        // If there are no bases to trim, remove only the flanking minor columns to avoid overlapping variants.
+        const std::vector<secondary::Interval64> trim_indices =
+                trim_partial_insertion_edges(flank_trimmed_samples);
+        flank_trimmed_samples = apply_trim(std::move(flank_trimmed_samples), trim_indices);
+    } else {
+        // Trim the bases from the edges, which will also remove partial minor columns.
+        const std::vector<secondary::Interval64> trim_indices =
+                trim_flanks(flank_trimmed_samples, simple_variants, flank_trim);
+        flank_trimmed_samples = apply_trim(std::move(flank_trimmed_samples), trim_indices);
+    }
 
     if (gvcf) {
         // Split decode chunks on hemizygous boundaries so that gVCF reference blocks respect them.
-        joined_samples = secondary::split_vc_samples_on_boundaries(
-                std::move(joined_samples), hemizygous_boundaries, draft, decoder);
+        flank_trimmed_samples = secondary::split_vc_samples_on_boundaries(
+                std::move(flank_trimmed_samples), hemizygous_boundaries, draft, decoder);
     }
 
     std::vector<secondary::Variant> results;
+    std::vector<secondary::IntervalInt64> merge_regions;
+    merge_regions.reserve(std::ssize(flank_trimmed_samples));
 
-    for (const auto& vc_sample : joined_samples) {
+    for (const auto& vc_sample : flank_trimmed_samples) {
         std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                 decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq, pass_min_vq,
                 ambig_ref, gvcf, true, true, false,
@@ -1548,9 +1585,11 @@ call_variants_single_chrom(const std::string& draft,
 
         results.insert(std::end(results), std::make_move_iterator(std::begin(variants)),
                        std::make_move_iterator(std::end(variants)));
+
+        merge_regions.emplace_back(vc_sample.start(), vc_sample.end() - 1, vc_sample.seq_id);
     }
 
-    debug_print_samples(joined_samples, "4. joined_samples", seq_id);
+    debug_print_samples(flank_trimmed_samples, "4. flank_trimmed_samples", seq_id);
 
     // Sort the variants.
     std::stable_sort(std::begin(results), std::end(results));
@@ -1897,7 +1936,7 @@ void worker_variant_calling_reduce(
 
         std::vector<secondary::Variant> variants;
         std::vector<secondary::IntervalInt64> merge_regions;
-        reduce_data.processed_regions = make_processed_regions(vc_decode_data, false);
+        reduce_data.processed_regions = make_processed_regions(vc_decode_data);
         if (!std::empty(vc_decode_data)) {
             const bool merge_with_simple =
                     (variant_candidate_source == secondary::VariantCandidateSource::COMPUTE);
