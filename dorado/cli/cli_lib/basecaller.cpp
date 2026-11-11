@@ -174,14 +174,12 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
     }
     {
         parser.add_group("Alignment arguments");
-        parser.add_argument("--reference")
-                .help("Path to reference for alignment.")
-                .default_value(std::string{});
+        parser.add_argument("--reference").help("Path to reference for alignment.").nargs(1);
         parser.add_argument("--bed-file")
                 .help("Optional bed-file. If specified, overlaps between the alignments and "
                       "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
                       "read tag.")
-                .default_value(std::string{});
+                .nargs(1);
         alignment::mm2::add_options_string_arg(parser);
     }
     {
@@ -1104,8 +1102,7 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (parser.get<std::string>("--reference").empty() &&
-        !parser.get<std::string>("--bed-file").empty()) {
+    if (!parser.is_used("--reference") && parser.is_used("--bed-file")) {
         DORADO_LOG(error, "--bed-file cannot be used without --reference.");
         return EXIT_FAILURE;
     }
@@ -1158,7 +1155,7 @@ int basecaller(int argc, char* argv[]) {
     }
 
     const auto emit_args = cli::get_emit_args(parser);
-    const auto& alignment_reference = parser.get<std::string>("--reference");
+    const auto alignment_reference = parser.present<std::string>("--reference");
     if (cli::emit_cram_with_mmi_reference(emit_args, alignment_reference)) {
         return EXIT_FAILURE;
     }
@@ -1167,8 +1164,8 @@ int basecaller(int argc, char* argv[]) {
         const BasecallerOptions options{
                 .emit_args = emit_args,
                 .pod5_folder_info = pod5_folder_info,
-                .alignment_reference = alignment_reference,
-                .bed_file = parser.get<std::string>("--bed-file"),
+                .alignment_reference = alignment_reference.value_or(""),
+                .bed_file = parser.present<std::string>("--bed-file").value_or(""),
                 .device = device,
                 .dump_stats_file = parser.get<std::string>("--dump_stats_file"),
                 .dump_stats_filter = parser.get<std::string>("--dump_stats_filter"),
