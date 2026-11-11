@@ -11,6 +11,7 @@ target_sources(dorado_secondary
         ${PUBLIC_BASE}/interval.h
         ${PUBLIC_BASE}/interval_tree_types.h
         ${PUBLIC_BASE}/region.h
+        ${PUBLIC_BASE}/resolve_model.h
         ${PUBLIC_BASE}/stats.h
         ${PUBLIC_BASE}/variant.h
         ${PUBLIC_BASE}/vcf_writer.h
@@ -22,6 +23,7 @@ target_sources(dorado_secondary
         bam_info.cpp
         batching.cpp
         region.cpp
+        resolve_model.cpp
         variant.cpp
         vcf_writer.cpp
         window.cpp

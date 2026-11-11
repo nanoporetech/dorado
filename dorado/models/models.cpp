@@ -133,6 +133,15 @@ std::string format_msg(const Chemistry& chemistry,
     return s;
 }
 
+template <typename T, std::size_t... Ns>
+constexpr std::array<T, (Ns + ...)> concat(const std::array<T, Ns>&... arrays) {
+    std::array<T, (Ns + ...)> result{};
+    std::size_t offset = 0;
+    ((std::copy(arrays.begin(), arrays.end(), result.begin() + offset), offset += arrays.size()),
+     ...);
+    return result;
+}
+
 }  // namespace
 
 ModelInfo find_model(std::span<const ModelInfo> models,
@@ -1820,8 +1829,43 @@ const std::array models = {
 
 namespace polisher {
 
-const std::array models = {
-        // Read-level models.
+// Legacy models, counts based.
+const std::array models_legacy{
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish",
+                "8092073ee021ac94e94a18000c97ac0e26dbf37f0cb16a706d583c2a374de33b",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish",
+                "91ff09a711162b116c898f39831228d53e5e11981f6a16e08a7ef9575b911dc6",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_2_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish",
+                "9bc24d9cd8c2247e472c3e5cbd6248cd00cf9547537bd3e2e6cac6334005700a",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
+                ModsVariantPair{},
+        },
+        ModelInfo{
+                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish",
+                "378f2e407f14bb2c4ec77e73b1b8ea86d3f4c47007d8ffb21f82fe6e89df7631",
+                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
+                ModelType::POLISH,
+                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
+                ModsVariantPair{},
+        },
+};
+
+const std::array models_read_level{
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl",
                 "d343b4394b904d219257ad188c82ece63b935f15d78f09f551e591b2275da4b9",
@@ -1903,8 +1947,9 @@ const std::array models = {
                 ModelVariantPair{ModelVariant::HAC, VV::v6_0_0},
                 ModsVariantPair{},
         },
+};
 
-        // Bacterial models.
+const std::array models_bacterial{
         ModelInfo{
                 "dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0",
                 "56e3763638677adb32de783e648dd721aa1ec04504d0328db70be208822aef6e",
@@ -1913,41 +1958,9 @@ const std::array models = {
                 ModelVariantPair{},
                 ModsVariantPair{},
         },
-
-        // Legacy models, counts based.
-        ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_hac@v4.2.0_polish",
-                "8092073ee021ac94e94a18000c97ac0e26dbf37f0cb16a706d583c2a374de33b",
-                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-                ModelType::POLISH,
-                ModelVariantPair{ModelVariant::HAC, VV::v4_2_0},
-                ModsVariantPair{},
-        },
-        ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup@v4.2.0_polish",
-                "91ff09a711162b116c898f39831228d53e5e11981f6a16e08a7ef9575b911dc6",
-                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-                ModelType::POLISH,
-                ModelVariantPair{ModelVariant::SUP, VV::v4_2_0},
-                ModsVariantPair{},
-        },
-        ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_hac@v4.3.0_polish",
-                "9bc24d9cd8c2247e472c3e5cbd6248cd00cf9547537bd3e2e6cac6334005700a",
-                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-                ModelType::POLISH,
-                ModelVariantPair{ModelVariant::HAC, VV::v4_3_0},
-                ModsVariantPair{},
-        },
-        ModelInfo{
-                "dna_r10.4.1_e8.2_400bps_sup@v4.3.0_polish",
-                "378f2e407f14bb2c4ec77e73b1b8ea86d3f4c47007d8ffb21f82fe6e89df7631",
-                CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
-                ModelType::POLISH,
-                ModelVariantPair{ModelVariant::SUP, VV::v4_3_0},
-                ModsVariantPair{},
-        },
 };
+
+const std::array models = concat(models_read_level, models_bacterial, models_legacy);
 
 }  // namespace polisher
 
@@ -1991,6 +2004,9 @@ std::span<const ModelInfo> modified_models() { return modified::models; }
 std::span<const ModelInfo> modified_deprecated_models() { return modified::deprecated; }
 std::span<const ModelInfo> correction_models() { return correction::models; }
 std::span<const ModelInfo> polish_models() { return polisher::models; }
+std::span<const ModelInfo> polish_models_legacy() { return polisher::models_legacy; }
+std::span<const ModelInfo> polish_models_bacterial() { return polisher::models_bacterial; }
+std::span<const ModelInfo> polish_models_read_level() { return polisher::models_read_level; }
 std::span<const ModelInfo> variant_models() { return small_variant_caller::models; }
 
 namespace {
