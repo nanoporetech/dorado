@@ -10,7 +10,7 @@ Resolving from models-directory. Downloads will be tested separately.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -40,7 +40,7 @@ Resolving from models-directory. Downloads will be tested separately.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -69,7 +69,7 @@ Resolve a model from a user-specified folder.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -100,7 +100,7 @@ Allowed because of `--model-override`.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -127,7 +127,7 @@ Using `--model-override`.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > model=${POLISH_MODEL}
   > #
@@ -184,7 +184,7 @@ Fail to download a non-existent auto-resolved model
   > ### Prepare mocked data.
   > source ${TEST_DIR}/cram/variant/helpers.sh
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
-  > prepare_mock_data "${in_dir}/in.aln.bam" "dna_r10.4.1_e8.2_400bps_sup@v5.0.0" 0 0 "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "dna_r10.4.1_e8.2_400bps_sup@v5.0.0" 0 0 "out/in.bam"
   > in_bam=out/in.bam
   > in_ref=${in_dir}/in.ref.fasta.gz
   > #
@@ -213,7 +213,7 @@ Fails with auto-detect mode because the model cannot be resolved.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -237,7 +237,7 @@ Allowed because of `--model-override`.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr

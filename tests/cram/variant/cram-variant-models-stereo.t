@@ -9,7 +9,7 @@ Stereo models should fail.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -34,7 +34,7 @@ This succeeds because the model was explicitly specified.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${MODEL_BAM}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -60,7 +60,7 @@ Since `--model-override` is used and the model explicitly specified, only warnin
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data_two_rg "${in_dir}/in.aln.bam" "${MODEL_BAM_RG_01}" "${MODEL_BAM_RG_02}" "out/in.bam"
+  > prepare_variant_mock_data_two_rg "${in_dir}/in.aln.bam" "${MODEL_BAM_RG_01}" "${MODEL_BAM_RG_02}" "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
@@ -86,7 +86,7 @@ This should error out.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data_two_rg "${in_dir}/in.aln.bam" "${MODEL_BAM_RG_01}" "${MODEL_BAM_RG_02}" "out/in.bam"
+  > prepare_variant_mock_data_two_rg "${in_dir}/in.aln.bam" "${MODEL_BAM_RG_01}" "${MODEL_BAM_RG_02}" "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr

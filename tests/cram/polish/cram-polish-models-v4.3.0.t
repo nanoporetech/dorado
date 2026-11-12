@@ -43,7 +43,7 @@ Bacterial HAC v4.3.0 with dwells. Resolves to a compatible bacterial model.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
 
 SUP v4.3.0 with dwells. This is a non-read-level legacy model and there is no difference if it has or does not have dwells.
@@ -79,7 +79,7 @@ Bacterial SUP v4.3.0 with dwells. Resolves to a compatible bacterial model.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
 
 HAC v4.3.0 with no dwells. This is a non-read-level legacy model and there is no difference if it has or does not have dwells.
@@ -119,7 +119,7 @@ Bacterial HAC v4.3.0 with no dwells. Resolves to a compatible bacterial model.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
 
 SUP v4.3.0 with no dwells. This is a non-read-level legacy model and there is no difference if it has or does not have dwells.
@@ -159,5 +159,5 @@ Bacterial SUP v4.3.0 with no dwells. Resolves to a compatible bacterial model.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0

@@ -44,7 +44,7 @@ Bacterial HAC v5.2.0 with dwells.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
 
 SUP v5.2.0 with dwells.
@@ -80,7 +80,7 @@ Bacterial SUP v5.2.0 with dwells.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
 
 HAC v5.2.0 with no dwells.
@@ -120,7 +120,7 @@ Bacterial HAC v5.2.0 with no dwells.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
 
 SUP v5.2.0 with no dwells.
@@ -160,5 +160,5 @@ Bacterial SUP v5.2.0 with no dwells.
   > grep "\- downloading" out/out.fasta.stderr | wc -l | awk '{ print $1 }'
   > grep "\[error\]" out/out.fasta.stderr | sed -E 's/.*\[error\] //g'
   Exit code: 0
-  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0
+  Resolved model from input data: dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0
   0
