@@ -582,7 +582,7 @@ build_archive:macos:arm:
     - ln -s ../tests tests
     - !reference [.extract_archive, script]
     # Manually sharding the tests based on how long they take (in an arm64 job).
-    # Note that Windows can't run the cram tests (shard 1 and 2).
+    # Note that Windows can't run the cram tests (shard 1, 2, 3).
     - if [[ ${TEST_SHARD} -eq 0 ]] ; then
     -   bash ./tests/test_simple_basecaller_execution.sh ${DORADO_BIN} ${MODEL} ${BATCH}  # 11m
     -   bash ./tests/test_nested_output_structure.sh ${DORADO_BIN} ${MODEL} ${BATCH}      # <1m
@@ -591,8 +591,9 @@ build_archive:macos:arm:
     -   bash ./tests/test_dorado_correct.sh ${DORADO_BIN}                                 # <1m
     - elif [[ ${TEST_SHARD} -eq 1 ]] ; then
     -   bash ./tests/test_dorado_correct_cram.sh ${DORADO_BIN}                            # 10m
-    -   bash ./tests/test_dorado_variant.sh ${DORADO_BIN}                                 # 3m
     - elif [[ ${TEST_SHARD} -eq 2 ]] ; then
+    -   bash ./tests/test_dorado_variant.sh ${DORADO_BIN}                                 # 9m
+    - elif [[ ${TEST_SHARD} -eq 3 ]] ; then
     -   bash ./tests/test_dorado_polish.sh ${DORADO_BIN}                                  # 16m
     - else
     -   echo "Invalid shard '${TEST_SHARD}'"
@@ -609,7 +610,7 @@ build_archive:macos:arm:
     - .test_dorado_common
   parallel:
     matrix:
-      - TEST_SHARD: [0, 1, 2]
+      - TEST_SHARD: [0, 1, 2, 3]
 
 .test_dorado_windows:
   extends:
@@ -619,7 +620,7 @@ build_archive:macos:arm:
     VALIDATE_BAM: 0
   parallel:
     matrix:
-      # Not running shards 1 or 2. See .test_dorado_common
+      # Not running shards 1, 2, 3. See .test_dorado_common
       - TEST_SHARD: [0]
 
 .extract_archive:
