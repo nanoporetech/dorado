@@ -16,15 +16,15 @@ bool koi_can_run_flstm(int device_id);
 bool koi_can_run_tx_vcs(int device_id);
 
 // NVFP4 tx_encoder
-std::pair<at::Tensor, at::Tensor> to_block_fp4(const at::Tensor& t_in, const float maxval);
+std::pair<at::Tensor, at::Tensor> to_block_fp4(const at::Tensor& t_in, float maxval);
 
 at::Tensor convert_to_nvfp4_tiled(const at::Tensor& t,
                                   const std::array<int64_t, 2>& smem_dims,
-                                  const bool is_B,
-                                  const at::TensorOptions i32_opts);
+                                  bool is_B,
+                                  at::TensorOptions i32_opts);
 
 at::Tensor untile_nvfp4(const at::Tensor& t_nvfp4,
                         const std::array<int64_t, 2>& smem_dims,
-                        const at::TensorOptions f16_opts);
+                        at::TensorOptions f16_opts);
 
 }  // namespace dorado::nn

@@ -11,6 +11,7 @@
 #include <c10/core/ScalarType.h>
 
 #include <cmath>
+#include <stdexcept>
 
 #if DORADO_CUDA_BUILD
 #include "nn/KoiUtils.h"
@@ -462,10 +463,10 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
     utils::ScopedProfileRange layer_spr("TxLayerKoiTiled", 2);
     const float alpha = params.deepnorm_alpha;
 
-    auto f16_opts = x_f16.options().dtype(torch::kF16);
-    auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
-    bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
-                  utils::get_dev_opt<bool>("koi_use_f8", true);
+    const auto f16_opts = x_f16.options().dtype(torch::kF16);
+    const auto f8_opts = x_f16.options().dtype(torch::kFloat8_e4m3fn);
+    const bool use_f8 = (koi_tc_is_available(KOI_E4M3) == KOI_SUCCESS) &&
+                        utils::get_dev_opt<bool>("koi_use_f8", true);
 
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
@@ -584,14 +585,14 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
 
     int res = KOI_SUCCESS;
     int calls = 0;
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE", 3);
         res = koi_qkv_rotary(stream, &in, &weights_qkv, &sincos, &out_qkv,
                              aux ? aux->qkv_rope_lut.data_ptr<int>() : nullptr,
                              ctr[0].data_ptr<int>());
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Apply masked attention
         utils::ScopedProfileRange spr("MEA", 3);
         if (aux) {
@@ -601,20 +602,20 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
             res = koi_masked_attention(stream, win_upper, win_lower, &out_qkv, &out_attn);
         }
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Koi linear matmul
         utils::ScopedProfileRange spr("OUTP", 3);
         res = koi_linear(stream, &out_attn_mk, &proj_w, &proj_b, &out_proj_mn,
                          ctr[1].data_ptr<int>());
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1", 3);
         KoiTensorExt res_weights(t_res_weights, {'C'});
         res = koi_rmsnorm_residual(stream, &out_proj_ntc, &in_f16, alpha, &res_weights, &in_f16,
                                    use_f8 ? &out_rms_f8 : nullptr, use_f8 ? nullptr : in_i8_ptr);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU", 3);
         KoiTensorExt fc1_wts(t_fc1_wts.t, {'N', 'K', 'n', 'k'}, t_fc1_wts.scale, 'K');
@@ -622,14 +623,14 @@ void TxEncoderImpl::koi_forward(utils::ScaledTensor &scaled_tensor,
         res = koi_mm_swiglu(stream, &in_mk, &fc1_wts, &fc1_out, ctr[2].data_ptr<int>(),
                             use_f32_accum, use_uswiglu);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Fully connected
         utils::ScopedProfileRange spr("FC2", 3);
         KoiTensorExt fc2_wts(t_fc2_wts, {'N', 'K', 'n', 'k'});
         res = koi_linear(stream, &fc1_out_mk, &fc2_wts, nullptr, &fc2_out_mn,
                          ctr[3].data_ptr<int>());
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2", 3);
         KoiTensorExt res2_weights(t_res2_weights, {'C'});
@@ -653,10 +654,9 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
     // TODO: I should have alpha be an argument to RMSNorm kernels...
     // const float alpha = params.deepnorm_alpha;
 
-    // auto f32_opts = x_tiled_nvfp4.options().dtype(torch::kFloat);
-    auto f16_opts = x_tiled_nvfp4.options().dtype(torch::kF16);
-    auto f8_opts = x_tiled_nvfp4.options().dtype(torch::kFloat8_e4m3fn);
-    auto i32_opts = x_tiled_nvfp4.options().dtype(torch::kInt);
+    const auto f16_opts = x_tiled_nvfp4.options().dtype(torch::kF16);
+    const auto f8_opts = x_tiled_nvfp4.options().dtype(torch::kFloat8_e4m3fn);
+    const auto i32_opts = x_tiled_nvfp4.options().dtype(torch::kInt);
     if (!t_res_weights.numel()) {
         // QKV weights layout is very messy for now, sorry
         const int64_t SMEM_M_QKV = 128;
@@ -782,18 +782,18 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
 
     int res = KOI_SUCCESS;
     int calls = 0;
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE B12", 3);
         res = koi_b12_qkv_rope(stream, x_tiled_nvfp4.data_ptr(), wqkv_weights_f16.t.data_ptr(),
                                sincos_bfr.data_ptr(), qkv.data_ptr(), N * T, C, T);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Apply window flashattention
         utils::ScopedProfileRange spr("MEA B12", 3);
         res = koi_b12_flashattn(stream, qkv.data_ptr(), t_out_attn_nvfp4.data_ptr(), N, T);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // RMS residual
         utils::ScopedProfileRange spr("Proj + Residual + RMSNorm B12", 3);
         // TODO: Add bias functionality, testing for performance only now...
@@ -804,13 +804,13 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
                                           t_residual_nvfp4.data_ptr(),  // output
                                           N * T, C, H * D);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU B12", 3);
         res = koi_b12_swiglu(stream, t_residual_nvfp4.data_ptr(), t_fc1_wts_f16.t.data_ptr(),
                              t_fc1_out_nvfp4.data_ptr(), N * T, C, use_uswiglu);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Koi linear matmul, fc2 weights (K=2048)
         utils::ScopedProfileRange spr("FC2 + Residual + RMSNorm B12", 3);
         res = koi_b12_mm_bias_res_rmsnorm(stream, t_fc1_out_nvfp4.data_ptr(), t_fc2_wts.data_ptr(),
@@ -820,7 +820,7 @@ void TxEncoderImpl::koi_nvfp4_forward(at::Tensor &x_tiled_nvfp4, const int N, co
                                           N * T, C, E / 2);
     }
     if (res != KOI_SUCCESS) {
-        spdlog::error("Koi B12 tiled path failed {}", calls);
+        DORADO_LOG(error, "Koi B12 tiled path failed {}", calls);
     }
 #else
     (void)x_tiled_nvfp4;
@@ -851,7 +851,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     utils::ScopedProfileRange layer_spr("TxLayerKoiVoltaTiled", 2);
     const float alpha = params.deepnorm_alpha;
 
-    auto f16_opts = x_f16.options().dtype(torch::kF16);
+    const auto f16_opts = x_f16.options().dtype(torch::kF16);
     if (!t_res_weights.numel()) {
         // Weights for the Q,K and V tensors which will be multiplied with the inputs
         wqkv_weights_f16.t = torch::empty_like(self_attn->wqkv->weight);
@@ -912,38 +912,38 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
     int res = KOI_SUCCESS;
     int calls = 0;
     std::stringstream ss;
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Fused QKV Matmul Plus Rotary embedding
         utils::ScopedProfileRange spr("QKV+ROTE Volta", 3);
         res = koi_volta_qkv_rotary(stream, x_f16.data_ptr(), wqkv_weights_f16.t.data_ptr(),
                                    qkv.data_ptr(), sincos_bfr.data_ptr(), useFloatAccumQKV, N, T);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Apply window flashattention
         utils::ScopedProfileRange spr("MEA Volta", 3);
         res = koi_volta_attn(stream, qkv.data_ptr(), t_out_attn.data_ptr(), N, T);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Koi linear matmul, proj weights (K=512)
         utils::ScopedProfileRange spr("OUTP Volta", 3);
         res = koi_volta_linear(stream, t_out_attn.data_ptr(), proj_weight.data_ptr(),
                                t_out_proj.data_ptr(), proj_bias.data_ptr(), useFloatAccumProj,
                                useBiasProj, N * T, C);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // RMS residual
         utils::ScopedProfileRange spr("LNORM1 Volta", 3);
         res = koi_volta_rmsnorm_residual(stream, x_f16.data_ptr(), t_out_proj.data_ptr(),
                                          t_res_weights.data_ptr(), t_out_rms1.data_ptr(), alpha,
                                          N * T);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Matmul + SWIGLU
         utils::ScopedProfileRange spr("FC1+SILU Volta", 3);
         koi_volta_mm_swiglu(stream, t_out_rms1.data_ptr(), t_fc1_wts_f16.t.data_ptr(),
                             t_fc1_out.data_ptr(), useFloatAccumSwiglu, use_uswiglu, N * T);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // Koi linear matmul, fc2 weights (K=2048)
         utils::ScopedProfileRange spr("FC2 Volta", 3);
         res = koi_volta_linear(stream, t_fc1_out.data_ptr(), t_fc2_wts.data_ptr(),
@@ -951,7 +951,7 @@ void TxEncoderImpl::koi_volta_forward(at::Tensor &x_f16) {
                                nullptr,  // No bias for fc2
                                useFloatAccumfc2, useBiasfc2, N * T, E / 2);
     }
-    if (res == KOI_SUCCESS && ++calls) {
+    if ((res == KOI_SUCCESS) && ++calls) {
         // RMS Norm Residual again
         utils::ScopedProfileRange spr("LNORM2 Volta", 3);
         res = koi_volta_rmsnorm_residual(
@@ -1035,7 +1035,7 @@ TxEncoderStackImpl::TxEncoderStackImpl(const TxEncoderParams &params,
     use_koi_nvfp4_tiled = is_sup_model && options.device().is_cuda() &&
                           (koi_tc_is_available(KOI_E2M1) == KOI_SUCCESS) &&
                           utils::get_dev_opt<bool>("use_koi_nvfp4_tiled", false);
-    spdlog::debug("TxEncoderStack: use_koi_nvfp4_tiled {}.", use_koi_nvfp4_tiled);
+    DORADO_LOG(debug, "TxEncoderStack: use_koi_nvfp4_tiled {}.", use_koi_nvfp4_tiled);
 
 #if (CUDA_VERSION / 1000) < 13
     // Custom Volta flag
