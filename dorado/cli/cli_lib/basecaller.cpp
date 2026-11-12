@@ -103,8 +103,8 @@ struct BasecallerOptions {
     const cli::EmitArgs& emit_args;
     const InputPod5FolderInfo& pod5_folder_info;
 
-    std::string alignment_reference;
-    std::string bed_file;
+    std::optional<std::string> alignment_reference;
+    std::optional<std::string> bed_file;
     std::string device;
     std::string dump_stats_file;
     std::string dump_stats_filter;
@@ -536,7 +536,7 @@ auto create_writers(ProgressTracker& tracker,
             [&tracker](const std::string& description) { tracker.set_description(description); });
     auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
             options.emit_args.fastq, options.emit_args.sam, options.emit_args.cram,
-            !options.alignment_reference.empty(), options.output_dir,
+            options.alignment_reference.has_value(), options.output_dir,
             thread_allocations.writer_threads, progress_callback, description_callback, gpu_names);
 
     std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
@@ -544,8 +544,8 @@ auto create_writers(ProgressTracker& tracker,
         throw std::runtime_error("Failed to create hts file writer");
     }
 
-    if (!options.alignment_reference.empty() && options.emit_args.cram) {
-        hts_file_writer->set_cram_reference(options.alignment_reference);
+    if (options.alignment_reference.has_value() && options.emit_args.cram) {
+        hts_file_writer->set_cram_reference(*options.alignment_reference);
     }
 
     tracker.set_post_processing_percentage(hts_file_writer->finalise_is_noop() ? 0.0f : 0.5f);
@@ -596,7 +596,7 @@ NewPipeline create_pipeline(
         const BasecallModelConfig& model_config) {
     DORADO_LOG(info, "> Creating basecall pipeline");
 
-    const bool enable_aligner = !options.alignment_reference.empty();
+    const bool enable_aligner = options.alignment_reference.has_value();
 
     PipelineDescriptor pipeline_desc;
     auto hts_writer = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
@@ -605,15 +605,15 @@ NewPipeline create_pipeline(
     if (enable_aligner) {
         auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
         auto bed_file_access = std::make_shared<alignment::BedFileAccess>();
-        if (!options.bed_file.empty()) {
-            if (!bed_file_access->load_bedfile(options.bed_file)) {
-                throw std::runtime_error("Could not load bed-file " + options.bed_file);
+        if (options.bed_file.has_value()) {
+            if (!bed_file_access->load_bedfile(*options.bed_file)) {
+                throw std::runtime_error("Could not load bed-file " + *options.bed_file);
             }
         }
-        aligner = pipeline_desc.add_node<AlignerNode>({current_sink_node}, index_file_access,
-                                                      bed_file_access, options.alignment_reference,
-                                                      options.bed_file, aligner_options,
-                                                      worker_pools.aligner_executor.get());
+        aligner = pipeline_desc.add_node<AlignerNode>(
+                {current_sink_node}, index_file_access, bed_file_access,
+                *options.alignment_reference, options.bed_file.value_or(""), aligner_options,
+                worker_pools.aligner_executor.get());
         current_sink_node = aligner;
     }
     current_sink_node = pipeline_desc.add_node<ReadToBamTypeNode>(
@@ -944,7 +944,7 @@ void run(const BasecallerOptions& options,
                 "results.");
     }
 
-    const bool enable_aligner = !options.alignment_reference.empty();
+    const bool enable_aligner = options.alignment_reference.has_value();
     const bool adapter_trimming_enabled =
             (adapter_info && (adapter_info->trim_adapters || adapter_info->trim_primers));
     const auto thread_allocations = utils::default_thread_allocations(
@@ -1102,8 +1102,11 @@ int basecaller(int argc, char* argv[]) {
         return EXIT_FAILURE;
     }
 
-    if (!parser.is_used("--reference") && parser.is_used("--bed-file")) {
-        DORADO_LOG(error, "--bed-file cannot be used without --reference.");
+    cli::AlignmentArgs alignment_args;
+    try {
+        alignment_args = cli::get_alignment_args(parser);
+    } catch (const std::exception& e) {
+        DORADO_LOG(error, e.what());
         return EXIT_FAILURE;
     }
 
@@ -1155,8 +1158,7 @@ int basecaller(int argc, char* argv[]) {
     }
 
     const auto emit_args = cli::get_emit_args(parser);
-    const auto alignment_reference = parser.present<std::string>("--reference");
-    if (cli::emit_cram_with_mmi_reference(emit_args, alignment_reference)) {
+    if (cli::emit_cram_with_mmi_reference(emit_args, alignment_args.reference)) {
         return EXIT_FAILURE;
     }
 
@@ -1164,8 +1166,8 @@ int basecaller(int argc, char* argv[]) {
         const BasecallerOptions options{
                 .emit_args = emit_args,
                 .pod5_folder_info = pod5_folder_info,
-                .alignment_reference = alignment_reference.value_or(""),
-                .bed_file = parser.present<std::string>("--bed-file").value_or(""),
+                .alignment_reference = alignment_args.reference,
+                .bed_file = alignment_args.bed_file,
                 .device = device,
                 .dump_stats_file = parser.get<std::string>("--dump_stats_file"),
                 .dump_stats_filter = parser.get<std::string>("--dump_stats_filter"),

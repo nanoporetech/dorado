@@ -106,6 +106,25 @@ EmitArgs get_emit_args(const argparse::ArgumentParser& parser) {
     return emit;
 };
 
+AlignmentArgs get_alignment_args(const argparse::ArgumentParser& parser) {
+    auto ref = parser.present<std::string>("--reference");
+    auto bed = parser.present<std::string>("--bed-file");
+
+    if (!ref.has_value() && bed.has_value()) {
+        throw std::runtime_error("--bed-file cannot be used without --reference.");
+    }
+
+    if (ref.has_value() && ref->empty()) {
+        throw std::runtime_error("Empty --reference parameter provided.");
+    }
+
+    if (bed.has_value() && bed->empty()) {
+        throw std::runtime_error("Empty --bed-file parameter provided.");
+    }
+
+    return {std::move(ref), std::move(bed)};
+}
+
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser) {
     return parser.present<std::string>(OUTPUT_DIR_ARG);
 }
