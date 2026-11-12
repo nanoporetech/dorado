@@ -204,42 +204,6 @@ std::string sample_to_string(const Sample& sample) {
     return oss.str();
 }
 
-void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
-    if (lh.seq_id != rh.seq_id) {
-        std::ostringstream oss;
-        oss << "Cannot merge samples. Different seq_id. lh = " << lh << ", rh = " << rh;
-        throw std::runtime_error(oss.str());
-    }
-    if (lh.end() != (rh.start() + 1)) {
-        std::ostringstream oss;
-        oss << "Cannot merge samples, coordinates are not adjacent. lh = " << lh << ", rh = " << rh;
-        throw std::runtime_error(oss.str());
-    }
-
-    const size_t width = std::size(lh.positions_major);
-
-    // Merge the tensors.
-    lh.features = at::cat({std::move(lh.features), rh.features});
-    lh.depth = at::cat({std::move(lh.depth), rh.depth});
-
-    if ((lh.draft_seq) && (rh.draft_seq)) {
-        lh.draft_seq = {at::cat({std::move(*lh.draft_seq), *rh.draft_seq})};
-    } else {
-        lh.draft_seq = {std::nullopt};
-    }
-
-    // Insert positions vectors.
-    lh.positions_major.reserve(width + std::size(rh.positions_major));
-    lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
-                              std::end(rh.positions_major));
-    lh.positions_minor.reserve(width + std::size(rh.positions_minor));
-    lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
-                              std::end(rh.positions_minor));
-
-    // Propagate read IDs.
-    lh.read_ids_right = rh.read_ids_right;
-}
-
 std::vector<secondary::Sample> split_samples(std::vector<Sample> samples,
                                              const int64_t chunk_len,
                                              const int64_t chunk_overlap) {
@@ -776,10 +740,6 @@ std::vector<secondary::Sample> split_sample_on_intervals(
         return {};
     }
 
-    // Reusable.
-    const std::vector<std::string> placeholder_ids =
-            placeholder_read_ids(std::ssize(sample.read_ids_left));
-
     std::vector<secondary::Sample> ret;
     for (int64_t i = 0; i < std::ssize(intervals); ++i) {
         const secondary::Interval64 iv = intervals[i];
@@ -792,8 +752,9 @@ std::vector<secondary::Sample> split_sample_on_intervals(
                     "), sample_len = " + std::to_string(std::size(sample.positions_major)));
         }
 
-        // Generate the sample slice. This propagates read_ids_left and read_ids_right
-        // from the original samples.
+        // Generate the sample slice.
+        // read_ids_left and/or read_ids_right are propagated from the original samples if the new sample reaches the end of sample.
+        // Internal boundaries are assigned placeholder read_id arrays.
         Sample new_sample = slice_sample(sample, iv.start, iv.end);
 
         ret.emplace_back(std::move(new_sample));

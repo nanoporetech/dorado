@@ -213,17 +213,17 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             read_ids_right.emplace_back(std::move(sample.read_ids_right));
         }
 
-        // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
+        // Read ids are propagated through reordering
         auto [reordered_reads, reordered_read_ids_left, reordered_read_ids_right] =
                 reorder_reads(std::move(features), read_ids_left, read_ids_right);
         secondary::Sample ret{
-                seq_id,
-                at::cat(pad_reads(reordered_reads, -1)),
-                cat_vectors(positions_major),
-                cat_vectors(positions_minor),
-                at::cat(std::move(depth)),
-                std::move(reordered_read_ids_left),
-                std::move(reordered_read_ids_right),
+                .seq_id = seq_id,
+                .features = at::cat(pad_reads(reordered_reads, -1)),
+                .positions_major = cat_vectors(positions_major),
+                .positions_minor = cat_vectors(positions_minor),
+                .depth = at::cat(std::move(depth)),
+                .read_ids_left = std::move(reordered_read_ids_left),
+                .read_ids_right = std::move(reordered_read_ids_right),
         };
 
         ret.validate();

@@ -199,26 +199,6 @@ CATCH_TEST_CASE("slice_sample: Preserves non-empty boundary read IDs", TEST_GROU
     }
 }
 
-CATCH_TEST_CASE("merge_adjacent_samples_in_place: Propagates boundary read IDs", TEST_GROUP) {
-    Sample left = make_linear_sample(1, {0, 1});
-    left.read_ids_left = {"left_0", "left_1"};
-    left.read_ids_right = {"middle_0", "middle_1"};
-
-    const Sample right = [&] {
-        Sample sample = make_linear_sample(1, {1, 2});
-        sample.read_ids_left = {"middle_0", "middle_1"};
-        sample.read_ids_right = {"right_0", "right_1"};
-        return sample;
-    }();
-
-    merge_adjacent_samples_in_place(left, right);
-
-    CATCH_CHECK(left.read_ids_left == std::vector<std::string>{"left_0", "left_1"});
-    CATCH_CHECK(left.read_ids_right == std::vector<std::string>{"right_0", "right_1"});
-    CATCH_CHECK(left.positions_major == std::vector<int64_t>{0, 1, 1, 2});
-    CATCH_CHECK(left.positions_minor == std::vector<int64_t>{0, 0, 0, 0});
-}
-
 CATCH_TEST_CASE("slice_sample: Error conditions", TEST_GROUP) {
     Sample sample;
     sample.seq_id = 1;
