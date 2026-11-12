@@ -12,7 +12,7 @@ and new integration tests for the new model have not been added.
   > in_dir=${TEST_DATA_DIR}/variant/test-02-supertiny
   > #
   > source ${TEST_DIR}/cram/variant/helpers.sh
-  > prepare_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
+  > prepare_variant_mock_data "${in_dir}/in.aln.bam" "${TARGET_MODEL}" ${REMOVE_RG} ${REMOVE_DWELLS} "out/in.bam"
   > #
   > ### Run the unit under test.
   > ${DORADO_BIN} smallvar --device cpu out/in.bam ${in_dir}/in.ref.fasta.gz -t 4 --regions "chr20:1-100" -v ${SMALLVAR_PARAMS} > out/out.vcf 2> out/out.stderr
