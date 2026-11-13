@@ -1212,19 +1212,16 @@ Variant collapse_to_haploid(const Variant& var, const bool require_hom) {
     return ret;
 }
 
-std::vector<Variant> general_decode_variants(
-        const DecoderBase& decoder,
-        const VariantCallingSample& vc_sample,
-        const std::string_view draft,
-        const float pass_min_qual,
-        const float pass_min_gq,
-        const float pass_min_aq,
-        const float pass_min_vq,
-        const bool ambig_ref,
-        const bool return_all,
-        const bool merge_overlapping,
-        const bool merge_adjacent,
-        const std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins) {
+std::vector<Variant> general_decode_variants(const DecoderBase& decoder,
+                                             const VariantCallingSample& vc_sample,
+                                             const std::string_view draft,
+                                             const float pass_min_qual,
+                                             const float pass_min_gq,
+                                             const float pass_min_aq,
+                                             const float pass_min_vq,
+                                             const bool ambig_ref,
+                                             const bool merge_overlapping,
+                                             const bool merge_adjacent) {
     // Validate inputs.
     vc_sample.validate();
 
@@ -1385,14 +1382,47 @@ std::vector<Variant> general_decode_variants(
     std::cerr << '\n';
 #endif
 
-    if (return_all) {
-        std::sort(std::begin(variants), std::end(variants));
+    std::sort(std::begin(variants), std::end(variants));
 
-        const std::size_t num_existing_variants = std::size(variants);
-        std::size_t variant_idx = 0;
+    return variants;
+}
+
+std::vector<Variant> make_gvcf_reference_records(
+        const DecoderBase& decoder,
+        const std::span<const VariantCallingSample> vc_samples,
+        const std::string_view draft,
+        const std::span<const Variant> variants,
+        const std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins) {
+    const std::array<int32_t, 256> symbol_lookup =
+            create_symbol_lookup(decoder.get_label_scheme_symbols());
+
+    std::vector<Variant> ret;
+
+    // The variant index is shared between samples, because both are sorted.
+    const std::size_t num_variants = std::size(variants);
+    std::size_t variant_idx = 0;
+
+    for (const VariantCallingSample& vc_sample : vc_samples) {
+        const int32_t seq_id = vc_sample.seq_id;
+        const std::vector<int64_t>& positions_major = vc_sample.positions_major;
+        const std::vector<int64_t>& positions_minor = vc_sample.positions_minor;
+
+        if (std::empty(positions_major)) {
+            continue;
+        }
+
+        // Systematize the input probabilities to support the legacy case (shape [num_pos x num_classes])
+        // and the new case (shape [num_pos x num_haps x num_classes]).
+        const at::Tensor probs_3D = (std::size(vc_sample.logits.sizes()) == 2)
+                                            ? vc_sample.logits.unsqueeze(1)
+                                            : vc_sample.logits;
+        const int32_t num_haplotypes = static_cast<int32_t>(probs_3D.size(1));
+
+        const std::string ref_seq_with_gaps =
+                extract_draft_with_gaps(draft, positions_major, positions_minor);
 
         const auto find_next_variant = [&](std::size_t idx, const int64_t pos) {
-            while ((idx < num_existing_variants) &&
+            while ((idx < num_variants) &&
                    variant_ends_before_position(variants[idx], seq_id, pos)) {
                 ++idx;
             }
@@ -1418,7 +1448,7 @@ std::vector<Variant> general_decode_variants(
 
             const int64_t pos = positions_major[i];
             variant_idx = find_next_variant(variant_idx, pos);
-            if ((variant_idx < num_existing_variants) &&
+            if ((variant_idx < num_variants) &&
                 variant_covers_position(variants[variant_idx], seq_id, pos)) {
                 ++i;
                 continue;
@@ -1446,7 +1476,7 @@ std::vector<Variant> general_decode_variants(
                 const int64_t current_pos = positions_major[i];
                 variant_idx = find_next_variant(variant_idx, current_pos);
                 if ((current_pos != block_end_pos) ||
-                    ((variant_idx < num_existing_variants) &&
+                    ((variant_idx < num_variants) &&
                      variant_covers_position(variants[variant_idx], seq_id, current_pos))) {
                     break;
                 }
@@ -1472,13 +1502,11 @@ std::vector<Variant> general_decode_variants(
 
             add_depth(var, vc_sample.depth);
 
-            variants.emplace_back(std::move(var));
+            ret.emplace_back(std::move(var));
         }
     }
 
-    std::sort(std::begin(variants), std::end(variants));
-
-    return variants;
+    return ret;
 }
 
 std::pair<std::vector<std::string_view>, bool> split_GT_string(const std::string_view gt) {

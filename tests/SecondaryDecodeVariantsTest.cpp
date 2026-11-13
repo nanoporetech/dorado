@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -933,14 +934,21 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
     if (test_case.expect_throw) {
         CATCH_CHECK_THROWS(general_decode_variants(
                 decoder, vc_sample, draft, test_case.pass_min_qual, 0.0f, 0.0f, 0.0f,
-                test_case.ambig_ref, test_case.return_all, test_case.merge_overlapping,
-                test_case.merge_adjacent, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS));
+                test_case.ambig_ref, test_case.merge_overlapping, test_case.merge_adjacent));
 
     } else {
-        const std::vector<Variant> result = general_decode_variants(
+        std::vector<Variant> result = general_decode_variants(
                 decoder, vc_sample, draft, test_case.pass_min_qual, 0.0f, 0.0f, 0.0f,
-                test_case.ambig_ref, test_case.return_all, test_case.merge_overlapping,
-                test_case.merge_adjacent, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                test_case.ambig_ref, test_case.merge_overlapping, test_case.merge_adjacent);
+
+        // Add the gVCF reference records for all non-variant positions.
+        if (test_case.return_all) {
+            const std::vector<Variant> ref_records =
+                    make_gvcf_reference_records(decoder, std::span{&vc_sample, 1}, draft, result,
+                                                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+            result.insert(std::end(result), std::begin(ref_records), std::end(ref_records));
+            std::sort(std::begin(result), std::end(result));
+        }
 
         CATCH_CHECK(test_case.expected == result);
     }
@@ -993,7 +1001,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
 
     const auto decode = [&](const VariantCallingSample& sample, const std::string_view ref) {
         return general_decode_variants(decoder, sample, ref, 10.0f, 0.0f, 0.0f, 0.0f, false, false,
-                                       false, false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                                       false);
     };
 
     CATCH_SECTION("counts matching ref and alt allele") {
@@ -1057,8 +1065,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
         };
 
         const std::vector<Variant> result = general_decode_variants(
-                decoder, sample, "ACGA", 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, sample, "ACGA", 0.0f, 0.0f, 0.0f, 0.0f, false, true, false);
 
         CATCH_REQUIRE(std::size(result) == 1);
         CATCH_CHECK(std::cbegin(result)->ref == "C");
@@ -1088,8 +1095,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
                                           make_basecalls({"AA--GA", "AA---A", "A---GA"})};
 
         const std::vector<Variant> result = general_decode_variants(
-                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, true, false);
 
         CATCH_REQUIRE(std::size(result) == 1);
         CATCH_CHECK(std::cbegin(result)->ref == "ACC");
@@ -1113,8 +1119,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
                 make_basecalls({"AA--GA", "AAT--A", "AA--GA", "AAT-GA", "AATG-A"})};
 
         const std::vector<Variant> result = general_decode_variants(
-                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, true, false);
 
         CATCH_REQUIRE(std::size(result) == 1);
         CATCH_CHECK(std::cbegin(result)->ref == "ACC");
@@ -1172,9 +1177,8 @@ CATCH_TEST_CASE("join_samples joins a long insertion split between multiple samp
 
     std::vector<Variant> result;
     for (const VariantCallingSample& sample : joined) {
-        std::vector<Variant> variants = general_decode_variants(
-                decoder, sample, draft, 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+        std::vector<Variant> variants = general_decode_variants(decoder, sample, draft, 0.0f, 0.0f,
+                                                                0.0f, 0.0f, false, true, false);
         result.insert(std::end(result), std::begin(variants), std::end(variants));
     }
     CATCH_REQUIRE(std::size(result) == 1);
@@ -1204,9 +1208,8 @@ CATCH_TEST_CASE("decode_variants with a sample starting on an insertion column",
             at::Tensor{},
     };
 
-    const std::vector<Variant> result =
-            general_decode_variants(decoder, sample, draft, 0.0f, 0.0f, 0.0f, 0.0f, false, false,
-                                    false, false, DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+    const std::vector<Variant> result = general_decode_variants(decoder, sample, draft, 0.0f, 0.0f,
+                                                                0.0f, 0.0f, false, false, false);
 
     CATCH_REQUIRE(std::size(result) == 1);
     CATCH_CHECK(result.front().pos == 2);

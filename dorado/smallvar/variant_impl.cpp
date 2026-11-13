@@ -1472,7 +1472,15 @@ std::vector<secondary::VariantCallingSample> apply_trim(
 
 namespace {
 
-std::pair<std::vector<secondary::Variant>, std::vector<secondary::IntervalInt64>>
+/**
+ * \brief Decodes the variants of a single chromosome.
+ * \returns {variants, merge_regions, decoded_samples}. The decoded samples are the trimmed, joined and
+ *          split samples from which the variants were decoded. They are needed for the gVCF reference
+ *          records, which are created only after the final normalization and filtering.
+ */
+std::tuple<std::vector<secondary::Variant>,
+           std::vector<secondary::IntervalInt64>,
+           std::vector<secondary::VariantCallingSample>>
 call_variants_single_chrom(const std::string& draft,
                            std::vector<secondary::VariantCallingSample> vc_input_data,
                            const secondary::DecoderBase& decoder,
@@ -1577,7 +1585,7 @@ call_variants_single_chrom(const std::string& draft,
     for (const auto& vc_sample : flank_trimmed_samples) {
         std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                 decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq, pass_min_vq,
-                ambig_ref, gvcf, true, true, secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                ambig_ref, true, true);
 
         results.insert(std::end(results), std::make_move_iterator(std::begin(variants)),
                        std::make_move_iterator(std::end(variants)));
@@ -1590,7 +1598,7 @@ call_variants_single_chrom(const std::string& draft,
     // Sort the variants.
     std::stable_sort(std::begin(results), std::end(results));
 
-    return {std::move(results), std::move(merge_regions)};
+    return {std::move(results), std::move(merge_regions), std::move(flank_trimmed_samples)};
 }
 
 std::vector<secondary::Interval64> merge_intervals(
@@ -1932,6 +1940,7 @@ void worker_variant_calling_reduce(
 
         std::vector<secondary::Variant> variants;
         std::vector<secondary::IntervalInt64> merge_regions;
+        std::vector<secondary::VariantCallingSample> decoded_samples;
         reduce_data.processed_regions = make_processed_regions(vc_decode_data);
         if (!std::empty(vc_decode_data)) {
             const bool merge_with_simple =
@@ -1939,7 +1948,7 @@ void worker_variant_calling_reduce(
             const std::vector<secondary::Variant> empty_simple_variants;
             const auto& simple_variants =
                     merge_with_simple ? reduce_data.variants_simple : empty_simple_variants;
-            std::tie(variants, merge_regions) = call_variants_single_chrom(
+            std::tie(variants, merge_regions, decoded_samples) = call_variants_single_chrom(
                     *draft, std::move(vc_decode_data), decoder, simple_variants,
                     merge_with_simple ? flank_trim : 0, pass_min_qual, pass_min_gq, pass_min_aq,
                     pass_min_vq, ambig_ref, gvcf, hemizygous_boundaries);
@@ -1978,6 +1987,22 @@ void worker_variant_calling_reduce(
         if (gvcf) {
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));
+
+            // Reference records of the inference samples. Created only after the final normalization
+            // and filtering, so that they do not block the normalization.
+            if (!std::empty(decoded_samples)) {
+                std::vector<secondary::Variant> ref_records =
+                        secondary::make_gvcf_reference_records(
+                                decoder, decoded_samples, *draft, reduce_data.variants_merged,
+                                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                reduce_data.variants_merged.insert(std::end(reduce_data.variants_merged),
+                                                   std::make_move_iterator(std::begin(ref_records)),
+                                                   std::make_move_iterator(std::end(ref_records)));
+                std::stable_sort(std::begin(reduce_data.variants_merged),
+                                 std::end(reduce_data.variants_merged));
+            }
+
+            // Reference records of the regions which were not processed by inference.
             std::stable_sort(std::begin(reduce_data.read_endpoints),
                              std::end(reduce_data.read_endpoints));
             add_gvcf_reference_records_for_unprocessed_regions(

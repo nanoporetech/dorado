@@ -176,24 +176,41 @@ Variant construct_variant(std::string_view draft,
  * \param vc_sample A VariantCallingSample containing ref ID, positions and output scores.
  * \param draft The entire input draft/reference sequence.
  * \param ambig_ref Allow ambiguous reference bases (`N`) for variant calling.
- * \param return_all Returns gVCF records for all reference positions, including the non-variant ones.
  * \param merge_overlapping Overlapping variants will be merged and deduplicated.
  * \param merge_adjacent Variants which are immediately adjacent will be merged into a single larger variant.
  * \returns Normalized variants for the input sample. All variants of the sample are normalized together
  *          with normalize_variants_vs_haplotypes, after they are constructed from the haplotypes.
  */
-std::vector<Variant> general_decode_variants(
+std::vector<Variant> general_decode_variants(const DecoderBase& decoder,
+                                             const VariantCallingSample& vc_sample,
+                                             const std::string_view draft,
+                                             const float pass_min_qual,
+                                             const float pass_min_gq,
+                                             const float pass_min_aq,
+                                             const float pass_min_vq,
+                                             bool ambig_ref,
+                                             bool merge_overlapping,
+                                             bool merge_adjacent);
+
+/**
+ * \brief Creates gVCF reference records (blocks) for all reference positions of the inference samples
+ *          which are not covered by any of the given variants. The GQ of each block is computed from
+ *          the probabilities of its sample, and blocks never span across samples.
+ *        This should be called on the final variants (after normalization and filtering), because the
+ *          reference records do not move with the variants and would act as barriers to normalization.
+ * \param decoder The decoder which contains the label scheme.
+ * \param vc_samples Inference samples of a single sequence, sorted by position and non-overlapping.
+ * \param draft The entire input draft/reference sequence.
+ * \param variants Final variants of the same sequence, sorted by position.
+ * \param gvcf_reference_block_gq_margins Allowed GQ deviation within a block, depending on the GQ of the
+ *          first position of the block.
+ * \returns Only the new reference records, sorted by position.
+ */
+std::vector<Variant> make_gvcf_reference_records(
         const DecoderBase& decoder,
-        const VariantCallingSample& vc_sample,
-        const std::string_view draft,
-        const float pass_min_qual,
-        const float pass_min_gq,
-        const float pass_min_aq,
-        const float pass_min_vq,
-        bool ambig_ref,
-        bool return_all,
-        bool merge_overlapping,
-        bool merge_adjacent,
+        std::span<const VariantCallingSample> vc_samples,
+        std::string_view draft,
+        std::span<const Variant> variants,
         std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins);
 
 /**
