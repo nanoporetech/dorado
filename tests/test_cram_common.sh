@@ -29,16 +29,16 @@ TEST_DATA_DIR=${TEST_DIR}/data
 DORADO_BIN=$(cd "$(dirname ${IN_DORADO_BIN})"; pwd -P)/$(basename ${IN_DORADO_BIN})
 
 # Output directory. Either user specified or generated.
-output_dir=$(cd "${OUT_DIR}"; pwd -P)
+OUTPUT_DIR=$(cd "${OUT_DIR}"; pwd -P)
 if [[ "${OUT_DIR}" == "" ]]; then
     output_dir_name=${fallback_output_dir}_${RANDOM}
-    output_dir=${TEST_DIR}/${output_dir_name}
+    OUTPUT_DIR=${TEST_DIR}/${output_dir_name}
 fi
 
-mkdir -p ${output_dir}
+mkdir -p ${OUTPUT_DIR}
 
 # Download the Cram package.
-pushd ${output_dir}
+pushd ${OUTPUT_DIR}
     if [ ! -d cram-0.6 ]; then
         curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
         tar -xzf cram-0.6.tar.gz
@@ -61,7 +61,7 @@ function run_cram_tests() {
     export DORADO_BIN
     export TEST_DATA_DIR
     export TEST_DIR
-    export OUTPUT_DIR=${output_dir}
+    export OUTPUT_DIR
     python3 \
         ${CRAM} \
         --verbose \
