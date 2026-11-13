@@ -12,6 +12,47 @@
 
 namespace dorado::secondary {
 
+namespace {
+
+// Rows without a read are labelled with blank placeholder ID. Blank IDs
+// are never matched by name, but they can be paired with any unmatched row.
+bool is_blank(const std::string_view rid) { return rid == BLANK_READ_PLACEHOLDER; }
+
+/**
+ * \brief Checks whether the rows of the new chunk can stay where they are. This is the case if
+ *          (1) any read ID common to both vectors is at the same index in both, and
+ *          (2) no two different named (non-blank) IDs would share a row.
+ *          Rows paired by index where at least one ID is blank are acceptable.
+ */
+bool ordering_is_valid(const std::vector<std::string>& prev_rids_out,
+                       const std::vector<std::string>& rids_in) {
+    const size_t num_shared = std::min(std::size(prev_rids_out), std::size(rids_in));
+    for (size_t i = 0; i < num_shared; ++i) {
+        if ((prev_rids_out[i] != rids_in[i]) && !is_blank(prev_rids_out[i]) &&
+            !is_blank(rids_in[i])) {
+            return false;
+        }
+    }
+
+    std::unordered_map<std::string_view, size_t> prev_rids_out_map;
+    for (size_t i = 0; i < std::size(prev_rids_out); ++i) {
+        if (!is_blank(prev_rids_out[i])) {
+            prev_rids_out_map.try_emplace(prev_rids_out[i], i);
+        }
+    }
+    for (size_t i = 0; i < std::size(rids_in); ++i) {
+        const auto it = is_blank(rids_in[i]) ? std::end(prev_rids_out_map)
+                                             : prev_rids_out_map.find(rids_in[i]);
+        if ((it != std::end(prev_rids_out_map)) && (it->second != i)) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+}  // namespace
+
 std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
         const at::Tensor& chunk,
         const std::vector<std::string>& prev_rids_out,
@@ -30,9 +71,29 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
                "chunk.shape = [{}]",
                std::size(prev_rids_out), std::size(rids_in), utils::tensor_shape_as_string(chunk));
 
-    // Rows without a read are labelled with blank placeholder ID. Blank IDs
-    // are never matched by name, but they can be paired with any unmatched row.
-    const auto is_blank = [](const std::string_view rid) { return rid == BLANK_READ_PLACEHOLDER; };
+    // If the rows are already in a valid order, avoid reordering. This can leave unnecessary
+    // empty rows, but is cheaper than permuting the chunk.
+    if (ordering_is_valid(prev_rids_out, rids_in)) {
+        DORADO_LOG(trace, "[reorder_chunk] Current row order is valid, skipping reordering.");
+
+        const int64_t num_prev = std::ssize(prev_rids_out);
+        const int64_t num_in = std::ssize(rids_in);
+
+        // Pad with empty rows only if the previous chunk is deeper.
+        at::Tensor padded_chunk = chunk;
+        std::vector<std::string> next_rids_out = rids_out;
+        if (num_prev > num_in) {
+            padded_chunk = at::cat(
+                    {chunk,
+                     at::zeros({chunk.size(0), num_prev - num_in, chunk.size(2)}, chunk.options())},
+                    /*dim=*/1);
+            next_rids_out.reserve(num_prev);
+            for (int64_t i = num_in; i < num_prev; ++i) {
+                next_rids_out.emplace_back(BLANK_READ_PLACEHOLDER);
+            }
+        }
+        return {std::move(padded_chunk), std::move(next_rids_out)};
+    }
 
     // Create a lookup of the named reads.
     std::unordered_map<std::string_view, int64_t> rids_in_map;
