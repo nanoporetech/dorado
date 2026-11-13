@@ -46,7 +46,8 @@ This version of Dorado includes a new v6.1 basecalling model for DNA and a new b
 * b0434f1bd0c5ec998ca4a8942c37430af50e72ca - Improve performance of Poly(A) detection.
 * 770481394030ee438dcfec17b9d0d0f1aee69d9a - AVX2 optimisations for Windows builds.
 * bbc1536031464ef14004ba4025f0af27c5563b34 - Fix empty LB tag emission if sample_id is absent.
-* 478e869015cccb41dd30ca2d2fc6d7ba325e5672 - Updated to POD5 0.3.47
+* 3605923630052bb30e60733248b47143d1b47796 - Updated to POD5 0.3.49
+* a0a2f0c5fb5acb62db29eb7e124d36654c6efc77 - Updated htslib to 1.24.
 
 
 # [1.3.4] (3 September 2026)
