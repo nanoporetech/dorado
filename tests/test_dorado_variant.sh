@@ -57,6 +57,14 @@ do
   fi
 done
 
+# Shard the tests.
+tests_to_run=( $(ls ${TEST_DIR}/cram/variant/*.t) )
+if [[ -n $SHARD_COUNT ]] && [[ -n $SHARD_IDX ]]
+    shard_size=$(( ( ${#tests_to_run[@]} + ${SHARD_COUNT} - 1) / ${SHARD_COUNT} ))
+    shard_start=$(( ${shard_size} * ${SHARD_IDX} ))
+    tests_to_run=${tests_to_run[@]:${shard_start}:${shard_size}}
+fi
+
 export DORADO_BIN
 export TEST_DATA_DIR
 export TEST_DIR
@@ -68,4 +76,4 @@ python3 \
     ${CRAM} \
     --verbose \
     --shell=${TEST_DIR}/cram/cram_shell_wrapper.sh \
-    ${TEST_DIR}/cram/variant/*.t
+    ${tests_to_run[@]}

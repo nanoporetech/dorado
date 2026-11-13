@@ -49,6 +49,14 @@ if [[ ! -d "${MODEL_DIR}" ]]; then
     ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${MODEL_ROOT_DIR}
 fi
 
+# Shard the tests.
+tests_to_run=( $(ls ${TEST_DIR}/cram/correct/*.t) )
+if [[ -n $SHARD_COUNT ]] && [[ -n $SHARD_IDX ]]
+    shard_size=$(( ( ${#tests_to_run[@]} + ${SHARD_COUNT} - 1) / ${SHARD_COUNT} ))
+    shard_start=$(( ${shard_size} * ${SHARD_IDX} ))
+    tests_to_run=${tests_to_run[@]:${shard_start}:${shard_size}}
+fi
+
 export DORADO_BIN
 export TEST_DATA_DIR
 export MODEL_DIR
@@ -59,4 +67,4 @@ python3 \
     ${CRAM} \
     --verbose \
     --shell=${TEST_DIR}/cram/cram_shell_wrapper.sh \
-   ${TEST_DIR}/cram/correct/*.t
+    ${tests_to_run[@]}
