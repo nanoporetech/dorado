@@ -1,51 +1,17 @@
 #!/bin/bash
-
+#
 # Integration tests for Dorado Polish.
+#
 
-set -ex
-set -o pipefail
-
-if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <dorado executable> [<out_dir>]"
-    exit 1
-fi
-
-if [[ $# -eq 2 ]]; then
-    mkdir -p $2
-fi
-
-# CLI options.
-IN_DORADO_BIN="$1"
-OUT_DIR="$2"
-
-TEST_DIR=$(cd "$(dirname $0)"; pwd -P)
-TEST_DATA_DIR=${TEST_DIR}/data
-DORADO_BIN=$(cd "$(dirname ${IN_DORADO_BIN})"; pwd -P)/$(basename ${IN_DORADO_BIN})
-
-# Output directory. Either user specified or generated.
-output_dir=$(cd "${OUT_DIR}"; pwd -P)
-if [[ "${OUT_DIR}" == "" ]]; then
-    output_dir_name=test_output_polish_${RANDOM}
-    output_dir=${TEST_DIR}/${output_dir_name}
-fi
-
-mkdir -p ${output_dir}
-
-# Download the Cram package.
-pushd ${output_dir}
-if [ ! -d cram-0.6 ]; then
-    curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
-    tar -xzf cram-0.6.tar.gz
-fi
-CRAM=$(pwd)/cram-0.6/cram.py
-popd
+# Common setup.
+fallback_output_dir="test_output_polish"
+source "$(dirname $0)/test_cram_common.sh"
 
 SMALLVAR_MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.2.0_smallvar@v1.0"
 POLISH_MODEL_NAME="dna_r10.4.1_e8.2_400bps_hac@v5.0.0_polish_rl_mv"
 
-ALL_MODELS=$(${DORADO_BIN} download --list-structured 2>/dev/null | grep "polish" | sed -E 's/^[^"]*"([^"]*)".*/\1/' | grep -v "polish_models" | sort -u)
-
 # Download the models once.
+ALL_MODELS=$(${DORADO_BIN} download --list-structured 2>/dev/null | grep "polish" | sed -E 's/^[^"]*"([^"]*)".*/\1/' | grep -v "polish_models" | sort -u)
 for model in ${SMALLVAR_MODEL_NAME} ${ALL_MODELS}
 do
   model_dir=${output_dir}/${model}
@@ -54,23 +20,8 @@ do
   fi
 done
 
-# Shard the tests.
-tests_to_run=( $(ls ${TEST_DIR}/cram/polish/*.t) )
-if [[ -n $SHARD_COUNT ]] && [[ -n $SHARD_IDX ]]
-    shard_size=$(( ( ${#tests_to_run[@]} + ${SHARD_COUNT} - 1) / ${SHARD_COUNT} ))
-    shard_start=$(( ${shard_size} * ${SHARD_IDX} ))
-    tests_to_run=${tests_to_run[@]:${shard_start}:${shard_size}}
-fi
-
-export DORADO_BIN
-export TEST_DATA_DIR
-export TEST_DIR
+# Run the tests.
 export MODEL_ROOT_DIR=${output_dir}
 export POLISH_MODEL=${MODEL_ROOT_DIR}/${POLISH_MODEL_NAME}
 export SMALLVAR_MODEL=${MODEL_ROOT_DIR}/${SMALLVAR_MODEL_NAME}
-export OUTPUT_DIR=${output_dir}
-python3 \
-    ${CRAM} \
-    --verbose \
-    --shell=${TEST_DIR}/cram/cram_shell_wrapper.sh \
-    ${tests_to_run[@]}
+run_cram_tests "polish"
