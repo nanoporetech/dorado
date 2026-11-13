@@ -168,8 +168,16 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             DORADO_LOG(trace, "[reorder_reads] n = {}, done.", n);
         }
 
+        // Rows added by reordering later chunks (and zero-padded in the first chunk) have no left
+        // read ID. Label them the same way as `reorder_chunk` labels inserted rows.
+        std::vector<std::string> new_left_rids = read_ids_in[0];
+        new_left_rids.reserve(std::size(prev_rids_out));
+        for (std::size_t i = std::size(new_left_rids); i < std::size(prev_rids_out); ++i) {
+            new_left_rids.emplace_back("__inserted_" + std::to_string(i));
+        }
+
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                          std::vector<std::string>>{reordered_chunks, read_ids_in[0],
+                          std::vector<std::string>>{reordered_chunks, std::move(new_left_rids),
                                                     prev_rids_out};
     };
 
