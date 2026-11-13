@@ -1,4 +1,5 @@
 #include "secondary/features/encoder_utils.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
@@ -11,6 +12,49 @@
 #define TEST_GROUP "[SecondaryEncoderUtils]"
 
 namespace dorado::secondary::tests {
+
+CATCH_TEST_CASE("plan_chunk_reorder", TEST_GROUP) {
+    const std::string blank(BLANK_READ_PLACEHOLDER);
+    using Ids = std::vector<std::string>;
+    using Rows = std::vector<int64_t>;
+
+    CATCH_SECTION("Equal IDs, rows stay in place") {
+        const ChunkReorderPlan plan = plan_chunk_reorder({"A", "B"}, {"A", "B"}, {"oA", "oB"});
+        CATCH_CHECK_FALSE(plan.requires_reorder);
+        CATCH_CHECK(plan.src_rows == Rows{0, 1});
+        CATCH_CHECK(plan.next_rids_out == Ids{"oA", "oB"});
+    }
+
+    CATCH_SECTION("Valid order, previous chunk is deeper, rows are added") {
+        const ChunkReorderPlan plan =
+                plan_chunk_reorder({"A", "B", "C"}, {"A", blank}, {"oA", "oBlank"});
+        CATCH_CHECK_FALSE(plan.requires_reorder);
+        CATCH_CHECK(plan.src_rows == Rows{0, 1, -1});
+        CATCH_CHECK(plan.next_rids_out == Ids{"oA", "oBlank", blank});
+    }
+
+    CATCH_SECTION("Valid order, this chunk is deeper") {
+        const ChunkReorderPlan plan = plan_chunk_reorder({"A"}, {"A", "B"}, {"oA", "oB"});
+        CATCH_CHECK_FALSE(plan.requires_reorder);
+        CATCH_CHECK(plan.src_rows == Rows{0, 1});
+        CATCH_CHECK(plan.next_rids_out == Ids{"oA", "oB"});
+    }
+
+    CATCH_SECTION("Rows are permuted and an empty row is left for a read which ended") {
+        const ChunkReorderPlan plan = plan_chunk_reorder({"A", "B", "C"}, {"C", "A"}, {"oC", "oA"});
+        CATCH_CHECK(plan.requires_reorder);
+        CATCH_CHECK(plan.src_rows == Rows{1, -1, 0});
+        CATCH_CHECK(plan.next_rids_out == Ids{"oA", blank, "oC"});
+    }
+
+    CATCH_SECTION("Different named reads are not paired, rows are added") {
+        const ChunkReorderPlan plan = plan_chunk_reorder({"A", "B"}, {"C", "D"}, {"oC", "oD"});
+        CATCH_CHECK(plan.requires_reorder);
+        CATCH_CHECK(plan.src_rows == Rows{-1, -1, 0, 1});
+        CATCH_CHECK(plan.next_rids_out == Ids{blank, blank, "oC", "oD"});
+    }
+}
+
 CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
     struct TestCase {
         std::string test_name;
@@ -694,6 +738,284 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
     } else {
         CATCH_CHECK(test_case.expected_reordered_chunk.equal(result_reordered_chunk));
         CATCH_CHECK(test_case.expected_out_ids == result_out_ids);
+    }
+}
+
+CATCH_TEST_CASE("merge_read_chunks", TEST_GROUP) {
+    const std::string blank(BLANK_READ_PLACEHOLDER);
+    const auto make_tensor = [](const std::vector<int8_t>& values,
+                                const std::vector<int64_t>& shape) {
+        return at::tensor(values, at::kChar).reshape(shape);
+    };
+
+    struct TestCase {
+        std::string test_name;
+        std::vector<at::Tensor> chunks;
+        std::vector<std::vector<std::string>> left_rids;
+        std::vector<std::vector<std::string>> right_rids;
+        bool should_throw{false};
+        at::Tensor expected_chunk;
+        std::vector<std::string> expected_left_rids;
+        std::vector<std::string> expected_right_rids;
+    };
+
+    auto [test_case] = GENERATE_REF(table<TestCase>({
+            TestCase{"Empty input returns empty", {}, {}, {}, false, {}, {}, {}},
+            TestCase{
+                    "Single chunk is returned unchanged",
+                    {make_tensor({0, 1, 2, 3}, {2, 2})},
+                    {{"l0", "l1"}},
+                    {{"r0", "r1"}},
+                    false,
+                    make_tensor({0, 1, 2, 3}, {2, 2}),
+                    {"l0", "l1"},
+                    {"r0", "r1"},
+            },
+
+            TestCase{
+                    "Same depth, no padding, equals a concatenation",
+                    {make_tensor({0, 1, 2, 3}, {2, 2}), make_tensor({4, 5, 6, 7}, {2, 2})},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"r0", "r1"}},
+                    false,
+                    make_tensor({0, 1, 2, 3, 4, 5, 6, 7}, {4, 2}),
+                    {"l0", "l1"},
+                    {"r0", "r1"},
+            },
+
+            TestCase{
+                    "Depth grows 2 -> 3 -> 4, padded once",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({3, 4, 5}, {1, 3}),
+                     make_tensor({6, 7, 8, 9}, {1, 4})},
+                    {{"l0", "l1"}, {"a", "b", "c"}, {"d", "e", "f", "g"}},
+                    {{"a", "b"}, {"d", "e", "f"}, {"h", "i", "j", "k"}},
+                    false,
+                    make_tensor({1, 2, 0, 0, 3, 4, 5, 0, 6, 7, 8, 9}, {3, 4}),
+                    {"l0", "l1", blank, blank},
+                    {"h", "i", "j", "k"},
+            },
+
+            TestCase{
+                    "Depth grows then shrinks 3 -> 4 -> 2, padded once",
+                    {make_tensor({1, 2, 3}, {1, 3}), make_tensor({4, 5, 6, 7}, {1, 4}),
+                     make_tensor({8, 9}, {1, 2})},
+                    {{"l0", "l1", "l2"}, {"a", "b", "c", "d"}, {"e", "f"}},
+                    {{"a", "b", "c"}, {"e", "f", "g", "h"}, {"x", "y"}},
+                    false,
+                    make_tensor({1, 2, 3, 0, 4, 5, 6, 7, 8, 9, 0, 0}, {3, 4}),
+                    {"l0", "l1", "l2", blank},
+                    {"x", "y", blank, blank},
+            },
+
+            // Second chunk has reads (b, N, a) while the first chunk ended with reads (a, b).
+            // Rows of the second chunk are placed as (a, b, N). Chunks are [1 x reads x 2].
+            TestCase{
+                    "Permuted chunk with padding, 3D chunks with 2 features",
+                    {make_tensor({1, 2, 3, 4}, {1, 2, 2}),
+                     make_tensor({10, 11, 20, 21, 30, 31}, {1, 3, 2})},
+                    {{"l0", "l1"}, {"b", "N", "a"}},
+                    {{"a", "b"}, {"ob", "oN", "oa"}},
+                    false,
+                    make_tensor({1, 2, 3, 4, 0, 0, 30, 31, 10, 11, 20, 21}, {2, 3, 2}),
+                    {"l0", "l1", blank},
+                    {"oa", "ob", "oN"},
+            },
+
+            // Chunks of 2, 3 and 1 positions. The second chunk is permuted (b, N, a) -> (a, b, N)
+            // and the first is padded, with the third chunk following at offset 2 + 3.
+            TestCase{
+                    "Chunks with different numbers of positions, permuted and padded",
+                    {make_tensor({1, 2, 3, 4}, {2, 2}),
+                     make_tensor({10, 11, 12, 13, 14, 15, 16, 17, 18}, {3, 3}),
+                     make_tensor({20, 21, 22}, {1, 3})},
+                    {{"l0", "l1"}, {"b", "N", "a"}, {"oa", "ob", "oN"}},
+                    {{"a", "b"}, {"ob", "oN", "oa"}, {"x", "y", "z"}},
+                    false,
+                    make_tensor({1, 2, 0, 3, 4, 0, 12, 10, 11, 15, 13, 14, 18, 16, 17, 20, 21, 22},
+                                {6, 3}),
+                    {"l0", "l1", blank},
+                    {"x", "y", "z"},
+            },
+
+            // The third chunk is reordered against the right IDs of the reordered, padded second
+            // chunk (oa, ob, oN), which adds a row. The depth is 4 for all chunks in the end.
+            TestCase{
+                    "Three chunks, the third is reordered against the reordered second",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({3, 4, 5}, {1, 3}),
+                     make_tensor({6, 7, 8}, {1, 3})},
+                    {{"l0", "l1"}, {"b", "N", "a"}, {"oN", "oa", "Z"}},
+                    {{"a", "b"}, {"ob", "oN", "oa"}, {"pN", "pa", "pZ"}},
+                    false,
+                    make_tensor({1, 2, 0, 0, 5, 3, 4, 0, 7, 0, 6, 8}, {3, 4}),
+                    {"l0", "l1", blank, blank},
+                    {"pa", blank, "pN", "pZ"},
+            },
+
+            // The first chunk is the deepest, so the left IDs need no padding and the shallower
+            // second chunk is padded.
+            TestCase{
+                    "First chunk is the deepest, later chunk is padded",
+                    {make_tensor({1, 2, 3, 4}, {1, 4}), make_tensor({5, 6}, {1, 2})},
+                    {{"l0", "l1", "l2", "l3"}, {"a", "b"}},
+                    {{"a", "b", "c", "d"}, {"e", "f"}},
+                    false,
+                    make_tensor({1, 2, 3, 4, 5, 6, 0, 0}, {2, 4}),
+                    {"l0", "l1", "l2", "l3"},
+                    {"e", "f", blank, blank},
+            },
+
+            // Chunks which are [positions x reads x 2] views of larger tensors, sliced on the reads
+            // dimension as produced by the read matrix tensors. The second chunk is permuted.
+            TestCase{
+                    "Non-contiguous 3D chunks, permuted and padded",
+                    {make_tensor({1, 2, 3, 4, 9, 9, 9, 9, 5, 6, 7, 8, 9, 9, 9, 9}, {2, 4, 2})
+                             .slice(1, 0, 2),
+                     make_tensor({10, 11, 20, 21, 30, 31, 99, 99, 99, 99,
+                                  12, 13, 22, 23, 32, 33, 99, 99, 99, 99},
+                                 {2, 5, 2})
+                             .slice(1, 0, 3)},
+                    {{"l0", "l1"}, {"b", "N", "a"}},
+                    {{"a", "b"}, {"ob", "oN", "oa"}},
+                    false,
+                    make_tensor({1,  2,  3,  4,  0,  0,  5,  6,  7,  8,  0,  0,
+                                 30, 31, 10, 11, 20, 21, 32, 33, 12, 13, 22, 23},
+                                {4, 3, 2}),
+                    {"l0", "l1", blank},
+                    {"oa", "ob", "oN"},
+            },
+
+            TestCase{
+                    "Chunk with zero depth first, the other chunk is padded",
+                    {make_tensor({}, {1, 0}), make_tensor({5, 6}, {1, 2})},
+                    {{}, {"a", "b"}},
+                    {{}, {"c", "d"}},
+                    false,
+                    make_tensor({0, 0, 5, 6}, {2, 2}),
+                    {blank, blank},
+                    {"c", "d"},
+            },
+
+            TestCase{
+                    "Chunk with zero depth last is padded",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({}, {1, 0})},
+                    {{"a", "b"}, {}},
+                    {{"c", "d"}, {}},
+                    false,
+                    make_tensor({1, 2, 0, 0}, {2, 2}),
+                    {"a", "b"},
+                    {blank, blank},
+            },
+
+            TestCase{
+                    "Chunk with zero positions adds no rows",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({}, {0, 2})},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"c", "d"}},
+                    false,
+                    make_tensor({1, 2}, {1, 2}),
+                    {"l0", "l1"},
+                    {"c", "d"},
+            },
+
+            TestCase{
+                    "Undefined first chunk throws",
+                    {at::Tensor{}, make_tensor({1, 2}, {1, 2})},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+
+            TestCase{
+                    "Undefined chunks throw",
+                    {make_tensor({1, 2}, {1, 2}), at::Tensor{}},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+
+            TestCase{
+                    "Chunks which are not at least 2D throw",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({3, 4}, {2})},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+
+            TestCase{
+                    "Chunks with different inner shape throw",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({3, 4}, {1, 2, 1})},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+
+            TestCase{
+                    "3D chunks with different feature sizes throw",
+                    {make_tensor({1, 2, 3, 4}, {1, 2, 2}),
+                     make_tensor({1, 2, 3, 4, 5, 6}, {1, 2, 3})},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+
+            TestCase{
+                    "Chunks with different dtype throw",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({3, 4}, {1, 2}).to(at::kInt)},
+                    {{"l0", "l1"}, {"a", "b"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+
+            TestCase{
+                    "Read IDs which do not match the depth of the chunk throw",
+                    {make_tensor({1, 2}, {1, 2}), make_tensor({3, 4}, {1, 2})},
+                    {{"l0", "l1"}, {"a", "b", "c"}},
+                    {{"a", "b"}, {"d", "e"}},
+                    true,
+                    {},
+                    {},
+                    {},
+            },
+    }));
+
+    CATCH_INFO(TEST_GROUP << " Test name: " << test_case.test_name);
+
+    if (test_case.should_throw) {
+        CATCH_CHECK_THROWS_AS(
+                merge_read_chunks(test_case.chunks, test_case.left_rids, test_case.right_rids),
+                std::runtime_error);
+    } else {
+        const auto [merged_chunk, merged_read_ids_left, merged_read_ids_right] =
+                merge_read_chunks(test_case.chunks, test_case.left_rids, test_case.right_rids);
+        if (test_case.expected_chunk.defined()) {
+            CATCH_CHECK(merged_chunk.equal(test_case.expected_chunk));
+        } else {
+            CATCH_CHECK_FALSE(merged_chunk.defined());
+        }
+        CATCH_CHECK(merged_read_ids_left == test_case.expected_left_rids);
+        CATCH_CHECK(merged_read_ids_right == test_case.expected_right_rids);
+        // Inputs are released once copied.
+        for (const auto& chunk : test_case.chunks) {
+            CATCH_CHECK_FALSE(chunk.defined());
+        }
     }
 }
 

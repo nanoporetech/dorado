@@ -5,7 +5,6 @@
 #include "secondary/consensus/sample_trimming.h"
 #include "secondary/features/decoder_base.h"
 #include "secondary/features/encoder_utils.h"
-#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/log_utils.h"
 
@@ -314,161 +313,120 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
     return slice_vc_sample(vc_sample, start_idx, end_idx, true);
 }
 
-std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples) {
-    // modified from secondary/features/encoder_read_alignment.cpp
-    const auto cat_vectors_in_place = [](std::vector<int64_t>& v1, const std::vector<int64_t>& v2) {
-        v1.reserve(std::size(v1) + std::size(v2));
-        v1.insert(std::end(v1), std::cbegin(v2), std::cend(v2));
-    };
+namespace {
 
-    const auto pad_reads = [](std::vector<at::Tensor> chunks, int64_t target_depth) {
-        // Determine the target depth if not provided
-        if (target_depth < 0) {
-            target_depth = 0;
-            for (const auto& chunk : chunks) {
-                target_depth = std::max(target_depth, chunk.size(1));
-            }
-        }
-
-        bool needs_padding = false;
-        for (const auto& chunk : chunks) {
-            if (chunk.size(1) < target_depth) {
-                needs_padding = true;
-                break;
-            }
-        }
-        if (!needs_padding) {
-            return chunks;
-        }
-
-        // Pad each chunk to match the target depth
-        std::vector<at::Tensor> padded_chunks;
-        for (auto& chunk : chunks) {
-            const int64_t pad_depth = target_depth - chunk.size(1);
-            if (pad_depth > 0) {
-                auto padding = at::zeros({chunk.size(0), pad_depth}, chunk.options());
-                auto concated = at::cat({std::move(chunk), std::move(padding)}, 1);
-                padded_chunks.emplace_back(std::move(concated));
-            } else {
-                padded_chunks.emplace_back(std::move(chunk));
-            }
-        }
-
-        return padded_chunks;
-    };
-
-    /**
-     * \brief This lambda reorders reads in the chunk tensors, because some rows (reads) may be missing
-     *          between neighboring samples (e.g. some reads end/begin).
-     */
-    const auto reorder_reads = [](std::vector<at::Tensor> chunks,
-                                  const std::vector<std::vector<std::string>>& read_ids_in,
-                                  const std::vector<std::vector<std::string>>& read_ids_out) {
-        if (std::size(chunks) < 2) {
-            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                              std::vector<std::string>>{std::move(chunks), read_ids_in.front(),
-                                                        read_ids_out.back()};
-        }
-
-        bool already_ordered = true;
-        for (std::size_t n = 1; n < std::size(chunks); ++n) {
-            if (read_ids_out[n - 1] != read_ids_in[n]) {
-                already_ordered = false;
-                break;
-            }
-        }
-        if (already_ordered) {
-            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                              std::vector<std::string>>{std::move(chunks), read_ids_in.front(),
-                                                        read_ids_out.back()};
-        }
-
-        std::vector<at::Tensor> reordered_chunks;
-        reordered_chunks.reserve(std::ssize(chunks));
-        reordered_chunks.emplace_back(std::move(chunks.front()));
-
-        std::vector<std::string> new_left_rids = read_ids_in.front();
-        std::vector<std::string> new_right_rids = read_ids_out.front();
-
-        for (std::size_t n = 1; n < std::size(chunks); ++n) {
-            // reorder_chunk expects 3-dim inputs, so expand the dimension and then
-            // squeeze again
-            auto [reordered_chunk, next_rids_out] = reorder_chunk(
-                    chunks[n].unsqueeze(-1), new_right_rids, read_ids_in[n], read_ids_out[n]);
-            reordered_chunks.emplace_back(reordered_chunk.squeeze(-1));
-            new_right_rids = std::move(next_rids_out);
-        }
-
-        if (std::size(new_left_rids) < std::size(new_right_rids)) {
-            new_left_rids.resize(std::size(new_right_rids), std::string(BLANK_READ_PLACEHOLDER));
-        }
-
-        return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                          std::vector<std::string>>{
-                std::move(reordered_chunks), std::move(new_left_rids), std::move(new_right_rids)};
-    };
-
-    const auto merge_adjacent_samples_in_place = [&cat_vectors_in_place, &pad_reads,
-                                                  &reorder_reads](VariantCallingSample& lh,
-                                                                  const VariantCallingSample& rh) {
-        // Insert positions vectors.
-        cat_vectors_in_place(lh.positions_major, rh.positions_major);
-        cat_vectors_in_place(lh.positions_minor, rh.positions_minor);
-        // Merge the tensors.
-        lh.logits = at::cat({std::move(lh.logits), rh.logits});
-        lh.depth = at::cat({std::move(lh.depth), rh.depth});
-        // Merge basecall arrays
-        if (lh.basecalls.defined() != rh.basecalls.defined()) {
-            throw std::runtime_error{
-                    "Inconsistent basecall definitions when merging VariantCallingSamples"};
-        }
-        if (lh.basecalls.defined() && rh.basecalls.defined()) {
-            auto [reordered_reads, reordered_read_ids_left, reordered_read_ids_right] =
-                    reorder_reads({std::move(lh.basecalls), rh.basecalls},
-                                  {std::move(lh.read_ids_left), rh.read_ids_left},
-                                  {std::move(lh.read_ids_right), rh.read_ids_right});
-            lh.basecalls = at::cat(pad_reads(std::move(reordered_reads), -1));
-            lh.read_ids_left = std::move(reordered_read_ids_left);
-            lh.read_ids_right = std::move(reordered_read_ids_right);
-        }
-
-        // Validate the result. This can throw.
-        lh.validate();
-    };
-
-    if (std::empty(vc_samples)) {
+/**
+ * \brief Merges a group of adjacent samples into one. The positions, logits, depth and, if all of the
+ *        samples have them, the basecalls are concatenated, and the consumed input samples are cleared
+ *        as they are copied. The read IDs are taken from the outer edges of the group, with the
+ *        basecalls rows lined up by read ID. If none of the samples have basecalls, the basecalls
+ *        and read IDs are left empty in the output. An empty input group produces an empty sample.
+ *        A group of a single sample is returned unchanged.
+ * \param group Adjacent samples to merge.
+ * \throws std::runtime_error if only some of the samples have basecalls.
+ */
+VariantCallingSample merge_group(std::vector<VariantCallingSample>& group) {
+    if (std::empty(group)) {
         return {};
     }
-    if (std::size(vc_samples) == 1) {
-        vc_samples.front().validate();
-        return vc_samples;
+    if (std::size(group) == 1) {
+        return std::move(group.front());
     }
 
-    // Validate sample for sanity. This can throw.
-    vc_samples[0].validate();
+    // Basecalls and read IDs are merged only if every sample has the basecalls (rank 2 is
+    // guaranteed by the sample validation).
+    const int64_t num_with_basecalls = std::count_if(
+            std::cbegin(group), std::cend(group),
+            [](const VariantCallingSample& sample) { return sample.basecalls.defined(); });
+    if ((num_with_basecalls != 0) && (num_with_basecalls != std::ssize(group))) {
+        throw std::runtime_error{
+                "Inconsistent basecall definitions when merging VariantCallingSamples"};
+    }
+    const bool merge_basecalls = (num_with_basecalls != 0);
+
+    int64_t num_rows = 0;
+    for (const VariantCallingSample& sample : group) {
+        num_rows += std::ssize(sample.positions_major);
+    }
+
+    VariantCallingSample ret{
+            .seq_id = group.front().seq_id,
+            .positions_major = {},
+            .positions_minor = {},
+            .logits = {},
+            .depth = {},
+    };
+    ret.positions_major.reserve(num_rows);
+    ret.positions_minor.reserve(num_rows);
+    std::vector<at::Tensor> logits;
+    std::vector<at::Tensor> depth;
+    std::vector<at::Tensor> basecalls;
+    std::vector<std::vector<std::string>> read_ids_left;
+    std::vector<std::vector<std::string>> read_ids_right;
+
+    logits.reserve(std::size(group));
+    depth.reserve(std::size(group));
+    if (merge_basecalls) {
+        basecalls.reserve(std::size(group));
+        read_ids_left.reserve(std::size(group));
+        read_ids_right.reserve(std::size(group));
+    }
+
+    for (VariantCallingSample& sample : group) {
+        ret.positions_major.insert(std::end(ret.positions_major),
+                                   std::cbegin(sample.positions_major),
+                                   std::cend(sample.positions_major));
+        ret.positions_minor.insert(std::end(ret.positions_minor),
+                                   std::cbegin(sample.positions_minor),
+                                   std::cend(sample.positions_minor));
+        logits.emplace_back(std::move(sample.logits));
+        depth.emplace_back(std::move(sample.depth));
+        if (merge_basecalls) {
+            basecalls.emplace_back(std::move(sample.basecalls));
+            read_ids_left.emplace_back(std::move(sample.read_ids_left));
+            read_ids_right.emplace_back(std::move(sample.read_ids_right));
+        }
+        sample = {};
+    }
+
+    ret.logits = at::cat(logits);
+    ret.depth = at::cat(depth);
+
+    if (merge_basecalls) {
+        auto [merged_basecalls, merged_read_ids_left, merged_read_ids_right] =
+                merge_read_chunks(basecalls, read_ids_left, read_ids_right);
+        ret.basecalls = std::move(merged_basecalls);
+        ret.read_ids_left = std::move(merged_read_ids_left);
+        ret.read_ids_right = std::move(merged_read_ids_right);
+    }
+
+    // Validate the result. This can throw.
+    ret.validate();
+
+    return ret;
+}
+
+}  // namespace
+
+std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples) {
     std::vector<VariantCallingSample> ret;
     ret.reserve(std::size(vc_samples));
-    ret.emplace_back(std::move(vc_samples.front()));
 
-    for (std::size_t i = 1; i < std::size(vc_samples); ++i) {
-        const VariantCallingSample& last = ret.back();
-        VariantCallingSample& curr = vc_samples[i];
-
+    // Group the adjacent samples first, so that each group is merged with a single allocation.
+    std::vector<VariantCallingSample> group{};
+    group.reserve(std::size(vc_samples));
+    for (VariantCallingSample& sample : vc_samples) {
         // Validate sample for sanity. This can throw.
-        curr.validate();
+        sample.validate();
 
-        // Should not happen, but sanity check.
-        if (std::empty(last.positions_major) || std::empty(curr.positions_major)) {
-            ret.emplace_back(std::move(curr));
-            continue;
+        if (!std::empty(group) && !are_samples_adjacent(group.back(), sample)) {
+            ret.emplace_back(merge_group(group));
+            group.clear();
         }
-
-        if (are_samples_adjacent(last, curr)) {
-            merge_adjacent_samples_in_place(ret.back(), vc_samples[i]);
-            curr = {};
-        } else {
-            ret.emplace_back(std::move(curr));
-        }
+        group.emplace_back(std::move(sample));
+    }
+    if (!std::empty(group)) {
+        ret.emplace_back(merge_group(group));
     }
 
     return ret;
