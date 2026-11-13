@@ -33,6 +33,31 @@ void Sample::validate() const {
                 ", depth.size(0) = " + std::to_string(depth.size(0)) +
                 ", features.size(0) = " + std::to_string(features.size(0)));
     }
+
+    // The draft sequence is optional, but if present it must have one entry per column.
+    if (draft_seq && draft_seq->defined() &&
+        ((draft_seq->dim() != 1) || (draft_seq->size(0) != num_columns))) {
+        throw std::runtime_error("Sample::draft_seq has wrong shape. draft_seq.shape = [" +
+                                 utils::tensor_shape_as_string(*draft_seq) + "], expected = [" +
+                                 std::to_string(num_columns) + "]");
+    }
+
+    if (features.dim() == 3) {
+        // Read IDs for read-level features must have one entry per row (depth dimension) of the features.
+        const int64_t num_reads = features.size(1);
+        if (std::ssize(read_ids_left) != num_reads) {
+            throw std::runtime_error(
+                    "Sample read IDs are inconsistent with features. read_ids_left.size = " +
+                    std::to_string(std::size(read_ids_left)) +
+                    ", expected_size = " + std::to_string(num_reads));
+        }
+        if (std::ssize(read_ids_right) != num_reads) {
+            throw std::runtime_error(
+                    "Sample read IDs are inconsistent with features. read_ids_right.size = " +
+                    std::to_string(std::size(read_ids_right)) +
+                    ", expected_size = " + std::to_string(num_reads));
+        }
+    }
 }
 
 int64_t Sample::find_max_depth(const int64_t start_idx, const int64_t end_idx) const {
@@ -124,6 +149,7 @@ Sample slice_sample(const Sample& sample,
         }
     }
 
+    ret.validate();
     return ret;
 }
 

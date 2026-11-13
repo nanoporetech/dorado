@@ -296,6 +296,8 @@ secondary::Sample make_sample(const int32_t seq_id,
     sample.positions_major = positions_major;
     sample.positions_minor = std::vector<int64_t>(std::size(positions_major), 0);
     sample.depth = at::ones({num_positions}, options);
+    sample.read_ids_left = {"left1"};
+    sample.read_ids_right = {"right1"};
 
     return sample;
 }

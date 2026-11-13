@@ -180,6 +180,7 @@ secondary::Sample counts_to_features(CountsResult& pileup,
             .read_ids_right = {},
     };
 
+    sample.validate();
     return sample;
 }
 
@@ -234,6 +235,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                 {},
         };
 
+        ret.validate();
         return ret;
     };
 
@@ -368,6 +370,7 @@ secondary::Sample EncoderCounts::encode_region(
         sample.features = torch::clamp_min(sample.features, 0);
     }
 
+    sample.validate();
     return sample;
 }
 

@@ -59,8 +59,8 @@ Sample make_pileup_sample(const int32_t seq_id,
     sample.positions_major = std::move(positions_major);
     sample.positions_minor = std::move(positions_minor);
     sample.depth = depth.clone();
-    sample.read_ids_left = {"left_0", "left_1"};
-    sample.read_ids_right = {"right_0", "right_1"};
+    sample.read_ids_left = {"left_0", "left_1", "left_2"};
+    sample.read_ids_right = {"right_0", "right_1", "right_2"};
     return sample;
 }
 
@@ -301,6 +301,115 @@ CATCH_TEST_CASE("slice_sample: error, wrong length of the positions_minor vector
     sample.depth = torch::rand({10});
 
     CATCH_CHECK_THROWS_AS(slice_sample(sample, 0, 5), std::runtime_error);
+}
+
+CATCH_TEST_CASE("Sample::validate: read IDs must match features.size(1)", TEST_GROUP) {
+    const auto make_sample_with_read_ids = [](std::vector<std::string> read_ids_left,
+                                              std::vector<std::string> read_ids_right) {
+        Sample sample{
+                .seq_id = 0,
+                // read-level features: (positions, reads, channels).
+                .features = at::ones({4, 3, 5}, at::kChar),
+                .positions_major = {0, 1, 2, 3},
+                .positions_minor = {0, 0, 0, 0},
+                .depth = at::ones({4}, at::kInt),
+                .read_ids_left = std::move(read_ids_left),
+                .read_ids_right = std::move(read_ids_right),
+        };
+        return sample;
+    };
+
+    CATCH_SECTION("Both empty") {
+        const Sample sample = make_sample_with_read_ids({}, {});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("Both matching") {
+        const Sample sample = make_sample_with_read_ids({"l0", "l1", "l2"}, {"r0", "r1", "r2"});
+        CATCH_CHECK_NOTHROW(sample.validate());
+    }
+
+    CATCH_SECTION("Only one side provided and matching") {
+        const Sample sample_left = make_sample_with_read_ids({}, {"r0", "r1", "r2"});
+        CATCH_CHECK_THROWS_AS(sample_left.validate(), std::runtime_error);
+        const Sample sample_right = make_sample_with_read_ids({"l0", "l1", "l2"}, {});
+        CATCH_CHECK_THROWS_AS(sample_right.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("read_ids_left too short") {
+        const Sample sample = make_sample_with_read_ids({"l0", "l1"}, {"r0", "r1", "r2"});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("read_ids_left too long") {
+        const Sample sample =
+                make_sample_with_read_ids({"l0", "l1", "l2", "l3"}, {"r0", "r1", "r2"});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("read_ids_right too short") {
+        const Sample sample = make_sample_with_read_ids({"l0", "l1", "l2"}, {"r0", "r1"});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("read_ids_right too long") {
+        const Sample sample =
+                make_sample_with_read_ids({"l0", "l1", "l2"}, {"r0", "r1", "r2", "r3"});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("2D (counts) features do not check read IDs") {
+        Sample sample = make_sample_with_read_ids({"l0"}, {});
+        sample.features = torch::rand({4, 5});
+        CATCH_CHECK_NOTHROW(sample.validate());
+    }
+}
+
+CATCH_TEST_CASE("Sample::validate: draft_seq must match features.size(0)", TEST_GROUP) {
+    const auto make_sample_with_draft = [](std::optional<at::Tensor> draft_seq) {
+        Sample sample{
+                .seq_id = 0,
+                // read-level features: (positions, reads, channels).
+                .features = at::ones({4, 2, 5}, at::kChar),
+                .positions_major = {0, 1, 2, 3},
+                .positions_minor = {0, 0, 0, 0},
+                .depth = at::ones({4}, at::kInt),
+                .read_ids_left = {"read1", "read2"},
+                .read_ids_right = {"read1", "read2"},
+                .draft_seq = std::move(draft_seq),
+        };
+        return sample;
+    };
+
+    CATCH_SECTION("draft_seq not set") {
+        const Sample sample = make_sample_with_draft(std::nullopt);
+        CATCH_CHECK_NOTHROW(sample.validate());
+    }
+
+    CATCH_SECTION("draft_seq empty") {
+        const Sample sample = make_sample_with_draft({at::Tensor{}});
+        CATCH_CHECK_NOTHROW(sample.validate());
+    }
+
+    CATCH_SECTION("draft_seq has expected length") {
+        const Sample sample = make_sample_with_draft({at::ones({4}, at::kChar)});
+        CATCH_CHECK_NOTHROW(sample.validate());
+    }
+
+    CATCH_SECTION("draft_seq too short") {
+        const Sample sample = make_sample_with_draft({at::ones({3}, at::kChar)});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("draft_seq too long") {
+        const Sample sample = make_sample_with_draft({at::ones({5}, at::kChar)});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
+
+    CATCH_SECTION("draft_seq wrong dimension") {
+        const Sample sample = make_sample_with_draft({at::ones({4, 1}, at::kChar)});
+        CATCH_CHECK_THROWS_AS(sample.validate(), std::runtime_error);
+    }
 }
 
 CATCH_TEST_CASE("find_max_depth", TEST_GROUP) {

@@ -231,7 +231,7 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
 
     // Slice.
     if (clone) {
-        return VariantCallingSample{
+        VariantCallingSample ret{
                 .seq_id = vc_sample.seq_id,
                 .positions_major =
                         std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
@@ -249,9 +249,11 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                                                .index({at::indexing::Slice(idx_start, idx_end)})
                                                .clone()
                                      : at::Tensor{}};
+        ret.validate();
+        return ret;
     }
 
-    return VariantCallingSample{
+    VariantCallingSample ret{
             .seq_id = vc_sample.seq_id,
             .positions_major =
                     std::vector<int64_t>(std::begin(vc_sample.positions_major) + idx_start,
@@ -268,6 +270,8 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
                     vc_sample.basecalls.defined()
                             ? vc_sample.basecalls.index({at::indexing::Slice(idx_start, idx_end)})
                             : at::Tensor{}};
+    ret.validate();
+    return ret;
 }
 
 VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& vc_sample,

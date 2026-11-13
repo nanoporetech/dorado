@@ -226,6 +226,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
                 std::move(reordered_read_ids_right),
         };
 
+        ret.validate();
         return ret;
     };
 
@@ -461,6 +462,7 @@ secondary::Sample EncoderReadAlignment::encode_region(
         sample.features = at::clamp_min(sample.features, 0);
     }
 
+    sample.validate();
     return sample;
 }
 
