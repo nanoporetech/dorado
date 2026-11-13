@@ -52,10 +52,10 @@ function run_cram_tests() {
 
     # Shard the tests.
     tests_to_run=( $(ls ${TEST_DIR}/cram/${cram_test_folder}/*.t) )
-    if [[ -n $SHARD_COUNT ]] && [[ -n $SHARD_IDX ]]
+    if [[ -n $SHARD_COUNT ]] && [[ -n $SHARD_IDX ]]; then
         shard_size=$(( ( ${#tests_to_run[@]} + ${SHARD_COUNT} - 1) / ${SHARD_COUNT} ))
         shard_start=$(( ${shard_size} * ${SHARD_IDX} ))
-        tests_to_run=${tests_to_run[@]:${shard_start}:${shard_size}}
+        tests_to_run=( ${tests_to_run[@]:${shard_start}:${shard_size}} )
     fi
 
     export DORADO_BIN
