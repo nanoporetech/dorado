@@ -3185,4 +3185,80 @@ CATCH_TEST_CASE("trim_partial_insertion_edges of no samples returns no intervals
     CATCH_CHECK(std::empty(trim_partial_insertion_edges({})));
 }
 
+CATCH_TEST_CASE("worker_variant_calling_reduce does not output variants with empty alts",
+                TEST_GROUP) {
+    /**
+     * \brief The entire reference is deleted in both haplotypes, so the decoded variant has an
+     *          empty ALT which cannot be padded by normalization (no flanking reference bases).
+     *          general_decode_variants does not remove such variants, so the reducer has to either
+     *          convert them into reference records or remove them before output.
+     */
+    const auto temp_dir = make_temp_dir("variant_reduce_empty_alts");
+    const auto reference_fasta = temp_dir.m_path / "reference.fa";
+
+    {
+        std::ofstream ref_out(reference_fasta);
+        ref_out << ">chr1\nACG\n";
+    }
+
+    const secondary::DecoderBase decoder(secondary::LabelSchemeType::DIPLOID);
+    secondary::VariantCallingSample vc_sample{
+            .seq_id = 0,
+            .positions_major = {0, 1, 2},
+            .positions_minor = {0, 0, 0},
+            .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(), {"***", "***"},
+                                           {0.999f, 0.999f}),
+            .depth = at::full({3}, 10, at::kInt),
+    };
+
+    std::vector<ChromosomeReduceData> chrom_reduce_data(1);
+    {
+        ChromosomeReduceData& data = chrom_reduce_data[0];
+        data.seq_id = 0;
+        data.seq_name = "chr1";
+        data.seq_len = 3;
+        data.progress_target = 6;
+        data.ready = true;
+        data.num_samples = 1;
+    }
+
+    std::vector<std::unique_ptr<hts_io::FastxRandomReader>> fastx_readers;
+    fastx_readers.emplace_back(std::make_unique<hts_io::FastxRandomReader>(reference_fasta));
+
+    const std::vector<std::pair<std::string, int64_t>> draft_lens{
+            {"chr1", 3},
+    };
+
+    utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
+    utils::AsyncQueue<int64_t> output_queue{2};
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
+    input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+
+    std::atomic<bool> worker_terminate{false};
+    secondary::WorkerReturnStatus ret_status;
+
+    secondary::Stats stats;
+    stats.set("processed", 0.0);
+
+    // No flank trimming, so that the entire sample is decoded.
+    worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
+                                  ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
+                                  {}, 3.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 0,
+                                  secondary::VariantCandidateSource::COMPUTE);
+
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
+
+    // Sanity check that the input actually produced the problematic variant.
+    CATCH_REQUIRE(std::size(chrom_reduce_data[0].variants_inference) == 1);
+    CATCH_REQUIRE(secondary::has_empty_alts(chrom_reduce_data[0].variants_inference.front()));
+
+    for (const secondary::Variant& var : chrom_reduce_data[0].variants_merged) {
+        CATCH_INFO("var = " << secondary::to_string(var));
+        CATCH_CHECK_FALSE(secondary::has_empty_alts(var));
+        CATCH_CHECK((secondary::is_reference_record(var) || secondary::is_valid(var)));
+    }
+}
+
 }  // namespace dorado::smallvar::tests
