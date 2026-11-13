@@ -174,12 +174,7 @@ void set_dorado_basecaller_args(argparse::ArgumentParser& parser, int& verbosity
     }
     {
         parser.add_group("Alignment arguments");
-        parser.add_argument("--reference").help("Path to reference for alignment.").nargs(1);
-        parser.add_argument("--bed-file")
-                .help("Optional bed-file. If specified, overlaps between the alignments and "
-                      "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
-                      "read tag.")
-                .nargs(1);
+        cli::add_alignment_args(parser);
         alignment::mm2::add_options_string_arg(parser);
     }
     {

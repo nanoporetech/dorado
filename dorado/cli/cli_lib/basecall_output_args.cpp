@@ -106,6 +106,15 @@ EmitArgs get_emit_args(const argparse::ArgumentParser& parser) {
     return emit;
 };
 
+void add_alignment_args(argparse::ArgumentParser& parser) {
+    parser.add_argument("--reference").help("Path to reference for alignment.").nargs(1);
+    parser.add_argument("--bed-file")
+            .help("Optional bed-file. If specified, overlaps between the alignments and "
+                  "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
+                  "read tag.")
+            .nargs(1);
+}
+
 AlignmentArgs get_alignment_args(const argparse::ArgumentParser& parser) {
     auto ref = parser.present<std::string>("--reference");
     auto bed = parser.present<std::string>("--bed-file");

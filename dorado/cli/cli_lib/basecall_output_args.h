@@ -31,6 +31,8 @@ void add_duplex_output_arguments(argparse::ArgumentParser& parser);
 void add_demux_output_arguments(argparse::ArgumentParser& parser);
 void add_aligner_output_arguments(argparse::ArgumentParser& parser);
 
+void add_alignment_args(argparse::ArgumentParser& parser);
+
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser);
 
 // True if `--emit-cram` is set and the ref path ends in `.mmi`

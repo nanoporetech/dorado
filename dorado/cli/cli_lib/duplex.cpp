@@ -182,13 +182,8 @@ int duplex(int argc, char* argv[]) {
     }
     {
         parser.add_group("Alignment arguments");
-        parser.add_argument("--reference").help("Path to reference for alignment.").nargs(1);
+        cli::add_alignment_args(parser);
         alignment::mm2::add_options_string_arg(parser);
-        parser.add_argument("--bed-file")
-                .help("Optional bed-file. If specified, overlaps between the alignments and "
-                      "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
-                      "read tag.")
-                .nargs(1);
     }
     {
         const std::string options = utils::join(models::modified_model_variants(), ", ");
