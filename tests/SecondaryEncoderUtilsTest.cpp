@@ -122,20 +122,18 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
         ///         missing_out_indices (indices present in prev_rids_out but not in rids_in)
         ///             missing_out_indices = {1, 5}
         ///             missing_in_indices = {3}
-        ///     4. Fill empty new_indices with missing_in_indices:
-        ///             new_indices = {0, 3, 1, 2, 4, -1}
-        ///     5. If len(missing_in_indices) > len(missing_out_indices), append remaining to new_indices.
-        ///             -> Not the case here
+        ///     4. If any of the missing_out_indices indicate rows whose names indicate that they terminate with empty positions,
+        ///         fill those positions from missing_in_indices. Alternatively, if any of the missing_in_indices correspond to
+        ///         rows that start with empty positions, match these up with missing_out_indices.
+        ///        In this case there are no such possible matches, but these are tested below.
+        ///             new_indices = {0, -1, 1, 2, 4, -1}
+        ///     5. If there are still any positions in missing_in_indices, append these to new_indices.
+        ///             new_indices = {0, -1, 1, 2, 4, -1, 3}
         ///     6. Reorder chunk: permute with new_indices as the key, if new_indices[i] != -1.
         ///     7. Create thew next_rids_out. For new_indices[i] which exists, keep existing rids_out[i]. Otherwise,
         ///         set new_indices[i] = "__inserted_{i}".
         ///
-        /// So, the next_rids_out is filled like this:
-        ///         new_indices = {0, -1, 1, 2, 4, -1}
-        ///                     V
-        ///         new_indices = {0, 3, 1, 2, 4, -1}
-
-        ///         expected_out_ids = {A, F, C, H, E, __insert   }
+        ///         expected_out_ids = {A, __inserted_1, C, H, E, __inserted_5, F}
         ///
         TestCase{
             "Reordering. Five rows (dim = 1), input tensor is [1 x 5 x 4]. Two reads from prev_rids_out no "
@@ -179,11 +177,72 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // A
+                    {0, 0, 0, 0},    // B -> __inserted_1
+                    {2, 2, 2, 2},    // C
+                    {3, 3, 3, 3},    // D
+                    {5, 5, 5, 5},    // E
+                    {0, 0, 0, 0},    // G -> __inserted_5
                     {4, 4, 4, 4},    // F
+                }
+            }),
+            // expected_out_ids
+            {
+                "A",
+                "__inserted_1",
+                "C",
+                "H",
+                "E",
+                "__inserted_5",
+                "F"
+            },
+        },
+
+        TestCase{
+            "Reordering. Five rows (dim = 1), input tensor is [1 x 5 x 4]. Unmatched in rows can be matched with empty previous out rows",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D -> H
+                    {4, 4, 4, 4},    // F
                     {5, 5, 5, 5},    // E
-                    {0, 0, 0, 0},    // __inserted_5
+                }
+            }),
+            // prev_rids_out
+            {
+                "A",
+                "__blank_1",
+                "C",
+                "D",
+                "E",
+                "G",
+            },
+            // rids_in
+            {
+                "A",
+                "C",
+                "D",
+                "F",
+                "E",
+            },
+            // rids_out
+            {
+                "A",
+                "C",
+                "H",
+                "F",
+                "E",
+            },
+            // expected_reordered_chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
+                    {4, 4, 4, 4},    // __blank_1 -> F
+                    {2, 2, 2, 2},    // C
+                    {3, 3, 3, 3},    // D
+                    {5, 5, 5, 5},    // E
+                    {0, 0, 0, 0},    // G -> __inserted_5
                 }
             }),
             // expected_out_ids
@@ -194,6 +253,206 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                 "H",
                 "E",
                 "__inserted_5",
+            },
+        },
+
+        TestCase{
+            "Reordering. Five rows (dim = 1), input tensor is [1 x 5 x 4]. Empty in rows can be matched with unmatched out rows",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
+                    {2, 2, 2, 2},    // C
+                    {3, 3, 3, 3},    // D/H
+                    {0, 0, 0, 0},    // __blank_3
+                    {5, 5, 5, 5},    // E
+                }
+            }),
+            // prev_rids_out
+            {
+                "A",
+                "B",
+                "C",
+                "D",
+                "E",
+                "G",
+            },
+            // rids_in
+            {
+                "A",
+                "C",
+                "D",
+                "__blank_3",
+                "E",
+            },
+            // rids_out
+            {
+                "A",
+                "C",
+                "H",
+                "__blank_3",
+                "E",
+            },
+            // expected_reordered_chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
+                    {0, 0, 0, 0},    // B -> __blank_3
+                    {2, 2, 2, 2},    // C
+                    {3, 3, 3, 3},    // D/H
+                    {5, 5, 5, 5},    // E
+                    {0, 0, 0, 0},    // G -> __inserted_5
+                }
+            }),
+            // expected_out_ids
+            {
+                "A",
+                "__blank_3",
+                "C",
+                "H",
+                "E",
+                "__inserted_5",
+            },
+        },
+
+        TestCase{
+            "Reordering. Five rows (dim = 1), input tensor is [1 x 5 x 4]. Blanks can be matched with blanks",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
+                    {2, 2, 2, 2},    // C
+                    {3, 3, 3, 3},    // D/H
+                    {0, 0, 0, 0},    // __blank_3
+                    {5, 5, 5, 5},    // E
+                }
+            }),
+            // prev_rids_out
+            {
+                "A",
+                "__blank_1",
+                "C",
+                "D",
+                "E",
+                "__blank_4",
+            },
+            // rids_in
+            {
+                "A",
+                "C",
+                "D",
+                "__blank_3",
+                "E",
+            },
+            // rids_out
+            {
+                "A",
+                "C",
+                "H",
+                "__blank_3",
+                "E",
+            },
+            // expected_reordered_chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
+                    {0, 0, 0, 0},    // __blank_1 -> __blank_3
+                    {2, 2, 2, 2},    // C
+                    {3, 3, 3, 3},    // D/H
+                    {5, 5, 5, 5},    // E
+                    {0, 0, 0, 0},    // __blank_4 -> __inserted_5
+                }
+            }),
+            // expected_out_ids
+            {
+                "A",
+                "__blank_3",
+                "C",
+                "H",
+                "E",
+                "__inserted_5",
+            },
+        },
+
+        TestCase{
+            "Reordering. Blank IDs are not matched by name, even if prev_rids_out and rids_in share a blank ID.",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // N
+                    {0, 0, 0, 0},    // __blank_1
+                }
+            }),
+            // prev_rids_out
+            {
+                "__blank_1",
+                "B",
+            },
+            // rids_in
+            {
+                "N",
+                "__blank_1",
+            },
+            // rids_out
+            {
+                "oN",
+                "oBlank",
+            },
+            // expected_reordered_chunk: N takes the blank row, the in blank takes row B.
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // N
+                    {0, 0, 0, 0},    // __blank_1
+                }
+            }),
+            // expected_out_ids
+            {
+                "oN",
+                "oBlank",
+            },
+        },
+
+        TestCase{
+            "Reordering. Pairing does not depend on the order of the blank rows.",
+            // chunk
+            torch::tensor({
+                {
+                    {0, 0, 0, 0},    // __blank_2
+                    {1, 1, 1, 1},    // A
+                    {2, 2, 2, 2},    // N
+                }
+            }),
+            // prev_rids_out
+            {
+                "A",
+                "__blank_1",
+                "B",
+            },
+            // rids_in
+            {
+                "__blank_2",
+                "A",
+                "N",
+            },
+            // rids_out
+            {
+                "oBlank",
+                "oA",
+                "oN",
+            },
+            // expected_reordered_chunk: N takes the out blank row, the in blank takes row B.
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // A
+                    {2, 2, 2, 2},    // N
+                    {0, 0, 0, 0},    // __blank_2
+                }
+            }),
+            // expected_out_ids
+            {
+                "oA",
+                "oN",
+                "oBlank",
             },
         },
 

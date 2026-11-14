@@ -2791,4 +2791,80 @@ CATCH_TEST_CASE(
     CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "oN", "oC"});
 }
 
+// Read IDs of rows which have no read (placeholders produced by the encoders, e.g. "__blank_1").
+// Such IDs are "empty" and can be paired with any otherwise unmatched read ID in the other chunk.
+// Non-empty IDs which do not match can never be paired.
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: left IDs of 2nd chunk are a subset of "
+        "right IDs of 1st chunk plus new IDs",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Read B ends at the boundary and read N is new. Both are named, so they cannot be paired
+    // and each needs its own row: depth = 4. Matching reads (A, C) must land in their rows.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "C"}),
+            make_read_level_sample(2, 2, {13, 20, 11}, {"C", "N", "A"}, {"oC", "oN", "oA"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {1, 2, 3, 0}}, {2, {11, 0, 13, 20}}})));
+    // Padding rows are labelled "__inserted_<row index>".
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC", "__inserted_3"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "__inserted_1", "oC", "oN"});
+}
+
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: unmatched named IDs are not paired and "
+        "both chunks are padded",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // B (only in chunk 1) and X, Y (only in chunk 2) are all named. None may share a row,
+    // so depth = A, B, C + X, Y = 5. Chunk 1 is padded with zero rows at the end, chunk 2
+    // has a zero row where B lives.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "C"}),
+            make_read_level_sample(2, 2, {13, 24, 25, 11}, {"C", "X", "Y", "A"},
+                                   {"oC", "oX", "oY", "oA"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 5);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {1, 2, 3, 0, 0}}, {2, {11, 0, 13, 24, 25}}})));
+    // Padding rows are labelled "__inserted_<row index>".
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC", "__inserted_3", "__inserted_4"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "__inserted_1", "oC", "oX", "oY"});
+}
+
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: mix of matched, empty and unmatched IDs",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Chunk 1 right: A (matches), B (named, only in chunk 1), empty.
+    // Chunk 2 left:  N (named, only in chunk 2), A (matches), empty.
+    // The empty chunk 2 ID takes B, the empty chunk 1 ID takes N. Depth stays 3.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "__blank_1"}),
+            make_read_level_sample(2, 2, {20, 11, 12}, {"N", "A", "__blank_2"},
+                                   {"oN", "oA", "oBlank"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 3);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(
+            at::equal(result[0].features, expected_features({{2, {1, 2, 3}}, {2, {11, 12, 20}}})));
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "oBlank", "oN"});
+}
+
 }  // namespace dorado::secondary::tests
