@@ -634,11 +634,11 @@ ReadAlignmentData calculate_read_alignment(
             pileup.read_ids_right[r] = read.qname;
         } else {
             ++nright;
-            pileup.read_ids_right[r] = "__blank_" + std::to_string(nright);
+            pileup.read_ids_right[r] = std::string(BLANK_READ_PREFIX) + std::to_string(nright);
         }
         if (std::empty(pileup.read_ids_left[r])) {
             ++nleft;
-            pileup.read_ids_left[r] = "__blank_" + std::to_string(nleft);
+            pileup.read_ids_left[r] = std::string(BLANK_READ_PREFIX) + std::to_string(nleft);
         }
     }
 

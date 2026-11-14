@@ -173,7 +173,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         std::vector<std::string> new_left_rids = read_ids_in[0];
         new_left_rids.reserve(std::size(prev_rids_out));
         for (std::size_t i = std::size(new_left_rids); i < std::size(prev_rids_out); ++i) {
-            new_left_rids.emplace_back("__inserted_" + std::to_string(i));
+            new_left_rids.emplace_back(std::string(INSERTED_READ_PREFIX) + std::to_string(i));
         }
 
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,

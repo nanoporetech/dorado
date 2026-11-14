@@ -3721,12 +3721,14 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
 
             for (uint32_t i = 0, j = 1; i < left_qnames.size(); i++) {
                 if (left_qnames[i].empty()) {
-                    left_qnames[i] = "__blank_" + std::to_string(j++);
+                    left_qnames[i] =
+                            std::string(dorado::secondary::BLANK_READ_PREFIX) + std::to_string(j++);
                 }
             }
             for (uint32_t i = 0, j = 1; i < right_qnames.size(); i++) {
                 if (right_qnames[i].empty()) {
-                    right_qnames[i] = "__blank_" + std::to_string(j++);
+                    right_qnames[i] =
+                            std::string(dorado::secondary::BLANK_READ_PREFIX) + std::to_string(j++);
                 }
             }
         }
