@@ -227,7 +227,9 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
     }
 
     std::vector<std::string> placeholder_rids =
-            placeholder_read_ids(std::ssize(vc_sample.read_ids_left));
+            ((idx_start > 0) || (idx_end < num_columns))
+                    ? placeholder_read_ids(std::ssize(vc_sample.read_ids_left))
+                    : std::vector<std::string>{};
 
     // Slice.
     if (clone) {
