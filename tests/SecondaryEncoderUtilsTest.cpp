@@ -131,9 +131,9 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
         ///             new_indices = {0, -1, 1, 2, 4, -1, 3}
         ///     6. Reorder chunk: permute with new_indices as the key, if new_indices[i] != -1.
         ///     7. Create thew next_rids_out. For new_indices[i] which exists, keep existing rids_out[i]. Otherwise,
-        ///         set new_indices[i] = "__inserted_{i}".
+        ///         set new_indices[i] = "__blank"
         ///
-        ///         expected_out_ids = {A, __inserted_1, C, H, E, __inserted_5, F}
+        ///         expected_out_ids = {A, __blank, C, H, E, __blank, F}
         ///
         TestCase{
             "Reordering. Five rows (dim = 1), input tensor is [1 x 5 x 4]. Two reads from prev_rids_out no "
@@ -177,22 +177,22 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // A
-                    {0, 0, 0, 0},    // B -> __inserted_1
+                    {0, 0, 0, 0},    // B -> __blank
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D
                     {5, 5, 5, 5},    // E
-                    {0, 0, 0, 0},    // G -> __inserted_5
+                    {0, 0, 0, 0},    // G -> __blank
                     {4, 4, 4, 4},    // F
                 }
             }),
             // expected_out_ids
             {
                 "A",
-                "__inserted_1",
+                "__blank",
                 "C",
                 "H",
                 "E",
-                "__inserted_5",
+                "__blank",
                 "F"
             },
         },
@@ -212,7 +212,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             // prev_rids_out
             {
                 "A",
-                "__blank_1",
+                "__blank",
                 "C",
                 "D",
                 "E",
@@ -238,11 +238,11 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // A
-                    {4, 4, 4, 4},    // __blank_1 -> F
+                    {4, 4, 4, 4},    // __blank -> F
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D
                     {5, 5, 5, 5},    // E
-                    {0, 0, 0, 0},    // G -> __inserted_5
+                    {0, 0, 0, 0},    // G -> __blank
                 }
             }),
             // expected_out_ids
@@ -252,7 +252,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                 "C",
                 "H",
                 "E",
-                "__inserted_5",
+                "__blank",
             },
         },
 
@@ -264,7 +264,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                     {1, 1, 1, 1},    // A
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D/H
-                    {0, 0, 0, 0},    // __blank_3
+                    {0, 0, 0, 0},    // __blank
                     {5, 5, 5, 5},    // E
                 }
             }),
@@ -282,7 +282,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                 "A",
                 "C",
                 "D",
-                "__blank_3",
+                "__blank",
                 "E",
             },
             // rids_out
@@ -290,28 +290,28 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                 "A",
                 "C",
                 "H",
-                "__blank_3",
+                "__blank",
                 "E",
             },
             // expected_reordered_chunk
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // A
-                    {0, 0, 0, 0},    // B -> __blank_3
+                    {0, 0, 0, 0},    // B -> __blank
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D/H
                     {5, 5, 5, 5},    // E
-                    {0, 0, 0, 0},    // G -> __inserted_5
+                    {0, 0, 0, 0},    // G -> __blank
                 }
             }),
             // expected_out_ids
             {
                 "A",
-                "__blank_3",
+                "__blank",
                 "C",
                 "H",
                 "E",
-                "__inserted_5",
+                "__blank",
             },
         },
 
@@ -323,25 +323,25 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                     {1, 1, 1, 1},    // A
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D/H
-                    {0, 0, 0, 0},    // __blank_3
+                    {0, 0, 0, 0},    // __blank
                     {5, 5, 5, 5},    // E
                 }
             }),
             // prev_rids_out
             {
                 "A",
-                "__blank_1",
+                "__blank",
                 "C",
                 "D",
                 "E",
-                "__blank_4",
+                "__blank",
             },
             // rids_in
             {
                 "A",
                 "C",
                 "D",
-                "__blank_3",
+                "__blank",
                 "E",
             },
             // rids_out
@@ -349,28 +349,28 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                 "A",
                 "C",
                 "H",
-                "__blank_3",
+                "__blank",
                 "E",
             },
             // expected_reordered_chunk
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // A
-                    {0, 0, 0, 0},    // __blank_1 -> __blank_3
+                    {0, 0, 0, 0},    // __blank -> __blank
                     {2, 2, 2, 2},    // C
                     {3, 3, 3, 3},    // D/H
                     {5, 5, 5, 5},    // E
-                    {0, 0, 0, 0},    // __blank_4 -> __inserted_5
+                    {0, 0, 0, 0},    // __blank -> __blank
                 }
             }),
             // expected_out_ids
             {
                 "A",
-                "__blank_3",
+                "__blank",
                 "C",
                 "H",
                 "E",
-                "__inserted_5",
+                "__blank",
             },
         },
 
@@ -380,18 +380,18 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // N
-                    {0, 0, 0, 0},    // __blank_1
+                    {0, 0, 0, 0},    // __blank
                 }
             }),
             // prev_rids_out
             {
-                "__blank_1",
+                "__blank",
                 "B",
             },
             // rids_in
             {
                 "N",
-                "__blank_1",
+                "__blank",
             },
             // rids_out
             {
@@ -402,7 +402,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             torch::tensor({
                 {
                     {1, 1, 1, 1},    // N
-                    {0, 0, 0, 0},    // __blank_1
+                    {0, 0, 0, 0},    // __blank
                 }
             }),
             // expected_out_ids
@@ -417,7 +417,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             // chunk
             torch::tensor({
                 {
-                    {0, 0, 0, 0},    // __blank_2
+                    {0, 0, 0, 0},    // __blank
                     {1, 1, 1, 1},    // A
                     {2, 2, 2, 2},    // N
                 }
@@ -425,12 +425,12 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
             // prev_rids_out
             {
                 "A",
-                "__blank_1",
+                "__blank",
                 "B",
             },
             // rids_in
             {
-                "__blank_2",
+                "__blank",
                 "A",
                 "N",
             },
@@ -445,7 +445,7 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
                 {
                     {1, 1, 1, 1},    // A
                     {2, 2, 2, 2},    // N
-                    {0, 0, 0, 0},    // __blank_2
+                    {0, 0, 0, 0},    // __blank
                 }
             }),
             // expected_out_ids

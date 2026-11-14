@@ -30,11 +30,9 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
                "chunk.shape = [{}]",
                std::size(prev_rids_out), std::size(rids_in), utils::tensor_shape_as_string(chunk));
 
-    // Rows without a read are labelled with blank placeholder IDs. Blank IDs are numbered per chunk,
-    // so they are never matched by name, but they can be paired with any unmatched row.
-    const auto is_blank = [](const std::string_view rid) {
-        return rid.starts_with(BLANK_READ_PREFIX) || rid.starts_with(INSERTED_READ_PREFIX);
-    };
+    // Rows without a read are labelled with blank placeholder ID. Blank IDs
+    // are never matched by name, but they can be paired with any unmatched row.
+    const auto is_blank = [](const std::string_view rid) { return rid == BLANK_READ_PLACEHOLDER; };
 
     // Create a lookup of the named reads.
     std::unordered_map<std::string_view, int64_t> rids_in_map;
@@ -128,8 +126,7 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
     std::vector<std::string> next_rids_out(std::size(new_indices));
     for (int64_t i = 0; i < std::ssize(new_indices); ++i) {
         const int64_t idx = new_indices[i];
-        next_rids_out[i] = (idx == -1) ? (std::string(INSERTED_READ_PREFIX) + std::to_string(i))
-                                       : rids_out[idx];
+        next_rids_out[i] = (idx == -1) ? BLANK_READ_PLACEHOLDER : rids_out[idx];
     }
 
     return std::tuple(std::move(reordered_chunk), std::move(next_rids_out));

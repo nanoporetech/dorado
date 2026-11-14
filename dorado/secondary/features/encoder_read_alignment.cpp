@@ -171,9 +171,8 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         // Rows added by reordering later chunks (and zero-padded in the first chunk) have no left
         // read ID. Label them the same way as `reorder_chunk` labels inserted rows.
         std::vector<std::string> new_left_rids = read_ids_in[0];
-        new_left_rids.reserve(std::size(prev_rids_out));
-        for (std::size_t i = std::size(new_left_rids); i < std::size(prev_rids_out); ++i) {
-            new_left_rids.emplace_back(std::string(INSERTED_READ_PREFIX) + std::to_string(i));
+        if (std::size(new_left_rids) < std::size(prev_rids_out)) {
+            new_left_rids.resize(std::size(prev_rids_out), std::string(BLANK_READ_PLACEHOLDER));
         }
 
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,

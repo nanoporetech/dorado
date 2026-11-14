@@ -400,10 +400,7 @@ std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSam
         }
 
         if (std::size(new_left_rids) < std::size(new_right_rids)) {
-            new_left_rids.reserve(std::size(new_right_rids));
-            for (size_t i = std::size(new_left_rids); i < std::size(new_right_rids); ++i) {
-                new_left_rids.emplace_back(std::string(INSERTED_READ_PREFIX) + std::to_string(i));
-            }
+            new_left_rids.resize(std::size(new_right_rids), std::string(BLANK_READ_PLACEHOLDER));
         }
 
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
