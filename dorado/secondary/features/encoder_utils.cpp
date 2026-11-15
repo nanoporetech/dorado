@@ -210,30 +210,6 @@ void place_chunk(const at::Tensor& block, const at::Tensor& chunk, const ChunkRe
 
 }  // namespace
 
-std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
-        const at::Tensor& chunk,
-        const std::vector<std::string>& prev_rids_out,
-        const std::vector<std::string>& rids_in,
-        const std::vector<std::string>& rids_out) {
-    if (!chunk.defined()) {
-        return {};
-    }
-
-    ChunkReorderPlan plan = plan_chunk_reorder(prev_rids_out, rids_in, rids_out);
-
-    const int64_t out_depth = std::ssize(plan.src_rows);
-    if (!plan.requires_reorder && (chunk.size(1) == out_depth)) {
-        return {chunk, std::move(plan.next_rids_out)};
-    }
-
-    std::vector<int64_t> shape = chunk.sizes().vec();
-    shape[1] = out_depth;
-    at::Tensor reordered_chunk = at::zeros(shape, chunk.options());
-    place_chunk(reordered_chunk, chunk, plan);
-
-    return {reordered_chunk, std::move(plan.next_rids_out)};
-}
-
 std::tuple<at::Tensor, std::vector<std::string>, std::vector<std::string>> merge_read_chunks(
         std::vector<at::Tensor>& chunks,
         const std::vector<std::vector<std::string>>& read_ids_left,

@@ -3,7 +3,6 @@
 #include "secondary/features/encoder_utils.h"
 #include "secondary/features/kadayashi_utils.h"
 #include "secondary/features/medaka_read_matrix.h"
-#include "secondary/features/medaka_read_matrix_constants.h"
 #include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -70,119 +69,7 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         return ret;
     };
 
-    const auto pad_reads = [](std::vector<at::Tensor> chunks, int64_t target_depth) {
-        utils::ScopedProfileRange spr2("merge_adjacent_samples_impl-pad_reads", 7);
-
-        // Determine the target depth if not provided
-        if (target_depth < 0) {
-            target_depth = 0;
-            for (const auto& chunk : chunks) {
-                target_depth = std::max(target_depth, chunk.size(1));
-            }
-        }
-
-        bool needs_padding = false;
-        for (const auto& chunk : chunks) {
-            if (chunk.size(1) < target_depth) {
-                needs_padding = true;
-                break;
-            }
-        }
-        if (!needs_padding) {
-            return chunks;
-        }
-
-        // Pad each chunk to match the target depth
-        std::vector<at::Tensor> padded_chunks;
-        for (auto& chunk : chunks) {
-            const int64_t pad_depth = target_depth - chunk.size(1);
-            if (pad_depth > 0) {
-                auto padding =
-                        at::zeros({chunk.size(0), pad_depth, chunk.size(2)}, chunk.options());
-
-                DORADO_LOG(trace, "[pad_reads] Padding depth: chunk.shape = {}, padding.shape = {}",
-                           utils::tensor_shape_as_string(chunk),
-                           utils::tensor_shape_as_string(padding));
-
-                auto concated = at::cat({std::move(chunk), std::move(padding)}, 1);
-
-                DORADO_LOG(trace, "[pad_reads] Emplacing (1) chunk: concated.shape = {}",
-                           utils::tensor_shape_as_string(concated));
-
-                padded_chunks.emplace_back(std::move(concated));
-            } else {
-                DORADO_LOG(trace, "[pad_reads] Emplacing (2) chunk: chunk.shape = {}",
-                           utils::tensor_shape_as_string(chunk));
-
-                padded_chunks.emplace_back(std::move(chunk));
-            }
-        }
-
-        return padded_chunks;
-    };
-
-    /**
-     * \brief This lambda reorders reads in the chunk tensors, because some rows (reads) may be missing
-     *          between neighboring samples (e.g. some reads end/begin).
-     */
-    const auto reorder_reads = [](std::vector<at::Tensor> chunks,
-                                  const std::vector<std::vector<std::string>>& read_ids_in,
-                                  const std::vector<std::vector<std::string>>& read_ids_out) {
-        DORADO_LOG(trace, "[reorder_reads] Entered. chunks.size = {}", std::size(chunks));
-        utils::ScopedProfileRange spr2("merge_adjacent_samples_impl-reorder_reads", 8);
-
-        if (std::size(chunks) < 2) {
-            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                              std::vector<std::string>>{chunks, read_ids_in.front(),
-                                                        read_ids_out.front()};
-        }
-
-        bool already_ordered = true;
-        for (std::size_t n = 1; n < std::size(chunks); ++n) {
-            if (read_ids_out[n - 1] != read_ids_in[n]) {
-                already_ordered = false;
-                break;
-            }
-        }
-        if (already_ordered) {
-            return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                              std::vector<std::string>>{std::move(chunks), read_ids_in.front(),
-                                                        read_ids_out.back()};
-        }
-
-        std::vector<at::Tensor> reordered_chunks{chunks[0]};
-
-        std::vector<std::string> prev_rids_out = read_ids_out[0];
-
-        for (std::size_t n = 1; n < std::size(chunks); ++n) {
-            DORADO_LOG(trace, "[reorder_reads] Reordering chunk n = {}", n);
-
-            auto [reordered_chunk, next_rids_out] =
-                    reorder_chunk(chunks[n], prev_rids_out, read_ids_in[n], read_ids_out[n]);
-
-            reordered_chunks.emplace_back(std::move(reordered_chunk));
-
-            prev_rids_out = std::move(next_rids_out);
-
-            DORADO_LOG(trace, "[reorder_reads] n = {}, updating the previous out column.", n);
-
-            DORADO_LOG(trace, "[reorder_reads] n = {}, done.", n);
-        }
-
-        // Rows added by reordering later chunks (and zero-padded in the first chunk) have no left
-        // read ID. Label them the same way as `reorder_chunk` labels inserted rows.
-        std::vector<std::string> new_left_rids = read_ids_in[0];
-        if (std::size(new_left_rids) < std::size(prev_rids_out)) {
-            new_left_rids.resize(std::size(prev_rids_out), std::string(BLANK_READ_PLACEHOLDER));
-        }
-
-        return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                          std::vector<std::string>>{reordered_chunks, std::move(new_left_rids),
-                                                    prev_rids_out};
-    };
-
-    const auto merge_samples = [&samples, &cat_vectors, &pad_reads,
-                                &reorder_reads](const std::vector<int64_t>& sample_ids) {
+    const auto merge_samples = [&samples, &cat_vectors](const std::vector<int64_t>& sample_ids) {
         utils::ScopedProfileRange spr2("merge_adjacent_samples_impl-merge_samples", 6);
 
         // The torch::cat is slow, so just move if there is nothing to concatenate.
@@ -213,17 +100,17 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             read_ids_right.emplace_back(std::move(sample.read_ids_right));
         }
 
-        // Read ids are propagated through reordering
-        auto [reordered_reads, reordered_read_ids_left, reordered_read_ids_right] =
-                reorder_reads(std::move(features), read_ids_left, read_ids_right);
+        // Rows are lined up by read ID and padded once, and the read IDs are propagated.
+        auto [merged_features, merged_read_ids_left, merged_read_ids_right] =
+                merge_read_chunks(features, read_ids_left, read_ids_right);
         secondary::Sample ret{
                 .seq_id = seq_id,
-                .features = at::cat(pad_reads(reordered_reads, -1)),
+                .features = std::move(merged_features),
                 .positions_major = cat_vectors(positions_major),
                 .positions_minor = cat_vectors(positions_minor),
                 .depth = at::cat(std::move(depth)),
-                .read_ids_left = std::move(reordered_read_ids_left),
-                .read_ids_right = std::move(reordered_read_ids_right),
+                .read_ids_left = std::move(merged_read_ids_left),
+                .read_ids_right = std::move(merged_read_ids_right),
         };
 
         ret.validate();

@@ -38,16 +38,6 @@ ChunkReorderPlan plan_chunk_reorder(const std::vector<std::string>& prev_rids_ou
                                     const std::vector<std::string>& rids_out);
 
 /**
- * \brief Applies plan_chunk_reorder to a single chunk of shape [positions, reads, features].
- *          Returns the input chunk itself if no rows need to move or be added.
- */
-std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
-        const at::Tensor& chunk,
-        const std::vector<std::string>& prev_rids_out,
-        const std::vector<std::string>& rids_in,
-        const std::vector<std::string>& rids_out);
-
-/**
  * \brief Concatenates neighboring chunks along dim 0, lining up their rows (dim 1) by read ID.
  *          All chunks are planned from the read IDs first, so that the output is allocated once at its
  *          final size and every chunk is copied once. Padding is a single zero fill of the output.
