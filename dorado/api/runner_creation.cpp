@@ -4,6 +4,7 @@
 #include "basecall/ModelRunner.h"
 #include "config/BasecallModelConfig.h"
 #include "config/ModBaseModelConfig.h"
+#include "utils/dev_utils.h"
 #include "utils/log_utils.h"
 
 #include <thread>
@@ -50,7 +51,7 @@ bool check_variable_chunk_sizes_supported(
                                   (params.attn_window.first == 127) &&
                                   (params.attn_window.second == 128) &&
                                   (params.dim_feedforward == 2048);
-        return is_sup_model;
+        return is_sup_model && !utils::get_dev_opt<bool>("use_koi_nvfp4_tiled", false);
     }
 #endif
     return false;
