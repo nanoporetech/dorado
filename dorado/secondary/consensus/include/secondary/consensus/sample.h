@@ -63,8 +63,6 @@ Sample slice_sample(const Sample& sample,
 
 Sample slice_sample(const Sample& sample, const int64_t idx_start, const int64_t idx_end);
 
-void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh);
-
 void debug_print_sample(std::ostream& os,
                         const Sample& sample,
                         int64_t start /*= 0*/,

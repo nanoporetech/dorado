@@ -168,8 +168,16 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             DORADO_LOG(trace, "[reorder_reads] n = {}, done.", n);
         }
 
+        // Rows added by reordering later chunks (and zero-padded in the first chunk) have no left
+        // read ID. Label them the same way as `reorder_chunk` labels inserted rows.
+        std::vector<std::string> new_left_rids = read_ids_in[0];
+        new_left_rids.reserve(std::size(prev_rids_out));
+        for (std::size_t i = std::size(new_left_rids); i < std::size(prev_rids_out); ++i) {
+            new_left_rids.emplace_back("__inserted_" + std::to_string(i));
+        }
+
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
-                          std::vector<std::string>>{reordered_chunks, read_ids_in[0],
+                          std::vector<std::string>>{reordered_chunks, std::move(new_left_rids),
                                                     prev_rids_out};
     };
 
@@ -205,19 +213,20 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             read_ids_right.emplace_back(std::move(sample.read_ids_right));
         }
 
-        // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
+        // Read ids are propagated through reordering
         auto [reordered_reads, reordered_read_ids_left, reordered_read_ids_right] =
                 reorder_reads(std::move(features), read_ids_left, read_ids_right);
         secondary::Sample ret{
-                seq_id,
-                at::cat(pad_reads(reordered_reads, -1)),
-                cat_vectors(positions_major),
-                cat_vectors(positions_minor),
-                at::cat(std::move(depth)),
-                std::move(reordered_read_ids_left),
-                std::move(reordered_read_ids_right),
+                .seq_id = seq_id,
+                .features = at::cat(pad_reads(reordered_reads, -1)),
+                .positions_major = cat_vectors(positions_major),
+                .positions_minor = cat_vectors(positions_minor),
+                .depth = at::cat(std::move(depth)),
+                .read_ids_left = std::move(reordered_read_ids_left),
+                .read_ids_right = std::move(reordered_read_ids_right),
         };
 
+        ret.validate();
         return ret;
     };
 
@@ -453,6 +462,7 @@ secondary::Sample EncoderReadAlignment::encode_region(
         sample.features = at::clamp_min(sample.features, 0);
     }
 
+    sample.validate();
     return sample;
 }
 

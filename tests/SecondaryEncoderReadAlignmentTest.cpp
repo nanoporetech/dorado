@@ -16,6 +16,7 @@
 #include <cstdint>
 #include <filesystem>
 #include <fstream>
+#include <numeric>
 #include <optional>
 #include <span>
 #include <stdexcept>
@@ -2546,6 +2547,248 @@ CATCH_TEST_CASE("EncoderReadAlignment::collate preserves padded batch shape afte
                               torch::indexing::Slice()})
                         .min()
                         .item<int64_t>() == 7);
+}
+
+namespace {
+
+// Creates an encoder over a trivial BAM/reference. Only used to access merge_adjacent_samples().
+EncoderReadAlignment make_merge_test_encoder(const std::filesystem::path& dir) {
+    const auto ref_fn = dir / "in.ref.fasta";
+    const auto bam_fn = dir / "in.aln.bam";
+    const std::vector<std::pair<std::string, std::string>> targets{{"contig_1", "ACTGAACTGA"}};
+    const std::vector<BamRecord> records{
+            {"read_01", 0, 0, 0, 50, "10M", "10", "ACTGAACTGA", "", {}, {}, 0}};
+    write_bam(bam_fn, targets, records);
+    write_ref(ref_fn, targets);
+    return EncoderReadAlignment(ref_fn, bam_fn, {}, "", 0, false, "", 1, 100, 0.0, false, false,
+                                true, false, false, HaplotagSource::BAM_HAP_TAG, {}, false,
+                                KadayashiOptions{}, false);
+}
+
+// Creates a read-level sample where features[p, r, 0] == row_values[r] for every position p.
+Sample make_read_level_sample(const int64_t start,
+                              const int64_t num_pos,
+                              const std::vector<int8_t>& row_values,
+                              std::vector<std::string> read_ids_left,
+                              std::vector<std::string> read_ids_right) {
+    const int64_t depth = std::ssize(row_values);
+    Sample sample;
+    sample.seq_id = 0;
+    sample.features =
+            at::tensor(row_values, at::kChar).view({1, depth, 1}).expand({num_pos, -1, 1}).clone();
+    sample.positions_major.resize(num_pos);
+    std::iota(std::begin(sample.positions_major), std::end(sample.positions_major), start);
+    sample.positions_minor.assign(num_pos, 0);
+    sample.depth = at::ones({num_pos}, at::kLong);
+    sample.read_ids_left = std::move(read_ids_left);
+    sample.read_ids_right = std::move(read_ids_right);
+    sample.validate();
+    return sample;
+}
+
+// Expected features for a merged sample: each (num_pos, row_values) block is stacked along dim 0
+// and zero-padded along dim 1 up to the maximum depth.
+at::Tensor expected_features(const std::vector<std::pair<int64_t, std::vector<int8_t>>>& blocks) {
+    std::vector<at::Tensor> parts;
+    parts.reserve(std::size(blocks));
+    for (const auto& [num_pos, row_values] : blocks) {
+        parts.emplace_back(at::tensor(row_values, at::kChar)
+                                   .view({1, std::ssize(row_values), 1})
+                                   .expand({num_pos, -1, 1})
+                                   .clone());
+    }
+    return at::cat(parts, 0);
+}
+
+using Ids = std::vector<std::string>;
+
+}  // namespace
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: single sample is unchanged",
+                TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    const Sample in = make_read_level_sample(0, 3, {1, 2}, {"a", "b"}, {"x", "y"});
+    const auto result = encoder.merge_adjacent_samples({in});
+    const at::Tensor expected = expected_features({{3, {1, 2}}});
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(result[0].read_ids_left == in.read_ids_left);
+    CATCH_CHECK(result[0].read_ids_right == in.read_ids_right);
+    CATCH_CHECK(at::equal(result[0].features, in.features));
+    CATCH_CHECK(at::equal(result[0].features, expected));
+}
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: same read order", TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Right IDs of each chunk match the left IDs of the next one: no reordering needed.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"a", "b", "c"}, {"d", "e", "f"}),
+            make_read_level_sample(2, 3, {4, 5, 6}, {"d", "e", "f"}, {"g", "h", "i"}),
+            make_read_level_sample(5, 1, {7, 8, 9}, {"g", "h", "i"}, {"j", "k", "l"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(result[0].positions_major == std::vector<int64_t>{0, 1, 2, 3, 4, 5});
+    CATCH_CHECK(result[0].read_ids_left == Ids{"a", "b", "c"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"j", "k", "l"});
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {1, 2, 3}}, {3, {4, 5, 6}}, {1, {7, 8, 9}}})));
+}
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: rows are reordered at same depth",
+                TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // The second chunk lists the same reads (a, b, c) in a different row order (c, a, b).
+    // Row values equal the read index of the first chunk (10, 11, 12) so the reorder is visible.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {10, 11, 12}, {"l0", "l1", "l2"}, {"a", "b", "c"}),
+            make_read_level_sample(2, 2, {12, 10, 11}, {"c", "a", "b"}, {"x", "y", "z"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "l2"});
+    // Out IDs of the second chunk are permuted along with its rows.
+    CATCH_CHECK(result[0].read_ids_right == Ids{"y", "z", "x"});
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {10, 11, 12}}, {2, {10, 11, 12}}})));
+}
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: depth shrinks in a later chunk",
+                TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Read c ends at the boundary, so the second chunk has one row fewer.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {10, 11, 12}, {"l0", "l1", "l2"}, {"a", "b", "c"}),
+            make_read_level_sample(2, 2, {10, 11}, {"a", "b"}, {"x", "y"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 3);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "l2"});
+    CATCH_CHECK(std::ssize(result[0].read_ids_right) == 3);
+    CATCH_CHECK(result[0].read_ids_right[0] == "x");
+    CATCH_CHECK(result[0].read_ids_right[1] == "y");
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {10, 11, 12}}, {2, {10, 11, 0}}})));
+}
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: depth grows in a later chunk",
+                TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // A new read (c) starts in the second chunk. The merged tensor is padded to depth 3, and
+    // read_ids_left must be consistent with that depth.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {10, 11}, {"l0", "l1"}, {"a", "b"}),
+            make_read_level_sample(2, 2, {10, 11, 12}, {"a", "b", "c"}, {"x", "y", "z"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 3);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "__inserted_2"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"x", "y", "z"});
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {10, 11, 0}}, {2, {10, 11, 12}}})));
+}
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: depth grows in a middle chunk",
+                TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Max depth is reached in the middle chunk; both boundary ID vectors must follow it.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 1, {10, 11}, {"l0", "l1"}, {"a", "b"}),
+            make_read_level_sample(1, 1, {10, 11, 12}, {"a", "b", "c"}, {"p", "q", "r"}),
+            make_read_level_sample(2, 1, {10, 11}, {"p", "q"}, {"x", "y"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 3);
+    CATCH_CHECK(
+            at::equal(result[0].features,
+                      expected_features({{1, {10, 11, 0}}, {1, {10, 11, 12}}, {1, {10, 11, 0}}})));
+    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "__inserted_2"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"x", "y", "__inserted_2"});
+}
+
+CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: non-adjacent samples stay separate",
+                TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    const std::vector<Sample> in{
+            make_read_level_sample(0, 2, {10, 11}, {"a", "b"}, {"c", "d"}),
+            make_read_level_sample(5, 2, {12, 13, 14}, {"e", "f", "g"}, {"h", "i", "j"}),
+    };
+
+    // Gap between positions 2 and 5, so the chunks must not be merged.
+    const auto result = encoder.merge_adjacent_samples(in);
+
+    CATCH_REQUIRE(std::size(result) == 2);
+    CATCH_CHECK(at::equal(result[0].features, in[0].features));
+    CATCH_CHECK(result[0].read_ids_right == Ids{"c", "d"});
+    CATCH_CHECK(at::equal(result[1].features, in[1].features));
+    CATCH_CHECK(result[1].read_ids_right == Ids{"h", "i", "j"});
+}
+
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: empty left ID in 2nd chunk matches an "
+        "unmatched row of the 1st chunk",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Read B has no named counterpart in the second chunk, but the second chunk has one empty
+    // left ID, which takes the B row. No extra depth is needed.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "C"}),
+            make_read_level_sample(2, 2, {13, 12, 11}, {"C", "__blank_1", "A"},
+                                   {"oC", "oBlank", "oA"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(
+            at::equal(result[0].features, expected_features({{2, {1, 2, 3}}, {2, {11, 12, 13}}})));
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "oBlank", "oC"});
+}
+
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: empty right ID in 1st chunk matches an "
+        "unmatched row of the 2nd chunk",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Row 1 of the first chunk is empty on the right, so the new read N from the second chunk
+    // takes this row. No extra depth is needed.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "__blank_1", "C"}),
+            make_read_level_sample(2, 2, {13, 20, 11}, {"C", "N", "A"}, {"oC", "oN", "oA"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(
+            at::equal(result[0].features, expected_features({{2, {1, 2, 3}}, {2, {11, 20, 13}}})));
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "oN", "oC"});
 }
 
 }  // namespace dorado::secondary::tests

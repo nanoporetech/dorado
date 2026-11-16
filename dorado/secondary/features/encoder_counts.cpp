@@ -180,6 +180,7 @@ secondary::Sample counts_to_features(CountsResult& pileup,
             .read_ids_right = {},
     };
 
+    sample.validate();
     return sample;
 }
 
@@ -223,17 +224,18 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
             positions_minor.emplace_back(std::move(sample.positions_minor));
         }
 
-        // NOTE: It appears that the read IDs are not supposed to be merged. After this stage it seems they are no longer needed.
+        // Read ids are set to empty here as they will never be used
         secondary::Sample ret{
-                seq_id,
-                torch::cat(std::move(features)),
-                cat_vectors(positions_major),
-                cat_vectors(positions_minor),
-                torch::cat(std::move(depth)),
-                {},
-                {},
+                .seq_id = seq_id,
+                .features = torch::cat(std::move(features)),
+                .positions_major = cat_vectors(positions_major),
+                .positions_minor = cat_vectors(positions_minor),
+                .depth = torch::cat(std::move(depth)),
+                .read_ids_left = {},
+                .read_ids_right = {},
         };
 
+        ret.validate();
         return ret;
     };
 
@@ -368,6 +370,7 @@ secondary::Sample EncoderCounts::encode_region(
         sample.features = torch::clamp_min(sample.features, 0);
     }
 
+    sample.validate();
     return sample;
 }
 

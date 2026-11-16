@@ -33,6 +33,31 @@ void Sample::validate() const {
                 ", depth.size(0) = " + std::to_string(depth.size(0)) +
                 ", features.size(0) = " + std::to_string(features.size(0)));
     }
+
+    // The draft sequence is optional, but if present it must have one entry per column.
+    if (draft_seq && draft_seq->defined() &&
+        ((draft_seq->dim() != 1) || (draft_seq->size(0) != num_columns))) {
+        throw std::runtime_error("Sample::draft_seq has wrong shape. draft_seq.shape = [" +
+                                 utils::tensor_shape_as_string(*draft_seq) + "], expected = [" +
+                                 std::to_string(num_columns) + "]");
+    }
+
+    if (features.dim() == 3) {
+        // Read IDs for read-level features must have one entry per row (depth dimension) of the features.
+        const int64_t num_reads = features.size(1);
+        if (std::ssize(read_ids_left) != num_reads) {
+            throw std::runtime_error(
+                    "Sample read IDs are inconsistent with features. read_ids_left.size = " +
+                    std::to_string(std::size(read_ids_left)) +
+                    ", expected_size = " + std::to_string(num_reads));
+        }
+        if (std::ssize(read_ids_right) != num_reads) {
+            throw std::runtime_error(
+                    "Sample read IDs are inconsistent with features. read_ids_right.size = " +
+                    std::to_string(std::size(read_ids_right)) +
+                    ", expected_size = " + std::to_string(num_reads));
+        }
+    }
 }
 
 int64_t Sample::find_max_depth(const int64_t start_idx, const int64_t end_idx) const {
@@ -124,6 +149,7 @@ Sample slice_sample(const Sample& sample,
         }
     }
 
+    ret.validate();
     return ret;
 }
 
@@ -176,42 +202,6 @@ std::string sample_to_string(const Sample& sample) {
     std::ostringstream oss;
     oss << sample;
     return oss.str();
-}
-
-void merge_adjacent_samples_in_place(Sample& lh, const Sample& rh) {
-    if (lh.seq_id != rh.seq_id) {
-        std::ostringstream oss;
-        oss << "Cannot merge samples. Different seq_id. lh = " << lh << ", rh = " << rh;
-        throw std::runtime_error(oss.str());
-    }
-    if (lh.end() != (rh.start() + 1)) {
-        std::ostringstream oss;
-        oss << "Cannot merge samples, coordinates are not adjacent. lh = " << lh << ", rh = " << rh;
-        throw std::runtime_error(oss.str());
-    }
-
-    const size_t width = std::size(lh.positions_major);
-
-    // Merge the tensors.
-    lh.features = at::cat({std::move(lh.features), rh.features});
-    lh.depth = at::cat({std::move(lh.depth), rh.depth});
-
-    if ((lh.draft_seq) && (rh.draft_seq)) {
-        lh.draft_seq = {at::cat({std::move(*lh.draft_seq), *rh.draft_seq})};
-    } else {
-        lh.draft_seq = {std::nullopt};
-    }
-
-    // Insert positions vectors.
-    lh.positions_major.reserve(width + std::size(rh.positions_major));
-    lh.positions_major.insert(std::end(lh.positions_major), std::begin(rh.positions_major),
-                              std::end(rh.positions_major));
-    lh.positions_minor.reserve(width + std::size(rh.positions_minor));
-    lh.positions_minor.insert(std::end(lh.positions_minor), std::begin(rh.positions_minor),
-                              std::end(rh.positions_minor));
-
-    // Propagate read IDs.
-    lh.read_ids_right = rh.read_ids_right;
 }
 
 std::vector<secondary::Sample> split_samples(std::vector<Sample> samples,
@@ -750,10 +740,6 @@ std::vector<secondary::Sample> split_sample_on_intervals(
         return {};
     }
 
-    // Reusable.
-    const std::vector<std::string> placeholder_ids =
-            placeholder_read_ids(std::ssize(sample.read_ids_left));
-
     std::vector<secondary::Sample> ret;
     for (int64_t i = 0; i < std::ssize(intervals); ++i) {
         const secondary::Interval64 iv = intervals[i];
@@ -766,8 +752,9 @@ std::vector<secondary::Sample> split_sample_on_intervals(
                     "), sample_len = " + std::to_string(std::size(sample.positions_major)));
         }
 
-        // Generate the sample slice. This propagates read_ids_left and read_ids_right
-        // from the original samples.
+        // Generate the sample slice.
+        // read_ids_left and/or read_ids_right are propagated from the original samples if the new sample reaches the end of sample.
+        // Internal boundaries are assigned placeholder read_id arrays.
         Sample new_sample = slice_sample(sample, iv.start, iv.end);
 
         ret.emplace_back(std::move(new_sample));
