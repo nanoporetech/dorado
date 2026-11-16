@@ -1,6 +1,6 @@
 #include "secondary/features/encoder_utils.h"
 
-#include "secondary/features/medaka_read_matrix.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/log_utils.h"
 

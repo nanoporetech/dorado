@@ -3,6 +3,7 @@
 #include "hts_utils/bam_utils.h"
 #include "medaka_bamiter.h"
 #include "secondary/common/bam_file.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/gpu_profiling.h"
 
 #include <htslib/sam.h>

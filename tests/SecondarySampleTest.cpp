@@ -1,4 +1,5 @@
 #include "secondary/consensus/sample.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <torch/types.h>
@@ -606,7 +607,6 @@ CATCH_TEST_CASE("split_samples_tiled_with_candidates: flank extension is applied
      *          at least max(2, 0.5 * max depth) reads with a deletion there (all 3 reads here).
      */
     constexpr int64_t NUM_COLUMNS = 60;
-    constexpr int8_t DEL_VAL = 5;
 
     std::vector<int64_t> positions_major(NUM_COLUMNS);
     for (int64_t i = 0; i < NUM_COLUMNS; ++i) {

@@ -3,6 +3,7 @@
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/faidx_utils.h"
 #include "secondary/kadayashi/sequence_utility.h"
