@@ -3,6 +3,7 @@
 #include "hts_utils/bam_utils.h"
 #include "hts_utils/hts_types.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "secondary/kadayashi/bam_record_parsing.h"
 #include "secondary/kadayashi/faidx_utils.h"
 #include "secondary/kadayashi/sequence_utility.h"
@@ -3719,14 +3720,14 @@ MedakaFeatureMatrix gen_medaka_feature_matrix(
                 }
             }
 
-            for (uint32_t i = 0, j = 1; i < left_qnames.size(); i++) {
+            for (uint32_t i = 0; i < left_qnames.size(); i++) {
                 if (left_qnames[i].empty()) {
-                    left_qnames[i] = "__blank_" + std::to_string(j++);
+                    left_qnames[i] = dorado::secondary::BLANK_READ_PLACEHOLDER;
                 }
             }
-            for (uint32_t i = 0, j = 1; i < right_qnames.size(); i++) {
+            for (uint32_t i = 0; i < right_qnames.size(); i++) {
                 if (right_qnames[i].empty()) {
-                    right_qnames[i] = "__blank_" + std::to_string(j++);
+                    right_qnames[i] = dorado::secondary::BLANK_READ_PLACEHOLDER;
                 }
             }
         }

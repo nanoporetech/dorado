@@ -12,14 +12,6 @@ struct faidx_t;
 
 namespace dorado::secondary {
 
-static constexpr int8_t DEL_VAL = 5;  // Value representing deletion in base channel.
-
-// convert 16bit IUPAC (+16 for strand) to plp_bases index
-static constexpr std::array<int8_t, 32> NUM_TO_COUNT_BASE_SYMM{
-        -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
-        -1, 1, 2, -1, 3, -1, -1, -1, 4, -1, -1, -1, -1, -1, -1, -1,
-};
-
 enum class CalcDwellsReturnValue {
     SUCCESS,
     NO_DWELL_TAG,

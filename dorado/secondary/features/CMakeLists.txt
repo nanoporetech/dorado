@@ -13,6 +13,7 @@ target_sources(dorado_secondary
         ${PUBLIC_BASE}/kadayashi_utils.h
         ${PUBLIC_BASE}/variant_candidate_source.h
         ${PUBLIC_BASE}/medaka_read_matrix.h
+        ${PUBLIC_BASE}/medaka_read_matrix_constants.h
     PRIVATE
         decoder_base.cpp
         decoder_factory.cpp

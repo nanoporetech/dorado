@@ -1810,7 +1810,7 @@ CATCH_TEST_CASE("kadayashi_featmatgen uses SNP accuracy for read filtering", TES
         CATCH_CHECK(result.read_ids_left[0] == "perfect");
         CATCH_CHECK(result.read_ids_left[1] == "low_snp_acc");
         CATCH_CHECK(result.read_ids_right[0] == "one_snp");
-        CATCH_CHECK(result.read_ids_right[1] == "__blank_1");
+        CATCH_CHECK(result.read_ids_right[1] == "__blank");
         CATCH_CHECK(get_feature_matrix_value(result, 1, 1, 0) == 4);
         CATCH_CHECK(result.major == expected_majors);
         CATCH_CHECK(result.minor == expected_minors);

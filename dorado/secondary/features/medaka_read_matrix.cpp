@@ -3,6 +3,7 @@
 #include "hts_utils/bam_utils.h"
 #include "medaka_bamiter.h"
 #include "secondary/common/bam_file.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/gpu_profiling.h"
 
 #include <htslib/sam.h>
@@ -628,17 +629,15 @@ ReadAlignmentData calculate_read_alignment(
 
     ++last_pos;
 
-    for (size_t r = 0, nleft = 0, nright = 0; r < std::size(read_array); ++r) {
+    for (size_t r = 0; r < std::size(read_array); ++r) {
         const Read &read = read_array[r];
         if (read.ref_end >= last_pos) {
             pileup.read_ids_right[r] = read.qname;
         } else {
-            ++nright;
-            pileup.read_ids_right[r] = "__blank_" + std::to_string(nright);
+            pileup.read_ids_right[r] = BLANK_READ_PLACEHOLDER;
         }
         if (std::empty(pileup.read_ids_left[r])) {
-            ++nleft;
-            pileup.read_ids_left[r] = "__blank_" + std::to_string(nleft);
+            pileup.read_ids_left[r] = BLANK_READ_PLACEHOLDER;
         }
     }
 

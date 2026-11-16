@@ -253,7 +253,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         "bf84ebf6-5820-4b4d-bb17-e16ecd14b856",
         "6a3a4f34-c012-457c-9c82-5e384caa6bd0",
         "daf9f60a-8d26-4b84-ae41-dc40a47b5e8e",
-        "__blank_1",
+        "__blank",
     };
     const std::vector<std::string> expected_read_ids_right{
         "667f963f-68c1-40c8-9af3-96190eca411f",
@@ -263,7 +263,7 @@ CATCH_TEST_CASE("read_ids", TEST_GROUP) {
         "bdfeee16-390f-43a7-938b-9502ce984921",
         "9ab794fd-8b68-40d3-b0da-a2c52634d2c0",
         "fc40fcd9-5967-4cce-8dcd-b11675508925",
-        "__blank_1",
+        "__blank",
         "6a3a4f34-c012-457c-9c82-5e384caa6bd0",
         "daf9f60a-8d26-4b84-ae41-dc40a47b5e8e",
         "8c06fcee-fe52-4c3b-be39-ce92a87e5d31",
@@ -655,14 +655,14 @@ CATCH_TEST_CASE("synthetic_test_01", TEST_GROUP) {
             "read_01",
             "read_02",
             "read_03",
-            "__blank_1",
-            "__blank_2",
+            "__blank",
+            "__blank",
         },
         .read_ids_right = {
             "read_01",
-            "__blank_1",
+            "__blank",
             "read_04",
-            "__blank_2",
+            "__blank",
             "read_06",
         },
     };
@@ -1254,11 +1254,11 @@ CATCH_TEST_CASE("synthetic_test_03-one_read_per_row", TEST_GROUP) {
         .read_ids_left = {
             "read_01",
             "read_02",
-            "__blank_1",
+            "__blank",
         },
         .read_ids_right = {
             "read_01",
-            "__blank_1",
+            "__blank",
             "read_03",
         },
     };
@@ -1751,7 +1751,7 @@ CATCH_TEST_CASE("synthetic_test_06-calculate_read_alignment_fix_for_high_coverag
         },
         .read_ids_right = {
             "read_01",
-            "__blank_1",
+            "__blank",
             "read_04",
         },
     };
@@ -2018,14 +2018,14 @@ CATCH_TEST_CASE("synthetic_test_08-zero_coverage_trimming_start", TEST_GROUP) {
             "read_01",
             "read_02",
             "read_03",
-            "__blank_1",
-            "__blank_2",
+            "__blank",
+            "__blank",
         },
         .read_ids_right = {
             "read_01",
-            "__blank_1",
+            "__blank",
             "read_04",
-            "__blank_2",
+            "__blank",
             "read_06",
         },
     };
@@ -2220,14 +2220,14 @@ CATCH_TEST_CASE("synthetic_test_09-zero_coverage_trimming_end", TEST_GROUP) {
             "read_01",
             "read_02",
             "read_03",
-            "__blank_1",
-            "__blank_2",
+            "__blank",
+            "__blank",
         },
         .read_ids_right = {
             "read_01",
-            "__blank_1",
+            "__blank",
             "read_04",
-            "__blank_2",
+            "__blank",
             "read_06",
         },
     };
@@ -2422,14 +2422,14 @@ CATCH_TEST_CASE("synthetic_test_10-zero_coverage_internal", TEST_GROUP) {
             "read_01",
             "read_02",
             "read_03",
-            "__blank_1",
-            "__blank_2",
+            "__blank",
+            "__blank",
         },
         .read_ids_right = {
             "read_04",
-            "__blank_1",
-            "__blank_2",
-            "__blank_3",
+            "__blank",
+            "__blank",
+            "__blank",
             "read_06",
         },
     };
@@ -2699,7 +2699,7 @@ CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: depth grows in a 
     CATCH_REQUIRE(std::size(result) == 1);
     CATCH_CHECK(result[0].features.size(1) == 3);
     CATCH_CHECK_NOTHROW(result[0].validate());
-    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "__inserted_2"});
+    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "__blank"});
     CATCH_CHECK(result[0].read_ids_right == Ids{"x", "y", "z"});
     CATCH_CHECK(at::equal(result[0].features,
                           expected_features({{2, {10, 11, 0}}, {2, {10, 11, 12}}})));
@@ -2722,8 +2722,8 @@ CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: depth grows in a 
     CATCH_CHECK(
             at::equal(result[0].features,
                       expected_features({{1, {10, 11, 0}}, {1, {10, 11, 12}}, {1, {10, 11, 0}}})));
-    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "__inserted_2"});
-    CATCH_CHECK(result[0].read_ids_right == Ids{"x", "y", "__inserted_2"});
+    CATCH_CHECK(result[0].read_ids_left == Ids{"l0", "l1", "__blank"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"x", "y", "__blank"});
 }
 
 CATCH_TEST_CASE("EncoderReadAlignment::merge_adjacent_samples: non-adjacent samples stay separate",
@@ -2757,7 +2757,7 @@ CATCH_TEST_CASE(
     // left ID, which takes the B row. No extra depth is needed.
     const auto result = encoder.merge_adjacent_samples({
             make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "C"}),
-            make_read_level_sample(2, 2, {13, 12, 11}, {"C", "__blank_1", "A"},
+            make_read_level_sample(2, 2, {13, 12, 11}, {"C", "__blank", "A"},
                                    {"oC", "oBlank", "oA"}),
     });
 
@@ -2779,7 +2779,7 @@ CATCH_TEST_CASE(
     // Row 1 of the first chunk is empty on the right, so the new read N from the second chunk
     // takes this row. No extra depth is needed.
     const auto result = encoder.merge_adjacent_samples({
-            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "__blank_1", "C"}),
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "__blank", "C"}),
             make_read_level_sample(2, 2, {13, 20, 11}, {"C", "N", "A"}, {"oC", "oN", "oA"}),
     });
 
@@ -2789,6 +2789,82 @@ CATCH_TEST_CASE(
             at::equal(result[0].features, expected_features({{2, {1, 2, 3}}, {2, {11, 20, 13}}})));
     CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC"});
     CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "oN", "oC"});
+}
+
+// Read IDs of rows which have no read (placeholders produced by the encoders, e.g. "__blank").
+// Such IDs are "empty" and can be paired with any otherwise unmatched read ID in the other chunk.
+// Non-empty IDs which do not match can never be paired.
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: left IDs of 2nd chunk are a subset of "
+        "right IDs of 1st chunk plus new IDs",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Read B ends at the boundary and read N is new. Both are named, so they cannot be paired
+    // and each needs its own row: depth = 4. Matching reads (A, C) must land in their rows.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "C"}),
+            make_read_level_sample(2, 2, {13, 20, 11}, {"C", "N", "A"}, {"oC", "oN", "oA"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {1, 2, 3, 0}}, {2, {11, 0, 13, 20}}})));
+    // Padding rows are labelled "__blank".
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC", "__blank"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "__blank", "oC", "oN"});
+}
+
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: unmatched named IDs are not paired and "
+        "both chunks are padded",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // B (only in chunk 1) and X, Y (only in chunk 2) are all named. None may share a row,
+    // so depth = A, B, C + X, Y = 5. Chunk 1 is padded with zero rows at the end, chunk 2
+    // has a zero row where B lives.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "C"}),
+            make_read_level_sample(2, 2, {13, 24, 25, 11}, {"C", "X", "Y", "A"},
+                                   {"oC", "oX", "oY", "oA"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 5);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(at::equal(result[0].features,
+                          expected_features({{2, {1, 2, 3, 0, 0}}, {2, {11, 0, 13, 24, 25}}})));
+    // Padding rows are labelled "__blank".
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC", "__blank", "__blank"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "__blank", "oC", "oX", "oY"});
+}
+
+CATCH_TEST_CASE(
+        "EncoderReadAlignment::merge_adjacent_samples: mix of matched, empty and unmatched IDs",
+        TEST_GROUP) {
+    const auto temp_dir = make_temp_dir("encoder_read_aln_merge_test");
+    const auto encoder = make_merge_test_encoder(temp_dir.m_path);
+
+    // Chunk 1 right: A (matches), B (named, only in chunk 1), empty.
+    // Chunk 2 left:  N (named, only in chunk 2), A (matches), empty.
+    // The empty chunk 2 ID takes B, the empty chunk 1 ID takes N. Depth stays 3.
+    const auto result = encoder.merge_adjacent_samples({
+            make_read_level_sample(0, 2, {1, 2, 3}, {"iA", "iB", "iC"}, {"A", "B", "__blank"}),
+            make_read_level_sample(2, 2, {20, 11, 12}, {"N", "A", "__blank"},
+                                   {"oN", "oA", "oBlank"}),
+    });
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result[0].features.size(1) == 3);
+    CATCH_CHECK_NOTHROW(result[0].validate());
+    CATCH_CHECK(
+            at::equal(result[0].features, expected_features({{2, {1, 2, 3}}, {2, {11, 12, 20}}})));
+    CATCH_CHECK(result[0].read_ids_left == Ids{"iA", "iB", "iC"});
+    CATCH_CHECK(result[0].read_ids_right == Ids{"oA", "oBlank", "oN"});
 }
 
 }  // namespace dorado::secondary::tests

@@ -1,10 +1,10 @@
 #include "secondary/features/encoder_utils.h"
 
-#include "secondary/features/medaka_read_matrix.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/tensor_utils.h"
-#include "utils/container_utils.h"
 #include "utils/log_utils.h"
 
+#include <algorithm>
 #include <cstddef>
 #include <span>
 #include <unordered_map>
@@ -30,10 +30,16 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
                "chunk.shape = [{}]",
                std::size(prev_rids_out), std::size(rids_in), utils::tensor_shape_as_string(chunk));
 
-    // Create a lookup.
+    // Rows without a read are labelled with blank placeholder ID. Blank IDs
+    // are never matched by name, but they can be paired with any unmatched row.
+    const auto is_blank = [](const std::string_view rid) { return rid == BLANK_READ_PLACEHOLDER; };
+
+    // Create a lookup of the named reads.
     std::unordered_map<std::string_view, int64_t> rids_in_map;
     for (int64_t i = 0; i < std::ssize(rids_in); ++i) {
-        rids_in_map[rids_in[i]] = i;
+        if (!is_blank(rids_in[i])) {
+            rids_in_map[rids_in[i]] = i;
+        }
     }
 
     // Find the indices of the out reads in the in reads.
@@ -41,48 +47,65 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
     for (int64_t i = 0; i < std::ssize(prev_rids_out); ++i) {
         const std::string_view rid = prev_rids_out[i];
         const auto it = rids_in_map.find(rid);
-        new_indices[i] = (it != std::end(rids_in_map)) ? it->second : -1;
+        new_indices[i] = ((it == std::end(rids_in_map)) || is_blank(rid)) ? -1 : it->second;
     }
 
     // Find missing out indices.
-    std::vector<int64_t> missing_out_indices;
+    std::vector<int64_t> named_out;
+    std::vector<int64_t> blank_out;
     for (int64_t i = 0; i < std::ssize(new_indices); ++i) {
         if (new_indices[i] == -1) {
-            missing_out_indices.emplace_back(i);
+            if (is_blank(prev_rids_out[i])) {
+                blank_out.emplace_back(i);
+            } else {
+                named_out.emplace_back(i);
+            }
         }
     }
 
     // Find missing in indices.
     const std::unordered_set<int64_t> new_indices_set(std::begin(new_indices),
                                                       std::end(new_indices));
-    std::vector<int64_t> missing_in_indices;
+    std::vector<int64_t> named_in;
+    std::vector<int64_t> blank_in;
     for (int64_t i = 0; i < std::ssize(rids_in); ++i) {
         if (!new_indices_set.contains(i)) {
-            missing_in_indices.emplace_back(i);
+            if (is_blank(rids_in[i])) {
+                blank_in.emplace_back(i);
+            } else {
+                named_in.emplace_back(i);
+            }
         }
     }
 
     DORADO_LOG(trace,
-               "[reorder_chunk] missing_in_indices.size() = {}, "
-               "missing_out_indices.size() = {}",
-               std::size(missing_in_indices), std::size(missing_out_indices));
-    DORADO_LOG(trace, "[reorder_chunk] missing_in_indices: {}",
-               utils::print_container_as_string(missing_in_indices, ", ", true));
-    DORADO_LOG(trace, "[reorder_chunk] missing_out_indices: {}",
-               utils::print_container_as_string(missing_out_indices, ", ", true));
+               "[reorder_chunk] named_in.size() = {}, blank_in.size() = {}, "
+               "named_out.size() = {}, blank_out.size() = {}",
+               std::size(named_in), std::size(blank_in), std::size(named_out),
+               std::size(blank_out));
 
     // Fill out the gaps in the array with some of the extra indices.
-    for (size_t i = 0; i < std::min(std::size(missing_out_indices), std::size(missing_in_indices));
-         ++i) {
-        new_indices[missing_out_indices[i]] = missing_in_indices[i];
-    }
+    // A pair of reads can be joined if either side is blank. We disallow joining of two named
+    // reads as this would combine multiple reads into contiguous read data in the tensor.
+    // Named reads take blank rows first, then blanks take the remaining named rows, which
+    // minimises the number of rows regardless of the row order.
+    const auto pair_up = [&new_indices](std::vector<int64_t>& in_indices,
+                                        std::vector<int64_t>& out_indices) {
+        const size_t num_pairs = std::min(std::size(in_indices), std::size(out_indices));
+        for (size_t i = 0; i < num_pairs; ++i) {
+            new_indices[out_indices[i]] = in_indices[i];
+        }
+        in_indices.erase(std::begin(in_indices), std::begin(in_indices) + num_pairs);
+        out_indices.erase(std::begin(out_indices), std::begin(out_indices) + num_pairs);
+    };
+    pair_up(named_in, blank_out);
+    pair_up(blank_in, named_out);
+    pair_up(blank_in, blank_out);
 
     // Add remaining missing in-indices.
-    if (std::size(missing_in_indices) > std::size(missing_out_indices)) {
-        new_indices.insert(std::end(new_indices),
-                           std::cbegin(missing_in_indices) + std::size(missing_out_indices),
-                           std::cend(missing_in_indices));
-    }
+    named_in.insert(std::end(named_in), std::cbegin(blank_in), std::cend(blank_in));
+    std::sort(std::begin(named_in), std::end(named_in));
+    new_indices.insert(std::end(new_indices), std::cbegin(named_in), std::cend(named_in));
 
     // Permute.
     at::Tensor reordered_chunk = at::zeros(
@@ -103,7 +126,7 @@ std::tuple<at::Tensor, std::vector<std::string>> reorder_chunk(
     std::vector<std::string> next_rids_out(std::size(new_indices));
     for (int64_t i = 0; i < std::ssize(new_indices); ++i) {
         const int64_t idx = new_indices[i];
-        next_rids_out[i] = (idx == -1) ? ("__inserted_" + std::to_string(i)) : rids_out[idx];
+        next_rids_out[i] = (idx == -1) ? BLANK_READ_PLACEHOLDER : rids_out[idx];
     }
 
     return std::tuple(std::move(reordered_chunk), std::move(next_rids_out));

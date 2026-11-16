@@ -1,6 +1,7 @@
 #include "secondary/consensus/sample.h"
 
 #include "secondary/common/interval.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/log_utils.h"
 
@@ -452,7 +453,6 @@ std::vector<secondary::Sample> split_samples_tiled_with_candidates(
                                            const int64_t min_abs_cov) {
         /// @brief Returns true if any of the first/last `major_bases` major positions have many deletion
         ///         counts (above `max(cov * cov_fraction, min_abs_cov)`).
-        static constexpr int8_t DEL_VAL = 5;  // Value representing deletion in base channel.
 
         // Find maximum non-padded coverage of this sample.
         const int64_t cov = sample.find_max_depth(start_idx, end_idx);

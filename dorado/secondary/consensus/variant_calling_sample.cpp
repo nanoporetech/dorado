@@ -5,6 +5,7 @@
 #include "secondary/consensus/sample_trimming.h"
 #include "secondary/features/decoder_base.h"
 #include "secondary/features/encoder_utils.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "torch_utils/tensor_utils.h"
 #include "utils/log_utils.h"
 
@@ -227,7 +228,9 @@ VariantCallingSample slice_vc_sample(const VariantCallingSample& vc_sample,
     }
 
     std::vector<std::string> placeholder_rids =
-            placeholder_read_ids(std::ssize(vc_sample.read_ids_left));
+            ((idx_start > 0) || (idx_end < num_columns))
+                    ? placeholder_read_ids(std::ssize(vc_sample.read_ids_left))
+                    : std::vector<std::string>{};
 
     // Slice.
     if (clone) {
@@ -397,11 +400,7 @@ std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSam
         }
 
         if (std::size(new_left_rids) < std::size(new_right_rids)) {
-            const size_t num_to_insert = std::size(new_right_rids) - std::size(new_left_rids);
-            new_left_rids.reserve(std::size(new_right_rids));
-            for (size_t i = 0; i < num_to_insert; ++i) {
-                new_left_rids.emplace_back("__inserted_" + std::to_string(i));
-            }
+            new_left_rids.resize(std::size(new_right_rids), std::string(BLANK_READ_PLACEHOLDER));
         }
 
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,

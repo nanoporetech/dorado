@@ -3,6 +3,7 @@
 #include "secondary/features/encoder_utils.h"
 #include "secondary/features/kadayashi_utils.h"
 #include "secondary/features/medaka_read_matrix.h"
+#include "secondary/features/medaka_read_matrix_constants.h"
 #include "secondary/kadayashi/local_haplotagging.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -171,9 +172,8 @@ std::vector<secondary::Sample> merge_adjacent_samples_impl(std::vector<secondary
         // Rows added by reordering later chunks (and zero-padded in the first chunk) have no left
         // read ID. Label them the same way as `reorder_chunk` labels inserted rows.
         std::vector<std::string> new_left_rids = read_ids_in[0];
-        new_left_rids.reserve(std::size(prev_rids_out));
-        for (std::size_t i = std::size(new_left_rids); i < std::size(prev_rids_out); ++i) {
-            new_left_rids.emplace_back("__inserted_" + std::to_string(i));
+        if (std::size(new_left_rids) < std::size(prev_rids_out)) {
+            new_left_rids.resize(std::size(prev_rids_out), std::string(BLANK_READ_PLACEHOLDER));
         }
 
         return std::tuple<std::vector<at::Tensor>, std::vector<std::string>,
