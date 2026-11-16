@@ -106,6 +106,34 @@ EmitArgs get_emit_args(const argparse::ArgumentParser& parser) {
     return emit;
 };
 
+void add_alignment_args(argparse::ArgumentParser& parser) {
+    parser.add_argument("--reference").help("Path to reference for alignment.").nargs(1);
+    parser.add_argument("--bed-file")
+            .help("Optional bed-file. If specified, overlaps between the alignments and "
+                  "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
+                  "read tag.")
+            .nargs(1);
+}
+
+AlignmentArgs get_alignment_args(const argparse::ArgumentParser& parser) {
+    auto ref = parser.present<std::string>("--reference");
+    auto bed = parser.present<std::string>("--bed-file");
+
+    if (!ref.has_value() && bed.has_value()) {
+        throw std::runtime_error("--bed-file cannot be used without --reference.");
+    }
+
+    if (ref.has_value() && ref->empty()) {
+        throw std::runtime_error("Empty --reference parameter provided.");
+    }
+
+    if (bed.has_value() && bed->empty()) {
+        throw std::runtime_error("Empty --bed-file parameter provided.");
+    }
+
+    return {std::move(ref), std::move(bed)};
+}
+
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser) {
     return parser.present<std::string>(OUTPUT_DIR_ARG);
 }

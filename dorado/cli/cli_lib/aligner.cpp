@@ -116,7 +116,7 @@ int aligner(int argc, char* argv[]) {
                 .help("Optional bed-file. If specified, overlaps between the alignments and "
                       "bed-file entries will be counted, and recorded in BAM output using the 'bh' "
                       "read tag.")
-                .default_value(std::string(""));
+                .nargs(1);
     }
     {
         parser.add_group("Output arguments");
@@ -166,7 +166,12 @@ int aligner(int argc, char* argv[]) {
     }
     auto align_info = std::make_shared<alignment::AlignmentInfo>();
     align_info->reference_file = parser.get<std::string>("index");
-    align_info->bed_file = parser.get<std::string>("bed-file");
+    auto bed_file = parser.present<std::string>("bed-file");
+    if (bed_file && bed_file->empty()) {
+        DORADO_LOG(error, "--bed-file parameter cannot be blank.");
+        return EXIT_FAILURE;
+    }
+    align_info->bed_file = bed_file.value_or("");
 
     const auto reads(parser.get<std::string>("reads"));
     const auto recursive_input = parser.get<bool>("recursive");

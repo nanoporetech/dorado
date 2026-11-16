@@ -18,12 +18,20 @@ struct EmitArgs {
     bool summary{false};
 };
 
+struct AlignmentArgs {
+    std::optional<std::string> reference;
+    std::optional<std::string> bed_file;
+};
+
 EmitArgs get_emit_args(const argparse::ArgumentParser& parser);
+AlignmentArgs get_alignment_args(const argparse::ArgumentParser& parser);
 
 void add_basecaller_output_arguments(argparse::ArgumentParser& parser);
 void add_duplex_output_arguments(argparse::ArgumentParser& parser);
 void add_demux_output_arguments(argparse::ArgumentParser& parser);
 void add_aligner_output_arguments(argparse::ArgumentParser& parser);
+
+void add_alignment_args(argparse::ArgumentParser& parser);
 
 std::optional<std::string> get_output_dir(const argparse::ArgumentParser& parser);
 

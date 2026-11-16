@@ -182,16 +182,8 @@ int duplex(int argc, char* argv[]) {
     }
     {
         parser.add_group("Alignment arguments");
-        parser.add_argument("--reference")
-                .help("Path to reference for alignment.")
-                .default_value(std::string(""));
+        cli::add_alignment_args(parser);
         alignment::mm2::add_options_string_arg(parser);
-        parser.add_argument("--bed-file")
-                .help("Optional bed-file. If specified, overlaps between the alignments and "
-                      "bed-file "
-                      "entries will be counted, and recorded in BAM output using the 'bh' read "
-                      "tag.")
-                .default_value(std::string(""));
     }
     {
         const std::string options = utils::join(models::modified_model_variants(), ", ");
@@ -261,8 +253,6 @@ int duplex(int argc, char* argv[]) {
         std::string pairs_file = parser.get<std::string>("--pairs");
         auto threads = static_cast<size_t>(parser.get<int>("--threads"));
         auto min_qscore(parser.get<int>("--min-qscore"));
-        auto ref = parser.get<std::string>("--reference");
-        auto bed = parser.get<std::string>("--bed-file");
         std::vector<std::string_view> args(argv, argv + argc);
         if (parser.get<bool>("--verbose")) {
             utils::SetVerboseLogging(static_cast<dorado::utils::VerboseLogLevel>(verbosity));
@@ -283,14 +273,16 @@ int duplex(int argc, char* argv[]) {
                        "> No duplex pairs file provided, pairing will be performed automatically");
         }
 
-        const cli::EmitArgs emit = cli::get_emit_args(parser);
-        if (cli::emit_cram_with_mmi_reference(emit, ref)) {
+        cli::AlignmentArgs alignment_args;
+        try {
+            alignment_args = cli::get_alignment_args(parser);
+        } catch (const std::exception& e) {
+            DORADO_LOG(error, e.what());
             return EXIT_FAILURE;
         }
 
-        if (parser.get<std::string>("--reference").empty() &&
-            !parser.get<std::string>("--bed-file").empty()) {
-            DORADO_LOG(error, "--bed-file cannot be used without --reference.");
+        const cli::EmitArgs emit = cli::get_emit_args(parser);
+        if (cli::emit_cram_with_mmi_reference(emit, alignment_args.reference)) {
             return EXIT_FAILURE;
         }
 
@@ -345,8 +337,9 @@ int duplex(int argc, char* argv[]) {
 
             constexpr int WRITER_THREADS = 4;
             auto hts_writer_builder = hts_writer::BasecallHtsFileWriterBuilder(
-                    emit.fastq, emit.sam, emit.cram, !ref.empty(), cli::get_output_dir(parser),
-                    WRITER_THREADS, progress_callback, description_callback, gpu_names);
+                    emit.fastq, emit.sam, emit.cram, alignment_args.reference.has_value(),
+                    cli::get_output_dir(parser), WRITER_THREADS, progress_callback,
+                    description_callback, gpu_names);
 
             std::unique_ptr<hts_writer::HtsFileWriter> hts_file_writer = hts_writer_builder.build();
             if (hts_file_writer == nullptr) {
@@ -371,7 +364,7 @@ int duplex(int argc, char* argv[]) {
         hts_writer = pipeline_desc.add_node<WriterNode>({}, std::move(writers));
         converted_reads_sink = hts_writer;
 
-        if (!ref.empty()) {
+        if (alignment_args.reference.has_value()) {
             std::string err_msg{};
             auto minimap_options = alignment::mm2::try_parse_options(mm2_option_string, err_msg);
             if (!minimap_options) {
@@ -380,15 +373,15 @@ int duplex(int argc, char* argv[]) {
             }
             auto index_file_access = std::make_shared<alignment::IndexFileAccess>();
             auto bed_file_access = std::make_shared<alignment::BedFileAccess>();
-            if (!bed.empty()) {
-                if (!bed_file_access->load_bedfile(bed)) {
-                    throw std::runtime_error("Could not load bed-file " + bed);
+            if (alignment_args.bed_file.has_value()) {
+                if (!bed_file_access->load_bedfile(*alignment_args.bed_file)) {
+                    throw std::runtime_error("Could not load bed-file " + *alignment_args.bed_file);
                 }
             }
 
-            aligner = pipeline_desc.add_node<AlignerNode>({}, index_file_access, bed_file_access,
-                                                          ref, bed, *minimap_options,
-                                                          aligner_executor.get());
+            aligner = pipeline_desc.add_node<AlignerNode>(
+                    {}, index_file_access, bed_file_access, *alignment_args.reference,
+                    alignment_args.bed_file.value_or(""), *minimap_options, aligner_executor.get());
             pipeline_desc.add_node_sink(aligner, converted_reads_sink);
             converted_reads_sink = aligner;
         }
@@ -652,7 +645,7 @@ int duplex(int argc, char* argv[]) {
 
             // At present, header output file header writing relies on direct node method calls
             // rather than the pipeline framework.
-            if (!ref.empty()) {
+            if (aligner != PipelineDescriptor::InvalidNodeHandle) {
                 cli::add_aligner_pg_hdr(hdr.get());
                 const auto& aligner_ref = pipeline->get_node_ref<AlignerNode>(aligner);
                 utils::add_sq_hdr(hdr.get(), aligner_ref.get_sequence_records_for_header());
