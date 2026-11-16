@@ -457,6 +457,165 @@ CATCH_TEST_CASE("reorder_chunks", TEST_GROUP) {
         },
 
         TestCase{
+            "No reordering. Valid order is kept when IDs are paired by index with at least one blank.",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // __blank
+                    {2, 2, 2, 2},    // N
+                }
+            }),
+            // prev_rids_out
+            {
+                "__blank",
+                "__blank",
+            },
+            // rids_in
+            {
+                "__blank",
+                "N",
+            },
+            // rids_out
+            {
+                "oBlank",
+                "oN",
+            },
+            // expected_reordered_chunk: the minimal pairing would swap the rows, but the order is valid.
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // __blank
+                    {2, 2, 2, 2},    // N
+                }
+            }),
+            // expected_out_ids
+            {
+                "oBlank",
+                "oN",
+            },
+        },
+
+        TestCase{
+            "No reordering. Valid order is kept and the chunk is padded when prev_rids_out is longer.",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // N
+                    {2, 2, 2, 2},    // __blank
+                }
+            }),
+            // prev_rids_out
+            {
+                "__blank",
+                "__blank",
+                "C",
+            },
+            // rids_in
+            {
+                "N",
+                "__blank",
+            },
+            // rids_out
+            {
+                "oN",
+                "oBlank",
+            },
+            // expected_reordered_chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // N
+                    {2, 2, 2, 2},    // __blank
+                    {0, 0, 0, 0},    // __blank
+                }
+            }),
+            // expected_out_ids
+            {
+                "oN",
+                "oBlank",
+                "__blank",
+            },
+        },
+
+        TestCase{
+            "Reordering. A common ID at a different index requires reordering even if all rows pair by index.",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // __blank
+                    {2, 2, 2, 2},    // A
+                }
+            }),
+            // prev_rids_out
+            {
+                "A",
+                "__blank",
+            },
+            // rids_in
+            {
+                "__blank",
+                "A",
+            },
+            // rids_out
+            {
+                "oBlank",
+                "oA",
+            },
+            // expected_reordered_chunk
+            torch::tensor({
+                {
+                    {2, 2, 2, 2},    // A
+                    {1, 1, 1, 1},    // __blank
+                }
+            }),
+            // expected_out_ids
+            {
+                "oA",
+                "oBlank",
+            },
+        },
+
+        TestCase{
+            "Reordering. Different named IDs at the same index require reordering and are not paired.",
+            // chunk
+            torch::tensor({
+                {
+                    {1, 1, 1, 1},    // C
+                    {2, 2, 2, 2},    // D
+                }
+            }),
+            // prev_rids_out
+            {
+                "A",
+                "B",
+            },
+            // rids_in
+            {
+                "C",
+                "D",
+            },
+            // rids_out
+            {
+                "oC",
+                "oD",
+            },
+            // expected_reordered_chunk
+            torch::tensor({
+                {
+                    {0, 0, 0, 0},    // __blank
+                    {0, 0, 0, 0},    // __blank
+                    {1, 1, 1, 1},    // C
+                    {2, 2, 2, 2},    // D
+                }
+            }),
+            // expected_out_ids
+            {
+                "__blank",
+                "__blank",
+                "oC",
+                "oD",
+            },
+        },
+
+        TestCase{
             "Reordering. Duplicate read IDs cause the final chunk to have more rows than before.",
             // chunk
             torch::tensor({
