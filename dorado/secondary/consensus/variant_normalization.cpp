@@ -1,7 +1,9 @@
 #include "secondary/consensus/variant_normalization.h"
 
+#include "secondary/consensus/variant_calling.h"
 #include "utils/log_utils.h"
 #include "utils/sequence_utils.h"
+#include "utils/stl_utils.h"
 
 #include <algorithm>
 
@@ -151,12 +153,14 @@ std::pair<Variant, NormalizationStatus> normalize_variant_vs_ref_core(
                    win_start_offset);
         return {variant, NormalizationStatus::ERROR_NEGATIVE_OFFSET};
     }
-    if ((variant.pos < win_start_offset) || (variant.pos >= win_end) ||
-        (variant_end(variant) > win_end)) {
+    // REF can be empty for an unanchored insertion (inserted before variant.pos), which can then
+    // also be located at the window end.
+    const int64_t ref_end = variant.pos + std::ssize(variant.ref);
+    if ((variant.pos < win_start_offset) || (variant.pos > win_end) || (ref_end > win_end)) {
         DORADO_LOG(warn,
                    "Variant is outside the reference sequence. variant.pos = {}, "
-                   "variant_end = {}, win_start_offset = {}, ref_seq.size() = {}",
-                   variant.pos, variant_end(variant), win_start_offset, std::ssize(ref_seq));
+                   "ref_end = {}, win_start_offset = {}, ref_seq.size() = {}",
+                   variant.pos, ref_end, win_start_offset, std::ssize(ref_seq));
         return {variant, NormalizationStatus::ERROR_OUT_OF_RANGE};
     }
 
@@ -165,7 +169,7 @@ std::pair<Variant, NormalizationStatus> normalize_variant_vs_ref_core(
 
     // Validate the REF sequence.
     const std::string_view actual_ref_subseq =
-            ref_seq.substr(ret.pos - win_start_offset, variant_ref_span(ret));
+            ref_seq.substr(ret.pos - win_start_offset, std::size(ret.ref));
     if (ret.ref != actual_ref_subseq) {
         DORADO_LOG(warn,
                    "Variant REF does not match the reference sequence. ret.ref = \"{}\", "
@@ -333,6 +337,235 @@ std::vector<Variant> normalize_variants_vs_ref(const std::span<const Variant> va
                                                const std::string_view ref_seq,
                                                const bool allow_ambig_ref) {
     return normalize_variants_vs_ref_core(variants, ref_seq, 0, allow_ambig_ref).first;
+}
+
+std::vector<Variant> normalize_variants_vs_haplotypes(
+        const std::string_view draft,
+        const std::string_view ref_with_gaps,
+        const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+        const std::vector<int64_t>& positions_major,
+        const std::vector<int64_t>& positions_minor,
+        const std::unordered_set<char>& symbol_set,
+        const std::span<const Variant> variants,
+        const bool allow_ambig_ref,
+        const at::Tensor& probs_3D,
+        const std::array<int32_t, 256>& symbol_lookup,
+        const bool merge_overlapping,
+        const bool merge_adjacent,
+        const at::Tensor& basecalls,
+        const at::Tensor& depth,
+        const float pass_min_qual,
+        const float pass_min_gq,
+        const float pass_min_aq,
+        const float pass_min_vq) {
+    constexpr int32_t MAX_NORMALIZATION_ITERATIONS = 10;
+
+    if (std::empty(variants)) {
+        return {};
+    }
+
+    if (std::empty(positions_major)) {
+        return {};
+    }
+
+    if (std::size(positions_major) != std::size(positions_minor)) {
+        throw std::runtime_error{
+                "Number of elements of positions_major and positions_minor differs. "
+                "positions_major.size() = " +
+                std::to_string(std::size(positions_major)) +
+                ", positions_minor.size() = " + std::to_string(std::size(positions_minor))};
+    }
+
+    // Start/end coordinate of the window.
+    const int64_t win_start = positions_major.front();
+    const int64_t win_end = positions_major.back() + 1;
+
+    // Reference of the window. It is taken from the draft rather than from the reference columns of
+    // the window, because a reference position can be present only through its insertion columns
+    // (e.g. a window starting on an insertion column), and construct_variant anchors such variants
+    // on the draft base.
+    const std::string_view ref_seq = draft.substr(win_start, win_end - win_start);
+
+    // Normalizes the variants within the window. The column span of each variant is extended to
+    // cover both the original and the normalized variant. Returns {variants, modified}.
+    const auto normalize_window = [&](const std::span<const Variant> in) {
+        auto [out, out_status] =
+                normalize_variants_vs_ref_core(in, ref_seq, win_start, allow_ambig_ref);
+        for (Variant& var : out) {
+            if (!is_reference_record(var)) {
+                var.rstart = std::min(var.rstart,
+                                      utils::find_column_to_insert(positions_major, var.pos));
+                var.rend = std::max(
+                        var.rend, utils::find_column_to_insert(positions_major, variant_end(var)));
+            }
+        }
+        return std::make_pair(std::move(out), out_status == NormalizationStatus::CHANGED);
+    };
+
+    // Constructs a single variant from the haplotypes over the columns [rstart, rend). Empty alleles
+    // (e.g. deletions) are padded by the normalization which follows.
+    const auto construct_merged_variant = [&](const int64_t rstart, const int64_t rend,
+                                              const Variant& first) {
+        const std::string variant_source = utils::get_value_or_default(
+                first.format, FORMAT_TAG_VARIANT_SOURCE, VARIANT_SOURCE_UNKNOWN);
+
+        return construct_variant(draft, positions_major, positions_minor, ref_with_gaps,
+                                 cons_seqs_with_gaps, first.seq_id, rstart, rend, true,
+                                 allow_ambig_ref, variant_source, probs_3D, symbol_set,
+                                 symbol_lookup, basecalls, depth, pass_min_qual, pass_min_gq,
+                                 pass_min_aq, pass_min_vq);
+    };
+
+    const auto has_disallowed_ambig_ref = [&](const int64_t start, const int64_t end) {
+        return !allow_ambig_ref && (end > start) &&
+               !is_subset_of_symbols(symbol_set, ref_with_gaps.substr(start, end - start));
+    };
+
+    // Replaces each group of overlapping and/or adjacent variants with a single variant.
+    // Does not merge variants which cover ambiguous bases unless allow_ambig_ref is true.
+    // Reference records are never merged. The group is extended greedily, one variant at a time.
+    const auto merge_groups = [&](std::vector<Variant> in, const bool merge_overlapping_,
+                                  const bool merge_adjacent_) {
+        std::vector<Variant> out;
+        out.reserve(std::size(in));
+        for (int64_t i = 0; i < std::ssize(in);) {
+            int64_t group_start = in[i].pos;
+            int64_t group_end = variant_end(in[i]);
+            int64_t group_rend = in[i].rend;
+
+            bool prev_is_ambig = has_disallowed_ambig_ref(in[i].rstart, in[i].rend);
+
+            int64_t j = i + 1;
+
+            for (j = i + 1; j < std::ssize(in); ++j) {
+                const bool curr_is_ambig = has_disallowed_ambig_ref(in[j].rstart, in[j].rend);
+
+                const bool is_mergeable = !is_reference_record(in[i]) &&
+                                          !is_reference_record(in[j]) &&
+                                          ((merge_overlapping_ && (in[j].pos < group_end)) ||
+                                           (merge_adjacent_ && (in[j].pos == group_end))) &&
+                                          !prev_is_ambig && !curr_is_ambig;
+
+                prev_is_ambig = curr_is_ambig;
+
+                if (!is_mergeable) {
+                    break;
+                }
+
+                group_start = std::min(group_start, in[j].pos);
+                group_end = std::max(group_end, variant_end(in[j]));
+                group_rend = std::max(group_rend, in[j].rend);
+            }
+
+            if (j == (i + 1)) {
+                // No merging happened, just move it.
+                out.emplace_back(std::move(in[i]));
+
+            } else {
+                const int64_t new_rstart =
+                        utils::find_column_to_insert(positions_major, group_start);
+                const int64_t new_rend = std::max(
+                        group_rend, utils::find_column_to_insert(positions_major, group_end));
+
+                // Variants begin on reference positions, so the start column is the column of the
+                // group start. The end column covers the furthest reach of all variants in the group.
+                Variant var = construct_merged_variant(new_rstart, new_rend, in[i]);
+
+                // Empty alleles are kept, because they are padded by the normalization which follows.
+                // If merging failed (e.g. an ambiguous ref base with ambig_ref = false), keep the
+                // original variants of the group.
+                if (!is_reference_record(var)) {
+                    // Add the merged variant.
+                    out.emplace_back(std::move(var));
+
+                } else {
+                    // Failed for some reason, keep the originals.
+                    for (int64_t k = i; k < j; ++k) {
+                        out.emplace_back(std::move(in[k]));
+                    }
+                }
+            }
+
+            i = j;
+        }
+        return out;
+    };
+
+    // Construct the variants.
+    std::vector<Variant> ret = normalize_window(variants).first;
+
+    // Merge and normalize again until convergence, only if required.
+    if (merge_overlapping || merge_adjacent) {
+        int32_t iter = 0;
+        for (iter = 0; iter < MAX_NORMALIZATION_ITERATIONS; ++iter) {
+            // Merging replaces each group of two or more variants with at most one variant, so
+            // variants were merged only if the count decreased.
+            std::vector<Variant> merged = merge_groups(ret, merge_overlapping, merge_adjacent);
+            const bool any_merged = (std::size(merged) != std::size(ret));
+            auto [normalized, any_normalized] = normalize_window(merged);
+            ret = std::move(normalized);
+            if (!any_merged && !any_normalized) {
+                break;
+            }
+        }
+        if (iter == MAX_NORMALIZATION_ITERATIONS) {
+            const int32_t seq_id = (!std::empty(variants)) ? (variants.front().seq_id) : -1;
+            DORADO_LOG(debug,
+                       "Reached MAX_NORMALIZATION_ITERATIONS in normalize_variants_vs_haplotypes. "
+                       "seq_id = {}, win_start = {}, win_end = {}",
+                       seq_id, win_start, win_end);
+        }
+    }
+
+    return ret;
+}
+
+void renormalize_non_valid_variants(std::vector<Variant>& variants,
+                                    const std::string_view ref_seq,
+                                    const bool allow_ambig_ref,
+                                    const int32_t ploidy) {
+    // Handle an edge case where some variants can still have empty alts. Try to prepend a reference base to them before failing.
+    // One possible scenario where this could happen: a sample has a 1bp major position sandwiched between long insertions which
+    // are not fully captured. In a concrete case: front insertion gets removed because it begins on a minor position, and
+    // back insertion results in a reference match (no variants). The only variant is the 1bp major position and it is a deletion.
+    // Example:
+    //   - MAJOR: 5555555555...
+    //   - MINOR: 0123456789...
+    //   - REF:   G*********...
+    //   - HAP 0: **********...
+    //   - HAP 1: G*********...
+    //   - VAR:   1111111111...
+    // Variant: chr19 5 G {[]} PASS 19.202 0 368 gt:AQ=16,16,PL=19,0,26,GQ=18,VQ=12.84,AD=15,11,SRC=I,GT=0/1 info:
+    // Solution: re-normalize only variants with empty alts. If they still turn out empty, reset them to a reference match.
+    // The variants are sorted, so each variant with an empty allele is normalized only within the bases between its
+    // neighboring variants.
+
+    // Furthest end of all previous variants.
+    int64_t prev_end = 0;
+
+    for (int64_t i = 0; i < std::ssize(variants); ++i) {
+        Variant& var = variants[i];
+
+        const bool needs_normalization =
+                !is_reference_record(var) && (has_empty_alts(var) || !is_valid(var));
+
+        if (needs_normalization) {
+            const int64_t next_start =
+                    ((i + 1) == std::ssize(variants)) ? std::ssize(ref_seq) : variants[i + 1].pos;
+
+            // A variant which overlaps a neighbor is not normalized.
+            if ((var.pos >= prev_end) && (variant_end(var) <= next_start)) {
+                const std::string_view ref_subseq = ref_seq.substr(prev_end, next_start - prev_end);
+                var = normalize_variant_vs_ref_core(var, ref_subseq, prev_end, allow_ambig_ref)
+                              .first;
+            }
+
+            // If all else fails, convert the variant to a reference match.
+            sanitize_empty_alts(var, ploidy);
+        }
+
+        prev_end = std::max(prev_end, variant_end(var));
+    }
 }
 
 }  // namespace dorado::secondary

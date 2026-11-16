@@ -218,7 +218,6 @@ BamWindowResult process_single_bam_window(
         [[maybe_unused]] const std::vector<std::string>& draft_seqs,
         const secondary::VariantCandidateSource candidate_source,
         const std::optional<secondary::IntervalTreesInt64Map>& candidate_trees_from_file,
-        const int32_t ploidy,
         const float pass_min_qual,
         const int32_t window_len,
         const int32_t window_overlap,
@@ -266,7 +265,6 @@ BamWindowResult process_single_bam_window(
             if ((!(var.filters & secondary::Filters::NonVariant)) && (var.qual < pass_min_qual)) {
                 var.filters.update(secondary::Filters::LowQual);
             }
-            secondary::sanitize_empty_alts(var, ploidy);
         }
 
         // Overlapping records cannot be merged without phasing, so defer them to inference.
@@ -301,7 +299,7 @@ BamWindowResult process_single_bam_window(
             const bool crosses_boundary = (var.pos < bam_window.start_no_overlap) ||
                                           (secondary::variant_end(var) > bam_window.end_no_overlap);
 
-            if (is_overlapping[i] || crosses_boundary ||
+            if (is_overlapping[i] || crosses_boundary || secondary::has_empty_alts(var) ||
                 !((var.filters & secondary::Filters::Filter::Pass) ||
                   (var.filters & secondary::Filters::Filter::NonVariant))) {
                 // Add the entire variant span, so that inference covers long events fully.
@@ -438,7 +436,6 @@ void worker_sample_producer(
         const int32_t window_overlap,
         const int32_t variant_flanking_bases,
         const bool continue_on_exception,
-        const int32_t ploidy,
         const float pass_min_qual,
         const bool tiled_regions,
         const bool tiled_ext_flanks,
@@ -479,10 +476,10 @@ void worker_sample_producer(
             try {
                 BamWindowResult bam_window_result = process_single_bam_window(
                         bam_window, *resources.encoders[tid], draft_lens, draft_seqs,
-                        candidate_source, candidate_trees_from_file, ploidy, pass_min_qual,
-                        window_len, window_overlap, variant_flanking_bases, tiled_regions,
-                        tiled_ext_flanks, tiled_ext_major, tiled_ext_min_cov, tiled_ext_cov_fract,
-                        min_depth, resources.models[0]->requires_ref(), tid);
+                        candidate_source, candidate_trees_from_file, pass_min_qual, window_len,
+                        window_overlap, variant_flanking_bases, tiled_regions, tiled_ext_flanks,
+                        tiled_ext_major, tiled_ext_min_cov, tiled_ext_cov_fract, min_depth,
+                        resources.models[0]->requires_ref(), tid);
                 stats.add("processed",
                           static_cast<double>(std::max<int64_t>(
                                   0, bam_window.end_no_overlap - bam_window.start_no_overlap)));
@@ -1475,7 +1472,15 @@ std::vector<secondary::VariantCallingSample> apply_trim(
 
 namespace {
 
-std::pair<std::vector<secondary::Variant>, std::vector<secondary::IntervalInt64>>
+/**
+ * \brief Decodes the variants of a single chromosome.
+ * \returns {variants, merge_regions, decoded_samples}. The decoded samples are the trimmed, joined and
+ *          split samples from which the variants were decoded. They are needed for the gVCF reference
+ *          records, which are created only after the final normalization and filtering.
+ */
+std::tuple<std::vector<secondary::Variant>,
+           std::vector<secondary::IntervalInt64>,
+           std::vector<secondary::VariantCallingSample>>
 call_variants_single_chrom(const std::string& draft,
                            std::vector<secondary::VariantCallingSample> vc_input_data,
                            const secondary::DecoderBase& decoder,
@@ -1580,8 +1585,7 @@ call_variants_single_chrom(const std::string& draft,
     for (const auto& vc_sample : flank_trimmed_samples) {
         std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                 decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq, pass_min_vq,
-                ambig_ref, gvcf, true, true, false,
-                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                ambig_ref, true, true);
 
         results.insert(std::end(results), std::make_move_iterator(std::begin(variants)),
                        std::make_move_iterator(std::end(variants)));
@@ -1594,7 +1598,7 @@ call_variants_single_chrom(const std::string& draft,
     // Sort the variants.
     std::stable_sort(std::begin(results), std::end(results));
 
-    return {std::move(results), std::move(merge_regions)};
+    return {std::move(results), std::move(merge_regions), std::move(flank_trimmed_samples)};
 }
 
 std::vector<secondary::Interval64> merge_intervals(
@@ -1936,6 +1940,7 @@ void worker_variant_calling_reduce(
 
         std::vector<secondary::Variant> variants;
         std::vector<secondary::IntervalInt64> merge_regions;
+        std::vector<secondary::VariantCallingSample> decoded_samples;
         reduce_data.processed_regions = make_processed_regions(vc_decode_data);
         if (!std::empty(vc_decode_data)) {
             const bool merge_with_simple =
@@ -1943,7 +1948,7 @@ void worker_variant_calling_reduce(
             const std::vector<secondary::Variant> empty_simple_variants;
             const auto& simple_variants =
                     merge_with_simple ? reduce_data.variants_simple : empty_simple_variants;
-            std::tie(variants, merge_regions) = call_variants_single_chrom(
+            std::tie(variants, merge_regions, decoded_samples) = call_variants_single_chrom(
                     *draft, std::move(vc_decode_data), decoder, simple_variants,
                     merge_with_simple ? flank_trim : 0, pass_min_qual, pass_min_gq, pass_min_aq,
                     pass_min_vq, ambig_ref, gvcf, hemizygous_boundaries);
@@ -1965,9 +1970,39 @@ void worker_variant_calling_reduce(
         } else {
             reduce_data.variants_merged = reduce_data.variants_inference;
         }
+
+        // Normalization fallback. Re-normalize the non-valid variants (e.g. with empty alts) against the
+        // entire chromosome, and convert those which still have empty alts into reference records.
+        // The merged (inference and simple) variants are sorted, so each variant is normalized only
+        // within the bases between its neighboring variants of either source.
+        // The draft is not loaded if there are no variants.
+        if (draft) {
+            secondary::renormalize_non_valid_variants(reduce_data.variants_merged, *draft,
+                                                      ambig_ref, ploidy);
+        }
+
+        // Filter non-valid variants as a sanity check.
+        secondary::remove_non_valid_variants(reduce_data.variants_merged);
+
         if (gvcf) {
             std::stable_sort(std::begin(reduce_data.variants_merged),
                              std::end(reduce_data.variants_merged));
+
+            // Reference records of the inference samples. Created only after the final normalization
+            // and filtering, so that they do not block the normalization.
+            if (!std::empty(decoded_samples)) {
+                std::vector<secondary::Variant> ref_records =
+                        secondary::make_gvcf_reference_records(
+                                decoder, decoded_samples, *draft, reduce_data.variants_merged,
+                                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                reduce_data.variants_merged.insert(std::end(reduce_data.variants_merged),
+                                                   std::make_move_iterator(std::begin(ref_records)),
+                                                   std::make_move_iterator(std::end(ref_records)));
+                std::stable_sort(std::begin(reduce_data.variants_merged),
+                                 std::end(reduce_data.variants_merged));
+            }
+
+            // Reference records of the regions which were not processed by inference.
             std::stable_sort(std::begin(reduce_data.read_endpoints),
                              std::end(reduce_data.read_endpoints));
             add_gvcf_reference_records_for_unprocessed_regions(

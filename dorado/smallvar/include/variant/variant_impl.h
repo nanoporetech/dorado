@@ -152,7 +152,6 @@ void worker_sample_producer(
         const int32_t window_overlap,
         const int32_t variant_flanking_bases,
         const bool continue_on_exception,
-        const int32_t ploidy,
         const float pass_min_qual,
         const bool tiled_regions,
         const bool tiled_ext_flanks,

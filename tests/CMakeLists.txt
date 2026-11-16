@@ -56,6 +56,7 @@ add_executable(dorado_tests
     PafUtilsTest.cpp
     PairingNodeTest.cpp
     PipelineTest.cpp
+    PolishCallVariantsTest.cpp
     Pod5DataLoaderTest.cpp
     PolyACalculatorTest.cpp
     PostConditionTest.cpp

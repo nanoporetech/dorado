@@ -122,25 +122,53 @@ void sanitize_empty_alts(Variant& var, int32_t ploidy);
 Variant collapse_to_haploid(const Variant& var, const bool require_hom);
 
 /**
- * \brief Normalizes the input variant (pushes it to the left). Stops normalization when another
- *          variant is reached, or until it can no longer be normalized.
- * \param ref_with_gaps Reference (or draft) sequence for the region specified by positions_major.
- *                      It has '*' added to the minor positions.
- * \param cons_seqs_with_gaps Consensus sequences, one for each haplotype. Minor positions can have
- *                              an actual predicted base or a '*' in them.
- * \param positions_major Major coordinates for each position in the input probs tensor (i.e. actual reference positions).
- * \param positions_minor Minor coordinates for each position in the input probs tensor (i.e. 0 if this is a major position,
- *                          1 and above for large insertion regions).
- * \param variant Input variant to be normalized.
- * \returns A normalized variant.
- **/
-Variant normalize_variant(const std::string_view ref_with_gaps,
-                          const std::vector<std::string_view>& cons_seqs_with_gaps,
+ * \brief Utility function which checks if every character of query is in the allowed
+ *          symbol map.
+ */
+bool is_subset_of_symbols(const std::unordered_set<char>& symbol_map, const std::string_view query);
+
+/**
+ * \brief Constructs a variant from the haplotype sequences over a span of sample columns, and computes
+ *          its genotype and quality scores from the per-haplotype probabilities.
+ * \param draft The entire input draft/reference sequence.
+ * \param positions_major Major (reference) coordinate for each sample column.
+ * \param positions_minor Minor coordinate for each sample column (0 for reference positions).
+ * \param ref_seq_with_gaps Reference sequence with gaps at minor positions, one character per column.
+ * \param cons_seqs_with_gaps Consensus sequence with gaps for each haplotype, one character per column.
+ * \param seq_id Reference sequence ID of the variant.
+ * \param rstart Start column of the variant span. Zero-based.
+ * \param rend End column of the variant span. Non-inclusive.
+ * \param is_var If true, an empty variant is returned when no haplotype differs from the reference.
+ * \param ambig_ref Allow ambiguous reference bases in the variant.
+ * \param variant_source Value for the SRC FORMAT tag.
+ * \param probs_3D Probabilities of shape [num_columns x num_haplotypes x num_classes].
+ * \param symbol_set Set of valid symbols in the label scheme.
+ * \param symbol_lookup Class index for each symbol, or -1.
+ * \param basecalls Optional basecalls tensor used to compute the AD tag. Can be undefined.
+ * \param depth Optional per-column depth tensor used to compute the DP and MIN_DP tags on the
+ *              columns [rstart, rend). Can be undefined.
+ * \returns The constructed variant, or an empty (invalid) variant if no variant can be constructed.
+ */
+Variant construct_variant(std::string_view draft,
                           const std::vector<int64_t>& positions_major,
                           const std::vector<int64_t>& positions_minor,
+                          std::string_view ref_seq_with_gaps,
+                          const std::vector<ConsensusResult>& cons_seqs_with_gaps,
+                          int32_t seq_id,
+                          int64_t rstart,
+                          int64_t rend,
+                          bool is_var,
+                          bool ambig_ref,
+                          const std::string& variant_source,
+                          const at::Tensor& probs_3D,
                           const std::unordered_set<char>& symbol_set,
-                          const Variant& variant,
-                          bool ambig_variant);
+                          const std::array<int32_t, 256>& symbol_lookup,
+                          const at::Tensor& basecalls,
+                          const at::Tensor& depth,
+                          float pass_min_qual,
+                          float pass_min_gq,
+                          float pass_min_aq,
+                          float pass_min_vq);
 
 /**
  * \brief Decodes polyploid variants from a given tensor of probabilities for a single inference sample (not a batch).
@@ -148,25 +176,41 @@ Variant normalize_variant(const std::string_view ref_with_gaps,
  * \param vc_sample A VariantCallingSample containing ref ID, positions and output scores.
  * \param draft The entire input draft/reference sequence.
  * \param ambig_ref Allow ambiguous reference bases (`N`) for variant calling.
- * \param return_all Returns gVCF records for all reference positions, including the non-variant ones.
- * \param normalize Normalizes the variants (pushes them to the left if possible).
  * \param merge_overlapping Overlapping variants will be merged and deduplicated.
  * \param merge_adjacent Variants which are immediately adjacent will be merged into a single larger variant.
- * \returns Normalized variants for the input sample.
+ * \returns Normalized variants for the input sample. All variants of the sample are normalized together
+ *          with normalize_variants_vs_haplotypes, after they are constructed from the haplotypes.
  */
-std::vector<Variant> general_decode_variants(
+std::vector<Variant> general_decode_variants(const DecoderBase& decoder,
+                                             const VariantCallingSample& vc_sample,
+                                             const std::string_view draft,
+                                             const float pass_min_qual,
+                                             const float pass_min_gq,
+                                             const float pass_min_aq,
+                                             const float pass_min_vq,
+                                             bool ambig_ref,
+                                             bool merge_overlapping,
+                                             bool merge_adjacent);
+
+/**
+ * \brief Creates gVCF reference records (blocks) for all reference positions of the inference samples
+ *          which are not covered by any of the given variants. The GQ of each block is computed from
+ *          the probabilities of its sample, and blocks never span across samples.
+ *        This should be called on the final variants (after normalization and filtering), because the
+ *          reference records do not move with the variants and would act as barriers to normalization.
+ * \param decoder The decoder which contains the label scheme.
+ * \param vc_samples Inference samples of a single sequence, sorted by position and non-overlapping.
+ * \param draft The entire input draft/reference sequence.
+ * \param variants Final variants of the same sequence, sorted by position.
+ * \param gvcf_reference_block_gq_margins Allowed GQ deviation within a block, depending on the GQ of the
+ *          first position of the block.
+ * \returns Only the new reference records, sorted by position.
+ */
+std::vector<Variant> make_gvcf_reference_records(
         const DecoderBase& decoder,
-        const VariantCallingSample& vc_sample,
-        const std::string_view draft,
-        const float pass_min_qual,
-        const float pass_min_gq,
-        const float pass_min_aq,
-        const float pass_min_vq,
-        bool ambig_ref,
-        bool return_all,
-        bool normalize,
-        bool merge_overlapping,
-        bool merge_adjacent,
+        std::span<const VariantCallingSample> vc_samples,
+        std::string_view draft,
+        std::span<const Variant> variants,
         std::span<const std::pair<int64_t, float>> gvcf_reference_block_gq_margins);
 
 /**

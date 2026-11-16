@@ -91,6 +91,11 @@ bool is_valid(const Variant& var);
 
 bool is_reference_record(const Variant& var);
 
+/**
+ * \brief Removes all variants which are neither valid nor reference records.
+ */
+void remove_non_valid_variants(std::vector<Variant>& variants);
+
 int64_t variant_end(const Variant& var);
 
 int64_t variant_ref_span(const Variant& var);
@@ -98,6 +103,8 @@ int64_t variant_ref_span(const Variant& var);
 bool variant_ends_before_position(const Variant& var, int32_t seq_id, int64_t pos);
 
 bool variant_covers_position(const Variant& var, int32_t seq_id, int64_t pos);
+
+bool has_empty_alts(const Variant& var);
 
 void set_gvcf_reference_block_end(Variant& var, int64_t end);
 

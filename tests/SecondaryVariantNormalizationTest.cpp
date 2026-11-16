@@ -1,11 +1,16 @@
 #include "secondary/common/variant.h"
+#include "secondary/consensus/consensus_result.h"
+#include "secondary/consensus/variant_calling.h"
 #include "secondary/consensus/variant_normalization.h"
 
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/generators/catch_generators.hpp>
 
+#include <array>
 #include <cstdint>
 #include <string>
+#include <string_view>
+#include <unordered_set>
 #include <utility>
 #include <vector>
 
@@ -461,6 +466,35 @@ CATCH_TEST_CASE("normalize_variant_vs_ref_core within the bounds of the neighbor
             true,
             false,
         },
+        // An empty REF is an unanchored insertion before the variant position, padded by normalization.
+        TestCase{
+            "Unanchored insertion inside the chromosome is padded and left-aligned", "AAAAAA", 0, 6,
+            Variant{0, 3, "", {"A"}, {}, {}, 0.0f, {}, 0, 0},
+            Variant{0, 0, "A", {"AA"}, {}, {}, 0.0f, {}, 0, 0},
+            true,
+            false,
+        },
+        TestCase{
+            "Unanchored insertion at chromosome start is right padded", "ACGT", 0, 4,
+            Variant{0, 0, "", {"TT"}, {}, {}, 0.0f, {}, 0, 0},
+            Variant{0, 0, "A", {"TTA"}, {}, {}, 0.0f, {}, 0, 0},
+            true,
+            false,
+        },
+        TestCase{
+            "Unanchored insertion at chromosome end is left padded", "ACGT", 0, 4,
+            Variant{0, 4, "", {"A"}, {}, {}, 0.0f, {}, 0, 0},
+            Variant{0, 3, "T", {"TA"}, {}, {}, 0.0f, {}, 0, 0},
+            true,
+            false,
+        },
+        TestCase{
+            "Unanchored insertion on an empty chromosome cannot be padded", "", 0, 0,
+            Variant{0, 0, "", {"A"}, {}, {}, 0.0f, {}, 0, 0},
+            Variant{0, 0, "", {"A"}, {}, {}, 0.0f, {}, 0, 0},
+            false,
+            false,
+        },
     }));
     // clang-format on
 
@@ -477,7 +511,7 @@ CATCH_TEST_CASE("normalize_variant_vs_ref_core within the bounds of the neighbor
     CATCH_REQUIRE(test_case.ref_seq.substr(result_var.pos, result_var.ref.size()) ==
                   result_var.ref);
     CATCH_CHECK(result_var.pos >= test_case.prev_variant_end);
-    CATCH_CHECK(variant_end(result_var) <= test_case.next_variant_start);
+    CATCH_CHECK((result_var.pos + std::ssize(result_var.ref)) <= test_case.next_variant_start);
     CATCH_CHECK(normalize_variant_vs_ref_core(result_var, window, test_case.prev_variant_end,
                                               test_case.allow_ambig_ref)
                         .first == result_var);
@@ -762,12 +796,6 @@ CATCH_TEST_CASE("normalize_variant_vs_ref_core returns an error for invalid inpu
                  Variant{0, 0, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
         TestCase{"Unpadded insertion beyond chromosome end", "ACGT", 0, 4,
                  Variant{0, 5, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
-        TestCase{"Unpadded insertion at chromosome end", "ACGT", 0, 4,
-                 Variant{0, 4, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
-        TestCase{"Empty REF inside the chromosome", "AAAAAA", 0, 6,
-                 Variant{0, 3, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
-        TestCase{"Empty REF at chromosome start", "ACGT", 0, 4,
-                 Variant{0, 0, "", {"TT"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"REF mismatches the chromosome", "ACGT", 0, 4,
                  Variant{0, 1, "A", {"T"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
         TestCase{"Variant starts before the window", "AAAA", 3, 4,
@@ -779,11 +807,9 @@ CATCH_TEST_CASE("normalize_variant_vs_ref_core returns an error for invalid inpu
         TestCase{"One of several ALTs equals REF", "AAAA", 0, 4,
                  Variant{0, 2, "AA", {"A", "AA"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_DUPLICATE_ALLELE},
         TestCase{"All alleles are empty", "ACGT", 0, 4,
-                 Variant{0, 2, "", {""}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
+                 Variant{0, 2, "", {""}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_DUPLICATE_ALLELE},
         TestCase{"Empty REF and one empty ALT", "ACGT", 0, 4,
-                 Variant{0, 2, "", {"A", ""}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_REF},
-        TestCase{"Insertion on an empty chromosome", "", 0, 0,
-                 Variant{0, 0, "", {"A"}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_OUT_OF_RANGE},
+                 Variant{0, 2, "", {"A", ""}, {}, {}, 0.0f, {}, 0, 0}, NormalizationStatus::ERROR_DUPLICATE_ALLELE},
     }));
     // clang-format on
 
@@ -958,6 +984,260 @@ CATCH_TEST_CASE("normalize_variants_vs_ref_core returns an error for invalid inp
     CATCH_CHECK(result == test_case.variants);
     CATCH_CHECK(normalize_variants_vs_ref(test_case.variants, test_case.ref_seq, false) ==
                 test_case.variants);
+}
+
+CATCH_TEST_CASE("normalize_variants_vs_haplotypes", TEST_GROUP) {
+    constexpr std::string_view SYMBOLS{"*ACGT"};
+    const std::unordered_set<char> symbol_set(std::begin(SYMBOLS), std::end(SYMBOLS));
+    std::array<int32_t, 256> symbol_lookup{};
+    symbol_lookup.fill(-1);
+    for (int32_t i = 0; i < std::ssize(SYMBOLS); ++i) {
+        symbol_lookup[static_cast<uint8_t>(SYMBOLS[i])] = i;
+    }
+
+    const auto make_variant = [](const int64_t pos, const std::string& ref,
+                                 const std::vector<std::string>& alts, const std::string& gt,
+                                 const int64_t rstart, const int64_t rend) {
+        return Variant{
+                .seq_id = 0,
+                .pos = pos,
+                .ref = ref,
+                .alts = alts,
+                .filters = {Filters::Pass},
+                .info = {},
+                .qual = 30.0f,
+                .format = {{"GT", gt}, {FORMAT_TAG_VARIANT_SOURCE, VARIANT_SOURCE_INFERENCE}},
+                .rstart = rstart,
+                .rend = rend};
+    };
+
+    // Contiguous major positions without insertion columns.
+    const auto make_majors = [](const int64_t start, const int64_t len) {
+        std::vector<int64_t> ret(len);
+        std::iota(std::begin(ret), std::end(ret), start);
+        return ret;
+    };
+
+    struct Expected {
+        int64_t pos;
+        std::string ref;
+        std::vector<std::string> alts;
+        std::string gt;
+        int64_t rstart;
+        int64_t rend;
+    };
+
+    struct TestCase {
+        std::string name;
+        std::string draft;
+        std::vector<int64_t> positions_major;
+        std::vector<int64_t> positions_minor;
+        std::vector<std::string> haps;  // One character per column, '*' is a gap.
+        std::vector<Variant> variants;
+        std::vector<Expected> expected;
+        bool merge_overlapping = true;
+        bool merge_adjacent = true;
+    };
+
+    // clang-format off
+    const std::vector<TestCase> test_cases{
+        {"Unmerged deletion is left-aligned in a homopolymer",
+            "ACGTTTTACG", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACGTTT*ACG", "ACGTTT*ACG"},
+            {make_variant(5, "TT", {"T"}, "1/1", 5, 7)},
+            {{2, "GT", {"G"}, "1/1", 2, 7}}},
+        {"Adjacent variants are normalized individually before merging, so they can move apart",
+            "ACGTTTTACG", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACGTTT*CCG", "ACGTTT*CCG"},
+            {make_variant(5, "TT", {"T"}, "1/1", 5, 7), make_variant(7, "A", {"C"}, "1/1", 7, 8)},
+            {{2, "GT", {"G"}, "1/1", 2, 7}, {7, "A", {"C"}, "1/1", 7, 8}}},
+        {"Insertion in a minor column is left-aligned and the columns are updated",
+            "ACGTTTACG", {0, 1, 2, 3, 4, 5, 5, 6, 7, 8}, {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
+            {"ACGTTTTACG", "ACGTTTTACG"},
+            {make_variant(5, "T", {"TT"}, "1/1", 5, 7)},
+            {{2, "G", {"GT"}, "1/1", 2, 7}}},
+        {"Adjacent SNPs are merged into a single variant",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACTAACGTAC", "ACTAACGTAC"},
+            {make_variant(2, "G", {"T"}, "1/1", 2, 3), make_variant(3, "T", {"A"}, "1/1", 3, 4)},
+            {{2, "GT", {"TA"}, "1/1", 2, 4}}},
+        {"Overlapping deletion and SNP on different haplotypes are merged",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACTTACGTAC", "AC**ACGTAC"},
+            {make_variant(1, "CGT", {"C"}, "0/1", 1, 4), make_variant(2, "G", {"T"}, "0/1", 2, 3)},
+            {{1, "CGT", {"C", "CTT"}, "1/2", 1, 4}}},
+        {"Normalization does not step out of the window start",
+            "GGGTTTTTTACGTAC", make_majors(5, 10), std::vector<int64_t>(10, 0),
+            {"TTT*ACGTAC", "TTT*ACGTAC"},
+            {make_variant(7, "TT", {"T"}, "1/1", 2, 4)},
+            {{5, "TT", {"T"}, "1/1", 0, 4}}},
+        {"Merged group with an empty allele is anchored on the previous reference base",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACGT**GTAC", "ACGTGTGTAC"},
+            {make_variant(4, "A", {"G"}, "0/1", 4, 5), make_variant(5, "C", {"T"}, "0/1", 5, 6)},
+            {{3, "TAC", {"T", "TGT"}, "1/2", 3, 6}}},
+        {"Merged group with an empty allele at the window start is anchored on the next reference base",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"**GTACGTAC", "GTGTACGTAC"},
+            {make_variant(0, "A", {"G"}, "0/1", 0, 1), make_variant(1, "C", {"T"}, "0/1", 1, 2)},
+            {{0, "ACG", {"G", "GTG"}, "1/2", 0, 3}}},
+        {"Merged group with an empty allele is anchored on the next reference base if the previous one belongs to a reference record",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACGT**GTAC", "ACGTGTGTAC"},
+            {make_variant(3, "T", {"."}, "0/0", 3, 4), make_variant(4, "A", {"G"}, "0/1", 4, 5), make_variant(5, "C", {"T"}, "0/1", 5, 6)},
+            {{3, "T", {"."}, "0/0", 3, 4}, {4, "ACG", {"G", "GTG"}, "1/2", 4, 7}}},
+        {"Adjacent SNPs are merged when only adjacent variants are merged",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACTAACGTAC", "ACTAACGTAC"},
+            {make_variant(2, "G", {"T"}, "1/1", 2, 3), make_variant(3, "T", {"A"}, "1/1", 3, 4)},
+            {{2, "GT", {"TA"}, "1/1", 2, 4}},
+            false, true},
+        {"Adjacent SNPs are not merged when only overlapping variants are merged",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACTAACGTAC", "ACTAACGTAC"},
+            {make_variant(2, "G", {"T"}, "1/1", 2, 3), make_variant(3, "T", {"A"}, "1/1", 3, 4)},
+            {{2, "G", {"T"}, "1/1", 2, 3}, {3, "T", {"A"}, "1/1", 3, 4}},
+            true, false},
+        {"Overlapping deletion and SNP are merged when only overlapping variants are merged",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACTTACGTAC", "AC**ACGTAC"},
+            {make_variant(1, "CGT", {"C"}, "0/1", 1, 4), make_variant(2, "G", {"T"}, "0/1", 2, 3)},
+            {{1, "CGT", {"C", "CTT"}, "1/2", 1, 4}},
+            true, false},
+        {"Overlapping deletion and SNP are not merged when only adjacent variants are merged",
+            "ACGTACGTAC", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACTTACGTAC", "AC**ACGTAC"},
+            {make_variant(1, "CGT", {"C"}, "0/1", 1, 4), make_variant(2, "G", {"T"}, "0/1", 2, 3)},
+            {{1, "CGT", {"C"}, "0/1", 1, 4}, {2, "G", {"T"}, "0/1", 2, 3}},
+            false, true},
+        {"Without merging, variants are only normalized",
+            "ACGTTTTACG", make_majors(0, 10), std::vector<int64_t>(10, 0),
+            {"ACGTTT*ACG", "ACGTTT*ACG"},
+            {make_variant(5, "TT", {"T"}, "1/1", 5, 7)},
+            {{2, "GT", {"G"}, "1/1", 2, 7}},
+            false, false},
+        {"Window starting on an insertion column uses the reference base of that position",
+            "ACGTACGTAC", {2, 3, 4, 5, 6}, {1, 0, 0, 0, 0},
+            {"ATACG", "ATACG"},
+            {make_variant(2, "G", {"GA"}, "1/1", 0, 1)},
+            {{2, "G", {"GA"}, "1/1", 0, 1}}},
+    };
+    // clang-format on
+
+    for (const TestCase& test_case : test_cases) {
+        CATCH_CAPTURE(test_case.name);
+        const int64_t num_columns = std::ssize(test_case.positions_major);
+        const int64_t num_haps = std::ssize(test_case.haps);
+
+        std::string ref_with_gaps;
+        for (int64_t i = 0; i < num_columns; ++i) {
+            ref_with_gaps += (test_case.positions_minor[i] == 0)
+                                     ? test_case.draft[test_case.positions_major[i]]
+                                     : '*';
+        }
+
+        // Haplotypes and probabilities which strongly support them.
+        std::vector<ConsensusResult> cons_seqs;
+        at::Tensor probs = at::full({num_columns, num_haps, std::ssize(SYMBOLS)}, 0.01f);
+        for (int64_t hap = 0; hap < num_haps; ++hap) {
+            cons_seqs.emplace_back(ConsensusResult{"", test_case.haps[hap], ""});
+            for (int64_t i = 0; i < num_columns; ++i) {
+                const int32_t cls = symbol_lookup[static_cast<uint8_t>(test_case.haps[hap][i])];
+                probs.index_put_({i, hap, cls}, 0.96f);
+            }
+        }
+
+        const std::vector<Variant> result = normalize_variants_vs_haplotypes(
+                test_case.draft, ref_with_gaps, cons_seqs, test_case.positions_major,
+                test_case.positions_minor, symbol_set, test_case.variants, false, probs,
+                symbol_lookup, test_case.merge_overlapping, test_case.merge_adjacent, at::Tensor{},
+                at::Tensor{}, 0.0f, 0.0f, 0.0f, 0.0f);
+
+        CATCH_REQUIRE(std::size(result) == std::size(test_case.expected));
+        for (int64_t i = 0; i < std::ssize(result); ++i) {
+            CATCH_CAPTURE(i, result[i]);
+            CATCH_CHECK(result[i].pos == test_case.expected[i].pos);
+            CATCH_CHECK(result[i].ref == test_case.expected[i].ref);
+            CATCH_CHECK(result[i].alts == test_case.expected[i].alts);
+            CATCH_CHECK(result[i].format.at("GT") == test_case.expected[i].gt);
+            CATCH_CHECK(result[i].rstart == test_case.expected[i].rstart);
+            CATCH_CHECK(result[i].rend == test_case.expected[i].rend);
+        }
+    }
+}
+
+CATCH_TEST_CASE("normalize_variants_vs_haplotypes computes DP on the original columns",
+                TEST_GROUP) {
+    constexpr std::string_view SYMBOLS{"*ACGT"};
+    const std::unordered_set<char> symbol_set(std::begin(SYMBOLS), std::end(SYMBOLS));
+    std::array<int32_t, 256> symbol_lookup{};
+    symbol_lookup.fill(-1);
+    for (int32_t i = 0; i < std::ssize(SYMBOLS); ++i) {
+        symbol_lookup[static_cast<uint8_t>(SYMBOLS[i])] = i;
+    }
+
+    struct TestCase {
+        std::string name;
+        std::string draft;
+        std::string hap;  // One character per column, '*' is a gap. Both haplotypes are identical.
+        std::vector<std::pair<int64_t, int64_t>> runs;  // Variant columns [rstart, rend).
+        std::vector<int64_t> depth;
+        std::string expected_dp;
+        std::string expected_min_dp;
+    };
+
+    // clang-format off
+    const std::vector<TestCase> test_cases{
+        // The deletion of the columns [5, 8) is left-aligned to the position 2, but the evidence
+        // stays on the columns [5, 8). The normalized span [2, 8) would give DP = 9.
+        {"Left-aligned deletion keeps the depth of the original columns",
+            "ACGTTTTTACG", "ACGTT***ACG", {{5, 8}},
+            {10, 10, 10, 10, 10, 9, 5, 7, 10, 10, 10}, "7", "5"},
+        // The 3 adjacent SNPs are merged. The merged variant covers the columns [2, 5).
+        {"Merged variant gets the depth of the merged columns",
+            "ACGTACGTAC", "ACTACCGTAC", {{2, 3}, {3, 4}, {4, 5}},
+            {10, 10, 3, 9, 6, 10, 10, 10, 10, 10}, "6", "3"},
+    };
+    // clang-format on
+
+    for (const TestCase& test_case : test_cases) {
+        CATCH_CAPTURE(test_case.name);
+        const int64_t num_columns = std::ssize(test_case.hap);
+        std::vector<int64_t> positions_major(num_columns);
+        std::iota(std::begin(positions_major), std::end(positions_major), 0);
+        const std::vector<int64_t> positions_minor(num_columns, 0);
+
+        constexpr int64_t NUM_HAPS = 2;
+        std::vector<ConsensusResult> cons_seqs;
+        at::Tensor probs = at::full({num_columns, NUM_HAPS, std::ssize(SYMBOLS)}, 0.01f);
+        for (int64_t hap = 0; hap < NUM_HAPS; ++hap) {
+            cons_seqs.emplace_back(ConsensusResult{"", test_case.hap, ""});
+            for (int64_t i = 0; i < num_columns; ++i) {
+                const int32_t cls = symbol_lookup[static_cast<uint8_t>(test_case.hap[i])];
+                probs.index_put_({i, hap, cls}, 0.96f);
+            }
+        }
+        const at::Tensor depth = at::tensor(test_case.depth, at::kLong);
+
+        // Construct the variants the same way as the decoding does.
+        std::vector<Variant> variants;
+        variants.reserve(std::size(test_case.runs));
+        for (const auto& [rstart, rend] : test_case.runs) {
+            variants.emplace_back(construct_variant(
+                    test_case.draft, positions_major, positions_minor, test_case.draft, cons_seqs,
+                    0, rstart, rend, true, false, VARIANT_SOURCE_INFERENCE, probs, symbol_set,
+                    symbol_lookup, at::Tensor{}, depth, 0.0f, 0.0f, 0.0f, 0.0f));
+        }
+
+        const std::vector<Variant> result = normalize_variants_vs_haplotypes(
+                test_case.draft, test_case.draft, cons_seqs, positions_major, positions_minor,
+                symbol_set, variants, false, probs, symbol_lookup, true, true, at::Tensor{}, depth,
+                0.0f, 0.0f, 0.0f, 0.0f);
+
+        CATCH_REQUIRE(std::size(result) == 1);
+        CATCH_CHECK(result.front().format.at("DP") == test_case.expected_dp);
+        CATCH_CHECK(result.front().format.at("MIN_DP") == test_case.expected_min_dp);
+    }
 }
 
 }  // namespace dorado::secondary::tests

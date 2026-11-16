@@ -9,6 +9,7 @@
 #include <algorithm>
 #include <array>
 #include <cstdint>
+#include <span>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -342,7 +343,6 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         float pass_min_qual = 3.0f;
         bool ambig_ref = false;
         bool return_all = false;
-        bool normalize = false;
         bool merge_overlapping = false;
         bool merge_adjacent = false;
         std::vector<Variant> expected;
@@ -358,17 +358,17 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
     auto [test_case] = GENERATE_REF(table<TestCase>({
         TestCase{
             "Empty test",
-            "", {}, {}, {}, 3.0f, false, false, false, false, false, {}, false,
+            "", {}, {}, {}, 3.0f, false, false, false, false, {}, false,
         },
 
         TestCase{
             "No variants, one haplotype.",
-            "ACTG", {"ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false, {}, false,
+            "ACTG", {"ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, {}, false,
         },
 
         TestCase{
             "Return all reference positions (gVCF), one haplotype emits haploid reference genotype.",
-            "AC", {"AC"}, {0, 1}, {0, 0}, 3.0f, false, true, true, false, false,
+            "AC", {"AC"}, {0, 1}, {0, 0}, 3.0f, false, true, false, false,
             {
                 Variant{0, 0, "A", {"<*>"}, {Filters::NonVariant}, {{"END", "2"}}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 0, 2},
             },
@@ -377,7 +377,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Return all reference positions (gVCF), diploid non-ACGT reference bases emit missing genotype.",
-            "ANCT", {"A*CT", "A*CT"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, true, true, false, false,
+            "ANCT", {"A*CT", "A*CT"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, true, false, false,
             {
                 Variant{0, 0, "A", {"<*>"}, {Filters::NonVariant}, {{"END", "1"}}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"LEN", "1"}, {"MIN_DP", "10"}}, 0, 1},
                 Variant{0, 1, "N", {"<*>"}, {Filters::NonVariant}, {{"END", "2"}}, -1.0f, {source_inference, {"GT", "./."}, {"GQ", "."}, {"LEN", "1"}, {"MIN_DP", "10"}}, 1, 2},
@@ -388,12 +388,12 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "No variants, three haplotype.",
-            "ACTG", {"ACTG", "ACTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false, {}, false,
+            "ACTG", {"ACTG", "ACTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, {}, false,
         },
 
         TestCase{
-            "One variant, one haplotype. No normalization.",
-            "ACTG", {"AGTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
+            "One variant, one haplotype.",
+            "ACTG", {"AGTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 1, 2},
             },
@@ -401,8 +401,8 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "One variant, two haplotype. No normalization. The genotype information and the alleles are always normalized so they are valid, however.",
-            "ACTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
+            "One variant, two haplotype. The genotype information and the alleles are always normalized so they are valid, however.",
+            "ACTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0,100"}, {"AQ", "60,60"}}, 1, 2},
             },
@@ -410,8 +410,8 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Two variants, two haplotypes. No normalization.",
-            "ACATG", {"AGATG", "ACAAG"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, false, false, false, false,
+            "Two variants, two haplotypes.",
+            "ACATG", {"AGATG", "ACAAG"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 1, "C", {"G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0,100"}, {"AQ", "60,60"}}, 1, 2},
                 Variant{0, 3, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0,100"}, {"AQ", "60,60"}}, 3, 4},
@@ -420,8 +420,8 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Multi-base SNP variant, two haplotypes. No normalization.",
-            "ACTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
+            "Multi-base SNP variant, two haplotypes.",
+            "ACTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 1, "CT", {"CA", "GT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,100,200,100,0,200"}, {"AQ", "0,60,60"}}, 1, 3},
             },
@@ -431,7 +431,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Normalization. One SNP variant, one haplotype. No effect, SNPs cannot be normalized.",
-            "AAAA", {"ACAA"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, true, false, false,
+            "AAAA", {"ACAA"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 1, "A", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 1, 2},
             },
@@ -440,25 +440,17 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Normalization. One deletion variant, one haplotype.",
-            "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, true, false, false,
+            "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 0, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 0, 3},
             },
             false,
         },
 
-        TestCase{
-            "No normalization. One deletion variant, one haplotype. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
-            "CAAA", {"CA*A"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
-            {
-                Variant{0, 2, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 2, 3},
-            },
-            false,
-        },
 
         TestCase{
             "Normalization. One deletion variant at position 0, one haplotype. Deletion is the first event, cannot left-extend. Extend to the right with one reference base instead.",
-            "ATAC", {"*TAC"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, true, false, false,
+            "ATAC", {"*TAC"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 0, "AT", {"T"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 0, 2},
             },
@@ -466,17 +458,18 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Normalization. Single reference base which is deleted in the alt. Cannot be represented in the VCF, so puts a '.' in the ALT field.",
-            "A", {"*"}, {0}, {0}, 3.0f, false, false, true, false, false,
+            "Normalization. Single reference base which is deleted in the alt.",
+            "A", {"*"}, {0}, {0}, 3.0f, false, false, false, false,
             {
-                Variant{0, 0, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 1},
+                // Variant{0, 0, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 1},
+                Variant{0, 0, "A", {""}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 0, 1},
             },
             false,
         },
 
         TestCase{
             "Return all reference positions (gVCF), skipping positions covered by variants.",
-            "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, true, true, false, false,
+            "ACTGA", {"ACAGA"}, {0, 1, 2, 3, 4}, {0, 0, 0, 0, 0}, 3.0f, false, true, false, false,
             {
                 Variant{0, 0, "A", {"<*>"}, {Filters::NonVariant}, {{"END", "2"}}, 60.0f, {source_inference, {"GT", "0"}, {"GQ", "60"}, {"LEN", "2"}, {"MIN_DP", "10"}}, 0, 2},
                 Variant{0, 2, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0"}, {"AQ", "0,60"}}, 2, 3},
@@ -486,8 +479,8 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Prepending with a reference base because the entire variant is in an insertion.",
-            "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, 3.0f, false, false, true, false, false,
+            "Variant entirely in an insertion is constructed without an anchor, and normalization prepends the reference base.",
+            "ACT***GCT", {"ACTAAAGCT"}, {0, 1, 2, 2, 2, 2, 3, 4, 5}, {0, 0, 0, 1, 2, 3, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 2, "T", {"TAAA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "300,0"}, {"AQ", "0,60"}}, 2, 6},
             },
@@ -495,37 +488,37 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         },
 
         TestCase{
-            "Edge case. SNPs follow a long stretch of minor positions, making a large variant region. The rstart moved left 1bp because a base was prepended.",
+            "Edge case. SNPs follow a long stretch of minor positions, making a large variant region. The variant is constructed from the first column of the region (no base is prepended).",
              "CCTAG***********TATTATT",
             {"CCTAG*********TT*CTTATT"
             },
             {0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 7, 8, 9, 10, 11},
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
-                Variant{0, 6, "A", {"TC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "195,0"}, {"AQ", "0,60"}}, 4, 18},
+                Variant{0, 6, "A", {"TC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "195,0"}, {"AQ", "0,60"}}, 5, 18},
             },
             false,
         },
 
         TestCase{
-            "Edge case, diploid. Normalize, merge overlapping and merge adjacent. SNPs follow a long stretch of minor positions, making a large variant region. The rstart moved left 1bp because a base was prepended.",
+            "Edge case, diploid. Normalize, merge overlapping and merge adjacent. SNPs follow a long stretch of minor positions, making a large variant region. The variant is constructed from the first column of the region (no base is prepended).",
              "CCTAG************TTATTATT",
             {"CCTAG*********TT**T*TTATT",
              "CCTAG*********T*AT*ATTATT",
             },
             {0, 1, 2, 3, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 4, 5, 6, 7, 8, 9, 10, 11, 12},
             {0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, true, true,
+            3.0f, false, false, true, true,
             {
-                Variant{0, 6, "TA", {"ATA", "TT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,100,200,100,0,197"}, {"AQ", "0,60,60"}}, 4, 20},
+                Variant{0, 6, "TA", {"ATA", "TT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,100,200,100,0,197"}, {"AQ", "0,60,60"}}, 5, 20},
             },
             false,
         },
 
         TestCase{
             "Ambiguous reference not allowed. Single base SNP, not reported because the reference has an N base.",
-            "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
+            "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
             },
             false,
@@ -533,7 +526,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Ambiguous reference IS allowed. Single base SNP is reported even though the reference has an N base.",
-            "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, true, false, false, false, false,
+            "ANTG", {"AGTG", "ACTG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, true, false, false, false,
             {
                 Variant{0, 1, "N", {"C", "G"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,100,100,100,0,100"}, {"AQ", "0,60,60"}}, 1, 2},
             },
@@ -542,7 +535,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Ambiguous reference - variants not allowed. 2-base SNP extends into an N reference region. Only one base should be reported.",
-            "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false, false,
+            "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, false, false, false, false,
             {
                 Variant{0, 2, "T", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "100,0,100"}, {"AQ", "60,60"}}, 2, 3},
             },
@@ -551,7 +544,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
 
         TestCase{
             "Ambiguous reference IS allowed. 2-base SNP extends into an N reference region.",
-            "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, true, false, false, false, false,
+            "ANTG", {"AGTG", "ACAG"}, {0, 1, 2, 3}, {0, 0, 0, 0}, 3.0f, true, false, false, false,
             {
                 Variant{0, 1, "NT", {"CA", "GT"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "300,100,200,200,0,200"}, {"AQ", "0,60,60"}}, 1, 3},
             },
@@ -562,77 +555,6 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         /// Prepending/appending a ref base ///
         /// if any alt is empty.            ///
         ///////////////////////////////////////
-        // No normalization - no prepending or appending.
-        TestCase{
-            "No normalization. Cannot prepend a base before a large deletion.",
-             "AAGCCATTACA",
-            {"A*******ACA",
-             "A*******ACA"},
-            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, false, false, false,
-            {
-                Variant{0, 1, "AGCCATT", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 1, 8},
-            },
-            false,
-        },
-
-        TestCase{
-            "No normalization. Cannot append a base after a large deletion.",
-             "AGCCATTACA",
-            {"*******ACA",
-             "*******ACA"},
-            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, false, false, false,
-            {
-                Variant{0, 0, "AGCCATT", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 7},
-            },
-            false,
-        },
-
-        TestCase{
-            "No normalization, so cannot prepend/append. Ambiguous reference NOT allowed. (Appending case.) N bases flank a large deletion. Cannot prepend a ref base because it is an N and ambig_ref == false.",
-             "ANNNNNAGCCATTACA",
-            {"A************ACA",
-             "A************ACA"},
-            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, false, false, false,
-            {
-                Variant{0, 6, "AGCCATT", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 6, 13},
-            },
-            false,
-        },
-
-        TestCase{
-            "No normalization, so cannot prepend/append. Ambiguous reference IS allowed. With normalization this would be a prepending case (N bases flank a large deletion, but are also themselves deleted; prepends the ref base at position 0).",
-             "ANNNNNAGCCATTACA",
-            {"A************ACA",
-             "A************ACA"},
-            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, true, false, false, false, false,
-            {
-                Variant{0, 1, "NNNNNAGCCATT", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 1, 13},
-            },
-            false,
-        },
-
-        TestCase{
-            "No normalization, so cannot prepend/append. Ambiguous reference IS allowed. With normalization this would be an appending case (N bases are also deleted but at the very front of the region; this would append the base because there is nothing to prepend).",
-             "NNNNNAGCCATTACA",
-            {"************ACA",
-             "************ACA"},
-            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
-            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, true, false, false, false, false,
-            {
-                Variant{0, 0, "NNNNNAGCCATT", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 0, 12},
-            },
-            false,
-        },
-
         // With normalization, prepending/appending should work.
         TestCase{
             "Prepend a base before a large deletion.",
@@ -641,7 +563,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "A*******ACA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 0, "AAGCCATT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,697,0"}, {"AQ", "0,60"}}, 0, 8},
             },
@@ -655,7 +577,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "*******ACA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 0, "AGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,697,0"}, {"AQ", "0,60"}}, 0, 8},
             },
@@ -669,7 +591,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "A************ACA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 6, "AGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,697,0"}, {"AQ", "0,60"}}, 6, 14},
             },
@@ -683,7 +605,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "AA******AA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 1, "NGCCATT", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,597,0"}, {"AQ", "0,60"}}, 1, 8},
             },
@@ -698,7 +620,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "A************ACA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, true, false, true, false, false,
+            3.0f, true, false, false, false,
             {
                 Variant{0, 0, "ANNNNNAGCCATT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,697,0"}, {"AQ", "0,60"}}, 0, 13},
             },
@@ -712,7 +634,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "************ACA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, true, false, true, false, false,
+            3.0f, true, false, false, false,
             {
                 Variant{0, 0, "NNNNNAGCCATTA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,697,0"}, {"AQ", "0,60"}}, 0, 13},
             },
@@ -726,7 +648,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "A*******ACA"},
             {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10},
             {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            80.0f, false, false, true, false, false,
+            80.0f, false, false, false, false,
             {
                 Variant{0, 0, "AAGCCATT", {"A"}, {Filters::LowQual}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "990,697,0"}, {"AQ", "0,60"}}, 0, 8},
             },
@@ -778,22 +700,6 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop.
         //           H2: CACCA           CACC            ACC         CC
         TestCase{
-            "Diploid 1, test 1. No normalization and no filtering of overlapping variants. Report all variants but put dots because empty ALT fields are not allowed in the VCF.",
-             "ACCAAA*AAA",
-            {"ACC*A***AA",
-             "ACC*ACC*A*",
-            },
-            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
-            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, false, false, false,
-            {
-                Variant{0, 3, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 5, 8},          // V2
-                Variant{0, 8, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 9, 10},          // V3
-            },
-            false,
-        },
-        TestCase{
             "Diploid 1, test 2. Using normalization but no filtering of overlapping variants.",
              "ACCAAA*AAA",
             {"ACC*A***AA",
@@ -801,7 +707,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,97,0"}, {"AQ", "0,60"}}, 2, 4},             // V1
                 Variant{0, 4, "AAA", {"A", "ACC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "395,200,200,195,0,195"}, {"AQ", "0,60,60"}}, 4, 8},     // V2
@@ -817,9 +723,57 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, true, true,
+            3.0f, false, false, true, true,
             {
                 Variant{0, 4, "AAAA", {"A", "CC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "689,395,197,294,0,195"}, {"AQ", "0,60,60"}}, 2, 10},
+            },
+            false,
+        },
+
+        // Merging adjacent variants fails because the merged ref contains an ambiguous base and ambig_ref is false.
+        // The original variants must be kept instead of being dropped.
+        TestCase{
+            "Two adjacent deletions separated by an ambiguous ref base. No merging.",
+             "AGTNCGNAAA",
+            {"A**A**AAAA",
+             "A**A**AAAA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, false, false,
+            {
+                Variant{0, 0, "AGT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 0, 3},
+                Variant{0, 3, "NCG", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 3, 6},
+            },
+            false,
+        },
+        TestCase{
+            "Two adjacent deletions separated by an ambiguous ref base. Merging fails (ambig_ref = false), so the original variants are kept.",
+             "AGTNCGNAAA",
+            {"A**A**AAAA",
+             "A**A**AAAA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, true, true,
+            {
+                Variant{0, 0, "AGT", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 0, 3},
+                Variant{0, 3, "NCG", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 3, 6},
+            },
+            false,
+        },
+
+        // The first two adjacent variants have no ambiguous bases and should be merged. The third one is
+        // anchored on an ambiguous base, so it must not be merged into the group, but it must be kept.
+        TestCase{
+            "Three adjacent deletions, the third one anchored on an ambiguous ref base. The first two are merged, the third is kept.",
+             "AGTCCGNTTNAA",
+            {"A**C**A**AAA",
+             "A**C**A**AAA"},
+            {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11},
+            {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+            3.0f, false, false, true, true,
+            {
+                Variant{0, 1, "GTCCG", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "800,397,0"}, {"AQ", "0,60"}}, 0, 6},
+                Variant{0, 6, "NTT", {"N"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "400,197,0"}, {"AQ", "0,60"}}, 6, 9},
             },
             false,
         },
@@ -850,22 +804,6 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  AA      =>  A       Stop. No left trim because H1 would be empty.
         //           H2: CAACA           CAAC            AAC         AC
         TestCase{
-            "Diploid 2, test 1. No normalization and no filtering of overlapping variants. Report all variants but put dots because empty ALT fields are not allowed in the VCF.",
-             "ACCAAA*AAA",
-            {"ACC*A***AA",
-             "ACC*AAC*A*",
-            },
-            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
-            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, false, false, false,
-            {
-                Variant{0, 3, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 3, 4},           // V1
-                Variant{0, 5, "AA", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 5, 8},          // V2
-                Variant{0, 8, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 9, 10},          // V3
-            },
-            false,
-        },
-        TestCase{
             "Diploid 2, test 2. Using normalization but no filtering of overlapping variants. Similar to Diploid 1 tests, "
             "but position 5 does not have a SNP. That means that there could be more trimming at the front of the variant "
             "during normalization, but normalization stops because it hits the previous variant.",
@@ -875,7 +813,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,97,0"}, {"AQ", "0,60"}}, 2, 4},             // V1
                 Variant{0, 4, "AAA", {"A", "AAC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "295,100,200,195,0,195"}, {"AQ", "0,60,60"}}, 4, 8},     // V2
@@ -891,7 +829,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, true, true,
+            3.0f, false, false, true, true,
             {
                 Variant{0, 4, "AAAA", {"A", "AC"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "589,295,100,294,0,194"}, {"AQ", "0,60,60"}}, 2, 10},
             },
@@ -942,22 +880,6 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
         //           H1: CAAA        =>  CAA         =>  CA          =>  CA          =>  C           Stop. No left trim because H1 would be empty.
         //           H2: CAAAA           CAAA            CAA             CAA             CAA
         TestCase{
-            "Diploid 3, test 1. No normalization and no filtering of overlapping variants. Report all variants, but put dots because empty ALT fields are not allowed in the VCF.",
-             "ACCAAA*AAA",
-            {"ACC*A***AA",
-             "ACC*AAA*A*",
-            },
-            {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
-            {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, false, false, false,
-            {
-                Variant{0, 3, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 3, 4},       // V1
-                Variant{0, 5, "AA", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 5, 8},      // V2
-                Variant{0, 8, "A", {"."}, {Filters::NonVariant}, {}, 60.0f, {source_inference, {"GT", "0/0"}, {"GQ", "60"}, {"MIN_DP", "10"}}, 9, 10},      // V3
-            },
-            false,
-        },
-        TestCase{
             "Diploid 3, test 2. Using normalization but no filtering of overlapping variants. "
             "Triggers the case where left-extend would step into a previous variant.",
              "ACCAAA*AAA",
@@ -966,7 +888,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, false, false,
+            3.0f, false, false, false, false,
             {
                 Variant{0, 2, "CA", {"C"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "200,97,0"}, {"AQ", "0,60"}}, 2, 4},     // V1
                 Variant{0, 4, "AAA", {"A"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "195,0,200"}, {"AQ", "60,60"}}, 4, 8},    // V2
@@ -982,7 +904,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, false, true,
+            3.0f, false, false, false, true,
             {
                 Variant{0, 2, "CAAA", {"C", "CA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "489,195,94,288,0,94"}, {"AQ", "0,60,60"}}, 2, 10},
             },
@@ -996,7 +918,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
             },
             {0, 1, 2, 3, 4, 5, 5, 6, 7, 8},
             {0, 0, 0, 0, 0, 0, 1, 0, 0, 0},
-            3.0f, false, false, true, true, true,
+            3.0f, false, false, true, true,
             {
                 Variant{0, 2, "CAAA", {"C", "CA"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "1/2"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "489,195,94,288,0,94"}, {"AQ", "0,60,60"}}, 2, 10},
             },
@@ -1013,7 +935,7 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
              "T*****TCCCATT*****AGCAATCACCGCCAATTTCTAATTTCATCAATATTTCTATCACCTCAAAATAA"},
             {0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 6, 7, 7, 7, 7, 7, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60},
             {0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 1, 2, 3, 4, 5, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
-            3.0f, false, false, true, true, true,
+            3.0f, false, false, true, true,
             {
                 Variant{0, 0, "TTCCCATT", {"T"}, {Filters::Pass}, {}, 60.0f, {source_inference, {"GT", "0/1"}, {"GQ", "60"}, {"VQ", "60.00"}, {"DP", "10"}, {"PL", "671,0,700"}, {"AQ", "60,60"}}, 0, 18},
             },
@@ -1060,16 +982,21 @@ CATCH_TEST_CASE("decode_variants", TEST_GROUP) {
     if (test_case.expect_throw) {
         CATCH_CHECK_THROWS(general_decode_variants(
                 decoder, vc_sample, draft, test_case.pass_min_qual, 0.0f, 0.0f, 0.0f,
-                test_case.ambig_ref, test_case.return_all, test_case.normalize,
-                test_case.merge_overlapping, test_case.merge_adjacent,
-                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS));
+                test_case.ambig_ref, test_case.merge_overlapping, test_case.merge_adjacent));
 
     } else {
-        const std::vector<Variant> result = general_decode_variants(
+        std::vector<Variant> result = general_decode_variants(
                 decoder, vc_sample, draft, test_case.pass_min_qual, 0.0f, 0.0f, 0.0f,
-                test_case.ambig_ref, test_case.return_all, test_case.normalize,
-                test_case.merge_overlapping, test_case.merge_adjacent,
-                secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                test_case.ambig_ref, test_case.merge_overlapping, test_case.merge_adjacent);
+
+        // Add the gVCF reference records for all non-variant positions.
+        if (test_case.return_all) {
+            const std::vector<Variant> ref_records =
+                    make_gvcf_reference_records(decoder, std::span{&vc_sample, 1}, draft, result,
+                                                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+            result.insert(std::end(result), std::begin(ref_records), std::end(ref_records));
+            std::sort(std::begin(result), std::end(result));
+        }
 
         CATCH_CHECK(test_case.expected == result);
     }
@@ -1122,8 +1049,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
 
     const auto decode = [&](const VariantCallingSample& sample, const std::string_view ref) {
         return general_decode_variants(decoder, sample, ref, 10.0f, 0.0f, 0.0f, 0.0f, false, false,
-                                       false, false, false,
-                                       DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                                       false);
     };
 
     CATCH_SECTION("counts matching ref and alt allele") {
@@ -1187,8 +1113,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
         };
 
         const std::vector<Variant> result = general_decode_variants(
-                decoder, sample, "ACGA", 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, sample, "ACGA", 0.0f, 0.0f, 0.0f, 0.0f, false, true, false);
 
         CATCH_REQUIRE(std::size(result) == 1);
         CATCH_CHECK(std::cbegin(result)->ref == "C");
@@ -1218,8 +1143,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
                                           make_basecalls({"AA--GA", "AA---A", "A---GA"})};
 
         const std::vector<Variant> result = general_decode_variants(
-                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, true, false);
 
         CATCH_REQUIRE(std::size(result) == 1);
         CATCH_CHECK(std::cbegin(result)->ref == "ACC");
@@ -1243,8 +1167,7 @@ CATCH_TEST_CASE("decode_variants adds AD from basecalls", TEST_GROUP) {
                 make_basecalls({"AA--GA", "AAT--A", "AA--GA", "AAT-GA", "AATG-A"})};
 
         const std::vector<Variant> result = general_decode_variants(
-                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                decoder, sample, "AACCGA", 0.0f, 0.0f, 0.0f, 0.0f, false, true, false);
 
         CATCH_REQUIRE(std::size(result) == 1);
         CATCH_CHECK(std::cbegin(result)->ref == "ACC");
@@ -1302,15 +1225,44 @@ CATCH_TEST_CASE("join_samples joins a long insertion split between multiple samp
 
     std::vector<Variant> result;
     for (const VariantCallingSample& sample : joined) {
-        std::vector<Variant> variants = general_decode_variants(
-                decoder, sample, draft, 0.0f, 0.0f, 0.0f, 0.0f, false, false, true, true, false,
-                DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+        std::vector<Variant> variants = general_decode_variants(decoder, sample, draft, 0.0f, 0.0f,
+                                                                0.0f, 0.0f, false, true, false);
         result.insert(std::end(result), std::begin(variants), std::end(variants));
     }
     CATCH_REQUIRE(std::size(result) == 1);
     CATCH_CHECK(result.front().pos == 2);
     CATCH_CHECK(result.front().ref == "G");
     CATCH_CHECK(result.front().alts == std::vector<std::string>{"GACGTTGCAAC"});
+}
+
+CATCH_TEST_CASE("decode_variants with a sample starting on an insertion column", TEST_GROUP) {
+    /**
+     * \brief The sample starts on an insertion column after the reference position 2, so position 2
+     *          has no reference column in the sample. The insertion is anchored on the draft base
+     *          of position 2, which must also be the reference base used by normalization.
+     */
+    const DecoderBase decoder(LabelSchemeType::HAPLOID);
+    const std::string symbols = decoder.get_label_scheme_symbols();
+    const std::string_view draft{"ACGTACGTAC"};
+
+    const VariantCallingSample sample{
+            0,
+            {2, 3, 4, 5, 6},
+            {1, 0, 0, 0, 0},
+            make_haploid_probs(symbols, "ATACG", 0.99f),
+            at::full({5}, 10, at::kInt),
+            {},
+            {},
+            at::Tensor{},
+    };
+
+    const std::vector<Variant> result = general_decode_variants(decoder, sample, draft, 0.0f, 0.0f,
+                                                                0.0f, 0.0f, false, false, false);
+
+    CATCH_REQUIRE(std::size(result) == 1);
+    CATCH_CHECK(result.front().pos == 2);
+    CATCH_CHECK(result.front().ref == "G");
+    CATCH_CHECK(result.front().alts == std::vector<std::string>{"GA"});
 }
 
 CATCH_TEST_CASE("compute VAF from AD", TEST_GROUP) {

@@ -6,6 +6,7 @@
 #include "secondary/common/region.h"
 #include "secondary/consensus/sample_collate_utils.h"
 #include "secondary/consensus/variant_calling.h"
+#include "secondary/consensus/variant_normalization.h"
 #include "secondary/consensus/window_utils.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/tensor_utils.h"
@@ -1727,8 +1728,7 @@ std::vector<secondary::Variant> call_variants(
                 for (const auto& vc_sample : joined_samples) {
                     std::vector<secondary::Variant> variants = secondary::general_decode_variants(
                             decoder, vc_sample, draft, pass_min_qual, pass_min_gq, pass_min_aq,
-                            pass_min_vq, ambig_ref, gvcf, true, true, true,
-                            secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                            pass_min_vq, ambig_ref, true, true);
 
                     for (auto& v : variants) {
                         v.format.try_emplace(secondary::FORMAT_TAG_VARIANT_SOURCE,
@@ -1740,6 +1740,35 @@ std::vector<secondary::Variant> call_variants(
                     results[group_id].insert(std::end(results[group_id]),
                                              std::make_move_iterator(std::begin(variants)),
                                              std::make_move_iterator(std::end(variants)));
+                }
+
+                // Normalization fallback for non-valid variants (e.g. with empty alts), and a
+                // sanity check filter. Same as in Smallvar.
+                if (!std::empty(joined_samples)) {
+                    const at::Tensor& logits = joined_samples.front().logits;
+                    const int32_t ploidy =
+                            (logits.dim() == 2) ? 1 : static_cast<int32_t>(logits.size(1));
+
+                    std::stable_sort(std::begin(results[group_id]), std::end(results[group_id]));
+
+                    secondary::renormalize_non_valid_variants(results[group_id], draft, ambig_ref,
+                                                              ploidy);
+
+                    secondary::remove_non_valid_variants(results[group_id]);
+
+                    // Reference records are created only after the final normalization and
+                    // filtering, so that they do not block the normalization.
+                    if (gvcf) {
+                        std::vector<secondary::Variant> ref_records =
+                                secondary::make_gvcf_reference_records(
+                                        decoder, joined_samples, draft, results[group_id],
+                                        secondary::DEFAULT_GVCF_REFERENCE_BLOCK_GQ_MARGINS);
+                        results[group_id].insert(std::end(results[group_id]),
+                                                 std::make_move_iterator(std::begin(ref_records)),
+                                                 std::make_move_iterator(std::end(ref_records)));
+                        std::stable_sort(std::begin(results[group_id]),
+                                         std::end(results[group_id]));
+                    }
                 }
             } catch (const std::exception& e) {
                 std::ostringstream oss;

@@ -841,8 +841,7 @@ CATCH_TEST_CASE("worker_sample_producer preserves simple pass variants when enco
     worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
                            worker_terminate, ret_status, bam_regions, draft_lens, draft_seqs,
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
-                           bam_window.seq_length, 0, 10, false, 2, 30.0f, false, false, 0, 0, 0.0f,
-                           0);
+                           bam_window.seq_length, 0, 10, false, 30.0f, false, false, 0, 0, 0.0f, 0);
 
     ////////////////////////////////////////
     /// Eval.                            ///
@@ -966,7 +965,7 @@ CATCH_TEST_CASE("worker_sample_producer ignores simple variants outside a window
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
                            /*window_len=*/100, /*window_overlap=*/40,
                            /*variant_flanking_bases=*/10, /*continue_on_exception=*/false,
-                           /*ploidy=*/2, /*pass_min_qual=*/30.0f,
+                           /*pass_min_qual=*/30.0f,
                            /*tiled_regions=*/false, /*tiled_ext_flanks=*/false,
                            /*tiled_ext_major=*/0, /*tiled_ext_min_cov=*/0,
                            /*tiled_ext_cov_fract=*/0.0f, /*min_depth=*/0);
@@ -1043,7 +1042,7 @@ CATCH_TEST_CASE("worker_sample_producer defers overlapping simple variants to in
                                worker_terminate, ret_status, {{bam_window}}, {{"chr1", 10}},
                                std::vector<std::string>(1),
                                secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1, 10, 0,
-                               10, false, 2, pass_min_qual, false, false, 0, 0, 0.0f, 0);
+                               10, false, pass_min_qual, false, false, 0, 0, 0.0f, 0);
 
         CATCH_CHECK_FALSE(ret_status.exception_thrown);
         return chrom_reduce_data[0].variants_simple;
@@ -1154,7 +1153,7 @@ CATCH_TEST_CASE("worker_sample_producer sends the full span of candidate variant
                                worker_terminate, ret_status, {{bam_window}}, {{"chr1", SEQ_LEN}},
                                std::vector<std::string>(1),
                                secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1, 10, 5,
-                               3, false, 2, 30.0f, tiled_regions, false, 0, 0, 0.0f, 0);
+                               3, false, 30.0f, tiled_regions, false, 0, 0, 0.0f, 0);
         output_queue.terminate(utils::AsyncQueueTerminateFast::No);
 
         CATCH_CHECK_FALSE(ret_status.exception_thrown);
@@ -1244,8 +1243,7 @@ CATCH_TEST_CASE("worker_sample_producer rejects bam windows with seq_id outside 
     worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
                            worker_terminate, ret_status, bam_regions, draft_lens, draft_seqs,
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
-                           bam_window.seq_length, 0, 10, false, 2, 30.0f, false, false, 0, 0, 0.0f,
-                           0);
+                           bam_window.seq_length, 0, 10, false, 30.0f, false, false, 0, 0, 0.0f, 0);
 
     ////////////////////////////////////////
     /// Eval.                            ///
@@ -1331,8 +1329,7 @@ CATCH_TEST_CASE("worker_sample_producer rejects negative remaining_bam_regions",
     worker_sample_producer(input_queue, output_queue, chrom_reduce_data, resources, stats,
                            worker_terminate, ret_status, bam_regions, draft_lens, draft_seqs,
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt, 1,
-                           bam_window.seq_length, 0, 10, false, 2, 30.0f, false, false, 0, 0, 0.0f,
-                           0);
+                           bam_window.seq_length, 0, 10, false, 30.0f, false, false, 0, 0, 0.0f, 0);
 
     ////////////////////////////////////////
     /// Eval.                            ///
@@ -1417,7 +1414,7 @@ CATCH_TEST_CASE("worker_sample_producer handles migrated haplotagging with real 
                            secondary::VariantCandidateSource::COMPUTE, std::nullopt,
                            /*num_threads=*/2, /*window_len=*/1000, /*window_overlap=*/0,
                            /*variant_flanking_bases=*/50, /*continue_on_exception=*/false,
-                           /*ploidy=*/2, /*pass_min_qual=*/3.0f, /*tiled_regions=*/false,
+                           /*pass_min_qual=*/3.0f, /*tiled_regions=*/false,
                            /*tiled_ext_flanks=*/false, /*tiled_ext_major=*/0,
                            /*tiled_ext_min_cov=*/0, /*tiled_ext_cov_fract=*/0.0f,
                            /*min_depth=*/0);
@@ -3186,6 +3183,82 @@ CATCH_TEST_CASE("trim_partial_insertion_edges returns one interval per sample, i
 
 CATCH_TEST_CASE("trim_partial_insertion_edges of no samples returns no intervals", TEST_GROUP) {
     CATCH_CHECK(std::empty(trim_partial_insertion_edges({})));
+}
+
+CATCH_TEST_CASE("worker_variant_calling_reduce does not output variants with empty alts",
+                TEST_GROUP) {
+    /**
+     * \brief The entire reference is deleted in both haplotypes, so the decoded variant has an
+     *          empty ALT which cannot be padded by normalization (no flanking reference bases).
+     *          general_decode_variants does not remove such variants, so the reducer has to either
+     *          convert them into reference records or remove them before output.
+     */
+    const auto temp_dir = make_temp_dir("variant_reduce_empty_alts");
+    const auto reference_fasta = temp_dir.m_path / "reference.fa";
+
+    {
+        std::ofstream ref_out(reference_fasta);
+        ref_out << ">chr1\nACG\n";
+    }
+
+    const secondary::DecoderBase decoder(secondary::LabelSchemeType::DIPLOID);
+    secondary::VariantCallingSample vc_sample{
+            .seq_id = 0,
+            .positions_major = {0, 1, 2},
+            .positions_minor = {0, 0, 0},
+            .logits = make_polyploid_probs(decoder.get_label_scheme_symbols(), {"***", "***"},
+                                           {0.999f, 0.999f}),
+            .depth = at::full({3}, 10, at::kInt),
+    };
+
+    std::vector<ChromosomeReduceData> chrom_reduce_data(1);
+    {
+        ChromosomeReduceData& data = chrom_reduce_data[0];
+        data.seq_id = 0;
+        data.seq_name = "chr1";
+        data.seq_len = 3;
+        data.progress_target = 6;
+        data.ready = true;
+        data.num_samples = 1;
+    }
+
+    std::vector<std::unique_ptr<hts_io::FastxRandomReader>> fastx_readers;
+    fastx_readers.emplace_back(std::make_unique<hts_io::FastxRandomReader>(reference_fasta));
+
+    const std::vector<std::pair<std::string, int64_t>> draft_lens{
+            {"chr1", 3},
+    };
+
+    utils::AsyncQueue<secondary::VariantCallingSample> input_queue{2};
+    utils::AsyncQueue<int64_t> output_queue{2};
+    const auto push_result = input_queue.try_push(std::move(vc_sample));
+    CATCH_REQUIRE(push_result == utils::AsyncQueueStatus::Success);
+    input_queue.terminate(utils::AsyncQueueTerminateFast::No);
+
+    std::atomic<bool> worker_terminate{false};
+    secondary::WorkerReturnStatus ret_status;
+
+    secondary::Stats stats;
+    stats.set("processed", 0.0);
+
+    // No flank trimming, so that the entire sample is decoded.
+    worker_variant_calling_reduce(input_queue, output_queue, chrom_reduce_data, worker_terminate,
+                                  ret_status, stats, fastx_readers, false, 1, draft_lens, decoder,
+                                  {}, 3.0f, 0.0f, 0.0f, 0.0f, false, false, 2, 0,
+                                  secondary::VariantCandidateSource::COMPUTE);
+
+    CATCH_REQUIRE_FALSE(ret_status.exception_thrown);
+    CATCH_REQUIRE_FALSE(worker_terminate.load());
+
+    // Sanity check that the input actually produced the problematic variant.
+    CATCH_REQUIRE(std::size(chrom_reduce_data[0].variants_inference) == 1);
+    CATCH_REQUIRE(secondary::has_empty_alts(chrom_reduce_data[0].variants_inference.front()));
+
+    for (const secondary::Variant& var : chrom_reduce_data[0].variants_merged) {
+        CATCH_INFO("var = " << secondary::to_string(var));
+        CATCH_CHECK_FALSE(secondary::has_empty_alts(var));
+        CATCH_CHECK((secondary::is_reference_record(var) || secondary::is_valid(var)));
+    }
 }
 
 }  // namespace dorado::smallvar::tests
