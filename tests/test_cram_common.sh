@@ -29,12 +29,12 @@ TEST_DATA_DIR=${TEST_DIR}/data
 DORADO_BIN=$(cd "$(dirname ${IN_DORADO_BIN})"; pwd -P)/$(basename ${IN_DORADO_BIN})
 
 # Output directory. Either user specified or generated.
-OUTPUT_DIR=$(cd "${OUT_DIR}"; pwd -P)
 if [[ "${OUT_DIR}" == "" ]]; then
     output_dir_name=${fallback_output_dir}_${RANDOM}
     OUTPUT_DIR=${TEST_DIR}/${output_dir_name}
+else
+    OUTPUT_DIR=$(cd "${OUT_DIR}"; pwd -P)
 fi
-
 mkdir -p ${OUTPUT_DIR}
 
 # Download the Cram package.
