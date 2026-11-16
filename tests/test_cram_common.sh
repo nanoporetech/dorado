@@ -38,13 +38,9 @@ fi
 mkdir -p ${OUTPUT_DIR}
 
 # Download the Cram package.
-pushd ${OUTPUT_DIR}
-    if [ ! -d cram-0.6 ]; then
-        curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
-        tar -xzf cram-0.6.tar.gz
-    fi
-    CRAM=$(pwd)/cram-0.6/cram.py
-popd
+python3 -m venv "${TEST_DIR}"/.cram_venv
+source "${TEST_DIR}"/.cram_venv/*/activate
+pip install "cram==0.6"
 
 # Once the calling script has setup/cached what it needs it should call this to run the tests.
 function run_cram_tests() {
@@ -62,8 +58,7 @@ function run_cram_tests() {
     export TEST_DATA_DIR
     export TEST_DIR
     export OUTPUT_DIR
-    python3 \
-        ${CRAM} \
+    cram \
         --verbose \
         --shell=${TEST_DIR}/cram/cram_shell_wrapper.sh \
         ${tests_to_run[@]}
