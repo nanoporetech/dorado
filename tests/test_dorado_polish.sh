@@ -20,8 +20,12 @@ do
   fi
 done
 
+# Grab the tests.
+test_cases=(  $(ls "${TEST_DIR}"/cram/polish/cram-polish-??-*.t    | sort) )
+test_cases+=( $(ls "${TEST_DIR}"/cram/polish/cram-polish-models*.t | sort) )
+
 # Run the tests.
 export MODEL_ROOT_DIR=${OUTPUT_DIR}
 export POLISH_MODEL=${MODEL_ROOT_DIR}/${POLISH_MODEL_NAME}
 export SMALLVAR_MODEL=${MODEL_ROOT_DIR}/${SMALLVAR_MODEL_NAME}
-run_cram_tests "polish"
+run_cram_tests "${test_cases[@]}"

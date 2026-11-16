@@ -21,8 +21,12 @@ do
   fi
 done
 
+# Grab the tests.
+test_cases=(  $(ls "${TEST_DIR}"/cram/variant/cram-variant-??-*.t    | sort) )
+test_cases+=( $(ls "${TEST_DIR}"/cram/variant/cram-variant-models*.t | sort) )
+
 # Run the tests.
 export MODEL_ROOT_DIR=${OUTPUT_DIR}
 export POLISH_MODEL=${MODEL_ROOT_DIR}/${POLISH_MODEL_NAME}
 export SMALLVAR_MODEL_v600=${MODEL_ROOT_DIR}/${SMALLVAR_MODEL_NAME_v600}
-run_cram_tests "variant"
+run_cram_tests "${test_cases[@]}"
