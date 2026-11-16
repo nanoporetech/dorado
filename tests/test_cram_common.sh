@@ -47,7 +47,7 @@ function run_cram_tests() {
     cram_test_folder=$1
 
     # Shard the tests.
-    tests_to_run=( $(ls ${TEST_DIR}/cram/${cram_test_folder}/*.t) )
+    tests_to_run=( $(ls ${TEST_DIR}/cram/${cram_test_folder}/*.t | sort) )
     if [[ -n $SHARD_COUNT ]] && [[ -n $SHARD_IDX ]]; then
         shard_size=$(( ( ${#tests_to_run[@]} + ${SHARD_COUNT} - 1) / ${SHARD_COUNT} ))
         shard_start=$(( ${shard_size} * ${SHARD_IDX} ))
