@@ -65,11 +65,15 @@ KoiActivation get_koi_activation(config::Activation act) {
 TensorLayout get_koi_lstm_input_layout(const int layer_size,
                                        const int inner_dim,
                                        const config::Activation activation) {
+    const bool cutlass_lstm = koi_can_use_cutlass();
+    const bool quantised_lstm = koi_can_use_quantised_lstm();
     TensorLayout layout = TensorLayout::CUBLAS_TN2C;
-    if (koi_can_use_quantised_lstm() && (layer_size == 96 || layer_size == 128)) {
+    if (cutlass_lstm && (layer_size == 96)) {
+        layout = TensorLayout::CUTLASS_TNC_F16;
+    } else if (quantised_lstm && ((layer_size == 96) || (layer_size == 128))) {
         layout = TensorLayout::NTC;
-    } else if (koi_can_use_cutlass() && layer_size <= 1024 && layer_size > 128 &&
-               (layer_size % 128) == 0) {
+    } else if (cutlass_lstm && (layer_size <= 1024) && (layer_size > 128) &&
+               ((layer_size % 128) == 0)) {
         layout = (activation == config::Activation::TANH) ? TensorLayout::CUTLASS_TNC_I8
                                                           : TensorLayout::CUTLASS_TNC_F16;
     }
@@ -89,7 +93,7 @@ TensorLayout get_koi_lstm_input_layout(const int layer_size,
 
     const bool flstm = (inner_dim > 0);
     if (flstm) {  // cannot be overriden
-        if (koi_can_use_cutlass() && ((layer_size % 128) == 0)) {
+        if (cutlass_lstm && ((layer_size % 128) == 0)) {
             if (koi_can_run_flstm() && (layer_size == 1024) && (inner_dim == 128)) {
                 layout = TensorLayout::CUTLASS_TNC_I8;
             } else {
