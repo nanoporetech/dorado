@@ -1,62 +1,26 @@
 #!/bin/bash
-
+#
 # Integration tests for Dorado Correct.
+#
 
-set -ex
-set -o pipefail
-
-if [[ $# -lt 1 ]]; then
-    echo "Usage: $0 <dorado executable> [<out_dir>]"
-    exit 1
-fi
-
-if [[ $# -eq 2 ]]; then
-    mkdir -p $2
-fi
-
-# CLI options.
-IN_DORADO_BIN="$1"
-OUT_DIR="$2"
-
-TEST_DIR=$(cd "$(dirname $0)"; pwd -P)
-TEST_DATA_DIR=${TEST_DIR}/data
-DORADO_BIN=$(cd "$(dirname ${IN_DORADO_BIN})"; pwd -P)/$(basename ${IN_DORADO_BIN})
-
-# Output directory. Either user specified or generated.
-output_dir=$(cd "${OUT_DIR}"; pwd -P)
-if [[ "${OUT_DIR}" == "" ]]; then
-    output_dir_name=test_output_correct_cram_${RANDOM}
-    output_dir=${TEST_DIR}/${output_dir_name}
-fi
-
-mkdir -p ${output_dir}
-
-# Download the Cram package.
-pushd ${output_dir}
-if [ ! -d cram-0.6 ]; then
-    curl -o cram-0.6.tar.gz https://bitheap.org/cram/cram-0.6.tar.gz
-    tar -xzf cram-0.6.tar.gz
-fi
-CRAM=$(pwd)/cram-0.6/cram.py
-popd
-
-MODEL_ROOT_DIR=${output_dir}
+# Common setup.
+fallback_output_dir="test_output_correct_cram"
+source "$(dirname $0)/test_cram_common.sh"
 
 # Download the model once.
 MODEL_NAME="herro-v1.1"
-MODEL_DIR=${MODEL_ROOT_DIR}/${MODEL_NAME}
+MODEL_DIR=${OUTPUT_DIR}/${MODEL_NAME}
 if [[ ! -d "${MODEL_DIR}" ]]; then
-    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${MODEL_ROOT_DIR}
+    ${DORADO_BIN} download --model "${MODEL_NAME}" --models-directory ${OUTPUT_DIR}
 fi
 
-export DORADO_BIN
-export TEST_DATA_DIR
+# Grab the tests.
+test_cases=(  $(ls "${TEST_DIR}"/cram/correct/cram-correct-blocks-??.t     | sort) )
+test_cases+=( $(ls "${TEST_DIR}"/cram/correct/cram-correct-index-size-??.t | sort) )
+test_cases+=( $(ls "${TEST_DIR}"/cram/correct/cram-correct-resume-??.t     | sort) )
+
+# Run the tests.
 export MODEL_DIR
 export MODEL_NAME
-export MODEL_ROOT_DIR
-export OUTPUT_DIR=${output_dir}
-python3 \
-    ${CRAM} \
-    --verbose \
-    --shell=${TEST_DIR}/cram/cram_shell_wrapper.sh \
-   ${TEST_DIR}/cram/correct/*.t
+export MODEL_ROOT_DIR=${OUTPUT_DIR}
+run_cram_tests "${test_cases[@]}"
