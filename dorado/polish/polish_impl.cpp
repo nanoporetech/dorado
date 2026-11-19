@@ -1282,7 +1282,6 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 std::atomic<bool>& worker_terminate,
                                 secondary::WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
-                                const secondary::FeatureColumnMap& feature_column_map,
                                 const int32_t num_threads,
                                 const int32_t min_depth,
                                 const bool collect_vc_data,
@@ -1489,8 +1488,7 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 .depth = item.samples[i].depth.clone(),
                                 .read_ids_left = std::move(item.samples[i].read_ids_left),
                                 .read_ids_right = std::move(item.samples[i].read_ids_right),
-                                .basecalls = item.samples[i].select_feature_channel(
-                                        secondary::FeatureColumns::BASE, feature_column_map),
+                                .basecalls = {},
                         });
                     }
                 }

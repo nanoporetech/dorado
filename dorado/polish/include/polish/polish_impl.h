@@ -18,7 +18,6 @@
 #include "secondary/consensus/variant_calling_sample.h"
 #include "secondary/features/decoder_factory.h"
 #include "secondary/features/encoder_factory.h"
-#include "secondary/features/feature_columns.h"
 #include "secondary/features/kadayashi_options.h"
 #include "secondary/kadayashi/local_haplotagging.h"
 #include "utils/AsyncQueue.h"
@@ -103,7 +102,6 @@ void decode_samples_in_parallel(std::vector<std::vector<secondary::ConsensusResu
                                 std::atomic<bool>& worker_terminate,
                                 secondary::WorkerReturnStatus& ret_status,
                                 const secondary::DecoderBase& decoder,
-                                const secondary::FeatureColumnMap& feature_column_map,
                                 int32_t num_threads,
                                 int32_t min_depth,
                                 bool collect_vc_data,
