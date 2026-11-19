@@ -72,6 +72,12 @@ VariantCallingSample slice_vc_sample_in_ref_coords(const VariantCallingSample& v
  * \param vc_samples Input variant calling samples. Should be sorted by the start position
  *                   (positions_major[0]). The samples are consumed while constructing the result.
  * \return A new vector of VariantCallingSample where any adjacent samples from the input are merged into a single sample.
+ *          The positions, logits and depth are merged, each into a single newly allocated tensor. If every sample in
+ *          a merged group has `basecalls`, these are merged too, with rows lined up by read ID and padded once,
+ *          and the read IDs are the left IDs of the first and the right IDs of the last sample. If none of the samples
+ *          have `basecalls`, the `basecalls` and read IDs of the merged sample are empty. Samples with no adjacent
+ *          neighbor are returned unchanged.
+ * \throws std::runtime_error if only some of the samples in a group of adjacent samples have `basecalls`.
  */
 std::vector<VariantCallingSample> merge_vc_samples(std::vector<VariantCallingSample> vc_samples);
 
