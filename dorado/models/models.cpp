@@ -1952,8 +1952,7 @@ const std::array models_read_level{
                 "54d89ec9b3808c7b72118e630cf7e3b0222cc8b93e052936db3adf811a2cd917",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::POLISH,
-                ModelVariantPair{ModelVariant::HAC,
-                                 VV::v6_0_0},  // TODO: Change to v6_1_0 when available!
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
                 ModsVariantPair{},
         },
         ModelInfo{
@@ -1961,8 +1960,7 @@ const std::array models_read_level{
                 "3e13f050cb649568c65a61a565633ff2d7bdee96939015fccfb5cde41fc036bd",
                 CC::DNA_R10_4_1_E8_2_400BPS_5KHZ,
                 ModelType::POLISH,
-                ModelVariantPair{ModelVariant::HAC,
-                                 VV::v6_0_0},  // TODO: Change to v6_1_0 when available!
+                ModelVariantPair{ModelVariant::HAC, VV::v6_1_0},
                 ModsVariantPair{},
         },
 };
