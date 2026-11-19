@@ -431,6 +431,7 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
         for (int64_t i = 0; i < std::ssize(in);) {
             int64_t group_start = in[i].pos;
             int64_t group_end = variant_end(in[i]);
+            int64_t group_rstart = in[i].rstart;
             int64_t group_rend = in[i].rend;
 
             bool prev_is_ambig = has_disallowed_ambig_ref(in[i].rstart, in[i].rend);
@@ -454,6 +455,7 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
 
                 group_start = std::min(group_start, in[j].pos);
                 group_end = std::max(group_end, variant_end(in[j]));
+                group_rstart = std::min(group_rstart, in[j].rstart);
                 group_rend = std::max(group_rend, in[j].rend);
             }
 
@@ -462,13 +464,16 @@ std::vector<Variant> normalize_variants_vs_haplotypes(
                 out.emplace_back(std::move(in[i]));
 
             } else {
-                const int64_t new_rstart =
-                        utils::find_column_to_insert(positions_major, group_start);
+                // The start column is the column of the group start, or an earlier one if a variant
+                // of the group begins on an insertion column: such a variant has its pos after the
+                // anchor base, so the column of its pos is on the major column which follows the
+                // insertion columns, and starting there would drop the leading insertion from the
+                // merged alleles. The end column covers the furthest reach of all variants in the
+                // group.
+                const int64_t new_rstart = std::min(
+                        group_rstart, utils::find_column_to_insert(positions_major, group_start));
                 const int64_t new_rend = std::max(
                         group_rend, utils::find_column_to_insert(positions_major, group_end));
-
-                // Variants begin on reference positions, so the start column is the column of the
-                // group start. The end column covers the furthest reach of all variants in the group.
                 Variant var = construct_merged_variant(new_rstart, new_rend, in[i]);
 
                 // Empty alleles are kept, because they are padded by the normalization which follows.
