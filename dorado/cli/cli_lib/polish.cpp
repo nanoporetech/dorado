@@ -18,7 +18,6 @@
 #include "secondary/common/variant.h"
 #include "secondary/common/vcf_writer.h"
 #include "secondary/consensus/window_utils.h"
-#include "secondary/features/feature_columns.h"
 #include "torch_utils/gpu_profiling.h"
 #include "torch_utils/torch_utils.h"
 #include "utils/AsyncQueue.h"
@@ -1031,15 +1030,10 @@ void run_polishing(const Options& opt,
                         utils::jthread([&all_results_cons, &vc_input_data, &decode_queue, &stats,
                                         &resources, &opt, &worker_terminate, &wrs_decoder] {
                             utils::set_thread_name("polish_decode");
-                            const secondary::FeatureColumnMap feature_column_map =
-                                    (!std::empty(resources.encoders))
-                                            ? resources.encoders.front()->get_feature_column_map()
-                                            : secondary::FeatureColumnMap{};
                             polisher::decode_samples_in_parallel(
                                     all_results_cons, vc_input_data, decode_queue, stats,
-                                    worker_terminate, wrs_decoder, *resources.decoder,
-                                    feature_column_map, opt.threads, opt.min_depth,
-                                    opt.run_variant_calling, opt.continue_on_error);
+                                    worker_terminate, wrs_decoder, *resources.decoder, opt.threads,
+                                    opt.min_depth, opt.run_variant_calling, opt.continue_on_error);
                         });
 
                 // Run the inference worker on the main thread.
