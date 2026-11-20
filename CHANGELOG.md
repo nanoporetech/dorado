@@ -20,7 +20,6 @@ This version of Dorado includes a new v6.1 basecalling model for DNA and a new b
 * 138b1638018b6a76720c2cfe0c266fbe53741fb2 - Align QUAL and GQ definitions with VCF spec, add VQ field and reset default filtering options for Dorado `smallvar` and `polish`.
 * f079e93d17deb6781916f2878ca4706535b31f8c - Add AQ (allele quality) to VCF FORMAT fields.
 * 745a5860ce4442b02797f5669889cc701b321558 - Break gVCF reference blocks on hemizygous region boundaries in Dorado `smallvar`.
-* d3d5258fd6bad7a68c4935623d70e1585d4a82a7 - Reduce system memory usage of Dorado `smallvar`.
 * aacbcc94d8d58a53f7272a940791c609abbbeef2 - Fix Dorado `smallvar` calling some variants in  regions where there are no aligned reads.
 * 458cdfc626a212ddc53fa974300efb02ced4fc1c - Fix duplicate variants appearing in output of Dorado `smallvar`.
 * f0c317018306df11a5cd2e809f015fa7b8e01f80 - Fix instances of overlapping variants in Dorado `smallvar`.
