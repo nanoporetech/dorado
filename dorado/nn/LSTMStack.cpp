@@ -44,7 +44,10 @@ void LSTMStackImpl::reserve_working_memory(WorkingMemory &wm) {
         wm.temp({wm.N * wm.T, 4 * layer_size}, torch::kF16);
         wm.next_is_current();
     } else if (wm.layout == TensorLayout::CUTLASS_TNC_F16) {
-        wm.next_NTC(-1, wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
+        const bool f16_acc = utils::get_dev_opt<bool>("koi_lstm_f16_acc", wm.C == 96);
+        if (!f16_acc) {
+            wm.next_NTC(-1, wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
+        }
     } else if (wm.layout == TensorLayout::CUBLAS_TN2C) {
         wm.temp({wm.N, 4 * layer_size}, torch::kF16);
         wm.next_is_current();
@@ -149,6 +152,8 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *cons
     auto opts_f16 = wm.current.options().dtype(torch::kF16);
     auto opts_i32 = opts_f16.dtype(torch::kI32);
 
+    const bool f16_acc = utils::get_dev_opt<bool>("koi_lstm_f16_acc", wm.C == 96);
+
     for (size_t layer_idx = 0; layer_idx < rnns.size(); ++layer_idx) {
         utils::ScopedProfileRange spr_lstm("lstm_layer", 3);
         bool reverse = reverse_first ? !(layer_idx & 1) : (layer_idx & 1);
@@ -204,7 +209,7 @@ void LSTMStackImpl::forward_cutlass(WorkingMemory &wm, const AuxiliaryData *cons
                           state_buf.data_ptr(), workspace_buf.data_ptr(), encoding, interleave,
                           flags);
 
-        if (type_id == KOI_F16) {
+        if ((type_id == KOI_F16) && !f16_acc) {
             utils::ScopedProfileRange spr_convert("f16_to_int8", 4);
             auto out = wm.next_NTC(-1, wm.T, wm.C, TensorLayout::CUTLASS_TNC_I8);
             host_convert(stream, in.data_ptr(), int(in.stride(0)), int(in.stride(1)),
