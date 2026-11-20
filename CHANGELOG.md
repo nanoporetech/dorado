@@ -6,8 +6,6 @@ All notable changes to Dorado will be documented in this file.
 
 This version of Dorado includes a new v6.1 basecalling model for DNA and a new bacterial polishing model, which together deliver improved basecalling of bacterial isolates with atypical modifications. It also includes new general polishing models. The release also includes new modification calling models for direct RNA which deliver reduced false positive rates in specific contexts whilst maintaining the same true positive rates as before on gold-standard benchmarking strands. This version also brings changes to VCF output from Dorado `smallvar` and `polish` to better align with the VCF specification and to provide richer information about variant calls, as well as other usability and performance improvements.
 
-* TODO - cublas/cutlass chunk-order determinism fix.
-* TODO - final smallvar changes.
 * 4f8f13a6676623ebca0fe56453369fcca0caf9d8 - Add dna_r10.4.1_e8.2_400bps_hac@v6.1.0 basecall model plus 4mC_5mC, 5mC_5hmC, 5mCG_5hmCG and 6mA mod models.  Added dna_r10.4.1_e8.2_400bps_hac@v6.1.0_smallvar@v1.0 smallvar model (note that this model has identical weights to the previous smallvar model).
 * 1c7572b69cf43da3067ef9964645feb581a87f15 - Add rna004_sup@v6.0.0_m5C_2OmeC@v2, rna004_sup@v6.0.0_inosine_m6A_2OmeA@v2, rna004_sup@v6.0.0_pseU_2OmeU@v2 modbase models.
 * e4c706494026746b63bf0f9d0001cd43ea05e3ad - Add dna_r10.4.1_e8.2_400bps_hac@v6.1.0_polish_rl@v1.0 and dna_r10.4.1_e8.2_400bps_hac@v6.1.0_polish_rl_mv@v1.0 models, rename dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0 to dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v1.0 and add dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0.
@@ -28,6 +26,7 @@ This version of Dorado includes a new v6.1 basecalling model for DNA and a new b
 * f0c317018306df11a5cd2e809f015fa7b8e01f80 - Fix instances of overlapping variants in Dorado `smallvar`.
 * eb654a589e35a8e5eb978bddd79eb18e74b2f49a - Fix occurrences of non-gVCF reference-matching variants alts in Dorado `smallvar`.
 * 27aea5bf17241fb55e87f4d8e2d155de40250d2f - Implement normalisation of simple variants in Dorado `smallvar`.
+* 93841c73538ad6096e134a9a7aaaf701eca4ad87 - Fix issues with normalisation of variants in Dorado `smallvar`.
 * 14f33421b678bf476aa770b1e9047330215c5d8e - Fix a windowing issue when a candidate variant covers multiple reference bases (e.g. a long deletion).
 * 4acba9d578b0539c3782c78bc5ffc7f8099a8128 - Sort the VCF output by chromosome in Dorado `smallvar`.
 * 360c4c821d8a83106317665587c1b38f66f87e4d - Set SAMPLE name from command line argument --sample-name or LB tag from BAM RG lines, in VCF files.
@@ -43,6 +42,7 @@ This version of Dorado includes a new v6.1 basecalling model for DNA and a new b
 * df2bee47fc9e844ee8123b62642e3b7b0fbea6e2 - Reduced system memory usage when running FLSTM (HAC v6.0.0) models.
 * 9e95e2b4f6ce2aa51ddb1d0ef5c8b36075604934 - Fix possible GPU out of memory errors when running Fast RNA models.
 * 8d3d847328d2781dd6baa581319c0ca2f8379a8d - Fix possible GPU out of memory errors when running HAC + modbase models.
+* fe23c3cc34a7724ef4adc341a02ae4865f7f726a - Fix minor non-determinism when running Fast basecalling models, where chunk order in a batch could slightly change results.
 * e1d09b2238c4e8d8a9dfbaf7c491b3ed3cb31018 - Improve CPU utilisation of Dorado `demux`.
 * b553a5d754e23c0504cb542ab04f76238497ad5f - Performance improvements to edlib, speeding up barcode demux.
 * 37436985496bdd9dbe757ac0731c5b1282d65798 - Improve efficiency of file system operations in Dorado `demux`.
