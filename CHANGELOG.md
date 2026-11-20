@@ -2,6 +2,58 @@
 
 All notable changes to Dorado will be documented in this file.
 
+# [2.2.0] (23 November 2026)
+
+This version of Dorado includes a new v6.1 basecalling model for DNA and a new bacterial polishing model, which together deliver improved basecalling of bacterial isolates with atypical modifications. It also includes new general polishing models. The release also includes new modification calling models for direct RNA which deliver reduced false positive rates in specific contexts whilst maintaining the same true positive rates as before on gold-standard benchmarking strands. This version also brings changes to VCF output from Dorado `smallvar` and `polish` to better align with the VCF specification and to provide richer information about variant calls, as well as other usability and performance improvements.
+
+* 4f8f13a6676623ebca0fe56453369fcca0caf9d8 - Add dna_r10.4.1_e8.2_400bps_hac@v6.1.0 basecall model plus 4mC_5mC, 5mC_5hmC, 5mCG_5hmCG and 6mA mod models.  Added dna_r10.4.1_e8.2_400bps_hac@v6.1.0_smallvar@v1.0 smallvar model (note that this model has identical weights to the previous smallvar model).
+* 1c7572b69cf43da3067ef9964645feb581a87f15 - Add rna004_sup@v6.0.0_m5C_2OmeC@v2, rna004_sup@v6.0.0_inosine_m6A_2OmeA@v2, rna004_sup@v6.0.0_pseU_2OmeU@v2 modbase models.
+* e4c706494026746b63bf0f9d0001cd43ea05e3ad - Add dna_r10.4.1_e8.2_400bps_hac@v6.1.0_polish_rl@v1.0 and dna_r10.4.1_e8.2_400bps_hac@v6.1.0_polish_rl_mv@v1.0 models, rename dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation_v5.0.0 to dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v1.0 and add dna_r10.4.1_e8.2_400bps_polish_bacterial_methylation@v2.0.
+* 0827bb8717a2dbb8605b8c3434d36e25eb9c9108 - Added output of read depth in the FORMAT:DP vcf tag.
+* 8425d4e705019e98152e9b52b315f25cc08d33b9 - Changed hemizygous het variant handling from deletion to filtering in Dorado `smallvar`.
+* 72a55065387c203d26020ee542dff58fa52c6bd6 - Fix variant co-ordinate off-by-one error.
+* 0089ae9776da000150fc300dded1117b706c8d8e - In Dorado `smallvar`, add a FORMAT field tag SRC which marks where the variant was generated.
+* 4d51a447c556eb6f811cb18e8411c1e2a790487e - Dorado `smallvar` and `polish` now record the command line to the VCF header.
+* fb2e0497acb0ea36660de9f0c52fa0cf850cf4d6 - Add per-allele depth in the FORMAT:AD vcf field.
+* c2d7bdcc92d2bda541e7b4005fe1ef372f607821 - Add PL field to the VCF FORMAT output.
+* a8aedb93f1334f23f1eaaf379e71f627c8a26f6e - Add VAF (variant allele fraction) to VCF FORMAT fields, derived from the AD and DP/MIN_DP FORMAT entries.
+* 138b1638018b6a76720c2cfe0c266fbe53741fb2 - Align QUAL and GQ definitions with VCF spec, add VQ field and reset default filtering options for Dorado `smallvar` and `polish`.
+* f079e93d17deb6781916f2878ca4706535b31f8c - Add AQ (allele quality) to VCF FORMAT fields.
+* 745a5860ce4442b02797f5669889cc701b321558 - Break gVCF reference blocks on hemizygous region boundaries in Dorado `smallvar`.
+* aacbcc94d8d58a53f7272a940791c609abbbeef2 - Fix Dorado `smallvar` calling some variants in  regions where there are no aligned reads.
+* 458cdfc626a212ddc53fa974300efb02ced4fc1c - Fix duplicate variants appearing in output of Dorado `smallvar`.
+* f0c317018306df11a5cd2e809f015fa7b8e01f80 - Fix instances of overlapping variants in Dorado `smallvar`.
+* eb654a589e35a8e5eb978bddd79eb18e74b2f49a - Fix occurrences of non-gVCF reference-matching variants alts in Dorado `smallvar`.
+* 27aea5bf17241fb55e87f4d8e2d155de40250d2f - Implement normalisation of simple variants in Dorado `smallvar`.
+* 93841c73538ad6096e134a9a7aaaf701eca4ad87 - Fix issues with normalisation of variants in Dorado `smallvar`.
+* 14f33421b678bf476aa770b1e9047330215c5d8e - Fix a windowing issue when a candidate variant covers multiple reference bases (e.g. a long deletion).
+* 4acba9d578b0539c3782c78bc5ffc7f8099a8128 - Sort the VCF output by chromosome in Dorado `smallvar`.
+* 360c4c821d8a83106317665587c1b38f66f87e4d - Set SAMPLE name from command line argument --sample-name or LB tag from BAM RG lines, in VCF files.
+* 664895fda4a3aa7083f56c07815e4772e2fbbbee - Compress and index VCF output if writing to output directory from Dorado `polish` or `smallvar`.
+* 67c0e1d79e7758fd2efc94a122af5ee6b90388b6 - Improve CPU utilisation of Dorado `polish` when running in CPU mode.
+* de511bb10fa978bfc4504fa52b07a1db57349732 - Fix hang due to race condition in Dorado `correct`.
+* bdba192aa4110d11da4b66daa6c6bd3060fd64ff - Removed blank default argument from `--bed-file` and `--reference` command line arguments.
+* 74df0197b2cfc06394e56fb187e9c6377963ffd3 - Add command line arguments to PG CL tag emitted by Dorado `aligner`.
+* 6f167c53bc5589163da028a5bdd847d5ab8b8326 - Use uncompressed BAM for temporary file writes in Dorado `aligner` to improve performance.
+* e8933b3869a48cafc355f6559485c99cbd72e40b - Add support for -u option to --mm2-opts.
+* 4d3e734d7c2d058755fe26b8b32930aad0135efe - Dorado `download` now respects the `DORADO_MODELS_DIRECTORY` environment variable.
+* c1b358f77dc07f45d7c69a6ae280ca8a51d5925f - Fix RG ID field to be compliant with the ont-output-specifications.
+* df2bee47fc9e844ee8123b62642e3b7b0fbea6e2 - Reduced system memory usage when running FLSTM (HAC v6.0.0) models.
+* 9e95e2b4f6ce2aa51ddb1d0ef5c8b36075604934 - Fix possible GPU out of memory errors when running Fast RNA models.
+* 8d3d847328d2781dd6baa581319c0ca2f8379a8d - Fix possible GPU out of memory errors when running HAC + modbase models.
+* fe23c3cc34a7724ef4adc341a02ae4865f7f726a - Fix minor non-determinism when running Fast basecalling models, where chunk order in a batch could slightly change results.
+* e1d09b2238c4e8d8a9dfbaf7c491b3ed3cb31018 - Improve CPU utilisation of Dorado `demux`.
+* b553a5d754e23c0504cb542ab04f76238497ad5f - Performance improvements to edlib, speeding up barcode demux.
+* 37436985496bdd9dbe757ac0731c5b1282d65798 - Improve efficiency of file system operations in Dorado `demux`.
+* c2a155383376ce88c238d001499bb2ebab2a3446 - Prevent reading of non-primary alignments when running Dorado `demux` with FASTQ output.
+* 640f8afee8819a108e5147e5a6a7aa5c562ee84f - Improve CPU efficiency of basecalling with variable chunk sizes enabled.
+* b0434f1bd0c5ec998ca4a8942c37430af50e72ca - Improve performance of Poly(A) detection.
+* 770481394030ee438dcfec17b9d0d0f1aee69d9a - AVX2 optimisations for Windows builds.
+* bbc1536031464ef14004ba4025f0af27c5563b34 - Fix empty LB tag emission if sample_id is absent.
+* 3605923630052bb30e60733248b47143d1b47796 - Updated to POD5 0.3.49
+* a0a2f0c5fb5acb62db29eb7e124d36654c6efc77 - Updated htslib to 1.24.
+
+
 # [1.3.4] (3 September 2026)
 
 This release of Dorado adds a bug fix backport to the 1.3.x release.
