@@ -1,0 +1,23 @@
+##fileformat=VCFv4.2
+##FILTER=<ID=PASS,Description="All filters passed">
+##FILTER=<ID=LowQual,Description="Variant QUAL is below threshold">
+##FILTER=<ID=.,Description="Non-variant position">
+##FILTER=<ID=LowGQ,Description="Variant GQ is below threshold">
+##FILTER=<ID=LowAQ,Description="Variant AQ is below threshold">
+##FILTER=<ID=LowVQ,Description="Variant VQ is below threshold">
+##contig=<ID=chr20,length=2000>
+##dorado_version=0.0.0+e4c706494+dirty
+##cmdline=polish aln.bam ref.fasta -x cpu --models-directory /media/groups/machine_learning/active/dorado/models/ -o out --vcf --bam-subchunk 1000 --any-bam
+##FORMAT=<ID=GT,Number=1,Type=String,Description="Genotype">
+##FORMAT=<ID=GQ,Number=1,Type=Integer,Description="Genotype quality score">
+##FORMAT=<ID=DP,Number=1,Type=Integer,Description="Read depth">
+##FORMAT=<ID=MIN_DP,Number=1,Type=Integer,Description="Minimum read depth">
+##FORMAT=<ID=SRC,Number=1,Type=String,Description="Source of the variant">
+##FORMAT=<ID=AD,Number=R,Type=Integer,Description="Allele read depth">
+##FORMAT=<ID=VAF,Number=A,Type=Float,Description="Variant allele fraction">
+##FORMAT=<ID=PL,Number=G,Type=Integer,Description="Phred-scaled genotype likelihood">
+##FORMAT=<ID=AQ,Number=R,Type=Integer,Description="Phred-scaled allele quality score">
+##FORMAT=<ID=VQ,Number=1,Type=Float,Description="Phred-scaled total variant quality score">
+#CHROM	POS	ID	REF	ALT	QUAL	FILTER	INFO	FORMAT	HG002
+chr20	14	.	T	TA	19.453	PASS	.	GT:GQ:DP:SRC:PL:AQ:VQ	1:19:13:I:19,0:0,19:19.36
+chr20	425	.	CT	C	6.925	PASS	.	GT:GQ:DP:SRC:PL:AQ:VQ	1:7:16:I:6,0:1,7:6.62
